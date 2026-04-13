@@ -1,0 +1,3 @@
+/target/
+**/*.wasm
+!lineos/m0/assets/wasm/.gitkeep

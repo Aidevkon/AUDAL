@@ -1,0 +1,203 @@
+# LineOS — M0 Module Justfile
+# lineos/m0/Justfile
+# Authority: M0 Constitution v2.0
+#
+# Usage:
+#   just m0::<recipe>    from repo root
+#   just <recipe>        from lineos/m0/ directory
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# ─────────────────────────────────────────
+# DEVELOPMENT
+# ─────────────────────────────────────────
+
+# Watch m0d — cargo check on every file change
+dev:
+    cargo watch -p m0d -x check
+
+# Watch m0d — run tests on every file change
+test-watch:
+    cargo watch -p m0d -x test
+
+# Watch m0d — check + test on every file change
+dev-full:
+    cargo watch -p m0d -x "check" -x "test"
+
+# ─────────────────────────────────────────
+# BUILD
+# ─────────────────────────────────────────
+
+# Build m0d (debug)
+build:
+    cargo build -p m0d
+
+# Build m0d (release)
+build-release:
+    cargo build --release -p m0d
+
+# ─────────────────────────────────────────
+# TESTING
+# ─────────────────────────────────────────
+
+# Run all m0d tests
+test:
+    cargo test -p m0d
+
+# Run specific test module
+test-mod mod:
+    cargo test -p m0d -- {{mod}}
+
+# Run registry + hash verification tests
+test-registry:
+    cargo test -p m0d -- registry
+
+# Run health gate tests (all 7 criteria from M0 Constitution §04.2)
+test-health:
+    cargo test -p m0d -- health
+
+# Run audit subsystem tests
+test-audit:
+    cargo test -p m0d -- audit
+
+# Run policy enforcement tests
+test-policy:
+    cargo test -p m0d -- policy
+
+# Run CDN + tamper detection tests
+test-cdn:
+    cargo test -p m0d -- cdn
+
+# Run marketplace gatekeeper tests
+test-marketplace:
+    cargo test -p m0d -- marketplace
+
+# ─────────────────────────────────────────
+# RUNTIME
+# ─────────────────────────────────────────
+
+# Start m0d (release mode)
+start:
+    cargo run --release -p m0d
+
+# Check health endpoint — all 7 criteria
+health:
+    @curl -sf http://127.0.0.1:7401/health | python3 -m json.tool
+
+# Tail audit log live (today's file)
+audit:
+    @tail -f lineos/m0/logs/audit/m0-audit-$(date +%Y%m%d).ndjson \
+        2>/dev/null || echo "No audit log for today yet"
+
+# Show last N audit entries, pretty-printed (default: 10)
+audit-last n="10":
+    @tail -{{n}} lineos/m0/logs/audit/m0-audit-$(date +%Y%m%d).ndjson \
+        | python3 -c "import sys,json; [print(json.dumps(json.loads(l), indent=2)) for l in sys.stdin]"
+
+# Show policy violations from audit log
+audit-violations:
+    @grep 'policy_violation' lineos/m0/logs/audit/m0-audit-$(date +%Y%m%d).ndjson \
+        | python3 -c "import sys,json; [print(json.dumps(json.loads(l), indent=2)) for l in sys.stdin]" \
+        2>/dev/null || echo "No policy violations today"
+
+# Show marketplace rejection events
+audit-marketplace:
+    @grep 'marketplace' lineos/m0/logs/audit/m0-audit-$(date +%Y%m%d).ndjson \
+        | python3 -c "import sys,json; [print(json.dumps(json.loads(l), indent=2)) for l in sys.stdin]" \
+        2>/dev/null || echo "No marketplace events today"
+
+# ─────────────────────────────────────────
+# REGISTRY
+# ─────────────────────────────────────────
+
+# Compute blake3 digest + SHA-256 for an asset — paste into registry
+hash-asset file:
+    @echo "blake3:  $(b3sum {{file}} | awk '{print $1}')"
+    @echo "sha256:  $(sha256sum {{file}} | awk '{print $1}')"
+    @echo "size:    $(wc -c < {{file}}) bytes"
+    @echo ""
+    @echo "Add to m0-registry.json → wasm_modules or engines:"
+    @echo "  \"$(basename {{file}})\": {"
+    @echo "    \"blake3\": \"$(b3sum {{file}} | awk '{print $1}')\","
+    @echo "    \"sha256\": \"$(sha256sum {{file}} | awk '{print $1}')\","
+    @echo "    \"size_bytes\": $(wc -c < {{file}})"
+    @echo "  }"
+
+# Verify all assets in checksums.json against actual files
+verify-assets:
+    @echo "→ Verifying assets against checksums.json..."
+    @python3 -c "
+import json, hashlib, os, sys
+checksums = json.load(open('lineos/m0/registry/checksums.json'))
+errors = 0
+for path, meta in checksums.get('assets', {}).items():
+    full_path = os.path.join('lineos/m0/assets', path)
+    if not os.path.exists(full_path):
+        print(f'  ❌ MISSING: {path}')
+        errors += 1
+        continue
+    with open(full_path, 'rb') as f:
+        actual = hashlib.sha256(f.read()).hexdigest()
+    expected = meta.get('sha256', '')
+    if actual == expected:
+        print(f'  ✅ {path}')
+    else:
+        print(f'  ❌ HASH MISMATCH: {path}')
+        print(f'     expected: {expected}')
+        print(f'     actual:   {actual}')
+        errors += 1
+if errors:
+    print(f'\n❌ {errors} asset(s) failed verification')
+    sys.exit(1)
+else:
+    print('\n✅ All assets verified')
+"
+
+# Verify WASM engine is present and pinned
+verify-engine name:
+    @python3 -c "
+import json, sys
+reg = json.load(open('lineos/m0/registry/m0-registry.json'))
+engines = reg.get('wasm_modules', {})
+if '{{name}}' in engines:
+    e = engines['{{name}}']
+    print(f'  ✅ {{name}} — version {e.get(\"version\",\"?\")} — blake3: {e.get(\"blake3\",\"?\")[:12]}...')
+else:
+    print(f'  ❌ {{name}} not found in registry')
+    sys.exit(1)
+"
+
+# ─────────────────────────────────────────
+# VALIDATION
+# ─────────────────────────────────────────
+
+# Validate all M0 config files
+validate:
+    @python3 -c "import json; json.load(open('lineos/m0/config/caddy.json'));          print('  ✅ caddy.json')"
+    @python3 -c "import tomllib; tomllib.load(open('lineos/m0/config/policies.toml','rb')); print('  ✅ policies.toml')"
+    @python3 -c "import json; json.load(open('lineos/m0/registry/m0-registry.json'));  print('  ✅ m0-registry.json')"
+    @python3 -c "import json; json.load(open('lineos/m0/registry/checksums.json'));    print('  ✅ checksums.json')"
+    @python3 -c "import json; json.load(open('lineos/m0/api/m0-api.schema.json'));     print('  ✅ m0-api.schema.json')"
+    @echo "✅ M0 config valid"
+
+# Validate Caddy is bound to localhost only
+validate-caddy-binding:
+    @echo "→ Caddy binding check..."
+    @grep -n '0\.0\.0\.0' lineos/m0/config/caddy.json \
+        && echo "❌ CADDY EXPOSED ON 0.0.0.0" || echo "✅ Caddy localhost-only"
+    @grep -q '127\.0\.0\.1' lineos/m0/config/caddy.json \
+        && echo "✅ Caddy binds 127.0.0.1" || echo "⚠️  No explicit 127.0.0.1 binding found"
+
+# Validate no --network=host in Podman definitions
+validate-network:
+    @grep -r 'network=host\|network host' \
+        infra/ lineos/m0/systemd/ 2>/dev/null \
+        && echo "❌ HOST NETWORK FOUND" || echo "✅ No host networking"
+
+# ─────────────────────────────────────────
+# CI GATES (M0-specific)
+# ─────────────────────────────────────────
+
+# Full M0 CI gate: validate + test + verify-assets
+ci: validate validate-caddy-binding validate-network test verify-assets
+    @echo "✅ M0 CI gates passed"

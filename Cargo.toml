@@ -1,0 +1,4 @@
+[workspace]
+resolver = "2"
+members = []
+# Phase 1: lineos/m0/m0-daemon will be added here
