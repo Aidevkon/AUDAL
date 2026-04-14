@@ -3,6 +3,10 @@ resolver = "2"
 members = [
     "lineos/m0/m0-daemon",
     "lineos/m1/sp314-dsp",
+    "lineos/m1/telemetry",
+    "lineos/m1/metadata",
+    "lineos/m1/insights",
 ]
 # Phase 1: m0-daemon added per task P1-001
 # Phase 2: sp314-dsp added per task P2-001
+# Phase 3: telemetry + metadata + insights added per task P3-005

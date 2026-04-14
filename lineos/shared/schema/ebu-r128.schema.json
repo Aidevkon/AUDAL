@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EBU R128 Full Measurement",
+  "description": "Full EBU R128 BS.1770-4 loudness measurement produced by the telemetry service. Reads from Golden Blob only — never re-measures raw audio. Authority: LineOS Constitution v2.0 §07 (comparator rule).",
+  "version": "1.0",
+  "type": "object",
+  "properties": {
+    "integrated_lufs":    { "type": "number", "description": "BS.1770-4 integrated gated loudness (LUFS)" },
+    "true_peak_dbtp":     { "type": "number", "description": "BS.1770-4 true peak (dBTP)" },
+    "loudness_range_lu":  { "type": "number", "description": "EBU R128 LRA — 95th minus 10th percentile of short-term loudness (LU)" },
+    "momentary_lufs":     { "type": "number", "description": "Momentary loudness: last 400ms ungated window" },
+    "short_term_lufs":    { "type": "number", "description": "Short-term loudness: last 3s sliding window" },
+    "stereo_correlation": { "type": "number", "minimum": -1.0, "maximum": 1.0, "description": "Stereo correlation coefficient" },
+    "dynamic_range_db":   { "type": "number", "description": "Peak-to-RMS dynamic range (dB)" },
+    "sample_rate":        { "type": "integer", "description": "Sample rate of the mastered audio" },
+    "channels":           { "type": "integer", "description": "Channel count" },
+    "duration_seconds":   { "type": "number", "description": "Duration of the mastered audio in seconds" }
+  },
+  "required": [
+    "integrated_lufs",
+    "true_peak_dbtp",
+    "loudness_range_lu",
+    "momentary_lufs",
+    "short_term_lufs"
+  ],
+  "additionalProperties": false
+}

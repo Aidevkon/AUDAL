@@ -233,11 +233,14 @@ impl AnalysisAccumulator {
         QualityMetrics {
             integrated_lufs:    self.integrated_lufs,
             true_peak_dbfs:     self.true_peak_dbfs,
-            loudness_range_lu:  0.0,  // Phase 3: EBU R128 Level 2+
+            loudness_range_lu:  0.0,  // Phase 3: filled by lineos-telemetry LRA computation
             bs1770_integrated:  self.integrated_lufs,
             bs1770_true_peak:   self.true_peak_dbfs,
             stereo_correlation: self.stereo_correlation,
             dc_offset:          self.dc_offset,
+            sample_rate:        self.sample_rate,
+            channels:           self.channels,
+            dynamic_range_db:   0.0,  // Phase 3: peak-to-RMS filled by telemetry
         }
     }
 
