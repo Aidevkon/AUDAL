@@ -2,24 +2,28 @@
 //! ZERO hardcoded values in this file. All f32 literals are fallbacks in
 //! `unwrap_or()` only — the primary source is always the schema.
 //! Authority: LineOS Constitution v2.0 §05 · LineOS §12 (BMR-128 rule)
+//! v1.1: Thresholds now carries preset_name + target_lufs for selected preset only.
+//! Rule-engine evaluates against the selected preset; Cockpit owns preset selection.
 
 use sp314_dsp::types::config::Bmr128Schema;
 use serde::{Deserialize, Serialize};
 
-/// All thresholds needed by the 8 core rules.
+/// All thresholds needed by the 6 core rules.
 /// Constructed once at startup from bmr-128.schema.json.
 /// Passed as `&Thresholds` to every rule — no threshold is read inline.
+///
+/// `preset_name` + `target_lufs` represent the Cockpit's selected preset.
+/// `lufs_compliance` evaluates against `target_lufs` only — never against all presets.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Thresholds {
-    // ── Platform LUFS targets (from bmr-128.schema.json presets) ───────────
-    pub spotify_lufs:   f32,
-    pub youtube_lufs:   f32,
-    pub apple_lufs:     f32,
-    pub tidal_lufs:     f32,
-    pub broadcast_lufs: f32,
+    // ── Selected preset (set by Cockpit, loaded from schema) ─────────────────
+    /// Name of the user-selected BMR-128 preset (e.g. "spotify", "broadcast")
+    pub preset_name:  &'static str,
+    /// LUFS target for the selected preset. None = raw preset, lufs_compliance skips.
+    pub target_lufs:  Option<f32>,
 
-    // ── Universal limits (from bmr-128.schema.json) ─────────────────────────
-    /// Absolute true peak ceiling (dBTP) — from spotify preset as reference
+    // ── Universal limits (from bmr-128.schema.json) ───────────────────────────
+    /// Absolute true peak ceiling (dBTP) — from selected preset
     pub true_peak_max:  f32,
     /// LUFS compliance tolerance band (±LU) — symmetric
     pub lufs_tolerance: f32,
@@ -38,32 +42,24 @@ pub struct Thresholds {
 }
 
 impl Thresholds {
-    /// Load from a deserialized Bmr128Schema.
-    /// Any missing preset gracefully falls back to a safe default (documented inline).
-    pub fn from_schema(schema: &Bmr128Schema) -> Self {
-        let lufs = |preset: &str| {
-            schema.presets
-                .get(preset)
-                .and_then(|p| p.target_lufs)
-                .unwrap_or(-14.0)  // safe fallback — not a hardcode, schema is authoritative
-        };
+    /// Load from a deserialized Bmr128Schema for a specific preset.
+    /// `preset` — the key into schema.presets (e.g. "spotify", "broadcast", "raw").
+    /// All values come from the schema; fallbacks are documented.
+    pub fn from_schema_with_preset(schema: &Bmr128Schema, preset: &'static str) -> Self {
+        let entry = schema.presets.get(preset);
 
-        let tp = |preset: &str| {
-            schema.presets
-                .get(preset)
-                .map(|p| p.true_peak_ceiling_dbfs)
-                .unwrap_or(-1.0)   // safe fallback
-        };
+        let target_lufs = entry.and_then(|p| p.target_lufs);
+
+        let true_peak_max = entry
+            .map(|p| p.true_peak_ceiling_dbfs)
+            .unwrap_or(-1.0);   // safe fallback
 
         Self {
-            spotify_lufs:   lufs("spotify"),
-            youtube_lufs:   lufs("youtube"),
-            apple_lufs:     lufs("apple_music"),
-            tidal_lufs:     lufs("tidal"),
-            broadcast_lufs: lufs("broadcast"),
-            true_peak_max:  tp("spotify"),   // all presets share -1.0 dBTP ceiling
-            // These quality thresholds are not in bmr-128.schema.json yet —
-            // they are rule-engine defaults. Phase 5 will add them to the schema.
+            preset_name:  preset,
+            target_lufs,
+            true_peak_max,
+            // Quality thresholds not yet in bmr-128.schema.json — rule-engine defaults.
+            // Phase 5 will migrate these into the schema.
             lufs_tolerance:      0.5,
             dynamic_range_min:   6.0,
             stereo_corr_min:     0.8,
@@ -71,6 +67,11 @@ impl Thresholds {
             dc_offset_max:       0.01,
             lra_max:             14.0,
         }
+    }
+
+    /// Convenience: load for the "spotify" preset (most common default).
+    pub fn from_schema(schema: &Bmr128Schema) -> Self {
+        Self::from_schema_with_preset(schema, "spotify")
     }
 }
 
@@ -104,23 +105,55 @@ mod tests {
     }
 
     #[test]
-    fn test_thresholds_loaded_from_schema() {
+    fn test_thresholds_spotify_loaded_from_schema() {
         let schema = make_schema();
-        let t = Thresholds::from_schema(&schema);
-        assert_eq!(t.spotify_lufs,   -14.0);
-        assert_eq!(t.apple_lufs,     -16.0);
-        assert_eq!(t.broadcast_lufs, -23.0);
-        assert_eq!(t.true_peak_max,  -1.0);
+        let t = Thresholds::from_schema_with_preset(&schema, "spotify");
+        assert_eq!(t.preset_name, "spotify");
+        assert_eq!(t.target_lufs, Some(-14.0));
+        assert_eq!(t.true_peak_max, -1.0);
+    }
+
+    #[test]
+    fn test_thresholds_apple_music_loaded_from_schema() {
+        let schema = make_schema();
+        let t = Thresholds::from_schema_with_preset(&schema, "apple_music");
+        assert_eq!(t.preset_name, "apple_music");
+        assert_eq!(t.target_lufs, Some(-16.0));
+    }
+
+    #[test]
+    fn test_thresholds_broadcast_loaded_from_schema() {
+        let schema = make_schema();
+        let t = Thresholds::from_schema_with_preset(&schema, "broadcast");
+        assert_eq!(t.preset_name, "broadcast");
+        assert_eq!(t.target_lufs, Some(-23.0));
+    }
+
+    #[test]
+    fn test_thresholds_raw_preset_no_lufs_target() {
+        let schema = make_schema();
+        let t = Thresholds::from_schema_with_preset(&schema, "raw");
+        assert_eq!(t.preset_name, "raw");
+        assert_eq!(t.target_lufs, None);
     }
 
     #[test]
     fn test_thresholds_missing_preset_uses_fallback() {
         let schema = Bmr128Schema {
-            presets: BTreeMap::new(), // empty
+            presets: BTreeMap::new(),
             pipeline: make_schema().pipeline,
         };
+        let t = Thresholds::from_schema_with_preset(&schema, "spotify");
+        // Missing preset → None for target_lufs, -1.0 fallback for true_peak_max
+        assert_eq!(t.target_lufs, None);
+        assert_eq!(t.true_peak_max, -1.0);
+    }
+
+    #[test]
+    fn test_from_schema_shorthand_is_spotify() {
+        let schema = make_schema();
         let t = Thresholds::from_schema(&schema);
-        // Should fall back gracefully — not panic
-        assert_eq!(t.spotify_lufs, -14.0);
+        assert_eq!(t.preset_name, "spotify");
+        assert_eq!(t.target_lufs, Some(-14.0));
     }
 }

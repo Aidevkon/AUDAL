@@ -65,8 +65,7 @@ mod tests {
 
     fn thresholds() -> Thresholds {
         Thresholds {
-            spotify_lufs: -14.0, youtube_lufs: -14.0, apple_lufs: -16.0,
-            tidal_lufs: -14.0, broadcast_lufs: -23.0,
+            preset_name: "spotify", target_lufs: Some(-14.0),
             true_peak_max: -1.0, lufs_tolerance: 0.5,
             dynamic_range_min: 6.0, stereo_corr_min: 0.8,
             stereo_corr_warning: 0.5, dc_offset_max: 0.01, lra_max: 14.0,
