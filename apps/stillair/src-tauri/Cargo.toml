@@ -1,0 +1,26 @@
+[package]
+name = "stillair"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Still Air — Creator OS mastering cockpit (Tauri backend)"
+
+[lib]
+name = "stillair_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "stillair"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri        = { version = "2" }
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+tokio        = { version = "1", features = ["full"] }
+reqwest      = { version = "0.12", features = ["json"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs     = "2"
