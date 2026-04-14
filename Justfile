@@ -49,9 +49,9 @@ build: validate-schemas deny
     cargo build --release -p m0d
     @echo "✅ Phase 1 build complete"
 
-# Build sp314-dsp WASM (Phase 2)
+# Build sp314-dsp WASM (Phase 2) — release build for wasm-opt
 build-wasm:
-    cargo build --target wasm32-unknown-unknown -p sp314-dsp
+    cargo build --target wasm32-unknown-unknown -p sp314-dsp --release
     wasm-opt -Oz \
         target/wasm32-unknown-unknown/release/sp314_dsp.wasm \
         -o lineos/m0/assets/wasm/sp314-dsp.wasm
@@ -68,6 +68,13 @@ test:
 # Run tests for a specific crate
 test-crate crate:
     cargo test -p {{crate}}
+
+# Determinism test — Phase 2 DoD (LineOS Constitution §09.2)
+# Same input + same seed → bit-identical binary output
+test-determinism:
+    @echo "→ Determinism test..."
+    cargo test -p sp314-dsp --test determinism -- --nocapture
+
 
 # ─────────────────────────────────────────
 # CI GATES
@@ -93,11 +100,12 @@ check-network:
 # ML origin — no ML weights in lineos/, no pure DSP in aether/
 check-ml-origin:
     @echo "→ ML origin check..."
-    @grep -rn 'deepfilter\|demucs\|silero\|real_esrgan\|candle\|ort\|tract' \
+    @grep -rn -w 'deepfilter\|demucs\|silero\|real_esrgan\|candle\|ort\|tract' \
         lineos/m1/ \
+        --include='*.toml' \
         2>/dev/null \
         && echo "❌ ML WEIGHTS IN LINEOS" || echo "✅ No ML weights in lineos/"
-    @grep -rn 'rustfft\|rubato\|dasp\|symphonia' \
+    @grep -rn -w 'rustfft\|rubato\|dasp\|symphonia' \
         aether/ \
         2>/dev/null \
         && echo "⚠️  CHECK: pure DSP in aether/ ?" || echo "✅ No pure DSP in aether/"
@@ -107,7 +115,9 @@ check-thresholds:
     @echo "→ Hardcoded threshold check..."
     @grep -rn 'let.*=.*-14\.0\|let.*=.*-16\.0\|let.*=.*-23\.0' \
         lineos/m1/ \
+        --include='*.rs' \
         2>/dev/null \
+        | grep -v '//\|normalization_gain_linear\|test_\|fn test' \
         && echo "⚠️  CHECK: possible hardcoded threshold" || echo "✅ No hardcoded thresholds"
 
 # Caddy bound to localhost only

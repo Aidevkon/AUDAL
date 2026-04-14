@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BMR-128 Compliance Schema",
+  "description": "Platform loudness targets and pipeline constants for the sp314-dsp mastering engine. Authority: LineOS Constitution v2.0 §05. Never hardcode these values — always load from this schema.",
+  "version": "1.0",
+  "presets": {
+    "spotify":     { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
+    "youtube":     { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
+    "apple_music": { "target_lufs": -16.0, "true_peak_ceiling_dbfs": -1.0 },
+    "tidal":       { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
+    "broadcast":   { "target_lufs": -23.0, "true_peak_ceiling_dbfs": -1.0 },
+    "raw":         { "target_lufs": null,   "true_peak_ceiling_dbfs": -0.1 }
+  },
+  "pipeline": {
+    "lookahead_ms":        2.0,
+    "lookahead_max":       192,
+    "eq_hpf_freq_hz":      30.0,
+    "eq_air_shelf_hz":     12000.0,
+    "dess_band_low_hz":    6000.0,
+    "dess_band_high_hz":   8000.0,
+    "comp_threshold_dbfs": -18.0,
+    "comp_ratio_default":  2.0,
+    "comp_knee_db":        6.0,
+    "sat_drive_default":   1.3,
+    "ms_side_gain_db":     1.5,
+    "ms_side_hpf_hz":      120.0,
+    "smoothing_ramp_ms":   20.0,
+    "dither_bits_24":      0.00000011920928955078125,
+    "dither_bits_16":      0.000030517578125
+  }
+}

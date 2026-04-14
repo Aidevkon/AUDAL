@@ -1,10 +1,10 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "assets": {
     "sp314-dsp.wasm": {
-      "blake3": "01d9f2eeca5a941e7965c0b9d85799f57898287c7409e44ee0f9f54584a38eac",
-      "sha256": "0f2b2f856e3e2fb171a0411b0c18257cbcaf38127d71f541fc4e8fab59ad8134",
-      "size_bytes": 20
+      "blake3": "c288798b63bcc4058ca5280cac4030245f6a99b4da9b589a8a1aea9297051c0b",
+      "sha256": "312493ff43683165188ee49d0019ef9fb2cf51a5f17696d2c712f8ecbfc04af9",
+      "size_bytes": 259
     },
     "speakforge.wasm": {
       "blake3": "3b67e194514e844ddb781d05e0eb00d1bdf8986ea4e00d4be41fe66ab751a11d",

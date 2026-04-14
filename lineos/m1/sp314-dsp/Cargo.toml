@@ -1,0 +1,28 @@
+[package]
+name        = "sp314-dsp"
+version     = "0.1.0"
+edition     = "2021"
+license     = "MIT"
+# Authority: LineOS Constitution v2.0 §05 · Creator OS Constitution v2.6 §05
+# ML Origin Rule: pure algorithmic DSP — no ML weights
+# Immutable between phase releases.
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libm       = "0.2"
+serde      = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", optional = true }
+
+[features]
+# std is the default for native builds (cargo check / cargo test / cargo build --release)
+# For WASM target (wasm32-unknown-unknown), Cargo automatically disables std-dependent crates.
+# The #![cfg_attr(not(feature = "std"), no_std)] guard activates only when std is explicitly disabled.
+default = ["std"]
+std     = ["serde_json", "serde/std"]
+
+[dev-dependencies]
+serde_json = "1"
+libm       = "0.2"
+
