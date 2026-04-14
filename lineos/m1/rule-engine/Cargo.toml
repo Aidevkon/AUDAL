@@ -1,0 +1,21 @@
+[package]
+name        = "lineos-rule-engine"
+version     = "0.1.0"
+edition     = "2021"
+license     = "MIT"
+# Authority: LineOS Constitution v2.0 §07 · Coach-Core README v1.0
+# Deterministic rule engine — no LLM, no randomness, no side effects.
+# Pure functions only. Static RULES array. Zero dynamic dispatch.
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+sp314-dsp        = { path = "../sp314-dsp" }
+lineos-insights  = { path = "../insights" }
+serde            = { version = "1", features = ["derive"] }
+serde_json       = "1"
+
+[dev-dependencies]
+serde_json = "1"
+insta      = "1"

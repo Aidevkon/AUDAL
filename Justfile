@@ -32,6 +32,9 @@ validate-schemas:
     @python3 -c "import tomllib; tomllib.load(open('lineos/m0/config/policies.toml','rb')); print('  ✅ policies.toml')"
     @python3 -c "import json; json.load(open('lineos/m0/config/caddy.json'));          print('  ✅ caddy.json')"
     @python3 -c "import json; json.load(open('lineos/m0/api/m0-api.schema.json'));     print('  ✅ m0-api.schema.json')"
+    @python3 -c "import json; json.load(open('lineos/shared/schema/ebu-r128.schema.json'));         print('  ✅ ebu-r128.schema.json')"
+    @python3 -c "import json; json.load(open('lineos/shared/schema/analysis-report.schema.json')); print('  ✅ analysis-report.schema.json')"
+    @python3 -c "import json; json.load(open('lineos/shared/schema/coach-findings.schema.json'));   print('  ✅ coach-findings.schema.json')"
     @echo "✅ All schemas valid"
 
 # cargo deny check (license + ban rules) — optional in Phase 1 dev

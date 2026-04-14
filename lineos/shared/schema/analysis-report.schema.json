@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalysisReport",
+  "description": "Input contract for lineos-rule-engine. Built from Golden Blob QualityMetrics + InsightsReport compliance flags. Phase 4: QualityMetrics + ComplianceFlags only. SpectralMetrics and DynamicsMetrics are Phase 5+.",
+  "version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quality", "compliance", "version"],
+  "properties": {
+    "version": { "type": "string" },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lufs_integrated", "lufs_short_term", "lufs_momentary",
+        "true_peak", "loudness_range", "stereo_correlation",
+        "dynamic_range", "dc_offset"
+      ],
+      "properties": {
+        "lufs_integrated":    { "type": "number", "description": "BS.1770-4 integrated gated loudness (LUFS)" },
+        "lufs_short_term":    { "type": "number", "description": "Short-term loudness — 3s window" },
+        "lufs_momentary":     { "type": "number", "description": "Momentary loudness — 400ms window" },
+        "true_peak":          { "type": "number", "description": "BS.1770-4 true peak (dBTP)" },
+        "loudness_range":     { "type": "number", "minimum": 0.0, "description": "EBU R128 LRA (LU)" },
+        "stereo_correlation": { "type": "number", "minimum": -1.0, "maximum": 1.0 },
+        "dynamic_range":      { "type": "number", "description": "Peak-to-RMS dynamic range (dB)" },
+        "dc_offset":          { "type": "number", "minimum": -1.0, "maximum": 1.0 }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "description": "Per-platform pass/fail booleans from InsightsReport",
+      "properties": {
+        "spotify_ok":    { "type": "boolean" },
+        "youtube_ok":    { "type": "boolean" },
+        "apple_ok":      { "type": "boolean" },
+        "tidal_ok":      { "type": "boolean" },
+        "broadcast_ok":  { "type": "boolean" }
+      }
+    }
+  }
+}

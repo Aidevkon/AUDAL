@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CoachFindings",
+  "description": "Output contract of lineos-rule-engine. Severity values are exactly: info | low | medium | high. serde_json::Value is forbidden — IssueParams uses typed numerics only.",
+  "version": "1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issues", "recommendation"],
+  "properties": {
+    "recommendation": {
+      "type": "string",
+      "description": "Deterministic single-sentence action recommendation"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "params", "tags"],
+        "properties": {
+          "id":       { "type": "string", "description": "Stable rule identifier (snake_case)" },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "low", "medium", "high"],
+            "description": "Exactly these four values — never extend without major version bump"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["current", "target", "delta"],
+            "properties": {
+              "current": { "type": "number" },
+              "target":  { "type": "number" },
+              "delta":   { "type": "number" }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
