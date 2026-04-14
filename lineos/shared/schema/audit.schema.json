@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "M0 Audit Entry",
+  "description": "Schema for LineOS M0 audit log entries (NDJSON format). Authority: M0 Constitution v2.0 §03.5",
+  "additionalProperties": false,
+  "type": "object",
+  "required": ["timestamp", "event_type", "level", "message"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp with timezone (UTC)"
+    },
+    "event_type": {
+      "type": "string",
+      "description": "One of the 7 canonical M0 audit event types",
+      "enum": [
+        "m0d.startup",
+        "m0d.health_gate_passed",
+        "m0d.asset_served",
+        "m0d.policy_violation",
+        "m0d.proxy_request",
+        "m0d.marketplace_rejection",
+        "m0d.shutdown",
+        "m0d.audit_test"
+      ]
+    },
+    "level": {
+      "type": "string",
+      "enum": ["info", "warn", "error", "audit"],
+      "description": "audit = security-relevant event; info = operational; warn/error = degradation"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable audit message"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Structured metadata. For asset_served: path + digest (never content). For policy_violation: destination + reason.",
+      "additionalProperties": true
+    }
+  }
+}

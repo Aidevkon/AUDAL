@@ -1,0 +1,16 @@
+# M0 Policy Configuration
+# M0 Constitution v2.0 §03.6
+# deny-by-default — only explicitly listed destinations are allowed
+# All commented outbound rules require explicit user opt-in
+
+[outbound]
+# M1.6 sync — disabled by default (requires explicit user opt-in)
+# [[outbound.allow]]
+# destination = "https://api.creatorcloud.io"
+# module = "m1.6-sync"
+# requires_user_consent = true
+
+[inbound]
+# All inbound via Caddy proxy only (127.0.0.1:7400)
+# Direct pod access blocked at network level
+# Undeclared route → 403 + audit entry

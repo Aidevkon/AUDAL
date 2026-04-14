@@ -1,0 +1,45 @@
+# deny.toml — cargo deny configuration
+# Authority: Creator OS Constitution v2.5
+# Phase 1: License audit configuration
+# Run: cargo deny check
+
+[graph]
+targets = []
+
+[licenses]
+# Allowed license list per Creator OS Library Stack §3
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "ISC",
+    "Unicode-DFS-2016",
+    "OpenSSL",
+    "CC0-1.0",
+]
+# Confidence threshold for license detection
+confidence-threshold = 0.8
+
+[bans]
+# Dependencies banned per ARCHITECTURE.md §Forbidden
+deny = []
+# FFmpeg: LGPL + subprocess spawn = M0 constitution violation
+# Ban list expanded in Phase 2
+
+[advisories]
+# Security advisory database
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "warn"
+notice = "warn"
+ignore = []
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -1,0 +1,49 @@
+# m0d.quadlet — LineOS M0 Daemon Container (Podman Quadlet)
+# M0 Constitution v2.0 §05 — Rootless, localhost-only, no host networking
+
+[Unit]
+Description=LineOS M0 Daemon Container
+Documentation=https://github.com/creator-os/lineos
+After=network.target
+Wants=network.target
+
+[Container]
+Image=ghcr.io/creator-os/m0d:0.1.0
+ContainerName=m0d
+
+# Network: slirp4netns (rootless NAT) — NEVER host
+Network=slirp4netns
+
+# Port binding — localhost ONLY (M0 Constitution §03.2)
+PublishPort=127.0.0.1:7400:7400
+PublishPort=127.0.0.1:7401:7401
+
+# Volume mounts
+Volume=/opt/lineos/registry:/opt/lineos/registry:ro,Z
+Volume=/opt/lineos/config:/opt/lineos/config:ro,Z
+Volume=/opt/lineos/assets:/opt/lineos/assets:ro,Z
+Volume=/var/log/lineos/audit:/var/log/lineos/audit:rw,Z
+Volume=/run/lineos:/run/lineos:rw,Z
+
+# Security
+SecurityLabelType=svirt_sandbox_file_t
+NoNewPrivileges=true
+ReadOnly=true
+ReadWriteTmpfs=/tmp
+
+# Environment
+Environment=RUST_LOG=info
+Environment=M0_REGISTRY_PATH=/opt/lineos/registry/m0-registry.json
+Environment=M0_CHECKSUMS_PATH=/opt/lineos/registry/checksums.json
+Environment=M0_POLICIES_PATH=/opt/lineos/config/policies.toml
+Environment=M0_AUDIT_LOG_DIR=/var/log/lineos/audit
+Environment=M0_ASSETS_ROOT=/opt/lineos/assets
+
+[Service]
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=35s
+User=lineos
+
+[Install]
+WantedBy=multi-user.target default.target

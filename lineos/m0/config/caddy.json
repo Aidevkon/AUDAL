@@ -1,0 +1,59 @@
+{
+  "admin": { "disabled": true },
+  "apps": {
+    "http": {
+      "servers": {
+        "m0_proxy": {
+          "listen": ["127.0.0.1:7400"],
+          "routes": [
+            {
+              "match": [{ "path": ["/telemetry*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7411" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            },
+            {
+              "match": [{ "path": ["/metadata*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7412" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            },
+            {
+              "match": [{ "path": ["/insights*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7413" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            },
+            {
+              "match": [{ "path": ["/coach*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7414" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            },
+            {
+              "match": [{ "path": ["/sync-egress*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7415" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

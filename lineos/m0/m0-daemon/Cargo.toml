@@ -1,0 +1,26 @@
+[package]
+name = "m0d"
+version = "0.1.0"
+edition = "2021"
+# M0 Constitution v2.0
+# inherits_from = ["creator-os-invariants", "lineos-constitution"]
+
+[dependencies]
+tokio        = { version = "1", features = ["full"] }
+axum         = "0.7"
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+toml         = "0.8"
+sha2         = "0.10"
+blake3       = "1"
+hex          = "0.4"
+ed25519-dalek = "2"
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow       = "1"
+chrono       = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile   = "3"
+rand       = "0.8"

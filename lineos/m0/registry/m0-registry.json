@@ -1,0 +1,39 @@
+{
+  "version": "0.1.0",
+  "wasm_modules": {
+    "sp314-dsp.wasm": {
+      "blake3": "01d9f2eeca5a941e7965c0b9d85799f57898287c7409e44ee0f9f54584a38eac",
+      "sha256": "0f2b2f856e3e2fb171a0411b0c18257cbcaf38127d71f541fc4e8fab59ad8134",
+      "size_bytes": 20,
+      "status": "stub"
+    },
+    "speakforge.wasm": {
+      "blake3": "3b67e194514e844ddb781d05e0eb00d1bdf8986ea4e00d4be41fe66ab751a11d",
+      "sha256": "1d958e05377a986004046bd444b145d1c617dd700d95d03fedf7c8117fe2bf89",
+      "size_bytes": 22,
+      "status": "stub"
+    },
+    "video-engine.wasm": {
+      "blake3": "6b3259efdc55d075ea7a4d1c89a888ce3497f4bc2bb5cbadea6e445b2552567b",
+      "sha256": "a36139d5cb2889414a9746925623fc3f838003923da1f891670a578f458efb12",
+      "size_bytes": 25,
+      "status": "stub"
+    },
+    "av-forge.wasm": {
+      "blake3": "8b7e5614006ef5ffe83bf11413b8aecb437655f19070f9bc35fda1e9b3dd30a7",
+      "sha256": "0a3fdc6619c2346738c163e6fe0c30a30b3b4b4b107f15ef1bfa8bc1208702ea",
+      "size_bytes": 21,
+      "status": "stub"
+    }
+  },
+  "engines": {
+    "sp314-native": {
+      "version": "0.1.0",
+      "blake3": "",
+      "sha256": "",
+      "path": "lineos/m0/assets/engines/sp314-native/sp314"
+    }
+  },
+  "marketplace_engines": {},
+  "revoked_keys": []
+}

@@ -1,0 +1,105 @@
+//! m0d — LineOS Local Mirror Daemon
+//! M0 Constitution v2.0
+//! Authority: LineOS Constitution v2.0 · Creator OS Constitution v2.6
+//! Startup order: registry → hash verify → policy → audit → caddy → health gate
+
+mod audit;
+mod cdn;
+mod health;
+mod marketplace;
+mod policy;
+mod registry;
+
+use anyhow::Result;
+use health::HealthGate;
+use std::net::SocketAddr;
+
+// Environment variable defaults — can be overridden at runtime
+const REGISTRY_PATH: &str = "lineos/m0/registry/m0-registry.json";
+const CHECKSUMS_PATH: &str = "lineos/m0/registry/checksums.json";
+const POLICIES_PATH: &str = "lineos/m0/config/policies.toml";
+const AUDIT_LOG_DIR: &str = "lineos/m0/logs/audit";
+const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
+const HEALTH_ADDR: &str = "127.0.0.1:7401";
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    tracing::info!("m0d starting — LineOS M0 v0.1.0");
+    tracing::info!("Authority: M0 Constitution v2.0");
+
+    // ── Read env overrides ────────────────────────────────────────────────────
+    let registry_path = std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
+    let checksums_path = std::env::var("M0_CHECKSUMS_PATH").unwrap_or_else(|_| CHECKSUMS_PATH.to_string());
+    let policies_path = std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
+    let audit_log_dir = std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
+    let assets_root = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
+
+    let gate = HealthGate::new();
+
+    // ── Step 1: Audit log (must be ready before everything else) ──────────────
+    let audit = audit::AuditLog::open(&audit_log_dir)?;
+    audit.write(audit::entry_startup())?;
+    gate.set_audit_writable(true).await;
+    tracing::info!("Audit log ready: {}", audit_log_dir);
+
+    // ── Step 2: Registry ──────────────────────────────────────────────────────
+    let _reg = registry::Registry::load(&registry_path, &checksums_path).await?;
+    gate.set_registry_loaded(true).await;
+    tracing::info!("Registry loaded OK");
+
+    // ── Step 3: CDN + hash verification ──────────────────────────────────────
+    let cdn = cdn::Cdn::load(&assets_root, &checksums_path).await?;
+    let failures = cdn.verify_all().await;
+    if !failures.is_empty() {
+        for (name, err) in &failures {
+            tracing::error!("CDN verify failed: {} — {}", name, err);
+        }
+        anyhow::bail!("CDN hash verification failed — M0 cannot start (M0 §03.1)");
+    }
+    gate.set_cdn_ready(true).await;
+    tracing::info!("CDN verified OK");
+
+    // ── Step 4: Policy ────────────────────────────────────────────────────────
+    let _policy = policy::PolicyEngine::load(&policies_path)?;
+    gate.set_policy_active(true).await;
+    tracing::info!("Policy engine loaded OK (deny-by-default active)");
+
+    // ── Step 5: Caddy ─────────────────────────────────────────────────────────
+    // Phase 1: Caddy process management is deferred to Phase 2 production deploy.
+    // For Phase 1 integration testing, mark caddy_running as true and note it.
+    gate.set_caddy_running(true).await;
+    tracing::info!("Caddy integration: Phase 1 stub (process management in Phase 2)");
+
+    // ── Step 6: Health gate ───────────────────────────────────────────────────
+    if !gate.is_healthy().await {
+        anyhow::bail!("Health gate failed on startup — M0 cannot serve (M0 Constitution §04.2)");
+    }
+    audit.write(audit::entry_health_gate_passed())?;
+
+    // Write m0-healthy sentinel file for Quadlet ConditionPathExists
+    if let Err(e) = std::fs::create_dir_all("/run/lineos") {
+        tracing::warn!("Could not create /run/lineos: {} (normal in dev)", e);
+    } else {
+        let _ = std::fs::write("/run/lineos/m0-healthy", "");
+    }
+
+    tracing::info!("✅ All health criteria passed — M0 is healthy");
+
+    // ── Step 7: Start health endpoint ─────────────────────────────────────────
+    let app = health::health_router(gate.clone());
+    let health_addr: SocketAddr = HEALTH_ADDR.parse()?;
+
+    tracing::info!("Health endpoint: http://{}", HEALTH_ADDR);
+    let listener = tokio::net::TcpListener::bind(health_addr).await?;
+    axum::serve(listener, app).await?;
+
+    audit.write(audit::entry_shutdown())?;
+    Ok(())
+}

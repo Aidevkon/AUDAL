@@ -1,0 +1,55 @@
+# m1.quadlet — LineOS M1 Deterministic Processing Container (Podman Quadlet)
+# M0 Constitution v2.0 §05 — Gated on M0 health via ConditionPathExists
+
+[Unit]
+Description=LineOS M1 Deterministic Processing Container
+Documentation=https://github.com/creator-os/lineos
+
+# Gate: M1 must NOT start unless M0 is healthy.
+# m0d writes this file when all 7 health criteria pass.
+ConditionPathExists=/run/lineos/m0-healthy
+
+After=m0d.service
+Requires=m0d.service
+
+[Container]
+Image=ghcr.io/creator-os/m1:0.1.0
+ContainerName=m1
+
+# Network: slirp4netns (rootless NAT) — NEVER host
+# M1 communicates with M0 only via 127.0.0.1 IPC
+Network=slirp4netns
+
+# Port binding — internal only
+PublishPort=127.0.0.1:7411:7411
+PublishPort=127.0.0.1:7412:7412
+PublishPort=127.0.0.1:7413:7413
+PublishPort=127.0.0.1:7414:7414
+PublishPort=127.0.0.1:7415:7415
+
+# Volume mounts (read-only for assets, writable for outputs)
+Volume=/opt/lineos/assets:/opt/lineos/assets:ro,Z
+Volume=/opt/lineos/output:/opt/lineos/output:rw,Z
+Volume=/run/lineos:/run/lineos:ro,Z
+
+# Security
+NoNewPrivileges=true
+ReadOnly=true
+ReadWriteTmpfs=/tmp
+
+# Environment
+Environment=RUST_LOG=info
+Environment=M0_PROXY_URL=http://127.0.0.1:7400
+Environment=M1_TELEMETRY_PORT=7411
+Environment=M1_METADATA_PORT=7412
+Environment=M1_INSIGHTS_PORT=7413
+Environment=M1_COACH_PORT=7414
+Environment=M1_SYNC_PORT=7415
+
+[Service]
+Restart=on-failure
+RestartSec=5s
+User=lineos
+
+[Install]
+WantedBy=multi-user.target default.target

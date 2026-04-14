@@ -1,0 +1,55 @@
+[Unit]
+Description=LineOS M0 Daemon — Trust Boundary
+Documentation=https://github.com/creator-os/lineos
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/m0d
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=35s
+WorkingDirectory=/opt/lineos
+
+# Run as dedicated non-root user
+User=lineos
+Group=lineos
+
+# Security hardening — M0 Constitution v2.0 §05
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Runtime directories
+RuntimeDirectory=lineos
+RuntimeDirectoryMode=0750
+LogsDirectory=lineos
+LogsDirectoryMode=0750
+StateDirectory=lineos
+StateDirectoryMode=0750
+
+# Environment
+Environment=RUST_LOG=info
+Environment=M0_REGISTRY_PATH=/opt/lineos/registry/m0-registry.json
+Environment=M0_CHECKSUMS_PATH=/opt/lineos/registry/checksums.json
+Environment=M0_POLICIES_PATH=/opt/lineos/config/policies.toml
+Environment=M0_AUDIT_LOG_DIR=/var/log/lineos/audit
+Environment=M0_ASSETS_ROOT=/opt/lineos/assets
+
+[Install]
+WantedBy=multi-user.target

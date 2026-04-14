@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0",
+  "description": "M0 public API — sole interface for all callers. Frozen as of Phase 1. All communication with M0 must go through this schema only. No Rust type sharing across boundaries.",
+  "additionalProperties": false,
+  "definitions": {
+    "HealthResponse": {
+      "type": "object",
+      "description": "Response from GET /health — M0 health status and all 7 criteria",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "degraded"],
+          "description": "ok = all 7 criteria pass; degraded = one or more fail"
+        },
+        "criteria": {
+          "type": "object",
+          "description": "Per-criterion health status (optional — included when status=degraded)",
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    },
+    "ProxyRequest": {
+      "type": "object",
+      "description": "Inbound proxy request routed through Caddy at 127.0.0.1:7400",
+      "required": ["path", "method"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Request path (must match a declared Caddy route)"
+        },
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+          "description": "HTTP method"
+        },
+        "headers": {
+          "type": "object",
+          "description": "Request headers",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "AuditEntry": {
+      "type": "object",
+      "description": "A single audit log entry (NDJSON line in m0-audit-YYYYMMDD.ndjson)",
+      "required": ["timestamp", "event_type", "level", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "event_type": {
+          "type": "string",
+          "description": "One of the 7 canonical M0 event types"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["info", "warn", "error", "audit"]
+        },
+        "message": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Structured metadata — path + digest for assets, never content"
+        }
+      }
+    },
+    "PolicyViolationResponse": {
+      "type": "object",
+      "description": "Response when a request is blocked by M0 policy",
+      "required": ["error", "destination"],
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "string",
+          "const": "policy_violation"
+        },
+        "destination": {
+          "type": "string",
+          "description": "The destination that was blocked"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the block"
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,6 @@
 [workspace]
 resolver = "2"
-members = []
-# Phase 1: lineos/m0/m0-daemon will be added here
+members = [
+    "lineos/m0/m0-daemon",
+]
+# Phase 1: m0-daemon added per task P1-001
