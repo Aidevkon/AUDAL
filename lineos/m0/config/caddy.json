@@ -6,6 +6,51 @@
         "m0_proxy": {
           "listen": ["127.0.0.1:7400"],
           "routes": [
+
+            {
+              "_comment": "Health — proxied to m0d health endpoint (port 7401)",
+              "match": [{ "path": ["/health"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7401" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "5s" }
+              }]
+            },
+
+            {
+              "_comment": "POST /master — mastering API (port 7402). Cockpit never calls 7402 directly.",
+              "match": [{ "path": ["/master"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7402" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "120s" }
+              }]
+            },
+
+            {
+              "_comment": "GET /blob/* — blob fetch (port 7402). Cockpit never calls 7402 directly.",
+              "match": [{ "path": ["/blob/*"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7402" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "10s" }
+              }]
+            },
+
+            {
+              "_comment": "POST /export — export audio (port 7402). Cockpit never calls 7402 directly.",
+              "match": [{ "path": ["/export"] }],
+              "handle": [{
+                "handler": "reverse_proxy",
+                "upstreams": [{ "dial": "127.0.0.1:7402" }],
+                "transport": { "protocol": "http" },
+                "timeouts": { "response": "60s" }
+              }]
+            },
+
             {
               "match": [{ "path": ["/telemetry*"] }],
               "handle": [{
@@ -51,6 +96,7 @@
                 "timeouts": { "response": "10s" }
               }]
             }
+
           ]
         }
       }
