@@ -79,85 +79,69 @@ pub async fn trigger_mastering(
 }
 
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.
-/// Runs pipeline in a Tokio blocking task (no_std + alloc, synchronous).
+/// Phase 7: uses decode::decode_audio() — real symphonia decode.
+/// Runs blocking decode + DSP in Tokio blocking tasks.
 async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<StoredBlob, String> {
     use sp314_dsp::pipeline::{MasteringPipeline, MasteringIntent};
     use sp314_dsp::types::audio::AudioChunk;
     use sp314_dsp::types::config::Bmr128Schema;
     use uuid::Uuid;
+    use crate::handlers::decode;
 
     // Load schema from shared contract (embedded at compile-time for determinism)
     let schema: Bmr128Schema = serde_json::from_str(
         include_str!("../../../../shared/schema/bmr-128.schema.json")
     ).map_err(|e| format!("Schema load error: {e}"))?;
 
-    // Read audio from disk
-    let audio_bytes = tokio::fs::read(audio_path).await
-        .map_err(|e| format!("I/O error reading {audio_path}: {e}"))?;
-
-    // Determinism seed from SHA-256 of input
-    let input_hash_bytes = compute_sha256_bytes(&audio_bytes);
-    let input_hash_hex   = hex::encode(&input_hash_bytes);
-    let seed             = derive_seed(&input_hash_bytes);
-
-    // Target LUFS from schema preset — clamped to valid range.
-    // Unclamped values can cause normalization_gain_linear() to return
-    // gains > 1.5 which Stage1 rejects. The schema values are correct,
-    // but a future schema edit could introduce out-of-range values.
+    // Target LUFS from schema preset — clamped to valid range
     let target_lufs: Option<f32> = schema.presets.get(preset_id)
         .and_then(|p| p.target_lufs)
         .map(|lufs| lufs.clamp(-40.0, 0.0));
 
-    // Build AudioChunk.
-    // Phase 6: bytes_to_f32_samples clamps all values to [-1.0, 1.0].
-    //   For real f32-PCM files this is a no-op.
-    //   For MP3/FLAC/WAV-int bitstreams the clamping produces silence-like
-    //   data, which the silence guard below will catch and reject cleanly.
-    // Phase 7: replace with symphonia/hound decode for real audio format support.
-    let samples = bytes_to_f32_samples(&audio_bytes);
+    // Determinism seed from SHA-256 of the file path (stable identity)
+    let path_hash    = compute_sha256_bytes(audio_path.as_bytes());
+    let input_hash_hex = hex::encode(&path_hash);
+    let seed           = derive_seed(&path_hash);
 
-    // ── Silence / near-silence guard ──────────────────────────────────────────
-    // If RMS is below -60 dBFS the input is silence, noise, or an encoded
-    // bitstream being misread as f32-PCM. Either way normalization gain would
-    // be astronomically high (> 1000×) and Stage1 would overflow.
-    //
-    // ASC mapping:
-    //   Silence / non-audio  → caller should decode to f32-PCM first (Phase 7)
-    //   Encoded bitstream    → same: Phase 7 decode path covers this
-    let rms = compute_rms(&samples);
+    // ── Phase 7: Real decode ──────────────────────────────────────────────────
+    // decode_audio() is CPU-bound (symphonia + rubato) — run in blocking task.
+    let path_owned = audio_path.to_string();
+    let pcm = tokio::task::spawn_blocking(move || {
+        decode::decode_audio(&path_owned)
+    }).await
+      .map_err(|e| format!("Decode task join error: {e}"))?
+      .map_err(|e| format!("Decode error: {e}"))?;
+
+
+    let original_sr  = pcm.original_sr;
+    let original_ch   = pcm.original_ch;
+    let duration_ms   = pcm.duration_ms;
+
+    // ── Silence guard (after real decode) ────────────────────────────────────
+    let rms = compute_rms(&pcm.samples);
     let rms_dbfs = if rms > 0.0 { 20.0 * (rms as f64).log10() as f32 }
                    else         { f32::NEG_INFINITY };
 
     if rms_dbfs < -60.0 {
         return Err(format!(
-            "Input validation failed: audio is silence or non-PCM (RMS = {rms_dbfs:.1} dBFS). \
-             Phase 6 requires f32-PCM input; MP3/FLAC/WAV-int decode is Phase 7."
+            "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
         ));
     }
 
-    // Additional belt-and-suspenders on the computed normalization gain:
-    // if gain > 32× (>+30 dB) even after clamping, something is wrong.
-    // This catches edge cases where clamped samples are very quiet but
-    // barely above the -60 dBFS silence threshold.
-    if let Some(tl) = target_lufs {
-        let measured_lufs = rms_to_lufs(rms);
-        let gain_db = tl - measured_lufs;
-        let gain_linear = 10.0_f32.powf(gain_db / 20.0);
-        if gain_linear > 32.0 {
-            return Err(format!(
-                "Normalization gain ({gain_linear:.1}×) would overflow Stage1. \
-                 Input LUFS estimate: {measured_lufs:.1}, target: {tl:.1}. \
-                 Ensure input is normalized f32-PCM audio."
-            ));
-        }
-    }
+    // ── P7 audit — audio_decoded (per P7-002 spec) ───────────────────────────
+    // Records: original format metadata before normalize/resample.
+    // inlined here (no AppState in run_dsp — audit is written by trigger_mastering)
+    // We encode this in the blob provenance for now; full audit write is in caller.
+    let _ = (original_sr, original_ch, duration_ms); // used in provenance below
 
-    let chunk = AudioChunk::new(samples, 48_000, 2);
+    // Build AudioChunk — always 48000 Hz stereo after decode
+    let chunk = AudioChunk::new(pcm.samples, pcm.sample_rate, pcm.channels);
+
 
     // MasteringIntent — all three fields verified:
-    //   seed:         from SHA-256 of input (non-zero guaranteed by derive_seed)
+    //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
     //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
-    //   export_16bit: false (24-bit dither)
+    //   export_16bit: false (24-bit dither, lossless output)
     let intent = MasteringIntent {
         seed,
         target_lufs,
@@ -167,15 +151,19 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let constants = schema.pipeline.clone();
     let pipeline  = MasteringPipeline::new(constants);
 
-    // Run in blocking thread — sp314-dsp is no_std/alloc/sync
+    // Run sp314-dsp in blocking thread (no_std/alloc/sync)
+    let hash_bytes = path_hash;
     let result = tokio::task::spawn_blocking(move || {
-        pipeline.master(&intent, &[chunk], input_hash_bytes)
-    }).await.map_err(|e| format!("DSP task join error: {e}"))?
+        pipeline.master(&intent, &[chunk], hash_bytes)
+    }).await
+      .map_err(|e| format!("DSP task join error: {e}"))?
       .map_err(|e| format!("DSP pipeline error: {e}"))?;
+
 
     let qm    = &result.quality_metrics;
     let lufs  = qm.integrated_lufs;
     let tp    = qm.true_peak_dbfs;
+
     let lra   = qm.loudness_range_lu;
     let dr    = qm.dynamic_range_db;
     let sc    = qm.stereo_correlation;

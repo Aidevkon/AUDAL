@@ -22,6 +22,18 @@ anyhow       = "1"
 chrono       = { version = "0.4", features = ["serde"] }
 uuid         = { version = "1", features = ["v4"] }
 sp314-dsp    = { path = "../../m1/sp314-dsp" }
+# P7-001: Audio decode — M0 responsibility (never in sp314-dsp)
+# Authority: LineOS Constitution v2.0 §05 · Phase 7 master prompt
+symphonia    = { version = "0.5", features = [
+    "mp3",
+    "flac",
+    "pcm",
+    "aiff",
+    "wav",
+    "isomp4",
+] }
+rubato       = "0.15"   # SincFixedIn resampling → 48000 Hz
+
 
 
 [dev-dependencies]
