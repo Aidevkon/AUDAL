@@ -30,7 +30,10 @@ use crate::types::{AudioMeta, CoachFindings, GoldenBlobJson, Issue, Metrics, Sev
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"], js_name = invoke)]
+    /// Tauri v2 IPC bridge — always at window.__TAURI_INTERNALS__.invoke.
+    /// withGlobalTauri: true additionally wires window.__TAURI__ high-level API,
+    /// but raw IPC lives here regardless of that setting.
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI_INTERNALS__"], js_name = invoke)]
     async fn tauri_invoke(cmd: &str, args: JsValue) -> JsValue;
 }
 

@@ -1,5 +1,6 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
+
   "productName": "Still Air",
   "version": "0.1.0",
   "identifier": "ai.stillair.cockpit",
@@ -10,7 +11,9 @@
     "beforeBuildCommand": "trunk build --release"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
+
       {
         "title": "Still Air — Creator OS",
         "width": 1440,
