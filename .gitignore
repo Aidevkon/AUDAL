@@ -3,3 +3,5 @@
 !lineos/m0/assets/wasm/.gitkeep
 apps/stillair/dist/
 lineos/m0/logs/
+apps/stillair/frontend/dist/
+apps/stillair/src-tauri/gen/
