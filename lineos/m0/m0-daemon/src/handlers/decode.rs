@@ -206,6 +206,14 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     // ── 6. Assemble AudioPcm ──────────────────────────────────────────────────
     let duration_ms = (resampled.len() as u64 / 2) * 1000 / TARGET_SAMPLE_RATE as u64;
 
+    // Final sanitization: NaN/Inf → 0.0, then clamp to [-1.0, 1.0].
+    // Must run AFTER resampling — rubato can produce NaN in head/tail frames.
+    // f32::clamp(NaN) returns NaN, so is_nan check must come first.
+    let mut resampled = resampled;
+    for s in resampled.iter_mut() {
+        *s = sanitize_sample(*s);
+    }
+
     Ok(AudioPcm {
         samples:     resampled,
         sample_rate: TARGET_SAMPLE_RATE,
@@ -216,9 +224,25 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     })
 }
 
-// ── Channel helpers ───────────────────────────────────────────────────────────
 
-/// Mono interleaved → stereo interleaved (duplicate each sample).
+// Sample sanitization
+
+/// Sanitize a single f32 sample for safe delivery to sp314-dsp.
+///
+/// Order matters:
+///   1. NaN/Inf -> 0.0  (f32::clamp(NaN) returns NaN, so must check first)
+///   2. clamp to [-1.0, 1.0]
+///
+/// Applied at: downmix output, resample re-interleave, final decode_audio() pass.
+#[inline(always)]
+fn sanitize_sample(s: f32) -> f32 {
+    if s.is_nan() || s.is_infinite() { 0.0 } else { s.clamp(-1.0, 1.0) }
+}
+
+// Channel helpers
+
+/// Mono interleaved -> stereo interleaved (duplicate each sample).
+
 pub fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
     let mut out = Vec::with_capacity(mono.len() * 2);
     for &s in mono {
@@ -243,8 +267,9 @@ pub fn downmix_to_stereo(interleaved: &[f32], channels: usize) -> Vec<f32> {
         let r_ch: Vec<f32> = (1..channels).step_by(2).map(|c| interleaved[base + c]).collect();
         let l = if l_ch.is_empty() { 0.0 } else { l_ch.iter().sum::<f32>() / l_ch.len() as f32 };
         let r = if r_ch.is_empty() { l } else { r_ch.iter().sum::<f32>() / r_ch.len() as f32 };
-        out.push(l.clamp(-1.0, 1.0));
-        out.push(r.clamp(-1.0, 1.0));
+        out.push(sanitize_sample(l));
+        out.push(sanitize_sample(r));
+
     }
     out
 }
@@ -326,12 +351,13 @@ fn resample_stereo_to_48k(
         }
     }
 
-    // Re-interleave for sp314-dsp AudioChunk
+    // Re-interleave for sp314-dsp AudioChunk.
+    // sanitize_sample() is used instead of bare .clamp() — f32::clamp(NaN) is NaN.
     let out_frames = out_ch0.len().min(out_ch1.len());
     let mut interleaved_out = Vec::with_capacity(out_frames * 2);
     for i in 0..out_frames {
-        interleaved_out.push(out_ch0[i].clamp(-1.0, 1.0));
-        interleaved_out.push(out_ch1[i].clamp(-1.0, 1.0));
+        interleaved_out.push(sanitize_sample(out_ch0[i]));
+        interleaved_out.push(sanitize_sample(out_ch1[i]));
     }
 
     Ok(interleaved_out)
