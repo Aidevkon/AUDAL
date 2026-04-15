@@ -19,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
+            commands::mastering::open_audio_file,
             commands::mastering::trigger_mastering,
             commands::mastering::load_audio_file,
             commands::mastering::get_golden_blob,

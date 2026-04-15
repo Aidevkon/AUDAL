@@ -79,13 +79,12 @@ pub fn App() -> impl IntoView {
 
     // ── Event handlers ────────────────────────────────────────────────────────
 
-    // FM0 → FM1: file dropped
+    // FM0 → FM1: file dropped (drag-and-drop)
     let on_file_drop = UnsyncCallback::new(move |path: String| {
         if path.is_empty() {
             set_mode.set(CockpitMode::Fault(AscCode::ValidationFail));
             return;
         }
-        // Call Tauri load_audio_file (async)
         spawn_local(async move {
             match invoke::<crate::commands::AudioMetaResponse>(
                 "load_audio_file",
@@ -93,6 +92,7 @@ pub fn App() -> impl IntoView {
             ).await {
                 Ok(resp) => {
                     set_meta.set(Some(AudioMeta {
+                        path:        resp.path,
                         name:        resp.name,
                         format:      resp.format,
                         sample_rate: resp.sample_rate,
@@ -102,6 +102,9 @@ pub fn App() -> impl IntoView {
                     }));
                     set_preset.set(None);
                     set_mode.set(CockpitMode::FileLoaded);
+                }
+                Err(e) if e.contains("ASC:0x04") => {
+                    set_mode.set(CockpitMode::Fault(AscCode::ValidationFail));
                 }
                 Err(_) => {
                     set_mode.set(CockpitMode::Fault(AscCode::IoErr));
@@ -119,8 +122,9 @@ pub fn App() -> impl IntoView {
     // FM1.5 → FM2 → Data Cascade (FM3→FM4→FM5)
     let on_master = UnsyncCallback::new(move |()| {
         let preset = sel_preset.get_untracked().unwrap_or("spotify");
+        // Use full filesystem path for M0 (not display name)
         let audio_path = audio_meta.get_untracked()
-            .map(|m| m.name.clone())
+            .map(|m| m.path.clone())
             .unwrap_or_default();
 
         set_mode.set(CockpitMode::Mastering);
@@ -209,9 +213,57 @@ pub fn App() -> impl IntoView {
         set_preset.set(None);
     });
 
-    // FM3/4/5 → FM0: load new file (hard reset)
+    // LOAD NEW — open native file picker, then transition FM1 on selection.
+    // Behaviour per spec:
+    //   File selected + valid ext → hard reset state → FM1 (FileLoaded)
+    //   Dialog cancelled         → stay in current mode (no state change)
+    //   Invalid extension        → FM-ERR ASC 0x04 (ValidationFail)
     let on_load_new = UnsyncCallback::new(move |()| {
-        hard_reset();
+        spawn_local(async move {
+            match invoke::<Option<crate::commands::AudioMetaResponse>>(
+                "open_audio_file",
+                serde_json::json!({}),
+            ).await {
+                // User cancelled — stay exactly where we are
+                Ok(None) => {}
+
+                // File selected and valid — reset state, transition FM1
+                Ok(Some(resp)) => {
+                    // Hard reset all signals before populating new file
+                    set_mode.set(CockpitMode::Idle);
+                    set_meta.set(None);
+                    set_preset.set(None);
+                    set_metrics.set(None);
+                    set_findings.set(None);
+                    set_blob_id.set(None);
+                    set_live_lufs.set(None);
+                    set_live_peak.set(None);
+                    set_progress.set(0.0);
+                    set_stage.set("Initializing".into());
+                    // Now populate with the new file and advance to FM1
+                    set_meta.set(Some(AudioMeta {
+                        path:        resp.path,
+                        name:        resp.name,
+                        format:      resp.format,
+                        sample_rate: resp.sample_rate,
+                        bit_depth:   resp.bit_depth,
+                        duration_s:  resp.duration_s,
+                        channels:    resp.channels,
+                    }));
+                    set_mode.set(CockpitMode::FileLoaded);
+                }
+
+                // ASC 0x04: unsupported extension
+                Err(e) if e.contains("ASC:0x04") => {
+                    set_mode.set(CockpitMode::Fault(AscCode::ValidationFail));
+                }
+
+                // Other error (dialog crash, etc.) — IoErr
+                Err(_) => {
+                    set_mode.set(CockpitMode::Fault(AscCode::IoErr));
+                }
+            }
+        });
     });
 
     // FM5 → FM6: export

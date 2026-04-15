@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 /// File metadata displayed in FM1 Session panel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioMeta {
+    /// Full filesystem path — forwarded to trigger_mastering.
+    pub path:        String,
     pub name:        String,
     pub format:      String,
     pub sample_rate: u32,

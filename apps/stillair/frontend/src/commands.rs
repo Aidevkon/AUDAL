@@ -4,9 +4,11 @@
 
 use serde::{Deserialize, Serialize};
 
-/// AudioMeta from load_audio_file Tauri command.
+/// AudioMeta from load_audio_file / open_audio_file Tauri commands.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioMetaResponse {
+    /// Full filesystem path — used by trigger_mastering.
+    pub path:        String,
     pub name:        String,
     pub format:      String,
     pub sample_rate: u32,
