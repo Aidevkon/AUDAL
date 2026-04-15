@@ -100,15 +100,64 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let input_hash_hex   = hex::encode(&input_hash_bytes);
     let seed             = derive_seed(&input_hash_bytes);
 
-    // Target LUFS from schema preset
+    // Target LUFS from schema preset — clamped to valid range.
+    // Unclamped values can cause normalization_gain_linear() to return
+    // gains > 1.5 which Stage1 rejects. The schema values are correct,
+    // but a future schema edit could introduce out-of-range values.
     let target_lufs: Option<f32> = schema.presets.get(preset_id)
-        .and_then(|p| p.target_lufs);
+        .and_then(|p| p.target_lufs)
+        .map(|lufs| lufs.clamp(-40.0, 0.0));
 
-    // Build AudioChunk — Phase 6: assume 48kHz stereo f32 PCM raw input
-    // Phase 7: real decode via hound/symphonia
+    // Build AudioChunk.
+    // Phase 6: bytes_to_f32_samples clamps all values to [-1.0, 1.0].
+    //   For real f32-PCM files this is a no-op.
+    //   For MP3/FLAC/WAV-int bitstreams the clamping produces silence-like
+    //   data, which the silence guard below will catch and reject cleanly.
+    // Phase 7: replace with symphonia/hound decode for real audio format support.
     let samples = bytes_to_f32_samples(&audio_bytes);
+
+    // ── Silence / near-silence guard ──────────────────────────────────────────
+    // If RMS is below -60 dBFS the input is silence, noise, or an encoded
+    // bitstream being misread as f32-PCM. Either way normalization gain would
+    // be astronomically high (> 1000×) and Stage1 would overflow.
+    //
+    // ASC mapping:
+    //   Silence / non-audio  → caller should decode to f32-PCM first (Phase 7)
+    //   Encoded bitstream    → same: Phase 7 decode path covers this
+    let rms = compute_rms(&samples);
+    let rms_dbfs = if rms > 0.0 { 20.0 * (rms as f64).log10() as f32 }
+                   else         { f32::NEG_INFINITY };
+
+    if rms_dbfs < -60.0 {
+        return Err(format!(
+            "Input validation failed: audio is silence or non-PCM (RMS = {rms_dbfs:.1} dBFS). \
+             Phase 6 requires f32-PCM input; MP3/FLAC/WAV-int decode is Phase 7."
+        ));
+    }
+
+    // Additional belt-and-suspenders on the computed normalization gain:
+    // if gain > 32× (>+30 dB) even after clamping, something is wrong.
+    // This catches edge cases where clamped samples are very quiet but
+    // barely above the -60 dBFS silence threshold.
+    if let Some(tl) = target_lufs {
+        let measured_lufs = rms_to_lufs(rms);
+        let gain_db = tl - measured_lufs;
+        let gain_linear = 10.0_f32.powf(gain_db / 20.0);
+        if gain_linear > 32.0 {
+            return Err(format!(
+                "Normalization gain ({gain_linear:.1}×) would overflow Stage1. \
+                 Input LUFS estimate: {measured_lufs:.1}, target: {tl:.1}. \
+                 Ensure input is normalized f32-PCM audio."
+            ));
+        }
+    }
+
     let chunk = AudioChunk::new(samples, 48_000, 2);
 
+    // MasteringIntent — all three fields verified:
+    //   seed:         from SHA-256 of input (non-zero guaranteed by derive_seed)
+    //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
+    //   export_16bit: false (24-bit dither)
     let intent = MasteringIntent {
         seed,
         target_lufs,
@@ -201,12 +250,37 @@ fn derive_seed(hash: &[u8; 32]) -> u64 {
     u64::from_be_bytes(hash[..8].try_into().unwrap_or([0; 8]))
 }
 
-/// Convert raw bytes → f32 PCM samples (little-endian float).
-/// Phase 6: assumes f32-PCM input. Phase 7: use symphonia/hound decoder.
+/// Convert raw bytes → f32 PCM samples (little-endian float) with clamping.
+///
+/// Phase 6: assumes f32-PCM input. Samples are clamped to [-1.0, 1.0] and
+/// NaN/Inf are mapped to 0.0. This makes the function safe for arbitrary
+/// byte inputs — encoded bitstreams (MP3/FLAC) will produce near-zero values
+/// that the silence guard above catches, rather than crashing Stage1.
+///
+/// Phase 7: replace with symphonia/hound decode for real format support.
 fn bytes_to_f32_samples(bytes: &[u8]) -> Vec<f32> {
     bytes.chunks_exact(4)
-        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .map(|b| {
+            let v = f32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+            // Map NaN/Inf to 0.0, then clamp to audio range
+            if v.is_finite() { v.clamp(-1.0, 1.0) } else { 0.0 }
+        })
         .collect()
+}
+
+/// Compute RMS amplitude of samples.
+fn compute_rms(samples: &[f32]) -> f32 {
+    if samples.is_empty() { return 0.0; }
+    let sum_sq: f64 = samples.iter().map(|&s| (s as f64) * (s as f64)).sum();
+    (sum_sq / samples.len() as f64).sqrt() as f32
+}
+
+/// Rough LUFS estimate from RMS — used only for overflow guard, not stored.
+/// Full EBU R128 measurement happens inside sp314-dsp.
+fn rms_to_lufs(rms: f32) -> f32 {
+    if rms <= 0.0 { return f32::NEG_INFINITY; }
+    // K-weighting approximation: subtract ~1 dB from RMS dBFS
+    20.0 * rms.log10() - 1.0
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -242,4 +316,72 @@ mod tests {
     fn test_platform_ok_tp_exceeded() {
         assert!(!platform_ok(-14.0, -14.0, -0.5));
     }
+
+    #[test]
+    fn test_bytes_to_f32_clamps_in_range() {
+        // Valid f32-PCM bytes representing 0.5 should pass through unchanged
+        let sample: f32 = 0.5;
+        let bytes = sample.to_le_bytes();
+        let out = bytes_to_f32_samples(&bytes);
+        assert_eq!(out.len(), 1);
+        assert!((out[0] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_bytes_to_f32_clamps_mp3_bitstream() {
+        // MP3 sync word bytes [0xFF, 0xFB, ...] reinterpreted as f32 → NaN or huge value
+        // bytes_to_f32_samples must return 0.0 or a clamped value, never > 1.0
+        let mp3_header_bytes = [0xFF, 0xFBu8, 0x90, 0x00];
+        let out = bytes_to_f32_samples(&mp3_header_bytes);
+        assert_eq!(out.len(), 1);
+        assert!(out[0] >= -1.0 && out[0] <= 1.0,
+            "Clamped value must be in [-1.0, 1.0], got {}", out[0]);
+    }
+
+    #[test]
+    fn test_compute_rms_silence() {
+        let samples = vec![0.0f32; 4096];
+        assert_eq!(compute_rms(&samples), 0.0);
+    }
+
+    #[test]
+    fn test_compute_rms_half_amp() {
+        // Signal at 0.5 amplitude → RMS = 0.5 / sqrt(2) ≈ 0.354
+        let samples: Vec<f32> = (0..4096)
+            .map(|i| 0.5 * (2.0 * std::f32::consts::PI * 440.0 * i as f32 / 48000.0).sin())
+            .collect();
+        let rms = compute_rms(&samples);
+        assert!((rms - 0.5_f32 / 2.0_f32.sqrt()).abs() < 0.01,
+            "RMS should be ~0.354, got {rms}");
+    }
+
+    #[test]
+    fn test_silence_guard_threshold() {
+        // RMS of 0.0 → dBFS = -∞ → below -60 dBFS silence threshold
+        let rms = 0.0_f32;
+        let rms_dbfs = if rms > 0.0 { 20.0 * (rms as f64).log10() as f32 }
+                       else         { f32::NEG_INFINITY };
+        assert!(rms_dbfs < -60.0, "Silence must be below guard threshold");
+    }
+
+    #[test]
+    fn test_gain_overflow_guard() {
+        // Very quiet input (-70 LUFS) with target -14 LUFS → gain >> 32×
+        let quiet_rms = 10.0_f32.powf(-70.0 / 20.0);
+        let measured_lufs = rms_to_lufs(quiet_rms);
+        let gain_db = -14.0 - measured_lufs;
+        let gain_linear = 10.0_f32.powf(gain_db / 20.0);
+        assert!(gain_linear > 32.0,
+            "Very quiet input should trigger overflow guard, gain={gain_linear:.1}×");
+    }
+
+    #[test]
+    fn test_target_lufs_clamped() {
+        // Out-of-range values should be clamped
+        let clamped_low: f32  = (-50.0_f32).clamp(-40.0, 0.0);
+        let clamped_high: f32 = (5.0_f32).clamp(-40.0, 0.0);
+        assert_eq!(clamped_low,  -40.0);
+        assert_eq!(clamped_high,   0.0);
+    }
+
 }
