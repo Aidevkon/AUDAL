@@ -2,25 +2,36 @@
 //! M0 Constitution v2.0
 //! Authority: LineOS Constitution v2.0 · Creator OS Constitution v2.6
 //! Startup order: registry → hash verify → policy → audit → caddy → health gate
+//!
+//! Phase 6: Added mastering API router on port 7400 (Caddy proxy target).
+//! New endpoints: POST /master, GET /blob/:id, POST /export
+//! Existing:      GET /health (port 7401)
 
+mod app_state;
 mod audit;
+mod blob_store;
 mod cdn;
+mod handlers;
 mod health;
 mod marketplace;
 mod policy;
 mod registry;
 
 use anyhow::Result;
+use app_state::AppState;
 use health::HealthGate;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
-// Environment variable defaults — can be overridden at runtime
-const REGISTRY_PATH: &str = "lineos/m0/registry/m0-registry.json";
+// Environment variable defaults
+const REGISTRY_PATH:  &str = "lineos/m0/registry/m0-registry.json";
 const CHECKSUMS_PATH: &str = "lineos/m0/registry/checksums.json";
-const POLICIES_PATH: &str = "lineos/m0/config/policies.toml";
-const AUDIT_LOG_DIR: &str = "lineos/m0/logs/audit";
-const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
-const HEALTH_ADDR: &str = "127.0.0.1:7401";
+const POLICIES_PATH:  &str = "lineos/m0/config/policies.toml";
+const AUDIT_LOG_DIR:  &str = "lineos/m0/logs/audit";
+const ASSETS_ROOT:    &str = "lineos/m0/assets/wasm";
+const HEALTH_ADDR:    &str = "127.0.0.1:7401";
+/// Mastering API — proxied through Caddy at 127.0.0.1:7400
+const MASTERING_ADDR: &str = "127.0.0.1:7402";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -35,15 +46,15 @@ async fn main() -> Result<()> {
     tracing::info!("Authority: M0 Constitution v2.0");
 
     // ── Read env overrides ────────────────────────────────────────────────────
-    let registry_path = std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
+    let registry_path  = std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
     let checksums_path = std::env::var("M0_CHECKSUMS_PATH").unwrap_or_else(|_| CHECKSUMS_PATH.to_string());
-    let policies_path = std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
-    let audit_log_dir = std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
-    let assets_root = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
+    let policies_path  = std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
+    let audit_log_dir  = std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
+    let assets_root    = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
 
     let gate = HealthGate::new();
 
-    // ── Step 1: Audit log (must be ready before everything else) ──────────────
+    // ── Step 1: Audit log ─────────────────────────────────────────────────────
     let audit = audit::AuditLog::open(&audit_log_dir)?;
     audit.write(audit::entry_startup())?;
     gate.set_audit_writable(true).await;
@@ -72,8 +83,6 @@ async fn main() -> Result<()> {
     tracing::info!("Policy engine loaded OK (deny-by-default active)");
 
     // ── Step 5: Caddy ─────────────────────────────────────────────────────────
-    // Phase 1: Caddy process management is deferred to Phase 2 production deploy.
-    // For Phase 1 integration testing, mark caddy_running as true and note it.
     gate.set_caddy_running(true).await;
     tracing::info!("Caddy integration: Phase 1 stub (process management in Phase 2)");
 
@@ -83,7 +92,6 @@ async fn main() -> Result<()> {
     }
     audit.write(audit::entry_health_gate_passed())?;
 
-    // Write m0-healthy sentinel file for Quadlet ConditionPathExists
     if let Err(e) = std::fs::create_dir_all("/run/lineos") {
         tracing::warn!("Could not create /run/lineos: {} (normal in dev)", e);
     } else {
@@ -92,14 +100,49 @@ async fn main() -> Result<()> {
 
     tracing::info!("✅ All health criteria passed — M0 is healthy");
 
-    // ── Step 7: Start health endpoint ─────────────────────────────────────────
-    let app = health::health_router(gate.clone());
+    // ── Step 7: Build AppState for mastering API ──────────────────────────────
+    let audit_arc  = Arc::new(audit);
+    let app_state  = AppState::new(audit_arc.clone());
+
+    // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
+    // Phase 6: mastering router binds directly to 7402.
+    // Caddy (7400) proxies → 7402. This matches M0 Constitution §03.
+    let mastering_router = mastering_router(app_state);
+    let mastering_addr: SocketAddr = MASTERING_ADDR.parse()?;
+
+    // ── Step 9: Start health endpoint (port 7401) ──────────────────────────────
+    let health_app  = health::health_router(gate.clone());
     let health_addr: SocketAddr = HEALTH_ADDR.parse()?;
 
-    tracing::info!("Health endpoint: http://{}", HEALTH_ADDR);
-    let listener = tokio::net::TcpListener::bind(health_addr).await?;
-    axum::serve(listener, app).await?;
+    tracing::info!("Health endpoint:    http://{HEALTH_ADDR}");
+    tracing::info!("Mastering endpoint: http://{MASTERING_ADDR}");
 
-    audit.write(audit::entry_shutdown())?;
+    // Run both routers concurrently
+    let health_listener    = tokio::net::TcpListener::bind(health_addr).await?;
+    let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;
+
+    tokio::select! {
+        res = axum::serve(health_listener, health_app) => {
+            tracing::error!("Health router exited: {:?}", res);
+        }
+        res = axum::serve(mastering_listener, mastering_router) => {
+            tracing::error!("Mastering router exited: {:?}", res);
+        }
+    }
+
+    audit_arc.write(audit::entry_shutdown())?;
     Ok(())
+}
+
+/// Build the mastering API Axum router.
+/// Endpoints: POST /master, GET /blob/:id, POST /export
+/// Authority: Phase 6 task-decomposition P6-003 · m0-api.schema.json
+fn mastering_router(state: AppState) -> axum::Router {
+    use axum::routing::{get, post};
+
+    axum::Router::new()
+        .route("/master",    post(handlers::master::trigger_mastering))
+        .route("/blob/:id",  get(handlers::blob::get_blob))
+        .route("/export",    post(handlers::export::export_audio))
+        .with_state(state)
 }

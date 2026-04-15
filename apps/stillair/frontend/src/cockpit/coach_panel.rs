@@ -5,11 +5,11 @@
 //! FM5:      CoachFindings list + recommendation
 //! FM6:      "Locked during export"
 //!
-//! Severity colors per spec §P5-007:
-//!   High   → #ef4444  badge-high / sev-high
-//!   Medium → #f59e0b  badge-medium / sev-medium
-//!   Low    → #fde047  badge-low / sev-low
-//!   Info   → #6b7280  badge-info / sev-info
+//! Severity colors — design-tokens-v1.0.md §5:
+//!   High   → var(--severity-high)   badge-high / sev-high
+//!   Medium → var(--severity-medium) badge-medium / sev-medium
+//!   Low    → var(--severity-low)    badge-low / sev-low
+//!   Info   → var(--severity-info)   badge-info / sev-info
 //!
 //! FORBIDDEN: No business logic or rule evaluation in this component.
 //! FORBIDDEN: No direct import of lineos-rule-engine.
@@ -68,13 +68,13 @@ fn FindingsList(findings: CoachFindings) -> impl IntoView {
                     <div class="finding-header">
                         <span class="finding-id">{issue.id.clone()}</span>
                         <span class=format!("severity-badge {}", issue.severity.badge_class())>
-                            {issue.severity.as_str()}
+                            {issue.severity.display_name()}
                         </span>
                     </div>
                     <div class="finding-params">
-                        <span>"cur: "{format!("{:.1}", issue.params.current)}</span>
-                        <span>"tgt: "{format!("{:.1}", issue.params.target)}</span>
-                        <span>"Δ: "{format!("{:+.1}", issue.params.delta)}</span>
+                        <span>"cur: "{format!("{:.1}", issue.current)}</span>
+                        <span>"tgt: "{format!("{:.1}", issue.target)}</span>
+                        <span>"Δ: "{format!("{:+.1}", issue.delta)}</span>
                     </div>
                     {if !issue.tags.is_empty() {
                         view! {

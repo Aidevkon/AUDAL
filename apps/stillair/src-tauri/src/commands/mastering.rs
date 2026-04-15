@@ -1,37 +1,46 @@
-//! M0 IPC command stubs — Phase 5.
-//! Phase 6 will replace these stubs with real M0 HTTP calls to localhost:7400.
-//! Authority: state-machine.md §6.3 · Phase 5 task-decomposition P5-008
+//! Mastering commands — real M0 IPC calls replacing Phase 5 stubs.
+//! Authority: Phase 6 task-decomposition P6-004
+//! Flow: Cockpit → Tauri → M0 → sp314-dsp → Golden Blob
 //!
-//! FORBIDDEN: No blocking audio processing here — Tauri commands must be async.
-//! FORBIDDEN: No serde_json::Value crossing the WASM boundary.
+//! FORBIDDEN: Calling sp314-dsp directly (must go through M0).
+//! FORBIDDEN: Audio processing in this module.
+//! FORBIDDEN: serde_json::Value in return types.
 
 use tauri::command;
+use crate::ipc::m0_client::{GoldenBlobJson, M0Client, MasterRequest};
 
-/// Phase 5 stub: simulates 2 seconds of DSP pipeline execution.
-/// Phase 6: calls M0 → sp314-dsp pipeline via HTTP POST localhost:7400/master.
+/// Real mastering: Cockpit → Tauri → M0 → sp314-dsp.
+/// Phase 5 replaced: 2s stub gone.
+/// Returns blob_id on success; ASC-mapped error string on failure.
 #[command]
 pub async fn trigger_mastering(
     audio_path: String,
     preset_id:  String,
 ) -> Result<String, String> {
-    // Phase 5: 2-second simulated processing delay
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    // Phase 6: replace with HTTP call to M0 → golden blob path returned
-    let _ = (audio_path, preset_id); // used in Phase 6
-    Ok("golden_blob_stub".to_string())
+    let client = M0Client::new();
+
+    // Guard: verify M0 is healthy. WasmPanic (ASC 0x05) guard.
+    client.health().await
+        .map_err(|e| format!("M0 unreachable: {e}"))?;
+
+    let resp = client
+        .trigger_mastering(MasterRequest { audio_path, preset_id })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if resp.status != "ok" {
+        return Err(resp.message.unwrap_or_else(|| "mastering failed".into()));
+    }
+
+    Ok(resp.blob_id)
 }
 
-/// Phase 5 stub: returns fake audio metadata from path.
-/// Phase 6: calls M0 CDN to decode and hash the file.
+/// Load audio file metadata — called on FM0 → FM1 transition.
+/// Phase 5 stub retained for now; Phase 7 wires real M0 decode.
 #[command]
-pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
-    let name = path
-        .split('/')
-        .last()
-        .unwrap_or("unknown")
-        .to_string();
-
-    Ok(AudioMeta {
+pub async fn load_audio_file(path: String) -> Result<crate::commands::AudioMeta, String> {
+    let name = path.split('/').last().unwrap_or("unknown").to_string();
+    Ok(crate::commands::AudioMeta {
         name,
         format:      "WAV".to_string(),
         sample_rate: 48_000,
@@ -41,8 +50,15 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
     })
 }
 
-/// Audio file metadata returned to frontend after file load.
-/// All fields are typed primitives — no serde_json::Value.
+/// Fetch Golden Blob as JSON — called on FM2 → FM3 to start Data Cascade.
+/// No binary data crosses the IPC boundary.
+#[command]
+pub async fn get_golden_blob(blob_id: String) -> Result<GoldenBlobJson, String> {
+    let client = M0Client::new();
+    client.get_blob(&blob_id).await.map_err(|e| e.to_string())
+}
+
+/// Audio file metadata returned to frontend on file load.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AudioMeta {
     pub name:        String,
@@ -58,20 +74,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_load_audio_file_returns_meta() {
-        let meta = load_audio_file("/tmp/track.wav".to_string()).await.unwrap();
+    async fn test_load_audio_file_stub_returns_meta() {
+        let meta = load_audio_file("/tmp/track.wav".into()).await.unwrap();
         assert_eq!(meta.name, "track.wav");
         assert_eq!(meta.sample_rate, 48_000);
         assert_eq!(meta.channels, 2);
-    }
-
-    #[tokio::test]
-    async fn test_trigger_mastering_returns_stub() {
-        let result = trigger_mastering(
-            "/tmp/track.wav".to_string(),
-            "spotify".to_string(),
-        ).await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "golden_blob_stub");
     }
 }

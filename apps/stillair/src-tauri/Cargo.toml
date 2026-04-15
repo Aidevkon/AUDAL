@@ -17,10 +17,14 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri        = { version = "2" }
-serde        = { version = "1", features = ["derive"] }
-serde_json   = "1"
-tokio        = { version = "1", features = ["full"] }
-reqwest      = { version = "0.12", features = ["json"] }
+tauri               = { version = "2" }
+serde               = { version = "1", features = ["derive"] }
+serde_json          = "1"
+tokio               = { version = "1", features = ["full"] }
+reqwest             = { version = "0.12", features = ["json"] }
+thiserror           = "1"
+uuid                = { version = "1", features = ["v4"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs     = "2"
+lineos-rule-engine  = { path = "../../../lineos/m1/rule-engine" }
+sp314-dsp           = { path = "../../../lineos/m1/sp314-dsp" }

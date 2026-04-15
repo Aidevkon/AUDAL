@@ -1,0 +1,10 @@
+[build]
+target = "frontend/index.html"
+dist = "dist"
+
+[watch]
+watch = ["frontend/src", "frontend/index.html"]
+
+[serve]
+port = 1420
+open = false

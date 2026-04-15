@@ -20,7 +20,10 @@ web-sys      = { version = "0.3", features = [
 ] }
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
+serde_wasm_bindgen = { package = "serde-wasm-bindgen", version = "0.6" }
+
 gloo-timers = { version = "0.3", features = ["futures"] }
+
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

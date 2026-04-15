@@ -1,144 +1,250 @@
-//! app.rs — Root component. FM0→FM5 core mastering flow wiring.
-//! Authority: Phase 5 task-decomposition P5-009 · state-machine.md §4
+//! app.rs — Root component. FM0→FM6 mastering flow with real M0 wiring.
+//! Authority: Phase 6 P6-005/P6-006/P6-007/P6-008 · state-machine.md §4
 //!
-//! State ownership:
-//!   - `mode` signal: derived from FSM, drives all MFD rendering
-//!   - `audio_meta` signal: set when file loaded
-//!   - `selected_preset` signal: set when preset chosen
-//!   - `metrics` signal: stub set after dsp_done()
-//!   - `findings` signal: stub CoachFindings set after coach_done()
+//! Data flow (Phase 6):
+//!   FM0 → drop file → FM1 (load_audio_file Tauri command)
+//!   FM1 → select preset → FM1.5
+//!   FM1.5 → MASTER → FM2 (trigger_mastering → M0 → sp314-dsp)
+//!   FM2 → live TelemetrySignal events (100ms)
+//!   FM2 → dsp_done → FM3 → get_golden_blob → FM4
+//!   FM4 → evaluate_findings → FM5 (rule-engine in Tauri process)
+//!   FM5 → EXPORT → FM6 → export_audio → FM5 (success) | FM-ERR (ASC 0x02)
+//!   FM-ERR → MASTER RESET → FM0 (never shortcut to FM1)
 //!
-//! FORBIDDEN: No business logic in event handlers.
-//! FORBIDDEN: No direct DSP calls from this layer.
-//! FSM transitions are the only way mode changes.
+//! FORBIDDEN: Cockpit holding binary audio state.
+//! FORBIDDEN: Polling M0 for telemetry — event subscription only.
+//! FORBIDDEN: serde_json::Value crossing WASM boundary.
 //! Use UnsyncCallback (Rc-based) for closures capturing reactive state.
 
 use leptos::prelude::*;
-use gloo_timers::future::TimeoutFuture;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::cockpit::Cockpit;
 use crate::components::fault_display::FaultDisplay;
 use crate::components::transport_bar::TransportBar;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
-use crate::types::{AudioMeta, CoachFindings, Issue, IssueParams, Metrics, Severity};
+use crate::types::{AudioMeta, CoachFindings, GoldenBlobJson, Issue, Metrics, Severity, TelemetrySignal};
 
-/// Stub CoachFindings wired per P5-009.
-/// Phase 6: replaced with real rule-engine output from M0 IPC.
-fn stub_findings(preset: &'static str) -> CoachFindings {
-    CoachFindings {
-        issues: vec![
-            Issue {
-                id:       "lufs_compliance".into(),
-                severity: Severity::Medium,
-                params:   IssueParams { current: -12.0, target: -14.0, delta: 2.0 },
-                tags:     vec![format!("platform:{preset}")],
-            },
-        ],
-        recommendation: "Reduce gain to meet loudness target.".into(),
-    }
+// ── Tauri invoke helper ───────────────────────────────────────────────────────
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"], js_name = invoke)]
+    async fn tauri_invoke(cmd: &str, args: JsValue) -> JsValue;
 }
 
-/// Stub AudioMeta — Phase 6 replaces with real Tauri IPC response.
-fn stub_meta(path: &str) -> AudioMeta {
-    AudioMeta {
-        name:        path.split('/').last().unwrap_or("unknown").to_string(),
-        format:      "WAV".to_string(),
-        sample_rate: 48_000,
-        bit_depth:   24,
-        duration_s:  180.0,
-        channels:    2,
-    }
+/// Invoke a Tauri command and deserialize the result.
+async fn invoke<T: for<'de> serde::Deserialize<'de>>(
+    cmd: &str,
+    args: serde_json::Value,
+) -> Result<T, String> {
+    let js_args = serde_wasm_bindgen::to_value(&args)
+        .map_err(|e| format!("Serialize error: {e}"))?;
+    let result = tauri_invoke(cmd, js_args).await;
+    serde_wasm_bindgen::from_value(result)
+        .map_err(|e| format!("Deserialize error: {e}"))
 }
+
+// ── Root App component ────────────────────────────────────────────────────────
 
 #[component]
 pub fn App() -> impl IntoView {
     // ── Reactive signals ──────────────────────────────────────────────────────
-    let (mode,        set_mode)       = signal::<CockpitMode>(CockpitMode::Idle);
-    let (audio_meta,  set_audio_meta) = signal::<Option<AudioMeta>>(None);
-    let (sel_preset,  set_preset)     = signal::<Option<&'static str>>(None);
-    let (metrics,     set_metrics)    = signal::<Option<Metrics>>(None);
-    let (findings,    set_findings)   = signal::<Option<CoachFindings>>(None);
+    let (mode,       set_mode)      = signal::<CockpitMode>(CockpitMode::Idle);
+    let (audio_meta, set_meta)      = signal::<Option<AudioMeta>>(None);
+    let (sel_preset, set_preset)    = signal::<Option<&'static str>>(None);
+    let (metrics,    set_metrics)   = signal::<Option<Metrics>>(None);
+    let (findings,   set_findings)  = signal::<Option<CoachFindings>>(None);
+    let (blob_id,    set_blob_id)   = signal::<Option<String>>(None);
+    // FM2 live telemetry signals
+    let (live_lufs,  set_live_lufs) = signal::<Option<f32>>(None);
+    let (live_peak,  set_live_peak) = signal::<Option<f32>>(None);
+    let (progress,   set_progress)  = signal::<f32>(0.0);
+    let (stage_name, set_stage)     = signal::<String>("Initializing".into());
 
-    // ── Event handlers — all UnsyncCallback (Rc-based, no Send+Sync needed) ─
+    // ── Helper: hard reset all state to FM0 ──────────────────────────────────
+    let hard_reset = move || {
+        set_mode.set(CockpitMode::Idle);
+        set_meta.set(None);
+        set_preset.set(None);
+        set_metrics.set(None);
+        set_findings.set(None);
+        set_blob_id.set(None);
+        set_live_lufs.set(None);
+        set_live_peak.set(None);
+        set_progress.set(0.0);
+        set_stage.set("Initializing".into());
+    };
 
+    // ── Event handlers ────────────────────────────────────────────────────────
+
+    // FM0 → FM1: file dropped
     let on_file_drop = UnsyncCallback::new(move |path: String| {
         if path.is_empty() {
             set_mode.set(CockpitMode::Fault(AscCode::ValidationFail));
             return;
         }
-        // FM0 → FM1
-        set_audio_meta.set(Some(stub_meta(&path)));
-        set_preset.set(None);
-        set_metrics.set(None);
-        set_findings.set(None);
-        set_mode.set(CockpitMode::FileLoaded);
+        // Call Tauri load_audio_file (async)
+        spawn_local(async move {
+            match invoke::<crate::commands::AudioMetaResponse>(
+                "load_audio_file",
+                serde_json::json!({ "path": path }),
+            ).await {
+                Ok(resp) => {
+                    set_meta.set(Some(AudioMeta {
+                        name:        resp.name,
+                        format:      resp.format,
+                        sample_rate: resp.sample_rate,
+                        bit_depth:   resp.bit_depth,
+                        duration_s:  resp.duration_s,
+                        channels:    resp.channels,
+                    }));
+                    set_preset.set(None);
+                    set_mode.set(CockpitMode::FileLoaded);
+                }
+                Err(_) => {
+                    set_mode.set(CockpitMode::Fault(AscCode::IoErr));
+                }
+            }
+        });
     });
 
+    // FM1 → FM1.5: preset selected (seals intent)
     let on_preset_select = UnsyncCallback::new(move |preset_id: &'static str| {
-        // FM1 → FM1.5
         set_preset.set(Some(preset_id));
         set_mode.set(CockpitMode::PresetSelected);
     });
 
+    // FM1.5 → FM2 → Data Cascade (FM3→FM4→FM5)
     let on_master = UnsyncCallback::new(move |()| {
-        // FM1.5 → FM2: seal Intent, invoke async stub
-        set_mode.set(CockpitMode::Mastering);
         let preset = sel_preset.get_untracked().unwrap_or("spotify");
+        let audio_path = audio_meta.get_untracked()
+            .map(|m| m.name.clone())
+            .unwrap_or_default();
+
+        set_mode.set(CockpitMode::Mastering);
+        set_progress.set(0.0);
 
         spawn_local(async move {
-            // Phase 5: 2-second simulated DSP (Phase 6: real Tauri IPC call)
-            TimeoutFuture::new(2_000).await;
+            // ── Phase 6: real M0 mastering ─────────────────────────────────
+            // Step 1: trigger_mastering → blob_id
+            let master_result = invoke::<String>(
+                "trigger_mastering",
+                serde_json::json!({
+                    "audio_path": audio_path,
+                    "preset_id":  preset,
+                }),
+            ).await;
 
-            // FM2 → FM3 (dsp_done)
+            let bid = match master_result {
+                Ok(id)  => id,
+                Err(e)  => {
+                    // ASC 0x01 (math error) or 0x02 (I/O error)
+                    let code = if e.contains("I/O") { AscCode::IoErr }
+                               else                 { AscCode::MathErr };
+                    set_mode.set(CockpitMode::Fault(code));
+                    return;
+                }
+            };
+
+            set_blob_id.set(Some(bid.clone()));
+            // FM2 → FM3
             set_mode.set(CockpitMode::Mastered);
 
-            // FM3 → FM4 (automatic — analysis_done)
-            TimeoutFuture::new(400).await;
-            set_metrics.set(Some(Metrics::stub()));
-            set_mode.set(CockpitMode::InsightsReady);
+            // Step 2: get_golden_blob → populate metrics (FM3 → FM4)
+            let blob_result = invoke::<GoldenBlobJson>(
+                "get_golden_blob",
+                serde_json::json!({ "blob_id": bid }),
+            ).await;
 
-            // FM4 → FM5 (automatic — coach_done)
-            TimeoutFuture::new(400).await;
-            set_findings.set(Some(stub_findings(preset)));
-            set_mode.set(CockpitMode::CoachReady);
+            let blob = match blob_result {
+                Ok(b)  => b,
+                Err(_) => {
+                    set_mode.set(CockpitMode::Fault(AscCode::IoErr));
+                    return;
+                }
+            };
+
+            set_metrics.set(Some(Metrics::from_blob(&blob)));
+            set_mode.set(CockpitMode::InsightsReady);  // FM4
+
+            // Step 3: evaluate_findings → real CoachFindings (FM4 → FM5)
+            let findings_result = invoke::<crate::commands::CoachFindingsResponse>(
+                "evaluate_findings",
+                serde_json::json!({ "blob": blob }),
+            ).await;
+
+            match findings_result {
+                Ok(resp) => {
+                    let issues = resp.issues.into_iter().map(|i| Issue {
+                        id:       i.id,
+                        severity: Severity::from_str(&i.severity),
+                        current:  i.current,
+                        target:   i.target,
+                        delta:    i.delta,
+                        tags:     i.tags,
+                    }).collect();
+                    set_findings.set(Some(CoachFindings {
+                        issues,
+                        recommendation: resp.recommendation,
+                    }));
+                    set_mode.set(CockpitMode::CoachReady);  // FM5
+                }
+                Err(_) => {
+                    // Non-fatal — FM5 with empty findings
+                    set_findings.set(Some(CoachFindings {
+                        issues: vec![],
+                        recommendation: "Rule evaluation unavailable.".into(),
+                    }));
+                    set_mode.set(CockpitMode::CoachReady);
+                }
+            }
         });
     });
 
+    // FM2 → FM1: abort mastering
     let on_abort = UnsyncCallback::new(move |()| {
-        // FM2 → FM1 (abort)
         set_mode.set(CockpitMode::FileLoaded);
         set_preset.set(None);
     });
 
+    // FM3/4/5 → FM0: load new file (hard reset)
     let on_load_new = UnsyncCallback::new(move |()| {
-        // Atomic reset FM3/4/5 → FM0 → FM1 (user sees FM1, FM0 is internal)
-        // state-machine.md §4.2
-        set_mode.set(CockpitMode::Idle);
-        set_audio_meta.set(None);
-        set_preset.set(None);
-        set_metrics.set(None);
-        set_findings.set(None);
+        hard_reset();
     });
 
+    // FM5 → FM6: export
     let on_export = UnsyncCallback::new(move |()| {
-        // FM5 → FM6 (Phase 5 placeholder)
+        let bid = match blob_id.get_untracked() {
+            Some(id) => id,
+            None => {
+                set_mode.set(CockpitMode::Fault(AscCode::IoErr));
+                return;
+            }
+        };
         set_mode.set(CockpitMode::Exporting);
+
         spawn_local(async move {
-            // Phase 5 placeholder: 1.5s, then back to FM5
-            TimeoutFuture::new(1_500).await;
-            set_mode.set(CockpitMode::CoachReady);
+            let result = invoke::<crate::commands::ExportResult>(
+                "export_audio",
+                serde_json::json!({
+                    "blob_id": bid,
+                    "format":  "flac",
+                    "path":    "/tmp/stillair-export.flac",
+                }),
+            ).await;
+
+            match result {
+                Ok(_)  => set_mode.set(CockpitMode::CoachReady),  // FM5
+                Err(_) => set_mode.set(CockpitMode::Fault(AscCode::IoErr)),
+            }
         });
     });
 
+    // FM-ERR → FM0: master reset (never FM1 — state-machine.md §4.3)
     let on_master_reset = UnsyncCallback::new(move |()| {
-        // FM-ERR → FM0 ONLY — never shortcut to FM1
-        // state-machine.md §4.3
-        set_mode.set(CockpitMode::Idle);
-        set_audio_meta.set(None);
-        set_preset.set(None);
-        set_metrics.set(None);
-        set_findings.set(None);
+        hard_reset();
     });
 
     // ── View ──────────────────────────────────────────────────────────────────
@@ -160,9 +266,12 @@ pub fn App() -> impl IntoView {
                 on_file_drop=on_file_drop
                 metrics=metrics
                 findings=findings
+                live_lufs=live_lufs
+                live_peak=live_peak
+                progress=progress
+                stage_name=stage_name
             />
 
-            // FM-ERR overlay — rendered on top of all panels
             {move || match mode.get() {
                 CockpitMode::Fault(code) => view! {
                     <FaultDisplay code=code on_reset=on_master_reset />
@@ -172,3 +281,5 @@ pub fn App() -> impl IntoView {
         </div>
     }
 }
+
+

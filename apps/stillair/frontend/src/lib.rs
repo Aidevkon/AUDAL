@@ -3,9 +3,11 @@
 
 mod app;
 mod cockpit;
+mod commands;
 mod components;
 mod state;
 mod types;
+
 
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
