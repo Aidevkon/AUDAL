@@ -19,6 +19,8 @@
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use js_sys;
+
 
 use crate::cockpit::Cockpit;
 use crate::components::fault_display::FaultDisplay;
@@ -33,21 +35,43 @@ extern "C" {
     /// Tauri v2 IPC bridge — always at window.__TAURI_INTERNALS__.invoke.
     /// withGlobalTauri: true additionally wires window.__TAURI__ high-level API,
     /// but raw IPC lives here regardless of that setting.
-    #[wasm_bindgen(js_namespace = ["window", "__TAURI_INTERNALS__"], js_name = invoke)]
-    async fn tauri_invoke(cmd: &str, args: JsValue) -> JsValue;
+    ///
+    /// IMPORTANT: must return Result<JsValue, JsValue>.
+    /// Tauri rejects the Promise on Err — wasm-bindgen maps a rejected Promise
+    /// to a WASM trap/panic if the return is declared as plain JsValue.
+    /// Result<JsValue, JsValue> propagates the rejection as Err instead.
+    #[wasm_bindgen(catch, js_namespace = ["window", "__TAURI_INTERNALS__"], js_name = invoke)]
+    async fn tauri_invoke(cmd: &str, args: JsValue) -> Result<JsValue, JsValue>;
 }
 
 /// Invoke a Tauri command and deserialize the result.
+///
+/// Error path: the Tauri backend Err(_) → JS Promise rejection → Err(JsValue).
+/// We extract the error message from the JS Error object (.message property)
+/// or fall back to the string representation.
 async fn invoke<T: for<'de> serde::Deserialize<'de>>(
     cmd: &str,
     args: serde_json::Value,
 ) -> Result<T, String> {
     let js_args = serde_wasm_bindgen::to_value(&args)
         .map_err(|e| format!("Serialize error: {e}"))?;
-    let result = tauri_invoke(cmd, js_args).await;
+
+    let result = tauri_invoke(cmd, js_args).await
+        .map_err(|js_err| {
+            // js_err is a JS Error object. Try to extract .message first,
+            // then fall back to the full string representation.
+            js_sys::Reflect::get(&js_err, &wasm_bindgen::JsValue::from_str("message"))
+                .ok()
+                .and_then(|v| v.as_string())
+                .unwrap_or_else(|| {
+                    js_err.as_string().unwrap_or_else(|| "Unknown Tauri IPC error".into())
+                })
+        })?;
+
     serde_wasm_bindgen::from_value(result)
         .map_err(|e| format!("Deserialize error: {e}"))
 }
+
 
 // ── Root App component ────────────────────────────────────────────────────────
 
