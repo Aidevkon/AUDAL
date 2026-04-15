@@ -380,7 +380,7 @@ function __wbg_get_imports() {
             return ret;
         },
         __wbg_invoke_ace758e9254ed40a: function(arg0, arg1, arg2) {
-            const ret = window.__TAURI__.core.invoke(getStringFromWasm0(arg0, arg1), arg2);
+            const ret = window.__TAURI_INTERNALS__.invoke(getStringFromWasm0(arg0, arg1), arg2);
             return ret;
         },
         __wbg_isArray_c3109d14ffc06469: function(arg0) {
