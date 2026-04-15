@@ -1,0 +1,5 @@
+{"timestamp":"2026-04-15T21:05:11.658829543+00:00","event_type":"m0d.startup","level":"audit","message":"M0 daemon starting"}
+{"timestamp":"2026-04-15T21:06:53.783538363+00:00","event_type":"m0d.startup","level":"audit","message":"M0 daemon starting"}
+{"timestamp":"2026-04-15T21:09:51.401100089+00:00","event_type":"m0d.startup","level":"audit","message":"M0 daemon starting"}
+{"timestamp":"2026-04-15T21:10:29.770682735+00:00","event_type":"m0d.startup","level":"audit","message":"M0 daemon starting"}
+{"timestamp":"2026-04-15T23:29:46.141989553+00:00","event_type":"m0d.startup","level":"audit","message":"M0 daemon starting"}

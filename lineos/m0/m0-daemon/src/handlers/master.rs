@@ -117,14 +117,43 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let original_ch   = pcm.original_ch;
     let duration_ms   = pcm.duration_ms;
 
+    tracing::info!(
+        "Decoded: {} samples, sr={}, ch={}, first5={:?}",
+        pcm.samples.len(),
+        pcm.sample_rate,
+        pcm.channels,
+        &pcm.samples[..5.min(pcm.samples.len())],
+    );
+
     // ── Silence guard (after real decode) ────────────────────────────────────
     let rms = compute_rms(&pcm.samples);
     let rms_dbfs = if rms > 0.0 { 20.0 * (rms as f64).log10() as f32 }
                    else         { f32::NEG_INFINITY };
 
+    // Rough normalization gain estimate (RMS-based) — used only for overflow guard.
+    // Full LUFS-accurate gain computed inside sp314-dsp AnalysisAccumulator.
+    let norm_gain_check = rms_to_lufs(rms);
+    tracing::info!("RMS: {:.2} dBFS, est. LUFS: {:.4}", rms_dbfs, norm_gain_check);
+
     if rms_dbfs < -60.0 {
         return Err(format!(
             "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
+        ));
+    }
+
+    // ── Normalization gain overflow guard ─────────────────────────────────────
+    // AnalysisAccumulator::normalization_gain_linear() returns inf when
+    // integrated_lufs == f32::NEG_INFINITY (no valid LUFS blocks — track < 400ms
+    // or K-weighted energy below absolute gate). inf * sample = NaN in Stage 1.
+    // Guard: if rough-LUFS signals the gain would exceed 32× (30 dB), the track
+    // is too quiet or too short to normalize safely — fail with a clear message.
+    let rough_lufs = norm_gain_check; // already computed: rms_to_lufs(rms)
+    let rough_gain_db = -14.0_f32 - rough_lufs; // worst-case against Spotify target
+    if rough_gain_db > 30.0 {
+        return Err(format!(
+            "DSP arithmetic error — normalization gain would exceed 32× \
+             (input RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB). \
+             Track too quiet or too short (< 400ms) for loudness normalization."
         ));
     }
 

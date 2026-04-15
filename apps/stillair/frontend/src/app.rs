@@ -49,6 +49,10 @@ extern "C" {
 /// Error path: the Tauri backend Err(_) → JS Promise rejection → Err(JsValue).
 /// We extract the error message from the JS Error object (.message property)
 /// or fall back to the string representation.
+///
+/// Deserialization: uses JSON round-trip (JsValue → JSON string → serde_json)
+/// rather than serde_wasm_bindgen::from_value, which is known to mis-map
+/// #[serde(rename)] attributes (e.g. blob_type ↔ "type") in v0.6.
 async fn invoke<T: for<'de> serde::Deserialize<'de>>(
     cmd: &str,
     args: serde_json::Value,
@@ -68,8 +72,16 @@ async fn invoke<T: for<'de> serde::Deserialize<'de>>(
                 })
         })?;
 
-    serde_wasm_bindgen::from_value(result)
-        .map_err(|e| format!("Deserialize error: {e}"))
+    // Use JSON round-trip to deserialize: JsValue → JSON string → T.
+    // This path correctly honours all #[serde(rename)] attributes, whereas
+    // serde_wasm_bindgen::from_value bypasses them for object property lookup.
+    let json_str = js_sys::JSON::stringify(&result)
+        .map_err(|_| "Failed to stringify JsValue to JSON".to_string())?
+        .as_string()
+        .ok_or_else(|| "JSON::stringify returned non-string".to_string())?;
+
+    serde_json::from_str::<T>(&json_str)
+        .map_err(|e| format!("Deserialize error: {e} — JSON was: {json_str}"))
 }
 
 
@@ -160,20 +172,42 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             // ── Phase 6: real M0 mastering ─────────────────────────────────
             // Step 1: trigger_mastering → blob_id
+            leptos::logging::log!("MASTER: invoking trigger_mastering path={} preset={}", audio_path, preset);
             let master_result = invoke::<String>(
                 "trigger_mastering",
                 serde_json::json!({
-                    "audio_path": audio_path,
-                    "preset_id":  preset,
+                    "audioPath": audio_path,
+                    "presetId":  preset,
                 }),
             ).await;
 
             let bid = match master_result {
-                Ok(id)  => id,
+                Ok(id)  => {
+                    leptos::logging::log!("MASTER: got blob_id={}", id);
+                    id
+                }
                 Err(e)  => {
-                    // ASC 0x01 (math error) or 0x02 (I/O error)
-                    let code = if e.contains("I/O") { AscCode::IoErr }
-                               else                 { AscCode::MathErr };
+                    leptos::logging::log!("MASTER ERROR: {}", e);
+                    // Map M0 error strings to the correct ASC fault code.
+                    // Authority: M0 Constitution v2.0 §04 ASC codes:
+                    //   0x01 MathErr  — NaN/Inf in DSP output (M0 says "DSP arithmetic")
+                    //   0x02 IoErr    — file read, network, or IPC failure
+                    //   0x04 ValidationFail — input rejected by M0 validation
+                    //
+                    // Default to IoErr — the old fallback `else { MathErr }` incorrectly
+                    // classified ALL non-I/O IPC/deserialize failures as a DSP math error.
+                    let code = if e.contains("DSP arithmetic")
+                                  || e.contains("NaN")
+                                  || e.contains("Inf") {
+                        AscCode::MathErr
+                    } else if e.contains("ASC:0x04")
+                                  || e.contains("validation")
+                                  || e.contains("silence") {
+                        AscCode::ValidationFail
+                    } else {
+                        AscCode::IoErr
+                    };
+                    leptos::logging::warn!("trigger_mastering → Fault({code:?})");
                     set_mode.set(CockpitMode::Fault(code));
                     return;
                 }
@@ -184,14 +218,19 @@ pub fn App() -> impl IntoView {
             set_mode.set(CockpitMode::Mastered);
 
             // Step 2: get_golden_blob → populate metrics (FM3 → FM4)
+            leptos::logging::log!("MASTER: fetching blob {}", bid);
             let blob_result = invoke::<GoldenBlobJson>(
                 "get_golden_blob",
-                serde_json::json!({ "blob_id": bid }),
+                serde_json::json!({ "blobId": bid }),
             ).await;
 
             let blob = match blob_result {
-                Ok(b)  => b,
-                Err(_) => {
+                Ok(b)  => {
+                    leptos::logging::log!("BLOB OK: id={} lufs={}", b.id, b.loudness.integrated_lufs);
+                    b
+                }
+                Err(e) => {
+                    leptos::logging::log!("BLOB ERROR: {}", e);
                     set_mode.set(CockpitMode::Fault(AscCode::IoErr));
                     return;
                 }
@@ -247,15 +286,19 @@ pub fn App() -> impl IntoView {
     //   Invalid extension        → FM-ERR ASC 0x04 (ValidationFail)
     let on_load_new = UnsyncCallback::new(move |()| {
         spawn_local(async move {
+            leptos::logging::log!("LOAD_NEW: invoking open_audio_file");
             match invoke::<Option<crate::commands::AudioMetaResponse>>(
                 "open_audio_file",
                 serde_json::json!({}),
             ).await {
                 // User cancelled — stay exactly where we are
-                Ok(None) => {}
+                Ok(None) => {
+                    leptos::logging::log!("LOAD_NEW: dialog cancelled");
+                }
 
                 // File selected and valid — reset state, transition FM1
                 Ok(Some(resp)) => {
+                    leptos::logging::log!("LOAD_NEW: file selected path={} format={}", resp.path, resp.format);
                     // Hard reset all signals before populating new file
                     set_mode.set(CockpitMode::Idle);
                     set_meta.set(None);
@@ -282,11 +325,13 @@ pub fn App() -> impl IntoView {
 
                 // ASC 0x04: unsupported extension
                 Err(e) if e.contains("ASC:0x04") => {
+                    leptos::logging::log!("LOAD_NEW ERROR (ValidationFail): {}", e);
                     set_mode.set(CockpitMode::Fault(AscCode::ValidationFail));
                 }
 
-                // Other error (dialog crash, etc.) — IoErr
-                Err(_) => {
+                // Other error (capability denied, dialog crash, etc.) — IoErr
+                Err(e) => {
+                    leptos::logging::log!("LOAD_NEW ERROR (IoErr): {}", e);
                     set_mode.set(CockpitMode::Fault(AscCode::IoErr));
                 }
             }
@@ -308,9 +353,9 @@ pub fn App() -> impl IntoView {
             let result = invoke::<crate::commands::ExportResult>(
                 "export_audio",
                 serde_json::json!({
-                    "blob_id": bid,
-                    "format":  "flac",
-                    "path":    "/tmp/stillair-export.flac",
+                    "blobId": bid,
+                    "format": "flac",
+                    "path":   "/tmp/stillair-export.flac",
                 }),
             ).await;
 

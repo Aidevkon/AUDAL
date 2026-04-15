@@ -23,6 +23,7 @@ js-sys = "0.3"
 serde_wasm_bindgen = { package = "serde-wasm-bindgen", version = "0.6" }
 
 gloo-timers = { version = "0.3", features = ["futures"] }
+console_error_panic_hook = "0.1"
 
 
 [dev-dependencies]

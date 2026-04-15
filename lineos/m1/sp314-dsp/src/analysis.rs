@@ -246,8 +246,17 @@ impl AnalysisAccumulator {
 
     /// Compute linear gain needed to normalize to target_lufs.
     /// target_lufs is loaded from bmr-128.schema.json presets — never hardcoded.
+    ///
+    /// Guard: if integrated_lufs is -∞ (no valid LUFS blocks — track too short
+    /// or too quiet for the absolute gate), returning 10^(∞/20) = inf would
+    /// propagate NaN through Stage 1 multiplication. Clamp gain to 32× max.
     pub fn normalization_gain_linear(&self, target_lufs: f32) -> f32 {
-        let gain_db = target_lufs - self.integrated_lufs;
+        // If analysis produced no valid LUFS blocks, integrated_lufs stays at
+        // f32::NEG_INFINITY (set in new()). Return unity gain rather than inf.
+        if !self.integrated_lufs.is_finite() {
+            return 1.0;
+        }
+        let gain_db = (target_lufs - self.integrated_lufs).clamp(-60.0, 30.0);
         libm::powf(10.0, gain_db / 20.0)
     }
 
@@ -289,5 +298,22 @@ mod tests {
         // Normalization gain to -14.0 LUFS target should be a positive linear value
         let gain = acc.normalization_gain_linear(-14.0);
         assert!(gain > 0.0, "normalization gain should be positive");
+    }
+
+    #[test]
+    fn test_normalization_gain_no_data_is_finite() {
+        // Regression test for gargar.mp3 NaN bug:
+        // If no LUFS blocks were produced (track too short, below absolute gate, or
+        // K-weighted energy too low), integrated_lufs stays at f32::NEG_INFINITY.
+        // Without the guard: gain_db = -14 - (-inf) = +inf
+        //                    powf(10, +inf/20) = +inf
+        //                    sample * inf = NaN → Stage 1 "DSP arithmetic error".
+        // With guard: must return 1.0 (unity gain) — finite and non-NaN.
+        let acc = AnalysisAccumulator::new(48000, 2); // no data fed
+        let gain = acc.normalization_gain_linear(-14.0);
+        assert!(gain.is_finite(), "gain must be finite when no LUFS data: got {gain}");
+        assert!(gain > 0.0,      "gain must be positive: got {gain}");
+        assert!(!gain.is_nan(),  "gain must never be NaN: got {gain}");
+        assert_eq!(gain, 1.0,   "gain must be unity (1.0) when no LUFS data: got {gain}");
     }
 }

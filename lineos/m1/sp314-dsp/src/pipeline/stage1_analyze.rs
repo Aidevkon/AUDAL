@@ -20,6 +20,10 @@ impl Stage1Analyze {
     /// Returns Err if DC offset or anomaly detected (fatal per M0 Constitution §04.3).
     pub fn apply_gain_and_check(&self, chunk: &mut AudioChunk) -> Result<(), &'static str> {
         for sample in chunk.samples.iter_mut() {
+            // Sanitize before gain: NaN/Inf entering Stage 1 must never propagate.
+            // decode.rs sanitizes post-resample, but this is defense-in-depth.
+            if !sample.is_finite() { *sample = 0.0; }
+
             *sample *= self.norm_gain;
             // Hard clip detection — values > 1.5 indicate gain stage miscalculation
             if libm::fabsf(*sample) > 1.5 {
