@@ -154,8 +154,8 @@ pub struct GoldenBlobJson {
     pub created_at:       String,
     /// SHA-256 hex of original input file(s).
     pub input_hash:       String,
-    /// Determinism seed, derived from input_hash.
-    pub seed:             u64,
+    /// Determinism seed, derived from input_hash. Serialized as string to preserve u64 precision in JS.
+    pub seed:             String,
     /// Semver of the producing engine (e.g. "0.4.0").
     pub pipeline_version: String,
     /// User-selected preset (e.g. "spotify"). Not in spec directly but needed
@@ -265,7 +265,7 @@ mod tests {
             blob_type:        "audio".into(),
             created_at:       "2026-04-15T00:00:00Z".into(),
             input_hash:       "abcdef1234567890".into(),
-            seed:             42,
+            seed:             "42".into(),
             pipeline_version: "0.4.0".into(),
             preset_id:        "spotify".into(),
             loudness: LoudnessMetricsJson {

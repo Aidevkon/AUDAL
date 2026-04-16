@@ -40,7 +40,7 @@ pub struct GoldenBlobJson {
     pub blob_type:        String,
     pub created_at:       String,
     pub input_hash:       String,
-    pub seed:             u64,
+    pub seed:             String,  // serialized as JSON string — u64 exceeds JS safe integer range
     pub pipeline_version: String,
     pub preset_id:        String,
     pub loudness:         LoudnessMetricsJson,

@@ -103,7 +103,7 @@ mod tests {
             blob_type:        "audio".into(),
             created_at:       "2026-04-15T00:00:00Z".into(),
             input_hash:       "aabbccdd".into(),
-            seed:             1,
+            seed:             "1".into(),
             pipeline_version: "0.4.0".into(),
             preset_id:        preset.into(),
             loudness: LoudnessMetricsJson {
