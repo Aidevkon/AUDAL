@@ -10,6 +10,8 @@
 
 use dioxus::prelude::*;
 use serde_json::json;
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
@@ -84,7 +86,8 @@ pub fn SessionPanel(
 #[component]
 fn DropZone(mode: Signal<CockpitMode>) -> Element {
     let on_load = move |_| {
-        spawn(async move {
+        web_sys::console::log_1(&JsValue::from_str("[session] LOAD NEW clicked"));
+        spawn_local(async move {
             match invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
                 Ok(Some(meta)) => {
                     mode.set(CockpitMode::FileLoaded {
@@ -242,20 +245,34 @@ fn MasterButton(
     preset_id:     String,
 ) -> Element {
     let on_master = move |_| {
-        let p = path.clone();
+        web_sys::console::log_1(&JsValue::from_str("[session] MASTER CLICKED"));
+        let mode_val = format!("{:?}", mode.read().clone());
+        web_sys::console::log_1(&JsValue::from_str(
+            &format!("[session] current mode: {}", mode_val)
+        ));
+
+        let p  = path.clone();
         let pr = preset_id.clone();
-        spawn(async move {
+
+        // Use spawn_local — the correct WASM async primitive.
+        // Dioxus spawn() may not drive JsFuture correctly in web target.
+        spawn_local(async move {
+            web_sys::console::log_1(&JsValue::from_str("[session] spawn_local started"));
             mode.set(CockpitMode::Mastering {
                 path:      p.clone(),
                 preset_id: pr.clone(),
             });
 
+            web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
             let blob_id = match invoke::<String, _>(
                 "trigger_mastering",
                 json!({ "audio_path": p, "preset_id": pr }),
             ).await {
-                Ok(id) => id,
-                Err(e) => {
+                Ok(id)  => id,
+                Err(e)  => {
+                    web_sys::console::log_1(&JsValue::from_str(
+                        &format!("[session] trigger_mastering FAILED: {e}")
+                    ));
                     mode.set(CockpitMode::Fault {
                         code:    AscCode::IoErr,
                         message: format!("Mastering failed: {e}"),
@@ -263,14 +280,21 @@ fn MasterButton(
                     return;
                 }
             };
+            web_sys::console::log_1(&JsValue::from_str(
+                &format!("[session] mastering done, blob_id={blob_id}")
+            ));
 
             // Single IPC call: all session data in one shot (P9-008)
+            web_sys::console::log_1(&JsValue::from_str("[session] calling get_session_state..."));
             let state = match invoke::<crate::types::SessionStateJson, _>(
                 "get_session_state",
                 json!({ "blob_id": blob_id }),
             ).await {
-                Ok(s) => s,
-                Err(e) => {
+                Ok(s)   => s,
+                Err(e)  => {
+                    web_sys::console::log_1(&JsValue::from_str(
+                        &format!("[session] get_session_state FAILED: {e}")
+                    ));
                     mode.set(CockpitMode::Fault {
                         code:    AscCode::IoErr,
                         message: format!("Session state failed: {e}"),
@@ -278,8 +302,9 @@ fn MasterButton(
                     return;
                 }
             };
+            web_sys::console::log_1(&JsValue::from_str("[session] session state ok, transitioning to FM5"));
 
-            // FM5 — write session_state and transition mode atomically
+            // FM5
             session_state.set(Some(state));
             mode.set(CockpitMode::CoachReady { blob_id });
         });
@@ -366,7 +391,7 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
         move |_| {
             let b   = bid.clone();
             let fmt = export_format.read().clone();
-            spawn(async move {
+            spawn_local(async move {
                 mode.set(CockpitMode::Exporting {
                     blob_id: b.clone(),
                     format:  fmt.clone(),
@@ -381,7 +406,6 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                         mode.set(CockpitMode::CoachReady { blob_id: b });
                     }
                     Err(e) if e.contains("cancelled") => {
-                        // Non-fatal — stay in FM5
                         mode.set(CockpitMode::CoachReady { blob_id: b });
                     }
                     Err(e) => {
