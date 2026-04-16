@@ -266,7 +266,7 @@ fn MasterButton(
             web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
             let blob_id = match invoke::<String, _>(
                 "trigger_mastering",
-                json!({ "audio_path": p, "preset_id": pr }),
+                json!({ "audioPath": p, "presetId": pr }),
             ).await {
                 Ok(id)  => id,
                 Err(e)  => {
@@ -288,7 +288,7 @@ fn MasterButton(
             web_sys::console::log_1(&JsValue::from_str("[session] calling get_session_state..."));
             let state = match invoke::<crate::types::SessionStateJson, _>(
                 "get_session_state",
-                json!({ "blob_id": blob_id }),
+                json!({ "blobId": blob_id }),
             ).await {
                 Ok(s)   => s,
                 Err(e)  => {
@@ -399,7 +399,7 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
 
                 match invoke::<crate::types::ExportResult, _>(
                     "export_audio",
-                    json!({ "blob_id": b, "format": fmt }),
+                    json!({ "blobId": b, "format": fmt }),
                 ).await {
                     Ok(r) => {
                         eprintln!("[export] written: {} ({})", r.written_path, r.format);
