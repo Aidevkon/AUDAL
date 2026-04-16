@@ -1,30 +1,32 @@
-//! ipc.rs — Tauri IPC bridge for Dioxus desktop. P11-003
+//! ipc.rs — Tauri IPC bridge for Dioxus web. P11-003
 //! Authority: Phase 11 task-decomposition P11-003
 //!
-//! Dioxus 0.6 desktop apps run inside a Tauri WebView.
-//! `window.__TAURI_INTERNALS__` is injected by Tauri with `withGlobalTauri: true`.
+//! Calls window.__TAURI_INTERNALS__.invoke() via dioxus_document::eval().
+//! All command names are the exact Rust snake_case registered name.
+//! All JSON arg keys are the exact Rust parameter name (snake_case).
 //!
-//! The same Tauri commands (triggerMastering, getSessionState, exportAudio,
-//! openAudioFile) work identically from Dioxus as from the Leptos frontend.
-//!
-//! API (dioxus-document 0.6.3):
-//!   eval(script: &str) -> Eval        — free function from dioxus::prelude::*
-//!   Eval::join::<T>() -> Result<T, _> — typed async return via IntoFuture
-//!
-//! FORBIDDEN:
-//!   ❌ Calling M0 directly (all calls go through Tauri commands)
-//!   ❌ Business logic in IPC layer (IPC is pure transport)
-//!   ❌ Core crate imports
+//! Console logging is active for diagnostics — grep "IPC" in DevTools.
 
 use dioxus_document::eval;
 use serde::{de::DeserializeOwned, Serialize};
 
-/// Invoke a Tauri command from Dioxus desktop via JavaScript eval.
+/// Log to the browser/WebView console.
+#[allow(unused_macros)]
+macro_rules! clog {
+    ($($arg:tt)*) => {{
+        web_sys::console::log_1(&::wasm_bindgen::JsValue::from_str(
+            &format!($($arg)*)
+        ));
+    }};
+}
+
+/// Invoke a Tauri command from Dioxus web via JavaScript eval.
 ///
-/// Uses dioxus_document::eval() to execute JS in the embedded WebView,
-/// calling window.__TAURI_INTERNALS__.invoke — same as the Leptos frontend.
+/// Uses dioxus_document::eval() → Eval::join::<R>() to run JS inside
+/// the Tauri WebView and deserialize the return value.
 ///
-/// Eval::join::<R>() awaits the JS return and deserializes into R.
+/// Tauri v2: command names are exact Rust snake_case, arg keys are
+/// exact Rust parameter names (also snake_case).
 pub async fn invoke<R, A>(command: &str, args: A) -> Result<R, String>
 where
     R: DeserializeOwned + 'static,
@@ -33,6 +35,33 @@ where
     let args_json = serde_json::to_string(&args)
         .map_err(|e| format!("IPC serialize args failed: {e}"))?;
 
+    clog!("[IPC] invoke: {} args={}", command, args_json);
+
+    // Check that the Tauri IPC bridge is present
+    let check_script = r#"
+        if (typeof window.__TAURI_INTERNALS__ === 'undefined') {
+            return "TAURI_INTERNALS_MISSING";
+        }
+        return "TAURI_INTERNALS_OK";
+    "#;
+
+    let bridge_check = eval(check_script)
+        .join::<String>()
+        .await
+        .unwrap_or_else(|e| format!("check_failed: {e:?}"));
+
+    clog!("[IPC] TAURI_INTERNALS check: {}", bridge_check);
+
+    if bridge_check != "TAURI_INTERNALS_OK" {
+        let err = format!(
+            "Tauri IPC bridge not available ({bridge_check}). \
+             Ensure withGlobalTauri: true in tauri.conf.json."
+        );
+        clog!("[IPC] ERROR: {}", err);
+        return Err(err);
+    }
+
+    // Invoke the actual command
     let script = format!(
         r#"
         try {{
@@ -46,13 +75,21 @@ where
         "#
     );
 
-    // eval() returns an Eval handle; join::<R>() drives the JS to completion
-    // and deserializes the return value. The explicit turbofish is required
-    // because R itself carries the type information.
-    eval(&script)
+    let result = eval(&script)
         .join::<R>()
         .await
-        .map_err(|e| format!("IPC failed [{command}]: {e:?}"))
+        .map_err(|e| {
+            let msg = format!("IPC failed [{command}]: {e:?}");
+            clog!("[IPC] ERROR: {}", msg);
+            msg
+        });
+
+    match &result {
+        Ok(_)    => clog!("[IPC] {} ✅ ok", command),
+        Err(e)   => clog!("[IPC] {} ❌ {}", command, e),
+    }
+
+    result
 }
 
 /// Convenience: invoke with no arguments.
