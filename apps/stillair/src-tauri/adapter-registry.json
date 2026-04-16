@@ -1,0 +1,16 @@
+{
+  "adapters": [
+    {
+      "id": "coach-narrative-adapter",
+      "version": "1.0",
+      "app": "A1",
+      "layer": "aether",
+      "status": "active",
+      "provider": "ollama",
+      "models": ["phi3.5:3.8b", "gemma2:9b"],
+      "input_schema": "contracts/coach-findings.schema.json",
+      "output_schema": "contracts/coach-narrative.schema.json",
+      "authority": "LLM Adapter Amendment v1.1 §A5.4"
+    }
+  ]
+}

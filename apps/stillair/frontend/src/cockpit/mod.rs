@@ -7,7 +7,7 @@ pub mod session_panel;
 
 use leptos::prelude::*;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{AudioMeta, CoachFindings, Metrics};
+use crate::types::{AudioMeta, CoachFindings, CoachNarrativeJson, Metrics};
 use session_panel::SessionPanel;
 use insights_panel::InsightsPanel;
 use coach_panel::CoachPanel;
@@ -21,6 +21,7 @@ pub fn Cockpit(
     on_file_drop:     UnsyncCallback<String>,
     metrics:          ReadSignal<Option<Metrics>>,
     findings:         ReadSignal<Option<CoachFindings>>,
+    narrative:        ReadSignal<Option<CoachNarrativeJson>>,  // Phase 8
     // FM2 live telemetry — P6-007
     live_lufs:        ReadSignal<Option<f32>>,
     live_peak:        ReadSignal<Option<f32>>,
@@ -47,6 +48,7 @@ pub fn Cockpit(
             <CoachPanel
                 mode=mode
                 findings=findings
+                narrative=narrative
             />
         </div>
     }

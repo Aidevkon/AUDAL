@@ -9,9 +9,11 @@ members = [
     "lineos/m1/rule-engine",
     "apps/stillair/src-tauri",
     "apps/stillair/frontend",
+    "creator-os/shared/adapter-runtime",  # Phase 8: Aether LLM adapter runtime
 ]
 # Phase 1: m0-daemon       per P1-001
 # Phase 2: sp314-dsp       per P2-001
 # Phase 3: telemetry + metadata + insights  per P3-005
 # Phase 4: rule-engine     per P4-007
 # Phase 5: stillair + stillair-frontend  per P5-001
+# Phase 8: adapter-runtime per P8-002

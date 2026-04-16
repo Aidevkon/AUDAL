@@ -26,7 +26,7 @@ use crate::cockpit::Cockpit;
 use crate::components::fault_display::FaultDisplay;
 use crate::components::transport_bar::TransportBar;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
-use crate::types::{AudioMeta, CoachFindings, GoldenBlobJson, Issue, Metrics, Severity, TelemetrySignal};
+use crate::types::{AudioMeta, CoachFindings, CoachNarrativeJson, GoldenBlobJson, Issue, Metrics, Severity, TelemetrySignal};
 
 // ── Tauri invoke helper ───────────────────────────────────────────────────────
 
@@ -95,6 +95,7 @@ pub fn App() -> impl IntoView {
     let (sel_preset, set_preset)    = signal::<Option<&'static str>>(None);
     let (metrics,    set_metrics)   = signal::<Option<Metrics>>(None);
     let (findings,   set_findings)  = signal::<Option<CoachFindings>>(None);
+    let (narrative,  set_narrative)  = signal::<Option<CoachNarrativeJson>>(None); // Phase 8
     let (blob_id,    set_blob_id)   = signal::<Option<String>>(None);
     // FM2 live telemetry signals
     let (live_lufs,  set_live_lufs) = signal::<Option<f32>>(None);
@@ -109,6 +110,7 @@ pub fn App() -> impl IntoView {
         set_preset.set(None);
         set_metrics.set(None);
         set_findings.set(None);
+        set_narrative.set(None);  // Phase 8
         set_blob_id.set(None);
         set_live_lufs.set(None);
         set_live_peak.set(None);
@@ -247,7 +249,7 @@ pub fn App() -> impl IntoView {
 
             match findings_result {
                 Ok(resp) => {
-                    let issues = resp.issues.into_iter().map(|i| Issue {
+                    let issues: Vec<Issue> = resp.issues.into_iter().map(|i| Issue {
                         id:       i.id,
                         severity: Severity::from_str(&i.severity),
                         current:  i.current,
@@ -255,18 +257,54 @@ pub fn App() -> impl IntoView {
                         delta:    i.delta,
                         tags:     i.tags,
                     }).collect();
-                    set_findings.set(Some(CoachFindings {
-                        issues,
-                        recommendation: resp.recommendation,
-                    }));
+                    let findings_val = CoachFindings {
+                        issues: issues.clone(),
+                        recommendation: resp.recommendation.clone(),
+                    };
+                    set_findings.set(Some(findings_val.clone()));
                     set_mode.set(CockpitMode::CoachReady);  // FM5
+
+                    // Step 4: get_coach_narrative → LLM narrative (FM5 → display)
+                    // Non-fatal: if Ollama is down, findings still display without narrative.
+                    let findings_for_coach = crate::commands::CoachFindingsResponse {
+                        issues: findings_val.issues.iter().map(|i| crate::commands::IssueResponse {
+                            id:       i.id.clone(),
+                            severity: format!("{:?}", i.severity).to_lowercase(),
+                            current:  i.current,
+                            target:   i.target,
+                            delta:    i.delta,
+                            tags:     i.tags.clone(),
+                        }).collect(),
+                        recommendation: findings_val.recommendation.clone(),
+                    };
+                    leptos::logging::log!("COACH: invoking get_coach_narrative");
+                    let narrative_result = invoke::<CoachNarrativeJson>(
+                        "get_coach_narrative",
+                        serde_json::json!({ "findings": findings_for_coach }),
+                    ).await;
+                    match narrative_result {
+                        Ok(n) => {
+                            leptos::logging::log!(
+                                "COACH: narrative ok model={} explanations={}",
+                                n.model_used, n.explanations.len()
+                            );
+                            set_narrative.set(Some(n));
+                        }
+                        Err(e) => {
+                            // Non-fatal — coach narrative is optional enrichment
+                            leptos::logging::log!("COACH: narrative unavailable (non-fatal): {}", e);
+                            set_narrative.set(None);
+                        }
+                    }
                 }
-                Err(_) => {
-                    // Non-fatal — FM5 with empty findings
+                Err(e) => {
+                    leptos::logging::log!("FINDINGS ERROR: {}", e);
+                    // Non-fatal — FM5 with empty findings, no narrative
                     set_findings.set(Some(CoachFindings {
                         issues: vec![],
                         recommendation: "Rule evaluation unavailable.".into(),
                     }));
+                    set_narrative.set(None);
                     set_mode.set(CockpitMode::CoachReady);
                 }
             }
@@ -305,6 +343,7 @@ pub fn App() -> impl IntoView {
                     set_preset.set(None);
                     set_metrics.set(None);
                     set_findings.set(None);
+                    set_narrative.set(None);  // Phase 8: reset coach narrative
                     set_blob_id.set(None);
                     set_live_lufs.set(None);
                     set_live_peak.set(None);
@@ -390,6 +429,7 @@ pub fn App() -> impl IntoView {
                 on_file_drop=on_file_drop
                 metrics=metrics
                 findings=findings
+                narrative=narrative
                 live_lufs=live_lufs
                 live_peak=live_peak
                 progress=progress

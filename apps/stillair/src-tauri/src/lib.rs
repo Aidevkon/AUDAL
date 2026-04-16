@@ -13,6 +13,7 @@
 
 pub mod commands;
 pub mod ipc;
+pub mod aether;   // Phase 8: Aether Coach — LLM narrative layer
 
 pub fn run() {
     tauri::Builder::default()
@@ -25,6 +26,7 @@ pub fn run() {
             commands::mastering::get_golden_blob,
             commands::insights::evaluate_findings,
             commands::export::export_audio,
+            commands::coach::get_coach_narrative,   // Phase 8: Aether Coach
         ])
         .run(tauri::generate_context!())
         .expect("error while running Still Air");

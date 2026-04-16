@@ -28,3 +28,4 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs     = "2"
 lineos-rule-engine  = { path = "../../../lineos/m1/rule-engine" }
 sp314-dsp           = { path = "../../../lineos/m1/sp314-dsp" }
+adapter-runtime     = { path = "../../../creator-os/shared/adapter-runtime" }  # Phase 8: Aether

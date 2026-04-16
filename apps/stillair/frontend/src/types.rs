@@ -241,3 +241,36 @@ pub struct IssueParams {
     pub target:  f32,
     pub delta:   f32,
 }
+
+// ── Phase 8: Coach Narrative IPC types ───────────────────────────────────────
+//
+// Mirrors apps/stillair/src-tauri/src/aether/mod.rs exactly.
+// These are the Adapter Boundary output — no raw LLM text ever appears here.
+// Authority: LLM Adapter Amendment v1.1 §A3 · Phase 8 P8-003
+
+/// Coach narrative received from Tauri get_coach_narrative command.
+/// Fully schema-validated before leaving the Adapter Boundary.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CoachNarrativeJson {
+    /// 2–3 sentence overview of all findings in plain language.
+    pub summary:      String,
+    /// Per-finding explanations — teacher voice, no DSP values.
+    pub explanations: Vec<FindingExplanation>,
+    /// LLM model that produced this narrative: "phi3.5:3.8b" or "gemma2:9b".
+    pub model_used:   String,
+}
+
+/// Explanation for one finding from CoachFindings.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FindingExplanation {
+    /// issue_id — must match a known IssueJson.id (validated by CoachAdapter).
+    pub issue_id:   String,
+    /// Severity echoed from rule-engine — coach never modifies this.
+    pub severity:   String,
+    /// Human-readable title.
+    pub title:      String,
+    /// Why this finding matters to the listener — teacher voice.
+    pub why:        String,
+    /// Directional suggestion — no specific values or plugin names.
+    pub suggestion: String,
+}
