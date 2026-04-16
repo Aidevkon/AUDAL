@@ -9,11 +9,17 @@
 //! GoldenBlobJson field contract: golden-blob-spec.md v1.0 §Structure
 //! All fields are typed primitives — no serde_json::Value.
 
-use reqwest::Client;
+use reqwest::{Client, ClientBuilder};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// M0 base URL — always localhost:7400 (Caddy proxy, never direct).
 const M0_BASE: &str = "http://127.0.0.1:7400";
+
+/// Per-request timeouts.
+/// Mastering can take 60-120s for large files — give it 5 minutes.
+const TIMEOUT_MASTER_SECS: u64  = 300;   // POST /master — long pipeline
+const TIMEOUT_DEFAULT_SECS: u64 =  30;   // health / blob / export
 
 /// Stateless reqwest client. Create per-request (Phase 7: pool with AppState).
 pub struct M0Client {
@@ -22,7 +28,13 @@ pub struct M0Client {
 
 impl M0Client {
     pub fn new() -> Self {
-        Self { client: Client::new() }
+        let client = ClientBuilder::new()
+            // Default timeout for non-mastering requests.
+            // trigger_mastering overrides this per-request.
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+        Self { client }
     }
 
     /// GET /health — verify M0 is running before any operation.
@@ -41,6 +53,7 @@ impl M0Client {
 
     /// POST /master — trigger mastering pipeline.
     /// Returns MasterResponse with blob_id on success.
+    /// Timeout: 300s — mastering a large file takes 60-120s.
     pub async fn trigger_mastering(
         &self,
         req: MasterRequest,
@@ -48,6 +61,8 @@ impl M0Client {
         let resp = self.client
             .post(format!("{M0_BASE}/master"))
             .json(&req)
+            // Override the default 30s timeout — mastering is slow.
+            .timeout(Duration::from_secs(TIMEOUT_MASTER_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
