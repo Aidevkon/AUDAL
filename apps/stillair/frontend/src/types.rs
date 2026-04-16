@@ -274,3 +274,62 @@ pub struct FindingExplanation {
     /// Directional suggestion — no specific values or plugin names.
     pub suggestion: String,
 }
+
+// ── P9-008: Session State Unification ─────────────────────────────────────────
+//
+// Mirrors commands/session.rs SessionStateJson exactly.
+// Phase 11 Dioxus Cockpit entry point: call get_session_state(blob_id) once,
+// receive a complete view-model without a multi-step Data Cascade.
+
+/// Platform compliance summary derived from GoldenBlobJson loudness flags.
+/// Mirrors commands/session.rs ComplianceJson.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComplianceJson {
+    pub spotify:   bool,
+    pub youtube:   bool,
+    pub apple:     bool,
+    pub tidal:     bool,
+    pub broadcast: bool,
+    pub ebu_r128:  bool,
+}
+
+/// Serde-compatible coach findings used in SessionStateJson.
+/// Distinct from CoachFindings (display-oriented, uses Severity enum).
+/// Mirrors commands/insights.rs CoachFindingsJson exactly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CoachFindingsJson {
+    pub issues:         Vec<IssueJson>,
+    pub recommendation: String,
+}
+
+/// Serde-compatible issue. Mirrors commands/insights.rs IssueJson exactly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IssueJson {
+    pub id:       String,
+    pub severity: String,   // "info" | "low" | "medium" | "high"
+    pub current:  f32,
+    pub target:   f32,
+    pub delta:    f32,
+    pub tags:     Vec<String>,
+}
+
+/// Complete session snapshot for a mastered Golden Blob.
+/// Returned by the get_session_state Tauri command (P9-008).
+///
+/// Phase 11: Dioxus Cockpit calls get_session_state(blob_id) once and
+/// builds its full view from this struct. No separate Data Cascade needed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionStateJson {
+    /// Golden Blob ID this snapshot was generated from.
+    pub blob_id:    String,
+    /// BS.1770-4 canonical loudness measurements (never re-measured).
+    pub loudness:   LoudnessMetricsJson,
+    /// Objective quality measurements (never re-measured).
+    pub quality:    QualityMetricsJson,
+    /// Platform compliance flags derived from loudness.
+    pub compliance: ComplianceJson,
+    /// Rule-engine findings — deterministic.
+    pub findings:   CoachFindingsJson,
+    /// Coach narrative — None if Ollama unavailable (non-fatal).
+    pub narrative:  Option<CoachNarrativeJson>,
+}
