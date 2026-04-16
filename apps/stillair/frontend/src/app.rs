@@ -98,10 +98,13 @@ pub fn App() -> impl IntoView {
     let (narrative,  set_narrative)  = signal::<Option<CoachNarrativeJson>>(None); // Phase 8
     let (blob_id,    set_blob_id)   = signal::<Option<String>>(None);
     // FM2 live telemetry signals
-    let (live_lufs,  set_live_lufs) = signal::<Option<f32>>(None);
-    let (live_peak,  set_live_peak) = signal::<Option<f32>>(None);
-    let (progress,   set_progress)  = signal::<f32>(0.0);
-    let (stage_name, set_stage)     = signal::<String>("Initializing".into());
+    let (live_lufs,       set_live_lufs)    = signal::<Option<f32>>(None);
+    let (live_peak,       set_live_peak)    = signal::<Option<f32>>(None);
+    let (progress,        set_progress)     = signal::<f32>(0.0);
+    let (stage_name,      set_stage)        = signal::<String>("Initializing".into());
+    // Phase 10: export format selector + export completion status
+    let (export_format,   set_export_format) = signal::<&'static str>("flac");
+    let (export_status,   set_export_status) = signal::<Option<String>>(None);
 
     // ── Helper: hard reset all state to FM0 ──────────────────────────────────
     let hard_reset = move || {
@@ -116,6 +119,7 @@ pub fn App() -> impl IntoView {
         set_live_peak.set(None);
         set_progress.set(0.0);
         set_stage.set("Initializing".into());
+        set_export_status.set(None);  // Phase 10
     };
 
     // ── Event handlers ────────────────────────────────────────────────────────
@@ -378,6 +382,8 @@ pub fn App() -> impl IntoView {
     });
 
     // FM5 → FM6: export
+    // Phase 10: native save dialog opened by Tauri command — no hardcoded path.
+    // format comes from export_format signal (set by format selector in FM5).
     let on_export = UnsyncCallback::new(move |()| {
         let bid = match blob_id.get_untracked() {
             Some(id) => id,
@@ -386,21 +392,35 @@ pub fn App() -> impl IntoView {
                 return;
             }
         };
+        let fmt = export_format.get_untracked().to_string();
         set_mode.set(CockpitMode::Exporting);
+        set_export_status.set(None);
 
         spawn_local(async move {
             let result = invoke::<crate::commands::ExportResult>(
                 "export_audio",
                 serde_json::json!({
                     "blobId": bid,
-                    "format": "flac",
-                    "path":   "/tmp/stillair-export.flac",
+                    "format": fmt,
+                    // No "path" — native save dialog is opened inside the Tauri command
                 }),
             ).await;
 
             match result {
-                Ok(_)  => set_mode.set(CockpitMode::CoachReady),  // FM5
-                Err(_) => set_mode.set(CockpitMode::Fault(AscCode::IoErr)),
+                Ok(r) => {
+                    leptos::logging::log!("EXPORT OK: {} → {}", r.format, r.written_path);
+                    set_export_status.set(Some(r.written_path));
+                    set_mode.set(CockpitMode::CoachReady);  // FM5
+                }
+                Err(e) if e.contains("cancelled") => {
+                    // User closed dialog — non-fatal, stay in FM5
+                    leptos::logging::log!("EXPORT: cancelled by user");
+                    set_mode.set(CockpitMode::CoachReady);
+                }
+                Err(e) => {
+                    leptos::logging::warn!("EXPORT ERROR: {}", e);
+                    set_mode.set(CockpitMode::Fault(AscCode::IoErr));
+                }
             }
         });
     });

@@ -38,6 +38,16 @@ pub struct StoredBlob {
 
     // Provenance — golden-blob-spec.md §Provenance
     pub provenance: StoredProvenance,
+
+    // Audio payload — not serialized to JSON (never sent to frontend).
+    // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
+    // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
+    #[serde(skip)]
+    pub audio_bytes:  Vec<u8>,   // f32 LE PCM, always 48000 Hz
+    #[serde(skip)]
+    pub sample_rate:  u32,       // always 48000 after Phase 7 decode
+    #[serde(skip)]
+    pub channels:     u16,       // stereo = 2
 }
 
 /// BS.1770-4 canonical values + platform compliance flags.
@@ -161,6 +171,9 @@ mod tests {
                 aether_enriched:    false,
                 aether_devices:     vec![],
             },
+            audio_bytes:  vec![],   // empty for tests
+            sample_rate:  48000,
+            channels:     2,
         }
     }
 

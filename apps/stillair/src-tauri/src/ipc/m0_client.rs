@@ -83,9 +83,9 @@ impl M0Client {
         let resp = self.client
             .post(format!("{M0_BASE}/export"))
             .json(&ExportRequest {
-                blob_id: blob_id.to_string(),
-                format:  format.to_string(),
-                path:    path.to_string(),
+                blob_id:     blob_id.to_string(),
+                format:      format.to_string(),
+                output_path: path.to_string(),
             })
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
@@ -119,9 +119,9 @@ pub struct M0HealthResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportRequest {
-    pub blob_id: String,
-    pub format:  String,             // "flac" | "wav"
-    pub path:    String,
+    pub blob_id:     String,
+    pub format:      String,             // "wav" | "flac" | "opus"
+    pub output_path: String,             // absolute filesystem path
 }
 
 #[derive(Debug, Serialize, Deserialize)]

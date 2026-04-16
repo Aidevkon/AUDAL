@@ -30,3 +30,5 @@ lineos-rule-engine  = { path = "../../../lineos/m1/rule-engine" }
 sp314-dsp           = { path = "../../../lineos/m1/sp314-dsp" }
 adapter-runtime     = { path = "../../../creator-os/shared/adapter-runtime" }  # Phase 8: Aether
 toml                = "0.8"  # Phase 9: runtime coach_prompt.toml loading
+dirs                = "5"    # Phase 10: default export directory (~/.local/audio/StillAir)
+chrono              = { version = "0.4", features = ["serde"] }  # Phase 10: export timestamps

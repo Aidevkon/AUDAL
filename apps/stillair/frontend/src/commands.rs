@@ -36,7 +36,9 @@ pub struct IssueResponse {
 }
 
 /// Export result from export_audio command.
+/// Phase 10: includes format field for export status display.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportResult {
     pub written_path: String,
+    pub format:       String,   // "wav" | "flac" | "opus"
 }

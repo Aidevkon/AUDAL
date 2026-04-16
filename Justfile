@@ -145,9 +145,15 @@ check-float-methods:
         2>/dev/null \
         && echo "❌ STD FLOAT METHODS IN DSP — use libm" || echo "✅ No std float methods in DSP"
 
+# UI isolation check — Amendment A-002 §8: core crates MUST NOT depend on UI frameworks
+ui-isolation:
+    @echo "→ UI isolation check (Amendment A-002 §8)..."
+    @bash infra/ci/checks/ui-isolation-check.sh
+
 # Run all CI gates
 ci: validate-schemas deny check-boundary check-network check-ml-origin \
-    check-thresholds check-caddy-binding check-typed-input check-float-methods test
+    check-thresholds check-caddy-binding check-typed-input check-float-methods \
+    ui-isolation test
     @echo ""
     @echo "✅ All CI gates passed"
 

@@ -235,6 +235,13 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
         telemetry_lra, telemetry_momentary, telemetry_short_term
     );
 
+    // Phase 10: store mastered PCM as f32 LE bytes for export.
+    // FORBIDDEN: return these bytes to the frontend (Amendment A-002 §3).
+    // GoldenBlob.flac_bytes = raw f32 LE interleaved PCM from DSP output (Phase 2/10).
+    let audio_bytes       = result.flac_bytes;
+    let audio_sample_rate = pcm_sr_for_telemetry;
+    let audio_channels    = pcm_channels_for_telemetry;
+
     Ok(StoredBlob {
         id:               Uuid::new_v4().to_string(),
         version:          "1.0".into(),
@@ -280,6 +287,10 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
             aether_enriched:    false,
             aether_devices:     vec![],
         },
+        // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
+        audio_bytes:  audio_bytes,
+        sample_rate:  audio_sample_rate,
+        channels:     audio_channels,
     })
 }
 

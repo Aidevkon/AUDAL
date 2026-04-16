@@ -62,6 +62,9 @@ mod tests {
                 created_by: "test".into(), aether_enriched: false,
                 aether_devices: vec![],
             },
+            audio_bytes:  vec![],  // empty for tests
+            sample_rate:  48000,
+            channels:     2,
         }
     }
 
