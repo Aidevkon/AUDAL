@@ -98,37 +98,39 @@ pub struct SessionStateJson {
 ///   - narrative failure → narrative = None (non-fatal, not surfaced as error)
 #[tauri::command]
 pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, String> {
+    eprintln!("[get_session_state] START blob_id={blob_id}");
+
     // Step 1: Fetch GoldenBlobJson from M0
     let client = M0Client::new();
     let blob: GoldenBlobJson = client
         .get_blob(&blob_id)
         .await
         .map_err(|e| format!("Session: blob fetch failed: {e}"))?;
+    eprintln!("[get_session_state] blob fetched ok (lufs={})", blob.loudness.integrated_lufs);
 
     // Step 2: Evaluate findings via rule-engine (in-process, deterministic)
     let findings: CoachFindingsJson = evaluate_findings(blob.clone())
         .await
         .map_err(|e| format!("Session: rule-engine failed: {e}"))?;
+    eprintln!("[get_session_state] findings ok ({} issues)", findings.issues.len());
 
     // Step 3: Get coach narrative (best-effort, 25s timeout)
-    // Ollama inference can take 30-60s on slow hardware. We must not block
-    // the Cockpit in FM2 waiting for LLM output — narrative = None is safe;
-    // the Coach panel shows a "narrative unavailable" placeholder.
+    eprintln!("[get_session_state] calling coach (max {}s)...", COACH_TIMEOUT_SECS);
     let narrative: Option<CoachNarrativeJson> =
         match timeout(
             Duration::from_secs(COACH_TIMEOUT_SECS),
             get_coach_narrative(findings.clone()),
         ).await {
             Ok(Ok(n))  => {
-                eprintln!("[session] coach narrative ok");
+                eprintln!("[get_session_state] coach narrative ok");
                 Some(n)
             }
             Ok(Err(e)) => {
-                eprintln!("[session] coach narrative err (non-fatal): {e}");
+                eprintln!("[get_session_state] coach narrative err (non-fatal): {e}");
                 None
             }
             Err(_elapsed) => {
-                eprintln!("[session] coach narrative timeout after {COACH_TIMEOUT_SECS}s — returning None");
+                eprintln!("[get_session_state] coach timeout after {COACH_TIMEOUT_SECS}s — returning None");
                 None
             }
         };
@@ -143,6 +145,7 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         ebu_r128:  blob.loudness.ebu_r128_compliant,
     };
 
+    eprintln!("[get_session_state] DONE — returning SessionStateJson");
     Ok(SessionStateJson {
         blob_id:  blob_id,
         loudness: blob.loudness,

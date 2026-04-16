@@ -148,21 +148,26 @@ pub async fn trigger_mastering(
     audio_path: String,
     preset_id:  String,
 ) -> Result<String, String> {
+    eprintln!("[trigger_mastering] START path={audio_path} preset={preset_id}");
     let client = M0Client::new();
 
     // Guard: verify M0 is healthy (ASC 0x05 guard).
     client.health().await
         .map_err(|e| format!("M0 unreachable: {e}"))?;
+    eprintln!("[trigger_mastering] health OK — sending to M0...");
 
     let resp = client
         .trigger_mastering(MasterRequest { audio_path, preset_id })
         .await
         .map_err(|e| e.to_string())?;
 
+    eprintln!("[trigger_mastering] M0 returned status={} blob_id={}", resp.status, resp.blob_id);
+
     if resp.status != "ok" {
         return Err(resp.message.unwrap_or_else(|| "mastering failed".into()));
     }
 
+    eprintln!("[trigger_mastering] DONE blob_id={}", resp.blob_id);
     Ok(resp.blob_id)
 }
 
