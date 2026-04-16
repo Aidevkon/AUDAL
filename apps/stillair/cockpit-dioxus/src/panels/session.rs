@@ -85,7 +85,7 @@ pub fn SessionPanel(
 fn DropZone(mode: Signal<CockpitMode>) -> Element {
     let on_load = move |_| {
         spawn(async move {
-            match invoke::<Option<AudioMeta>, _>("openAudioFile", json!({})).await {
+            match invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
                 Ok(Some(meta)) => {
                     mode.set(CockpitMode::FileLoaded {
                         path:   meta.path.clone(),
@@ -251,8 +251,8 @@ fn MasterButton(
             });
 
             let blob_id = match invoke::<String, _>(
-                "triggerMastering",
-                json!({ "audioPath": p, "presetId": pr }),
+                "trigger_mastering",
+                json!({ "audio_path": p, "preset_id": pr }),
             ).await {
                 Ok(id) => id,
                 Err(e) => {
@@ -266,8 +266,8 @@ fn MasterButton(
 
             // Single IPC call: all session data in one shot (P9-008)
             let state = match invoke::<crate::types::SessionStateJson, _>(
-                "getSessionState",
-                json!({ "blobId": blob_id }),
+                "get_session_state",
+                json!({ "blob_id": blob_id }),
             ).await {
                 Ok(s) => s,
                 Err(e) => {
@@ -373,8 +373,8 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                 });
 
                 match invoke::<crate::types::ExportResult, _>(
-                    "exportAudio",
-                    json!({ "blobId": b, "format": fmt }),
+                    "export_audio",
+                    json!({ "blob_id": b, "format": fmt }),
                 ).await {
                     Ok(r) => {
                         eprintln!("[export] written: {} ({})", r.written_path, r.format);

@@ -7,8 +7,8 @@
   "build": {
     "frontendDist": "../cockpit-dioxus/dist",
     "devUrl": "http://localhost:1421",
-    "beforeDevCommand": "trunk serve --config ../cockpit-dioxus/Trunk.toml --port 1421",
-    "beforeBuildCommand": "trunk build --release --config ../cockpit-dioxus/Trunk.toml"
+    "beforeDevCommand": "cd /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus && trunk serve --port 1421",
+    "beforeBuildCommand": "cd /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus && trunk build --release"
   },
   "app": {
     "withGlobalTauri": true,
