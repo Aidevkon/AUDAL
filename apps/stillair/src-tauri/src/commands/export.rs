@@ -51,6 +51,8 @@ pub async fn export_audio(
     format:  String,    // "wav" | "flac" | "opus"
     app:     tauri::AppHandle,
 ) -> Result<ExportResult, String> {
+    eprintln!("[export_audio] called: blob_id={blob_id}, format={format}");
+
     let extension = format.to_lowercase();
     let default_name = format!("mastered.{extension}");
     let default_dir  = default_export_dir();
@@ -77,18 +79,26 @@ pub async fn export_audio(
 
     let file_path = match path {
         Some(p) => p,
-        None    => return Err("Export cancelled by user".into()),
+        None    => {
+            eprintln!("[export_audio] dialog returned None — user cancelled");
+            return Err("Export cancelled by user".into());
+        }
     };
     let output_path = match file_path {
         FilePath::Path(p) => p.to_string_lossy().to_string(),
         FilePath::Url(u)  => u.to_string(),
     };
+    eprintln!("[export_audio] dialog path: {output_path}");
 
     // Call M0 /export — audio bytes written to disk by M0, path returned
     let client = M0Client::new();
+    eprintln!("[export_audio] calling M0 export: blob_id={blob_id}, format={format}, path={output_path}");
     let resp = client.export(&blob_id, &format, &output_path)
         .await
         .map_err(|e| format!("IO_ERR:0x02:Export failed: {e}"))?;
+
+    eprintln!("[export_audio] M0 response: status={}, written={:?}, msg={:?}",
+        resp.status, resp.written_path, resp.message);
 
     if resp.status != "ok" {
         return Err(resp.message.unwrap_or_else(|| "export failed".into()));

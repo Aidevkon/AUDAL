@@ -393,10 +393,12 @@ pub fn App() -> impl IntoView {
             }
         };
         let fmt = export_format.get_untracked().to_string();
+        leptos::logging::log!("EXPORT: format={fmt}, blob_id={bid}");
         set_mode.set(CockpitMode::Exporting);
         set_export_status.set(None);
 
         spawn_local(async move {
+            leptos::logging::log!("EXPORT: invoking export_audio with blobId={bid}, format={fmt}");
             let result = invoke::<crate::commands::ExportResult>(
                 "export_audio",
                 serde_json::json!({
