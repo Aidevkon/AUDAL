@@ -87,6 +87,9 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     use sp314_dsp::types::config::Bmr128Schema;
     use uuid::Uuid;
     use crate::handlers::decode;
+    // Phase 9: EBU R128 windowed telemetry — LRA, momentary, short-term LUFS
+    use lineos_telemetry::lra::LraCalculator;
+    use lineos_telemetry::windows::{momentary_lufs, short_term_lufs};
 
     // Load schema from shared contract (embedded at compile-time for determinism)
     let schema: Bmr128Schema = serde_json::from_str(
@@ -163,7 +166,11 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     // We encode this in the blob provenance for now; full audit write is in caller.
     let _ = (original_sr, original_ch, duration_ms); // used in provenance below
 
-    // Build AudioChunk — always 48000 Hz stereo after decode
+    // Build AudioChunk — always 48000 Hz stereo after decode.
+    // Clone samples first so telemetry can read full-track PCM after DSP completes.
+    let pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
+    let pcm_channels_for_telemetry = pcm.channels;          // Phase 9
+    let pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
     let chunk = AudioChunk::new(pcm.samples, pcm.sample_rate, pcm.channels);
 
 
@@ -192,11 +199,41 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let qm    = &result.quality_metrics;
     let lufs  = qm.integrated_lufs;
     let tp    = qm.true_peak_dbfs;
-
     let lra   = qm.loudness_range_lu;
     let dr    = qm.dynamic_range_db;
     let sc    = qm.stereo_correlation;
     let elapsed = start.elapsed().as_millis() as u64;
+
+    // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
+    // Run full EBU R128 windowed analysis on the decoded (pre-mastered) PCM.
+    // LRA measures source material dynamic range — per EBU Tech 3342.
+    // Uses libm — no std::f32 methods per LineOS Constitution §09.1.
+    let telemetry_lra = tokio::task::spawn_blocking({
+        let samples  = pcm_samples_for_telemetry.clone();
+        let sr       = pcm_sr_for_telemetry;
+        let channels = pcm_channels_for_telemetry;
+        move || {
+            let mut calc = LraCalculator::new(sr);
+            calc.feed_samples(&samples, channels);
+            calc.compute()
+        }
+    }).await.unwrap_or(lra);   // fallback to sp314-dsp value on join failure
+
+    let telemetry_momentary  = momentary_lufs(
+        &pcm_samples_for_telemetry,
+        pcm_sr_for_telemetry,
+        pcm_channels_for_telemetry,
+    );
+    let telemetry_short_term = short_term_lufs(
+        &pcm_samples_for_telemetry,
+        pcm_sr_for_telemetry,
+        pcm_channels_for_telemetry,
+    );
+
+    tracing::info!(
+        "Telemetry: lra={:.2} LU, momentary={:.2} LUFS, short_term={:.2} LUFS",
+        telemetry_lra, telemetry_momentary, telemetry_short_term
+    );
 
     Ok(StoredBlob {
         id:               Uuid::new_v4().to_string(),
@@ -209,10 +246,10 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
         preset_id:        preset_id.to_string(),
         loudness: StoredLoudness {
             integrated_lufs:          lufs,
-            short_term_lufs:          lufs,          // Phase 7: 3s window
-            momentary_lufs:           lufs,          // Phase 7: 400ms window
+            short_term_lufs:          telemetry_short_term,   // Phase 9: real 3s window
+            momentary_lufs:           telemetry_momentary,    // Phase 9: real 400ms window
             true_peak_dbtp:           tp,
-            lra,
+            lra:                      telemetry_lra,           // Phase 9: real LRA (was 0.0)
             k_weighted:               true,
             ebu_r128_target_lufs:     -23.0,
             ebu_r128_compliant:       lufs <= -23.0 && tp <= -1.0,

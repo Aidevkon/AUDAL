@@ -29,3 +29,4 @@ tauri-plugin-fs     = "2"
 lineos-rule-engine  = { path = "../../../lineos/m1/rule-engine" }
 sp314-dsp           = { path = "../../../lineos/m1/sp314-dsp" }
 adapter-runtime     = { path = "../../../creator-os/shared/adapter-runtime" }  # Phase 8: Aether
+toml                = "0.8"  # Phase 9: runtime coach_prompt.toml loading

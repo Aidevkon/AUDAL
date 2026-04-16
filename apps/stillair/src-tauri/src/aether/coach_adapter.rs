@@ -1,12 +1,17 @@
 //! CoachAdapter — LLM Adapter for audio coaching narrative.
-//! Authority: LLM Adapter Amendment v1.1 · Phase 8 P8-004
+//! Authority: LLM Adapter Amendment v1.1 · Phase 8 P8-004 · Phase 9 P9-006
+//!
+//! Phase 9: Prompt loaded from assets/coach_prompt.toml at runtime.
+//! Edit coach_prompt.toml without rebuilding to adjust tone, rules, examples.
+//! Falls back to include_str! embedded copy if asset file not found.
 //!
 //! Architecture (binding):
 //!   CoachFindings (read-only input)
-//!       → build_prompt()
+//!       → load_prompt_config()              [runtime TOML load]
+//!       → build_prompt()                    [teacher identity from config]
 //!       → adapter_runtime::llm_client::invoke()   [sole LLM call point]
-//!       → validate_output()                        [Adapter Boundary]
-//!       → CoachNarrativeJson                       [deterministic from here]
+//!       → validate_output()                 [Adapter Boundary]
+//!       → CoachNarrativeJson                [deterministic from here]
 //!
 //! FORBIDDEN (per Amendment §A6):
 //!   ❌ Calling Ollama HTTP directly (use adapter_runtime::llm_client::invoke)
@@ -14,17 +19,67 @@
 //!   ❌ Modifying CoachFindings severity or issues
 //!   ❌ Adding new issues not present in findings
 //!   ❌ Giving specific DSP values in narrative
-//!   ❌ Retry logic (adapter-runtime handles retries)
 
 use crate::commands::insights::CoachFindingsJson;
 use super::{CoachNarrativeJson, FindingExplanation};
 use adapter_runtime::llm_client::{invoke, Provider};
 
+// ── Prompt configuration structs (deserialized from coach_prompt.toml) ────────
+
+#[derive(serde::Deserialize, Clone)]
+struct PromptConfig {
+    identity: IdentityConfig,
+    output:   OutputConfig,
+    schema:   SchemaConfig,
+    examples: ExamplesConfig,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct IdentityConfig {
+    role:  String,
+    style: String,
+    rules: Vec<String>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct OutputConfig {
+    format:      String,
+    no_markdown: bool,
+    #[allow(dead_code)]
+    no_preamble: bool,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct SchemaConfig {
+    template: String,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct ExamplesConfig {
+    good: Vec<ExampleEntry>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct ExampleEntry {
+    issue_id:   String,
+    severity:   String,
+    title:      String,
+    why:        String,
+    suggestion: String,
+}
+
+// Embedded fallback — compile-time guarantee that the file exists.
+// If the runtime asset path fails, this is used instead.
+const DEFAULT_PROMPT_TOML: &str =
+    include_str!("../../assets/coach_prompt.toml");
+
+// ── CoachAdapter ──────────────────────────────────────────────────────────────
+
 /// Coach adapter — translates CoachFindings to plain-language CoachNarrative.
 ///
 /// Teacher identity (immutable):
 /// - Explains WHY findings matter to the listener
-/// - Never gives specific DSP values (no "reduce by 2dB at 3kHz")
+/// - Never gives specific DSP values
 /// - Never modifies severity scores from the rule-engine
 /// - Never adds issues beyond what rule-engine found
 pub struct CoachAdapter {
@@ -42,26 +97,77 @@ impl CoachAdapter {
         Self { provider: Provider::Ollama { model: "gemma2:9b".into() } }
     }
 
+    /// Load prompt configuration from assets/coach_prompt.toml.
+    /// Runtime load: changes take effect on next invocation, no rebuild needed.
+    /// Falls back to embedded include_str! copy if asset file not found.
+    fn load_prompt_config() -> PromptConfig {
+        // Resolve asset path relative to the running binary
+        let asset_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.join("assets/coach_prompt.toml")))
+            .unwrap_or_else(|| std::path::Path::new("assets/coach_prompt.toml").to_path_buf());
+
+        let content_bytes = match std::fs::read(&asset_path) {
+            Ok(b)  => {
+                eprintln!("[CoachAdapter] loaded prompt config from {:?}", asset_path);
+                b
+            }
+            Err(_) => {
+                eprintln!(
+                    "[CoachAdapter] asset {:?} not found — using embedded fallback",
+                    asset_path
+                );
+                DEFAULT_PROMPT_TOML.as_bytes().to_vec()
+            }
+        };
+
+        toml::from_str(
+            std::str::from_utf8(&content_bytes).unwrap_or(DEFAULT_PROMPT_TOML)
+        ).unwrap_or_else(|e| {
+            eprintln!("[CoachAdapter] TOML parse error ({e}) — using embedded fallback");
+            toml::from_str(DEFAULT_PROMPT_TOML)
+                .expect("embedded DEFAULT_PROMPT_TOML must always be valid TOML")
+        })
+    }
+
     /// Generate a CoachNarrative from CoachFindings.
     ///
     /// Flow:
-    ///  1. build_prompt — translate findings to LLM prompt
-    ///  2. adapter_runtime invoke — sole LLM call point
-    ///  3. validate_output — parse + validate (Adapter Boundary)
-    ///  4. return typed CoachNarrativeJson
+    ///  1. load_prompt_config   — runtime TOML, fallback to embedded
+    ///  2. build_prompt         — translate findings + config to LLM prompt
+    ///  3. adapter_runtime invoke — sole LLM call point
+    ///  4. validate_output      — parse + validate (Adapter Boundary)
+    ///  5. return typed CoachNarrativeJson
     pub async fn generate(
         &self,
         findings: &CoachFindingsJson,
     ) -> Result<CoachNarrativeJson, String> {
-        let prompt = self.build_prompt(findings);
-        // Step 2: invoke via the adapter-runtime — never call Ollama directly
+        let config = Self::load_prompt_config();
+        let prompt = self.build_prompt(findings, &config);
+        // Step 3: invoke via adapter-runtime — never call Ollama directly
         let raw = invoke(&self.provider, &prompt).await?;
-        // Step 3: validate_output — Adapter Boundary. Raw output stops here.
+        // Step 4: validate_output — Adapter Boundary. Raw output stops here.
         self.validate_output(&raw, findings)
     }
 
-    /// Build a prompt with teacher identity — no DSP instructions permitted.
-    fn build_prompt(&self, findings: &CoachFindingsJson) -> String {
+    /// Build a prompt using identity + rules from coach_prompt.toml.
+    /// Teacher identity enforced — no DSP instructions permitted.
+    fn build_prompt(&self, findings: &CoachFindingsJson, config: &PromptConfig) -> String {
+        let rules_text   = config.identity.rules
+            .iter()
+            .map(|r| format!("- {r}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let examples_text = config.examples.good
+            .iter()
+            .map(|e| format!(
+                "  issue_id: {}, severity: {}, title: {}\n  why: {}\n  suggestion: {}",
+                e.issue_id, e.severity, e.title, e.why, e.suggestion
+            ))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
         let issues_text = if findings.issues.is_empty() {
             "No issues found — the track is fully compliant.".to_string()
         } else {
@@ -73,36 +179,39 @@ impl CoachAdapter {
             }).collect::<Vec<_>>().join("\n")
         };
 
-        format!(
-            r#"You are a professional audio mastering coach. Your role is to explain
-audio analysis findings to an artist in plain, encouraging language.
-You are a teacher, not a mixing engineer. Never give specific DSP values
-(no "reduce by 2dB", no plugin names, no frequency values).
-Explain WHY each finding matters for the listener's experience.
-Give directional suggestions only ("the track could benefit from more headroom").
+        let no_markdown_rule = if config.output.no_markdown {
+            "No markdown fences. No text before or after the JSON object."
+        } else {
+            ""
+        };
 
-Audio analysis results for this track:
-{issues_text}
+        format!(
+            r#"You are a {role}. Your approach: {style}.
+
+Strict rules for your response:
+{rules}
+
+Audio findings for this track:
+{issues}
 
 Overall assessment: {recommendation}
 
-Respond ONLY with valid JSON matching this EXACT schema (no markdown, no preamble):
-{{
-  "summary": "2-3 sentence plain-language overview",
-  "explanations": [
-    {{
-      "issue_id": "exact_issue_id_from_above",
-      "severity": "info|low|medium|high",
-      "title": "short human-readable title",
-      "why": "why this matters for the listener (1-2 sentences)",
-      "suggestion": "what direction to explore (no specific values)"
-    }}
-  ]
-}}
+Few-shot examples of good responses:
+{examples}
 
-JSON only. No markdown fences. No text before or after the JSON object."#,
-            issues_text = issues_text,
+You MUST respond ONLY with valid {format} matching this EXACT schema:
+{schema}
+
+{no_md}"#,
+            role           = config.identity.role,
+            style          = config.identity.style,
+            rules          = rules_text,
+            issues         = issues_text,
             recommendation = findings.recommendation,
+            examples       = examples_text,
+            format         = config.output.format,
+            schema         = config.schema.template,
+            no_md          = no_markdown_rule,
         )
     }
 

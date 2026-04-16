@@ -2619,6 +2619,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "hex",
+ "lineos-telemetry",
  "rand 0.8.5",
  "rubato",
  "serde",
@@ -4717,6 +4718,7 @@ dependencies = [
  "tauri-plugin-fs",
  "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.2",
  "uuid",
 ]
 
