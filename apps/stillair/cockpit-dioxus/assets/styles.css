@@ -1,0 +1,1220 @@
+/*
+ * styles.css — Still Air Cockpit · Design System v1.0
+ * Authority: design-tokens-v1.0.md §12 · appendix-a-oklch.md §A2
+ *
+ * ALL colors reference CSS custom properties from :root only.
+ * NO inline hex literals (design-tokens-v1.0.md §13).
+ * NO OKLCH values in token definitions (OKLCH is render-time only, §A2).
+ * Typography: --font-mono for all metric values and labels.
+ *
+ * Visual reference: avionics chassis — dark anodized metal with OLED panel insets,
+ * physical bezels, embossed screws, glowing accent lines per panel.
+ */
+
+/* ─── 0. Google Fonts import ──────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+/* ─── 1. Design Tokens (§12 canonical block) ─────────────────────────────── */
+:root {
+    /* Backgrounds */
+    --bg-base:           #111318;
+    --bg-panel:          #15181f;
+    --bg-elevated:       #1e2128;
+    --bg-overlay:        #0d0f14;
+
+    /* Panel accents */
+    --accent-session:    #FFD60A;   /* Left MFD  — Amber */
+    --accent-insights:   #00d1ff;   /* Center MFD — Cyan */
+    --accent-coach:      #4ade80;   /* Right MFD  — Green */
+
+    /* Severity */
+    --severity-high:     #ef4444;
+    --severity-medium:   #f59e0b;
+    --severity-low:      #fde047;
+    --severity-info:     #6b7280;
+
+    /* Text */
+    --text-primary:      #e8eaf0;
+    --text-secondary:    #8b8fa8;
+    --text-muted:        #4a4d5e;
+    --text-inverse:      #111318;
+
+    /* Borders */
+    --border-subtle:     #2A2D35;
+    --border-active:     #3d4155;
+
+    /* State indicators */
+    --state-idle:        #4a4d5e;
+    --state-active:      #4ade80;
+    --state-running:     #00d1ff;
+    --state-complete:    #FFD60A;
+    --state-fault:       #ef4444;
+    --state-locked:      #374151;
+
+    /* Transport buttons */
+    --btn-master-bg:     #FFD60A;
+    --btn-master-text:   #111318;
+    --btn-abort-bg:      #ef4444;
+    --btn-abort-text:    #ffffff;
+    --btn-neutral-bg:    #1e2128;
+    --btn-neutral-text:  #8b8fa8;
+    --btn-neutral-border:#2A2D35;
+
+    /* Typography */
+    --font-mono:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans:  'Inter', system-ui, sans-serif;
+
+    /* Text sizes */
+    --text-xs:     0.625rem;
+    --text-sm:     0.75rem;
+    --text-base:   0.875rem;
+    --text-lg:     1rem;
+    --text-xl:     1.25rem;
+    --text-2xl:    1.5rem;
+
+    /* Letter spacing */
+    --tracking-wide:   0.05em;
+    --tracking-wider:  0.1em;
+    --tracking-widest: 0.15em;
+
+    /* Spacing scale */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    /* Chassis geometry */
+    --chassis-transport-h: 52px;
+    --chassis-header-h:    44px;
+    --panel-inset:         12px;
+    --bezel-radius:        6px;
+    --panel-radius:        4px;
+    --screw-size:          8px;
+
+    /* Derived convenience (no new colors — references above tokens) */
+    --surface-panel:     var(--bg-elevated);
+    --status-ok:         var(--state-active);
+    --status-warn:       var(--severity-medium);
+    --status-err:        var(--severity-high);
+    --status-info:       var(--severity-info);
+    --accent-master:     var(--severity-high);   /* MASTER button — red-hot */
+}
+
+/* ─── 2. Reset & base ─────────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── 3. Chassis shell ────────────────────────────────────────────────────── */
+/*
+ * The outer chassis: dark anodized aluminum texture.
+ * Subtle gradient simulates physical depth (top-left highlight, bottom shadow).
+ * Rounded corners and box-shadow simulate a rack-mounted unit.
+ */
+.app-shell,
+#main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    background:
+        /* Brushed metal sheen — top highlight */
+        linear-gradient(
+            160deg,
+            rgba(255,255,255,0.025) 0%,
+            transparent 40%,
+            rgba(0,0,0,0.15) 100%
+        ),
+        var(--bg-base);
+    overflow: hidden;
+}
+
+/* ─── 4. Header / mode bar ────────────────────────────────────────────────── */
+/*
+ * Engraved top bar: "STILL AIR" wordmark + FM state badge.
+ * Simulates an etched aluminum label strip.
+ */
+.cockpit-header {
+    height: var(--chassis-header-h);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-6);
+    background: var(--bg-overlay);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+
+    /* Chassis top-edge inset shadow */
+    box-shadow:
+        inset 0 -1px 0 rgba(255,255,255,0.03),
+        0 2px 8px rgba(0,0,0,0.4);
+}
+
+.cockpit-header::before {
+    /* Left screw */
+    content: '';
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--screw-size);
+    height: var(--screw-size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.cockpit-header::after {
+    /* Right screw */
+    content: '';
+    position: absolute;
+    right: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--screw-size);
+    height: var(--screw-size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.wordmark {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    color: var(--text-primary);
+    text-transform: uppercase;
+}
+
+.mode-badge {
+    margin-left: var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wider);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    background: var(--bg-elevated);
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+.mode-badge.fm-running {
+    color: var(--state-running);
+    border-color: var(--state-running);
+    box-shadow: 0 0 6px rgba(0,209,255,0.2);
+}
+
+.mode-badge.fm-complete {
+    color: var(--state-complete);
+    border-color: var(--state-complete);
+    box-shadow: 0 0 6px rgba(255,214,10,0.2);
+}
+
+.mode-badge.fm-fault {
+    color: var(--state-fault);
+    border-color: var(--state-fault);
+    box-shadow: 0 0 6px rgba(239,68,68,0.25);
+    animation: fault-pulse 1s ease-in-out infinite;
+}
+
+@keyframes fault-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
+}
+
+/* ─── 5. MFD bay (3-panel grid) ───────────────────────────────────────────── */
+/*
+ * The three Multi-Function Display islands sit in a physical bay.
+ * Each panel is separated by a raised metal bezel divider.
+ * The bay has inset padding to simulate the chassis cavity.
+ */
+.mfd-bay {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--panel-inset);
+    padding: var(--panel-inset);
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ─── 6. MFD Panel (OLED inset) ───────────────────────────────────────────── */
+/*
+ * Each panel looks like a sunken OLED display in an anodized bezel.
+ * The inner shadow simulates depth. The subtle panel glow is per-accent.
+ */
+.mfd-panel {
+    background: var(--bg-panel);
+    border-radius: var(--bezel-radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+
+    /* Physical inset: panel sits below the bezel surface */
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 2px 8px rgba(0,0,0,0.5),
+        0 0 0 1px var(--border-subtle),
+        0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* Corner screw hardware dots */
+.mfd-panel::before,
+.mfd-panel::after {
+    content: '';
+    position: absolute;
+    width: var(--screw-size);
+    height: var(--screw-size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #2a2d35, #15181f 60%, #0d0f14);
+    border: 1px solid rgba(255,255,255,0.06);
+    z-index: 2;
+    pointer-events: none;
+}
+.mfd-panel::before { top: var(--space-2); left: var(--space-2); }
+.mfd-panel::after  { top: var(--space-2); right: var(--space-2); }
+
+/* ── Panel accent variants ── */
+.panel-session {
+    --panel-accent: var(--accent-session);
+}
+.panel-session .mfd-panel,
+.mfd-panel.panel-session {
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 2px 8px rgba(0,0,0,0.5),
+        0 0 0 1px var(--border-subtle),
+        0 0 20px rgba(255,214,10,0.04),
+        0 4px 16px rgba(0,0,0,0.4);
+}
+
+.panel-insights {
+    --panel-accent: var(--accent-insights);
+}
+.mfd-panel.panel-insights {
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 2px 8px rgba(0,0,0,0.5),
+        0 0 0 1px var(--border-subtle),
+        0 0 20px rgba(0,209,255,0.05),
+        0 4px 16px rgba(0,0,0,0.4);
+}
+
+.panel-coach {
+    --panel-accent: var(--accent-coach);
+}
+.mfd-panel.panel-coach {
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 2px 8px rgba(0,0,0,0.5),
+        0 0 0 1px var(--border-subtle),
+        0 0 20px rgba(74,222,128,0.04),
+        0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* ─── 7. Panel title bar ──────────────────────────────────────────────────── */
+/*
+ * Engraved panel label at top of each MFD.
+ * Accent color glow line below title = canonical accent per panel.
+ * Font: --font-mono, uppercase, tracked.
+ */
+.panel-title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    padding: var(--space-4) var(--space-6) var(--space-2);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+
+    /* Title glow — accent color per panel */
+    text-shadow: 0 0 12px currentColor;
+}
+
+/* Panel-title bottom line = accent glow line */
+.panel-title::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: var(--space-6);
+    right: var(--space-6);
+    height: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* ─── 8. Panel body ───────────────────────────────────────────────────────── */
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-active) transparent;
+}
+
+.panel-body::-webkit-scrollbar        { width: 4px; }
+.panel-body::-webkit-scrollbar-track  { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb  { background: var(--border-active); border-radius: 2px; }
+
+/* ─── 9. Section labels ────────────────────────────────────────────────────── */
+.section-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: var(--space-3) var(--space-6) var(--space-1);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.section-label:first-child {
+    border-top: none;
+    padding-top: var(--space-4);
+}
+
+/* ─── 10. Metric rows ──────────────────────────────────────────────────────── */
+/*
+ * Instrument reading rows — all values in --font-mono.
+ * Label: secondary / muted. Value: primary or accent.
+ */
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: var(--space-2) var(--space-6);
+    border-bottom: 1px solid rgba(255,255,255,0.025);
+    transition: background 0.1s ease;
+}
+
+.metric-row:hover {
+    background: rgba(255,255,255,0.02);
+}
+
+.metric-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.metric-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--tracking-wide);
+}
+
+.metric-value.ok      { color: var(--state-active); }
+.metric-value.warn    { color: var(--severity-medium); }
+.metric-value.err     { color: var(--severity-high); }
+
+/* Large LUFS readout */
+.lufs-readout {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--accent-insights);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 16px rgba(0,209,255,0.4);
+    line-height: 1;
+}
+
+/* ─── 11. Compliance table ────────────────────────────────────────────────── */
+.compliance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-6);
+}
+
+.compliance-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+}
+
+.compliance-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.compliance-dot.ok  {
+    background: var(--state-active);
+    box-shadow: 0 0 5px var(--state-active);
+}
+.compliance-dot.err {
+    background: var(--state-fault);
+    box-shadow: 0 0 5px var(--state-fault);
+}
+
+.compliance-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    letter-spacing: var(--tracking-wide);
+}
+
+/* ─── 12. Coach panel — finding cards ─────────────────────────────────────── */
+.finding-card {
+    margin: var(--space-1) var(--space-4);
+    padding: var(--space-3);
+    border-radius: var(--panel-radius);
+    border-left: 3px solid transparent;
+}
+
+.finding-card.high   {
+    background: rgba(239,68,68, 0.07);
+    border-left-color: var(--severity-high);
+}
+.finding-card.medium {
+    background: rgba(245,158,11, 0.07);
+    border-left-color: var(--severity-medium);
+}
+.finding-card.low    {
+    background: rgba(253,224,71, 0.07);
+    border-left-color: var(--severity-low);
+}
+.finding-card.info   {
+    background: rgba(107,114,128, 0.07);
+    border-left-color: var(--severity-info);
+}
+
+.finding-severity {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+}
+
+.finding-card.high   .finding-severity { color: var(--severity-high); }
+.finding-card.medium .finding-severity { color: var(--severity-medium); }
+.finding-card.low    .finding-severity { color: var(--severity-low); }
+.finding-card.info   .finding-severity { color: var(--severity-info); }
+
+.finding-id {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+}
+
+.finding-deltas {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.finding-delta-item {}
+
+.finding-delta-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.finding-delta-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.finding-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+}
+
+.finding-tag {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 2px var(--space-2);
+    border-radius: 3px;
+}
+
+/* ─── 13. Coach narrative ──────────────────────────────────────────────────── */
+.narrative-block {
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.narrative-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.narrative-text {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: 1.65;
+    font-style: italic;
+}
+
+.narrative-model {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-2);
+    letter-spacing: var(--tracking-wide);
+}
+
+/* ─── 14. Score / pass bar ────────────────────────────────────────────────── */
+.score-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.score-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.score-dot.ok     { background: var(--state-active);   box-shadow: 0 0 6px var(--state-active); }
+.score-dot.warn   { background: var(--severity-medium); box-shadow: 0 0 6px var(--severity-medium); }
+.score-dot.err    { background: var(--state-fault);    box-shadow: 0 0 6px var(--state-fault); }
+
+.score-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+}
+
+/* ─── 15. Drop zone ────────────────────────────────────────────────────────── */
+.drop-zone {
+    border: 2px dashed var(--border-active);
+    border-radius: var(--bezel-radius);
+    padding: var(--space-8) var(--space-6);
+    text-align: center;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    letter-spacing: var(--tracking-wider);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    margin: var(--space-6);
+}
+
+.drop-zone:hover {
+    border-color: var(--accent-session);
+    background: rgba(255,214,10,0.03);
+    color: var(--accent-session);
+}
+
+.drop-zone .drop-icon {
+    font-size: 2rem;
+    opacity: 0.25;
+    display: block;
+    margin-bottom: var(--space-3);
+    line-height: 1;
+}
+
+.drop-zone .drop-types {
+    font-size: var(--text-xs);
+    margin-top: var(--space-2);
+    opacity: 0.5;
+    letter-spacing: var(--tracking-wider);
+}
+
+/* ─── 16. Preset menu ──────────────────────────────────────────────────────── */
+.preset-menu {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-6);
+}
+
+.preset-btn {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--panel-radius);
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.preset-btn:hover {
+    border-color: var(--accent-session);
+    color: var(--accent-session);
+    background: rgba(255,214,10,0.04);
+}
+
+.preset-btn.selected {
+    border-color: var(--accent-session);
+    color: var(--accent-session);
+    background: rgba(255,214,10,0.06);
+    box-shadow: 0 0 8px rgba(255,214,10,0.1);
+}
+
+/* ─── 17. Transport hardware buttons ──────────────────────────────────────── */
+/*
+ * Avionics hardware buttons: bracket notation [LOAD] per visual reference.
+ * Embossed look: top-light highlight, bottom shadow.
+ */
+.transport-btn {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: var(--space-2) var(--space-4);
+    border-radius: 3px;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.transport-btn::before { content: '['; }
+.transport-btn::after  { content: ']'; }
+
+.transport-btn.neutral {
+    background: var(--btn-neutral-bg);
+    color: var(--btn-neutral-text);
+    border: 1px solid var(--btn-neutral-border);
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.05) inset,
+        0 -1px 0 rgba(0,0,0,0.3) inset;
+}
+
+.transport-btn.neutral:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--border-active);
+    background: var(--bg-elevated);
+}
+
+.transport-btn.master {
+    background: var(--btn-master-bg);
+    color: var(--btn-master-text);
+    font-weight: 700;
+    box-shadow:
+        0 0 12px rgba(255,214,10,0.25),
+        0 1px 0 rgba(255,255,255,0.2) inset,
+        0 -1px 0 rgba(0,0,0,0.2) inset;
+}
+
+.transport-btn.master:hover:not(:disabled) {
+    box-shadow:
+        0 0 20px rgba(255,214,10,0.4),
+        0 1px 0 rgba(255,255,255,0.2) inset;
+}
+
+.transport-btn.master.primary {
+    background: var(--severity-high);
+    color: #fff;
+    box-shadow:
+        0 0 14px rgba(239,68,68,0.3),
+        0 1px 0 rgba(255,255,255,0.15) inset;
+}
+
+.transport-btn.master.primary:hover:not(:disabled) {
+    box-shadow:
+        0 0 22px rgba(239,68,68,0.5),
+        0 1px 0 rgba(255,255,255,0.15) inset;
+}
+
+.transport-btn.export-btn {
+    background: rgba(0,209,255,0.12);
+    color: var(--accent-insights);
+    border: 1px solid rgba(0,209,255,0.3);
+    box-shadow:
+        0 0 8px rgba(0,209,255,0.1),
+        0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+.transport-btn.export-btn:hover:not(:disabled) {
+    background: rgba(0,209,255,0.18);
+    box-shadow: 0 0 14px rgba(0,209,255,0.2);
+}
+
+.transport-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ─── 18. Format selector pills ────────────────────────────────────────────── */
+.format-pills {
+    display: flex;
+    gap: var(--space-1);
+    margin-bottom: var(--space-3);
+}
+
+.format-pill {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+}
+
+.format-pill.active {
+    background: rgba(0,209,255,0.1);
+    color: var(--accent-insights);
+    border-color: rgba(0,209,255,0.4);
+    box-shadow: 0 0 6px rgba(0,209,255,0.1);
+}
+
+/* ─── 19. File info block ──────────────────────────────────────────────────── */
+.file-info {
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.file-info-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.file-info-name {
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text-primary);
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.file-info-meta {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-1);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+}
+
+/* ─── 20. Golden Blob badge ────────────────────────────────────────────────── */
+.blob-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.blob-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--state-complete);
+    box-shadow: 0 0 8px var(--state-complete);
+    flex-shrink: 0;
+    animation: blob-glow 2s ease-in-out infinite;
+}
+
+@keyframes blob-glow {
+    0%, 100% { box-shadow: 0 0 6px var(--state-complete); opacity: 1; }
+    50%       { box-shadow: 0 0 14px var(--state-complete); opacity: 0.8; }
+}
+
+.blob-text {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+/* ─── 21. Mastering progress ─────────────────────────────────────────────────  */
+.mastering-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: var(--space-8) var(--space-6);
+    text-align: center;
+}
+
+.mastering-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--state-running);
+    text-shadow: 0 0 10px rgba(0,209,255,0.4);
+    margin-bottom: var(--space-6);
+}
+
+.progress-track {
+    width: 100%;
+    height: 2px;
+    background: var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--state-running);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--state-running);
+    animation: progress-sweep 2s ease-in-out infinite;
+    transform-origin: left;
+}
+
+@keyframes progress-sweep {
+    0%   { width: 20%; opacity: 1; }
+    50%  { width: 80%; opacity: 1; }
+    100% { width: 20%; opacity: 0.7; }
+}
+
+.mastering-sub {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-4);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+}
+
+/* ─── 22. Spectrum placeholder (A-003 §3 — no canvas Phase 11) ──────────────── */
+.spectrum-placeholder {
+    margin: var(--space-2) var(--space-6) var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--panel-radius);
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    background: var(--bg-overlay);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle scanline texture — OLED phosphor effect */
+.spectrum-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0,209,255,0.015) 0px,
+        rgba(0,209,255,0.015) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    pointer-events: none;
+}
+
+/* Grid lines — oscilloscope reference */
+.spectrum-placeholder::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(rgba(0,209,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,209,255,0.04) 1px, transparent 1px);
+    background-size: 25% 25%;
+    pointer-events: none;
+}
+
+.spectrum-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 56px;
+    margin-bottom: var(--space-2);
+    position: relative;
+    z-index: 1;
+}
+
+.spectrum-bar {
+    flex: 1;
+    border-radius: 1px 1px 0 0;
+    background: linear-gradient(
+        to top,
+        var(--accent-insights),
+        rgba(0,209,255,0.3)
+    );
+    opacity: 0.4;
+    min-width: 3px;
+}
+
+.spectrum-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wider);
+    text-align: center;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+}
+
+/* ─── 23. Radar placeholder (A-003 §3 — no canvas Phase 11) ─────────────────── */
+.radar-placeholder {
+    margin: var(--space-2) var(--space-4) var(--space-4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--panel-radius);
+    padding: var(--space-6) var(--space-4) var(--space-3);
+    background: var(--bg-overlay);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.radar-icon {
+    font-size: 2rem;
+    opacity: 0.15;
+    display: block;
+    margin-bottom: var(--space-2);
+    color: var(--accent-coach);
+    line-height: 1;
+    letter-spacing: 0;
+}
+
+.radar-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+}
+
+/* ─── 24. Transport bar (bottom) ─────────────────────────────────────────────── */
+/*
+ * Fixed-height hardware transport strip at the bottom of the chassis.
+ * Raised surface (lighter than bay). Contains mode buttons.
+ * No timecodes or scrub in Phase 11 — those come with the playback engine.
+ */
+.transport-bar {
+    height: var(--chassis-transport-h);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-6);
+    background: var(--bg-overlay);
+    border-top: 1px solid var(--border-active);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 -2px 8px rgba(0,0,0,0.3);
+}
+
+/* Screw hardware on transport bar */
+.transport-bar::before,
+.transport-bar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--screw-size);
+    height: var(--screw-size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
+    border: 1px solid var(--border-subtle);
+}
+.transport-bar::before { left: var(--space-3); }
+.transport-bar::after  { right: var(--space-3); }
+
+/* Mode indicator LED in transport bar */
+.transport-mode {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    letter-spacing: var(--tracking-wider);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 2px var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    background: var(--bg-elevated);
+    user-select: none;
+}
+
+/* Push button group gap */
+.transport-group {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.transport-spacer {
+    flex: 1;
+}
+
+/* ─── 25. Fault overlay ──────────────────────────────────────────────────────── */
+.fault-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.fault-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--severity-high);
+    border-radius: var(--bezel-radius);
+    padding: var(--space-8);
+    text-align: center;
+    max-width: 400px;
+    box-shadow:
+        0 0 40px rgba(239,68,68,0.2),
+        0 8px 32px rgba(0,0,0,0.6);
+}
+
+.fault-code {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--severity-high);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    text-shadow: 0 0 16px rgba(239,68,68,0.4);
+    margin-bottom: var(--space-3);
+}
+
+.fault-message {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: var(--space-6);
+}
+
+/* ─── 26. Utility classes ────────────────────────────────────────────────────── */
+
+/* Text utilities */
+.font-mono  { font-family: var(--font-mono); }
+.font-sans  { font-family: var(--font-sans); }
+.text-xs    { font-size: var(--text-xs); }
+.text-sm    { font-size: var(--text-sm); }
+.text-base  { font-size: var(--text-base); }
+.text-primary    { color: var(--text-primary); }
+.text-secondary  { color: var(--text-secondary); }
+.text-muted      { color: var(--text-muted); }
+.uppercase  { text-transform: uppercase; }
+.tracking-widest { letter-spacing: var(--tracking-widest); }
+.tabular-nums    { font-variant-numeric: tabular-nums; }
+
+/* Divider */
+.divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 0;
+}
+
+/* Hidden (dead states before P11-010) */
+.hidden { display: none !important; }
+
+/* Awaiting state */
+.awaiting {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: var(--space-8);
+    text-align: center;
+}
+
+/* Subtle pulse for live indicators */
+@keyframes led-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+.led-pulse {
+    animation: led-pulse 1.8s ease-in-out infinite;
+}
+
+/* Export controls block */
+.export-controls {
+    padding: var(--space-4) var(--space-6);
+}
+
+.export-controls-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-widest);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
