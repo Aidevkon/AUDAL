@@ -5,16 +5,16 @@ edition = "2021"
 description = "Still Air — Dioxus 0.6 Cockpit (Phase 11)"
 license = "MIT"
 
-# Dioxus desktop: native binary, Tauri WebView IPC
+# Dioxus web: WASM target, served to Tauri WebView via trunk
+# window.__TAURI_INTERNALS__ is injected by Tauri (withGlobalTauri: true)
 # Amendment A-002 §2: UI is Disposable — this crate may be replaced
 # Amendment A-002 §3: Core crates are NOT dependencies of this crate
 [dependencies]
-dioxus          = { version = "0.6", features = ["desktop"] }
-dioxus-document = "0.6"
-serde           = { version = "1",   features = ["derive"] }
-serde_json      = "1"
-tokio           = { version = "1",   features = ["rt", "rt-multi-thread"] }
-chrono          = { version = "0.4", features = ["serde"] }
+dioxus           = { version = "0.6", features = ["web"] }
+dioxus-document  = "0.6"
+serde            = { version = "1",   features = ["derive"] }
+serde_json       = "1"
+wasm-bindgen-futures = "0.4"
 
 # ui-isolation-check.sh invariant:
 # sp314-dsp, lineos-telemetry, lineos-rule-engine, m0d, adapter-runtime

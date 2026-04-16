@@ -1,0 +1,14 @@
+# Trunk.toml — Dioxus Cockpit (Phase 11)
+# Authority: P11-009 · Amendment A-002 §7
+#
+# Builds stillair-cockpit as WASM and serves it to Tauri's WebView.
+# Trunk is the build system; cargo tauri dev manages the full window.
+
+[build]
+target = "index.html"
+
+# Serve the CSS design system from assets/
+[[hooks]]
+stage = "pre_build"
+command = "echo"
+command_arguments = ["Building Still Air Cockpit (Dioxus 0.6 web)..."]

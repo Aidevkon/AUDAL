@@ -5,10 +5,10 @@
   "version": "0.1.0",
   "identifier": "ai.stillair.cockpit",
   "build": {
-    "frontendDist": "../frontend/dist",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "trunk serve --port 1420",
-    "beforeBuildCommand": "trunk build --release"
+    "frontendDist": "../cockpit-dioxus/dist",
+    "devUrl": "http://localhost:1421",
+    "beforeDevCommand": "trunk serve --config ../cockpit-dioxus/Trunk.toml --port 1421",
+    "beforeBuildCommand": "trunk build --release --config ../cockpit-dioxus/Trunk.toml"
   },
   "app": {
     "withGlobalTauri": true,
