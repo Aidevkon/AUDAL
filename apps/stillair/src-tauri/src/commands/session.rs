@@ -23,11 +23,16 @@
 //!   ❌ LLM invocation outside CoachAdapter / adapter-runtime
 
 use serde::{Deserialize, Serialize};
+use tokio::time::{timeout, Duration};
 
 use crate::aether::CoachNarrativeJson;
 use crate::commands::insights::{evaluate_findings, CoachFindingsJson};
 use crate::commands::coach::get_coach_narrative;
 use crate::ipc::m0_client::{GoldenBlobJson, LoudnessMetricsJson, M0Client, QualityMetricsJson};
+
+/// Maximum time to wait for Ollama coach inference.
+/// If exceeded, narrative = None (non-fatal). Cockpit still transitions to FM5.
+const COACH_TIMEOUT_SECS: u64 = 25;
 
 // ── SessionStateJson ──────────────────────────────────────────────────────────
 
@@ -105,9 +110,28 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         .await
         .map_err(|e| format!("Session: rule-engine failed: {e}"))?;
 
-    // Step 3: Get coach narrative (best-effort — non-fatal on failure)
+    // Step 3: Get coach narrative (best-effort, 25s timeout)
+    // Ollama inference can take 30-60s on slow hardware. We must not block
+    // the Cockpit in FM2 waiting for LLM output — narrative = None is safe;
+    // the Coach panel shows a "narrative unavailable" placeholder.
     let narrative: Option<CoachNarrativeJson> =
-        get_coach_narrative(findings.clone()).await.ok();
+        match timeout(
+            Duration::from_secs(COACH_TIMEOUT_SECS),
+            get_coach_narrative(findings.clone()),
+        ).await {
+            Ok(Ok(n))  => {
+                eprintln!("[session] coach narrative ok");
+                Some(n)
+            }
+            Ok(Err(e)) => {
+                eprintln!("[session] coach narrative err (non-fatal): {e}");
+                None
+            }
+            Err(_elapsed) => {
+                eprintln!("[session] coach narrative timeout after {COACH_TIMEOUT_SECS}s — returning None");
+                None
+            }
+        };
 
     // Step 4: Compose compliance summary from pre-computed loudness flags
     let compliance = ComplianceJson {
