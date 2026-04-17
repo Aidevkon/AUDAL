@@ -119,10 +119,12 @@ pub fn App() -> Element {
     }
 
     // ── Transport bar state ───────────────────────────────────────────────────
+    // NOTE: has_audio is NOT stored as a let-binding here — Dioxus 0.6 does not
+    // re-subscribe to signals read as plain let-bindings outside rsx!.
+    // Use  matches!(*mode.read(), CockpitMode::CoachReady { .. })  inline.
     let is_playing   = playback_state.read().as_ref().map(|s| s.is_playing).unwrap_or(false);
     let position_ms  = playback_state.read().as_ref().map(|s| s.position_ms).unwrap_or(0);
     let duration_ms  = playback_state.read().as_ref().map(|s| s.duration_ms).unwrap_or(0);
-    let has_audio    = mode.read().blob_id().is_some();
     let scrub_len    = scrub_pct(position_ms, duration_ms);
 
     rsx! {
@@ -181,7 +183,7 @@ pub fn App() -> Element {
                         class:   "transport-skip",
                         id:      "btn-skip-back",
                         title:   "Skip back 5 seconds",
-                        disabled: !has_audio,
+                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
                         onclick: move |_| {
                             let new_ms = position_ms.saturating_sub(5_000);
                             let ps     = playback_state.clone();
@@ -197,7 +199,7 @@ pub fn App() -> Element {
                     button {
                         class: if is_playing { "transport-play is-playing" } else { "transport-play" },
                         id:    "btn-play-pause",
-                        disabled: !has_audio,
+                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
                         onclick: move |_| {
                             let action = if is_playing { "pause" } else { "play" };
                             let ps     = playback_state.clone();
@@ -215,7 +217,7 @@ pub fn App() -> Element {
                         class:   "transport-skip",
                         id:      "btn-skip-fwd",
                         title:   "Skip forward 5 seconds",
-                        disabled: !has_audio,
+                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
                         onclick: move |_| {
                             let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
                             let ps     = playback_state.clone();
@@ -233,7 +235,8 @@ pub fn App() -> Element {
                         title: "Click to seek",
                         // onclick MUST be before children (Dioxus RSX rule)
                         onclick: move |evt| {
-                            if !has_audio || duration_ms == 0 { return; }
+                            if !matches!(*mode.read(), CockpitMode::CoachReady { .. })
+                                || duration_ms == 0 { return; }
                             let client_x = evt.client_coordinates().x;
                             let window   = web_sys::window().unwrap();
                             let doc      = window.document().unwrap();
@@ -272,7 +275,7 @@ pub fn App() -> Element {
                     button {
                         class:    "transport-skip",
                         id:       "btn-stop",
-                        disabled: !has_audio,
+                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
                         onclick: move |_| {
                             let ps = playback_state.clone();
                             spawn_local(async move {
