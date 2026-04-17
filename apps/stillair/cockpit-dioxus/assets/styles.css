@@ -180,6 +180,7 @@ html, body {
     background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
     border: 1px solid var(--border-subtle);
     box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    pointer-events: none;  /* decorative screw — must not block clicks */
 }
 
 .cockpit-header::after {
@@ -195,6 +196,7 @@ html, body {
     background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
     border: 1px solid var(--border-subtle);
     box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    pointer-events: none;  /* decorative screw — must not block clicks */
 }
 
 .wordmark {
@@ -258,6 +260,8 @@ html, body {
     padding: var(--panel-inset);
     min-height: 0;
     overflow: hidden;
+    /* Isolate the MFD stacking context from the transport bar below */
+    isolation: isolate;
 }
 
 /* ─── 6. MFD Panel (OLED inset) ───────────────────────────────────────────── */
@@ -368,6 +372,7 @@ html, body {
     background: currentColor;
     opacity: 0.6;
     box-shadow: 0 0 6px currentColor;
+    pointer-events: none;  /* decorative glow line */
 }
 
 /* ─── 8. Panel body ───────────────────────────────────────────────────────── */
@@ -1063,6 +1068,8 @@ html, body {
     flex-shrink: 0;
     position: relative;
     z-index: 10;
+    /* Explicit: transport bar always receives pointer events */
+    pointer-events: auto;
 
     box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.05),
@@ -1082,6 +1089,7 @@ html, body {
     background: radial-gradient(circle at 35% 35%, #3d4155, #1e2128 60%, #111318);
     border: 1px solid var(--border-subtle);
     box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    pointer-events: none;  /* decorative screws must NEVER intercept clicks */
 }
 .transport-bar::before { left: var(--space-3); }
 .transport-bar::after  { right: var(--space-3); }
@@ -1125,6 +1133,7 @@ html, body {
     gap: var(--space-2);
     flex: 1;
     justify-content: center;
+    pointer-events: auto;
 }
 
 /* Skip / auxiliary buttons — small neutral bracket style */
@@ -1146,6 +1155,10 @@ html, body {
     box-shadow:
         0 1px 0 rgba(255,255,255,0.04) inset,
         0 -1px 0 rgba(0,0,0,0.25) inset;
+    /* Ensure button sits above pseudo-element stacking */
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 .transport-skip::before { content: '['; }
 .transport-skip::after  { content: ']'; }
@@ -1179,6 +1192,10 @@ html, body {
         0 1px 0 rgba(255,255,255,0.2) inset,
         0 -1px 0 rgba(0,0,0,0.2) inset;
     transition: box-shadow 0.15s ease;
+    /* Ensure button sits above pseudo-element stacking */
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 .transport-play::before { content: '['; }
 .transport-play::after  { content: ']'; }
