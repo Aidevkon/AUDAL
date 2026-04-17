@@ -1,9 +1,9 @@
 //! handlers/playback.rs — POST /playback/control, GET /playback/state
 //! Authority: Phase 12A P12A-007 · Amendment A-003 §8
 //!
-//! PlaybackEngine lives in AppState (Arc<Mutex<PlaybackEngine>>).
-//! These handlers expose play/pause/stop/seek and state query.
-//! No PCM crosses the HTTP boundary — PlaybackStateResponse is metrics only.
+//! PlaybackHandle in AppState is Send+Sync (mpsc Sender).
+//! The actual cpal::Stream lives on a dedicated worker thread.
+//! No PCM crosses the HTTP boundary — PlaybackState is metrics only.
 
 use axum::{Json, extract::State};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,6 @@ pub struct PlaybackControlRequest {
     pub position_ms: Option<u64>,
 }
 
-/// PlaybackState re-exported for JSON response — no PCM (A-003 §2).
 #[derive(Debug, Serialize)]
 pub struct PlaybackControlResponse {
     pub status:  &'static str,
@@ -36,37 +35,22 @@ pub async fn playback_control(
     State(state): State<AppState>,
     Json(req):    Json<PlaybackControlRequest>,
 ) -> Json<PlaybackControlResponse> {
-    let result = {
-        let mut engine = match state.playback.lock() {
-            Ok(e)  => e,
-            Err(_) => return Json(PlaybackControlResponse {
-                status:  "error",
-                state:   None,
-                message: Some("playback engine lock poisoned".into()),
-            }),
-        };
-
-        match req.action.as_str() {
-            "play"  => engine.play(),
-            "pause" => { engine.pause(); Ok(()) },
-            "stop"  => { engine.stop();  Ok(()) },
-            "seek"  => {
-                let ms = req.position_ms.unwrap_or(0);
-                engine.seek(ms)
-            }
-            other => Err(format!("unknown action: {other}")),
+    let result: Result<(), String> = match req.action.as_str() {
+        "play"  => { state.playback.play();  Ok(()) }
+        "pause" => { state.playback.pause(); Ok(()) }
+        "stop"  => { state.playback.stop();  Ok(()) }
+        "seek"  => {
+            state.playback.seek(req.position_ms.unwrap_or(0));
+            Ok(())
         }
+        other => Err(format!("unknown action: {other}")),
     };
 
     match result {
         Ok(()) => {
-            let state_snap = state.playback.lock().ok()
-                .and_then(|e| e.state());
-            Json(PlaybackControlResponse {
-                status:  "ok",
-                state:   state_snap,
-                message: None,
-            })
+            // get_state() is a synchronous round-trip to the worker thread
+            let snap = state.playback.get_state();
+            Json(PlaybackControlResponse { status: "ok", state: snap, message: None })
         }
         Err(e) => Json(PlaybackControlResponse {
             status:  "error",
@@ -76,11 +60,9 @@ pub async fn playback_control(
     }
 }
 
-/// GET /playback/state — current position, duration, is_playing
+/// GET /playback/state — current position (synchronous round-trip to worker).
 pub async fn get_playback_state(
     State(state): State<AppState>,
 ) -> Json<Option<PlaybackState>> {
-    let snap = state.playback.lock().ok()
-        .and_then(|e| e.state());
-    Json(snap)
+    Json(state.playback.get_state())
 }

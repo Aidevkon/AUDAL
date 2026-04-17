@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 ringbuf  = "0.4"                          # lock-free SPMC ring buffer — MIT
-cpal     = "0.15"                         # audio I/O — uses ALSA on Linux automatically
+cpal     = "0.15"                         # audio I/O backend — Apache-2.0
 uuid     = { version = "1", features = ["v4"] }
 tracing  = "0.1"
 serde    = { version = "1", features = ["derive"] }

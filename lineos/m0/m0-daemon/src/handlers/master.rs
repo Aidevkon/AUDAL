@@ -80,15 +80,12 @@ pub async fn trigger_mastering(
                 blob_id:     xaak_blob_id,
             };
 
-            if let Ok(mut engine) = state.playback.lock() {
-                engine.load(transfer);
-                tracing::info!(
-                    blob_id = %blob_id,
-                    "m0d: PCM transferred to xaak (A-003 §2)"
-                );
-            } else {
-                tracing::warn!("m0d: playback engine lock poisoned — PCM not loaded into xaak");
-            }
+            // PlaybackHandle.load() is non-blocking — sends over mpsc channel.
+            state.playback.load(transfer);
+            tracing::info!(
+                blob_id = %blob_id,
+                "m0d: PCM transferred to xaak (A-003 §2)"
+            );
 
             state.blob_store.insert(blob);
             state.audit.write(
