@@ -110,9 +110,67 @@ impl M0Client {
         }
         resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
     }
+
+    /// POST /playback/control — play | pause | stop | seek
+    /// Phase 12A (A-003 §8): cpal playback via xaak kernel.
+    pub async fn playback_control(
+        &self,
+        action:      &str,
+        position_ms: Option<u64>,
+    ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
+        let resp = self.client
+            .post(format!("{M0_BASE}/playback/control"))
+            .json(&PlaybackControlRequest {
+                action:      action.to_string(),
+                position_ms,
+            })
+            .send().await
+            .map_err(|e| M0Error::Unreachable(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            return Err(M0Error::RequestFailed(resp.status().as_u16()));
+        }
+
+        #[derive(serde::Deserialize)]
+        struct ControlResp {
+            status:  String,
+            state:   Option<crate::commands::playback::PlaybackStateJson>,
+            message: Option<String>,
+        }
+        let body: ControlResp = resp.json().await
+            .map_err(|e| M0Error::ParseError(e.to_string()))?;
+
+        if body.status == "ok" {
+            Ok(body.state)
+        } else {
+            Err(M0Error::RequestFailed(400))
+        }
+    }
+
+    /// GET /playback/state — current position (non-blocking).
+    pub async fn get_playback_state(
+        &self,
+    ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
+        let resp = self.client
+            .get(format!("{M0_BASE}/playback/state"))
+            .send().await
+            .map_err(|e| M0Error::Unreachable(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            return Err(M0Error::RequestFailed(resp.status().as_u16()));
+        }
+        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+    }
 }
 
 // ── Request / Response types ──────────────────────────────────────────────────
+
+/// POST /playback/control body (Phase 12A)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlaybackControlRequest {
+    pub action:      String,
+    pub position_ms: Option<u64>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MasterRequest {

@@ -1,0 +1,17 @@
+[package]
+name    = "xaak"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+# Amendment A-003 §1: Internal PCM Kernel — Phase 12 activation
+# Authority: Creator OS Amendment A-003 · LineOS Constitution v2.0
+
+[dependencies]
+ringbuf  = "0.4"                          # lock-free SPMC ring buffer — MIT
+cpal     = "0.15"                         # audio I/O — uses ALSA on Linux automatically
+uuid     = { version = "1", features = ["v4"] }
+tracing  = "0.1"
+serde    = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

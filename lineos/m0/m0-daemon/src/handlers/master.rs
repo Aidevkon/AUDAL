@@ -12,10 +12,13 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
+use uuid::Uuid;
 
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
 use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvenance};
+// Phase 12A (A-003 §1): PCM ownership transfer to xaak after mastering
+use xaak::PcmTransfer;
 
 #[derive(Debug, Deserialize)]
 pub struct MasterRequest {
@@ -57,7 +60,36 @@ pub async fn trigger_mastering(
 
     match run_dsp(&req.audio_path, &req.preset_id, start).await {
         Ok(blob) => {
-            let blob_id = blob.id.clone();
+            let blob_id  = blob.id.clone();
+
+            // Phase 12A (A-003 §2): Transfer PCM ownership to xaak before storing blob.
+            // blob.audio_bytes = raw f32-LE PCM from sp314-dsp output.
+            // After this, xaak is the SOLE PCM owner.
+            let pcm_samples: Vec<f32> = blob.audio_bytes
+                .chunks_exact(4)
+                .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+                .collect();
+
+            let xaak_blob_id = Uuid::parse_str(&blob_id)
+                .unwrap_or_else(|_| Uuid::new_v4());
+
+            let transfer = PcmTransfer {
+                samples:     pcm_samples,
+                sample_rate: blob.sample_rate,
+                channels:    blob.channels,
+                blob_id:     xaak_blob_id,
+            };
+
+            if let Ok(mut engine) = state.playback.lock() {
+                engine.load(transfer);
+                tracing::info!(
+                    blob_id = %blob_id,
+                    "m0d: PCM transferred to xaak (A-003 §2)"
+                );
+            } else {
+                tracing::warn!("m0d: playback engine lock poisoned — PCM not loaded into xaak");
+            }
+
             state.blob_store.insert(blob);
             state.audit.write(
                 AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,

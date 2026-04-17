@@ -39,6 +39,9 @@ rubato       = "0.15"   # SincFixedIn resampling → 48000 Hz
 hound        = "3.5"    # WAV write — pure Rust, MIT
 # Opus: requires libopus-dev (C library). Wired in Phase 11.
 # audiopus = "0.3.0-rc.0"
+# Phase 12A: xaak PCM kernel (Amendment A-003 §1)
+# No 'playback' feature — cpal remains in xaak, not in m0d
+xaak         = { path = "../../m1/xaak" }
 
 
 

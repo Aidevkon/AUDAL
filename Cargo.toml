@@ -7,6 +7,7 @@ members = [
     "lineos/m1/metadata",
     "lineos/m1/insights",
     "lineos/m1/rule-engine",
+    "lineos/m1/xaak",
     "apps/stillair/src-tauri",
     "apps/stillair/cockpit-dioxus",   # Phase 11: Dioxus 0.6 Cockpit
     "creator-os/shared/adapter-runtime",  # Phase 8: Aether LLM adapter runtime

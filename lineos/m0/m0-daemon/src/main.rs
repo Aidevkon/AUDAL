@@ -135,14 +135,17 @@ async fn main() -> Result<()> {
 }
 
 /// Build the mastering API Axum router.
-/// Endpoints: POST /master, GET /blob/:id, POST /export
-/// Authority: Phase 6 task-decomposition P6-003 · m0-api.schema.json
+/// Phase 12A adds: POST /playback/control, GET /playback/state
+/// Authority: Phase 6 task-decomposition P6-003 · Phase 12A P12A-007
 fn mastering_router(state: AppState) -> axum::Router {
     use axum::routing::{get, post};
 
     axum::Router::new()
-        .route("/master",    post(handlers::master::trigger_mastering))
-        .route("/blob/:id",  get(handlers::blob::get_blob))
-        .route("/export",    post(handlers::export::export_audio))
+        .route("/master",             post(handlers::master::trigger_mastering))
+        .route("/blob/:id",           get(handlers::blob::get_blob))
+        .route("/export",             post(handlers::export::export_audio))
+        // Phase 12A: PCM playback via xaak (A-003 §8)
+        .route("/playback/control",   post(handlers::playback::playback_control))
+        .route("/playback/state",     get(handlers::playback::get_playback_state))
         .with_state(state)
 }
