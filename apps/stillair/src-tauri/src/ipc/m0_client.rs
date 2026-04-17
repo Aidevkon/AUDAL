@@ -14,7 +14,13 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// M0 base URL — always localhost:7400 (Caddy proxy, never direct).
+/// Used for: /master, /blob/:id, /export
 const M0_BASE: &str = "http://127.0.0.1:7400";
+
+/// M0 playback server URL — port 7402 (xaak playback, NOT proxied through Caddy).
+/// Used for: /playback/control, /playback/state, /playback/telemetry
+/// Caddy on :7400 only forwards mastering routes (:7401); playback is :7402 directly.
+const M0_PLAYBACK_BASE: &str = "http://127.0.0.1:7402";
 
 /// Per-request timeouts.
 /// Mastering can take 60-120s for large files — give it 5 minutes.
@@ -119,7 +125,7 @@ impl M0Client {
         position_ms: Option<u64>,
     ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
         let resp = self.client
-            .post(format!("{M0_BASE}/playback/control"))
+            .post(format!("{M0_PLAYBACK_BASE}/playback/control"))
             .json(&PlaybackControlRequest {
                 action:      action.to_string(),
                 position_ms,
@@ -152,7 +158,7 @@ impl M0Client {
         &self,
     ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
         let resp = self.client
-            .get(format!("{M0_BASE}/playback/state"))
+            .get(format!("{M0_PLAYBACK_BASE}/playback/state"))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -167,7 +173,7 @@ impl M0Client {
         &self,
     ) -> Result<Option<crate::commands::playback::LiveTelemetryJson>, M0Error> {
         let resp = self.client
-            .get(format!("{M0_BASE}/playback/telemetry"))
+            .get(format!("{M0_PLAYBACK_BASE}/playback/telemetry"))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
