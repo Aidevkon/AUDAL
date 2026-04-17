@@ -4,6 +4,8 @@
 //! Phase 12A commands (A-003 §8):
 //!   playback::playback_control  — play | pause | stop | seek → xaak → cpal
 //!   playback::get_playback_state — current position, duration, is_playing
+//! Phase 13:
+//!   report::export_pdf_report — BMR-128 PDF compliance report (printpdf, MIT)
 
 // Prevent a console window from popping up on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -29,6 +31,8 @@ pub fn run() {
             commands::playback::playback_control,
             commands::playback::get_playback_state,
             commands::playback::get_live_telemetry,   // P12B-005: live LUFS
+            // Phase 13B: BMR-128 PDF report
+            commands::report::export_pdf_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Still Air");

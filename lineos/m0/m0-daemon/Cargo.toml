@@ -43,6 +43,13 @@ hound        = "3.5"    # WAV write — pure Rust, MIT
 # No 'playback' feature — cpal remains in xaak, not in m0d
 xaak         = { path = "../../m1/xaak" }
 
+# Phase 13: MP3 export via LAME
+# LGPL compliance: lame-sys links libmp3lame DYNAMICALLY (LGPL §6 — replaceability preserved).
+# NEVER use mp3lame-encoder — it statically links LAME (LGPL violation).
+# See: lineos/plan/phase-13/LAME-LGPL-NOTICE.md
+# System dependency: libmp3lame.so (apt: libmp3lame-dev or libmp3lame0)
+lame-sys = { path = "../../m1/lame-sys" }
+
 
 
 [dev-dependencies]

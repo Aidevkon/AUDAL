@@ -430,10 +430,10 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                 "EXPORT FORMAT"
             }
 
-            // Format selector
+            // Format selector — FLAC / WAV / MP3 / AIFF (Phase 13A + 13-003b)
             div {
-                style: "display:flex; gap:0.4rem; margin-bottom:1rem;",
-                for fmt in ["flac", "wav"] {
+                style: "display:flex; gap:0.4rem; margin-bottom:1rem; flex-wrap:wrap;",
+                for fmt in ["flac", "wav", "mp3", "aiff"] {
                     {
                         let f   = fmt.to_string();
                         let sel = export_format.read().clone() == fmt;
@@ -454,13 +454,14 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                                      letter-spacing:0.1em; cursor:pointer;
                                      text-transform:uppercase;"
                                 },
-                                "{fmt}"
+                                "{fmt.to_uppercase()}"
                             }
                         }
                     }
                 }
             }
 
+            // Export audio button
             button {
                 id: "btn-export",
                 onclick: on_export,
@@ -468,8 +469,41 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                         border:none; border-radius:4px; padding:0.6rem 1.5rem;
                         font-size:0.75rem; letter-spacing:0.15em;
                         text-transform:uppercase; cursor:pointer;
-                        font-weight:600; width:100%;",
+                        font-weight:600; width:100%; margin-bottom:0.5rem;",
                 "EXPORT"
+            }
+
+            // PDF Report button (Phase 13B: BMR-128 PDF)
+            {
+                let bid = blob_id.clone();
+                rsx! {
+                    button {
+                        id: "btn-pdf-report",
+                        onclick: move |_| {
+                            let b = bid.clone();
+                            spawn_local(async move {
+                                match crate::ipc::invoke::<String, _>(
+                                    "export_pdf_report",
+                                    serde_json::json!({ "blobId": b }),
+                                ).await {
+                                    Ok(path) => web_sys::console::log_1(
+                                        &format!("[PDF] saved: {path}").into()
+                                    ),
+                                    Err(e) if e.contains("Cancelled") => {}
+                                    Err(e) => web_sys::console::log_1(
+                                        &format!("[PDF] error: {e}").into()
+                                    ),
+                                }
+                            });
+                        },
+                        style: "background:var(--surface-panel); color:var(--text-muted);
+                                border:1px solid var(--border-subtle); border-radius:4px;
+                                padding:0.5rem 1.5rem; font-size:0.7rem;
+                                letter-spacing:0.15em; text-transform:uppercase;
+                                cursor:pointer; width:100%;",
+                        "PDF REPORT"
+                    }
+                }
             }
         }
     }

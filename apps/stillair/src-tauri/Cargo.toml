@@ -32,3 +32,4 @@ adapter-runtime     = { path = "../../../creator-os/shared/adapter-runtime" }  #
 toml                = "0.8"  # Phase 9: runtime coach_prompt.toml loading
 dirs                = "5"    # Phase 10: default export directory (~/.local/audio/StillAir)
 chrono              = { version = "0.4", features = ["serde"] }  # Phase 10: export timestamps
+printpdf            = "0.7"  # Phase 13B: BMR-128 PDF report — pure Rust, MIT
