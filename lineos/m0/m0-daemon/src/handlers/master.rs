@@ -45,7 +45,7 @@ pub async fn trigger_mastering(
             &format!("path={} preset={}", req.audio_path, req.preset_id))
     ).ok();
 
-    const ALLOWED: &[&str] = &["spotify", "youtube", "apple_music", "tidal", "broadcast", "raw"];
+    const ALLOWED: &[&str] = &["spotify", "youtube", "apple_music", "tidal", "broadcast", "raw", "amazon"];
     if !ALLOWED.contains(&req.preset_id.as_str()) {
         state.audit.write(
             AuditEntry::new("m0d.mastering_rejected", AuditLevel::Audit,
