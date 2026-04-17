@@ -17,9 +17,11 @@ serde_json            = "1"
 serde-wasm-bindgen    = "0.6"
 wasm-bindgen          = "0.2"
 wasm-bindgen-futures  = "0.4"
-web-sys               = { version = "0.3", features = ["console", "Window"] }
+web-sys               = { version = "0.3", features = ["console", "Window", "Document",
+                                                       "Element", "DomRect"] }
 js-sys                = "0.3"
+gloo-timers           = { version = "0.3", features = ["futures"] }  # P12B-004: 500ms poll
 
 # ui-isolation-check.sh invariant:
 # sp314-dsp, lineos-telemetry, lineos-rule-engine, m0d, adapter-runtime
-# MUST NOT appear in this dependency tree.
+# xaak, cpal, ringbuf MUST NOT appear in this dependency tree.

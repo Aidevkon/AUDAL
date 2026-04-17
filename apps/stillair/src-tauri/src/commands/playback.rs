@@ -1,7 +1,7 @@
-//! commands/playback.rs — Tauri commands: playback_control, get_playback_state
-//! Authority: Phase 12A P12A-007 · Amendment A-003 §8
+//! commands/playback.rs — Tauri commands: playback_control, get_playback_state, get_live_telemetry
+//! Authority: Phase 12A P12A-007 · Phase 12B P12B-005 · Amendment A-003 §8
 //!
-//! Exposes player control to the Cockpit via IPC.
+//! Exposes player control and live telemetry to the Cockpit via IPC.
 //! No PCM crosses the IPC boundary — only PlaybackStateJson (A-003 §2).
 
 use crate::ipc::m0_client::M0Client;
@@ -17,12 +17,19 @@ pub struct PlaybackStateJson {
     pub channels:    u16,
 }
 
+/// Live telemetry — momentary LUFS + short-term during playback (P12B-005).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LiveTelemetryJson {
+    pub momentary_lufs:  f32,
+    pub short_term_lufs: f32,
+    pub true_peak_dbtp:  f32,
+    pub position_ms:     u64,
+}
+
 /// Control playback.
 ///
 /// action: "play" | "pause" | "stop" | "seek"
 /// position_ms: required for "seek", ignored otherwise.
-///
-/// Arg keys: camelCase (Tauri v2 IPC convention — A-003 §7)
 #[tauri::command]
 pub async fn playback_control(
     action:      String,
@@ -41,4 +48,15 @@ pub async fn get_playback_state() -> Result<Option<PlaybackStateJson>, String> {
     client.get_playback_state()
         .await
         .map_err(|e| format!("IO_ERR:0x02:Get playback state failed: {e}"))
+}
+
+/// Get live telemetry during playback (P12B-005).
+/// Returns momentary LUFS from the active blob's stored metrics.
+/// Uses playback position to select the correct telemetry window.
+#[tauri::command]
+pub async fn get_live_telemetry() -> Result<Option<LiveTelemetryJson>, String> {
+    let client = M0Client::new();
+    client.get_live_telemetry()
+        .await
+        .map_err(|e| format!("IO_ERR:0x02:Live telemetry failed: {e}"))
 }

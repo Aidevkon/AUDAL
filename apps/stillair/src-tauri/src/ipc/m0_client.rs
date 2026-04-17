@@ -161,6 +161,21 @@ impl M0Client {
         }
         resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
     }
+
+    /// GET /playback/telemetry — live momentary LUFS from active blob (P12B-005).
+    pub async fn get_live_telemetry(
+        &self,
+    ) -> Result<Option<crate::commands::playback::LiveTelemetryJson>, M0Error> {
+        let resp = self.client
+            .get(format!("{M0_BASE}/playback/telemetry"))
+            .send().await
+            .map_err(|e| M0Error::Unreachable(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            return Err(M0Error::RequestFailed(resp.status().as_u16()));
+        }
+        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+    }
 }
 
 // ── Request / Response types ──────────────────────────────────────────────────

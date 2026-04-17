@@ -118,3 +118,27 @@ pub struct ExportResult {
     pub written_path: String,
     pub format:       String,
 }
+
+// ── PlaybackStateJson — transport metrics (A-003 §5: no PCM) ─────────────────
+
+/// Position/state from xaak kernel — exposed to Cockpit.
+/// No PCM: position_ms / duration_ms / is_playing only (A-003 §5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlaybackStateJson {
+    pub blob_id:     String,
+    pub position_ms: u64,
+    pub duration_ms: u64,
+    pub is_playing:  bool,
+    pub sample_rate: u32,
+    pub channels:    u16,
+}
+
+// ── LiveTelemetryJson — live momentary LUFS during playback ───────────────────
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LiveTelemetryJson {
+    pub momentary_lufs:  f32,
+    pub short_term_lufs: f32,
+    pub true_peak_dbtp:  f32,
+    pub position_ms:     u64,
+}

@@ -144,8 +144,9 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/master",             post(handlers::master::trigger_mastering))
         .route("/blob/:id",           get(handlers::blob::get_blob))
         .route("/export",             post(handlers::export::export_audio))
-        // Phase 12A: PCM playback via xaak (A-003 §8)
+        // Phase 12A/12B: PCM playback via xaak (A-003 §8)
         .route("/playback/control",   post(handlers::playback::playback_control))
         .route("/playback/state",     get(handlers::playback::get_playback_state))
+        .route("/playback/telemetry", get(handlers::playback::get_live_telemetry))
         .with_state(state)
 }

@@ -66,3 +66,37 @@ pub async fn get_playback_state(
 ) -> Json<Option<PlaybackState>> {
     Json(state.playback.get_state())
 }
+
+/// GET /playback/telemetry — momentary LUFS from blob metrics (P12B-005).
+/// Reads the active blob's stored loudness metrics.
+/// Does NOT expose PCM — numbers only (A-003 §5).
+pub async fn get_live_telemetry(
+    State(state): State<AppState>,
+) -> Json<Option<LiveTelemetryResponse>> {
+    // Get current playback state to find the active blob_id
+    let playback_state = state.playback.get_state();
+    let Some(ps) = playback_state else {
+        return Json(None);
+    };
+
+    // Look up the blob's stored loudness metrics
+    let blob = state.blob_store.get(&ps.blob_id);
+    let Some(blob) = blob else {
+        return Json(None);
+    };
+
+    Json(Some(LiveTelemetryResponse {
+        momentary_lufs:  blob.loudness.momentary_lufs,
+        short_term_lufs: blob.loudness.short_term_lufs,
+        true_peak_dbtp:  blob.loudness.true_peak_dbtp,
+        position_ms:     ps.position_ms,
+    }))
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct LiveTelemetryResponse {
+    pub momentary_lufs:  f32,
+    pub short_term_lufs: f32,
+    pub true_peak_dbtp:  f32,
+    pub position_ms:     u64,
+}

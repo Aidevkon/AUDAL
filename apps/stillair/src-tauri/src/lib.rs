@@ -25,9 +25,10 @@ pub fn run() {
             commands::export::export_audio,
             commands::coach::get_coach_narrative,    // Phase 8: Aether Coach
             commands::session::get_session_state,    // P9-008: Session State Unification
-            // Phase 12A: xaak playback (A-003 §8)
+            // Phase 12A/12B: xaak playback (A-003 §8)
             commands::playback::playback_control,
             commands::playback::get_playback_state,
+            commands::playback::get_live_telemetry,   // P12B-005: live LUFS
         ])
         .run(tauri::generate_context!())
         .expect("error while running Still Air");
