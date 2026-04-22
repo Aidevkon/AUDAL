@@ -15,7 +15,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
-use crate::types::{AudioMeta, SessionStateJson};
+use crate::types::{AudioMeta, SessionStateJson, VisualizationDataJson};
 
 const PRESETS: &[(&str, &str)] = &[
     ("spotify",       "Spotify  −14 LUFS"),
@@ -31,6 +31,8 @@ const PRESETS: &[(&str, &str)] = &[
 pub fn SessionPanel(
     mode:          Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
+    viz_data:      Signal<Option<VisualizationDataJson>>,
+    show_mastered: Signal<bool>,
 ) -> Element {
     rsx! {
         div {
@@ -63,7 +65,7 @@ pub fn SessionPanel(
                     CockpitMode::PresetSelected { path, name, preset_id } => rsx! {
                         FileInfo { name: name.clone(), format: String::new() }
                         SelectedPreset { preset_id: preset_id.clone() }
-                        MasterButton { mode, session_state, path, name, preset_id }
+                        MasterButton { mode, session_state, viz_data, path, name, preset_id }
                     },
                     CockpitMode::Mastering { .. } => rsx! {
                         MasteringProgress {}
@@ -240,6 +242,7 @@ fn SelectedPreset(preset_id: String) -> Element {
 fn MasterButton(
     mode:          Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
+    viz_data:      Signal<Option<VisualizationDataJson>>,
     path:          String,
     name:          String,
     preset_id:     String,
@@ -304,8 +307,18 @@ fn MasterButton(
             };
             web_sys::console::log_1(&JsValue::from_str("[session] session state ok, transitioning to FM5"));
 
-            // FM5
+            // FM5: set session state + fetch visualization data
             session_state.set(Some(state));
+
+            // P14-003: Fetch viz immediately after session (UI Agent Context §3)
+            let bid2 = blob_id.clone();
+            if let Ok(viz) = invoke::<VisualizationDataJson, _>(
+                "get_visualization_data",
+                json!({ "blobId": bid2 }),
+            ).await {
+                viz_data.set(Some(viz));
+            }
+
             mode.set(CockpitMode::CoachReady { blob_id });
         });
     };

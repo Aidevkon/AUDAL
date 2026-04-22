@@ -8,6 +8,9 @@
 //!   CorrelationRadar = static placeholder (A-003 §3, no canvas)
 
 use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
+use serde_json::json;
+use crate::ipc::invoke;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{IssueJson, SessionStateJson};
 
@@ -78,7 +81,7 @@ pub fn CoachPanel(
                             issues: s.findings.issues.len(),
                         }
 
-                        // ── Finding cards ─────────────────────────────────────
+                        // ── Finding rows (P14-008: progress bars + severity dots) ────
                         if !s.findings.issues.is_empty() {
                             div {
                                 style: "padding:0.5rem 1.5rem 0.25rem;
@@ -88,11 +91,13 @@ pub fn CoachPanel(
                             }
                         }
                         for issue in &s.findings.issues {
-                            FindingCard { issue: issue.clone() }
+                            FindingRow { issue: issue.clone() }
                         }
 
-                        // ── Correlation radar placeholder (A-003 §3) ─────────
-                        RadarPlaceholder {}
+                        // ── YES / NO action buttons (§4.10) ──────────────────────
+                        if !s.findings.issues.is_empty() {
+                            CoachActions {}
+                        }
                     },
                     None => rsx! {
                         div {
@@ -169,67 +174,100 @@ fn ScoreBar(pass: bool, issues: usize) -> Element {
     }
 }
 
+// ── P14-008: FindingRow (progress bar + severity dot) ─────────────────────
+
+/// FindingRow per §4.10: label + description + progress bar + severity dot.
+/// Colors via CSS variables only — no inline hex.
 #[component]
-fn FindingCard(issue: IssueJson) -> Element {
-    let (bg_color, text_color) = match issue.severity.as_str() {
-        "high"   => ("rgba(239,68,68,0.08)",  "var(--status-err)"),
-        "medium" => ("rgba(251,191,36,0.08)", "var(--status-warn)"),
-        "low"    => ("rgba(59,130,246,0.08)", "var(--status-info)"),
-        _        => ("rgba(255,255,255,0.04)","var(--text-muted)"),
+fn FindingRow(issue: IssueJson) -> Element {
+    // Score = how close current is to target (0–1 range)
+    // Higher delta = worse. Clamp score to 0–1.
+    let score_pct = if issue.target != 0.0 {
+        let ratio = (issue.target - issue.delta.abs()) / issue.target.abs();
+        (ratio * 100.0).clamp(0.0, 100.0)
+    } else {
+        50.0_f32  // unknown target
     };
-    let severity_upper = issue.severity.to_uppercase();
+    let pct_label = format!("{:.0}%", score_pct);
+    let sev = issue.severity.as_str();
 
     rsx! {
         div {
-            key: "{issue.id}",
-            style: "margin:0.4rem 1rem; padding:0.75rem;
-                    background:{bg_color}; border-radius:6px;
-                    border-left:3px solid {text_color};",
+            key:   "{issue.id}",
+            class: "finding-row",
 
-            // Header row
+            // Header: label + severity dot
             div {
-                style: "display:flex; justify-content:space-between;
-                        align-items:center; margin-bottom:0.4rem;",
+                class: "finding-row-header",
                 div {
-                    style: "color:{text_color}; font-size:0.65rem;
-                            letter-spacing:0.15em; text-transform:uppercase;
-                            font-weight:700;",
-                    "{severity_upper}"
-                }
-                div {
-                    style: "color:var(--text-muted); font-size:0.6rem;
-                            font-family:monospace;",
+                    class: "finding-row-label",
                     "{issue.id}"
                 }
+                div { class: "severity-dot {sev}" }
             }
 
-            // Delta row
+            // Description: current → target
             div {
-                style: "display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;",
-                MetricMini { label: "CURRENT", value: format!("{:.1}", issue.current) }
-                MetricMini { label: "TARGET",  value: format!("{:.1}", issue.target) }
-                MetricMini { label: "DELTA",   value: format!("{:+.1}", issue.delta) }
+                class: "finding-row-description",
+                { format!("current {:.1} → target {:.1} (delta {:+.1})",
+                          issue.current, issue.target, issue.delta) }
             }
 
-            // Tags
-            if !issue.tags.is_empty() {
-                div {
-                    style: "margin-top:0.4rem; display:flex; flex-wrap:wrap; gap:0.25rem;",
-                    for tag in &issue.tags {
-                        div {
-                            key: "{tag}",
-                            style: "background:rgba(255,255,255,0.05);
-                                    color:var(--text-muted); font-size:0.55rem;
-                                    letter-spacing:0.1em; text-transform:uppercase;
-                                    padding:0.15rem 0.4rem; border-radius:3px;",
-                            "{tag}"
-                        }
+            // Progress bar + percentage
+            div {
+                class: "finding-bar-label",
+                div { class: "finding-bar-track", style: "flex:1;",
+                    div {
+                        class: "finding-bar-fill",
+                        style: "width:{score_pct}%;",
                     }
                 }
+                div { class: "finding-bar-pct", "{pct_label}" }
             }
         }
     }
 }
+
+/// YES / NO coach action buttons (§4.10).
+/// invoke("coachAction", { action: "yes" | "no" }) on click.
+#[component]
+fn CoachActions() -> Element {
+    rsx! {
+        div {
+            class: "coach-actions",
+
+            button {
+                id:      "btn-coach-yes",
+                class:   "btn-yes",
+                onclick: move |_| {
+                    spawn_local(async move {
+                        let _ = invoke::<String, _>(
+                            "coach_action",
+                            json!({ "action": "yes" }),
+                        ).await;
+                    });
+                },
+                "YES"
+            }
+
+            button {
+                id:      "btn-coach-no",
+                class:   "btn-no",
+                onclick: move |_| {
+                    spawn_local(async move {
+                        let _ = invoke::<String, _>(
+                            "coach_action",
+                            json!({ "action": "no" }),
+                        ).await;
+                    });
+                },
+                "NO"
+            }
+        }
+    }
+}
+
+// ── Legacy sub-components (kept for backwards compat during transition) ────────
 
 #[component]
 fn MetricMini(label: &'static str, value: String) -> Element {
@@ -244,26 +282,6 @@ fn MetricMini(label: &'static str, value: String) -> Element {
                 style: "color:var(--text-secondary); font-size:0.75rem;
                         font-variant-numeric:tabular-nums; font-weight:500;",
                 "{value}"
-            }
-        }
-    }
-}
-
-/// CorrelationRadar placeholder — A-003 §3: no canvas, no live audio in Phase 11.
-#[component]
-fn RadarPlaceholder() -> Element {
-    rsx! {
-        div {
-            style: "margin:0.5rem 1rem 1rem;
-                    border:1px solid var(--border-subtle); border-radius:4px;
-                    padding:1.5rem; text-align:center;",
-            div {
-                style: "font-size:2rem; opacity:0.2; margin-bottom:0.5rem;",
-                "◎"
-            }
-            div {
-                style: "color:var(--text-muted); font-size:0.6rem; letter-spacing:0.1em;",
-                "CORRELATION RADAR · PHASE 12"
             }
         }
     }

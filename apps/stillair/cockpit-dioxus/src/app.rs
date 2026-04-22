@@ -19,10 +19,11 @@
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson};
+use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 use crate::panels::{
     coach::CoachPanel,
     insights::InsightsPanel,
+    mastered::MasteredView,
     session::SessionPanel,
 };
 
@@ -63,9 +64,12 @@ async fn invoke_playback(
 
 pub fn App() -> Element {
     // ── Signals ──────────────────────────────────────────────────────────────
-    let mode          = use_signal(|| CockpitMode::Idle);
-    let session_state = use_signal(|| None::<SessionStateJson>);
+    let mode           = use_signal(|| CockpitMode::Idle);
+    let session_state  = use_signal(|| None::<SessionStateJson>);
+    let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
+    // MasteredView overlay visibility (Signal only — no IPC per §5.3)
+    let mut show_mastered: Signal<bool> = use_signal(|| false);
 
     // ── Mode badge style  ─────────────────────────────────────────────────────
     let mode_label = mode.read().label().to_string();
@@ -152,9 +156,18 @@ pub fn App() -> Element {
                 id:    "mfd-bay",
                 class: "mfd-bay",
 
-                SessionPanel  { mode, session_state }
-                InsightsPanel { mode, session_state, playback_state }
+                SessionPanel  { mode, session_state, viz_data, show_mastered }
+                InsightsPanel { mode, session_state, playback_state, viz_data }
                 CoachPanel    { mode, session_state }
+            }
+
+            // ── MasteredView overlay (P14-011) — conditional on show_mastered ──
+            if *show_mastered.read() {
+                MasteredView {
+                    session_state,
+                    viz_data,
+                    on_close: move |_| { show_mastered.set(false); },
+                }
             }
 
             // ── Transport bar (bottom strip) — Phase 12B ──────────────────────

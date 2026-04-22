@@ -5183,6 +5183,7 @@ dependencies = [
  "adapter-runtime",
  "chrono",
  "dirs 5.0.1",
+ "libm",
  "lineos-rule-engine",
  "printpdf",
  "reqwest",

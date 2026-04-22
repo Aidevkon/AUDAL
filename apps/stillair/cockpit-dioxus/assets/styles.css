@@ -1622,16 +1622,644 @@ html, body {
     animation: led-pulse 1.8s ease-in-out infinite;
 }
 
-/* Export controls block */
-.export-controls {
-    padding: var(--space-4) var(--space-6);
+/* ─── Phase 14: ui-agent-context v2.1 canonical tokens ──────────────────────── */
+/*
+ * These tokens ARE AUTHORITATIVE per ui-agent-context.md §4.2.
+ * They alias existing tokens where possible, add new ones where required.
+ * Authority: Phase 14 P14-002.
+ */
+:root {
+    /* Backgrounds — §4.2 canonical names */
+    --bg-app:              var(--bg-overlay);
+    --bg-panel-inset:      var(--bg-overlay);
+    --bg-meter:            var(--bg-overlay);
+    --bg-finding-row:      var(--bg-elevated);
+    --bg-track-active:     #1a3a38;
+
+    /* Panel structure — §4.2 */
+    --border-panel:        var(--border-subtle);
+    --border-inset:        var(--border-subtle);
+    --screw-face:          #252525;
+    --screw-slot:          #111111;
+    --bracket-color:       var(--border-subtle);
+
+    /* Cyan — LUFS, active, insights — §4.2 */
+    --accent-cyan:         #00d4c8;
+    --accent-cyan-dim:     #007a74;
+    --accent-cyan-glow:    rgba(0, 212, 200, 0.25);
+    --accent-cyan-glow-sm: rgba(0, 212, 200, 0.12);
+
+    /* Amber — PEAK, warning — §4.2 */
+    --accent-amber:        #c8a832;
+    --accent-amber-dim:    #7a6420;
+
+    /* Gold — RANGE — §4.2 */
+    --accent-gold:         #d4a844;
+
+    /* Magenta — Lissajous inner trace — §4.2 */
+    --accent-magenta:      #e040a0;
+
+    /* Text accent — §4.2 */
+    --text-accent:         var(--accent-cyan);
 }
 
-.export-controls-label {
+/* ─── P14-002: Panel shadow system (§4.4) ──────────────────────────────────── */
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-panel);
+    border-radius: 6px;
+    box-shadow:
+        0 4px 24px rgba(0,0,0,0.8),
+        0 2px 8px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        inset 0 -1px 0 rgba(0,0,0,0.4);
+    position: relative;
+    isolation: isolate;  /* CRITICAL — prevents stacking bleed */
+}
+
+/* Insights panel: cyan glow (§4.4) */
+.panel-insights-glow {
+    border-color: var(--accent-cyan-dim) !important;
+    box-shadow:
+        0 4px 24px rgba(0,0,0,0.8),
+        0 2px 8px rgba(0,0,0,0.6),
+        0 0 32px var(--accent-cyan-glow),
+        0 0 64px var(--accent-cyan-glow-sm),
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        inset 0 -1px 0 rgba(0,0,0,0.4) !important;
+}
+
+/* OLED screen inset (§4.4) */
+.oled-screen {
+    background: var(--bg-panel-inset);
+    border: 1px solid var(--border-inset);
+    border-radius: 3px;
+    box-shadow:
+        inset 0 2px 8px rgba(0,0,0,0.8),
+        inset 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ─── P14-002: Corner screws (§4.5) ─────────────────────────────────────────── */
+
+.screw {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%,
+        #3a3a3a 0%, #1a1a1a 60%, #0a0a0a 100%);
+    border: 1px solid #111;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 3px rgba(0,0,0,0.8);
+    pointer-events: none;  /* MUST NOT block clicks */
+    z-index: 2;
+}
+
+.screw-tl { top: 8px;    left: 8px;   }
+.screw-tr { top: 8px;    right: 8px;  }
+.screw-bl { bottom: 8px; left: 8px;   }
+.screw-br { bottom: 8px; right: 8px;  }
+
+.screw::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 15%;
+    width: 70%;
+    height: 1.5px;
+    background: var(--screw-slot);
+    transform: translateY(-50%) rotate(45deg);
+    pointer-events: none;  /* §4.5: all decorative ::after → pointer-events: none */
+}
+
+/* ─── P14-003: Low-power mode (§4.3) ────────────────────────────────────────── */
+
+[data-low-power="true"] * {
+    box-shadow:        none !important;
+    filter:            none !important;
+    text-shadow:       none !important;
+    backdrop-filter:   none !important;
+}
+
+[data-low-power="true"] .oled-screen {
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6) !important;
+}
+
+/* ─── P14-004: VU Meters — 30 LED segments (§4.6) ───────────────────────────── */
+
+.vu-pair {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    padding: 8px;
+    height: 100%;
+}
+
+.vu-channel {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.vu-scale {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    justify-content: flex-end;
+}
+
+.vu-scale-label {
     font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--tracking-widest);
+    font-size: 0.45rem;
+    color: var(--text-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    height: 6px;  /* 4px seg height + 2px gap */
+    display: flex;
+    align-items: center;
+}
+
+.vu-meter {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    width: 28px;
+}
+
+.vu-segment {
+    height: 4px;
+    border-radius: 1px;
+}
+
+.vu-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 4px;
+}
+
+.vu-lufs { color: var(--accent-cyan); }
+.vu-peak { color: var(--accent-amber); }
+
+/* ─── P14-005: SpectrumDisplay (§4.7) ───────────────────────────────────────── */
+
+.spectrum-display {
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+    overflow: hidden;
+    position: relative;
+}
+
+.spectrum-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ─── P14-006: StereoScope (§4.8) ───────────────────────────────────────────── */
+
+.stereo-scope {
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.stereo-scope svg {
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+}
+
+/* ─── P14-007: MetricsReadout (§4.9) ────────────────────────────────────────── */
+
+.metrics-readout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    justify-content: center;
+    height: 100%;
+}
+
+.metric-readout-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metric-readout-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: var(--space-2);
+}
+
+.metric-readout-value {
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.metric-readout-value.peak  { color: var(--accent-amber); }
+.metric-readout-value.range { color: var(--accent-gold); }
+.metric-readout-value.corr  {
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px var(--accent-cyan-glow);
+}
+
+/* ─── P14-008: CoachPanel — finding progress bars + severity (§4.10) ───────── */
+
+.finding-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 16px;
+    background: var(--bg-finding-row);
+    border-bottom: 1px solid var(--border-inset);
+}
+
+.finding-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.finding-row-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-primary);
+}
+
+.finding-row-description {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Progress bar */
+.finding-bar-track {
+    height: 4px;
+    background: var(--bg-panel-inset);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.finding-bar-fill {
+    height: 4px;
+    background: var(--accent-cyan);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.finding-bar-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.finding-bar-pct {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    color: var(--text-muted);
+}
+
+/* Severity dot */
+.severity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.severity-dot.high   { background: var(--severity-high);   box-shadow: 0 0 5px var(--severity-high); }
+.severity-dot.medium { background: var(--severity-medium); box-shadow: 0 0 5px var(--severity-medium); }
+.severity-dot.low    { background: var(--severity-low);    box-shadow: 0 0 5px var(--severity-low); }
+.severity-dot.info   { background: var(--accent-cyan);     box-shadow: 0 0 4px var(--accent-cyan-glow); }
+
+/* YES / NO action buttons (§4.10) */
+.coach-actions {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-inset);
+}
+
+.btn-yes {
+    background: var(--accent-cyan);
+    color: var(--bg-app);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    box-shadow: 0 0 12px var(--accent-cyan-glow);
+    pointer-events: all;
+    position: relative;
+    z-index: 1;
+    transition: box-shadow 0.15s ease;
+}
+
+.btn-yes:hover {
+    box-shadow: 0 0 20px var(--accent-cyan-glow), 0 0 8px var(--accent-cyan-glow-sm);
+}
+
+.btn-no {
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    padding: 10px 24px;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    cursor: pointer;
+    pointer-events: all;
+    position: relative;
+    z-index: 1;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-no:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
+
+/* ─── P14-010: InsightsPanel 2×2 OLED grid (§4.10) ─────────────────────────── */
+
+.oled-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
+    padding: 8px;
+    height: 100%;
+    min-height: 0;
+}
+
+.oled-cell {
+    position: relative;
+    min-height: 100px;
+    overflow: hidden;
+}
+
+/* ─── P14-011: MasteredView (§5) ────────────────────────────────────────────── */
+
+.mastered-view {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-app);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    grid-template-rows: 1fr auto;
+}
+
+.mastered-sidebar {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-panel);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    grid-row: 1 / span 2;
+}
+
+.mastered-sidebar-title {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.mastered-nav-item {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 6px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s;
+}
+
+.mastered-nav-item:hover,
+.mastered-nav-item.active {
+    color: var(--accent-cyan);
+    background: var(--accent-cyan-glow-sm);
+}
+
+.mastered-main {
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.mastered-view-modes {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.view-mode-btn {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border: 1px solid var(--border-panel);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.1s, color 0.1s;
+}
+
+.view-mode-btn.active {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    box-shadow: 0 0 6px var(--accent-cyan-glow-sm);
+}
+
+/* Waveform display (§5.4) */
+.waveform-container {
+    position: relative;
+    background: var(--bg-panel-inset);
+    border: 1px solid var(--border-inset);
+    border-radius: 3px;
+    padding: 8px;
+}
+
+.waveform-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.waveform-svg {
+    width: 100%;
+    height: 120px;
+    display: block;
+}
+
+/* Quality gate panel (§5.5) */
+.quality-gate-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.quality-gate-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.quality-gate-label {
+    font-family: var(--font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.quality-gate-value {
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px var(--accent-cyan-glow);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+/* Compliance LED dots (§5.5) */
+.compliance-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.compliance-led {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.compliance-led-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.compliance-led-dot.active {
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan-glow), 0 0 4px var(--accent-cyan-glow-sm);
+}
+
+.compliance-led-dot.inactive {
+    background: var(--accent-cyan-dim);
+    opacity: 0.3;
+}
+
+.compliance-led-label {
+    font-family: var(--font-mono);
+    font-size: 0.45rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* MasteredView export bar (§5) */
+.mastered-export-bar {
+    grid-column: 2;
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border-panel);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ─── Corner brackets (§4.12) ────────────────────────────────────────────────── */
+
+.bracket-bl,
+.bracket-br {
+    position: absolute;
+    pointer-events: none;
+}
+
+.bracket-bl::before {  /* vertical arm */
+    content: "";
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    width: 2px;
+    height: 20px;
+    background: var(--bracket-color);
+    pointer-events: none;
+}
+
+.bracket-bl::after {   /* horizontal arm */
+    content: "";
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    width: 20px;
+    height: 2px;
+    background: var(--bracket-color);
+    pointer-events: none;
+}
+
+.bracket-br::before {
+    content: "";
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 2px;
+    height: 20px;
+    background: var(--bracket-color);
+    pointer-events: none;
+}
+
+.bracket-br::after {
+    content: "";
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    width: 20px;
+    height: 2px;
+    background: var(--bracket-color);
+    pointer-events: none;
 }

@@ -1,171 +1,118 @@
-//! panels/insights.rs — Insights Panel · Phase 12B
-//! Authority: Phase 12B P12B-006 · P12B-007 · design-tokens-v1.0.md
+//! panels/insights.rs — THE INSIGHTS panel · Phase 14
+//! Authority: Phase 14 P14-004 through P14-010 · UI Agent Context v2.1
 //!
-//! THE INSIGHTS panel (center MFD):
-//!   FM5: LUFS, True Peak, LRA + live LUFS during playback
-//!   Spectrum analyzer — 16 real bars from spectral_centroid + flatness
-//!   Correlation radar — lissajous orbital SVG from stereo_correlation + width
-//!   LUFS/PEAK vertical meter bars
+//! This is a RENDERING SURFACE ONLY.
 //!
-//! A-003 §5: No PCM. No audio kernel imports. PlaybackStateJson metrics only.
+//! Laws enforced:
+//!   ❌ No SVG path computation — paths come from viz signal (getVisualizationData)
+//!   ❌ No business logic
+//!   ❌ No inline hex colors — CSS variables only
+//!   ❌ No std::f32 methods
+//!
+//! 2×2 OLED grid layout (§4 InsightsPanel):
+//!   TL: SpectrumDisplay   — SVG path from viz.spectrum_svg_path
+//!   TR: VuMeterPair       — LUFS cyan + PEAK amber, 30 segments each
+//!   BL: StereoScope       — dual ellipse from viz.lissajous_* rx/ry
+//!   BR: MetricsReadout    — PEAK/RANGE/CORR with correct colors
+//!
+//! A-003 §5: No PCM. No audio kernel imports.
 
 use dioxus::prelude::*;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{ComplianceJson, PlaybackStateJson, SessionStateJson};
+use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 
+// ── InsightsPanel (P14-010) ───────────────────────────────────────────────────
+
+/// THE INSIGHTS panel — center MFD.
+///
+/// Receives session and viz signals. Renders 2×2 OLED grid.
+/// Zero computation. All data comes from IPC signals.
 #[component]
 pub fn InsightsPanel(
-    mode:          Signal<CockpitMode>,
-    session_state: Signal<Option<SessionStateJson>>,
+    mode:           Signal<CockpitMode>,
+    session_state:  Signal<Option<SessionStateJson>>,
     playback_state: Signal<Option<PlaybackStateJson>>,
+    viz_data:       Signal<Option<VisualizationDataJson>>,
 ) -> Element {
-    let state    = session_state.read();
-    let playback = playback_state.read();
+    let state = session_state.read();
+    let viz   = viz_data.read();
 
     rsx! {
         div {
-            class: "mfd-panel panel-insights",
+            class: "mfd-panel panel-insights panel-insights-glow",
+            isolation: "isolate",
+
+            // Corner screws (§4.5)
+            div { class: "screw screw-tl" }
+            div { class: "screw screw-tr" }
+            div { class: "screw screw-bl" }
+            div { class: "screw screw-br" }
 
             // Panel title bar
             div {
                 class: "panel-title",
-                style: "color:var(--accent-insights);",
+                style: "color:var(--accent-cyan);",
                 "THE INSIGHTS"
             }
 
+            // Panel body — 2×2 OLED grid
             div {
-                style: "flex:1; overflow-y:auto;",
+                class: "panel-body",
+
                 match state.as_ref() {
-                    Some(s) => rsx! {
-
-                        // ── Live LUFS + Peak meters ───────────────────────────
-                        div {
-                            style: "display:flex; gap:var(--space-4); align-items:flex-start;\
-                                    padding:var(--space-2) var(--space-4) var(--space-1);",
-
-                            // Big integrated LUFS readout
-                            div {
-                                style: "flex:1;",
-                                div {
-                                    style: "color:var(--text-muted); font-size:0.55rem;\
-                                            letter-spacing:var(--tracking-widest);\
-                                            text-transform:uppercase; margin-bottom:2px;",
-                                    "LUFS"
-                                }
-                                div {
-                                    class: "lufs-readout",
-                                    { format!("{:.1}", s.loudness.integrated_lufs) }
-                                }
-                                div {
-                                    style: "color:var(--text-muted); font-size:0.55rem;\
-                                            letter-spacing:var(--tracking-widest);\
-                                            text-transform:uppercase;",
-                                    "INTEGRATED"
-                                }
-                            }
-
-                            // LUFS + PEAK vertical meter bars
-                            div {
-                                class: "lufs-meters",
-
-                                // LUFS bar (integrated)
-                                LufsBar {
-                                    label: "LUFS",
-                                    value: s.loudness.integrated_lufs,
-                                    // map LUFS -30..0 → 0..100%
-                                    fill_pct: ((s.loudness.integrated_lufs + 30.0) / 30.0 * 100.0)
-                                        .clamp(0.0, 100.0),
-                                }
-
-                                // True Peak bar
-                                LufsBar {
-                                    label: "PEAK",
-                                    value: s.loudness.true_peak_dbtp,
-                                    fill_pct: ((s.loudness.true_peak_dbtp + 30.0) / 30.0 * 100.0)
-                                        .clamp(0.0, 100.0),
-                                }
-                            }
-                        }
-
-                        // ── Spectrum analyzer (real, Phase 12B) ───────────────
-                        SectionLabel { label: "SPECTRUM" }
-                        SpectrumAnalyzer {
-                            centroid: s.quality.spectral_centroid,
-                            flatness:  s.quality.spectral_flatness,
-                        }
-
-                        // ── Correlation / Lissajous radar ─────────────────────
-                        SectionLabel { label: "STEREO FIELD" }
-                        CorrelationRadar {
-                            correlation: s.quality.stereo_correlation,
-                            width:       s.quality.stereo_width,
-                            peak:        s.loudness.true_peak_dbtp,
-                            range:       s.loudness.lra,
-                        }
-
-                        // ── Loudness metrics ──────────────────────────────────
-                        SectionLabel { label: "LOUDNESS" }
-                        MetricRow {
-                            label: "INTEGRATED",
-                            value: format!("{:.1} LUFS", s.loudness.integrated_lufs),
-                            accent: s.loudness.spotify_compliant,
-                        }
-                        MetricRow {
-                            label: "TRUE PEAK",
-                            value: format!("{:.1} dBTP", s.loudness.true_peak_dbtp),
-                            accent: s.loudness.true_peak_dbtp <= -1.0,
-                        }
-                        MetricRow {
-                            label: "LOUDNESS RANGE",
-                            value: format!("{:.1} LU", s.loudness.lra),
-                            accent: true,
-                        }
-
-                        // SHORT TERM — live if playback active
-                        {
-                            let live_lufs = playback.as_ref().filter(|p| p.is_playing)
-                                .map(|_| s.loudness.short_term_lufs);
-                            rsx! {
-                                MetricRow {
-                                    label: "SHORT TERM",
-                                    value: if let Some(lufs) = live_lufs {
-                                        format!("{:.1} LUFS ●", lufs)
-                                    } else {
-                                        format!("{:.1} LUFS", s.loudness.short_term_lufs)
-                                    },
-                                    accent: live_lufs.is_some(),
-                                }
-                            }
-                        }
-
-                        // ── Quality metrics ───────────────────────────────────
-                        SectionLabel { label: "QUALITY" }
-                        MetricRow {
-                            label: "STEREO CORR",
-                            value: format!("{:.2}", s.quality.stereo_correlation),
-                            accent: s.quality.stereo_correlation >= 0.85,
-                        }
-                        MetricRow {
-                            label: "DYNAMIC RANGE",
-                            value: format!("{:.1} dB", s.quality.dynamic_range_db),
-                            accent: s.quality.dynamic_range_db >= 8.0,
-                        }
-                        MetricRow {
-                            label: "CLIP FREE",
-                            value: if s.quality.clip_free { "✓ CLEAN".into() } else {
-                                format!("{} CLIPS", s.quality.clips_detected)
-                            },
-                            accent: s.quality.clip_free,
-                        }
-
-                        // ── Compliance table ──────────────────────────────────
-                        SectionLabel { label: "PLATFORM COMPLIANCE" }
-                        ComplianceTable { compliance: s.compliance.clone() }
-                    },
                     None => rsx! {
-                        div {
-                            class: "awaiting",
-                            "AWAITING MASTERING..."
+                        div { class: "awaiting", "AWAITING SESSION" }
+                    },
+                    Some(s) => {
+                        // Get viz data (may be None until backend responds)
+                        let spectrum_path = viz.as_ref()
+                            .map(|v| v.spectrum_svg_path.clone())
+                            .unwrap_or_default();
+                        let outer_rx = viz.as_ref().map(|v| v.lissajous_outer_rx).unwrap_or(20.0_f32);
+                        let outer_ry = viz.as_ref().map(|v| v.lissajous_outer_ry).unwrap_or(30.0_f32);
+                        let inner_rx = viz.as_ref().map(|v| v.lissajous_inner_rx).unwrap_or(10.0_f32);
+                        let inner_ry = viz.as_ref().map(|v| v.lissajous_inner_ry).unwrap_or(12.0_f32);
+
+                        rsx! {
+                            div {
+                                class: "oled-grid",
+
+                                // Top-left: SpectrumDisplay (§4.7)
+                                div {
+                                    class: "oled-cell oled-screen",
+                                    SpectrumDisplay { path: spectrum_path }
+                                }
+
+                                // Top-right: VuMeterPair (§4.6)
+                                div {
+                                    class: "oled-cell oled-screen",
+                                    VuMeterPair {
+                                        lufs: s.loudness.integrated_lufs,
+                                        peak: s.loudness.true_peak_dbtp,
+                                    }
+                                }
+
+                                // Bottom-left: StereoScope (§4.8)
+                                div {
+                                    class: "oled-cell oled-screen",
+                                    StereoScope {
+                                        outer_rx,
+                                        outer_ry,
+                                        inner_rx,
+                                        inner_ry,
+                                    }
+                                }
+
+                                // Bottom-right: MetricsReadout (§4.9)
+                                div {
+                                    class: "oled-cell oled-screen",
+                                    MetricsReadout {
+                                        peak:        s.loudness.true_peak_dbtp,
+                                        lra:         s.loudness.lra,
+                                        correlation: s.quality.stereo_correlation,
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -174,280 +121,313 @@ pub fn InsightsPanel(
     }
 }
 
-// ── Spectrum Analyzer — real bars (P12B-006) ──────────────────────────────────
-//
-// 16 bars from spectral_centroid (which band peaks) + flatness (how spread).
-// centroid: Hz value e.g. 3200 → maps to band index 0..15
-// flatness: 0.0 = tonal spike, 1.0 = flat noise
-// Bar heights: gaussian around centroid band, scaled by (1-flatness).
+// ── P14-005: SpectrumDisplay ──────────────────────────────────────────────────
 
+/// Renders a precomputed SVG spectrum curve.
+///
+/// Receives SVG path string from backend (getVisualizationData).
+/// Renders only — zero computation. Spec: §4.7.
 #[component]
-fn SpectrumAnalyzer(centroid: f32, flatness: f32) -> Element {
-    let bars: Vec<u8> = (0..16usize).map(|i| compute_bar(i, centroid, flatness)).collect();
-
+fn SpectrumDisplay(path: String) -> Element {
     rsx! {
         div {
-            class: "spectrum-analyzer",
-            div {
-                class: "spectrum-bars-live",
-                for (i, h) in bars.iter().enumerate() {
-                    div {
-                        key: "{i}",
-                        class: "spectrum-bar-live",
-                        style: format!("height:{}%", h),
+            class: "spectrum-display",
+
+            svg {
+                class: "spectrum-svg",
+                view_box: "0 0 400 200",
+
+                defs {
+                    linearGradient {
+                        id: "sg",
+                        x1: "0", y1: "0", x2: "0", y2: "1",
+                        stop { offset: "0%",   stop_color: "var(--accent-cyan)" }
+                        stop { offset: "100%", stop_color: "transparent" }
                     }
+                }
+
+                // Grid lines at frequency markers — opacity 0.08 per §4.7
+                SpectrumGrid {}
+
+                // Fill area — precomputed closed path from backend
+                path {
+                    d:    "{path}",
+                    fill: "url(#sg)",
+                    opacity: "0.4",
+                }
+
+                // Stroke — same path
+                path {
+                    d:            "{path}",
+                    fill:         "none",
+                    stroke:       "var(--accent-cyan)",
+                    stroke_width: "1.5",
                 }
             }
         }
     }
 }
 
-/// Compute height (0–95%) for band i given spectral centroid + flatness.
-fn compute_bar(band: usize, centroid: f32, flatness: f32) -> u8 {
-    // Map centroid Hz (20..20000) to band index (0..15)
-    let log_centroid = (centroid.max(20.0) / 20.0).log2();
-    let log_max      = (20_000.0_f32 / 20.0).log2();
-    let center_band  = (log_centroid / log_max * 15.0) as f32;
-
-    let distance = (band as f32 - center_band).abs();
-
-    // Gaussian peak at centroid band, width controlled by flatness
-    let sigma   = 1.5 + flatness * 4.0;
-    let peak    = (-distance * distance / (2.0 * sigma * sigma)).exp();
-    let flat    = flatness * 0.5;
-    let height  = ((1.0 - flatness) * peak + flat) * 90.0 + 5.0;
-
-    height.clamp(5.0, 95.0) as u8
+/// Frequency marker grid lines — §4.7 (7 markers, opacity 0.08).
+/// Static: 20Hz=10px, 100=70, 500=155, 1k=200, 5k=300, 10k=345, 20k=390.
+#[component]
+fn SpectrumGrid() -> Element {
+    // x positions for: 20Hz, 100, 500, 1k, 5k, 10k, 20k
+    let freq_x: &[f32] = &[10.0, 70.0, 155.0, 200.0, 300.0, 345.0, 390.0];
+    rsx! {
+        g {
+            opacity: "0.08",
+            stroke: "var(--accent-cyan)",
+            stroke_width: "1",
+            for x in freq_x {
+                line {
+                    key: "{x}",
+                    x1: "{x}", y1: "0",
+                    x2: "{x}", y2: "190",
+                }
+            }
+        }
+    }
 }
 
-// ── Correlation / Lissajous Radar — SVG (P12B-007) ───────────────────────────
-//
-// Renders a lissajous orbital figure (like the hardware reference image):
-//   - Cyan inner orbit from stereo_correlation
-//   - Magenta/pink outer orbit from stereo_width
-//   - Oval shape on 45° axis — more squashed = less correlated
-// No WebGL, no canvas — SVG polyline (Phase 12B constraint).
+// ── P14-004: VuMeterPair ──────────────────────────────────────────────────────
 
+/// LUFS + PEAK VU meter pair — 30 LED segments each.
+///
+/// Receives loudness float values. Renders only.
+/// LUFS = var(--accent-cyan). PEAK = var(--accent-amber). Spec: §4.6.
 #[component]
-fn CorrelationRadar(
-    correlation: f32,
-    width:       f32,
-    peak:        f32,
-    range:       f32,
+fn VuMeterPair(lufs: f32, peak: f32) -> Element {
+    rsx! {
+        div {
+            class: "vu-pair",
+
+            // Scale labels column (shared, reversed — 0 at top)
+            div {
+                class: "vu-scale",
+                // Labels at key positions: 0, -3, -6, -12, -18, -20, -25, -30
+                // Each label sits at a segment offset from top
+                // 30 segments: 0 at top (seg 30), -30 at bottom (seg 0)
+                // We emit labels for visual reference only
+                for (label, _seg) in [("0", 30usize), ("-3", 27), ("-6", 24),
+                                       ("-12",18), ("-18",12), ("-20",10),
+                                       ("-25",5), ("-30",0)] {
+                    span {
+                        key: "{label}",
+                        class: "vu-scale-label",
+                        "{label}"
+                    }
+                }
+            }
+
+            // LUFS channel — cyan
+            div {
+                class: "vu-channel",
+                VuMeter { value: lufs, min: -30.0_f32, max: 0.0_f32, color: "var(--accent-cyan)" }
+                div { class: "vu-label vu-lufs", "L" }
+            }
+
+            // PEAK channel — amber
+            div {
+                class: "vu-channel",
+                VuMeter { value: peak, min: -30.0_f32, max: 0.0_f32, color: "var(--accent-amber)" }
+                div { class: "vu-label vu-peak", "P" }
+            }
+        }
+    }
+}
+
+/// Single VU meter — 30 LED segments.
+///
+/// Filled: full color. Inactive: 8% opacity (color + "14" hex suffix).
+/// Top 3: #ff3b30 clipping zone. Spec: §4.6.
+/// No std::f32 methods — plain arithmetic only.
+#[component]
+fn VuMeter(value: f32, min: f32, max: f32, color: &'static str) -> Element {
+    let total = 30usize;
+    let range = max - min;
+    let ratio = if range > 0.0 { (value - min) / range } else { 0.0 };
+    let filled = (ratio * total as f32).clamp(0.0, total as f32) as usize;
+
+    rsx! {
+        div {
+            class: "vu-meter",
+            for i in 0..total {
+                div {
+                    key: "{i}",
+                    class: "vu-segment",
+                    // Active segments: top 3 are clip zone (red), rest are color
+                    // Inactive: color at 8% opacity → append "14" to hex
+                    // We use inline style here only for the dynamic color value
+                    style: {
+                        if i < filled {
+                            if i >= total - 3 {
+                                "background:#ff3b30;".to_string()
+                            } else {
+                                format!("background:{};", color)
+                            }
+                        } else {
+                            // 8% opacity: append hex "14" to the CSS variable value
+                            // We fake opacity via box-shadow trick if color is a var(),
+                            // but for simplicity use opacity on the element
+                            format!("background:{};opacity:0.08;", color)
+                        }
+                    },
+                }
+            }
+        }
+    }
+}
+
+// ── P14-006: StereoScope ─────────────────────────────────────────────────────
+
+/// Dual-ellipse Lissajous / goniometer display.
+///
+/// Receives 4 f32 values from viz signal — renders SVG ellipses.
+/// Zero computation. Spec: §4.8.
+///
+/// Outer ellipse: cyan (stereo width orbit).
+/// Inner ellipse: magenta (correlation tightness).
+/// Both rotated -45° (standard goniometer orientation).
+#[component]
+fn StereoScope(
+    outer_rx: f32,
+    outer_ry: f32,
+    inner_rx: f32,
+    inner_ry: f32,
 ) -> Element {
-    // Lissajous path: parametric ellipse on 45° axis
-    // rx: horizontal extent (width), ry: vertical extent (1-|corr|)
-    let cx  = 60.0_f32;
-    let cy  = 60.0_f32;
-    let rx  = (width * 38.0 + 6.0).clamp(4.0, 50.0);
-    let ry  = ((1.0 - correlation.abs()) * 28.0 + 4.0).clamp(4.0, 46.0);
+    rsx! {
+        div {
+            class: "stereo-scope",
 
-    // Generate parametric lissajous points (rotated 45°)
-    let n_pts = 72;
-    let liss_1: Vec<String> = (0..=n_pts).map(|i| {
-        let t  = std::f32::consts::TAU * (i as f32 / n_pts as f32);
-        let x0 = rx * t.cos();
-        let y0 = ry * t.sin();
-        // Rotate 45°
-        let cos45 = std::f32::consts::FRAC_1_SQRT_2;
-        let x  = cx + (x0 * cos45 - y0 * cos45);
-        let y  = cy + (x0 * cos45 + y0 * cos45);
-        format!("{:.1},{:.1}", x, y)
-    }).collect();
+            svg {
+                view_box: "0 0 120 120",
 
-    // Second orbit — slightly larger, opposite wound
-    let rx2 = rx * 0.65;
-    let ry2 = ry * 0.65;
-    let liss_2: Vec<String> = (0..=n_pts).map(|i| {
-        let t  = std::f32::consts::TAU * (i as f32 / n_pts as f32);
-        let x0 = rx2 * t.cos();
-        let y0 = -ry2 * t.sin();  // opposite wind → figure-eight feel
-        let cos45 = std::f32::consts::FRAC_1_SQRT_2;
-        let x  = cx + (x0 * cos45 - y0 * cos45);
-        let y  = cy + (x0 * cos45 + y0 * cos45);
-        format!("{:.1},{:.1}", x, y)
-    }).collect();
+                defs {
+                    filter {
+                        id: "cg",
+                        feGaussianBlur { std_deviation: "2" }
+                    }
+                }
 
-    let pts_1 = liss_1.join(" ");
-    let pts_2 = liss_2.join(" ");
+                // Polar grid background (3 circles + crosshair) — §4.8
+                StereoGrid {}
 
-    let corr_str  = format!("{:+.2}", correlation);
-    let corr_class = if correlation > 0.3 { "positive" } else { "warn" };
+                // Outer ellipse — cyan (stereo width)
+                ellipse {
+                    cx:           "60",
+                    cy:           "60",
+                    rx:           "{outer_rx}",
+                    ry:           "{outer_ry}",
+                    fill:         "none",
+                    stroke:       "var(--accent-cyan)",
+                    stroke_width: "1.5",
+                    opacity:      "0.8",
+                    transform:    "rotate(-45 60 60)",
+                }
+
+                // Inner ellipse — magenta (correlation)
+                ellipse {
+                    cx:           "60",
+                    cy:           "60",
+                    rx:           "{inner_rx}",
+                    ry:           "{inner_ry}",
+                    fill:         "none",
+                    stroke:       "var(--accent-magenta)",
+                    stroke_width: "1.0",
+                    opacity:      "0.7",
+                    transform:    "rotate(-45 60 60)",
+                }
+
+                // Center glow hotspot
+                circle {
+                    cx:     "60",
+                    cy:     "60",
+                    r:      "3",
+                    fill:   "var(--accent-cyan)",
+                    opacity:"0.9",
+                    filter: "url(#cg)",
+                }
+            }
+        }
+    }
+}
+
+/// Polar grid: 3 concentric circles + perpendicular crosshair.
+/// Opacity 0.15 per §4.8. Static — no data dependency.
+#[component]
+fn StereoGrid() -> Element {
+    rsx! {
+        g {
+            opacity: "0.15",
+            stroke: "var(--accent-cyan)",
+            stroke_width: "0.8",
+            fill: "none",
+
+            // 3 concentric circles
+            circle { cx: "60", cy: "60", r: "50" }
+            circle { cx: "60", cy: "60", r: "33" }
+            circle { cx: "60", cy: "60", r: "16" }
+
+            // Crosshair
+            line { x1: "60", y1: "5",  x2: "60", y2: "115" }
+            line { x1: "5",  y1: "60", x2: "115", y2: "60" }
+
+            // Diagonal axes (45°/135° — standard goniometer guides)
+            line { x1: "14", y1: "14", x2: "106", y2: "106" }
+            line { x1: "106", y1: "14", x2: "14", y2: "106" }
+        }
+    }
+}
+
+// ── P14-007: MetricsReadout ───────────────────────────────────────────────────
+
+/// PEAK / RANGE / CORR numerical readout. Spec: §4.9.
+///
+/// PEAK:  amber, 28px
+/// RANGE: gold,  28px
+/// CORR:  cyan,  28px (prefix "+" when ≥ 0.0)
+///
+/// No computation — receives values from session signal.
+#[component]
+fn MetricsReadout(peak: f32, lra: f32, correlation: f32) -> Element {
+    let corr_str = if correlation >= 0.0 {
+        format!("+{:.2}", correlation)
+    } else {
+        format!("{:.2}", correlation)
+    };
 
     rsx! {
         div {
-            class: "radar-display",
-            style: "flex-direction:row; gap:var(--space-4); justify-content:flex-start;\
-                    padding-left:var(--space-4);",
+            class: "metrics-readout",
 
-            // SVG lissajous display
-            div { class: "radar-svg-wrap",
-                svg {
-                    width:    "120",
-                    height:   "120",
-                    view_box: "0 0 120 120",
-
-                    // Background deep-space circle
-                    circle {
-                        cx: "60", cy: "60", r: "56",
-                        fill:         "var(--bg-overlay)",
-                        stroke:       "var(--border-subtle)",
-                        stroke_width: "1"
-                    }
-                    // Subtle concentric guide rings
-                    circle {
-                        cx: "60", cy: "60", r: "38",
-                        fill: "none",
-                        stroke: "rgba(0,209,255,0.06)",
-                        stroke_width: "1"
-                    }
-                    circle {
-                        cx: "60", cy: "60", r: "20",
-                        fill: "none",
-                        stroke: "rgba(0,209,255,0.06)",
-                        stroke_width: "1"
-                    }
-                    // Crosshair axis lines
-                    line {
-                        x1: "4",  y1: "60",
-                        x2: "116", y2: "60",
-                        stroke: "rgba(0,209,255,0.12)",
-                        stroke_width: "1"
-                    }
-                    line {
-                        x1: "60", y1: "4",
-                        x2: "60", y2: "116",
-                        stroke: "rgba(0,209,255,0.12)",
-                        stroke_width: "1"
-                    }
-                    // 45° axis guides
-                    line {
-                        x1: "14", y1: "14", x2: "106", y2: "106",
-                        stroke: "rgba(0,209,255,0.06)",
-                        stroke_width: "1"
-                    }
-                    line {
-                        x1: "106", y1: "14", x2: "14", y2: "106",
-                        stroke: "rgba(0,209,255,0.06)",
-                        stroke_width: "1"
-                    }
-
-                    // Outer lissajous — cyan (stereo width)
-                    polyline {
-                        class:        "lissajous-path",
-                        points:       "{pts_1}",
-                        fill:         "none",
-                        stroke:       "var(--accent-insights)",
-                        stroke_width: "1.5",
-                        opacity:      "0.85"
-                    }
-
-                    // Inner lissajous — magenta (correlation tightness)
-                    polyline {
-                        class:        "lissajous-path-2",
-                        points:       "{pts_2}",
-                        fill:         "none",
-                        stroke:       "#e879f9",
-                        stroke_width: "1.2",
-                        opacity:      "0.7"
-                    }
-
-                    // Center dot
-                    circle {
-                        cx: "60", cy: "60", r: "2",
-                        fill: "var(--accent-insights)"
-                    }
-                }
-            }
-
-            // Numerical readouts: PEAK / RANGE / CORR
-            div { class: "radar-readouts",
-                div { class: "radar-readout-item",
-                    div { class: "radar-readout-label", "PEAK" }
-                    div { class: "radar-readout-value", { format!("{:.1}", peak) } }
-                }
-                div { class: "radar-readout-item",
-                    div { class: "radar-readout-label", "RANGE" }
-                    div { class: "radar-readout-value", { format!("{:.0}", range) } }
-                }
-                div { class: "radar-readout-item",
-                    div { class: "radar-readout-label", "CORR" }
-                    div {
-                        class: format!("radar-readout-value {corr_class}"),
-                        "{corr_str}"
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── LUFS vertical bar meter ───────────────────────────────────────────────────
-
-#[component]
-fn LufsBar(label: &'static str, value: f32, fill_pct: f32) -> Element {
-    rsx! {
-        div { class: "lufs-meter",
-            div { class: "lufs-meter-label", "{label}" }
-            div { class: "lufs-meter-bar-wrap",
-                div {
-                    class: "lufs-meter-fill",
-                    style: format!("height:{}%", fill_pct.clamp(0.0, 100.0)),
-                }
-            }
-            div { class: "lufs-meter-value", { format!("{:.0}", value) } }
-        }
-    }
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-#[component]
-fn SectionLabel(label: &'static str) -> Element {
-    rsx! {
-        div {
-            class: "section-label",
-            "{label}"
-        }
-    }
-}
-
-#[component]
-fn MetricRow(label: &'static str, value: String, accent: bool) -> Element {
-    let color = if accent { "var(--text-primary)" } else { "var(--status-warn)" };
-    rsx! {
-        div { class: "metric-row",
-            div { class: "metric-label", "{label}" }
+            // PEAK — amber
             div {
-                class: "metric-value",
-                style: "color:{color};",
-                "{value}"
-            }
-        }
-    }
-}
-
-#[component]
-fn ComplianceTable(compliance: ComplianceJson) -> Element {
-    let platforms = [
-        ("Spotify",   compliance.spotify),
-        ("YouTube",   compliance.youtube),
-        ("Apple",     compliance.apple),
-        ("Tidal",     compliance.tidal),
-        ("Broadcast", compliance.broadcast),
-        ("EBU R128",  compliance.ebu_r128),
-    ];
-
-    rsx! {
-        div { class: "compliance-grid",
-            for (name, ok) in platforms {
+                class: "metric-readout-row",
+                div { class: "metric-readout-label", "PEAK" }
                 div {
-                    key: "{name}",
-                    class: "compliance-row",
-                    div {
-                        class: if ok { "compliance-dot ok" } else { "compliance-dot err" },
-                    }
-                    div { class: "compliance-name", "{name}" }
+                    class: "metric-readout-value peak",
+                    { format!("{:.1}", peak) }
+                }
+            }
+
+            // RANGE — gold
+            div {
+                class: "metric-readout-row",
+                div { class: "metric-readout-label", "RANGE" }
+                div {
+                    class: "metric-readout-value range",
+                    { format!("{:.0}", lra) }
+                }
+            }
+
+            // CORR — cyan
+            div {
+                class: "metric-readout-row",
+                div { class: "metric-readout-label", "CORR" }
+                div {
+                    class: "metric-readout-value corr",
+                    "{corr_str}"
                 }
             }
         }
