@@ -2688,3 +2688,57 @@ html, body {
     line-height: 1;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 14 Demo State + Screw Positioning CSS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Finding row header (label + severity dot inline) ─────────────────────── */
+
+.finding-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* ─── Severity dot — colored circle, right of finding label ─────────────────── */
+
+.severity-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px currentColor;
+}
+
+.severity-dot.high   { background: var(--severity-high);   color: var(--severity-high); }
+.severity-dot.medium { background: var(--severity-medium); color: var(--severity-medium); }
+.severity-dot.low    { background: var(--severity-low);    color: var(--severity-low); }
+.severity-dot.info   { background: var(--severity-info);   color: var(--severity-info); }
+
+/* ─── Screw corner positions — absolute within mfd-panel ────────────────────── */
+/* mfd-panel already has position:relative */
+
+.screw-tl { top:    8px; left: 8px;  }
+.screw-tr { top:    8px; right: 8px; }
+.screw-bl { bottom: 8px; left: 8px;  }
+.screw-br { bottom: 8px; right: 8px; }
+
+/* ─── Coach panel finding-bar-label row fix ──────────────────────────────────── */
+
+.finding-row .finding-bar-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+}
+
+/* ─── Session panel — corner bracket lines matching mockup ───────────────────── */
+
+.panel-session .bracket-bl,
+.panel-session .bracket-br {
+    border-color: var(--border-active);
+    opacity: 0.4;
+}
+

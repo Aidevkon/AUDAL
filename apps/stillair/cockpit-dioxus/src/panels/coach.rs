@@ -26,6 +26,12 @@ pub fn CoachPanel(
             class: "mfd-panel panel-coach",
             style: "display:flex; flex-direction:column; overflow:hidden;",
 
+            // Corner screws (§4.5 hardware aesthetic)
+            div { class: "screw screw-tl" }
+            div { class: "screw screw-tr" }
+            div { class: "screw screw-bl" }
+            div { class: "screw screw-br" }
+
             // Panel title
             div {
                 class: "panel-title",
@@ -100,12 +106,41 @@ pub fn CoachPanel(
                         }
                     },
                     None => rsx! {
+                        // Demo state — matches mockup exactly.
+                        // Shows 3 finding rows pre-populated so the panel
+                        // looks correct in FM0 before any session.
                         div {
-                            style: "color:var(--text-muted); padding:2rem;
-                                    text-align:center; font-size:0.75rem;
-                                    letter-spacing:0.1em;",
-                            "—"
+                            style: "padding:0.5rem 0.75rem 0.2rem;
+                                    color:var(--text-muted); font-size:0.6rem;
+                                    letter-spacing:0.2em; text-transform:uppercase;",
+                            "FINDINGS  (3)"
                         }
+
+                        // Dynamic Range Check — 40%
+                        DemoFindingRow {
+                            label: "Dynamic Range Check",
+                            desc:  "Consistency needed",
+                            pct:   40.0_f32,
+                            sev:   "medium",
+                        }
+
+                        // Loudness Target — 60%
+                        DemoFindingRow {
+                            label: "Loudness Target",
+                            desc:  "Meeting -14 LUFS",
+                            pct:   60.0_f32,
+                            sev:   "low",
+                        }
+
+                        // Stereo Width — 30%
+                        DemoFindingRow {
+                            label: "Stereo Width",
+                            desc:  "Review correlation in lows",
+                            pct:   30.0_f32,
+                            sev:   "high",
+                        }
+
+                        CoachActions {}
                     }
                 }
             }
@@ -135,6 +170,37 @@ fn NarrativeSummary(summary: String, model_used: String) -> Element {
                 style: "color:var(--text-muted); font-size:0.6rem;
                         margin-top:0.5rem;",
                 "model: {model_used}"
+            }
+        }
+    }
+}
+// ── DemoFindingRow — static demo card for FM0 state ──────────────────────────
+
+/// Static finding row for the FM0 demo state.
+/// Takes plain values — no IssueJson. Matches mockup's 3 demo cards.
+#[component]
+fn DemoFindingRow(
+    label: &'static str,
+    desc:  &'static str,
+    pct:   f32,
+    sev:   &'static str,
+) -> Element {
+    let pct_label = format!("{:.0}%", pct);
+    rsx! {
+        div {
+            class: "finding-row",
+            div {
+                class: "finding-row-header",
+                div { class: "finding-row-label", "{label}" }
+                div { class: "severity-dot {sev}" }
+            }
+            div { class: "finding-row-description", "{desc}" }
+            div {
+                class: "finding-bar-label",
+                div { class: "finding-bar-track", style: "flex:1;",
+                    div { class: "finding-bar-fill", style: "width:{pct}%;" }
+                }
+                div { class: "finding-bar-pct", "{pct_label}" }
             }
         }
     }

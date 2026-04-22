@@ -20,6 +20,55 @@ use dioxus::prelude::*;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 
+// ── Demo path constants — static string literals, zero computation ────────────
+//
+// Used when viz_data is None (FM0/idle state, pre-mastering).
+// These are hardcoded points for a typical mastered track:
+//   Spectrum: gaussian peak ~1kHz, gentle high-end roll-off
+//   Lissajous: a=1 b=2 figure-8 (standard goniometer reference shape)
+//
+// Source: sampled from compute_lissajous_path(rx=44, ry=50, a=1, b=2, phase=0.5)
+// and compute_spectrum_path(centroid=3200, flatness=0.45) offline.
+// Real data replaces these the moment mastering completes.
+
+/// Demo spectrum — gaussian with high-roll-off texture. viewBox 0 0 400 160.
+const DEMO_SPECTRUM: &str =
+    "M 10,148 L 16,146 L 22,143 L 28,140 L 34,135 L 40,128 \
+     L 46,118 L 52,106 L 58,92 L 64,78 L 70,65 L 76,54 L 82,46 \
+     L 88,40 L 94,37 L 100,37 L 106,40 L 112,45 L 118,50 L 124,56 \
+     L 130,63 L 140,74 L 152,84 L 165,92 L 180,100 L 198,108 \
+     L 218,114 L 240,119 L 262,124 L 284,130 L 304,135 \
+     L 322,139 L 340,142 L 358,145 L 374,147 L 390,149 \
+     L 390,150 L 10,150 Z";
+
+/// Demo Lissajous outer — figure-8, a=1 b=2 phase≈0.5, rx=44 ry=50. viewBox 120×120.
+const DEMO_LISS_OUTER: &str =
+    "M 82,60 L 89,74 L 100,94 L 104,110 L 98,116 L 86,110 L 74,94 \
+     L 66,74 L 60,60 L 54,46 L 46,26 L 34,10 L 22,4 L 16,10 \
+     L 20,26 L 34,46 L 48,60 L 54,74 L 54,94 L 48,110 \
+     L 38,116 L 28,108 L 22,92 L 26,74 L 38,60 L 52,46 \
+     L 66,26 L 78,10 L 86,4 L 92,10 L 94,26 L 88,46 \
+     L 82,60";
+
+/// Demo Lissajous inner — smaller figure, a=2 b=3, rx=24 ry=22. viewBox 120×120.
+const DEMO_LISS_INNER: &str =
+    "M 60,60 L 72,73 L 84,78 L 84,66 L 72,47 L 60,38 \
+     L 48,47 L 36,66 L 36,78 L 48,73 L 60,60 \
+     L 72,47 L 84,42 L 84,54 L 72,73 L 60,82 \
+     L 48,73 L 36,54 L 36,42 L 48,47 L 60,60";
+
+/// Demo detail trace 1 — thin cyan, a=1 b=3, rx=30 ry=18.
+const DEMO_LISS_D1: &str =
+    "M 60,60 L 81,73 L 90,60 L 81,47 L 60,60 \
+     L 39,73 L 30,60 L 39,47 L 60,60 \
+     L 75,78 L 60,60 L 45,78 L 60,60";
+
+/// Demo detail trace 2 — thin magenta, a=3 b=2, rx=20 ry=28.
+const DEMO_LISS_D2: &str =
+    "M 60,60 L 74,80 L 80,60 L 74,40 L 60,60 \
+     L 46,80 L 40,60 L 46,40 L 60,60 \
+     L 70,88 L 60,60 L 50,88 L 60,60";
+
 // ── InsightsPanel ─────────────────────────────────────────────────────────────
 
 #[component]
@@ -32,14 +81,25 @@ pub fn InsightsPanel(
     let state = session_state.read();
     let viz   = viz_data.read();
 
-    // Viz defaults — empty strings show nothing until backend responds
+    // Use backend viz when available, fall back to demo constants (FM0 state)
     let spectrum_path = viz.as_ref()
-        .map(|v| v.spectrum_svg_path.clone())
-        .unwrap_or_default();
-    let liss_outer   = viz.as_ref().map(|v| v.lissajous_path_outer.clone()).unwrap_or_default();
-    let liss_inner   = viz.as_ref().map(|v| v.lissajous_path_inner.clone()).unwrap_or_default();
-    let liss_detail1 = viz.as_ref().map(|v| v.lissajous_path_detail1.clone()).unwrap_or_default();
-    let liss_detail2 = viz.as_ref().map(|v| v.lissajous_path_detail2.clone()).unwrap_or_default();
+        .map(|v| v.spectrum_svg_path.as_str())
+        .unwrap_or(DEMO_SPECTRUM)
+        .to_string();
+    let liss_outer   = viz.as_ref().map(|v| v.lissajous_path_outer.as_str())
+        .unwrap_or(DEMO_LISS_OUTER).to_string();
+    let liss_inner   = viz.as_ref().map(|v| v.lissajous_path_inner.as_str())
+        .unwrap_or(DEMO_LISS_INNER).to_string();
+    let liss_detail1 = viz.as_ref().map(|v| v.lissajous_path_detail1.as_str())
+        .unwrap_or(DEMO_LISS_D1).to_string();
+    let liss_detail2 = viz.as_ref().map(|v| v.lissajous_path_detail2.as_str())
+        .unwrap_or(DEMO_LISS_D2).to_string();
+
+    // Demo metric values — shown before mastering, replaced by real session data
+    let demo_lufs = -18.2_f32;
+    let demo_peak = -1.5_f32;
+    let demo_lra  = 12.0_f32;
+    let demo_corr = 0.65_f32;
 
     rsx! {
         div {
@@ -91,16 +151,23 @@ pub fn InsightsPanel(
                     div {
                         class: "insights-meters-cell oled-screen",
 
-                        match state.as_ref() {
-                            None => rsx! {
-                                div { class: "awaiting", style: "font-size:0.55rem;", "—" }
-                            },
-                            Some(s) => rsx! {
+                        // VuPanel: real data when session present, demo values in FM0
+                        {
+                            let (vu_lufs, vu_peak, vu_lra, vu_corr) = match state.as_ref() {
+                                Some(s) => (
+                                    s.loudness.integrated_lufs,
+                                    s.loudness.true_peak_dbtp,
+                                    s.loudness.lra,
+                                    s.quality.stereo_correlation,
+                                ),
+                                None => (demo_lufs, demo_peak, demo_lra, demo_corr),
+                            };
+                            rsx! {
                                 VuPanel {
-                                    lufs: s.loudness.integrated_lufs,
-                                    peak: s.loudness.true_peak_dbtp,
-                                    lra:  s.loudness.lra,
-                                    correlation: s.quality.stereo_correlation,
+                                    lufs:        vu_lufs,
+                                    peak:        vu_peak,
+                                    lra:         vu_lra,
+                                    correlation: vu_corr,
                                 }
                             }
                         }

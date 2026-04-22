@@ -39,6 +39,12 @@ pub fn SessionPanel(
             class: "mfd-panel panel-session",
             style: "border-right:1px solid var(--border-subtle); display:flex; flex-direction:column; overflow:hidden;",
 
+            // Corner screws (§4.5 hardware aesthetic)
+            div { class: "screw screw-tl" }
+            div { class: "screw screw-tr" }
+            div { class: "screw screw-bl" }
+            div { class: "screw screw-br" }
+
             // Panel title bar
             div {
                 class: "panel-title",
