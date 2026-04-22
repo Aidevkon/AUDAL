@@ -1,19 +1,18 @@
 //! panels/insights.rs — THE INSIGHTS panel · Phase 14
 //! Authority: Phase 14 P14-004 through P14-010 · UI Agent Context v2.1
 //!
-//! This is a RENDERING SURFACE ONLY.
+//! Layout matches reference mockup exactly:
+//!   ┌───────────────────────────────┐
+//!   │  SPECTRUM (full width, top)   │  ~55% height
+//!   ├──────────────┬────────────────┤
+//!   │  StereoScope │  VU + Metrics  │  ~45% height
+//!   └──────────────┴────────────────┘
 //!
-//! Laws enforced:
-//!   ❌ No SVG path computation — paths come from viz signal (getVisualizationData)
+//! Laws:
+//!   ❌ No SVG path computation — paths come from viz signal
+//!   ❌ No inline hex colors — CSS variables only  
 //!   ❌ No business logic
-//!   ❌ No inline hex colors — CSS variables only
 //!   ❌ No std::f32 methods
-//!
-//! 2×2 OLED grid layout (§4 InsightsPanel):
-//!   TL: SpectrumDisplay   — SVG path from viz.spectrum_svg_path
-//!   TR: VuMeterPair       — LUFS cyan + PEAK amber, 30 segments each
-//!   BL: StereoScope       — dual ellipse from viz.lissajous_* rx/ry
-//!   BR: MetricsReadout    — PEAK/RANGE/CORR with correct colors
 //!
 //! A-003 §5: No PCM. No audio kernel imports.
 
@@ -21,12 +20,8 @@ use dioxus::prelude::*;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 
-// ── InsightsPanel (P14-010) ───────────────────────────────────────────────────
+// ── InsightsPanel ─────────────────────────────────────────────────────────────
 
-/// THE INSIGHTS panel — center MFD.
-///
-/// Receives session and viz signals. Renders 2×2 OLED grid.
-/// Zero computation. All data comes from IPC signals.
 #[component]
 pub fn InsightsPanel(
     mode:           Signal<CockpitMode>,
@@ -37,10 +32,18 @@ pub fn InsightsPanel(
     let state = session_state.read();
     let viz   = viz_data.read();
 
+    // Viz defaults — empty strings show nothing until backend responds
+    let spectrum_path = viz.as_ref()
+        .map(|v| v.spectrum_svg_path.clone())
+        .unwrap_or_default();
+    let liss_outer   = viz.as_ref().map(|v| v.lissajous_path_outer.clone()).unwrap_or_default();
+    let liss_inner   = viz.as_ref().map(|v| v.lissajous_path_inner.clone()).unwrap_or_default();
+    let liss_detail1 = viz.as_ref().map(|v| v.lissajous_path_detail1.clone()).unwrap_or_default();
+    let liss_detail2 = viz.as_ref().map(|v| v.lissajous_path_detail2.clone()).unwrap_or_default();
+
     rsx! {
         div {
-            class: "mfd-panel panel-insights panel-insights-glow",
-            isolation: "isolate",
+            class: "mfd-panel panel-insights",
 
             // Corner screws (§4.5)
             div { class: "screw screw-tl" }
@@ -51,66 +54,53 @@ pub fn InsightsPanel(
             // Panel title bar
             div {
                 class: "panel-title",
-                style: "color:var(--accent-cyan);",
+                style: "color:var(--accent-insights);",
                 "THE INSIGHTS"
             }
 
-            // Panel body — 2×2 OLED grid
+            // Panel body — avionics layout
             div {
-                class: "panel-body",
+                class: "insights-body",
 
-                match state.as_ref() {
-                    None => rsx! {
-                        div { class: "awaiting", "AWAITING SESSION" }
-                    },
-                    Some(s) => {
-                        // Get viz data (may be None until backend responds)
-                        let spectrum_path = viz.as_ref()
-                            .map(|v| v.spectrum_svg_path.clone())
-                            .unwrap_or_default();
-                        let outer_rx = viz.as_ref().map(|v| v.lissajous_outer_rx).unwrap_or(20.0_f32);
-                        let outer_ry = viz.as_ref().map(|v| v.lissajous_outer_ry).unwrap_or(30.0_f32);
-                        let inner_rx = viz.as_ref().map(|v| v.lissajous_inner_rx).unwrap_or(10.0_f32);
-                        let inner_ry = viz.as_ref().map(|v| v.lissajous_inner_ry).unwrap_or(12.0_f32);
+                // ── TOP: Spectrum (full width) ────────────────────────────────
+                div {
+                    class: "insights-spectrum-cell oled-screen",
+                    SpectrumDisplay {
+                        path: spectrum_path,
+                        lufs: state.as_ref().map(|s| s.loudness.integrated_lufs).unwrap_or(-18.2_f32),
+                        peak: state.as_ref().map(|s| s.loudness.true_peak_dbtp).unwrap_or(-1.5_f32),
+                    }
+                }
 
-                        rsx! {
-                            div {
-                                class: "oled-grid",
+                // ── BOTTOM ROW ────────────────────────────────────────────────
+                div {
+                    class: "insights-bottom-row",
 
-                                // Top-left: SpectrumDisplay (§4.7)
-                                div {
-                                    class: "oled-cell oled-screen",
-                                    SpectrumDisplay { path: spectrum_path }
-                                }
+                    // Bottom-left: StereoScope
+                    div {
+                        class: "insights-scope-cell oled-screen",
+                        StereoScope {
+                            path_outer:   liss_outer,
+                            path_inner:   liss_inner,
+                            path_detail1: liss_detail1,
+                            path_detail2: liss_detail2,
+                        }
+                    }
 
-                                // Top-right: VuMeterPair (§4.6)
-                                div {
-                                    class: "oled-cell oled-screen",
-                                    VuMeterPair {
-                                        lufs: s.loudness.integrated_lufs,
-                                        peak: s.loudness.true_peak_dbtp,
-                                    }
-                                }
+                    // Bottom-right: VU meters + large numeric readouts
+                    div {
+                        class: "insights-meters-cell oled-screen",
 
-                                // Bottom-left: StereoScope (§4.8)
-                                div {
-                                    class: "oled-cell oled-screen",
-                                    StereoScope {
-                                        outer_rx,
-                                        outer_ry,
-                                        inner_rx,
-                                        inner_ry,
-                                    }
-                                }
-
-                                // Bottom-right: MetricsReadout (§4.9)
-                                div {
-                                    class: "oled-cell oled-screen",
-                                    MetricsReadout {
-                                        peak:        s.loudness.true_peak_dbtp,
-                                        lra:         s.loudness.lra,
-                                        correlation: s.quality.stereo_correlation,
-                                    }
+                        match state.as_ref() {
+                            None => rsx! {
+                                div { class: "awaiting", style: "font-size:0.55rem;", "—" }
+                            },
+                            Some(s) => rsx! {
+                                VuPanel {
+                                    lufs: s.loudness.integrated_lufs,
+                                    peak: s.loudness.true_peak_dbtp,
+                                    lra:  s.loudness.lra,
+                                    correlation: s.quality.stereo_correlation,
                                 }
                             }
                         }
@@ -121,276 +111,239 @@ pub fn InsightsPanel(
     }
 }
 
-// ── P14-005: SpectrumDisplay ──────────────────────────────────────────────────
+// ── SpectrumDisplay (§4.7) ────────────────────────────────────────────────────
 
-/// Renders a precomputed SVG spectrum curve.
-///
-/// Receives SVG path string from backend (getVisualizationData).
-/// Renders only — zero computation. Spec: §4.7.
+/// Full-width spectrum with LUFS/PEAK readouts at bottom.
+/// Path from backend. Renders only. Spec: §4.7.
 #[component]
-fn SpectrumDisplay(path: String) -> Element {
+fn SpectrumDisplay(path: String, lufs: f32, peak: f32) -> Element {
+    let lufs_str = format!("{:.1}", lufs);
+    let peak_str = format!("{:.1}", peak);
+
     rsx! {
         div {
-            class: "spectrum-display",
+            class: "spectrum-wrap",
 
+            // SVG canvas
             svg {
                 class: "spectrum-svg",
-                view_box: "0 0 400 200",
+                view_box: "0 0 400 160",
+                xmlns: "http://www.w3.org/2000/svg",
 
                 defs {
                     linearGradient {
                         id: "sg",
                         x1: "0", y1: "0", x2: "0", y2: "1",
-                        stop { offset: "0%",   stop_color: "var(--accent-cyan)" }
-                        stop { offset: "100%", stop_color: "transparent" }
+                        stop { offset: "0%",   stop_color: "var(--accent-insights)", stop_opacity: "0.9" }
+                        stop { offset: "85%",  stop_color: "var(--accent-insights)", stop_opacity: "0.15" }
+                        stop { offset: "100%", stop_color: "transparent", stop_opacity: "0" }
                     }
                 }
 
-                // Grid lines at frequency markers — opacity 0.08 per §4.7
+                // Oscilloscope grid
                 SpectrumGrid {}
 
-                // Fill area — precomputed closed path from backend
-                path {
-                    d:    "{path}",
-                    fill: "url(#sg)",
-                    opacity: "0.4",
-                }
-
-                // Stroke — same path
-                path {
-                    d:            "{path}",
-                    fill:         "none",
-                    stroke:       "var(--accent-cyan)",
-                    stroke_width: "1.5",
-                }
-            }
-        }
-    }
-}
-
-/// Frequency marker grid lines — §4.7 (7 markers, opacity 0.08).
-/// Static: 20Hz=10px, 100=70, 500=155, 1k=200, 5k=300, 10k=345, 20k=390.
-#[component]
-fn SpectrumGrid() -> Element {
-    // x positions for: 20Hz, 100, 500, 1k, 5k, 10k, 20k
-    let freq_x: &[f32] = &[10.0, 70.0, 155.0, 200.0, 300.0, 345.0, 390.0];
-    rsx! {
-        g {
-            opacity: "0.08",
-            stroke: "var(--accent-cyan)",
-            stroke_width: "1",
-            for x in freq_x {
-                line {
-                    key: "{x}",
-                    x1: "{x}", y1: "0",
-                    x2: "{x}", y2: "190",
-                }
-            }
-        }
-    }
-}
-
-// ── P14-004: VuMeterPair ──────────────────────────────────────────────────────
-
-/// LUFS + PEAK VU meter pair — 30 LED segments each.
-///
-/// Receives loudness float values. Renders only.
-/// LUFS = var(--accent-cyan). PEAK = var(--accent-amber). Spec: §4.6.
-#[component]
-fn VuMeterPair(lufs: f32, peak: f32) -> Element {
-    rsx! {
-        div {
-            class: "vu-pair",
-
-            // Scale labels column (shared, reversed — 0 at top)
-            div {
-                class: "vu-scale",
-                // Labels at key positions: 0, -3, -6, -12, -18, -20, -25, -30
-                // Each label sits at a segment offset from top
-                // 30 segments: 0 at top (seg 30), -30 at bottom (seg 0)
-                // We emit labels for visual reference only
-                for (label, _seg) in [("0", 30usize), ("-3", 27), ("-6", 24),
-                                       ("-12",18), ("-18",12), ("-20",10),
-                                       ("-25",5), ("-30",0)] {
-                    span {
-                        key: "{label}",
-                        class: "vu-scale-label",
-                        "{label}"
+                // Fill area
+                if !path.is_empty() {
+                    path {
+                        d:    "{path}",
+                        fill: "url(#sg)",
+                    }
+                    // Stroke line
+                    path {
+                        d:            "{path}",
+                        fill:         "none",
+                        stroke:       "var(--accent-insights)",
+                        stroke_width: "1.5",
+                        stroke_linejoin: "round",
+                    }
+                } else {
+                    // Placeholder when no session — flat line
+                    path {
+                        d: "M 10,140 L 390,140",
+                        fill: "none",
+                        stroke: "var(--accent-insights)",
+                        stroke_width: "0.5",
+                        opacity: "0.2",
                     }
                 }
+
+                // Frequency labels at bottom
+                FreqLabels {}
             }
 
-            // LUFS channel — cyan
+            // LUFS/PEAK readout strip at bottom
             div {
-                class: "vu-channel",
-                VuMeter { value: lufs, min: -30.0_f32, max: 0.0_f32, color: "var(--accent-cyan)" }
-                div { class: "vu-label vu-lufs", "L" }
-            }
-
-            // PEAK channel — amber
-            div {
-                class: "vu-channel",
-                VuMeter { value: peak, min: -30.0_f32, max: 0.0_f32, color: "var(--accent-amber)" }
-                div { class: "vu-label vu-peak", "P" }
+                class: "spectrum-footer",
+                span { class: "spectrum-readout", "{lufs_str}" }
+                span { class: "spectrum-readout-peak", "{peak_str}" }
             }
         }
     }
 }
 
-/// Single VU meter — 30 LED segments.
-///
-/// Filled: full color. Inactive: 8% opacity (color + "14" hex suffix).
-/// Top 3: #ff3b30 clipping zone. Spec: §4.6.
-/// No std::f32 methods — plain arithmetic only.
+/// Oscilloscope grid lines — §4.7.
 #[component]
-fn VuMeter(value: f32, min: f32, max: f32, color: &'static str) -> Element {
-    let total = 30usize;
-    let range = max - min;
-    let ratio = if range > 0.0 { (value - min) / range } else { 0.0 };
-    let filled = (ratio * total as f32).clamp(0.0, total as f32) as usize;
-
+fn SpectrumGrid() -> Element {
     rsx! {
-        div {
-            class: "vu-meter",
-            for i in 0..total {
-                div {
-                    key: "{i}",
-                    class: "vu-segment",
-                    // Active segments: top 3 are clip zone (red), rest are color
-                    // Inactive: color at 8% opacity → append "14" to hex
-                    // We use inline style here only for the dynamic color value
-                    style: {
-                        if i < filled {
-                            if i >= total - 3 {
-                                "background:#ff3b30;".to_string()
-                            } else {
-                                format!("background:{};", color)
-                            }
-                        } else {
-                            // 8% opacity: append hex "14" to the CSS variable value
-                            // We fake opacity via box-shadow trick if color is a var(),
-                            // but for simplicity use opacity on the element
-                            format!("background:{};opacity:0.08;", color)
-                        }
-                    },
+        g {
+            stroke: "var(--accent-insights)",
+            stroke_width: "0.5",
+            opacity: "0.12",
+            fill: "none",
+            // Horizontal dB reference lines
+            line { x1:"10", y1:"20",  x2:"390", y2:"20"  }  // +10dB
+            line { x1:"10", y1:"50",  x2:"390", y2:"50"  }  // 0dB
+            line { x1:"10", y1:"80",  x2:"390", y2:"80"  }  // -10dB
+            line { x1:"10", y1:"110", x2:"390", y2:"110" }  // -20dB
+            line { x1:"10", y1:"140", x2:"390", y2:"140" }  // -30dB
+            // Vertical frequency markers
+            line { x1:"50",  y1:"10", x2:"50",  y2:"150" }  // 50Hz
+            line { x1:"90",  y1:"10", x2:"90",  y2:"150" }  // 100Hz
+            line { x1:"145", y1:"10", x2:"145", y2:"150" }  // 500Hz
+            line { x1:"195", y1:"10", x2:"195", y2:"150" }  // 1kHz
+            line { x1:"260", y1:"10", x2:"260", y2:"150" }  // 5kHz
+            line { x1:"310", y1:"10", x2:"310", y2:"150" }  // 10kHz
+            line { x1:"380", y1:"10", x2:"380", y2:"150" }  // 20kHz
+        }
+    }
+}
+
+/// Frequency axis tick labels.
+#[component]
+fn FreqLabels() -> Element {
+    let labels: &[(&str, &str)] = &[
+        ("20Hz", "12"), ("100", "52"), ("500", "107"),
+        ("1k", "155"), ("5k", "222"), ("10k", "272"), ("20k", "345"),
+    ];
+    rsx! {
+        g {
+            font_family: "monospace",
+            font_size: "8",
+            fill: "var(--accent-insights)",
+            opacity: "0.5",
+            for (label, x) in labels {
+                text {
+                    key: "{label}",
+                    x: "{x}",
+                    y: "158",
+                    "{label}"
                 }
             }
         }
     }
 }
 
-// ── P14-006: StereoScope ─────────────────────────────────────────────────────
+// ── StereoScope (§4.8) ───────────────────────────────────────────────────────
 
-/// Dual-ellipse Lissajous / goniometer display.
+/// Multi-trace Lissajous goniometer.
 ///
-/// Receives 4 f32 values from viz signal — renders SVG ellipses.
-/// Zero computation. Spec: §4.8.
+/// Receives 4 precomputed SVG path strings from the backend viz signal.
+/// Renders only — zero computation. Spec: §4.8.
 ///
-/// Outer ellipse: cyan (stereo width orbit).
-/// Inner ellipse: magenta (correlation tightness).
-/// Both rotated -45° (standard goniometer orientation).
+/// path_outer:   cyan, main stereo width figure  (opacity 0.9)
+/// path_inner:   magenta, correlation tightness  (opacity 0.8)
+/// path_detail1: cyan at 0.25 opacity            (richness trace)
+/// path_detail2: magenta at 0.15 opacity         (richness trace)
 #[component]
 fn StereoScope(
-    outer_rx: f32,
-    outer_ry: f32,
-    inner_rx: f32,
-    inner_ry: f32,
+    path_outer:   String,
+    path_inner:   String,
+    path_detail1: String,
+    path_detail2: String,
 ) -> Element {
     rsx! {
         div {
-            class: "stereo-scope",
+            class: "scope-wrap",
 
             svg {
                 view_box: "0 0 120 120",
+                xmlns: "http://www.w3.org/2000/svg",
+                style: "filter: drop-shadow(0 0 3px rgba(0,209,255,0.4));",
 
-                defs {
-                    filter {
-                        id: "cg",
-                        feGaussianBlur { std_deviation: "2" }
+                // Polar grid (static — no data dependency)
+                StereoGrid {}
+
+                // Detail traces — rendered first (under main traces)
+                if !path_detail2.is_empty() {
+                    path {
+                        d:            "{path_detail2}",
+                        fill:         "none",
+                        stroke:       "var(--accent-magenta)",
+                        stroke_width: "0.7",
+                        opacity:      "0.15",
+                    }
+                }
+                if !path_detail1.is_empty() {
+                    path {
+                        d:            "{path_detail1}",
+                        fill:         "none",
+                        stroke:       "var(--accent-insights)",
+                        stroke_width: "0.7",
+                        opacity:      "0.25",
                     }
                 }
 
-                // Polar grid background (3 circles + crosshair) — §4.8
-                StereoGrid {}
-
-                // Outer ellipse — cyan (stereo width)
-                ellipse {
-                    cx:           "60",
-                    cy:           "60",
-                    rx:           "{outer_rx}",
-                    ry:           "{outer_ry}",
-                    fill:         "none",
-                    stroke:       "var(--accent-cyan)",
-                    stroke_width: "1.5",
-                    opacity:      "0.8",
-                    transform:    "rotate(-45 60 60)",
+                // Inner orbit — magenta
+                if !path_inner.is_empty() {
+                    path {
+                        d:            "{path_inner}",
+                        fill:         "none",
+                        stroke:       "var(--accent-magenta)",
+                        stroke_width: "1.2",
+                        opacity:      "0.8",
+                    }
                 }
 
-                // Inner ellipse — magenta (correlation)
-                ellipse {
-                    cx:           "60",
-                    cy:           "60",
-                    rx:           "{inner_rx}",
-                    ry:           "{inner_ry}",
-                    fill:         "none",
-                    stroke:       "var(--accent-magenta)",
-                    stroke_width: "1.0",
-                    opacity:      "0.7",
-                    transform:    "rotate(-45 60 60)",
+                // Outer orbit — cyan (main, brightest)
+                if !path_outer.is_empty() {
+                    path {
+                        d:            "{path_outer}",
+                        fill:         "none",
+                        stroke:       "var(--accent-insights)",
+                        stroke_width: "1.6",
+                        opacity:      "0.9",
+                    }
                 }
 
-                // Center glow hotspot
+                // Center hotspot — always visible
                 circle {
-                    cx:     "60",
-                    cy:     "60",
-                    r:      "3",
-                    fill:   "var(--accent-cyan)",
-                    opacity:"0.9",
-                    filter: "url(#cg)",
+                    cx: "60", cy: "60",
+                    r:  "2",
+                    fill: "var(--accent-insights)",
+                    opacity: "1.0",
                 }
             }
         }
     }
 }
 
-/// Polar grid: 3 concentric circles + perpendicular crosshair.
-/// Opacity 0.15 per §4.8. Static — no data dependency.
+
+/// Polar grid: 3 circles + crosshair + diagonals (opacity 0.15).
 #[component]
 fn StereoGrid() -> Element {
     rsx! {
         g {
+            stroke: "var(--accent-insights)",
+            stroke_width: "0.7",
             opacity: "0.15",
-            stroke: "var(--accent-cyan)",
-            stroke_width: "0.8",
             fill: "none",
-
-            // 3 concentric circles
             circle { cx: "60", cy: "60", r: "50" }
             circle { cx: "60", cy: "60", r: "33" }
             circle { cx: "60", cy: "60", r: "16" }
-
-            // Crosshair
-            line { x1: "60", y1: "5",  x2: "60", y2: "115" }
-            line { x1: "5",  y1: "60", x2: "115", y2: "60" }
-
-            // Diagonal axes (45°/135° — standard goniometer guides)
-            line { x1: "14", y1: "14", x2: "106", y2: "106" }
-            line { x1: "106", y1: "14", x2: "14", y2: "106" }
+            line { x1: "60", y1: "5",   x2: "60",  y2: "115" }
+            line { x1: "5",  y1: "60",  x2: "115", y2: "60"  }
+            line { x1: "13", y1: "13",  x2: "107", y2: "107" }
+            line { x1: "107",y1: "13",  x2: "13",  y2: "107" }
         }
     }
 }
 
-// ── P14-007: MetricsReadout ───────────────────────────────────────────────────
+// ── VuPanel — VU meters + MetricsReadout ─────────────────────────────────────
 
-/// PEAK / RANGE / CORR numerical readout. Spec: §4.9.
-///
-/// PEAK:  amber, 28px
-/// RANGE: gold,  28px
-/// CORR:  cyan,  28px (prefix "+" when ≥ 0.0)
-///
-/// No computation — receives values from session signal.
+/// Right cell: segmented LUFS/PEAK VU meters + PEAK/RANGE/CORR numeric readout.
 #[component]
-fn MetricsReadout(peak: f32, lra: f32, correlation: f32) -> Element {
+fn VuPanel(lufs: f32, peak: f32, lra: f32, correlation: f32) -> Element {
     let corr_str = if correlation >= 0.0 {
         format!("+{:.2}", correlation)
     } else {
@@ -399,35 +352,99 @@ fn MetricsReadout(peak: f32, lra: f32, correlation: f32) -> Element {
 
     rsx! {
         div {
-            class: "metrics-readout",
+            class: "vu-panel",
 
-            // PEAK — amber
+            // Segmented VU meters
             div {
-                class: "metric-readout-row",
-                div { class: "metric-readout-label", "PEAK" }
+                class: "vu-meters-row",
+
+                // Scale labels column
+                div { class: "vu-scale",
+                    for label in ["0", "-3", "-6", "-10", "-12", "-14", "-18", "-20", "-25", "-30"] {
+                        span { class: "vu-scale-label", "{label}" }
+                    }
+                }
+
+                // LUFS channel
                 div {
-                    class: "metric-readout-value peak",
-                    { format!("{:.1}", peak) }
+                    class: "vu-channel-wrap",
+                    VuMeter { value: lufs, min: -30.0_f32, max: 0.0_f32, color_var: "var(--accent-insights)" }
+                    div { class: "vu-ch-label", "LUFS" }
+                }
+
+                // PEAK channel
+                div {
+                    class: "vu-channel-wrap",
+                    VuMeter { value: peak, min: -30.0_f32, max: 0.0_f32, color_var: "var(--accent-amber)" }
+                    div { class: "vu-ch-label vu-peak-label", "PEAK" }
+                }
+
+                // Readout values column
+                div {
+                    class: "vu-readout-col",
+
+                    div { class: "vu-readout-row",
+                        div { class: "vu-readout-label", "LUFS" }
+                        div { class: "vu-readout-value", style: "color:var(--accent-insights);",
+                            { format!("{:.1}", lufs) }
+                        }
+                    }
+                    div { class: "vu-readout-row",
+                        div { class: "vu-readout-label", "PEAK" }
+                        div { class: "vu-readout-value", style: "color:var(--accent-amber);",
+                            { format!("{:.1}", peak) }
+                        }
+                    }
+                    div { class: "vu-readout-row",
+                        div { class: "vu-readout-label", "RANGE" }
+                        div { class: "vu-readout-value", style: "color:var(--accent-gold);",
+                            { format!("{:.0}", lra) }
+                        }
+                    }
+                    div { class: "vu-readout-row",
+                        div { class: "vu-readout-label", "CORR" }
+                        div { class: "vu-readout-value", style: "color:var(--accent-insights);",
+                            "{corr_str}"
+                        }
+                    }
                 }
             }
+        }
+    }
+}
 
-            // RANGE — gold
-            div {
-                class: "metric-readout-row",
-                div { class: "metric-readout-label", "RANGE" }
-                div {
-                    class: "metric-readout-value range",
-                    { format!("{:.0}", lra) }
-                }
-            }
+// ── VuMeter — 30 LED segments ─────────────────────────────────────────────────
 
-            // CORR — cyan
-            div {
-                class: "metric-readout-row",
-                div { class: "metric-readout-label", "CORR" }
+/// 30-segment VU meter bar. Active segments = solid color. Inactive = 8% opacity.
+/// Top 3 segments (near 0dBTP) = red clip zone. No std::f32 methods.
+#[component]
+fn VuMeter(value: f32, min: f32, max: f32, color_var: &'static str) -> Element {
+    let total   = 30usize;
+    let range   = max - min;
+    let ratio   = if range > 0.0 { (value - min) / range } else { 0.0 };
+    let filled  = (ratio * total as f32).clamp(0.0, total as f32) as usize;
+
+    rsx! {
+        div {
+            class: "vu-bar",
+            // Segments render bottom-to-top via flex-direction:column-reverse
+            for i in 0..total {
                 div {
-                    class: "metric-readout-value corr",
-                    "{corr_str}"
+                    key: "{i}",
+                    class: "vu-seg",
+                    style: {
+                        if i < filled {
+                            // Active: top 3 = clip red, rest = color_var
+                            if i >= total - 3 {
+                                "background:#ff3b30;".to_string()
+                            } else {
+                                format!("background:{};", color_var)
+                            }
+                        } else {
+                            // Inactive: color at 8% opacity via inline alpha
+                            format!("background:{};opacity:0.08;", color_var)
+                        }
+                    },
                 }
             }
         }

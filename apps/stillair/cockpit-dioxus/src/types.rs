@@ -41,20 +41,24 @@ pub struct QualityMetricsJson {
 
 // ── VisualizationDataJson (Phase 14 — §2 IPC type) ───────────────────────────
 
-/// Precomputed visualization data from backend.
+/// Precomputed visualization data from backend (get_visualization_data command).
 /// UI receives this and renders — computes nothing itself.
 /// Authority: UI Agent Context v2.1 §2 · Phase 14 P14-003.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VisualizationDataJson {
-    /// Spectrum waveform — SVG path string, 400×200 viewBox
-    pub spectrum_svg_path:   String,
-    /// Lissajous outer ellipse rx/ry — derived from stereo_width
-    pub lissajous_outer_rx:  f32,
-    pub lissajous_outer_ry:  f32,
-    /// Lissajous inner ellipse rx/ry — derived from stereo_correlation
-    pub lissajous_inner_rx:  f32,
-    pub lissajous_inner_ry:  f32,
-    /// Waveform placements — Phase 15: real before/after PCM
+    /// Spectrum waveform — SVG path string, 400×160 viewBox. Closed fill path.
+    pub spectrum_svg_path:    String,
+
+    /// Lissajous goniometer paths — 120×120 viewBox. Rendered by StereoScope.
+    /// Outer orbit: rendered cyan (stereo width orbit).
+    pub lissajous_path_outer:   String,
+    /// Inner orbit: rendered magenta (correlation tightness).
+    pub lissajous_path_inner:   String,
+    /// Detail traces: rendered at low opacity for visual richness.
+    pub lissajous_path_detail1: String,
+    pub lissajous_path_detail2: String,
+
+    /// Waveform placeholders — Phase 15: real before/after PCM snapshots.
     pub waveform_before_svg: String,
     pub waveform_after_svg:  String,
 }
