@@ -27,8 +27,7 @@ use crate::panels::{
     session::SessionPanel,
 };
 
-// Inline the CSS design system at compile time
-const STYLES: &str = include_str!("../assets/styles.css");
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -132,7 +131,6 @@ pub fn App() -> Element {
     let scrub_len    = scrub_pct(position_ms, duration_ms);
 
     rsx! {
-        style { "{STYLES}" }
 
         div {
             id:    "app-shell",

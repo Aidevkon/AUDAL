@@ -1,13 +1,23 @@
-# Trunk.toml — Dioxus Cockpit (Phase 11)
-# Authority: P11-009 · Amendment A-002 §7
+# Trunk.toml — Dioxus Cockpit (Phase 14)
+# Authority: P11-009 · P14-002 · Amendment A-002 §7
 #
-# Builds stillair-cockpit as WASM and serves it to Tauri's WebView.
-# Trunk is the build system; cargo tauri dev manages the full window.
+# CSS is served as a Trunk-managed asset (link tag in index.html),
+# NOT embedded via include_str!. This enables CSS hot-reload without
+# WASM recompile — critical for rapid design iteration.
+#
+# Architecture:
+#   - styles.css → link data-trunk rel="css" in index.html
+#   - trunk serve watches assets/ and src/ for changes
+#   - CSS change → browser hot-reload (no WASM recompile)
+#   - Rust change → full WASM recompile
 
 [build]
 target = "index.html"
 
-# Serve the CSS design system from assets/
+# Explicitly watch assets/ so CSS changes trigger browser reload
+[watch]
+ignore = []
+
 [[hooks]]
 stage = "pre_build"
 command = "echo"

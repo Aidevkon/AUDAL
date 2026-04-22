@@ -7,6 +7,13 @@
   <meta name="description" content="Still Air — Precision mastering cockpit" />
 
   <!--
+    Trunk copies assets/styles.css to dist/ and injects a <link> here.
+    CSS changes hot-reload without WASM recompile (trunk watches assets/).
+    Authority: Phase 14 P14-002 · ui-agent-context.md §7.
+  -->
+  <link data-trunk rel="css" href="assets/styles.css" />
+
+  <!--
     Trunk injects the WASM bundle here at build time.
     withGlobalTauri: true ensures window.__TAURI_INTERNALS__ is available
     before the WASM module initializes.
