@@ -2742,3 +2742,205 @@ html, body {
     opacity: 0.4;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 14 Visual Polish — Screw fix · VU scale · Coach pct · OLED depth
+   Authority: User review pass, reference mockup images.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── FIX 1: Screws ─────────────────────────────────────────────────────────────
+   Problem: overflow:hidden clips .screw divs at panel edges.
+            ::before/::after pseudo-elements conflict with div screws.
+   Fix:
+     - Remove pseudo-element screws (keep only div-based .screw)
+     - Change .mfd-panel to overflow:visible + clip via outline
+     - Use clip-path workaround: panel clips children BUT screws are z-index:10
+       Actually simpler: move overflow:hidden to panel-body only, not wrapper.
+   ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Kill pseudo-element screws — we use .screw divs instead */
+.mfd-panel::before,
+.mfd-panel::after {
+    display: none !important;
+}
+
+/* Allow panel to show screws outside its overflow clip radius.
+   We set overflow:visible on the panel wrapper itself and put
+   overflow:hidden only on the panel-body content area. */
+.mfd-panel {
+    overflow: visible !important;
+}
+
+/* Re-apply clip to the panel's inner content children only */
+.panel-title,
+.panel-body,
+.insights-body,
+.coach-body {
+    overflow: hidden;
+}
+
+/* Screws: bigger, more visible, correct z-index above all content */
+.screw {
+    position: absolute !important;
+    width:  10px !important;
+    height: 10px !important;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%,
+        #44475a 0%, #23252e 45%, #111318 100%) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        inset 0 -1px 0 rgba(0,0,0,0.6),
+        0 1px 4px rgba(0,0,0,0.8) !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+}
+
+/* Slot line etched across screw face */
+.screw::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 15%;
+    width: 70%;
+    height: 1.5px;
+    background: rgba(0,0,0,0.7);
+    transform: translateY(-50%) rotate(45deg);
+    pointer-events: none;
+    border-radius: 1px;
+}
+
+/* Screw positions — 6px inset so they sit ON the panel border */
+.screw-tl { top:  6px; left:  6px; }
+.screw-tr { top:  6px; right: 6px; }
+.screw-bl { bottom: 6px; left:  6px; }
+.screw-br { bottom: 6px; right: 6px; }
+
+/* ─── FIX 2: VU meter scale labels — align to segment positions ────────────── */
+
+/* The .vu-scale column sits left of the bars.
+   Each label corresponds to one of 30 segments (every ~3 segments).
+   Use flex column-reverse to match bars direction. */
+.vu-scale {
+    display: flex !important;
+    flex-direction: column-reverse !important;
+    justify-content: space-between !important;
+    align-items: flex-end;
+    height: 100%;
+    padding-bottom: 2px;
+    padding-top: 2px;
+}
+
+.vu-scale-label {
+    font-family: var(--font-mono) !important;
+    font-size: 0.38rem !important;
+    color: var(--text-muted) !important;
+    line-height: 1 !important;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    flex-shrink: 0;
+    /* Each label gets equal share of vertical space */
+}
+
+/* VU channel labels: LUFS and PEAK header labels above bars */
+.vu-ch-label {
+    font-size: 0.42rem !important;
+    letter-spacing: 0.08em !important;
+    margin-bottom: 2px;
+}
+
+/* ─── FIX 3: Coach panel finding-bar percentage visibility ───────────────────── */
+
+/* The finding-bar-label flex row: track + pct number */
+.finding-bar-label {
+    display: flex !important;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+}
+
+.finding-bar-track {
+    flex: 1 !important;
+    height: 6px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.finding-bar-fill {
+    height: 100% !important;
+    background: var(--accent-insights) !important;
+    border-radius: 3px;
+    box-shadow: 0 0 6px rgba(0,209,255,0.35);
+}
+
+.finding-bar-pct {
+    font-family: var(--font-mono) !important;
+    font-size: 0.58rem !important;
+    color: var(--text-secondary) !important;
+    min-width: 26px;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── FIX 4: OLED inset depth effect ─────────────────────────────────────────── */
+
+/* Deep OLED recess — the screen is set into the panel metal */
+.oled-screen {
+    background: #05070a !important;   /* deeper black than bg-overlay */
+    border: 1px solid rgba(0,0,0,0.8);
+    border-radius: 4px;
+    box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 2px 12px rgba(0,0,0,0.9),
+        inset 0 0 30px rgba(0,0,0,0.6) !important;
+    position: relative;
+}
+
+/* Subtle cyan rim-glow on the spectrum cell (top OLED) */
+.insights-spectrum-cell.oled-screen {
+    box-shadow:
+        inset 0 0 0 1px rgba(0,209,255,0.08),
+        inset 0 2px 14px rgba(0,0,0,0.95),
+        inset 0 0 40px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(0,209,255,0.06) !important;
+}
+
+/* Scope and meters cells: standard deep OLED */
+.insights-scope-cell.oled-screen,
+.insights-meters-cell.oled-screen {
+    box-shadow:
+        inset 0 0 0 1px rgba(0,209,255,0.06),
+        inset 0 1px 10px rgba(0,0,0,0.95),
+        inset 0 0 20px rgba(0,0,0,0.6) !important;
+}
+
+/* Insights body: overall panel inset shadow for depth */
+.insights-body {
+    background: #0a0c10;
+    border-radius: 3px;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+}
+
+/* ─── FIX 5: Panel overflow fix for coach body scroll ───────────────────────── */
+
+.panel-coach > div[style*="overflow-y"] {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Coach finding row: ensure description is visible */
+.finding-row-description {
+    font-size: 0.6rem !important;
+    color: var(--text-secondary) !important;
+    margin: 2px 0 0 0 !important;
+    line-height: 1.35 !important;
+}
+
+/* Finding row: left accent border follows severity */
+.finding-row {
+    padding: 7px 10px !important;
+    margin: 3px 6px !important;
+}
+

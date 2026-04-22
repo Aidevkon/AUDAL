@@ -392,12 +392,14 @@ fn StereoGrid() -> Element {
     rsx! {
         g {
             stroke: "var(--accent-insights)",
-            stroke_width: "0.7",
-            opacity: "0.15",
+            stroke_width: "0.8",
+            opacity: "0.22",
             fill: "none",
+            // Circles
             circle { cx: "60", cy: "60", r: "50" }
             circle { cx: "60", cy: "60", r: "33" }
             circle { cx: "60", cy: "60", r: "16" }
+            // Cross + diagonals
             line { x1: "60", y1: "5",   x2: "60",  y2: "115" }
             line { x1: "5",  y1: "60",  x2: "115", y2: "60"  }
             line { x1: "13", y1: "13",  x2: "107", y2: "107" }
