@@ -2944,3 +2944,86 @@ html, body {
     margin: 3px 6px !important;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 14 — panel-screw-wrapper: correct screw architecture final fix
+   
+   CORRECT STRUCTURE:
+     .panel-screw-wrapper (position:relative)
+       .mfd-panel (overflow:hidden — content clipped normally)
+       .screw.screw-tl/tr/bl/br (absolute, siblings of panel, never clipped)
+   
+   This replaces the broken overflow:visible !important approach.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Undo the overflow:visible hack — .mfd-panel reverts to overflow:hidden */
+.mfd-panel {
+    overflow: hidden !important;
+}
+
+/* The wrapper provides the positioning context for 4 screw corners */
+.panel-screw-wrapper {
+    position: relative;
+    display: contents;  /* wrapper is invisible — grid layout passes through */
+}
+
+/* When panel fills a grid cell, wrapper must also fill it */
+.cockpit-grid > .panel-screw-wrapper,
+.cockpit-panels > .panel-screw-wrapper {
+    display: contents;
+}
+
+/* Screws: 10px metallic dots, z-index above all panel content */
+.screw {
+    position: absolute !important;
+    width:  10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    background: radial-gradient(circle at 35% 32%,
+        #44475a 0%, #23252e 45%, #111318 100%) !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.12),
+        inset 0 -1px 0 rgba(0,0,0,0.7),
+        0 1px 5px rgba(0,0,0,0.9) !important;
+    z-index: 20 !important;
+    pointer-events: none !important;
+}
+
+/* Etched slot across screw face */
+.screw::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 50%;
+    left: 15%;
+    width: 70%;
+    height: 1.5px;
+    background: rgba(0,0,0,0.75);
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+/* Screw corner positions — hover over the panel bezel edge */
+.screw-tl { top:  6px !important; left:  6px !important; }
+.screw-tr { top:  6px !important; right: 6px !important; }
+.screw-bl { bottom: 6px !important; left:  6px !important; }
+.screw-br { bottom: 6px !important; right: 6px !important; }
+
+
+/* ── panel-screw-wrapper: correct flex/grid passthrough ─────────────────────── */
+/* Fill the grid cell, provide positioning context for screw children */
+.panel-screw-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* The mfd-panel inside wrapper fills all available space */
+.panel-screw-wrapper > .mfd-panel {
+    flex: 1;
+    min-height: 0;
+}
+

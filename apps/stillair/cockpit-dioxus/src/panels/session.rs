@@ -35,57 +35,58 @@ pub fn SessionPanel(
     show_mastered: Signal<bool>,
 ) -> Element {
     rsx! {
-        div {
-            class: "mfd-panel panel-session",
-            style: "border-right:1px solid var(--border-subtle); display:flex; flex-direction:column; overflow:hidden;",
+        div { class: "panel-screw-wrapper",
 
-            // Corner screws (§4.5 hardware aesthetic)
+            div {
+                class: "mfd-panel panel-session",
+
+                div {
+                    class: "panel-title",
+                    style: "color:var(--accent-session);
+                            border-bottom:2px solid var(--accent-session);
+                            padding:1rem 1.5rem 0.5rem;
+                            font-size:0.7rem; letter-spacing:0.2em;
+                            text-transform:uppercase; font-weight:600;
+                            flex-shrink:0;",
+                    "THE SESSION"
+                }
+
+                div {
+                    style: "flex:1; overflow-y:auto; padding:0;",
+                    match mode.read().clone() {
+                        CockpitMode::Idle => rsx! {
+                            DropZone { mode }
+                        },
+                        CockpitMode::FileLoaded { name, format, path } => rsx! {
+                            FileInfo { name: name.clone(), format: format.clone() }
+                            PresetMenu { mode, path, name }
+                        },
+                        CockpitMode::PresetSelected { path, name, preset_id } => rsx! {
+                            FileInfo { name: name.clone(), format: String::new() }
+                            SelectedPreset { preset_id: preset_id.clone() }
+                            MasterButton { mode, session_state, viz_data, path, name, preset_id }
+                        },
+                        CockpitMode::Mastering { .. } => rsx! {
+                            MasteringProgress {}
+                        },
+                        CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
+                            GoldenBlobBadge {}
+                            ExportControls { mode, blob_id }
+                        },
+                        CockpitMode::Fault { code, message } => rsx! {
+                            FaultView { code, message }
+                        },
+                    }
+                }
+            }   // .mfd-panel
+
+            // Screws — siblings of panel, not clipped by overflow:hidden
             div { class: "screw screw-tl" }
             div { class: "screw screw-tr" }
             div { class: "screw screw-bl" }
             div { class: "screw screw-br" }
 
-            // Panel title bar
-            div {
-                class: "panel-title",
-                style: "color:var(--accent-session);
-                        border-bottom:2px solid var(--accent-session);
-                        padding:1rem 1.5rem 0.5rem;
-                        font-size:0.7rem; letter-spacing:0.2em;
-                        text-transform:uppercase; font-weight:600;
-                        flex-shrink:0;",
-                "THE SESSION"
-            }
-
-            // Panel body — mode-dependent
-            div {
-                style: "flex:1; overflow-y:auto; padding:0;",
-                match mode.read().clone() {
-                    CockpitMode::Idle => rsx! {
-                        DropZone { mode }
-                    },
-                    CockpitMode::FileLoaded { name, format, path } => rsx! {
-                        FileInfo { name: name.clone(), format: format.clone() }
-                        PresetMenu { mode, path, name }
-                    },
-                    CockpitMode::PresetSelected { path, name, preset_id } => rsx! {
-                        FileInfo { name: name.clone(), format: String::new() }
-                        SelectedPreset { preset_id: preset_id.clone() }
-                        MasterButton { mode, session_state, viz_data, path, name, preset_id }
-                    },
-                    CockpitMode::Mastering { .. } => rsx! {
-                        MasteringProgress {}
-                    },
-                    CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
-                        GoldenBlobBadge {}
-                        ExportControls { mode, blob_id }
-                    },
-                    CockpitMode::Fault { code, message } => rsx! {
-                        FaultView { code, message }
-                    },
-                }
-            }
-        }
+        }   // .panel-screw-wrapper
     }
 }
 

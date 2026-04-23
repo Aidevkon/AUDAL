@@ -22,129 +22,116 @@ pub fn CoachPanel(
     let state = session_state.read();
 
     rsx! {
-        div {
-            class: "mfd-panel panel-coach",
-            style: "display:flex; flex-direction:column; overflow:hidden;",
+        div { class: "panel-screw-wrapper",
 
-            // Corner screws (§4.5 hardware aesthetic)
+            div {
+                class: "mfd-panel panel-coach",
+
+                div {
+                    class: "panel-title",
+                    style: "color:var(--accent-coach);
+                            border-bottom:2px solid var(--accent-coach);
+                            padding:1rem 1.5rem 0.5rem;
+                            font-size:0.7rem; letter-spacing:0.2em;
+                            text-transform:uppercase; font-weight:600;
+                            flex-shrink:0;",
+                    "THE COACH"
+                }
+
+                div {
+                    style: "flex:1; overflow-y:auto;",
+                    match state.as_ref() {
+                        Some(s) => rsx! {
+                            if let Some(ref n) = s.narrative {
+                                NarrativeSummary {
+                                    summary:    n.summary.clone(),
+                                    model_used: n.model_used.clone(),
+                                }
+                            } else {
+                                div {
+                                    style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
+                                    div {
+                                        style: "color:var(--text-muted); font-size:0.7rem;
+                                                font-style:italic;",
+                                        "Coach narrative unavailable — Ollama not running."
+                                    }
+                                }
+                            }
+
+                            div {
+                                style: "padding:0.75rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
+                                div {
+                                    style: "color:var(--text-secondary); font-size:0.6rem;
+                                            letter-spacing:0.15em; text-transform:uppercase;
+                                            margin-bottom:0.35rem;",
+                                    "RECOMMENDATION"
+                                }
+                                div {
+                                    style: "color:var(--text-primary); font-size:0.8rem;
+                                            line-height:1.5;",
+                                    "{s.findings.recommendation}"
+                                }
+                            }
+
+                            ScoreBar {
+                                pass:   s.findings.issues.is_empty(),
+                                issues: s.findings.issues.len(),
+                            }
+
+                            if !s.findings.issues.is_empty() {
+                                div {
+                                    style: "padding:0.5rem 1.5rem 0.25rem;
+                                            color:var(--text-muted); font-size:0.6rem;
+                                            letter-spacing:0.2em; text-transform:uppercase;",
+                                    "FINDINGS  ({s.findings.issues.len()})"
+                                }
+                            }
+                            for issue in &s.findings.issues {
+                                FindingRow { issue: issue.clone() }
+                            }
+
+                            if !s.findings.issues.is_empty() {
+                                CoachActions {}
+                            }
+                        },
+                        None => rsx! {
+                            div {
+                                style: "padding:0.5rem 0.75rem 0.2rem;
+                                        color:var(--text-muted); font-size:0.6rem;
+                                        letter-spacing:0.2em; text-transform:uppercase;",
+                                "FINDINGS  (3)"
+                            }
+                            DemoFindingRow {
+                                label: "Dynamic Range Check",
+                                desc:  "Consistency needed",
+                                pct:   40.0_f32,
+                                sev:   "medium",
+                            }
+                            DemoFindingRow {
+                                label: "Loudness Target",
+                                desc:  "Meeting -14 LUFS",
+                                pct:   60.0_f32,
+                                sev:   "low",
+                            }
+                            DemoFindingRow {
+                                label: "Stereo Width",
+                                desc:  "Review correlation in lows",
+                                pct:   30.0_f32,
+                                sev:   "high",
+                            }
+                            CoachActions {}
+                        }
+                    }
+                }
+            }   // .mfd-panel
+
+            // Screws — siblings of panel, not clipped by overflow:hidden
             div { class: "screw screw-tl" }
             div { class: "screw screw-tr" }
             div { class: "screw screw-bl" }
             div { class: "screw screw-br" }
 
-            // Panel title
-            div {
-                class: "panel-title",
-                style: "color:var(--accent-coach);
-                        border-bottom:2px solid var(--accent-coach);
-                        padding:1rem 1.5rem 0.5rem;
-                        font-size:0.7rem; letter-spacing:0.2em;
-                        text-transform:uppercase; font-weight:600;
-                        flex-shrink:0;",
-                "THE COACH"
-            }
-
-            div {
-                style: "flex:1; overflow-y:auto;",
-                match state.as_ref() {
-                    Some(s) => rsx! {
-                        // ── Narrative summary ─────────────────────────────────
-                        if let Some(ref n) = s.narrative {
-                            NarrativeSummary {
-                                summary:    n.summary.clone(),
-                                model_used: n.model_used.clone(),
-                            }
-                        } else {
-                            div {
-                                style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
-                                div {
-                                    style: "color:var(--text-muted); font-size:0.7rem;
-                                            font-style:italic;",
-                                    "Coach narrative unavailable — Ollama not running."
-                                }
-                            }
-                        }
-
-                        // ── Recommendation ────────────────────────────────────
-                        div {
-                            style: "padding:0.75rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
-                            div {
-                                style: "color:var(--text-secondary); font-size:0.6rem;
-                                        letter-spacing:0.15em; text-transform:uppercase;
-                                        margin-bottom:0.35rem;",
-                                "RECOMMENDATION"
-                            }
-                            div {
-                                style: "color:var(--text-primary); font-size:0.8rem;
-                                        line-height:1.5;",
-                                "{s.findings.recommendation}"
-                            }
-                        }
-
-                        // ── Pass/fail score indicator ─────────────────────────
-                        ScoreBar {
-                            pass:   s.findings.issues.is_empty(),
-                            issues: s.findings.issues.len(),
-                        }
-
-                        // ── Finding rows (P14-008: progress bars + severity dots) ────
-                        if !s.findings.issues.is_empty() {
-                            div {
-                                style: "padding:0.5rem 1.5rem 0.25rem;
-                                        color:var(--text-muted); font-size:0.6rem;
-                                        letter-spacing:0.2em; text-transform:uppercase;",
-                                "FINDINGS  ({s.findings.issues.len()})"
-                            }
-                        }
-                        for issue in &s.findings.issues {
-                            FindingRow { issue: issue.clone() }
-                        }
-
-                        // ── YES / NO action buttons (§4.10) ──────────────────────
-                        if !s.findings.issues.is_empty() {
-                            CoachActions {}
-                        }
-                    },
-                    None => rsx! {
-                        // Demo state — matches mockup exactly.
-                        // Shows 3 finding rows pre-populated so the panel
-                        // looks correct in FM0 before any session.
-                        div {
-                            style: "padding:0.5rem 0.75rem 0.2rem;
-                                    color:var(--text-muted); font-size:0.6rem;
-                                    letter-spacing:0.2em; text-transform:uppercase;",
-                            "FINDINGS  (3)"
-                        }
-
-                        // Dynamic Range Check — 40%
-                        DemoFindingRow {
-                            label: "Dynamic Range Check",
-                            desc:  "Consistency needed",
-                            pct:   40.0_f32,
-                            sev:   "medium",
-                        }
-
-                        // Loudness Target — 60%
-                        DemoFindingRow {
-                            label: "Loudness Target",
-                            desc:  "Meeting -14 LUFS",
-                            pct:   60.0_f32,
-                            sev:   "low",
-                        }
-
-                        // Stereo Width — 30%
-                        DemoFindingRow {
-                            label: "Stereo Width",
-                            desc:  "Review correlation in lows",
-                            pct:   30.0_f32,
-                            sev:   "high",
-                        }
-
-                        CoachActions {}
-                    }
-                }
-            }
-        }
+        }   // .panel-screw-wrapper
     }
 }
 

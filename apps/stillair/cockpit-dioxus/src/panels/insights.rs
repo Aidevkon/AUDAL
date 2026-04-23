@@ -103,24 +103,22 @@ pub fn InsightsPanel(
 
     rsx! {
         div {
-            class: "mfd-panel panel-insights",
+            class: "panel-screw-wrapper",
 
-            // Corner screws (§4.5)
-            div { class: "screw screw-tl" }
-            div { class: "screw screw-tr" }
-            div { class: "screw screw-bl" }
-            div { class: "screw screw-br" }
-
-            // Panel title bar
+            // The panel itself — overflow:hidden stays, screws are siblings
             div {
-                class: "panel-title",
-                style: "color:var(--accent-insights);",
-                "THE INSIGHTS"
-            }
+                class: "mfd-panel panel-insights",
 
-            // Panel body — avionics layout
-            div {
-                class: "insights-body",
+                // Panel title bar
+                div {
+                    class: "panel-title",
+                    style: "color:var(--accent-insights);",
+                    "THE INSIGHTS"
+                }
+
+                // Panel body — avionics layout
+                div {
+                    class: "insights-body",
 
                 // ── TOP: Spectrum (full width) ────────────────────────────────
                 div {
@@ -173,8 +171,16 @@ pub fn InsightsPanel(
                         }
                     }
                 }
-            }
-        }
+            }   // .insights-body
+        }   // .mfd-panel panel-insights
+
+        // Screws — siblings of panel, not clipped by overflow:hidden
+        div { class: "screw screw-tl" }
+        div { class: "screw screw-tr" }
+        div { class: "screw screw-bl" }
+        div { class: "screw screw-br" }
+
+    }   // .panel-screw-wrapper
     }
 }
 
