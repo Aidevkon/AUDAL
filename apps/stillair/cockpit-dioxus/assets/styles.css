@@ -112,7 +112,7 @@
 
 html, body {
     height: 100%;
-    overflow: hidden;
+    overflow: visible;  /* screws use position:absolute — body must not clip them */
     background: var(--bg-overlay);
     color: var(--text-primary);
     font-family: var(--font-mono);
@@ -142,7 +142,7 @@ html, body {
             rgba(0,0,0,0.15) 100%
         ),
         var(--bg-base);
-    overflow: hidden;
+    overflow: visible;   /* screws escape panel bounds — must not clip here */
 }
 
 /* ─── 4. Header / mode bar ────────────────────────────────────────────────── */
