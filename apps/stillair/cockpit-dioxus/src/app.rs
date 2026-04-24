@@ -26,6 +26,11 @@ use crate::panels::{
     mastered::MasteredView,
     session::SessionPanel,
 };
+use crate::components::{
+    screw::Screw,
+    soft_key::{SoftKey, SoftKeyVariant},
+    annunciator::Annunciator,
+};
 
 
 
@@ -71,25 +76,8 @@ pub fn App() -> Element {
     let mut show_mastered: Signal<bool> = use_signal(|| false);
 
     // ── Mode badge style  ─────────────────────────────────────────────────────
-    let mode_label = mode.read().label().to_string();
 
-    let badge_style = {
-        let m = mode.read();
-        match &*m {
-            CockpitMode::Mastering { .. }  =>
-                "color:var(--state-running); border-color:var(--state-running);\
-                 box-shadow:0 0 6px rgba(0,209,255,0.25);",
-            CockpitMode::CoachReady { .. } =>
-                "color:var(--state-complete); border-color:var(--state-complete);\
-                 box-shadow:0 0 6px rgba(255,214,10,0.2);",
-            CockpitMode::Fault { .. }      =>
-                "color:var(--state-fault); border-color:var(--state-fault);\
-                 box-shadow:0 0 6px rgba(239,68,68,0.25);",
-            CockpitMode::Exporting { .. }  =>
-                "color:var(--state-locked); border-color:var(--state-locked);",
-            _                              => "",
-        }
-    };
+
 
     // ── P12B-004: Position polling — 500ms when in FM5 ───────────────────────
     {
@@ -136,19 +124,6 @@ pub fn App() -> Element {
             id:    "app-shell",
             class: "app-shell",
 
-            // ── Header ────────────────────────────────────────────────────────
-            header {
-                id:    "cockpit-header",
-                class: "cockpit-header",
-
-                span { class: "wordmark", "STILL AIR" }
-                span {
-                    class: "mode-badge",
-                    style: "{badge_style}",
-                    "{mode_label}"
-                }
-            }
-
             // ── MFD bay — 3 equal panels ──────────────────────────────────────
             main {
                 id:    "mfd-bay",
@@ -173,78 +148,100 @@ pub fn App() -> Element {
                 id:    "transport-bar",
                 class: "transport-bar",
 
-                // Left: mode indicator + timecode
-                div { class: "transport-mode", "{mode_label}" }
+                Screw { top: 10, left: 10 }
+                Screw { top: 10, right: 10 }
+                Screw { bottom: 10, left: 10 }
+                Screw { bottom: 10, right: 10 }
 
-                div { class: "transport-divider" }
-
-                // Position display MM:SS
+                // Left: Annunciator Zone (25% width)
                 div {
-                    class: "transport-time",
-                    id:    "transport-position",
-                    { format_ms(position_ms) }
+                    class: "transport-left dsp-annunciators",
+                    Annunciator { label: "FM0".to_string(), is_master: true, active: true } // Master is active for now
+                    Annunciator { label: "EQ".to_string(), active: false }
+                    Annunciator { label: "COMP".to_string(), active: false }
+                    Annunciator { label: "SAT".to_string(), active: false }
+                    Annunciator { label: "LIMIT".to_string(), active: false }
                 }
 
-                // Center: controls cluster
+                // Center: Chrono-Control Zone (50% width)
                 div {
-                    class: "transport-controls",
+                    class: "transport-center",
 
-                    // Skip back −5s
-                    button {
-                        class:   "transport-skip",
-                        id:      "btn-skip-back",
-                        title:   "Skip back 5 seconds",
-                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                        onclick: move |_| {
-                            let new_ms = position_ms.saturating_sub(5_000);
-                            let ps     = playback_state.clone();
-                            spawn_local(async move {
-                                invoke_playback("seek",
-                                    Some(new_ms), ps).await;
-                            });
-                        },
-                        "◄◄ 5s"
-                    }
+                    // Top: Controls & Time
+                    div {
+                        class: "transport-center-top",
 
-                    // Play / Pause toggle
-                    button {
-                        class: if is_playing { "transport-play is-playing" } else { "transport-play" },
-                        id:    "btn-play-pause",
-                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                        onclick: move |_| {
-                            let action = if is_playing { "pause" } else { "play" };
-                            let ps     = playback_state.clone();
-                            spawn_local(async move {
-                                invoke_playback(action, None, ps).await;
-                            });
-                        },
-                        {
-                            if is_playing { "▐▐  PAUSE" } else { "▶  PLAY" }
+                        // Skip back −5s
+                        SoftKey {
+                            label: "◄◄".to_string(),
+                            title: "Skip back 5 seconds".to_string(),
+                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
+                            variant: SoftKeyVariant::Standard,
+                            onclick: move |_| {
+                                let new_ms = position_ms.saturating_sub(5_000);
+                                let ps     = playback_state.clone();
+                                spawn_local(async move {
+                                    invoke_playback("seek", Some(new_ms), ps).await;
+                                });
+                            }
+                        }
+
+                        // Time Counter (Now VFD Styled and in the center)
+                        div {
+                            class: "transport-vfd-display transport-time",
+                            id:    "transport-position",
+                            { format_ms(position_ms) }
+                        }
+
+                        // Skip forward +5s
+                        SoftKey {
+                            label: "►►".to_string(),
+                            title: "Skip forward 5 seconds".to_string(),
+                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
+                            variant: SoftKeyVariant::Standard,
+                            onclick: move |_| {
+                                let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                let ps     = playback_state.clone();
+                                spawn_local(async move {
+                                    invoke_playback("seek", Some(new_ms), ps).await;
+                                });
+                            }
+                        }
+
+                        // Play / Pause toggle
+                        SoftKey {
+                            label: "PLAY".to_string(),
+                            active: is_playing,
+                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
+                            variant: SoftKeyVariant::Active,
+                            onclick: move |_| {
+                                let action = if is_playing { "pause" } else { "play" };
+                                let ps     = playback_state.clone();
+                                spawn_local(async move {
+                                    invoke_playback(action, None, ps).await;
+                                });
+                            }
+                        }
+
+                        // Stop button
+                        SoftKey {
+                            label: "STOP".to_string(),
+                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
+                            variant: SoftKeyVariant::Standard,
+                            onclick: move |_| {
+                                let ps = playback_state.clone();
+                                spawn_local(async move {
+                                    invoke_playback("stop", None, ps).await;
+                                });
+                            }
                         }
                     }
 
-                    // Skip forward +5s
-                    button {
-                        class:   "transport-skip",
-                        id:      "btn-skip-fwd",
-                        title:   "Skip forward 5 seconds",
-                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                        onclick: move |_| {
-                            let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                            let ps     = playback_state.clone();
-                            spawn_local(async move {
-                                invoke_playback("seek", Some(new_ms), ps).await;
-                            });
-                        },
-                        "5s ►►"
-                    }
-
-                    // Scrub rail — click maps to seek position
+                    // Bottom: Scrub rail
                     div {
                         class: "transport-scrub",
                         id:    "transport-scrub",
                         title: "Click to seek",
-                        // onclick MUST be before children (Dioxus RSX rule)
                         onclick: move |evt| {
                             if !matches!(*mode.read(), CockpitMode::CoachReady { .. })
                                 || duration_ms == 0 { return; }
@@ -264,14 +261,12 @@ pub fn App() -> Element {
                             }
                         },
 
-                        // Track + fill
                         div { class: "transport-scrub-track",
                             div {
                                 class: "transport-scrub-fill",
                                 style: format!("width:{}%", scrub_len),
                             }
                         }
-                        // Scrub head
                         div {
                             class: "transport-scrub-head",
                             style: format!("left:{}%", scrub_len),
@@ -281,27 +276,19 @@ pub fn App() -> Element {
                             "●SCRUB●"
                         }
                     }
-
-                    // Stop button
-                    button {
-                        class:    "transport-skip",
-                        id:       "btn-stop",
-                        disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                        onclick: move |_| {
-                            let ps = playback_state.clone();
-                            spawn_local(async move {
-                                invoke_playback("stop", None, ps).await;
-                            });
-                        },
-                        "■ STOP"
-                    }
                 }
 
-                // Duration display MM:SS
+                // Right: Critical Zone (25% width)
                 div {
-                    class: "transport-duration",
-                    id:    "transport-duration",
-                    { format!("/ {}", format_ms(duration_ms)) }
+                    class: "transport-right abort-zone",
+                    SoftKey {
+                        label: "ABORT".to_string(),
+                        variant: SoftKeyVariant::Danger,
+                        is_guarded: true,
+                        onclick: move |_| {
+                            web_sys::console::warn_1(&"Avionics ABORT trigger activated".into());
+                        }
+                    }
                 }
             }
         }

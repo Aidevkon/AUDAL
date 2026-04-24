@@ -9,6 +9,7 @@
 //!   FM5+: Golden Blob badge + EXPORT controls
 
 use dioxus::prelude::*;
+use crate::components::module_frame::ModuleFrame;
 use serde_json::json;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -35,25 +36,13 @@ pub fn SessionPanel(
     show_mastered: Signal<bool>,
 ) -> Element {
     rsx! {
-        div { class: "panel-screw-wrapper",
-
-            div {
-                class: "mfd-panel panel-session",
-
-                div {
-                    class: "panel-title",
-                    style: "color:var(--accent-session);
-                            border-bottom:2px solid var(--accent-session);
-                            padding:1rem 1.5rem 0.5rem;
-                            font-size:0.7rem; letter-spacing:0.2em;
-                            text-transform:uppercase; font-weight:600;
-                            flex-shrink:0;",
-                    "THE SESSION"
-                }
-
-                div {
-                    style: "flex:1; overflow-y:auto; padding:0;",
-                    match mode.read().clone() {
+        ModuleFrame {
+            title: "THE SESSION".to_string(),
+            panel_class: "panel-session".to_string(),
+            header_style: "color:var(--accent-session); border-bottom:2px solid var(--accent-session);".to_string(),
+            is_scrollable: true,
+            
+            { match mode.read().clone() {
                         CockpitMode::Idle => rsx! {
                             DropZone { mode }
                         },
@@ -78,17 +67,9 @@ pub fn SessionPanel(
                         },
                     }
                 }
-            }   // .mfd-panel
-
-            // Screws — siblings of panel, not clipped by overflow:hidden
-            div { class: "screw screw-tl" }
-            div { class: "screw screw-tr" }
-            div { class: "screw screw-bl" }
-            div { class: "screw screw-br" }
-
-        }   // .panel-screw-wrapper
+            }
+        }
     }
-}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 

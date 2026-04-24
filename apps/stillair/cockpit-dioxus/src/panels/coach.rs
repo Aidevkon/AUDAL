@@ -8,11 +8,20 @@
 //!   CorrelationRadar = static placeholder (A-003 §3, no canvas)
 
 use dioxus::prelude::*;
+use crate::components::module_frame::ModuleFrame;
 use wasm_bindgen_futures::spawn_local;
 use serde_json::json;
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{IssueJson, SessionStateJson};
+
+#[derive(PartialEq, Clone)]
+pub struct FindingData {
+    pub label: String,
+    pub desc: String,
+    pub pct: f32,
+    pub sev: String,
+}
 
 #[component]
 pub fn CoachPanel(
@@ -21,26 +30,33 @@ pub fn CoachPanel(
 ) -> Element {
     let state = session_state.read();
 
+    let demo_findings = vec![
+        FindingData {
+            label: "Dynamic Range Check".to_string(),
+            desc: "Consistency needed".to_string(),
+            pct: 40.0,
+            sev: "medium".to_string(),
+        },
+        FindingData {
+            label: "Loudness Target".to_string(),
+            desc: "Meeting -14 LUFS".to_string(),
+            pct: 60.0,
+            sev: "low".to_string(),
+        },
+        FindingData {
+            label: "Stereo Width".to_string(),
+            desc: "Review correlation in lows".to_string(),
+            pct: 30.0,
+            sev: "high".to_string(),
+        },
+    ];
+
     rsx! {
-        div { class: "panel-screw-wrapper",
-
-            div {
-                class: "mfd-panel panel-coach",
-
-                div {
-                    class: "panel-title",
-                    style: "color:var(--accent-coach);
-                            border-bottom:2px solid var(--accent-coach);
-                            padding:1rem 1.5rem 0.5rem;
-                            font-size:0.7rem; letter-spacing:0.2em;
-                            text-transform:uppercase; font-weight:600;
-                            flex-shrink:0;",
-                    "THE COACH"
-                }
-
-                div {
-                    style: "flex:1; overflow-y:auto;",
-                    match state.as_ref() {
+        ModuleFrame {
+            title: "SOCRATIC COACH".to_string(),
+            is_scrollable: true,
+            
+            { match state.as_ref() {
                         Some(s) => rsx! {
                             if let Some(ref n) = s.narrative {
                                 NarrativeSummary {
@@ -99,39 +115,15 @@ pub fn CoachPanel(
                                 style: "padding:0.5rem 0.75rem 0.2rem;
                                         color:var(--text-muted); font-size:0.6rem;
                                         letter-spacing:0.2em; text-transform:uppercase;",
-                                "FINDINGS  (3)"
+                                "FINDINGS  ({demo_findings.len()})"
                             }
-                            DemoFindingRow {
-                                label: "Dynamic Range Check",
-                                desc:  "Consistency needed",
-                                pct:   40.0_f32,
-                                sev:   "medium",
-                            }
-                            DemoFindingRow {
-                                label: "Loudness Target",
-                                desc:  "Meeting -14 LUFS",
-                                pct:   60.0_f32,
-                                sev:   "low",
-                            }
-                            DemoFindingRow {
-                                label: "Stereo Width",
-                                desc:  "Review correlation in lows",
-                                pct:   30.0_f32,
-                                sev:   "high",
+                            for f in demo_findings {
+                                DemoFindingRow { finding: f }
                             }
                             CoachActions {}
                         }
-                    }
-                }
-            }   // .mfd-panel
-
-            // Screws — siblings of panel, not clipped by overflow:hidden
-            div { class: "screw screw-tl" }
-            div { class: "screw screw-tr" }
-            div { class: "screw screw-bl" }
-            div { class: "screw screw-br" }
-
-        }   // .panel-screw-wrapper
+            } }
+        }
     }
 }
 
@@ -151,7 +143,7 @@ fn NarrativeSummary(summary: String, model_used: String) -> Element {
             div {
                 style: "color:var(--text-primary); font-size:0.82rem;
                         line-height:1.6; font-style:italic;",
-                ""{summary}""
+                "{summary}"
             }
             div {
                 style: "color:var(--text-muted); font-size:0.6rem;
@@ -166,13 +158,12 @@ fn NarrativeSummary(summary: String, model_used: String) -> Element {
 /// Static finding row for the FM0 demo state.
 /// Takes plain values — no IssueJson. Matches mockup's 3 demo cards.
 #[component]
-fn DemoFindingRow(
-    label: &'static str,
-    desc:  &'static str,
-    pct:   f32,
-    sev:   &'static str,
-) -> Element {
-    let pct_label = format!("{:.0}%", pct);
+fn DemoFindingRow(finding: FindingData) -> Element {
+    let pct_label = format!("{:.0}%", finding.pct);
+    let label = finding.label;
+    let sev = finding.sev;
+    let desc = finding.desc;
+    let pct = finding.pct;
     rsx! {
         div {
             class: "finding-row",
@@ -196,11 +187,11 @@ fn DemoFindingRow(
 #[component]
 fn ScoreBar(pass: bool, issues: usize) -> Element {
     let (label, color) = if pass {
-        ("ALL CLEAR", "var(--status-ok)")
+        ("ALL CLEAR", "var(--accent-cyan)")
     } else if issues <= 1 {
-        ("MINOR ISSUES", "var(--status-warn)")
+        ("MINOR ISSUES", "var(--accent-amber)")
     } else {
-        ("REVIEW NEEDED", "var(--status-err)")
+        ("REVIEW NEEDED", "var(--severity-high)")
     };
 
     rsx! {
