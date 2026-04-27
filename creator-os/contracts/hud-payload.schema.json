@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "creator-os/contracts/hud-payload.schema.json",
+  "title": "HudPayload",
+  "description": "The contract between the Rule Layer (JINI/coach-core) and the HUD Module (Cockpit Presentation Layer). This is the ONLY permitted data crossing from Rule Layer to HUD. No persona, no narrative, no JINI identity.",
+  "version": "1.0",
+  "status": "LOCKED",
+  "type": "object",
+  "required": ["schema_version", "session_id", "trigger", "severity", "findings", "context"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version — must match at runtime. Mismatch = hard error."
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Opaque session identifier from WorkspaceEngine. HUD does not interpret this — passes through for audit only.",
+      "minLength": 1
+    },
+    "trigger": {
+      "description": "What caused this HUD to appear.",
+      "$ref": "#/definitions/HudTrigger"
+    },
+    "severity": {
+      "description": "Aggregate severity — the highest severity across all findings. Drives the Stepped Pulse animation and dismiss rules.",
+      "type": "string",
+      "enum": ["info", "low", "medium", "high"]
+    },
+    "findings": {
+      "description": "The CoachFindings subset relevant to this HUD display. Read-only. HUD never modifies these.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/definitions/HudFinding" }
+    },
+    "context": {
+      "description": "Session context tags — read from PFR state, passed through Rule Layer. HUD displays these as context badges, not as business logic.",
+      "$ref": "#/definitions/HudContext"
+    },
+    "actions": {
+      "description": "Optional. Actionable items the user can take. If absent, HUD is display-only.",
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/definitions/HudAction" }
+    },
+    "lifecycle": {
+      "description": "Optional. Overrides default lifecycle rules for this specific payload.",
+      "$ref": "#/definitions/HudLifecycle"
+    }
+  },
+  "definitions": {
+    "HudTrigger": {
+      "type": "object",
+      "required": ["source", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["rule_engine", "user_request", "re_ingest"],
+          "description": "rule_engine: auto-triggered by severity >= high. user_request: manual trigger (Show Details). re_ingest: new ingest event replaced prior findings."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["auto", "manual"],
+          "description": "auto = rule_engine triggered. manual = user_request or re_ingest."
+        },
+        "finding_id": {
+          "type": "string",
+          "description": "Optional. If triggered by a specific finding (e.g. true_peak_exceeded), the finding ID that caused the trigger."
+        }
+      }
+    },
+    "HudFinding": {
+      "type": "object",
+      "required": ["id", "severity", "params", "tags"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Finding ID from Rule Engine. Maps 1:1 to CoachFindings issue IDs.",
+          "examples": ["true_peak_exceeded", "lufs_compliance", "dynamic_range_low", "stereo_correlation_weak", "dc_offset_detected", "lra_too_high"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "medium", "high"]
+        },
+        "params": {
+          "type": "object",
+          "description": "Numeric context for this finding. HUD displays these values — never interprets them.",
+          "properties": {
+            "current": { "type": "number" },
+            "target": { "type": "number" },
+            "delta": { "type": "number" },
+            "unit": { "type": "string" },
+            "timestamp_ms": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Platform/category tags from Rule Engine (e.g. 'platform:spotify', 'peak', 'critical')."
+        },
+        "guidance_key": {
+          "type": "string",
+          "description": "Optional. Lookup key into a static guidance strings table. HUD resolves this to a short deterministic string. NOT narrative. NOT persona.",
+          "examples": ["reduce_gain", "check_true_peak", "widen_stereo"]
+        }
+      }
+    },
+    "HudContext": {
+      "type": "object",
+      "required": ["input_mode"],
+      "additionalProperties": false,
+      "properties": {
+        "input_mode": {
+          "type": "string",
+          "enum": ["single", "ab", "stem"],
+          "description": "Read from PFR state. HUD displays as context badge only — 'A/B DETECTED' etc."
+        },
+        "preset_name": {
+          "type": "string",
+          "description": "Active preset from Thresholds. e.g. 'spotify', 'youtube', 'broadcast'."
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "description": "From ingest event. Display-only."
+        },
+        "bit_depth": {
+          "type": "integer",
+          "description": "From ingest event. Display-only."
+        }
+      }
+    },
+    "HudAction": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Action identifier. Cockpit dispatches this ID as an event — never interprets the action itself."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 24,
+          "description": "Short display label. e.g. 'Apply Fix', 'Dismiss', 'Show Details'."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["primary", "secondary", "dismiss"],
+          "description": "dismiss = always available. primary = highlighted action. secondary = supporting action."
+        },
+        "resolves_finding_id": {
+          "type": "string",
+          "description": "Optional. If this action resolves a specific finding, the finding ID. State change lives in Rule Layer — HUD only fires the event."
+        }
+      }
+    },
+    "HudLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_dismiss_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional. Auto-dismiss timeout in milliseconds. Only valid for severity info or low. For medium: optional, for high: MUST be absent (no auto-dismiss).",
+          "examples": [6000, 8000]
+        },
+        "persist_until_resolved": {
+          "type": "boolean",
+          "description": "If true, HUD stays visible until the finding is marked resolved by Rule Layer. Default true for high severity."
+        }
+      }
+    }
+  }
+}
