@@ -321,3 +321,8 @@ html, body {
 }
 .cr-v.lit { color: #009898; }
 
+.insights-body {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
