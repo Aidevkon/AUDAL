@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --mono: 'Share Tech Mono', monospace;
+    --cond: 'Barlow Condensed', sans-serif;
+    --bg:       #030508;
+    --s1:       #060a0f;
+    --s2:       #080e16;
+    --s3:       #0b131e;
+    --b1:       #0e1c28;
+    --b2:       #142435;
+    --b3:       #1a2e42;
+    --txt:      #4a7a96;
+    --txt2:     #2e5570;
+    --txt3:     #7aaac4;
+    --bright:   #b8d4e8;
+    --teal:     #009898;
+    --teal2:    #006868;
+    --hud:      #00ff88;
+    --hud2:     #00cc66;
+    --amber:    #e8a000;
+    --red:      #e83820;
+    --blue-a:   #00b0cc;
+    --pink-b:   #b83488;
+    --z-pfr:    100;
+    --z-hud:     60;
+    --z-intent:  40;
+    --z-work:    20;
+    --z-hangar:  10;
+}
+
+.main-chassis {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.cockpit-work-layer {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    min-height: 0;
+    position: relative;
+    z-index: var(--z-work);
+    filter: saturate(1) brightness(1);
+    transition: filter 300ms steps(3, end);
+}
+
+.cockpit-work-layer.intent-active {
+    filter: saturate(0.15) brightness(0.72);
+}
