@@ -65,6 +65,9 @@ async fn invoke_playback(
 
 // ── App root ──────────────────────────────────────────────────────────────────
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum DraggingKnob { None, Tone, Dynamics, Space, Loudness }
+
 pub fn App() -> Element {
     let mode           = use_signal(|| CockpitMode::Idle);
     let session_state  = use_signal(|| None::<SessionStateJson>);
@@ -72,7 +75,14 @@ pub fn App() -> Element {
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
     let mut show_mastered: Signal<bool> = use_signal(|| false);
 
-    // ── P12B-004: Position polling — 500ms when in FM5 ───────────────────────
+    let mut dragging = use_signal(|| DraggingKnob::None);
+    let mut start_y = use_signal(|| 0.0_f32);
+    let mut tone_angle = use_signal(|| 0.0_f32);
+    let mut dyn_angle = use_signal(|| 0.0_f32);
+    let mut space_angle = use_signal(|| 0.0_f32);
+    let mut loud_angle = use_signal(|| 0.0_f32);
+    let mut intent_open = use_signal(|| false); // Test toggling later or rely on shortcut/severity
+
     {
         let playback_state = playback_state.clone();
         let mode           = mode.clone();
@@ -92,8 +102,49 @@ pub fn App() -> Element {
         });
     }
 
+    // Temporary keyboard shortcut to test opening IntentBay
+    use_effect(move || {
+        let mut intent_open = intent_open.clone();
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        
+        let cb = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            if e.key() == "i" && !e.ctrl_key() && !e.alt_key() && !e.meta_key() {
+                let current = *intent_open.read();
+                intent_open.set(!current);
+            }
+        }) as Box<dyn FnMut(_)>);
+        
+        use wasm_bindgen::JsCast;
+        document.add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref()).unwrap();
+        cb.forget();
+    });
+
     rsx! {
-        div { class: "main-chassis",
+        div { 
+            class: "main-chassis",
+            onmousemove: move |e| {
+                let knob = *dragging.read();
+                if knob != DraggingKnob::None {
+                    let current_y = e.client_coordinates().y as f32;
+                    let delta = (*start_y.read() - current_y) * 1.2;
+                    let mut update = |mut angle: Signal<f32>| {
+                        let new_val = (*angle.read() + delta).clamp(-135.0, 135.0);
+                        angle.set(new_val);
+                    };
+                    match knob {
+                        DraggingKnob::Tone => update(tone_angle),
+                        DraggingKnob::Dynamics => update(dyn_angle),
+                        DraggingKnob::Space => update(space_angle),
+                        DraggingKnob::Loudness => update(loud_angle),
+                        DraggingKnob::None => {}
+                    }
+                    start_y.set(current_y);
+                }
+            },
+            onmouseup: move |_| { dragging.set(DraggingKnob::None); },
+            onmouseleave: move |_| { dragging.set(DraggingKnob::None); },
+
             PFRTransportBar { mode, playback_state }
             HUDOverlay {}
             if *show_mastered.read() {
@@ -103,32 +154,35 @@ pub fn App() -> Element {
                     on_close: move |_| { show_mastered.set(false); },
                 }
             }
-            div { class: "cockpit-work-layer",
+            div { 
+                class: if *intent_open.read() { "cockpit-work-layer intent-active" } else { "cockpit-work-layer" },
                 SiamesePanels { mode, session_state, playback_state, viz_data }
                 crate::components::active_processing_chain::ActiveProcessingChain {
                     eq: crate::components::active_processing_chain::types::EQState {
-                        low_db: 2.5,
-                        mid_db: -1.0,
-                        presence_db: 0.0,
-                        air_db: 1.5,
+                        low_db: 2.5, mid_db: -1.0, presence_db: 0.0, air_db: 1.5,
                         curve_points: vec![(0.0, 0.5), (0.1, 0.4), (0.5, 0.6), (0.8, 0.5), (1.0, 0.3)],
                     },
                     compressor: crate::components::active_processing_chain::types::CompressorState {
-                        threshold_db: -18.0,
-                        ratio: 4.0,
-                        gain_reduction_db: -3.2,
-                        makeup_db: 2.0,
+                        threshold_db: -18.0, ratio: 4.0, gain_reduction_db: -3.2, makeup_db: 2.0,
                         curve_points: vec![(0.0, 1.0), (0.5, 0.5), (1.0, 0.2)],
                     },
                     limiter: crate::components::active_processing_chain::types::LimiterState {
-                        ceiling_dbtp: -1.0,
-                        release_auto: true,
-                        isp_factor: 4,
+                        ceiling_dbtp: -1.0, release_auto: true, isp_factor: 4,
                         curve_points: vec![(0.0, 1.0), (0.5, 0.3), (1.0, 0.2)],
                     }
                 }
             }
-            IntentBay { open: false }
+            crate::components::intent_bay::IntentBay { 
+                open: *intent_open.read(),
+                tone_angle: *tone_angle.read(),
+                dyn_angle: *dyn_angle.read(),
+                space_angle: *space_angle.read(),
+                loud_angle: *loud_angle.read(),
+                on_down_tone: move |e: MouseEvent| { dragging.set(DraggingKnob::Tone); start_y.set(e.client_coordinates().y as f32); },
+                on_down_dyn: move |e: MouseEvent| { dragging.set(DraggingKnob::Dynamics); start_y.set(e.client_coordinates().y as f32); },
+                on_down_space: move |e: MouseEvent| { dragging.set(DraggingKnob::Space); start_y.set(e.client_coordinates().y as f32); },
+                on_down_loud: move |e: MouseEvent| { dragging.set(DraggingKnob::Loudness); start_y.set(e.client_coordinates().y as f32); },
+            }
             Hangar { mode, session_state }
         }
     }
@@ -267,17 +321,7 @@ pub fn SiamesePanels(props: SiamesePanelsProps) -> Element {
 
 
 
-#[derive(Props, Clone, PartialEq)]
-pub struct IntentBayProps {
-    pub open: bool,
-}
 
-#[component]
-pub fn IntentBay(props: IntentBayProps) -> Element {
-    rsx! {
-        div { class: "intent-bay" }
-    }
-}
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HangarProps {
