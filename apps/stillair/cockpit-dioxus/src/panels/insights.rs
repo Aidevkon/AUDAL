@@ -17,7 +17,7 @@
 //! A-003 §5: No PCM. No audio kernel imports.
 
 use dioxus::prelude::*;
-use crate::components::module_frame::ModuleFrame;
+
 use crate::components::screw::Screw;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
@@ -104,12 +104,7 @@ pub fn InsightsPanel(
     let demo_corr = 0.65_f32;
 
     rsx! {
-        ModuleFrame {
-            title: "THE INSIGHTS".to_string(),
-            panel_class: "panel-insights".to_string(),
-            header_style: "color:var(--accent-insights);".to_string(),
-            is_scrollable: false,
-
+        div { class: "insights-panel",
             div {
                 class: "insights-body",
 
