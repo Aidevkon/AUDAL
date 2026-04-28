@@ -68,8 +68,8 @@ html, body {
   min-height: 0 !important;
   height: calc(100vh - 115px - 200px) !important;
   max-height: calc(100vh - 115px - 200px) !important;
-  display: grid !important;
-  grid-template-columns: 1fr 260px !important;
+  display: flex !important;
+  flex-direction: row !important;
   overflow: hidden !important;
   z-index: 20;
   filter: saturate(1) brightness(1);
@@ -80,14 +80,6 @@ html, body {
   filter: saturate(0.15) brightness(0.72);
 }
 
-/* Siamese panels — left column fills full height */
-.cockpit-work-layer > .panel-screw-wrapper {
-  height: 100% !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
 
 .cockpit-work-layer .mfd-panel {
   flex: 1 !important;
@@ -325,4 +317,81 @@ html, body {
     height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
+}
+
+/* --- MONOBLOC CHASSIS --- */
+
+.monobloc-chassis .panel-body {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.chassis-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+.chassis-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid #0e1c28;
+}
+.chassis-col:last-child { border-right: none; }
+
+.psa-col   { flex: 35; }
+.sdi-col   { flex: 33; }
+.chain-col { flex: 32; }
+
+.chassis-col-header {
+    flex-shrink: 0;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    color: #2e5570;
+    text-transform: uppercase;
+    border-bottom: 1px solid #0e1c28;
+    background: #060a0f;
+}
+
+.chassis-col-content {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.chassis-footer {
+    flex-shrink: 0;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-top: 1px solid #0e1c28;
+    background: #060a0f;
+}
+
+.chassis-footer-left {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px;
+    color: #2e5570;
+    letter-spacing: .08em;
+}
+
+.chassis-footer-right {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: #7aaac4;
+    letter-spacing: .08em;
 }
