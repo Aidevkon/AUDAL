@@ -360,7 +360,8 @@ body {
 .siamese-col .mfd-panel {
   border: none !important;
   margin: 0 !important;
-  padding: 24px 20px 20px 20px !important; /* keep some padding for content, but no outer physical borders */
+  padding: 24px 20px 20px 20px !important;
+  /* keep some padding for content, but no outer physical borders */
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -380,6 +381,7 @@ body {
   flex: 1;
   width: 100%;
 }
+
 .hangar-layer .mfd-panel {
   width: 100%;
 }
@@ -490,6 +492,7 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
+
 /* --- STEP 1: SIAMESE FUSION ARCHITECTURE --- */
 
 .app-shell {
@@ -500,16 +503,18 @@ body {
 }
 
 .transport-bar {
-  flex: 0 0 10% !important; /* PFR Header 10% */
+  flex: 0 0 10% !important;
+  /* PFR Header 10% */
   /* overriding bottom placement since it is now top */
-  position: relative; 
+  position: relative;
   top: 0;
   bottom: auto;
   min-height: 0;
 }
 
 .work-layer {
-  flex: 0 0 65%; /* Middle 65% */
+  flex: 0 0 65%;
+  /* Middle 65% */
   display: flex;
   flex-direction: row;
   min-height: 0;
@@ -518,7 +523,8 @@ body {
 }
 
 .hangar-layer {
-  flex: 0 0 25%; /* Hangar Bottom 25% */
+  flex: 0 0 25%;
+  /* Hangar Bottom 25% */
   width: 100%;
   display: flex;
   min-height: 0;
@@ -534,19 +540,19 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  
+
   /* Match the Coach's exact metallic background / surface */
   background:
-        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
-        repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
-        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+    url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+    repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+    linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
 
   /* Add subtle shadow to match the overall chassis feel */
   box-shadow:
-        inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
-        inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
-        8px 8px 25px rgba(0, 0, 0, 0.6);
-  
+    inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
+    inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
+    8px 8px 25px rgba(0, 0, 0, 0.6);
+
   border-radius: 16px;
 }
 
@@ -574,21 +580,25 @@ body {
 }
 
 .siamese-insights {
-  width: 25%; /* Left 25% */
+  width: 25%;
+  /* Left 25% */
 }
 
 /* The vertical column separator */
 .siamese-join {
-  width: 20px; /* Thicker bridge column */
+  width: 20px;
+  /* Thicker bridge column */
   height: 100%;
 }
 
 .siamese-session {
-  width: 50%; /* Center 50% */
+  width: 50%;
+  /* Center 50% */
 }
 
 .siamese-reserved {
-  width: calc(25% - 2px); /* Right Empty Space */
+  width: calc(25% - 2px);
+  /* Right Empty Space */
 }
 
 /* Hangar coach width fix */
@@ -596,6 +606,7 @@ body {
   flex: 1;
   width: 100%;
 }
+
 .hangar-layer .mfd-panel {
   width: 100%;
 }
@@ -603,4 +614,49 @@ body {
 /* Remove the blue neon glow lines under all panel titles */
 .panel-title::after {
   display: none !important;
+}
+
+.panel-title {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title-right {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: #a4b5c4;
+  background: #04080b;
+  padding: 2px 6px;
+  border-radius: 3px;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.8);
+  border: 1px solid #141c26;
+  letter-spacing: 0;
+  text-shadow: none;
+}
+
+/* Active Processing Chain (Mastering Rack) layout */
+.active-processing-chain {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.chain-oled-container {
+  width: 100%;
+  height: 100%;
+  padding: 8px 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chain-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 120px;
 }

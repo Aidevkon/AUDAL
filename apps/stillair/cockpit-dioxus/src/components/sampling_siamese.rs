@@ -42,8 +42,23 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
                 }
             }
             
-            // MASTERING CHAIN - RIGHT (25% Empty space reserved for later)
-            div { class: "siamese-col siamese-reserved" }
+            // MASTERING CHAIN - RIGHT (25%)
+            div { class: "siamese-col siamese-reserved",
+                crate::components::active_processing_chain::ActiveProcessingChain {
+                    eq: crate::components::active_processing_chain::types::EQState {
+                        low_db: 2.5, mid_db: -1.0, presence_db: 0.0, air_db: 1.5,
+                        curve_points: vec![(0.0, 0.5), (0.1, 0.4), (0.5, 0.6), (0.8, 0.5), (1.0, 0.3)],
+                    },
+                    compressor: crate::components::active_processing_chain::types::CompressorState {
+                        threshold_db: -18.0, ratio: 4.0, gain_reduction_db: -3.2, makeup_db: 2.0,
+                        curve_points: vec![(0.0, 1.0), (0.5, 0.5), (1.0, 0.2)],
+                    },
+                    limiter: crate::components::active_processing_chain::types::LimiterState {
+                        ceiling_dbtp: -1.0, release_auto: true, isp_factor: 4,
+                        curve_points: vec![(0.0, 1.0), (0.5, 0.3), (1.0, 0.2)],
+                    }
+                }
+            }
         }
     }
 }

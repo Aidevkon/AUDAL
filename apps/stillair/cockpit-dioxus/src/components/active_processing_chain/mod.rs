@@ -21,10 +21,6 @@ pub struct ActiveProcessingChainProps {
 pub fn ActiveProcessingChain(props: ActiveProcessingChainProps) -> Element {
     rsx! {
         div { class: "active-processing-chain",
-            div { class: "chain-header",
-                span { class: "chain-header-title", "Mastering Chain" }
-                span { class: "chain-ro-badge", "READ-ONLY" }
-            }
             EQModule { state: props.eq.clone() }
             CompressorModule { state: props.compressor.clone() }
             LimiterModule { state: props.limiter.clone() }

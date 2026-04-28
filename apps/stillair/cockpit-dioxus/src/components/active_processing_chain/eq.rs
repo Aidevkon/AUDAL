@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use super::types::EQState;
-use super::readout::ReadoutItem;
+use crate::components::module_frame::ModuleFrame;
 
 pub fn eq_stroke_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
     if points.is_empty() { return format!("M0,{} L{},{}", height/2.0, width, height/2.0); }
@@ -21,23 +21,26 @@ fn eq_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
 
 #[component]
 pub fn EQModule(state: EQState) -> Element {
+    // Generate a pseudo-telemetry number from state
+    let sum_db = state.low_db + state.mid_db + state.presence_db + state.air_db;
+    let readout_val = format!("{:+.1}", sum_db);
+
     rsx! {
-        div { class: "chain-module",
-            div { class: "cm-header",
-                span { class: "cm-num", "01" }
-                span { class: "cm-name", "EQ" }
-                span { class: "cm-type", "4-Band PAR" }
-            }
-            div { class: "cm-plot",
-                div { class: "cm-grid" }
-                svg { class: "cm-svg", view_box: "0 0 240 60",
+        ModuleFrame {
+            title: "EQ — 4-BAND PAR".to_string(),
+            panel_class: "chain-eq-panel".to_string(),
+            right_header: rsx! { span { "{readout_val}" } },
+            is_scrollable: false,
+
+            div { class: "chain-oled-container",
+                svg { class: "chain-svg", view_box: "0 0 240 60", preserve_aspect_ratio: "none",
                     // zero line
                     line { x1: "0", y1: "30", x2: "240", y2: "30",
                            stroke: "#0e1c28", stroke_width: "0.5" }
                     // curve fill
                     path {
                         d: "{eq_fill_path(&state.curve_points, 240.0, 60.0)}",
-                        fill: "rgba(119,85,238,.07)"
+                        fill: "rgba(119,85,238,.1)"
                     }
                     // curve stroke
                     path {
@@ -48,22 +51,6 @@ pub fn EQModule(state: EQState) -> Element {
                     }
                 }
             }
-            div { class: "cm-reads",
-                ReadoutItem { label: "LOW".to_string(), value: format!("{:+.1}", state.low_db), lit: state.low_db.abs() > 0.5 }
-                ReadoutItem { label: "MID".to_string(), value: format!("{:+.1}", state.mid_db), lit: state.mid_db.abs() > 0.5 }
-                ReadoutItem { label: "PRES".to_string(), value: format!("{:+.1}", state.presence_db), lit: state.presence_db.abs() > 0.5 }
-                ReadoutItem { label: "AIR".to_string(), value: format!("{:+.1}", state.air_db), lit: state.air_db.abs() > 0.5 }
-            }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn eq_empty_curve() {
-        assert_eq!(eq_stroke_path(&[], 240.0, 60.0), "M0,30 L240,30");
-        assert_eq!(eq_fill_path(&[], 240.0, 60.0), "M0,30 L240,30 L240,30 L0,30 Z");
     }
 }

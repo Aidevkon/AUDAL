@@ -18,6 +18,10 @@ pub struct ModuleFrameProps {
     #[props(default = false)]
     pub is_scrollable: bool,
 
+    /// Optional element to project to the right of the title (e.g. readouts)
+    #[props(default = None)]
+    pub right_header: Option<Element>,
+
     /// The inner panel content
     pub children: Element,
 }
@@ -38,7 +42,10 @@ pub fn ModuleFrame(props: ModuleFrameProps) -> Element {
                 div {
                     class: "panel-title",
                     style: "{props.header_style}",
-                    "{props.title}"
+                    div { class: "panel-title-left", "{props.title}" }
+                    if let Some(right) = props.right_header {
+                        div { class: "panel-title-right", {right} }
+                    }
                 }
 
                 // ── The internal content area ──
