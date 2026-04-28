@@ -5,3 +5,4 @@ pub mod annunciator;
 pub mod active_processing_chain;
 pub mod intent_bay;
 pub mod primary_signal_analyzer;
+pub mod sampling_siamese;

@@ -912,10 +912,9 @@ body {
 
 .transport-vfd-display {
     background-color: #030304;
-    box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.9), inset -1px -1px 2px rgba(0, 0, 0, 0.5);
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9), inset -1px -1px 2px rgba(0,0,0,0.5);
     border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    /* mechanical bezel highlight */
+    border-top: 1px solid rgba(255, 255, 255, 0.08); /* mechanical bezel highlight */
     border-radius: 3px;
     padding: 4px 16px;
     display: flex;
@@ -1659,9 +1658,8 @@ body {
     letter-spacing: 0.05em;
     text-transform: uppercase;
     opacity: 0.88;
-    filter: blur(0.2px);
-    /* Silk-screen typography */
-    text-shadow: 0.5px 0.5px 0px rgba(255, 255, 255, 0.05);
+    filter: blur(0.2px); /* Silk-screen typography */
+    text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.05);
 }
 
 .dsp-led {
@@ -1669,8 +1667,8 @@ body {
     height: 14px;
     border-radius: 50%;
     background-color: #0b0c0e;
-    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.8), inset -1px -1px 2px rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(0, 0, 0, 0.8);
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8), inset -1px -1px 2px rgba(255,255,255,0.05);
+    border: 1px solid rgba(0,0,0,0.8);
     position: relative;
     /* Recessed look */
 }
@@ -1689,8 +1687,7 @@ body {
 }
 
 .dsp-led.active::after {
-    background: #00e5ff;
-    /* bright cyan */
+    background: #00e5ff; /* bright cyan */
     box-shadow: 0 0 6px #00e5ff, 0 0 12px rgba(0, 229, 255, 0.4);
 }
 
@@ -1698,7 +1695,6 @@ body {
     width: 26px;
     height: 26px;
 }
-
 .dsp-slot.fm0-slot .dsp-led::after {
     box-shadow: 0 0 10px #00e5ff, 0 0 20px rgba(0, 229, 255, 0.5);
 }
@@ -1719,10 +1715,9 @@ body {
     padding: 8px 14px;
     background-color: #080809;
     border-radius: 4px;
-    box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.9), inset -1px -1px 2px rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.8);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    /* Bezel cut */
+    box-shadow: inset 2px 2px 6px rgba(0,0,0,0.9), inset -1px -1px 2px rgba(255,255,255,0.03);
+    border: 1px solid rgba(0,0,0,0.8);
+    border-top: 1px solid rgba(255,255,255,0.05); /* Bezel cut */
 }
 
 .guard-rail {
@@ -1730,8 +1725,8 @@ body {
     height: 40px;
     background: linear-gradient(90deg, #b3b3b3, #e6e6e6, #808080);
     border-radius: 2px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.6), -1px -1px 2px rgba(255, 255, 255, 0.3) inset;
-    border: 1px solid rgba(0, 0, 0, 0.4);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.6), -1px -1px 2px rgba(255,255,255,0.3) inset;
+    border: 1px solid rgba(0,0,0,0.4);
 }
 
 .btn-abort {
@@ -1745,16 +1740,16 @@ body {
     border: 1px solid #570000;
     border-bottom: 4px solid #3d0000;
     border-radius: 4px;
-    box-shadow: inset 0 1px 0 rgba(255, 100, 100, 0.3), 0 3px 6px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255,100,100,0.3), 0 3px 6px rgba(0,0,0,0.4);
     cursor: pointer;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7);
     transition: all 0.1s ease;
 }
 
 .btn-abort:active {
     transform: translateY(3px);
     border-bottom-width: 1px;
-    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.6);
 }
 
 /* =========================================================================
@@ -1762,35 +1757,12 @@ body {
    ========================================================================= */
 
 @keyframes flicker-on {
-    0% {
-        opacity: 0;
-        box-shadow: none;
-    }
-
-    20% {
-        opacity: 1;
-        box-shadow: 0 0 10px #00e5ff;
-    }
-
-    40% {
-        opacity: 0.2;
-        box-shadow: 0 0 2px #00e5ff;
-    }
-
-    60% {
-        opacity: 1;
-        box-shadow: 0 0 12px #00e5ff;
-    }
-
-    80% {
-        opacity: 0.4;
-        box-shadow: 0 0 4px #00e5ff;
-    }
-
-    100% {
-        opacity: 1;
-        box-shadow: 0 0 12px #00e5ff;
-    }
+    0% { opacity: 0; box-shadow: none; }
+    20% { opacity: 1; box-shadow: 0 0 10px #00e5ff; }
+    40% { opacity: 0.2; box-shadow: 0 0 2px #00e5ff; }
+    60% { opacity: 1; box-shadow: 0 0 12px #00e5ff; }
+    80% { opacity: 0.4; box-shadow: 0 0 4px #00e5ff; }
+    100% { opacity: 1; box-shadow: 0 0 12px #00e5ff; }
 }
 
 .dsp-led.flicker-active::after {
@@ -1830,8 +1802,7 @@ body {
 
 .btn-active {
     background: var(--btn-neutral-bg);
-    color: #ffb703;
-    /* Amber text */
+    color: #ffb703; /* Amber text */
     border: 1px solid rgba(255, 183, 3, 0.4);
     box-shadow: 0 0 10px rgba(255, 183, 3, 0.2);
 }
@@ -1844,5 +1815,5 @@ body {
     color: #0b0c0e;
     background: #ffb703;
     border-color: #ffb703;
-    box-shadow: 0 0 22px rgba(255, 183, 3, 0.8), inset 0 2px 4px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 0 22px rgba(255, 183, 3, 0.8), inset 0 2px 4px rgba(0,0,0,0.6);
 }

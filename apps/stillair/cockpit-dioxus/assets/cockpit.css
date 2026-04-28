@@ -1,35 +1,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --mono:     'Share Tech Mono', monospace;
-  --cond:     'Barlow Condensed', sans-serif;
-  --bg:       #030508;
-  --s1:       #060a0f;
-  --s2:       #080e16;
-  --s3:       #0b131e;
-  --b1:       #0e1c28;
-  --b2:       #142435;
-  --b3:       #1a2e42;
-  --txt:      #4a7a96;
-  --txt2:     #2e5570;
-  --txt3:     #7aaac4;
-  --bright:   #b8d4e8;
-  --teal:     #009898;
-  --teal2:    #006868;
-  --hud:      #00ff88;
-  --hud2:     #00cc66;
-  --amber:    #e8a000;
-  --red:      #e83820;
-  --blue-a:   #00b0cc;
-  --pink-b:   #b83488;
-  --z-pfr:    100;
-  --z-hud:     60;
-  --z-intent:  40;
-  --z-work:    20;
-  --z-hangar:  10;
+  --mono: 'Share Tech Mono', monospace;
+  --cond: 'Barlow Condensed', sans-serif;
+  --bg: #030508;
+  --s1: #060a0f;
+  --s2: #080e16;
+  --s3: #0b131e;
+  --b1: #0e1c28;
+  --b2: #142435;
+  --b3: #1a2e42;
+  --txt: #4a7a96;
+  --txt2: #2e5570;
+  --txt3: #7aaac4;
+  --bright: #b8d4e8;
+  --teal: #009898;
+  --teal2: #006868;
+  --hud: #00ff88;
+  --hud2: #00cc66;
+  --amber: #e8a000;
+  --red: #e83820;
+  --blue-a: #00b0cc;
+  --pink-b: #b83488;
+  --z-pfr: 100;
+  --z-hud: 60;
+  --z-intent: 40;
+  --z-work: 20;
+  --z-hangar: 10;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   overflow: hidden;
 }
@@ -57,7 +58,8 @@ html, body {
 .hud-overlay {
   position: absolute;
   top: 115px;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   z-index: 60;
   pointer-events: none;
 }
@@ -107,10 +109,8 @@ html, body {
   position: relative;
   z-index: 40;
   background: #080c10;
-  background-image: repeating-linear-gradient(
-    0deg, transparent, transparent 3px,
-    rgba(255,255,255,0.018) 3px, rgba(255,255,255,0.018) 4px
-  );
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 3px,
+      rgba(255, 255, 255, 0.018) 3px, rgba(255, 255, 255, 0.018) 4px);
   border-top: 1px solid transparent;
   margin-bottom: -7px;
   transition:
@@ -132,7 +132,8 @@ html, body {
   display: flex;
   justify-content: center;
   position: absolute;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
 }
 
 .intent-knobs-wrapper {
@@ -179,7 +180,8 @@ html, body {
 }
 
 .intent-knob {
-  width: 46px; height: 46px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   border: 2px solid #142435;
   background: radial-gradient(circle at 38% 32%, #0b131e, #060a0f);
@@ -189,13 +191,15 @@ html, body {
 
 .intent-knob.highlighted {
   border-color: #009898;
-  box-shadow: 0 0 12px rgba(0,152,152,.3);
+  box-shadow: 0 0 12px rgba(0, 152, 152, .3);
 }
 
 .intent-knob-indicator {
   position: absolute;
-  top: 5px; left: 50%;
-  width: 2px; height: 10px;
+  top: 5px;
+  left: 50%;
+  width: 2px;
+  height: 10px;
   margin-left: -1px;
   background: #2e5570;
   transform-origin: 50% calc(100% + 13px);
@@ -206,7 +210,7 @@ html, body {
 }
 
 /* Hangar — fixed height strip at bottom */
-.main-chassis > .panel-screw-wrapper {
+.main-chassis>.panel-screw-wrapper {
   flex-shrink: 0 !important;
   height: 200px !important;
   max-height: 200px !important;
@@ -227,14 +231,16 @@ html, body {
 
 .chain-header-title {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 10px; font-weight: 600;
+  font-size: 10px;
+  font-weight: 600;
   letter-spacing: .14em;
   color: #2e5570;
   text-transform: uppercase;
 }
 
 .chain-ro-badge {
-  font-size: 6px; color: #2e5570;
+  font-size: 6px;
+  color: #2e5570;
   letter-spacing: .1em;
   border: 1px solid #0e1c28;
   padding: 1px 5px;
@@ -249,30 +255,44 @@ html, body {
   gap: 4px;
   min-height: 0;
 }
-.chain-module:last-child { border-bottom: none; }
+
+.chain-module:last-child {
+  border-bottom: none;
+}
 
 .cm-header {
-  display: flex; align-items: baseline;
-  gap: 6px; flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
 }
+
 .cm-num {
-  font-size: 7px; color: #009898;
+  font-size: 7px;
+  color: #009898;
   letter-spacing: .1em;
   font-family: 'Share Tech Mono', monospace;
 }
+
 .cm-name {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size: 12px; font-weight: 700;
-  letter-spacing: .1em; color: #b8d4e8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #b8d4e8;
   text-transform: uppercase;
 }
+
 .cm-type {
-  font-size: 7px; color: #2e5570;
-  letter-spacing: .08em; margin-left: auto;
+  font-size: 7px;
+  color: #2e5570;
+  letter-spacing: .08em;
+  margin-left: auto;
 }
 
 .cm-plot {
-  flex: 1; min-height: 0;
+  flex: 1;
+  min-height: 0;
   position: relative;
   background: #03060a;
   border: 1px solid #0e1c28;
@@ -280,137 +300,307 @@ html, body {
 }
 
 .cm-grid {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background:
     repeating-linear-gradient(90deg,
       transparent, transparent 19px,
-      rgba(14,28,40,.7) 19px, rgba(14,28,40,.7) 20px),
+      rgba(14, 28, 40, .7) 19px, rgba(14, 28, 40, .7) 20px),
     repeating-linear-gradient(0deg,
       transparent, transparent 11px,
-      rgba(14,28,40,.7) 11px, rgba(14,28,40,.7) 12px);
+      rgba(14, 28, 40, .7) 11px, rgba(14, 28, 40, .7) 12px);
 }
 
 .cm-svg {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
 .cm-reads {
-  display: flex; gap: 8px;
-  flex-wrap: wrap; flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
-.cr { display: flex; flex-direction: column; gap: 1px; }
+
+.cr {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .cr-l {
-  font-size: 6px; color: #2e5570;
+  font-size: 6px;
+  color: #2e5570;
   letter-spacing: .08em;
   font-family: 'Share Tech Mono', monospace;
 }
+
 .cr-v {
-  font-size: 9px; color: #7aaac4;
+  font-size: 9px;
+  color: #7aaac4;
   letter-spacing: .04em;
   font-family: 'Share Tech Mono', monospace;
 }
-.cr-v.lit { color: #009898; }
+
+.cr-v.lit {
+  color: #009898;
+}
 
 .insights-body {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Override inner panels zero-gap policy */
+.siamese-col .mfd-panel {
+  border: none !important;
+  margin: 0 !important;
+  padding: 24px 20px 20px 20px !important; /* keep some padding for content, but no outer physical borders */
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.siamese-col .panel-screw-wrapper {
+  flex: 1;
+}
+
+/* Hide the screws inherited from ModuleFrame */
+.siamese-col .screw {
+  display: none !important;
+}
+
+/* Hangar coach width fix */
+.hangar-layer .panel-screw-wrapper {
+  flex: 1;
+  width: 100%;
+}
+.hangar-layer .mfd-panel {
+  width: 100%;
 }
 
 /* --- MONOBLOC CHASSIS --- */
 
 .monobloc-chassis {
-    flex: 1 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 0 !important;
-    overflow: hidden !important;
+  flex: 1 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
 .chassis-body {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: row;
-    overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
 }
 
 .chassis-col {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    border-right: 1px solid #0e1c28;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid #0e1c28;
 }
-.chassis-col:last-child { border-right: none; }
 
-.psa-col   { flex: 35; }
-.sdi-col   { flex: 33; }
-.chain-col { flex: 32; }
+.chassis-col:last-child {
+  border-right: none;
+}
+
+.psa-col {
+  flex: 35;
+}
+
+.sdi-col {
+  flex: 33;
+}
+
+.chain-col {
+  flex: 32;
+}
 
 .chassis-col-header {
-    flex-shrink: 0;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .16em;
-    color: #2e5570;
-    text-transform: uppercase;
-    border-bottom: 1px solid #0e1c28;
-    background: #060a0f;
+  flex-shrink: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  color: #2e5570;
+  text-transform: uppercase;
+  border-bottom: 1px solid #0e1c28;
+  background: #060a0f;
 }
 
 .chassis-col-content {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chassis-footer {
-    flex-shrink: 0;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 12px;
-    border-top: 1px solid #0e1c28;
-    background: #060a0f;
+  flex-shrink: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-top: 1px solid #0e1c28;
+  background: #060a0f;
 }
 
 .chassis-footer-left {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 7px;
-    color: #2e5570;
-    letter-spacing: .08em;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7px;
+  color: #2e5570;
+  letter-spacing: .08em;
 }
 
 .chassis-footer-right {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 9px;
-    color: #7aaac4;
-    letter-spacing: .08em;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: #7aaac4;
+  letter-spacing: .08em;
 }
 
 .insights-panel {
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .psa-panel {
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* --- STEP 1: SIAMESE FUSION ARCHITECTURE --- */
+
+.app-shell {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.transport-bar {
+  flex: 0 0 10% !important; /* PFR Header 10% */
+  /* overriding bottom placement since it is now top */
+  position: relative; 
+  top: 0;
+  bottom: auto;
+  min-height: 0;
+}
+
+.work-layer {
+  flex: 0 0 65%; /* Middle 65% */
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.hangar-layer {
+  flex: 0 0 25%; /* Hangar Bottom 25% */
+  width: 100%;
+  display: flex;
+  min-height: 0;
+  background: transparent;
+}
+
+/* --- THE SIAMESE CHASSIS --- */
+
+.sampling-siamese {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  
+  /* Match the Coach's exact metallic background / surface */
+  background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+        repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+
+  /* Add subtle shadow to match the overall chassis feel */
+  box-shadow:
+        inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
+        inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
+        8px 8px 25px rgba(0, 0, 0, 0.6);
+  
+  border-radius: 16px;
+}
+
+.siamese-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Override inner panels zero-gap policy */
+.siamese-col .mfd-panel {
+  /* Keep continuous metal background from chassis */
+  background: transparent !important;
+  /* Allow the box shadow and border radius to draw the bezels */
+  margin: 10px !important;
+}
+
+.siamese-col .panel-screw-wrapper {
+  flex: 1;
+}
+
+/* Hide the screws inherited from ModuleFrame since they are carved into the same solid piece */
+.siamese-col .screw {
+  display: none !important;
+}
+
+.siamese-insights {
+  width: 25%; /* Left 25% */
+}
+
+/* The vertical column separator */
+.siamese-join {
+  width: 20px; /* Thicker bridge column */
+  height: 100%;
+}
+
+.siamese-session {
+  width: 50%; /* Center 50% */
+}
+
+.siamese-reserved {
+  width: calc(25% - 2px); /* Right Empty Space */
+}
+
+/* Hangar coach width fix */
+.hangar-layer .panel-screw-wrapper {
+  flex: 1;
+  width: 100%;
+}
+.hangar-layer .mfd-panel {
+  width: 100%;
+}
+
+/* Remove the blue neon glow lines under all panel titles */
+.panel-title::after {
+  display: none !important;
 }
