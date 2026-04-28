@@ -1,0 +1,432 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --mono: 'Share Tech Mono', monospace;
+    --cond: 'Barlow Condensed', sans-serif;
+    --bg:       #030508;
+    --s1:       #060a0f;
+    --s2:       #080e16;
+    --s3:       #0b131e;
+    --b1:       #0e1c28;
+    --b2:       #142435;
+    --b3:       #1a2e42;
+    --txt:      #4a7a96;
+    --txt2:     #2e5570;
+    --txt3:     #7aaac4;
+    --bright:   #b8d4e8;
+    --teal:     #009898;
+    --teal2:    #006868;
+    --hud:      #00ff88;
+    --hud2:     #00cc66;
+    --amber:    #e8a000;
+    --red:      #e83820;
+    --blue-a:   #00b0cc;
+    --pink-b:   #b83488;
+    --z-pfr:    100;
+    --z-hud:     60;
+    --z-intent:  40;
+    --z-work:    20;
+    --z-hangar:  10;
+}
+
+.main-chassis {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.cockpit-work-layer {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    min-height: 0;
+    position: relative;
+    z-index: var(--z-work);
+    filter: saturate(1) brightness(1);
+    transition: filter 300ms steps(3, end);
+}
+
+.cockpit-work-layer.intent-active {
+    filter: saturate(0.15) brightness(0.72);
+}
+
+.active-processing-chain {
+    display: flex;
+    flex-direction: column;
+    background: #060a0f;
+    border-left: 1px solid #0e1c28;
+    min-height: 0;
+}
+
+.chain-header {
+    padding: 5px 10px 4px;
+    border-bottom: 1px solid #0e1c28;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.chain-header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    color: #2e5570;
+    text-transform: uppercase;
+}
+
+.chain-ro-badge {
+    font-size: 6px;
+    color: #2e5570;
+    letter-spacing: .1em;
+    border: 1px solid #0e1c28;
+    padding: 1px 5px;
+}
+
+.chain-module {
+    flex: 1;
+    padding: 7px 10px 5px;
+    border-bottom: 1px solid #0e1c28;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+}
+.chain-module:last-child { border-bottom: none; }
+
+.cm-header {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.cm-num {
+    font-size: 7px;
+    color: #009898;
+    letter-spacing: .1em;
+    font-family: 'Share Tech Mono', monospace;
+}
+.cm-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    color: #b8d4e8;
+    text-transform: uppercase;
+}
+.cm-type {
+    font-size: 7px;
+    color: #2e5570;
+    letter-spacing: .08em;
+    margin-left: auto;
+}
+
+/* Plot area */
+.cm-plot {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    background: #03060a;
+    border: 1px solid #0e1c28;
+    overflow: hidden;
+}
+.cm-grid {
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-linear-gradient(90deg,
+            transparent, transparent 19px,
+            rgba(14,28,40,.7) 19px, rgba(14,28,40,.7) 20px),
+        repeating-linear-gradient(0deg,
+            transparent, transparent 11px,
+            rgba(14,28,40,.7) 11px, rgba(14,28,40,.7) 12px);
+}
+.cm-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+/* Readouts */
+.cm-reads {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.cr { display: flex; flex-direction: column; gap: 1px; }
+.cr-l { font-size: 6px; color: #2e5570; letter-spacing: .08em; font-family: 'Share Tech Mono', monospace; }
+.cr-v { font-size: 9px; color: #7aaac4; letter-spacing: .04em; font-family: 'Share Tech Mono', monospace; }
+.cr-v.lit { color: #009898; }
+
+.intent-bay {
+  height: 0;
+  overflow: hidden;
+  position: relative; /* ensure it handles margin overlap correctly */
+  margin-bottom: -7px;
+  z-index: var(--z-intent);
+  background: #080c10;
+  border-top: 1px solid #1a2e42;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.018) 3px,
+    rgba(255,255,255,0.018) 4px
+  );
+  filter: none;
+  transition:
+    height 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-top-color 200ms linear;
+}
+
+.intent-bay.open {
+  height: 100px; /* exact height — no layout shift */
+}
+
+.intent-bay.closing {
+  transition-duration: 260ms;
+}
+
+.intent-bay-top {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.intent-knobs-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.intent-knobs {
+  display: flex;
+  gap: 30px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 240ms linear 100ms,       /* 100ms delay — drawer must travel first */
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1) 100ms;
+}
+
+.intent-bay.open .intent-knobs {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.intent-knob-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.intent-knob-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  color: #7aaac4;
+  letter-spacing: .08em;
+}
+
+.intent-knob-range {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  color: #4a7a96;
+}
+
+.intent-knob {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #142435;
+  background: radial-gradient(circle at 38% 32%, #0b131e, #060a0f);
+  position: relative;
+  cursor: ns-resize;
+}
+
+.intent-knob.highlighted {
+  border-color: #009898;
+  box-shadow: 0 0 12px rgba(0,152,152,.3);
+}
+
+.intent-knob-indicator {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: #2e5570;
+  transform-origin: 50% calc(100% + 13px);
+}
+
+.intent-knob-indicator.highlighted {
+  background: #009898;
+}
+
+/* ── Layout overrides — canonical v1.0 ── */
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+.app-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+.main-chassis {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.cockpit-work-layer {
+    display: grid !important;
+    grid-template-columns: 1fr 260px !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.siamese-panels {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.mfd-bay {
+    display: contents !important;
+}
+
+.mfd-panel {
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* ── Canonical v1.0 height constraints ── */
+.main-chassis {
+    display: flex;
+    flex-direction: column;
+}
+
+.cockpit-work-layer {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Hangar — fixed height, never grows */
+.main-chassis > .panel-screw-wrapper,
+.main-chassis > .panel-screw-wrapper > .mfd-panel {
+    flex-shrink: 0 !important;
+    height: 160px !important;
+    max-height: 160px !important;
+    overflow: hidden !important;
+}
+
+/* SiamesePanels inside work layer — fill height */
+.cockpit-work-layer > .panel-screw-wrapper,
+.cockpit-work-layer > .panel-screw-wrapper > .mfd-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* ── Hangar height fix ── */
+.main-chassis > .panel-screw-wrapper {
+    flex-shrink: 0 !important;
+    height: 52px !important;
+    max-height: 52px !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+}
+
+/* ── Siamese — fill cockpit-work-layer ── */
+.cockpit-work-layer .mfd-panel.panel-insights {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* ── Hangar — fixed strip, no panel-insights class ── */
+.main-chassis > .panel-screw-wrapper > .mfd-panel:not(.panel-insights) {
+    flex-shrink: 0 !important;
+    height: 180px !important;
+    max-height: 180px !important;
+    overflow: hidden !important;
+}
+
+/* ── Main chassis flex column — final fix ── */
+.main-chassis {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+.transport-bar {
+    flex-shrink: 0 !important;
+    height: 115px !important;
+}
+
+.cockpit-work-layer {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    height: 0 !important; /* force flex to control height, not content */
+}
+
+/* Hangar fixed height */
+.main-chassis > .panel-screw-wrapper > .mfd-panel:not(.panel-insights) {
+    height: 180px !important;
+    max-height: 180px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+}
+
+/* ── Main chassis flex column — final fix ── */
+.main-chassis {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+.transport-bar {
+    flex-shrink: 0 !important;
+    height: 115px !important;
+}
+
+.cockpit-work-layer {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    height: 0 !important; /* force flex to control height, not content */
+}
+
+/* Hangar fixed height */
+.main-chassis > .panel-screw-wrapper > .mfd-panel:not(.panel-insights) {
+    height: 180px !important;
+    max-height: 180px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+}
