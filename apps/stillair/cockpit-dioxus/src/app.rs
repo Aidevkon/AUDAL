@@ -22,9 +22,7 @@ use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 use crate::panels::{
     coach::CoachPanel,
-    insights::InsightsPanel,
     mastered::MasteredView,
-    session::SessionPanel,
 };
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::{
@@ -67,6 +65,7 @@ async fn invoke_playback(
 
 // ── App root ──────────────────────────────────────────────────────────────────
 
+#[allow(non_snake_case)]
 pub fn App() -> Element {
     // ── Signals ──────────────────────────────────────────────────────────────
     let mode           = use_signal(|| CockpitMode::Idle);
