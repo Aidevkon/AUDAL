@@ -6,3 +6,5 @@ lineos/m0/logs/
 apps/stillair/frontend/dist/
 apps/stillair/src-tauri/gen/
 apps/stillair/cockpit-dioxus/dist/
+.venv/
+target/

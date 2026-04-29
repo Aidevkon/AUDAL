@@ -1,0 +1,1 @@
+sed -i 's/\.siamese-insights \.mfd-panel,/.siamese-insights > .panel-screw-wrapper > .mfd-panel,\n.siamese-session > .panel-screw-wrapper > .mfd-panel,\n.siamese-reserved > .panel-screw-wrapper > .mfd-panel {/g' /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus/assets/cockpit.css

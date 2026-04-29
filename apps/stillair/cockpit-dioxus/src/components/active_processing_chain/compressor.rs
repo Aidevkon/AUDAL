@@ -18,11 +18,19 @@ pub fn CompressorModule(state: CompressorState) -> Element {
     let readout_val = format!("{:+.1}", state.gain_reduction_db);
 
     rsx! {
-        ModuleFrame {
-            title: "COMPRESSOR - OPTICAL".to_string(),
-            panel_class: "chain-comp-panel".to_string(),
-            right_header: rsx! { span { "{readout_val}" } },
-            is_scrollable: false,
+        div {
+            class: "chain-module-container chain-comp-panel",
+            
+            // 4 corner screws
+            crate::components::screw::Screw { top: 6, left: 6 }
+            crate::components::screw::Screw { top: 6, right: 6 }
+            crate::components::screw::Screw { bottom: 6, left: 6 }
+            crate::components::screw::Screw { bottom: 6, right: 6 }
+
+            div { class: "chain-header",
+                span { class: "chain-header-title", "COMPRESSOR - OPTICAL" }
+                span { class: "chain-ro-badge", "{readout_val}" }
+            }
 
             div { class: "chain-oled-container",
                 svg { class: "chain-svg", view_box: "0 0 240 60", preserve_aspect_ratio: "none",

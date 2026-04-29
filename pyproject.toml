@@ -1,0 +1,14 @@
+[project]
+name = "creator-os"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.4.4",
+]
+
+[dependency-groups]
+dev = [
+    "numpy>=2.4.4",
+]

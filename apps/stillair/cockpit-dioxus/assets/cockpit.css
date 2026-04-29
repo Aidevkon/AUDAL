@@ -222,7 +222,6 @@ body {
 /* Chain module styles */
 .chain-header {
   padding: 5px 10px 4px;
-  border-bottom: 1px solid #0e1c28;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -356,25 +355,7 @@ body {
   flex-direction: column !important;
 }
 
-/* Override inner panels zero-gap policy */
-.siamese-col .mfd-panel {
-  border: none !important;
-  margin: 0 !important;
-  padding: 24px 20px 20px 20px !important;
-  /* keep some padding for content, but no outer physical borders */
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
 
-.siamese-col .panel-screw-wrapper {
-  flex: 1;
-}
-
-/* Hide the screws inherited from ModuleFrame */
-.siamese-col .screw {
-  display: none !important;
-}
 
 /* Hangar coach width fix */
 .hangar-layer .panel-screw-wrapper {
@@ -551,9 +532,11 @@ body {
   box-shadow:
     inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
     inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
+    inset 0 0 15px rgba(0, 0, 0, 0.8), /* 360-Degree inner shadow for recessed feel */
     8px 8px 25px rgba(0, 0, 0, 0.6);
 
   border-radius: 16px;
+  padding: 24px 20px; /* 360-Degree Frame: 24px top/bottom, 20px left/right */
 }
 
 .siamese-col {
@@ -562,20 +545,24 @@ body {
   flex-direction: column;
 }
 
-/* Override inner panels zero-gap policy */
-.siamese-col .mfd-panel {
-  /* Keep continuous metal background from chassis */
+/* Override inner panels zero-gap policy ONLY for left/center */
+.siamese-insights > .panel-screw-wrapper > .mfd-panel,
+.siamese-session > .panel-screw-wrapper > .mfd-panel {
+  border: none !important;
+  margin: 0 !important;
+  padding: 24px 20px 20px 20px !important;
+  border-radius: 0 !important;
   background: transparent !important;
-  /* Allow the box shadow and border radius to draw the bezels */
-  margin: 10px !important;
+  box-shadow: none !important;
 }
 
-.siamese-col .panel-screw-wrapper {
+.siamese-col > .panel-screw-wrapper {
   flex: 1;
 }
 
-/* Hide the screws inherited from ModuleFrame since they are carved into the same solid piece */
-.siamese-col .screw {
+/* Hide the screws inherited from ModuleFrame ONLY for left/center */
+.siamese-insights > .panel-screw-wrapper > .mfd-panel > .screw,
+.siamese-session > .panel-screw-wrapper > .mfd-panel > .screw {
   display: none !important;
 }
 
@@ -592,8 +579,8 @@ body {
 }
 
 .siamese-session {
-  width: 50%;
-  /* Center 50% */
+  width: 44%;
+  /* Center 44% (reduced from 50% to free up space for rails) */
 }
 
 .siamese-reserved {
@@ -640,23 +627,98 @@ body {
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
-  gap: 12px;
-  padding: 12px;
+  gap: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
 .chain-oled-container {
   width: 100%;
-  height: 100%;
+  flex: 1;
   padding: 8px 16px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+  
+  /* Make it a black recessed glass area */
+  background: #000000;
+  border-radius: 6px;
+  border: 1px solid #141c26;
+  position: relative;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.chain-oled-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 10px #000;
+  pointer-events: none;
+  border-radius: 6px;
 }
 
 .chain-svg {
   width: 100%;
   height: 100%;
   max-height: 120px;
+}
+
+/* The dark modules that are screwed into the monoblock chassis */
+.chain-module-container {
+  position: relative;
+  /* Apply brushed metal texture matching the main chassis */
+  background:
+    url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+    repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+    linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+  border-left: 1px solid #000;
+  border-right: 1px solid #1a2e42;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* evenly divide space */
+}
+
+/* Make the 3 mastering modules stack perfectly flush like a 500-Series rack */
+.chain-eq-panel {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #1a2e42;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+.chain-comp-panel {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #1a2e42;
+}
+
+.chain-limit-panel {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #1a2e42;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+}
+
+.chain-header-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: #4a7a96;
+  text-transform: uppercase;
+  text-shadow: 0 0 5px rgba(74, 122, 150, 0.5);
+}
+
+.chain-ro-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: #a4b5c4;
+  background: #04080b;
+  padding: 2px 6px;
+  border-radius: 3px;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.8);
+  border: 1px solid #141c26;
+  letter-spacing: 0;
 }

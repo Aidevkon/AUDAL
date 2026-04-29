@@ -1,6 +1,6 @@
-//! Stage 5 — Saturation (Harmonic Excitement)
-//! Ported from sm-core. No changes needed — already pure algorithmic, no std::f32.
-//! fast_tanh: Pade approximation — deterministic, no external math library needed.
+//! Stage 5 - Saturation (Harmonic Excitement)
+//! Ported from sm-core. No changes needed - already pure algorithmic, no std::f32.
+//! fast_tanh: Pade approximation - deterministic, no external math library needed.
 //! Authority: LineOS Constitution v2.0 §09.1
 
 use crate::types::audio::AudioChunk;
@@ -18,7 +18,7 @@ impl Stage5Saturate {
 
     /// Fast Pade approximation of tanh(x) with hard clamp.
     /// Pade is accurate for |x| < ~2.0 (typical DSP signal range after compression).
-    /// Values outside this range are clamped to [-1, 1] — saturation is the correct behavior.
+    /// Values outside this range are clamped to [-1, 1] - saturation is the correct behavior.
     #[inline(always)]
     fn fast_tanh(x: f32) -> f32 {
         let x2 = x * x;
@@ -69,7 +69,7 @@ mod tests {
         for i in -1000..=1000 {
             let x = i as f32 * 0.1;
             let y = Stage5Saturate::fast_tanh(x);
-            assert!(y.abs() <= 1.0 + 1e-5, "fast_tanh({x}) = {y} — unbounded!");
+            assert!(y.abs() <= 1.0 + 1e-5, "fast_tanh({x}) = {y} - unbounded!");
         }
     }
 }

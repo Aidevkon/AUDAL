@@ -37,7 +37,7 @@ pub fn SessionPanel(
 ) -> Element {
     rsx! {
         ModuleFrame {
-            title: "THE SESSION".to_string(),
+            title: "PRIMARY SIGNAL ANALYZER".to_string(),
             panel_class: "panel-session".to_string(),
             header_style: "color:var(--accent-session); border-bottom:2px solid var(--accent-session);".to_string(),
             is_scrollable: true,
