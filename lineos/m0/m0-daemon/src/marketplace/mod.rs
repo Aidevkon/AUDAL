@@ -2,6 +2,8 @@
 //! 4-step verification: manifest → signature → permissions → digest.
 //! Pure Rust: ed25519-dalek + blake3. No ring. No C FFI.
 
+#![allow(unused)]
+
 pub mod gatekeeper;
 pub mod revocation;
 

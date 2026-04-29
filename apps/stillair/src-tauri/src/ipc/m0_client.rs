@@ -138,6 +138,7 @@ impl M0Client {
         }
 
         #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
         struct ControlResp {
             status:  String,
             state:   Option<crate::commands::playback::PlaybackStateJson>,

@@ -2,6 +2,8 @@
 //! Append-only NDJSON. Synchronous writes. Failed write = fatal halt.
 //! Validates against lineos/shared/schema/audit.schema.json
 
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

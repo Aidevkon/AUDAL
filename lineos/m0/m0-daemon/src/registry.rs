@@ -2,6 +2,8 @@
 //! Loads m0-registry.json and checksums.json.
 //! Hash mismatch → fatal error (anyhow::bail!). Never silently pass.
 
+#![allow(dead_code)]
+
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

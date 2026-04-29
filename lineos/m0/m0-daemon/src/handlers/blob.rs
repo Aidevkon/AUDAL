@@ -28,7 +28,6 @@ pub async fn get_blob(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::blob_store::{BlobStore, StoredBlob, StoredLoudness, StoredQuality, StoredProvenance};
 
     fn stub_blob(id: &str) -> StoredBlob {

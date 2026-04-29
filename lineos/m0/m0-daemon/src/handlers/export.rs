@@ -73,6 +73,7 @@ impl ExportFormat {
         }
     }
 
+    #[allow(dead_code)]
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Wav  => "wav",

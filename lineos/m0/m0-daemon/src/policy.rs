@@ -2,6 +2,8 @@
 //! Deny-by-default outbound. Every blocked request → audit log.
 //! Undeclared destination → 403 + audit entry. No retry.
 
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;

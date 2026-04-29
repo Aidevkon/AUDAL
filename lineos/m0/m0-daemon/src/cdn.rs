@@ -2,6 +2,8 @@
 //! Serves WASM artifacts and schemas. Hash verification before every serve.
 //! Hash mismatch = fatal halt (never a warning).
 
+#![allow(dead_code)]
+
 use anyhow::{bail, Context, Result};
 use blake3::Hasher as Blake3Hasher;
 use serde::{Deserialize, Serialize};

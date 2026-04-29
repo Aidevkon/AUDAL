@@ -4,6 +4,8 @@
 //! All-or-nothing. Any step fails → Err, audit event written.
 //! Pure Rust: ed25519-dalek + blake3. No ring. No C FFI.
 
+#![allow(dead_code)]
+
 use blake3::Hasher as Blake3Hasher;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};

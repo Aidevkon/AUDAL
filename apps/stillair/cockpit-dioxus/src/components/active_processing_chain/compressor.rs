@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
 use super::types::CompressorState;
-use crate::components::module_frame::ModuleFrame;
 use super::eq::eq_stroke_path;
 
 pub fn comp_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {

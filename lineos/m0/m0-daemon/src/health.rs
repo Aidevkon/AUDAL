@@ -135,6 +135,7 @@ pub fn health_router(gate: HealthGate) -> Router {
 
 /// Retry health check every 5 seconds, fatal halt after 30 seconds.
 /// Returns Ok(()) when all criteria pass, Err if timeout exceeded.
+#[allow(dead_code)]
 pub async fn await_health_gate(gate: &HealthGate) -> anyhow::Result<()> {
     use std::time::{Duration, Instant};
 

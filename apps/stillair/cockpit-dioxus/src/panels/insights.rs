@@ -18,7 +18,6 @@
 
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
-use crate::components::screw::Screw;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 

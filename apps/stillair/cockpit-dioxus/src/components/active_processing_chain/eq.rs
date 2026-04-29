@@ -1,6 +1,5 @@
 use dioxus::prelude::*;
 use super::types::EQState;
-use crate::components::module_frame::ModuleFrame;
 
 pub fn eq_stroke_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
     if points.is_empty() { return format!("M0,{} L{},{}", height/2.0, width, height/2.0); }

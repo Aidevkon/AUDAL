@@ -352,6 +352,7 @@ fn derive_seed(hash: &[u8; 32]) -> u64 {
 /// that the silence guard above catches, rather than crashing Stage1.
 ///
 /// Phase 7: replace with symphonia/hound decode for real format support.
+#[allow(dead_code)]
 fn bytes_to_f32_samples(bytes: &[u8]) -> Vec<f32> {
     bytes.chunks_exact(4)
         .map(|b| {

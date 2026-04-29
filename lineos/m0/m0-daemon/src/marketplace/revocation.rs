@@ -1,6 +1,8 @@
 //! Key revocation — M0 Constitution v2.0 §03.7
 //! Any engine signed with a revoked key is immediately unloadable.
 
+#![allow(dead_code)]
+
 /// Returns true if the given public key hex is in the revoked_keys list.
 /// Used by the Gatekeeper before signature verification.
 pub fn is_revoked(key: &str, revoked_keys: &[String]) -> bool {
