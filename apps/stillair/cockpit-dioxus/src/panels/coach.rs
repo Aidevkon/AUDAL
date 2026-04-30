@@ -32,28 +32,35 @@ pub fn CoachPanel(
 
     let demo_findings = vec![
         FindingData {
-            label: "Dynamic Range Check".to_string(),
-            desc: "Consistency needed".to_string(),
-            pct: 40.0,
-            sev: "medium".to_string(),
-        },
-        FindingData {
-            label: "Loudness Target".to_string(),
-            desc: "Meeting -14 LUFS".to_string(),
-            pct: 60.0,
+            label: "Active Phase".to_string(),
+            desc: "A/B Analysis".to_string(),
+            pct: 100.0,
             sev: "low".to_string(),
         },
         FindingData {
-            label: "Stereo Width".to_string(),
-            desc: "Review correlation in lows".to_string(),
-            pct: 30.0,
-            sev: "high".to_string(),
+            label: "Phase Health".to_string(),
+            desc: "range consistency good".to_string(),
+            pct: 95.0,
+            sev: "low".to_string(),
+        },
+        FindingData {
+            label: "Spectral Analysis".to_string(),
+            desc: "phase coherence check OK".to_string(),
+            pct: 100.0,
+            sev: "low".to_string(),
+        },
+        FindingData {
+            label: "Findings".to_string(),
+            desc: "Dynamic range within target. DC offset nominal.".to_string(),
+            pct: 85.0,
+            sev: "medium".to_string(),
         },
     ];
 
     rsx! {
         ModuleFrame {
-            title: "SOCRATIC COACH".to_string(),
+            show_screws: false,
+            title: "HANGAR".to_string(),
             is_scrollable: true,
             
             { match state.as_ref() {
@@ -107,7 +114,7 @@ pub fn CoachPanel(
                             }
 
                             if !s.findings.issues.is_empty() {
-                                CoachActions {}
+                                // CoachActions removed per request
                             }
                         },
                         None => rsx! {
@@ -120,7 +127,7 @@ pub fn CoachPanel(
                             for f in demo_findings {
                                 DemoFindingRow { finding: f }
                             }
-                            CoachActions {}
+                            // CoachActions removed per request
                         }
             } }
         }
@@ -167,19 +174,26 @@ fn DemoFindingRow(finding: FindingData) -> Element {
     rsx! {
         div {
             class: "finding-row",
-            div {
-                class: "finding-row-header",
-                div { class: "finding-row-label", "{label}" }
-                div { class: "severity-dot {sev}" }
-            }
+
+            // Label (fixed width)
+            div { class: "finding-row-label", "{label}" }
+
+            // Description (flex grow)
             div { class: "finding-row-description", "{desc}" }
-            div {
-                class: "finding-bar-label",
-                div { class: "finding-bar-track", style: "flex:1;",
-                    div { class: "finding-bar-fill", style: "width:{pct}%;" }
+
+            // Segmented OLED Mini-bar
+            div { class: "finding-mini-bar-track",
+                div {
+                    class: "finding-mini-bar-fill {sev}",
+                    style: "width:{pct}%;",
                 }
-                div { class: "finding-bar-pct", "{pct_label}" }
             }
+
+            // Percentage value
+            div { class: "finding-row-pct", "{pct_label}" }
+
+            // Severity dot
+            div { class: "severity-dot {sev}" }
         }
     }
 }
@@ -240,34 +254,29 @@ fn FindingRow(issue: IssueJson) -> Element {
             key:   "{issue.id}",
             class: "finding-row",
 
-            // Header: label + severity dot
-            div {
-                class: "finding-row-header",
-                div {
-                    class: "finding-row-label",
-                    "{issue.id}"
-                }
-                div { class: "severity-dot {sev}" }
-            }
+            // Label (fixed width)
+            div { class: "finding-row-label", "{issue.id}" }
 
-            // Description: current → target
+            // Description (flex grow)
             div {
                 class: "finding-row-description",
                 { format!("current {:.1} → target {:.1} (delta {:+.1})",
                           issue.current, issue.target, issue.delta) }
             }
 
-            // Progress bar + percentage
-            div {
-                class: "finding-bar-label",
-                div { class: "finding-bar-track", style: "flex:1;",
-                    div {
-                        class: "finding-bar-fill",
-                        style: "width:{score_pct}%;",
-                    }
+            // Segmented OLED Mini-bar
+            div { class: "finding-mini-bar-track",
+                div {
+                    class: "finding-mini-bar-fill {sev}",
+                    style: "width:{score_pct}%;",
                 }
-                div { class: "finding-bar-pct", "{pct_label}" }
             }
+
+            // Percentage value
+            div { class: "finding-row-pct", "{pct_label}" }
+
+            // Severity dot
+            div { class: "severity-dot {sev}" }
         }
     }
 }

@@ -24,6 +24,9 @@ pub struct ModuleFrameProps {
 
     /// The inner panel content
     pub children: Element,
+    /// Show corner screws (default: true — set false for moving panels)
+    #[props(default = true)]
+    pub show_screws: bool,
 }
 
 #[component]
@@ -55,10 +58,12 @@ pub fn ModuleFrame(props: ModuleFrameProps) -> Element {
                 }
 
                 // ── Hardware anchoring: 4 Corner Torx Screws ──
-                Screw { top: 10, left: 10 }
-                Screw { top: 10, right: 10 }
-                Screw { bottom: 10, left: 10 }
-                Screw { bottom: 10, right: 10 }
+                if props.show_screws {
+                    Screw { top: 10, left: 10 }
+                    Screw { top: 10, right: 10 }
+                    Screw { bottom: 10, left: 10 }
+                    Screw { bottom: 10, right: 10 }
+                }
             }
         }
     }

@@ -14,6 +14,14 @@ pub fn IntentKnob(props: IntentKnobProps) -> Element {
     let hl_class = if props.highlighted { "highlighted" } else { "" };
     rsx! {
         div { class: "intent-knob-container",
+            div {
+                class: "intent-knob-lcd",
+                {
+                    let val = props.angle / 27.0; // -135..135 → -5.0..+5.0
+                    let sign = if val >= 0.0 { "+" } else { "" };
+                    format!("{sign}{val:.1}")
+                }
+            }
             div { class: "intent-knob-label", "{props.label}" }
             div { 
                 class: "intent-knob {hl_class}",

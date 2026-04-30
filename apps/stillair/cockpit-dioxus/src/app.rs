@@ -25,6 +25,7 @@ use crate::panels::{
     mastered::MasteredView,
 };
 use crate::components::sampling_siamese::SamplingSiamese;
+use crate::components::intent_bay::IntentBay;
 use crate::components::{
     screw::Screw,
     soft_key::{SoftKey, SoftKeyVariant},
@@ -68,12 +69,17 @@ async fn invoke_playback(
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     // ── Signals ──────────────────────────────────────────────────────────────
-    let mode           = use_signal(|| CockpitMode::Idle);
-    let session_state  = use_signal(|| None::<SessionStateJson>);
+    let mut mode           = use_signal(|| CockpitMode::Idle);
+    let mut session_state  = use_signal(|| None::<SessionStateJson>);
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
+    let mut intent_open: Signal<bool> = use_signal(|| false);
+    let mut tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let mut dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let mut space_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let mut loud_angle: Signal<f32> = use_signal(|| 0.0_f32);
 
     // ── Mode badge style  ─────────────────────────────────────────────────────
 
@@ -134,141 +140,127 @@ pub fn App() -> Element {
                 Screw { bottom: 10, left: 10 }
                 Screw { bottom: 10, right: 10 }
 
-                // Left: Annunciator Zone (25% width)
+                // Left: Annunciator Zone
                 div {
                     class: "transport-left dsp-annunciators",
-                    Annunciator { label: "FM0".to_string(), is_master: true, active: true } // Master is active for now
-                    Annunciator { label: "EQ".to_string(), active: false }
-                    Annunciator { label: "COMP".to_string(), active: false }
-                    Annunciator { label: "SAT".to_string(), active: false }
-                    Annunciator { label: "LIMIT".to_string(), active: false }
+                    Annunciator { label: "FM0".to_string(), is_master: true, active: true }
+                    div { class: "dsp-separator" }
+                    Annunciator { label: "EQ".to_string(), active: true, sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]) }
+                    Annunciator { label: "COMP".to_string(), active: true, sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]) }
+                    Annunciator { label: "SAT".to_string(), active: true, sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]) }
+                    Annunciator { label: "LIMIT".to_string(), active: true, sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]) }
                 }
 
-                // Center: Chrono-Control Zone (50% width)
+                div { class: "transport-module-divider" }
+
+                // Center: Transport & Time
                 div {
                     class: "transport-center",
 
-                    // Top: Controls & Time
-                    div {
-                        class: "transport-center-top",
+                    // Mini Stop Button (left of timecode)
+                    button {
+                        class: "btn-mini-square",
+                        onclick: move |_| {
+                            let ps = playback_state.clone();
+                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
+                        },
+                        div { class: "icon-stop-square" }
+                    }
 
-                        // Skip back −5s
-                        SoftKey {
-                            label: "◄◄".to_string(),
-                            title: "Skip back 5 seconds".to_string(),
-                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                            variant: SoftKeyVariant::Standard,
-                            onclick: move |_| {
-                                let new_ms = position_ms.saturating_sub(5_000);
-                                let ps     = playback_state.clone();
-                                spawn_local(async move {
-                                    invoke_playback("seek", Some(new_ms), ps).await;
-                                });
+                    // Main display column
+                    div { class: "transport-center-col",
+                        // Top row: Pill buttons
+                        div { class: "transport-pill-row",
+                            button {
+                                class: "btn-pill",
+                                onclick: move |_| {
+                                    let new_ms = position_ms.saturating_sub(5_000);
+                                    let ps = playback_state.clone();
+                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                },
+                                "◄◄ 5s"
+                            }
+                            button {
+                                class: if is_playing { "btn-pill btn-pill-orange active" } else { "btn-pill btn-pill-orange" },
+                                onclick: move |_| {
+                                    let action = if is_playing { "pause" } else { "play" };
+                                    let ps = playback_state.clone();
+                                    spawn_local(async move { invoke_playback(action, None, ps).await; });
+                                },
+                                "PLAY"
+                            }
+                            button {
+                                class: "btn-pill",
+                                onclick: move |_| {
+                                    let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                    let ps = playback_state.clone();
+                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                },
+                                "5s ►►"
                             }
                         }
 
-                        // Time Counter (Now VFD Styled and in the center)
+                        // Middle: OLED Timecode
                         div {
                             class: "transport-vfd-display transport-time",
                             id:    "transport-position",
-                            { format_ms(position_ms) }
+                            { format!("({:02}:{:02})", position_ms / 60000, (position_ms / 1000) % 60) }
                         }
 
-                        // Skip forward +5s
-                        SoftKey {
-                            label: "►►".to_string(),
-                            title: "Skip forward 5 seconds".to_string(),
-                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                            variant: SoftKeyVariant::Standard,
-                            onclick: move |_| {
-                                let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                let ps     = playback_state.clone();
-                                spawn_local(async move {
-                                    invoke_playback("seek", Some(new_ms), ps).await;
-                                });
-                            }
-                        }
-
-                        // Play / Pause toggle
-                        SoftKey {
-                            label: "PLAY".to_string(),
-                            active: is_playing,
-                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                            variant: SoftKeyVariant::Active,
-                            onclick: move |_| {
-                                let action = if is_playing { "pause" } else { "play" };
-                                let ps     = playback_state.clone();
-                                spawn_local(async move {
-                                    invoke_playback(action, None, ps).await;
-                                });
-                            }
-                        }
-
-                        // Stop button
-                        SoftKey {
-                            label: "STOP".to_string(),
-                            disabled: !matches!(*mode.read(), CockpitMode::CoachReady { .. }),
-                            variant: SoftKeyVariant::Standard,
-                            onclick: move |_| {
-                                let ps = playback_state.clone();
-                                spawn_local(async move {
-                                    invoke_playback("stop", None, ps).await;
-                                });
-                            }
-                        }
-                    }
-
-                    // Bottom: Scrub rail
-                    div {
-                        class: "transport-scrub",
-                        id:    "transport-scrub",
-                        title: "Click to seek",
-                        onclick: move |evt| {
-                            if !matches!(*mode.read(), CockpitMode::CoachReady { .. })
-                                || duration_ms == 0 { return; }
-                            let client_x = evt.client_coordinates().x;
-                            let window   = web_sys::window().unwrap();
-                            let doc      = window.document().unwrap();
-                            let el       = doc.get_element_by_id("transport-scrub");
-                            if let Some(el) = el {
-                                let rect  = el.get_bounding_client_rect();
-                                let frac  = ((client_x - rect.left()) / rect.width())
-                                               .clamp(0.0, 1.0);
-                                let seek_ms = (frac * duration_ms as f64) as u64;
-                                let ps      = playback_state.clone();
-                                spawn_local(async move {
-                                    invoke_playback("seek", Some(seek_ms), ps).await;
-                                });
-                            }
-                        },
-
-                        div { class: "transport-scrub-track",
-                            div {
-                                class: "transport-scrub-fill",
-                                style: format!("width:{}%", scrub_len),
-                            }
-                        }
+                        // Bottom: Scrub track
                         div {
-                            class: "transport-scrub-head",
-                            style: format!("left:{}%", scrub_len),
-                        }
-                        div {
-                            class: "transport-scrub-label",
-                            "●SCRUB●"
+                            class: "transport-scrub",
+                            id:    "transport-scrub",
+                            onclick: move |evt| {
+                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 { return; }
+                                let client_x = evt.client_coordinates().x;
+                                let window   = web_sys::window().unwrap();
+                                let doc      = window.document().unwrap();
+                                if let Some(el) = doc.get_element_by_id("transport-scrub") {
+                                    let rect  = el.get_bounding_client_rect();
+                                    let frac  = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                                    let seek_ms = (frac * duration_ms as f64) as u64;
+                                    let ps      = playback_state.clone();
+                                    spawn_local(async move { invoke_playback("seek", Some(seek_ms), ps).await; });
+                                }
+                            },
+                            div { class: "transport-scrub-track",
+                                div { class: "transport-scrub-fill", style: format!("width:{}%", scrub_len) }
+                            }
+                            div { class: "transport-scrub-head", style: format!("left:{}%", scrub_len) }
+                            div { class: "transport-scrub-label", "SCRUB" }
                         }
                     }
                 }
 
-                // Right: Critical Zone (25% width)
+                div { class: "transport-module-divider" }
+
+                // Right: Critical Zone
                 div {
                     class: "transport-right abort-zone",
-                    SoftKey {
-                        label: "ABORT".to_string(),
-                        variant: SoftKeyVariant::Danger,
-                        is_guarded: true,
+                    // Small STOP pill next to ABORT
+                    button {
+                        class: "btn-pill btn-pill-red",
                         onclick: move |_| {
-                            web_sys::console::warn_1(&"Avionics ABORT trigger activated".into());
+                            let ps = playback_state.clone();
+                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
+                        },
+                        "STOP"
+                    }
+
+                    div { class: "abort-guard-wrapper",
+                        div { class: "abort-guard-left" }
+                        button {
+                            class: "btn-abort-guarded",
+                            onclick: move |_| {
+                                let mut s = session_state.write();
+                                *s = None;
+                                let mut m = mode.write();
+                                *m = CockpitMode::Idle;
+                            },
+                            "ABORT"
                         }
+                        div { class: "abort-guard-right" }
                     }
                 }
             }
@@ -276,7 +268,7 @@ pub fn App() -> Element {
             // ── Work Layer — 65% Middle ──────────────────────────────────────
             main {
                 id:    "mfd-bay",
-                class: "mfd-bay work-layer",
+                class: if *intent_open.read() { "mfd-bay work-layer cockpit-work-layer intent-active" } else { "mfd-bay work-layer cockpit-work-layer" },
 
                 SamplingSiamese {
                     mode,
@@ -297,8 +289,27 @@ pub fn App() -> Element {
             }
 
             // ── Hangar — 25% Bottom ──────────────────────────────────────────
-            div { class: "hangar-layer coach-panel",
-                CoachPanel { mode, session_state }
+            div {
+                class: if *intent_open.read() { "hangar-layer intent-open" } else { "hangar-layer" },
+                div { class: "intent-knob-bay",
+                    IntentBay {
+                        open: *intent_open.read(),
+                        tone_angle: *tone_angle.read(),
+                        dyn_angle: *dyn_angle.read(),
+                        space_angle: *space_angle.read(),
+                        loud_angle: *loud_angle.read(),
+                        on_down_tone: move |_| {
+                            let current = *intent_open.read();
+                            intent_open.set(!current);
+                        },
+                        on_down_dyn: move |_| {},
+                        on_down_space: move |_| {},
+                        on_down_loud: move |_| {},
+                    }
+                }
+                div { class: "coach-panel",
+                    CoachPanel { mode, session_state }
+                }
             }
         }
     }

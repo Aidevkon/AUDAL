@@ -232,6 +232,15 @@ body {
     overflow: hidden;
 }
 
+.mfd-panel::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 0;
+}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -659,66 +668,95 @@ body {
 
 .finding-row {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 12px 14px;
-    margin: 8px 12px;
-    border-radius: 10px;
-    background: #0a0c10;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 12px;
+    margin: 0 12px 4px 12px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     box-shadow: none;
 }
 
-.finding-row-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
+/* Remove bottom border for the last item */
+.finding-row:last-child {
+    border-bottom: none;
 }
 
 .finding-row-label {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-primary);
+    width: 140px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .finding-row-description {
     font-family: var(--font-mono);
-    font-size: 0.58rem;
+    font-size: 0.6rem;
     color: var(--text-secondary);
-    line-height: 1.4;
-}
-
-.finding-bar-label {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 5px;
-}
-
-.finding-bar-track {
     flex: 1;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.07);
-    border-radius: 3px;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.finding-bar-fill {
+/* ── The "OLED" Mini-Bar ── */
+.finding-mini-bar-track {
+    width: 60px;
+    height: 8px;
+    background: #040608;
+    border-radius: 2px;
+    overflow: hidden;
+    /* Recessed gap logic */
+    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.9),
+                0 1px 0 rgba(255,255,255,0.05);
+    border: 1px solid #141c26;
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+}
+
+.finding-mini-bar-fill {
     height: 100%;
-    background: var(--accent-cyan);
-    border-radius: 3px;
-    box-shadow: 0 0 6px rgba(0, 209, 255, 0.35);
+    /* Default segmented look (fallback) */
+    background: repeating-linear-gradient(90deg, var(--text-muted) 0px, var(--text-muted) 4px, transparent 4px, transparent 6px);
+    border-radius: 1px;
 }
 
-.finding-bar-pct {
+/* Segmented glow logic per severity */
+.finding-mini-bar-fill.critical { 
+    background: repeating-linear-gradient(90deg, var(--accent-red) 0px, var(--accent-red) 4px, transparent 4px, transparent 6px); 
+    box-shadow: 0 0 8px rgba(255, 59, 48, 0.6); 
+}
+.finding-mini-bar-fill.high { 
+    background: repeating-linear-gradient(90deg, var(--accent-amber) 0px, var(--accent-amber) 4px, transparent 4px, transparent 6px); 
+    box-shadow: 0 0 8px rgba(255, 149, 0, 0.5); 
+}
+.finding-mini-bar-fill.medium { 
+    background: repeating-linear-gradient(90deg, var(--accent-yellow) 0px, var(--accent-yellow) 4px, transparent 4px, transparent 6px); 
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.4); 
+}
+.finding-mini-bar-fill.low { 
+    background: repeating-linear-gradient(90deg, var(--accent-cyan) 0px, var(--accent-cyan) 4px, transparent 4px, transparent 6px); 
+    box-shadow: 0 0 8px rgba(0, 209, 255, 0.35); 
+}
+
+.finding-row-pct {
     font-family: var(--font-mono);
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     color: var(--text-secondary);
-    min-width: 28px;
+    width: 30px;
     text-align: right;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+
 }
 
 .severity-dot {
@@ -884,12 +922,15 @@ body {
 
 .transport-left {
     flex: 1;
+    height: 100%;
     display: flex;
     justify-content: flex-start;
+    align-items: center;
 }
 
 .transport-center {
     flex: 2;
+    height: 100%;
     display: flex;
     justify-content: center;
     gap: 20px;
@@ -898,8 +939,10 @@ body {
 
 .transport-right {
     flex: 1;
+    height: 100%;
     display: flex;
     justify-content: flex-end;
+    align-items: center;
 }
 
 .transport-controls {
@@ -911,22 +954,28 @@ body {
 }
 
 .transport-vfd-display {
-    background-color: #030304;
-    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9), inset -1px -1px 2px rgba(0,0,0,0.5);
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08); /* mechanical bezel highlight */
-    border-radius: 3px;
-    padding: 4px 16px;
+    background: 
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 1px, transparent 1px, transparent 2px),
+        #060400; /* deep amber-tinted black */
+    box-shadow: inset 2px 2px 6px rgba(0,0,0,0.9), inset -1px -1px 2px rgba(255,255,255,0.05);
+    border: 1px solid #000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08); /* mechanical bezel highlight */
+    border-radius: 4px;
+    padding: 6px 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #ffb703;
+    font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: #ffb703; /* Amber phosphor */
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    text-shadow: 0 0 6px rgba(255, 183, 3, 0.4);
-    font-weight: 600;
+    /* Intense OLED phosphor glow */
+    text-shadow: 
+        0 0 4px #ffb703,
+        0 0 12px rgba(255, 183, 3, 0.8),
+        0 0 24px rgba(255, 183, 3, 0.4);
+    font-weight: 700;
     flex-shrink: 0;
 }
 
@@ -1007,30 +1056,48 @@ body {
     right: 0;
     top: 50%;
     transform: translateY(-50%);
-    height: 3px;
-    background: var(--border-active);
+    height: 4px; /* Thinner precision track */
+    background: #020305;
     border-radius: 2px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.08);
+    border: 1px solid #000;
     overflow: hidden;
 }
 
 .transport-scrub-fill {
     height: 100%;
-    background: var(--accent-insights);
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan);
     border-radius: 2px;
-    box-shadow: 0 0 6px rgba(0, 209, 255, 0.6);
-    transition: width 0.15s linear;
+    transition: width 0.1s linear;
 }
 
 .transport-scrub-head {
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--accent-insights);
-    box-shadow: 0 0 8px rgba(0, 209, 255, 0.8);
+    width: 12px;
+    height: 16px;
+    border-radius: 4px;
+    /* Dark machined knob */
+    background: linear-gradient(90deg, #1f222a, #2a2d35, #1f222a);
+    border: 1px solid #000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1);
     pointer-events: none;
+    z-index: 2;
+}
+
+/* Add ridges to the knob */
+.transport-scrub-head::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background: rgba(0,0,0,0.6);
+    box-shadow: 1px 0 0 rgba(255,255,255,0.1);
 }
 
 .transport-scrub-label {
@@ -1663,14 +1730,18 @@ body {
 }
 
 .dsp-led {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    background-color: #0b0c0e;
-    box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8), inset -1px -1px 2px rgba(255,255,255,0.05);
-    border: 1px solid rgba(0,0,0,0.8);
+    /* Dark interior hole */
+    background-color: #030405;
+    /* Milled silver ring effect */
+    border: 2px solid #3a3f4a;
+    box-shadow: 
+        inset 1px 1px 4px rgba(0,0,0,1), /* inner dark hole */
+        0 1px 1px rgba(255,255,255,0.1), /* outer bottom highlight */
+        0 -1px 2px rgba(0,0,0,0.8);      /* outer top shadow */
     position: relative;
-    /* Recessed look */
 }
 
 .dsp-led::after {
@@ -1679,8 +1750,8 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60%;
-    height: 60%;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: transparent;
     transition: all 0.2s ease;
@@ -1752,6 +1823,30 @@ body {
     box-shadow: inset 0 1px 4px rgba(0,0,0,0.6);
 }
 
+.btn-intent {
+    background: linear-gradient(180deg, #2b303b, #15181d);
+    color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    padding: 10px 18px;
+    border: 1px solid #000;
+    border-bottom: 4px solid #080a0e;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(0,0,0,0.4);
+    cursor: pointer;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 6px rgba(0,209,255,0.4);
+    transition: all 0.1s ease;
+    white-space: nowrap;
+}
+
+.btn-intent:active {
+    transform: translateY(3px);
+    border-bottom-width: 1px;
+    box-shadow: inset 0 1px 4px rgba(0,0,0,0.8);
+}
+
 /* =========================================================================
    Task 3.6: SoftKey & Annunciator Logic
    ========================================================================= */
@@ -1816,4 +1911,326 @@ body {
     background: #ffb703;
     border-color: #ffb703;
     box-shadow: 0 0 22px rgba(255, 183, 3, 0.8), inset 0 2px 4px rgba(0,0,0,0.6);
+}
+
+/* =========================================================================
+   Transport Bar 1:1 Mockup Overhaul
+   ========================================================================= */
+
+/* Structural Dividers */
+.transport-module-divider {
+    width: 16px;
+    height: 100%;
+    background: linear-gradient(90deg, #181a1f 0%, #2a2d35 50%, #181a1f 100%);
+    box-shadow: inset 2px 0 4px rgba(0,0,0,0.8), inset -1px 0 2px rgba(255,255,255,0.08);
+    border-left: 1px solid #000;
+    border-right: 1px solid #4a4e59;
+    position: relative;
+}
+
+.transport-module-divider::before,
+.transport-module-divider::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #000;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.2);
+}
+.transport-module-divider::before { top: 8px; }
+.transport-module-divider::after { bottom: 8px; }
+
+.dsp-separator {
+    width: 1px;
+    height: 60%;
+    background: rgba(255,255,255,0.05);
+    margin: 0 10px;
+    box-shadow: 1px 0 0 rgba(0,0,0,0.5);
+}
+
+/* Annunciators: Master FM0 Hardware Block */
+.fm0-slot {
+    width: 68px;
+    height: 68px;
+    background: linear-gradient(135deg, #2b2e35, #17191d);
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Vertically center the text and pit */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.15);
+    border: 1px solid #000;
+    margin-right: 16px;
+    margin-left: 20px; /* Clear the main chassis screw */
+    flex-shrink: 0;
+    /* Hide the original dsp-label since we use engraved-label */
+}
+.fm0-slot .dsp-label {
+    display: none;
+}
+
+.fm0-screw {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #0a0c10;
+    border: 1px solid #000;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.2);
+}
+.fm0-screw.top-left { top: 6px; left: 6px; }
+.fm0-screw.top-right { top: 6px; right: 6px; }
+.fm0-screw.bottom-left { bottom: 6px; left: 6px; }
+.fm0-screw.bottom-right { bottom: 6px; right: 6px; }
+
+.fm0-engraved-label {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: transparent;
+    text-shadow: 1px 1px 1px rgba(255,255,255,0.1), -1px -1px 1px rgba(0,0,0,0.8);
+    margin: 0;
+    margin-top: 2px;
+}
+
+.fm0-pit {
+    width: 44px;
+    height: 32px; 
+    border-radius: 8px;
+    background: #090b0f;
+    box-shadow: inset 0 8px 16px rgba(0,0,0,1), inset 0 2px 6px rgba(0,0,0,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-top: 4px;
+}
+
+.fm0-led {
+    width: 24px !important;
+    height: 14px !important;
+    border-radius: 2px !important;
+    border: none !important;
+    background-color: #030406 !important;
+    box-shadow: none !important;
+    transition: all 0.1s ease;
+}
+.fm0-led::after {
+    display: none !important; /* Overriding the generic circle */
+}
+.fm0-led.active {
+    background: #cbf9ff !important;
+    box-shadow: 0 0 12px #00e5ff, 0 0 24px #00e5ff, 0 0 40px rgba(0,229,255,0.5) !important;
+}
+
+/* Annunciators: Square Modules */
+.dsp-square-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px; /* Square with slightly rounded corners */
+    background-color: #0b0d10;
+    border: 1px solid #1a1d24;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.1), 0 -1px 2px rgba(0,0,0,0.8);
+    position: relative;
+}
+.dsp-square-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+.dsp-square-btn.active::after {
+    background: #cbf9ff; /* Pale cyan core */
+    box-shadow: 0 0 8px #00e5ff, 0 0 16px rgba(0, 229, 255, 0.6);
+}
+
+/* Micro LEDs for Sub-modules */
+.dsp-sub-leds {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+.dsp-sub-led-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.dsp-sub-led-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #040507;
+    border: 1px solid #1a1c20;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.1);
+}
+.dsp-sub-led-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: #6a6e7d;
+}
+
+/* Center Column */
+.transport-center-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+.transport-pill-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Pill Buttons (◄◄, PLAY, ►►) */
+.btn-pill {
+    background: linear-gradient(180deg, #383c47, #24272e, #17191d);
+    border: 1px solid #000;
+    border-top: 1px solid #555b6b;
+    border-radius: 12px;
+    padding: 6px 14px;
+    color: #a0a6bd;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 800;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 -2px 4px rgba(0,0,0,0.4);
+    text-shadow: 0 -1px 1px rgba(0,0,0,0.8);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.1s ease;
+}
+.btn-pill:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.8), inset 0 2px 6px rgba(0,0,0,0.8);
+    border-top: 1px solid #24272e;
+}
+.btn-pill-orange {
+    background: linear-gradient(180deg, #e6a500, #b38000, #664900);
+    color: #fff;
+    border-top: 1px solid #ffcc33;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.btn-pill-orange:active {
+    background: linear-gradient(180deg, #b38000, #664900, #332400);
+    border-top: 1px solid #b38000;
+}
+.btn-pill-red {
+    background: linear-gradient(180deg, #cc2922, #991f1a, #4d0f0d);
+    color: #fff;
+    border-top: 1px solid #ff5c52;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.btn-pill-red:active {
+    background: linear-gradient(180deg, #991f1a, #661411, #330a09);
+    border-top: 1px solid #991f1a;
+}
+
+/* Mini Stop Button */
+.btn-mini-square {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #1f2228, #111318);
+    border: 1px solid #000;
+    border-bottom: 2px solid #080a0e;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 12px;
+}
+.btn-mini-square:active {
+    transform: translateY(1px);
+    border-bottom-width: 1px;
+}
+.icon-stop-square {
+    width: 8px;
+    height: 8px;
+    background: #caced3;
+    border-radius: 1px;
+    box-shadow: 0 0 2px rgba(255,255,255,0.5);
+}
+
+/* Timecode Updates */
+.transport-time {
+    color: #00e5ff !important;
+    text-shadow: 0 0 4px #00e5ff, 0 0 12px rgba(0, 229, 255, 0.8), 0 0 24px rgba(0, 229, 255, 0.4) !important;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 1px, transparent 1px, transparent 2px), #030406 !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    padding: 8px 32px !important;
+    border-radius: 4px !important;
+    border: 1px solid #000 !important;
+    box-shadow: inset 0 4px 10px rgba(0,0,0,1), inset 0 1px 3px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* Guarded ABORT Switch */
+.abort-guard-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 12px;
+    position: relative;
+}
+.abort-guard-left, .abort-guard-right {
+    width: 8px;
+    height: 40px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #2a2d35, #4a4e59, #2a2d35);
+    box-shadow: 2px 0 4px rgba(0,0,0,0.8), inset 1px 1px 2px rgba(255,255,255,0.3);
+    border: 1px solid #111;
+}
+.btn-abort-guarded {
+    background: linear-gradient(180deg, #111, #000);
+    border: 1px solid #000;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 8px rgba(0,0,0,0.9);
+}
+/* The glowing red square inside the switch */
+.btn-abort-guarded::after {
+    content: 'ABORT';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #ff1a1a, #990000);
+    border: 2px solid #550000;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    box-shadow: inset 0 0 10px rgba(255,255,255,0.4), 0 0 10px rgba(255,0,0,0.6);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.btn-abort-guarded:active {
+    transform: translateY(2px);
+    box-shadow: inset 0 4px 8px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9);
+}
+.btn-abort-guarded:active::after {
+    background: linear-gradient(180deg, #cc0000, #660000);
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
 }

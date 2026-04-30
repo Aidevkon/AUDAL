@@ -16,6 +16,7 @@ target = "index.html"
 
 # Explicitly watch assets/ so CSS changes trigger browser reload
 [watch]
+watch = ["src", "assets"]
 ignore = []
 
 [[hooks]]

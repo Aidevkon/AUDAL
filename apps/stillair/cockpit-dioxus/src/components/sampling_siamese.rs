@@ -19,26 +19,25 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
         div {
             class: "sampling-siamese",
             
-            // INSIGHTS - LEFT (25%)
-            div { class: "siamese-col siamese-insights",
-                InsightsPanel {
-                    mode: props.mode,
-                    session_state: props.session_state,
-                    playback_state: props.playback_state,
-                    viz_data: props.viz_data,
-                }
-            }
-
-            // JOIN VERTICAL SLOT (1px)
-            div { class: "siamese-join" }
-
-            // SESSION - CENTER (50%)
+            // SESSION - LEFT (PSA)
             div { class: "siamese-col siamese-session",
                 SessionPanel {
                     mode: props.mode,
                     session_state: props.session_state,
                     viz_data: props.viz_data,
                     show_mastered: props.show_mastered,
+                }
+            }
+
+
+
+            // INSIGHTS - CENTER (Spectral Dynamics)
+            div { class: "siamese-col siamese-insights",
+                InsightsPanel {
+                    mode: props.mode,
+                    session_state: props.session_state,
+                    playback_state: props.playback_state,
+                    viz_data: props.viz_data,
                 }
             }
             
