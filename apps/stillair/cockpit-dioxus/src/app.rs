@@ -28,7 +28,6 @@ use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::intent_bay::IntentBay;
 use crate::components::{
     screw::Screw,
-    soft_key::{SoftKey, SoftKeyVariant},
     annunciator::Annunciator,
 };
 
@@ -76,10 +75,10 @@ pub fn App() -> Element {
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
     let mut intent_open: Signal<bool> = use_signal(|| false);
-    let mut tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
-    let mut dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
-    let mut space_angle: Signal<f32> = use_signal(|| 0.0_f32);
-    let mut loud_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let space_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    let loud_angle: Signal<f32> = use_signal(|| 0.0_f32);
 
     // ── Mode badge style  ─────────────────────────────────────────────────────
 
