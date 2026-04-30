@@ -249,12 +249,12 @@ pub fn App() -> Element {
                 // Right: Critical Zone
                 div {
                     class: "transport-right abort-zone",
-                    // Small STOP pill next to ABORT
+                    // Small STOP pill next to ABORT (Repurposed for Intent Bay reveal)
                     button {
                         class: "btn-pill btn-pill-red",
                         onclick: move |_| {
-                            let ps = playback_state.clone();
-                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
+                            let current = *intent_open.read();
+                            intent_open.set(!current);
                         },
                         "STOP"
                     }
