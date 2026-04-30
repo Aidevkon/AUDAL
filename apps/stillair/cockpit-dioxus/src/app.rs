@@ -142,12 +142,22 @@ pub fn App() -> Element {
                 // Left: Annunciator Zone
                 div {
                     class: "transport-left dsp-annunciators",
-                    Annunciator { label: "FM0".to_string(), is_master: true, active: true }
+                    div { class: "fm0-zone",
+                        Annunciator { label: "FM0".to_string(), is_master: true, active: true }
+                    }
                     div { class: "dsp-separator" }
-                    Annunciator { label: "EQ".to_string(), active: true, sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]) }
-                    Annunciator { label: "COMP".to_string(), active: true, sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]) }
-                    Annunciator { label: "SAT".to_string(), active: true, sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]) }
-                    Annunciator { label: "LIMIT".to_string(), active: true, sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]) }
+                    div { class: "dsp-chassis",
+                        div { class: "dsp-screw top-left" }
+                        div { class: "dsp-screw top-right" }
+                        div { class: "dsp-screw bottom-left" }
+                        div { class: "dsp-screw bottom-right" }
+                        div { class: "dsp-slots-wrapper",
+                            Annunciator { label: "EQ".to_string(), active: true, sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]) }
+                            Annunciator { label: "COMP".to_string(), active: true, sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]) }
+                            Annunciator { label: "SAT".to_string(), active: true, sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]) }
+                            Annunciator { label: "LIMIT".to_string(), active: true, sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]) }
+                        }
+                    }
                 }
 
                 div { class: "transport-module-divider" }

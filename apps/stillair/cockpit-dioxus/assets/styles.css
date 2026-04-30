@@ -927,7 +927,7 @@ body {
     flex: 1;
     height: 100%;
     display: flex;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
 }
 
@@ -1712,7 +1712,7 @@ body {
 .dsp-annunciators {
     display: flex;
     gap: 16px;
-    align-items: flex-end;
+    align-items: center;
 }
 
 .dsp-slot {
@@ -1720,6 +1720,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 8px;
+    position: relative;
 }
 
 .dsp-label {
@@ -1789,6 +1790,106 @@ body {
 }
 
 
+/* ── DSP Chassis: Brushed-metal multi-module container ────────────────────── */
+
+.dsp-chassis {
+    display: flex;
+    background: linear-gradient(180deg, #33363f, #1b1e25);
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #000;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 6px 12px rgba(0, 0, 0, 0.8);
+    position: relative;
+    margin-left: 8px;
+}
+
+.dsp-screw {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4a4f5a, #2a2d36);
+    border: 1px solid #111;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.8);
+    z-index: 2;
+}
+.dsp-screw.top-left { top: 4px; left: 4px; }
+.dsp-screw.top-right { top: 4px; right: 4px; }
+.dsp-screw.bottom-left { bottom: 4px; left: 4px; }
+.dsp-screw.bottom-right { bottom: 4px; right: 4px; }
+
+.dsp-slots-wrapper {
+    display: flex;
+    gap: 4px;
+    z-index: 2;
+}
+
+/* ── Individual DSP Pits (recessed dark wells) ────────────────────────────── */
+
+.dsp-pit {
+    width: 48px;
+    height: 68px;
+    background: #0f1115;
+    border-radius: 6px;
+    box-shadow: inset 0 4px 8px rgba(0, 0, 0, 1), inset 0 1px 2px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.dsp-engraved-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: #e2e4e9;
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Override .dsp-led when used inside a pit (non-master modules) */
+.dsp-pit > .dsp-led {
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    background: #080a0e;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.1);
+    margin: 0 !important;
+    border: none !important;
+}
+.dsp-pit > .dsp-led.active {
+    background: #cbf9ff;
+    box-shadow: 0 0 8px #00e5ff, 0 0 16px rgba(0, 229, 255, 0.6);
+}
+
+.dsp-pit .dsp-sub-leds {
+    display: flex;
+    gap: 6px;
+}
+.dsp-pit .dsp-sub-led-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.dsp-pit .dsp-sub-led-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #2a2e36;
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.dsp-pit .dsp-sub-led-dot.active {
+    background: #cbf9ff;
+    box-shadow: 0 0 4px #00e5ff, 0 0 8px rgba(0, 229, 255, 0.4);
+}
+.dsp-pit .dsp-sub-led-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 9px;
+    color: #9aa0b0;
+    font-weight: 600;
+}
 
 .abort-module {
     display: flex;
@@ -1989,8 +2090,16 @@ body {
     width: 1px;
     height: 60%;
     background: rgba(255, 255, 255, 0.05);
-    margin: 0 10px;
+    margin: 0;
     box-shadow: 1px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+/* FM0 centering zone — fills space between chassis screw and separator */
+.fm0-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* padding-left removed: transport-left flex centering handles alignment */
 }
 
 /* Annunciators: Master FM0 Hardware Block */
@@ -2004,14 +2113,9 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* Vertically center the text and pit */
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
     border: 1px solid #000;
-    margin-right: 16px;
-    margin-left: 20px;
-    /* Clear the main chassis screw */
     flex-shrink: 0;
-    /* Hide the original dsp-label since we use engraved-label */
 }
 
 .fm0-slot .dsp-label {
@@ -2023,9 +2127,10 @@ body {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #0a0c10;
-    border: 1px solid #000;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, #4a4f5a, #2a2d36);
+    border: 1px solid #111;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.8);
+    z-index: 2;
 }
 
 .fm0-screw.top-left {

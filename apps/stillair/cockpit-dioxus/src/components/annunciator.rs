@@ -20,24 +20,19 @@ pub struct AnnunciatorProps {
 
 #[component]
 pub fn Annunciator(props: AnnunciatorProps) -> Element {
-    let mut slot_class = "dsp-slot".to_string();
     let mut led_class = "dsp-led".to_string();
     
     if props.is_master {
-        slot_class.push_str(" fm0-slot");
         led_class.push_str(" fm0-led");
-    } else {
-        led_class.push_str(" dsp-square-btn");
     }
     
     if props.active {
-        // We use flicker-active which in CSS will trigger a 0.1s flicker animation
         led_class.push_str(" active flicker-active");
     }
 
     rsx! {
-        div { class: "{slot_class}",
-            if props.is_master {
+        if props.is_master {
+            div { class: "dsp-slot fm0-slot",
                 div { class: "fm0-screw top-left" }
                 div { class: "fm0-screw top-right" }
                 div { class: "fm0-screw bottom-left" }
@@ -46,15 +41,17 @@ pub fn Annunciator(props: AnnunciatorProps) -> Element {
                 div { class: "fm0-pit",
                     div { class: "{led_class}" }
                 }
-            } else {
-                span { class: "dsp-label", "{props.label}" }
+            }
+        } else {
+            div { class: "dsp-pit",
                 div { class: "{led_class}" }
+                span { class: "dsp-engraved-label", "{props.label}" }
                 if let Some(ref sub) = props.sub_labels {
                     div {
                         class: "dsp-sub-leds",
-                        for label in sub {
+                        for (i, label) in sub.iter().enumerate() {
                             div { class: "dsp-sub-led-col",
-                                div { class: "dsp-sub-led-dot" }
+                                div { class: if i == 0 { "dsp-sub-led-dot active" } else { "dsp-sub-led-dot" } }
                                 span { class: "dsp-sub-led-label", "{label}" }
                             }
                         }
