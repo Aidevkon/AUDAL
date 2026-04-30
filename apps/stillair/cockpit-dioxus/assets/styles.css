@@ -933,44 +933,10 @@ body {
 
 .transport-center {
     flex: 2;
-    height: 64px;
-    /* Constrain height to match FM0 block */
-    background: linear-gradient(135deg, #2b2e35, #17191d);
-    border-radius: 8px;
-    position: relative;
     display: flex;
     justify-content: center;
-    gap: 16px;
     align-items: center;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-    border: 1px solid #000;
-    margin: 0 24px;
 }
-
-/* 4 Screws for the center block */
-.transport-center::before,
-.transport-center::after {
-    content: '';
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #111;
-    border: 1px solid #000;
-    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 1), 0 1px 1px rgba(255, 255, 255, 0.2);
-}
-
-.transport-center::before {
-    top: 4px;
-    left: 4px;
-}
-
-.transport-center::after {
-    bottom: 4px;
-    left: 4px;
-}
-
-/* We need 2 more screws for the right side, so let's add an inner pseudo element or rely on HTML */
 
 .transport-right {
     flex: 1;
@@ -2203,52 +2169,84 @@ body {
     align-items: center;
 }
 
-/* Pill Buttons (Convex Rubber Style: ◄◄, PLAY, ►►) */
-.btn-pill {
-    background: linear-gradient(180deg, #383c47, #24272e, #17191d);
+/* Multi-Function Display (MFD) Center Pit */
+.transport-mfd-pit {
+    flex: 1;
+    background: #0d1016;
+    border-radius: 6px;
+    box-shadow: inset 0 6px 12px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 16px;
+    gap: 8px;
+    margin: 0 12px;
     border: 1px solid #000;
-    border-top: 1px solid #555b6b;
-    border-radius: 12px;
-    padding: 6px 14px;
-    color: #a0a6bd;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 800;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.4);
-    text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.8);
+}
+
+.mfd-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* Square Keycaps */
+.btn-keycap {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #3d424b 0%, #2b2e35 50%, #1f2228 100%);
+    border: 1px solid #000;
+    color: #e2e4e9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: 
+        inset 0 1px 1px rgba(255,255,255,0.15),
+        inset 0 -1px 2px rgba(0,0,0,0.4),
+        0 4px 0 #0f1115,
+        0 6px 10px rgba(0,0,0,0.6);
     cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.05s ease;
+    margin-bottom: 4px;
 }
 
-.btn-pill:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 2px 6px rgba(0, 0, 0, 0.8);
-    border-top: 1px solid #24272e;
+.btn-keycap:active {
+    transform: translateY(4px);
+    background: linear-gradient(180deg, #2b2e35 0%, #1f2228 100%);
+    box-shadow: 
+        inset 0 1px 3px rgba(0,0,0,0.8),
+        0 0 0 #0f1115,
+        0 1px 2px rgba(0,0,0,0.4);
 }
 
-.btn-pill-orange {
-    background: linear-gradient(180deg, #e6a500, #b38000, #664900);
-    color: #fff;
-    border-top: 1px solid #ffcc33;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+.btn-keycap-orange {
+    width: 40px;
+    background: linear-gradient(180deg, #b37700 0%, #805500 50%, #4d3300 100%);
+    color: #ffd666;
+    text-shadow: 0 0 6px rgba(255, 183, 3, 0.8), 0 1px 2px rgba(0,0,0,0.8);
+    box-shadow: 
+        inset 0 1px 1px rgba(255,204,102,0.3),
+        inset 0 -1px 2px rgba(0,0,0,0.6),
+        0 4px 0 #332200,
+        0 6px 10px rgba(0,0,0,0.6);
 }
 
-.btn-pill-orange:active {
-    background: linear-gradient(180deg, #b38000, #664900, #332400);
-    border-top: 1px solid #b38000;
+.btn-keycap-orange:active {
+    background: linear-gradient(180deg, #805500 0%, #4d3300 100%);
+    box-shadow: 
+        inset 0 1px 3px rgba(0,0,0,0.8),
+        0 0 0 #332200,
+        0 1px 2px rgba(0,0,0,0.6);
 }
 
-.btn-pill-red {
-    background: linear-gradient(180deg, #cc2922, #991f1a, #4d0f0d);
-    color: #fff;
-    border-top: 1px solid #ff5c52;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.btn-pill-red:active {
-    background: linear-gradient(180deg, #991f1a, #661411, #330a09);
-    border-top: 1px solid #991f1a;
+.btn-keycap-stop {
+    width: 40px;
+    color: #aeb4c9;
 }
 
 /* Mini Stop Button */
@@ -2284,14 +2282,36 @@ body {
 .transport-time {
     color: #00e5ff !important;
     text-shadow: 0 0 4px #00e5ff, 0 0 12px rgba(0, 229, 255, 0.8), 0 0 24px rgba(0, 229, 255, 0.4) !important;
-    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.3) 0px, rgba(0, 0, 0, 0.3) 1px, transparent 1px, transparent 2px), #030406 !important;
-    font-size: 16px !important;
-    font-weight: 800 !important;
-    padding: 8px 32px !important;
+    background: #030406 !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    padding: 2px 16px !important;
     border-radius: 4px !important;
     border: 1px solid #000 !important;
-    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 1), inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-    font-family: var(--font-mono) !important;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,1), inset 0 1px 3px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.05) !important;
+    font-family: 'Share Tech Mono', monospace, var(--font-mono) !important;
+    margin-bottom: 4px; /* Align with keycaps physical base */
+    line-height: 1.1 !important;
+}
+
+/* Glowing Scrub Trench */
+.transport-scrub-trench {
+    width: 100%;
+    height: 8px;
+    background: #040507;
+    border-radius: 4px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.05);
+    border: 1px solid #000;
+    overflow: hidden;
+    cursor: pointer;
+    margin-top: 4px;
+}
+.transport-scrub-trench-fill {
+    height: 100%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan);
+    border-radius: 2px;
+    transition: width 0.1s linear;
 }
 
 /* Guarded ABORT Switch */

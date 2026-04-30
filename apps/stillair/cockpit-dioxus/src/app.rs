@@ -157,31 +157,43 @@ pub fn App() -> Element {
                 div {
                     class: "transport-center",
 
-                    // Mini Stop Button (left of timecode)
-                    button {
-                        class: "btn-mini-square",
-                        onclick: move |_| {
-                            let ps = playback_state.clone();
-                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
-                        },
-                        div { class: "icon-stop-square" }
-                    }
-
-                    // Main display column
-                    div { class: "transport-center-col",
-                        // Top row: Pill buttons
-                        div { class: "transport-pill-row",
+                    div {
+                        class: "transport-mfd-pit",
+                        
+                        // Top row of controls and timecode
+                        div { class: "mfd-controls-row",
+                            // SKIP BACK
                             button {
-                                class: "btn-pill",
+                                class: "btn-keycap",
                                 onclick: move |_| {
                                     let new_ms = position_ms.saturating_sub(5_000);
                                     let ps = playback_state.clone();
                                     spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
                                 },
-                                "◄◄ 5s"
+                                "◄◄"
                             }
+
+                            // Middle: OLED Timecode
+                            div {
+                                class: "transport-vfd-display transport-time",
+                                id:    "transport-position",
+                                { format!("00:{:02}:{:02}:{:03}", position_ms / 60000, (position_ms / 1000) % 60, position_ms % 1000) }
+                            }
+
+                            // SKIP FORWARD
                             button {
-                                class: if is_playing { "btn-pill btn-pill-orange active" } else { "btn-pill btn-pill-orange" },
+                                class: "btn-keycap",
+                                onclick: move |_| {
+                                    let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                    let ps = playback_state.clone();
+                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                },
+                                "►►"
+                            }
+
+                            // PLAY
+                            button {
+                                class: if is_playing { "btn-keycap btn-keycap-orange active" } else { "btn-keycap btn-keycap-orange" },
                                 onclick: move |_| {
                                     let action = if is_playing { "pause" } else { "play" };
                                     let ps = playback_state.clone();
@@ -189,27 +201,21 @@ pub fn App() -> Element {
                                 },
                                 "PLAY"
                             }
+
+                            // STOP
                             button {
-                                class: "btn-pill",
+                                class: "btn-keycap btn-keycap-stop",
                                 onclick: move |_| {
-                                    let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
                                     let ps = playback_state.clone();
-                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                    spawn_local(async move { invoke_playback("stop", None, ps).await; });
                                 },
-                                "5s ►►"
+                                "STOP"
                             }
                         }
 
-                        // Middle: OLED Timecode
+                        // Bottom: Glowing Scrub Trench
                         div {
-                            class: "transport-vfd-display transport-time",
-                            id:    "transport-position",
-                            { format!("({:02}:{:02})", position_ms / 60000, (position_ms / 1000) % 60) }
-                        }
-
-                        // Bottom: Scrub track
-                        div {
-                            class: "transport-scrub",
+                            class: "transport-scrub-trench",
                             id:    "transport-scrub",
                             onclick: move |evt| {
                                 if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 { return; }
@@ -224,11 +230,7 @@ pub fn App() -> Element {
                                     spawn_local(async move { invoke_playback("seek", Some(seek_ms), ps).await; });
                                 }
                             },
-                            div { class: "transport-scrub-track",
-                                div { class: "transport-scrub-fill", style: format!("width:{}%", scrub_len) }
-                            }
-                            div { class: "transport-scrub-head", style: format!("left:{}%", scrub_len) }
-                            div { class: "transport-scrub-label", "SCRUB" }
+                            div { class: "transport-scrub-trench-fill", style: format!("width:{}%", scrub_len) }
                         }
                     }
                 }
