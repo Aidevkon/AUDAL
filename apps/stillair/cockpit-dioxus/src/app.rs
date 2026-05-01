@@ -29,6 +29,7 @@ use crate::components::intent_bay::IntentBay;
 use crate::components::{
     screw::Screw,
     annunciator::Annunciator,
+    play_actuator::{PlayActuator, LedColor},
 };
 
 
@@ -172,14 +173,17 @@ pub fn App() -> Element {
                         // Top row of controls and timecode
                         div { class: "mfd-controls-row",
                             // SKIP BACK
-                            button {
-                                class: "btn-keycap",
-                                onclick: move |_| {
-                                    let new_ms = position_ms.saturating_sub(5_000);
-                                    let ps = playback_state.clone();
-                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
-                                },
-                                "◄◄"
+                            div { class: "transport-btn-col",
+                                div { class: "transport-led-spacer" }
+                                button {
+                                    class: "btn-keycap",
+                                    onclick: move |_| {
+                                        let new_ms = position_ms.saturating_sub(5_000);
+                                        let ps = playback_state.clone();
+                                        spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                    },
+                                    span { "◄◄" }
+                                }
                             }
 
                             // Middle: OLED Timecode
@@ -190,35 +194,45 @@ pub fn App() -> Element {
                             }
 
                             // SKIP FORWARD
-                            button {
-                                class: "btn-keycap",
-                                onclick: move |_| {
-                                    let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                    let ps = playback_state.clone();
-                                    spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
-                                },
-                                "►►"
+                            div { class: "transport-btn-col",
+                                div { class: "transport-led-spacer" }
+                                button {
+                                    class: "btn-keycap",
+                                    onclick: move |_| {
+                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                        let ps = playback_state.clone();
+                                        spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
+                                    },
+                                    span { "►►" }
+                                }
                             }
 
                             // PLAY
-                            button {
-                                class: if is_playing { "btn-keycap btn-keycap-orange active" } else { "btn-keycap btn-keycap-orange" },
-                                onclick: move |_| {
-                                    let action = if is_playing { "pause" } else { "play" };
-                                    let ps = playback_state.clone();
-                                    spawn_local(async move { invoke_playback(action, None, ps).await; });
-                                },
-                                "PLAY"
+                            div { class: "transport-btn-col",
+                                div { class: "transport-led-spacer" }
+                                PlayActuator {
+                                    label: "PLAY".to_string(),
+                                    color: LedColor::Amber,
+                                    active: is_playing,
+                                    on_click: move |_| {
+                                        let action = if is_playing { "pause" } else { "play" };
+                                        let ps = playback_state.clone();
+                                        spawn_local(async move { invoke_playback(action, None, ps).await; });
+                                    }
+                                }
                             }
 
                             // STOP
-                            button {
-                                class: "btn-keycap btn-keycap-stop",
-                                onclick: move |_| {
-                                    let ps = playback_state.clone();
-                                    spawn_local(async move { invoke_playback("stop", None, ps).await; });
-                                },
-                                "STOP"
+                            div { class: "transport-btn-col",
+                                div { class: if !is_playing { "transport-led-pill red-active" } else { "transport-led-pill" } }
+                                button {
+                                    class: "btn-keycap btn-keycap-stop",
+                                    onclick: move |_| {
+                                        let ps = playback_state.clone();
+                                        spawn_local(async move { invoke_playback("stop", None, ps).await; });
+                                    },
+                                    span { "STOP" }
+                                }
                             }
                         }
 

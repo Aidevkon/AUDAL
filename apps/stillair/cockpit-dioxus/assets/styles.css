@@ -1813,10 +1813,26 @@ body {
     box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.8);
     z-index: 2;
 }
-.dsp-screw.top-left { top: 4px; left: 4px; }
-.dsp-screw.top-right { top: 4px; right: 4px; }
-.dsp-screw.bottom-left { bottom: 4px; left: 4px; }
-.dsp-screw.bottom-right { bottom: 4px; right: 4px; }
+
+.dsp-screw.top-left {
+    top: 4px;
+    left: 4px;
+}
+
+.dsp-screw.top-right {
+    top: 4px;
+    right: 4px;
+}
+
+.dsp-screw.bottom-left {
+    bottom: 4px;
+    left: 4px;
+}
+
+.dsp-screw.bottom-right {
+    bottom: 4px;
+    right: 4px;
+}
 
 .dsp-slots-wrapper {
     display: flex;
@@ -1849,7 +1865,7 @@ body {
 }
 
 /* Override .dsp-led when used inside a pit (non-master modules) */
-.dsp-pit > .dsp-led {
+.dsp-pit>.dsp-led {
     width: 10px !important;
     height: 10px !important;
     border-radius: 50% !important;
@@ -1858,7 +1874,8 @@ body {
     margin: 0 !important;
     border: none !important;
 }
-.dsp-pit > .dsp-led.active {
+
+.dsp-pit>.dsp-led.active {
     background: #cbf9ff;
     box-shadow: 0 0 8px #00e5ff, 0 0 16px rgba(0, 229, 255, 0.6);
 }
@@ -1867,12 +1884,14 @@ body {
     display: flex;
     gap: 6px;
 }
+
 .dsp-pit .dsp-sub-led-col {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
 }
+
 .dsp-pit .dsp-sub-led-dot {
     width: 6px;
     height: 6px;
@@ -1880,10 +1899,12 @@ body {
     background: #2a2e36;
     box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
+
 .dsp-pit .dsp-sub-led-dot.active {
     background: #cbf9ff;
     box-shadow: 0 0 4px #00e5ff, 0 0 8px rgba(0, 229, 255, 0.4);
 }
+
 .dsp-pit .dsp-sub-led-label {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 9px;
@@ -2282,14 +2303,16 @@ body {
     flex: 1;
     background: #0d1016;
     border-radius: 6px;
-    box-shadow: inset 0 6px 12px rgba(0,0,0,1), 0 1px 1px rgba(255,255,255,0.05);
+    box-shadow: inset 0 6px 12px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.15);
+    /* Metallic rim */
     display: flex;
     flex-direction: column;
     justify-content: center;
     padding: 10px 16px;
     gap: 8px;
     margin: 0 12px;
-    border: 1px solid #000;
+    border: 1px solid #080a0e;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .mfd-controls-row {
@@ -2299,62 +2322,123 @@ body {
     gap: 12px;
 }
 
-/* Square Keycaps */
+/* --- Global Keycap Geometry --- */
 .btn-keycap {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 48px;
     border-radius: 4px;
-    background: linear-gradient(180deg, #3d424b 0%, #2b2e35 50%, #1f2228 100%);
-    border: 1px solid #000;
-    color: #e2e4e9;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    box-shadow: 
-        inset 0 1px 1px rgba(255,255,255,0.15),
-        inset 0 -1px 2px rgba(0,0,0,0.4),
-        0 4px 0 #0f1115,
-        0 6px 10px rgba(0,0,0,0.6);
-    cursor: pointer;
+    /* Πιο κοφτές γωνίες για hardware feel */
+    position: relative;
+    border: none;
+    /* Αφαιρέθηκε το dark outer border */
+
+    /* Το "Skirt" του κουμπιού (η βάση) */
+    background: #1a1c22;
+
+    /* 3D layers: 1.Top face highlight, 2.Depth shadow, 3.Floor shadow */
+    box-shadow:
+        inset 1px 1px 1px rgba(255, 255, 255, 0.4),
+        inset -1px -1px 2px rgba(0, 0, 0, 0.8),
+        0 4px 0 #0a0b0d,
+        0 6px 12px rgba(0, 0, 0, 0.8);
+
+    transition: all 0.05s ease;
+    overflow: hidden;
+    /* Για να μην ξεφεύγει το εσωτερικό glow */
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.05s ease;
-    margin-bottom: 4px;
+    cursor: pointer;
+    margin: 0;
 }
 
 .btn-keycap:active {
     transform: translateY(4px);
-    background: linear-gradient(180deg, #2b2e35 0%, #1f2228 100%);
-    box-shadow: 
-        inset 0 1px 3px rgba(0,0,0,0.8),
-        0 0 0 #0f1115,
-        0 1px 2px rgba(0,0,0,0.4);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.8),
+        0 0 0 #0a0b0d,
+        0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-.btn-keycap-orange {
-    width: 40px;
-    background: linear-gradient(180deg, #b37700 0%, #805500 50%, #4d3300 100%);
-    color: #ffd666;
-    text-shadow: 0 0 6px rgba(255, 183, 3, 0.8), 0 1px 2px rgba(0,0,0,0.8);
-    box-shadow: 
-        inset 0 1px 1px rgba(255,204,102,0.3),
-        inset 0 -1px 2px rgba(0,0,0,0.6),
-        0 4px 0 #332200,
-        0 6px 10px rgba(0,0,0,0.6);
+/* Η πάνω επιφάνεια του κουμπιού (Top Face) */
+.btn-keycap::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    /* Δημιουργεί το bevel / πλάγιασμα */
+    border-radius: 4px;
+    background: linear-gradient(180deg, #353840 0%, #202227 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    z-index: 0;
 }
 
-.btn-keycap-orange:active {
-    background: linear-gradient(180deg, #805500 0%, #4d3300 100%);
-    box-shadow: 
-        inset 0 1px 3px rgba(0,0,0,0.8),
-        0 0 0 #332200,
-        0 1px 2px rgba(0,0,0,0.6);
+/* Το κείμενο πρέπει να είναι πάνω από το top face */
+.btn-keycap span {
+    position: relative;
+    z-index: 10;
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: #ffffff;
+    text-shadow: 0 0 2px #fff, 0 0 8px rgba(255, 183, 3, 0.8);
 }
 
-.btn-keycap-stop {
-    width: 40px;
-    color: #aeb4c9;
+.btn-keycap {
+    font-family: 'Inter', sans-serif;
+    /* Ή το σύμβολο FF */
+    font-size: 11px;
+    font-weight: 300;
+    /* Light weight for professional stencil look */
+    color: #ffffff;
+}
+
+/* --- STOP (Light Leak & Texture) --- */
+.btn-keycap-stop::after {
+    background-image:
+        linear-gradient(180deg, #353840 0%, #202227 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+    background-blend-mode: overlay;
+}
+
+/* --- STOP (Light Leak Effect) --- */
+.btn-keycap-stop::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Η αντανάκλαση από το κόκκινο LED */
+    background: radial-gradient(at top, rgba(255, 30, 30, 0.35), transparent 75%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Hardware Layouts & Indicators */
+.transport-btn-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.transport-led-spacer {
+    width: 24px;
+    height: 8px;
+    visibility: hidden;
+}
+
+.transport-led-pill {
+    width: 24px;
+    height: 8px;
+    border-radius: 4px;
+    background: #330505;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.transport-led-pill.red-active {
+    background: #ff1e1e;
+    box-shadow: 0 0 12px rgba(255, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 /* Mini Stop Button */
@@ -2396,9 +2480,10 @@ body {
     padding: 2px 16px !important;
     border-radius: 4px !important;
     border: 1px solid #000 !important;
-    box-shadow: inset 0 2px 6px rgba(0,0,0,1), inset 0 1px 3px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.05) !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 1), inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.05) !important;
     font-family: 'Share Tech Mono', monospace, var(--font-mono) !important;
-    margin-bottom: 4px; /* Align with keycaps physical base */
+    margin-bottom: 4px;
+    /* Align with keycaps physical base */
     line-height: 1.1 !important;
 }
 
@@ -2408,12 +2493,13 @@ body {
     height: 8px;
     background: #040507;
     border-radius: 4px;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.05);
     border: 1px solid #000;
     overflow: hidden;
     cursor: pointer;
     margin-top: 4px;
 }
+
 .transport-scrub-trench-fill {
     height: 100%;
     background: var(--accent-cyan);
@@ -2515,4 +2601,169 @@ body {
     background: linear-gradient(180deg, rgba(204, 0, 0, 0.95), rgba(102, 0, 0, 0.95));
     border-bottom: 1px solid #330000;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 4px rgba(255, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   PLAY ACTUATOR — Hardware Keycap (Illuminated Amber)
+   ========================================================================== */
+
+.play-actuator {
+    position: relative;
+    top: -5px;
+    /* optical alignment fix */
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0);
+}
+
+
+/* Matte dark chassis */
+.pa-housing {
+    width: 58px;
+    height: 58px;
+    background: #141518;
+    border-radius: 6px;
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.85),
+        0 4px 10px rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+
+
+/* Acrylic lens with bevel + chamfer */
+.pa-lens {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+
+    /* --- SATIN ACRYLIC WITH LIT EDGES --- */
+    background: radial-gradient(circle at 50% 60%,
+            rgba(255, 120, 20, 0.35) 0%,
+            rgba(120, 50, 0, 0.25) 40%,
+            rgba(20, 10, 0, 0.85) 100%);
+
+    /* --- EDGE SHADOWS + BEVEL --- */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        /* sharper top chamfer highlight */
+        inset 1px 0 0 rgba(255, 255, 255, 0.30),
+        /* crisp left side-wall highlight */
+        inset -1px 0 0 rgba(255, 255, 255, 0.15),
+        /* crisp right side-wall highlight */
+        inset 0 -3px 2px rgba(0, 0, 0, 1),
+        /* harder cutoff lower bevel shadow */
+        inset 0 -1px 0 rgba(0, 0, 0, 0.80),
+        /* bottom edge extra cutoff */
+        inset 0 0 0 1px rgba(0, 0, 0, 0.32),
+        /* inner acrylic depth plane */
+        inset 0 6px 12px rgba(0, 0, 0, 0.20),
+        /* internal optical depth */
+        0 0 10px rgba(255, 136, 0, 0.25),
+        inset 0 12px 18px rgba(255, 136, 0, 0.12);
+    /* acrylic glow */
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 40ms ease, box-shadow 40ms ease;
+}
+
+
+
+
+
+/* LED emitter plate */
+.pa-led {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 65%,
+            rgba(255, 120, 20, 0.75) 0%,
+            rgba(255, 90, 10, 0.45) 22%,
+            rgba(80, 30, 0, 0.25) 45%,
+            rgba(0, 0, 0, 0) 70%);
+    filter: blur(2.5px);
+    transition: opacity 40ms ease, filter 40ms ease;
+    pointer-events: none;
+}
+
+
+
+/* Engraved label */
+.pa-label {
+    position: relative;
+    z-index: 2;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: rgba(25, 20, 15, 0.50);
+    text-shadow:
+        0 -1px 1px rgba(255, 140, 40, 0.35),
+        0 1px 3px rgba(255, 110, 20, 0.40),
+        -1px 0 2px rgba(255, 110, 20, 0.28),
+        1px 0 2px rgba(255, 110, 20, 0.28);
+    pointer-events: none;
+    transition: color 40ms ease, text-shadow 40ms ease;
+}
+
+
+/* ACTIVE STATE — Pressed mechanics */
+.play-actuator:active .pa-lens,
+.play-actuator.active .pa-lens {
+    transform: translateY(2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.30),
+        inset 1px 0 0 rgba(255, 255, 255, 0.20),
+        inset -1px 0 0 rgba(255, 255, 255, 0.10),
+        inset 0 -3px 2px rgba(0, 0, 0, 1),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.80),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.32),
+        inset 0 6px 12px rgba(0, 0, 0, 0.20),
+        0 0 24px rgba(255, 136, 0, 0.55),
+        inset 0 12px 18px rgba(255, 136, 0, 0.12);
+}
+
+.play-actuator:active .pa-led,
+.play-actuator.active .pa-led {
+    opacity: 1;
+    filter: blur(4px);
+}
+
+.play-actuator:active .pa-label,
+.play-actuator.active .pa-label {
+    color: rgba(35, 25, 15, 0.65);
+    text-shadow:
+        /* cavity base */
+        0 -1px 0 rgba(0, 0, 0, 1),
+        0 1px 0 rgba(0, 0, 0, 0.85),
+
+        /* stronger rim leakage */
+        0 -1px 1px rgba(255, 136, 0, 0.55),
+
+        /* stronger left + right walls */
+        -1px -1px 2px rgba(255, 136, 0, 0.45),
+        1px -1px 2px rgba(255, 136, 0, 0.45),
+
+        /* stronger bottom scattering */
+        0 2px 3px rgba(255, 136, 0, 0.55);
+}
+
+.play-actuator:active .pa-housing,
+.play-actuator.active .pa-housing {
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.85),
+        0 2px 4px rgba(0, 0, 0, 0.75);
 }
