@@ -42,12 +42,7 @@ enum TransportState {
     Stopped,
 }
 
-/// Format milliseconds as MM:SS
-fn format_ms(ms: u64) -> String {
-    let secs = ms / 1_000;
-    let mins = secs / 60;
-    format!("{:02}:{:02}", mins, secs % 60)
-}
+
 
 /// Scrub fill % (0.0–100.0)
 fn scrub_pct(position_ms: u64, duration_ms: u64) -> f64 {
@@ -141,23 +136,24 @@ pub fn App() -> Element {
 
             // ── Transport bar (bottom strip) — Phase 12B ──────────────────────
             footer { id: "transport-bar", class: "transport-bar",
+                div { class: "transport-frame",
+                    Screw { top: 6, left: 10 }
+                    Screw { top: 6, right: 10 }
+                    Screw { bottom: 6, left: 10 }
+                    Screw { bottom: 6, right: 10 }
 
-                Screw { top: 10, left: 10 }
-                Screw { top: 10, right: 10 }
-                Screw { bottom: 10, left: 10 }
-                Screw { bottom: 10, right: 10 }
-
-                // Left: Annunciator Zone
-                div { class: "transport-left dsp-annunciators",
-                    div { class: "fm0-zone",
-                        Annunciator {
-                            label: "FM0".to_string(),
-                            is_master: true,
-                            active: true,
-                        }
-                    }
-                    div { class: "dsp-separator" }
-                    div { class: "dsp-chassis",
+                    div { class: "transport-panel",
+                        // Left: Annunciator Zone
+                        div { class: "transport-left dsp-annunciators",
+                            div { class: "fm0-zone",
+                                Annunciator {
+                                    label: "FM0".to_string(),
+                                    is_master: true,
+                                    active: true,
+                                }
+                            }
+                            div { class: "dsp-separator" }
+                            div { class: "dsp-chassis",
                         div { class: "dsp-screw top-left" }
                         div { class: "dsp-screw top-right" }
                         div { class: "dsp-screw bottom-left" }
@@ -357,6 +353,8 @@ pub fn App() -> Element {
                             div { class: "abort-led-dot" }
                             div { class: "abort-led-dot" }
                             div { class: "abort-led-dot" }
+                        }
+                    }
                         }
                     }
                 }

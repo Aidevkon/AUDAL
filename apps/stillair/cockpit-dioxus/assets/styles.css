@@ -110,7 +110,7 @@
     --space-8: 2rem;
 
     /* Chassis dimensions */
-    --chassis-transport-h: 115px;
+    --chassis-transport-h: 140px;
     --chassis-header-h: 44px;
     --panel-inset: 12px;
     --bezel-radius: 6px;
@@ -878,20 +878,71 @@ body {
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 #transport-bar {
-    height: 115px;
+    height: var(--chassis-transport-h);
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 15px 25px;
-    background:
-        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
-        repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
-        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+    padding: 6px 12px;
     flex-shrink: 0;
     position: relative;
     z-index: 10;
     pointer-events: auto;
+    background: transparent;
 }
+
+.transport-frame {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    
+    /* Main chassis metal stack */
+    background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+        repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+    box-shadow:
+        inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
+        inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
+        8px 8px 25px rgba(0, 0, 0, 0.6);
+        
+    border-radius: 8px;
+    padding: 6px 32px;
+    /* Horizontal padding for screws */
+    position: relative;
+    align-items: center;
+    z-index: 2;
+    /* Rim above chassis */
+}
+
+.transport-panel {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    justify-content: space-between;
+    align-items: center;
+
+    /* E3 Anodized Aluminium — matte, micro‑brushed, soft falloff */
+    background:
+        /* micro‑noise */
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.06"/></svg>'),
+        /* vertical micro‑brush */
+        repeating-linear-gradient(90deg,
+            transparent 0px,
+            transparent 1px,
+            rgba(255, 255, 255, 0.015) 1px,
+            rgba(255, 255, 255, 0.015) 2px),
+        /* soft anodized falloff */
+        linear-gradient(180deg, #26292e 0%, #1a1c20 100%);
+
+    /* panel cavity */
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.8);
+
+    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+}
+
 
 
 
@@ -945,7 +996,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 16px; /* Space between STOP pill and ABORT column */
+    gap: 16px;
+    /* Space between STOP pill and ABORT column */
 }
 
 .transport-controls {
@@ -2310,8 +2362,10 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 10px 16px;
+    padding: 5px 16px;
+    /* 5px distance from panel rim */
     gap: 8px;
+    /* Restored 2px to meet the +4px total module height requirement */
     margin: 0 12px;
     border: 1px solid #080a0e;
     border-top: 1px solid rgba(255, 255, 255, 0.15);
@@ -2421,7 +2475,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
 }
 
 .transport-led-spacer {
@@ -2554,14 +2608,14 @@ body {
 /* Glowing Scrub Trench */
 .transport-scrub-trench {
     width: 100%;
-    height: 8px;
+    height: 6px;
     background: #040507;
-    border-radius: 4px;
+    border-radius: 3px;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.05);
     border: 1px solid #000;
     overflow: hidden;
     cursor: pointer;
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 .transport-scrub-trench-fill {
@@ -2581,7 +2635,8 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px; /* Spacing between top indicator, button, and bottom strip */
+    gap: 8px;
+    /* Spacing between top indicator, button, and bottom strip */
 }
 
 /* 1. ABORT PENDING Indicator */
@@ -2598,7 +2653,7 @@ body {
     border-radius: 4px;
     background: #110000;
     border: 1px solid #330000;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
     text-shadow: 0 0 6px rgba(255, 0, 0, 0.6);
 }
 
@@ -2635,7 +2690,8 @@ body {
     /* Beautiful brushed cylindrical metal */
     background: linear-gradient(90deg, #222 0%, #aeb4c9 30%, #eef0f5 50%, #8a90a3 70%, #111 100%);
     box-shadow:
-        4px 0px 8px rgba(0, 0, 0, 0.9), /* Cast shadow inside the recess */
+        4px 0px 8px rgba(0, 0, 0, 0.9),
+        /* Cast shadow inside the recess */
         inset 0 1px 2px rgba(255, 255, 255, 0.8),
         inset 0 -1px 2px rgba(0, 0, 0, 0.8);
     position: relative;
@@ -2681,18 +2737,23 @@ body {
     justify-content: center;
     position: relative;
     border: none;
-    
+
     /* The premium dark red gem gradient */
     background: linear-gradient(180deg, #611717 0%, #4a0d0d 45%, #330505 100%);
-    
+
     /* Complex optical bevels */
     box-shadow:
-        inset 0 2px 0 rgba(255, 100, 100, 0.4),   /* Top spec catch */
-        inset 0 -1.5px 1px rgba(0, 0, 0, 0.9),    /* Bottom dark edge */
-        inset 0 0 16px rgba(0, 0, 0, 0.7),        /* Deep internal darkening */
-        0 4px 8px rgba(0, 0, 0, 0.8),             /* Ambient cast shadow */
-        0 0 0 1px rgba(0, 0, 0, 0.8);             /* Structural edge */
-    
+        inset 0 2px 0 rgba(255, 100, 100, 0.4),
+        /* Top spec catch */
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.9),
+        /* Bottom dark edge */
+        inset 0 0 16px rgba(0, 0, 0, 0.7),
+        /* Deep internal darkening */
+        0 4px 8px rgba(0, 0, 0, 0.8),
+        /* Ambient cast shadow */
+        0 0 0 1px rgba(0, 0, 0, 0.8);
+    /* Structural edge */
+
     transition: transform 40ms ease, box-shadow 40ms ease;
 }
 
@@ -2710,13 +2771,16 @@ body {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     font-weight: 700;
-    color: #ff9999; /* Soft pink-red engraving */
+    color: #ff9999;
+    /* Soft pink-red engraving */
     letter-spacing: 0.05em;
-    
+
     /* Matte engraving physics (NO glow!) */
     text-shadow:
-        0 -1px 1px rgba(0, 0, 0, 0.9),      /* Deep cut shadow */
-        0 1px 0 rgba(255, 150, 150, 0.2);   /* Soft bottom reflection */
+        0 -1px 1px rgba(0, 0, 0, 0.9),
+        /* Deep cut shadow */
+        0 1px 0 rgba(255, 150, 150, 0.2);
+    /* Soft bottom reflection */
 }
 
 /* 3. Bottom 6-Dot LED Strip */
@@ -2727,7 +2791,7 @@ body {
     background: #090a0b;
     border-radius: 6px;
     border: 1px solid #000;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .abort-led-dot {
@@ -2735,17 +2799,17 @@ body {
     height: 4px;
     border-radius: 50%;
     background: #1a0505;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .abort-led-dot.active-bright {
     background: #ff3333;
-    box-shadow: 0 0 6px #ff0000, 0 0 12px #ff0000, inset 0 1px 0 rgba(255,255,255,0.5);
+    box-shadow: 0 0 6px #ff0000, 0 0 12px #ff0000, inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .abort-led-dot.active-dim {
     background: #aa1111;
-    box-shadow: 0 0 4px rgba(255,0,0,0.5), inset 0 1px 0 rgba(255,100,100,0.3);
+    box-shadow: 0 0 4px rgba(255, 0, 0, 0.5), inset 0 1px 0 rgba(255, 100, 100, 0.3);
 }
 
 /* --- THE PHYSICAL SEAT --- */
@@ -3009,7 +3073,8 @@ body {
 
 /* --- TRANSPORT TOP LABEL --- */
 .transport-top-label {
-    height: 8px; /* Occupies the same space as the led-spacer */
+    height: 8px;
+    /* Occupies the same space as the led-spacer */
     font-family: var(--font-mono);
     font-size: 0.65rem;
     color: #a0a0a0;
@@ -3019,7 +3084,7 @@ body {
     align-items: center;
     justify-content: center;
     white-space: nowrap;
-    text-shadow: 0 -1px 1px rgba(0,0,0,0.8);
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.8);
 }
 
 /* --- SKIP BUTTON GEOMETRY (Continuous-Action) --- */
@@ -3032,26 +3097,36 @@ body {
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    
+
     /* The Bottom-Incline Surface Physics (Smooth Scoop) */
     /* Top 50% is flat, smoothly curving downward into shadow */
-    background: linear-gradient(
-        to bottom,
-        #303134 0%,       /* Top specular catch */
-        #242528 10%,      /* Flat surface plateau */
-        #242528 48%,      /* Flat surface ends */
-        #1b1c1e 65%,      /* Curve shadow starts */
-        #0b0c0d 100%      /* Deepest part of the scoop */
-    );
+    background: linear-gradient(to bottom,
+            #303134 0%,
+            /* Top specular catch */
+            #242528 10%,
+            /* Flat surface plateau */
+            #242528 48%,
+            /* Flat surface ends */
+            #1b1c1e 65%,
+            /* Curve shadow starts */
+            #0b0c0d 100%
+            /* Deepest part of the scoop */
+        );
 
     /* Identical Specular Rim & Structural Depth (W1 sidewalls, T1 thickness) + Bottom Bounce Light */
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.15),  /* Subtle bone reflection rim */
-        inset 0 -1px 0.5px rgba(255, 255, 255, 0.12), /* Bounce light on bottom scoop edge */
-        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),    /* Bottom separation */
-        inset 0 0 12px rgba(0, 0, 0, 0.8),        /* Inner sidewall darkening */
-        0 2px 3px rgba(0, 0, 0, 0.9),             /* Cast ambient shadow */
-        0 0 0 1px rgba(0, 0, 0, 0.7);             /* Physical edge boundary */
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        /* Subtle bone reflection rim */
+        inset 0 -1px 0.5px rgba(255, 255, 255, 0.12),
+        /* Bounce light on bottom scoop edge */
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
+        /* Bottom separation */
+        inset 0 0 12px rgba(0, 0, 0, 0.8),
+        /* Inner sidewall darkening */
+        0 2px 3px rgba(0, 0, 0, 0.9),
+        /* Cast ambient shadow */
+        0 0 0 1px rgba(0, 0, 0, 0.7);
+    /* Physical edge boundary */
 
     transition: transform 40ms ease, box-shadow 40ms ease;
 }
@@ -3060,13 +3135,13 @@ body {
 /* The entire button translates down inside the existing socket */
 .transport-actuator:active .skip-lens {
     transform: translateY(2px);
-    
+
     /* Keep base socket shadows but flatten the physical drop shadow */
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.1),
         inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
         inset 0 0 12px rgba(0, 0, 0, 0.8),
-        0 0px 1px rgba(0, 0, 0, 0.9), 
+        0 0px 1px rgba(0, 0, 0, 0.9),
         0 0 0 1px rgba(0, 0, 0, 0.7);
 }
 
@@ -3078,15 +3153,17 @@ body {
     font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.05em;
-    
+
     /* Optical Alignment: Align chevron center-line with the baseline of PLAY/STOP */
-    transform: translateY(1.5px); 
+    transform: translateY(1.5px);
 
     /* Clean engraving: sharp dark cut, no glowing halos */
     color: #e0e0e0;
-    text-shadow: 
-        0 -1px 1px rgba(0, 0, 0, 0.9),      /* Top inner shadow (deep cut) */
-        0 1px 0 rgba(255, 255, 255, 0.1);   /* Bottom rim reflection */
-        
+    text-shadow:
+        0 -1px 1px rgba(0, 0, 0, 0.9),
+        /* Top inner shadow (deep cut) */
+        0 1px 0 rgba(255, 255, 255, 0.1);
+    /* Bottom rim reflection */
+
     pointer-events: none;
 }

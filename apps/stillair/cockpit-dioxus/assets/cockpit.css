@@ -49,15 +49,15 @@ body {
 /* PFR — fixed height, never shrinks, never dims */
 .transport-bar {
   flex-shrink: 0 !important;
-  height: 115px !important;
-  min-height: 115px !important;
+  height: auto !important;
+  min-height: auto !important;
   z-index: 100;
 }
 
 /* HUD overlay — absolute, exempt from dim */
 .hud-overlay {
   position: absolute;
-  top: 115px;
+  top: var(--chassis-transport-h);
   left: 0;
   right: 0;
   z-index: 60;
@@ -68,8 +68,8 @@ body {
 .cockpit-work-layer {
   flex: 1 !important;
   min-height: 0 !important;
-  height: calc(100vh - 115px - 200px) !important;
-  max-height: calc(100vh - 115px - 200px) !important;
+  height: calc(100vh - var(--chassis-transport-h) - 200px) !important;
+  max-height: calc(100vh - var(--chassis-transport-h) - 200px) !important;
   display: flex !important;
   flex-direction: row !important;
   overflow: hidden !important;
@@ -491,14 +491,27 @@ body {
 }
 
 .transport-bar {
-  flex: 0 0 calc(10% - 8px) !important;
+  /* Merged properties with top definition to use AUTO computed height */
   position: relative;
   top: 0;
   bottom: auto;
-  min-height: 0;
+  
+  /* Width match and strict sizing */
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
   
   /* 1U Metal Module Styling - Mockup Matte Metal */
-  padding: 8px 16px !important;
+  /* Remove horizontal padding so it aligns exactly with the 100vw chassis */
+  padding: 8px 0 !important;
+}
+
+.transport-frame {
+  /* Match the 16px rounded corners of the main chassis (siamese) below it */
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }
 
 .work-layer {
