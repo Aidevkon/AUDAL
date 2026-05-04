@@ -29,7 +29,7 @@ use crate::components::intent_bay::IntentBay;
 use crate::components::{
     screw::Screw,
     annunciator::Annunciator,
-    transport_button::{TransportActuator, LedColor},
+    transport_button::{TransportActuator, LedColor, SkipActuator},
 };
 
 
@@ -131,16 +131,16 @@ pub fn App() -> Element {
     let duration_ms  = playback_state.read().as_ref().map(|s| s.duration_ms).unwrap_or(0);
     let scrub_len    = scrub_pct(position_ms, duration_ms);
 
+    // Define labels outside rsx! to prevent editor syntax highlighter errors with '<' and '>'
+    let lbl_skip_back = "<<".to_string();
+    let lbl_skip_fwd  = ">>".to_string();
+
     rsx! {
 
-        div {
-            id:    "app-shell",
-            class: "app-shell",
+        div { id: "app-shell", class: "app-shell",
 
             // ── Transport bar (bottom strip) — Phase 12B ──────────────────────
-            footer {
-                id:    "transport-bar",
-                class: "transport-bar",
+            footer { id: "transport-bar", class: "transport-bar",
 
                 Screw { top: 10, left: 10 }
                 Screw { top: 10, right: 10 }
@@ -148,10 +148,13 @@ pub fn App() -> Element {
                 Screw { bottom: 10, right: 10 }
 
                 // Left: Annunciator Zone
-                div {
-                    class: "transport-left dsp-annunciators",
+                div { class: "transport-left dsp-annunciators",
                     div { class: "fm0-zone",
-                        Annunciator { label: "FM0".to_string(), is_master: true, active: true }
+                        Annunciator {
+                            label: "FM0".to_string(),
+                            is_master: true,
+                            active: true,
+                        }
                     }
                     div { class: "dsp-separator" }
                     div { class: "dsp-chassis",
@@ -160,10 +163,26 @@ pub fn App() -> Element {
                         div { class: "dsp-screw bottom-left" }
                         div { class: "dsp-screw bottom-right" }
                         div { class: "dsp-slots-wrapper",
-                            Annunciator { label: "EQ".to_string(), active: true, sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]) }
-                            Annunciator { label: "COMP".to_string(), active: true, sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]) }
-                            Annunciator { label: "SAT".to_string(), active: true, sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]) }
-                            Annunciator { label: "LIMIT".to_string(), active: true, sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]) }
+                            Annunciator {
+                                label: "EQ".to_string(),
+                                active: true,
+                                sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]),
+                            }
+                            Annunciator {
+                                label: "COMP".to_string(),
+                                active: true,
+                                sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]),
+                            }
+                            Annunciator {
+                                label: "SAT".to_string(),
+                                active: true,
+                                sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]),
+                            }
+                            Annunciator {
+                                label: "LIMIT".to_string(),
+                                active: true,
+                                sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]),
+                            }
                         }
                     }
                 }
@@ -171,46 +190,56 @@ pub fn App() -> Element {
                 div { class: "transport-module-divider" }
 
                 // Center: Transport & Time
-                div {
-                    class: "transport-center",
+                div { class: "transport-center",
 
-                    div {
-                        class: "transport-mfd-pit",
-                        
+                    div { class: "transport-mfd-pit",
                         // Top row of controls and timecode
                         div { class: "mfd-controls-row",
                             // SKIP BACK
                             div { class: "transport-btn-col",
-                                div { class: "transport-led-spacer" }
-                                button {
-                                    class: "btn-keycap",
-                                    onclick: move |_| {
-                                        let new_ms = position_ms.saturating_sub(5_000);
-                                        let ps = playback_state.clone();
-                                        spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
-                                    },
-                                    span { "◄◄" }
+                                div { class: "transport-top-label", "SKIP-BACKWARD" }
+                                div { class: "button-base-seat-narrow",
+                                    SkipActuator {
+                                        label: "{lbl_skip_back}",
+                                        on_click: move |_| {
+                                            let new_ms = position_ms.saturating_sub(5_000);
+                                            let ps = playback_state.clone();
+                                            spawn_local(async move {
+                                                invoke_playback("seek", Some(new_ms), ps).await;
+                                            });
+                                        },
+                                    }
                                 }
                             }
 
                             // Middle: OLED Timecode
                             div {
                                 class: "transport-vfd-display transport-time",
-                                id:    "transport-position",
-                                { format!("00:{:02}:{:02}:{:03}", position_ms / 60000, (position_ms / 1000) % 60, position_ms % 1000) }
+                                id: "transport-position",
+                                {
+                                    format!(
+                                        "00:{:02}:{:02}:{:03}",
+                                        position_ms / 60000,
+                                        (position_ms / 1000) % 60,
+                                        position_ms % 1000,
+                                    )
+                                }
                             }
 
                             // SKIP FORWARD
                             div { class: "transport-btn-col",
-                                div { class: "transport-led-spacer" }
-                                button {
-                                    class: "btn-keycap",
-                                    onclick: move |_| {
-                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                        let ps = playback_state.clone();
-                                        spawn_local(async move { invoke_playback("seek", Some(new_ms), ps).await; });
-                                    },
-                                    span { "►►" }
+                                div { class: "transport-top-label", "SKIP-FORWARD" }
+                                div { class: "button-base-seat-narrow",
+                                    SkipActuator {
+                                        label: "{lbl_skip_fwd}",
+                                        on_click: move |_| {
+                                            let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                            let ps = playback_state.clone();
+                                            spawn_local(async move {
+                                                invoke_playback("seek", Some(new_ms), ps).await;
+                                            });
+                                        },
+                                    }
                                 }
                             }
 
@@ -225,8 +254,10 @@ pub fn App() -> Element {
                                         on_click: move |_| {
                                             current_state.set(TransportState::Playing);
                                             let ps = playback_state.clone();
-                                            spawn_local(async move { invoke_playback("play", None, ps).await; });
-                                        }
+                                            spawn_local(async move {
+                                                invoke_playback("play", None, ps).await;
+                                            });
+                                        },
                                     }
                                 }
                             }
@@ -242,8 +273,10 @@ pub fn App() -> Element {
                                         on_click: move |_| {
                                             current_state.set(TransportState::Stopped);
                                             let ps = playback_state.clone();
-                                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
-                                        }
+                                            spawn_local(async move {
+                                                invoke_playback("stop", None, ps).await;
+                                            });
+                                        },
                                     }
                                 }
                             }
@@ -252,21 +285,28 @@ pub fn App() -> Element {
                         // Bottom: Glowing Scrub Trench
                         div {
                             class: "transport-scrub-trench",
-                            id:    "transport-scrub",
+                            id: "transport-scrub",
                             onclick: move |evt| {
-                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 { return; }
+                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
+                                    return;
+                                }
                                 let client_x = evt.client_coordinates().x;
-                                let window   = web_sys::window().unwrap();
-                                let doc      = window.document().unwrap();
+                                let window = web_sys::window().unwrap();
+                                let doc = window.document().unwrap();
                                 if let Some(el) = doc.get_element_by_id("transport-scrub") {
-                                    let rect  = el.get_bounding_client_rect();
-                                    let frac  = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                                    let rect = el.get_bounding_client_rect();
+                                    let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
                                     let seek_ms = (frac * duration_ms as f64) as u64;
-                                    let ps      = playback_state.clone();
-                                    spawn_local(async move { invoke_playback("seek", Some(seek_ms), ps).await; });
+                                    let ps = playback_state.clone();
+                                    spawn_local(async move {
+                                        invoke_playback("seek", Some(seek_ms), ps).await;
+                                    });
                                 }
                             },
-                            div { class: "transport-scrub-trench-fill", style: format!("width:{}%", scrub_len) }
+                            div {
+                                class: "transport-scrub-trench-fill",
+                                style: format!("width:{}%", scrub_len),
+                            }
                         }
                     }
                 }
@@ -274,8 +314,7 @@ pub fn App() -> Element {
                 div { class: "transport-module-divider" }
 
                 // Right: Critical Zone
-                div {
-                    class: "transport-right abort-zone",
+                div { class: "transport-right abort-zone",
                     // Small STOP pill next to ABORT (Repurposed for Intent Bay reveal)
                     button {
                         class: "btn-pill btn-pill-red",
@@ -286,26 +325,46 @@ pub fn App() -> Element {
                         "STOP"
                     }
 
-                    div { class: "abort-guard-wrapper",
-                        div { class: "abort-guard-left" }
-                        button {
-                            class: "btn-abort-guarded",
-                            onclick: move |_| {
-                                let mut s = session_state.write();
-                                *s = None;
-                                let mut m = mode.write();
-                                *m = CockpitMode::Idle;
-                            },
-                            "ABORT"
+                    // The ABORT Column (Top Indicator, Switch, Bottom LED Strip)
+                    div { class: "abort-column",
+                        // 1. Top Indicator
+                        div { class: "abort-pending-indicator",
+                            span { class: "abort-dot", "•" }
+                            " ABORT PENDING"
                         }
-                        div { class: "abort-guard-right" }
+                        
+                        // 2. The Guarded Switch
+                        div { class: "abort-guard-wrapper",
+                            div { class: "abort-guard-left" }
+                            button {
+                                class: "btn-abort-guarded",
+                                onclick: move |_| {
+                                    let mut s = session_state.write();
+                                    *s = None;
+                                    let mut m = mode.write();
+                                    *m = CockpitMode::Idle;
+                                },
+                                span { class: "abort-label", "ABORT" }
+                            }
+                            div { class: "abort-guard-right" }
+                        }
+                        
+                        // 3. Bottom 6-Dot LED Strip
+                        div { class: "abort-led-strip",
+                            div { class: "abort-led-dot active-bright" }
+                            div { class: "abort-led-dot active-dim" }
+                            div { class: "abort-led-dot" }
+                            div { class: "abort-led-dot" }
+                            div { class: "abort-led-dot" }
+                            div { class: "abort-led-dot" }
+                        }
                     }
                 }
             }
 
             // ── Work Layer — 65% Middle ──────────────────────────────────────
             main {
-                id:    "mfd-bay",
+                id: "mfd-bay",
                 class: if *intent_open.read() { "mfd-bay work-layer cockpit-work-layer intent-active" } else { "mfd-bay work-layer cockpit-work-layer" },
 
                 SamplingSiamese {
@@ -322,13 +381,14 @@ pub fn App() -> Element {
                 MasteredView {
                     session_state,
                     viz_data,
-                    on_close: move |_| { show_mastered.set(false); },
+                    on_close: move |_| {
+                        show_mastered.set(false);
+                    },
                 }
             }
 
             // ── Hangar — 25% Bottom ──────────────────────────────────────────
-            div {
-                class: if *intent_open.read() { "hangar-layer intent-open" } else { "hangar-layer" },
+            div { class: if *intent_open.read() { "hangar-layer intent-open" } else { "hangar-layer" },
                 div { class: "intent-knob-bay",
                     IntentBay {
                         open: *intent_open.read(),

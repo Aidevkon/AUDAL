@@ -45,3 +45,27 @@ pub fn TransportActuator(props: TransportActuatorProps) -> Element {
         }
     }
 }
+
+#[derive(Props, Clone, PartialEq)]
+pub struct SkipActuatorProps {
+    pub label: String,
+    pub on_click: EventHandler<MouseEvent>,
+}
+
+#[allow(non_snake_case)]
+pub fn SkipActuator(props: SkipActuatorProps) -> Element {
+    rsx! {
+        button {
+            class: "transport-actuator",
+            onclick: move |evt| props.on_click.call(evt),
+            // The matte, light-absorbing outer chassis
+            div { class: "pa-housing-narrow",
+                // The new continuous-action 36x48 acrylic lens
+                div { class: "skip-lens",
+                    // The etched/engraved physical label
+                    span { class: "skip-label", "{props.label}" }
+                }
+            }
+        }
+    }
+}
