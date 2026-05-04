@@ -4,7 +4,6 @@ use dioxus::prelude::*;
 pub enum LedColor {
     Amber,
     Red,
-    Neutral,
 }
 
 impl LedColor {
@@ -12,13 +11,12 @@ impl LedColor {
         match self {
             LedColor::Amber => "led-amber",
             LedColor::Red => "led-red",
-            LedColor::Neutral => "led-neutral",
         }
     }
 }
 
 #[derive(Props, Clone, PartialEq)]
-pub struct PlayActuatorProps {
+pub struct TransportActuatorProps {
     pub label: String,
     pub color: LedColor,
     pub active: bool,
@@ -26,13 +24,13 @@ pub struct PlayActuatorProps {
 }
 
 #[allow(non_snake_case)]
-pub fn PlayActuator(props: PlayActuatorProps) -> Element {
+pub fn TransportActuator(props: TransportActuatorProps) -> Element {
     let active_class = if props.active { "active" } else { "" };
     let color_class = props.color.as_str();
 
     rsx! {
         button {
-            class: "play-actuator {active_class}",
+            class: "transport-actuator {color_class} {active_class}",
             onclick: move |evt| props.on_click.call(evt),
             // The matte, light-absorbing outer chassis
             div { class: "pa-housing",

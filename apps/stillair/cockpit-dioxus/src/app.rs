@@ -29,12 +29,18 @@ use crate::components::intent_bay::IntentBay;
 use crate::components::{
     screw::Screw,
     annunciator::Annunciator,
-    play_actuator::{PlayActuator, LedColor},
+    transport_button::{TransportActuator, LedColor},
 };
 
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+#[derive(PartialEq, Clone, Copy)]
+enum TransportState {
+    Playing,
+    Stopped,
+}
 
 /// Format milliseconds as MM:SS
 fn format_ms(ms: u64) -> String {
@@ -76,6 +82,7 @@ pub fn App() -> Element {
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
     let mut intent_open: Signal<bool> = use_signal(|| false);
+    let mut current_state = use_signal(|| TransportState::Stopped);
     let tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let space_angle: Signal<f32> = use_signal(|| 0.0_f32);
@@ -119,7 +126,7 @@ pub fn App() -> Element {
     // NOTE: has_audio is NOT stored as a let-binding here — Dioxus 0.6 does not
     // re-subscribe to signals read as plain let-bindings outside rsx!.
     // Use  matches!(*mode.read(), CockpitMode::CoachReady { .. })  inline.
-    let is_playing   = playback_state.read().as_ref().map(|s| s.is_playing).unwrap_or(false);
+    // let is_playing   = playback_state.read().as_ref().map(|s| s.is_playing).unwrap_or(false);
     let position_ms  = playback_state.read().as_ref().map(|s| s.position_ms).unwrap_or(0);
     let duration_ms  = playback_state.read().as_ref().map(|s| s.duration_ms).unwrap_or(0);
     let scrub_len    = scrub_pct(position_ms, duration_ms);
@@ -209,29 +216,35 @@ pub fn App() -> Element {
 
                             // PLAY
                             div { class: "transport-btn-col",
-                                div { class: "transport-led-spacer" }
-                                PlayActuator {
-                                    label: "PLAY".to_string(),
-                                    color: LedColor::Amber,
-                                    active: is_playing,
-                                    on_click: move |_| {
-                                        let action = if is_playing { "pause" } else { "play" };
-                                        let ps = playback_state.clone();
-                                        spawn_local(async move { invoke_playback(action, None, ps).await; });
+                                div { class: if current_state() == TransportState::Playing { "transport-led-pill amber-active" } else { "transport-led-pill" } }
+                                div { class: "button-base-seat",
+                                    TransportActuator {
+                                        label: "PLAY".to_string(),
+                                        color: LedColor::Amber,
+                                        active: current_state() == TransportState::Playing,
+                                        on_click: move |_| {
+                                            current_state.set(TransportState::Playing);
+                                            let ps = playback_state.clone();
+                                            spawn_local(async move { invoke_playback("play", None, ps).await; });
+                                        }
                                     }
                                 }
                             }
 
                             // STOP
                             div { class: "transport-btn-col",
-                                div { class: if !is_playing { "transport-led-pill red-active" } else { "transport-led-pill" } }
-                                button {
-                                    class: "btn-keycap btn-keycap-stop",
-                                    onclick: move |_| {
-                                        let ps = playback_state.clone();
-                                        spawn_local(async move { invoke_playback("stop", None, ps).await; });
-                                    },
-                                    span { "STOP" }
+                                div { class: if current_state() == TransportState::Stopped { "transport-led-pill red-active" } else { "transport-led-pill" } }
+                                div { class: "button-base-seat",
+                                    TransportActuator {
+                                        label: "STOP".to_string(),
+                                        color: LedColor::Red,
+                                        active: current_state() == TransportState::Stopped,
+                                        on_click: move |_| {
+                                            current_state.set(TransportState::Stopped);
+                                            let ps = playback_state.clone();
+                                            spawn_local(async move { invoke_playback("stop", None, ps).await; });
+                                        }
+                                    }
                                 }
                             }
                         }

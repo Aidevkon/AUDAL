@@ -2432,13 +2432,74 @@ body {
     width: 24px;
     height: 8px;
     border-radius: 4px;
-    background: #330505;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+    background-color: #141416;
+    /* 1. The Base Socket */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 1px rgba(255, 255, 255, 0.05);
+    position: relative;
+    transition: background-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+/* 2. The Specular Catch */
+.transport-led-pill::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 75%;
+    height: 35%;
+    border-radius: 10px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+    filter: blur(0.4px);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* 3. The Internal Filament (The Light Source) */
+.transport-led-pill::before {
+    content: "";
+    position: absolute;
+    inset: 1.5px;
+    border-radius: 2.5px;
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.transport-led-pill.amber-active::before {
+    background: radial-gradient(circle at 50% 40%, #FFD080 0%, #FF8A00 100%);
+    opacity: 1;
+}
+
+.transport-led-pill.red-active::before {
+    background: radial-gradient(circle at 50% 40%, #FF8080 0%, #FF0000 100%);
+    opacity: 1;
+}
+
+/* 4. The Final Bloom & Light Spill */
+.transport-led-pill.amber-active {
+    --glow-color: #ff8a00;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 8px 25px rgba(255, 138, 0, 0.6),
+        /* Light spill onto button */
+        0 0 10px rgba(255, 200, 0, 0.8),
+        /* Core bloom */
+        0 0 12px var(--glow-color),
+        0 0 3px rgba(255, 255, 255, 0.3);
 }
 
 .transport-led-pill.red-active {
-    background: #ff1e1e;
-    box-shadow: 0 0 12px rgba(255, 0, 0, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    --glow-color: #ff0000;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 1px rgba(255, 255, 255, 0.05),
+        0 8px 25px rgba(255, 0, 0, 0.6),
+        /* Light spill onto button */
+        0 0 10px rgba(255, 50, 50, 0.8),
+        /* Core bloom */
+        0 0 12px var(--glow-color),
+        0 0 3px rgba(255, 255, 255, 0.3);
 }
 
 /* Mini Stop Button */
@@ -2603,14 +2664,29 @@ body {
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 4px rgba(255, 0, 0, 0.4);
 }
 
-/* ==========================================================================
-   PLAY ACTUATOR — Hardware Keycap (Illuminated Amber)
-   ========================================================================== */
+/* --- THE PHYSICAL SEAT --- */
+.button-base-seat {
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #131417 0%, #18191c 100%);
+    box-shadow:
+        0 1px 1px rgba(255, 255, 255, 0.06),
+        0 -1px 2px rgba(0, 0, 0, 0.4),
+        inset 0 6px 10px rgba(0, 0, 0, 0.7),
+        inset 0 2px 4px rgba(0, 0, 0, 0.9),
+        inset 0 -2px 3px rgba(255, 255, 255, 0.03);
+    border: 1px solid #080809;
+}
 
-.play-actuator {
+/* --- THE ACTUATOR WRAPPER --- */
+.transport-actuator {
     position: relative;
     top: -5px;
-    /* optical alignment fix */
     padding: 0;
     border: none;
     background: transparent;
@@ -2621,8 +2697,6 @@ body {
     transform: translateZ(0);
 }
 
-
-/* Matte dark chassis */
 .pa-housing {
     width: 58px;
     height: 58px;
@@ -2631,139 +2705,180 @@ body {
     box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.05),
         inset 0 -3px 6px rgba(0, 0, 0, 0.85),
-        0 4px 10px rgba(0, 0, 0, 0.75);
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    box-sizing: border-box;
+    transition: box-shadow 150ms ease;
 }
 
+/* Light Catch on Housing when Actuator is Active */
+.transport-actuator.led-amber.active .pa-housing {
+    box-shadow:
+        inset 0 2px 3px rgba(255, 138, 0, 0.4),
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.85),
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 
+.transport-actuator.led-red.active .pa-housing {
+    box-shadow:
+        inset 0 2px 3px rgba(255, 0, 0, 0.4),
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.85),
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 
-/* Acrylic lens with bevel + chamfer */
+/* --- BASE GEOMETRY (The Shared Body) --- */
 .pa-lens {
     width: 48px;
     height: 48px;
-    border-radius: 10px;
-
-    /* --- SATIN ACRYLIC WITH LIT EDGES --- */
-    background: radial-gradient(circle at 50% 60%,
-            rgba(255, 120, 20, 0.35) 0%,
-            rgba(120, 50, 0, 0.25) 40%,
-            rgba(20, 10, 0, 0.85) 100%);
-
-    /* --- EDGE SHADOWS + BEVEL --- */
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.55),
-        /* sharper top chamfer highlight */
-        inset 1px 0 0 rgba(255, 255, 255, 0.30),
-        /* crisp left side-wall highlight */
-        inset -1px 0 0 rgba(255, 255, 255, 0.15),
-        /* crisp right side-wall highlight */
-        inset 0 -3px 2px rgba(0, 0, 0, 1),
-        /* harder cutoff lower bevel shadow */
-        inset 0 -1px 0 rgba(0, 0, 0, 0.80),
-        /* bottom edge extra cutoff */
-        inset 0 0 0 1px rgba(0, 0, 0, 0.32),
-        /* inner acrylic depth plane */
-        inset 0 6px 12px rgba(0, 0, 0, 0.20),
-        /* internal optical depth */
-        0 0 10px rgba(255, 136, 0, 0.25),
-        inset 0 12px 18px rgba(255, 136, 0, 0.12);
-    /* acrylic glow */
-
+    border-radius: 6px;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
+    box-sizing: border-box;
+
+    /* Specular Highlight (CRITICAL) */
+    box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 12px rgba(0, 0, 0, 0.7),
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(0, 0, 0, 0.5);
+
     transition: transform 40ms ease, box-shadow 40ms ease;
 }
 
+/* Pressed Physics */
+.transport-actuator:active .pa-lens,
+.transport-actuator.active .pa-lens {
+    transform: translateY(2px);
+    /* Keep base shadow + flatten physical drop shadow */
+    box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 12px rgba(0, 0, 0, 0.7),
+        0 0px 1px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(0, 0, 0, 0.5);
+}
 
+/* Specular Lens Catch from LED Pill Glow */
+.transport-actuator.led-amber.active .pa-lens {
+    box-shadow:
+        inset 0 1.5px 2px rgba(255, 138, 0, 0.35),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 12px rgba(0, 0, 0, 0.7),
+        0 0px 1px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(0, 0, 0, 0.5);
+}
 
+.transport-actuator.led-red.active .pa-lens {
+    box-shadow:
+        inset 0 1.5px 2px rgba(255, 0, 0, 0.35),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.8),
+        inset 0 0 12px rgba(0, 0, 0, 0.7),
+        0 0px 1px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(0, 0, 0, 0.5);
+}
 
-
-/* LED emitter plate */
 .pa-led {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: radial-gradient(circle at 50% 65%,
-            rgba(255, 120, 20, 0.75) 0%,
-            rgba(255, 90, 10, 0.45) 22%,
-            rgba(80, 30, 0, 0.25) 45%,
-            rgba(0, 0, 0, 0) 70%);
     filter: blur(2.5px);
-    transition: opacity 40ms ease, filter 40ms ease;
+    transition: opacity 40ms ease, filter 40ms ease, background 40ms ease;
     pointer-events: none;
+    opacity: 0;
+    /* Hidden by default until active */
 }
 
-
-
-/* Engraved label */
+/* Stencil Typography Base */
 .pa-label {
     position: relative;
     z-index: 2;
     font-family: var(--font-mono);
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    color: rgba(25, 20, 15, 0.50);
-    text-shadow:
-        0 -1px 1px rgba(255, 140, 40, 0.35),
-        0 1px 3px rgba(255, 110, 20, 0.40),
-        -1px 0 2px rgba(255, 110, 20, 0.28),
-        1px 0 2px rgba(255, 110, 20, 0.28);
+    font-size: 0.78rem;
+    font-weight: 300;
+    letter-spacing: 0.16em;
+    transform: translateY(1px);
     pointer-events: none;
-    transition: color 40ms ease, text-shadow 40ms ease;
+    transition: color 40ms ease, text-shadow 40ms ease, filter 40ms ease;
 }
 
+/* --- MATERIAL MODIFIERS --- */
 
-/* ACTIVE STATE — Pressed mechanics */
-.play-actuator:active .pa-lens,
-.play-actuator.active .pa-lens {
-    transform: translateY(2px);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.30),
-        inset 1px 0 0 rgba(255, 255, 255, 0.20),
-        inset -1px 0 0 rgba(255, 255, 255, 0.10),
-        inset 0 -3px 2px rgba(0, 0, 0, 1),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.80),
-        inset 0 0 0 1px rgba(0, 0, 0, 0.32),
-        inset 0 6px 12px rgba(0, 0, 0, 0.20),
-        0 0 24px rgba(255, 136, 0, 0.55),
-        inset 0 12px 18px rgba(255, 136, 0, 0.12);
+/* 1. .led-amber (The PLAY Actuator) */
+.transport-actuator.led-amber .pa-lens {
+    background: radial-gradient(circle, #2d190a 0%, #0f0a05 100%);
 }
 
-.play-actuator:active .pa-led,
-.play-actuator.active .pa-led {
+.transport-actuator.led-amber .pa-label {
+    color: #fff4e0;
+}
+
+/* Active Amber */
+.transport-actuator.led-amber:active .pa-led,
+.transport-actuator.led-amber.active .pa-led {
     opacity: 1;
     filter: blur(4px);
+    background: radial-gradient(circle at 50% 65%,
+            rgba(255, 138, 0, 0.75) 0%,
+            rgba(255, 138, 0, 0.45) 22%,
+            rgba(80, 30, 0, 0.25) 45%,
+            rgba(0, 0, 0, 0) 70%);
 }
 
-.play-actuator:active .pa-label,
-.play-actuator.active .pa-label {
-    color: rgba(35, 25, 15, 0.65);
+.transport-actuator.led-amber:active .pa-label,
+.transport-actuator.led-amber.active .pa-label {
+    color: #ff8a00;
+    filter: blur(0.35px) brightness(1.1);
     text-shadow:
-        /* cavity base */
-        0 -1px 0 rgba(0, 0, 0, 1),
-        0 1px 0 rgba(0, 0, 0, 0.85),
-
-        /* stronger rim leakage */
-        0 -1px 1px rgba(255, 136, 0, 0.55),
-
-        /* stronger left + right walls */
-        -1px -1px 2px rgba(255, 136, 0, 0.45),
-        1px -1px 2px rgba(255, 136, 0, 0.45),
-
-        /* stronger bottom scattering */
-        0 2px 3px rgba(255, 136, 0, 0.55);
+        0 1px 0 rgba(120, 60, 20, 0.75),
+        0 -1px 1px rgba(255, 138, 0, 0.65),
+        -1px 0 2px rgba(255, 138, 0, 0.55),
+        1px 0 2px rgba(255, 138, 0, 0.55),
+        0 2px 3px rgba(255, 138, 0, 0.65),
+        0 0 8px rgba(255, 138, 0, 0.85);
 }
 
-.play-actuator:active .pa-housing,
-.play-actuator.active .pa-housing {
-    box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, 0.05),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.85),
-        0 2px 4px rgba(0, 0, 0, 0.75);
+/* 2. .led-red (The STOP Actuator) */
+.transport-actuator.led-red .pa-lens {
+    background: #1a1b1e !important;
+}
+
+.transport-actuator.led-red .pa-label {
+    color: #ffffff;
+}
+
+/* Active Red */
+.transport-actuator.led-red:active .pa-led,
+.transport-actuator.led-red.active .pa-led {
+    opacity: 1;
+    filter: blur(4px);
+    background: radial-gradient(circle at 50% 50%,
+            rgba(255, 0, 0, 0.8) 0%,
+            rgba(255, 0, 0, 0.3) 15%,
+            rgba(0, 0, 0, 0) 40%);
+}
+
+.transport-actuator.led-red:active .pa-label,
+.transport-actuator.led-red.active .pa-label {
+    color: #ff0000;
+    filter: blur(0.35px) brightness(1.1);
+    text-shadow:
+        0 1px 0 rgba(100, 0, 0, 0.75),
+        0 -1px 1px rgba(255, 0, 0, 0.65),
+        -1px 0 2px rgba(255, 0, 0, 0.55),
+        1px 0 2px rgba(255, 0, 0, 0.55),
+        0 2px 3px rgba(255, 0, 0, 0.65),
+        0 0 8px rgba(255, 0, 0, 0.9);
 }
