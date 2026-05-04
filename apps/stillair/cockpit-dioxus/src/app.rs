@@ -152,7 +152,6 @@ pub fn App() -> Element {
                                     active: true,
                                 }
                             }
-                            div { class: "dsp-separator" }
                             div { class: "dsp-chassis",
                         div { class: "dsp-screw top-left" }
                         div { class: "dsp-screw top-right" }
@@ -183,7 +182,6 @@ pub fn App() -> Element {
                     }
                 }
 
-                div { class: "transport-module-divider" }
 
                 // Center: Transport & Time
                 div { class: "transport-center",
@@ -307,7 +305,6 @@ pub fn App() -> Element {
                     }
                 }
 
-                div { class: "transport-module-divider" }
 
                 // Right: Critical Zone
                 div { class: "transport-right abort-zone",
