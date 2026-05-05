@@ -27,7 +27,6 @@ use crate::panels::{
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::intent_bay::IntentBay;
 use crate::components::{
-    screw::Screw,
     annunciator::Annunciator,
     transport_button::{TransportActuator, LedColor, SkipActuator},
 };
@@ -136,11 +135,7 @@ pub fn App() -> Element {
 
             // ── Transport bar (bottom strip) — Phase 12B ──────────────────────
             footer { id: "transport-bar", class: "transport-bar",
-                div { class: "transport-frame",
-                    Screw { top: 6, left: 10 }
-                    Screw { top: 6, right: 10 }
-                    Screw { bottom: 6, left: 10 }
-                    Screw { bottom: 6, right: 10 }
+                div { class: "transport-rim",
 
                     div { class: "transport-panel",
                         // Left: Annunciator Zone
@@ -153,30 +148,26 @@ pub fn App() -> Element {
                                 }
                             }
                             div { class: "dsp-chassis",
-                        div { class: "dsp-screw top-left" }
-                        div { class: "dsp-screw top-right" }
-                        div { class: "dsp-screw bottom-left" }
-                        div { class: "dsp-screw bottom-right" }
                         div { class: "dsp-slots-wrapper",
                             Annunciator {
                                 label: "EQ".to_string(),
                                 active: true,
-                                sub_labels: Some(vec!["A1".to_string(), "A2".to_string(), "A3".to_string()]),
+                                pipeline_stages: 3,
                             }
                             Annunciator {
                                 label: "COMP".to_string(),
                                 active: true,
-                                sub_labels: Some(vec!["B1".to_string(), "B2".to_string(), "B3".to_string()]),
+                                pipeline_stages: 3,
                             }
                             Annunciator {
                                 label: "SAT".to_string(),
                                 active: true,
-                                sub_labels: Some(vec!["C1".to_string(), "C2".to_string(), "C3".to_string()]),
+                                pipeline_stages: 3,
                             }
                             Annunciator {
                                 label: "LIMIT".to_string(),
                                 active: true,
-                                sub_labels: Some(vec!["D1".to_string(), "D2".to_string(), "D3".to_string()]),
+                                pipeline_stages: 3,
                             }
                         }
                     }
@@ -185,124 +176,128 @@ pub fn App() -> Element {
 
                 // Center: Transport & Time
                 div { class: "transport-center",
+                    div { class: "insert-panel",
+                            div { class: "transport-mfd-pit",
+                                // Top row of controls and timecode
+                                div { class: "control-housing",
+                                    div { class: "mfd-controls-row",
+                                        // SKIP BACK
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "SKIP-BACKWARD" }
+                                            div { class: "button-base-seat-narrow",
+                                                SkipActuator {
+                                                    label: "{lbl_skip_back}",
+                                                    on_click: move |_| {
+                                                        let new_ms = position_ms.saturating_sub(5_000);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(new_ms), ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
 
-                    div { class: "transport-mfd-pit",
-                        // Top row of controls and timecode
-                        div { class: "mfd-controls-row",
-                            // SKIP BACK
-                            div { class: "transport-btn-col",
-                                div { class: "transport-top-label", "SKIP-BACKWARD" }
-                                div { class: "button-base-seat-narrow",
-                                    SkipActuator {
-                                        label: "{lbl_skip_back}",
-                                        on_click: move |_| {
-                                            let new_ms = position_ms.saturating_sub(5_000);
-                                            let ps = playback_state.clone();
-                                            spawn_local(async move {
-                                                invoke_playback("seek", Some(new_ms), ps).await;
-                                            });
-                                        },
+                                        // Middle: OLED Timecode
+                                        div { class: "lcd-bezel",
+                                            div {
+                                                class: "transport-vfd-display transport-time",
+                                                id: "transport-position",
+                                                {
+                                                    format!(
+                                                        "00:{:02}:{:02}:{:03}",
+                                                        position_ms / 60000,
+                                                        (position_ms / 1000) % 60,
+                                                        position_ms % 1000,
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // SKIP FORWARD
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "SKIP-FORWARD" }
+                                            div { class: "button-base-seat-narrow",
+                                                SkipActuator {
+                                                    label: "{lbl_skip_fwd}",
+                                                    on_click: move |_| {
+                                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(new_ms), ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
+
+                                        // PLAY
+                                        div { class: "transport-btn-col",
+                                            div { class: if current_state() == TransportState::Playing { "transport-led-pill amber-active" } else { "transport-led-pill" } }
+                                            div { class: "button-base-seat",
+                                                TransportActuator {
+                                                    label: "PLAY".to_string(),
+                                                    color: LedColor::Amber,
+                                                    active: current_state() == TransportState::Playing,
+                                                    on_click: move |_| {
+                                                        current_state.set(TransportState::Playing);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("play", None, ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
+
+                                        // STOP
+                                        div { class: "transport-btn-col",
+                                            div { class: if current_state() == TransportState::Stopped { "transport-led-pill red-active" } else { "transport-led-pill" } }
+                                            div { class: "button-base-seat",
+                                                TransportActuator {
+                                                    label: "STOP".to_string(),
+                                                    color: LedColor::Red,
+                                                    active: current_state() == TransportState::Stopped,
+                                                    on_click: move |_| {
+                                                        current_state.set(TransportState::Stopped);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("stop", None, ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
                                     }
-                                }
-                            }
-
-                            // Middle: OLED Timecode
-                            div {
-                                class: "transport-vfd-display transport-time",
-                                id: "transport-position",
-                                {
-                                    format!(
-                                        "00:{:02}:{:02}:{:03}",
-                                        position_ms / 60000,
-                                        (position_ms / 1000) % 60,
-                                        position_ms % 1000,
-                                    )
-                                }
-                            }
-
-                            // SKIP FORWARD
-                            div { class: "transport-btn-col",
-                                div { class: "transport-top-label", "SKIP-FORWARD" }
-                                div { class: "button-base-seat-narrow",
-                                    SkipActuator {
-                                        label: "{lbl_skip_fwd}",
-                                        on_click: move |_| {
-                                            let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                            let ps = playback_state.clone();
-                                            spawn_local(async move {
-                                                invoke_playback("seek", Some(new_ms), ps).await;
-                                            });
+                                    // Level 2 — Scrub Bar (inside control-housing)
+                                    div {
+                                        class: "transport-scrub-trench",
+                                        id: "transport-scrub",
+                                        onclick: move |evt| {
+                                            if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
+                                                return;
+                                            }
+                                            let client_x = evt.client_coordinates().x;
+                                            let window = web_sys::window().unwrap();
+                                            let doc = window.document().unwrap();
+                                            if let Some(el) = doc.get_element_by_id("transport-scrub") {
+                                                let rect = el.get_bounding_client_rect();
+                                                let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                                                let seek_ms = (frac * duration_ms as f64) as u64;
+                                                let ps = playback_state.clone();
+                                                spawn_local(async move {
+                                                    invoke_playback("seek", Some(seek_ms), ps).await;
+                                                });
+                                            }
                                         },
-                                    }
-                                }
-                            }
-
-                            // PLAY
-                            div { class: "transport-btn-col",
-                                div { class: if current_state() == TransportState::Playing { "transport-led-pill amber-active" } else { "transport-led-pill" } }
-                                div { class: "button-base-seat",
-                                    TransportActuator {
-                                        label: "PLAY".to_string(),
-                                        color: LedColor::Amber,
-                                        active: current_state() == TransportState::Playing,
-                                        on_click: move |_| {
-                                            current_state.set(TransportState::Playing);
-                                            let ps = playback_state.clone();
-                                            spawn_local(async move {
-                                                invoke_playback("play", None, ps).await;
-                                            });
-                                        },
-                                    }
-                                }
-                            }
-
-                            // STOP
-                            div { class: "transport-btn-col",
-                                div { class: if current_state() == TransportState::Stopped { "transport-led-pill red-active" } else { "transport-led-pill" } }
-                                div { class: "button-base-seat",
-                                    TransportActuator {
-                                        label: "STOP".to_string(),
-                                        color: LedColor::Red,
-                                        active: current_state() == TransportState::Stopped,
-                                        on_click: move |_| {
-                                            current_state.set(TransportState::Stopped);
-                                            let ps = playback_state.clone();
-                                            spawn_local(async move {
-                                                invoke_playback("stop", None, ps).await;
-                                            });
-                                        },
+                                        div {
+                                            class: "transport-scrub-trench-fill",
+                                            style: format!("width:{}%", scrub_len),
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        // Bottom: Glowing Scrub Trench
-                        div {
-                            class: "transport-scrub-trench",
-                            id: "transport-scrub",
-                            onclick: move |evt| {
-                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
-                                    return;
-                                }
-                                let client_x = evt.client_coordinates().x;
-                                let window = web_sys::window().unwrap();
-                                let doc = window.document().unwrap();
-                                if let Some(el) = doc.get_element_by_id("transport-scrub") {
-                                    let rect = el.get_bounding_client_rect();
-                                    let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
-                                    let seek_ms = (frac * duration_ms as f64) as u64;
-                                    let ps = playback_state.clone();
-                                    spawn_local(async move {
-                                        invoke_playback("seek", Some(seek_ms), ps).await;
-                                    });
-                                }
-                            },
-                            div {
-                                class: "transport-scrub-trench-fill",
-                                style: format!("width:{}%", scrub_len),
-                            }
-                        }
-                    }
                 }
 
 

@@ -38,32 +38,31 @@ pub fn ModuleFrame(props: ModuleFrameProps) -> Element {
     };
 
     rsx! {
-        div { class: "panel-screw-wrapper",
-            div { class: "mfd-panel {props.panel_class}",
-            
-                // ── Hardware physical cut-out header ──
-                div {
-                    class: "panel-title",
-                    style: "{props.header_style}",
-                    div { class: "panel-title-left", "{props.title}" }
-                    if let Some(right) = props.right_header {
-                        div { class: "panel-title-right", {right} }
-                    }
-                }
+        div { class: "mfd-panel {props.panel_class}",
 
-                // ── The internal content area ──
-                div {
-                    style: "{scroll_style}",
-                    {props.children}
+            // ── Hardware physical cut-out header ──
+            div {
+                class: "panel-title",
+                style: "{props.header_style}",
+                div { class: "panel-title-left", "{props.title}" }
+                if let Some(right) = props.right_header {
+                    div { class: "panel-title-right", {right} }
                 }
+            }
 
-                // ── Hardware anchoring: 4 Corner Torx Screws ──
-                if props.show_screws {
-                    Screw { top: 10, left: 10 }
-                    Screw { top: 10, right: 10 }
-                    Screw { bottom: 10, left: 10 }
-                    Screw { bottom: 10, right: 10 }
-                }
+            // ── The internal content area ──
+            div {
+                class: "module-screen",
+                style: "{scroll_style}",
+                {props.children}
+            }
+
+            // ── Hardware anchoring: 4 Corner Torx Screws ──
+            if props.show_screws {
+                Screw { top: 10, left: 10 }
+                Screw { top: 10, right: 10 }
+                Screw { bottom: 10, left: 10 }
+                Screw { bottom: 10, right: 10 }
             }
         }
     }

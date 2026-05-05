@@ -20,12 +20,6 @@ pub fn CompressorModule(state: CompressorState) -> Element {
         div {
             class: "chain-module-container chain-comp-panel",
             
-            // 4 corner screws
-            crate::components::screw::Screw { top: 6, left: 6 }
-            crate::components::screw::Screw { top: 6, right: 6 }
-            crate::components::screw::Screw { bottom: 6, left: 6 }
-            crate::components::screw::Screw { bottom: 6, right: 6 }
-
             div { class: "chain-header",
                 span { class: "chain-header-title", "COMPRESSOR - OPTICAL" }
                 span { class: "chain-ro-badge", "{readout_val}" }

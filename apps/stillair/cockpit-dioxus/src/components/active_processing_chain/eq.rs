@@ -28,12 +28,6 @@ pub fn EQModule(state: EQState) -> Element {
         div {
             class: "chain-module-container chain-eq-panel",
             
-            // 4 corner screws
-            crate::components::screw::Screw { top: 6, left: 6 }
-            crate::components::screw::Screw { top: 6, right: 6 }
-            crate::components::screw::Screw { bottom: 6, left: 6 }
-            crate::components::screw::Screw { bottom: 6, right: 6 }
-
             div { class: "chain-header",
                 span { class: "chain-header-title", "EQ — 4-BAND PAR" }
                 span { class: "chain-ro-badge", "{readout_val}" }
