@@ -115,107 +115,223 @@ body {
 
 /* Intent Bay — always present behind the coach-panel faceplate */
 .intent-bay {
-  flex-shrink: 0;
-  height: 100%;           /* always full height — revealed geometrically */
-  overflow: visible;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   position: relative;
   z-index: 1;
-  background: #080c10;
-  background-image: repeating-linear-gradient(0deg, transparent, transparent 3px,
+  display: flex;
+  flex-direction: column;
+
+  /* Portal depth: cavity mouth is darkest, fades lighter inward */
+  background-color: #080c10;
+  background-image:
+    linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.75) 0%,
+      rgba(0, 0, 0, 0.25) 18%,
+      transparent 45%),
+    repeating-linear-gradient(0deg, transparent, transparent 3px,
       rgba(255, 255, 255, 0.018) 3px, rgba(255, 255, 255, 0.018) 4px);
-  border-top: 1px solid #142435;
-  /* deep cavity shadow — looks like a physical slot inside the machine */
+
+  /* No border-top on cavity — would create 'floating slab' optical illusion */
+  border-top: none;
+
+  /* Cavity shadow stack: depth from above + lateral wall darkness */
   box-shadow:
-    inset 0 6px 20px rgba(0, 0, 0, 0.9),
-    inset 0 2px 6px rgba(0, 0, 0, 1);
+    inset 0 14px 35px rgba(0, 0, 0, 1),
+    /* primary portal depth */
+    inset 0 4px 12px rgba(0, 0, 0, 1),
+    /* secondary depth layer */
+    inset 12px 0 28px rgba(0, 0, 0, 0.45),
+    /* left wall shadow */
+    inset -12px 0 28px rgba(0, 0, 0, 0.45),
+    /* right wall shadow */
+    inset 0 -4px 10px rgba(255, 255, 255, 0.01);
+  /* floor bounce */
 }
 
 /* no .intent-bay.open height animation — coach-panel tilt IS the reveal */
 
 .intent-knobs-wrapper {
+  flex: 1;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  /* knobs at top of cavity — in the revealed zone */
+  padding-top: 14px;
   width: 100%;
-  height: 100%;
+  min-height: 0;
 }
 
 /* Knobs always rendered — no fade-in, pure geometric reveal */
 .intent-knobs {
   display: flex;
-  gap: 30px;
-  /* pointer-events controlled by intent-knob-bay parent */
+  gap: 24px;
+  align-items: center;
 }
 
 .intent-knob-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .intent-knob-label {
   font-family: 'Share Tech Mono', monospace;
-  font-size: 10px;
-  color: #7aaac4;
-  letter-spacing: .08em;
+  font-size: 9px;
+  color: #6a9ab4;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
 
-.intent-knob-lcd {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  color: #ffb703;
-  background: #000000;
-  border: 1px solid #1a1a1a;
-  border-radius: 2px;
-  padding: 2px 6px;
-  letter-spacing: 0.08em;
-  text-shadow: 0 0 6px rgba(255, 183, 3, 0.5);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.9);
-  min-width: 42px;
-  text-align: center;
-  flex-shrink: 0;
+/* ── LED ring pulse — the light source (on ::before) ── */
+@keyframes halo-pulse {
+
+  0%,
+  100% {
+    box-shadow:
+      0 0 4px rgba(0, 200, 200, 0.35),
+      0 0 10px rgba(0, 180, 180, 0.15);
+    opacity: 0.65;
+  }
+
+  50% {
+    box-shadow:
+      0 0 7px rgba(0, 242, 255, 0.65),
+      0 0 16px rgba(0, 220, 220, 0.28);
+    opacity: 1;
+  }
+}
+
+/* ── Wall spill pulse — reflected light on aluminum pit walls ── */
+
+/* ── Sinkhole Socket — conical recess machined into the panel ── */
+.intent-knob-socket {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.10) 0%, transparent 36%),
+    radial-gradient(circle at 72% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 30%),
+    radial-gradient(circle at 50% 55%, #010203 0%, #050a10 50%, #0c1520 100%);
+  /* zero-value spill layers kept for smooth interpolation when class toggles */
+  box-shadow:
+    inset 0 8px 22px rgba(0, 0, 0, 1),
+    inset 0 4px 10px rgba(0, 0, 0, 0.95),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.05),
+    inset 0 0 0px 0px rgba(0, 242, 255, 0),
+    inset 0 0 0px rgba(0, 242, 255, 0);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  outline: 1px solid rgba(0, 0, 0, 0.9);
+  outline-offset: 1px;
+  /* FADE-OUT: dramatic afterglow — light lingers in the pit walls */
+  transition: box-shadow 2s ease 3s;
+}
+
+/* LED ring — fiber optic circle at knob base */
+.intent-knob-socket::before {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  border-radius: 50%;
+  /* dim navy ring — always present on all sockets */
+  border: 1px solid rgba(50, 100, 140, 0.45);
+  box-shadow:
+    0 0 4px rgba(50, 120, 160, 0.2),
+    inset 0 0 3px rgba(50, 120, 160, 0.08);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Active socket: instant appear, dramatic afterglow on remove */
+.intent-knob-socket.socket-active {
+  /* Matching layer count with base — CSS interpolates correctly */
+  box-shadow:
+    inset 0 8px 22px rgba(0, 0, 0, 1),
+    inset 0 4px 10px rgba(0, 0, 0, 0.95),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.05),
+    inset 0 0 26px 6px rgba(0, 242, 255, 0.30),
+    /* wall spill */
+    inset 0 0 10px rgba(0, 242, 255, 0.45);
+  /* inner catch */
+  /* Override base transition — appear instantly */
+  transition: box-shadow 0.15s ease 0s;
+}
+
+/* Active ring ::before still pulses independently */
+.intent-knob-socket.socket-active::before {
+  border-color: rgba(0, 210, 210, 0.75);
+  animation: halo-pulse 2.4s ease-in-out infinite;
 }
 
 .intent-knob-range {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 10px;
-  color: #4a7a96;
+  display: none;
+  /* hidden in cavity — reserved for LED strip phase */
 }
 
+/* ── Machined Anodized Encoder ── */
 .intent-knob {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 2px solid #142435;
-  background: radial-gradient(circle at 38% 32%, #0b131e, #060a0f);
   position: relative;
   cursor: ns-resize;
+  will-change: transform;
+
+  /* 1. ANISOTROPIC MATERIAL — lathe-turned aluminum light trick */
+  background: conic-gradient(from 180deg at 50% 50%,
+      #2a2f38 0deg,
+      #4a4f5a 45deg,
+      #2a2f38 90deg,
+      #1a1d23 180deg,
+      #4a4f5a 225deg,
+      #2a2f38 270deg,
+      #2a2f38 360deg);
+
+  /* 2. PHYSICAL TEXTURE */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.5),
+    /* shadow cast onto pit */
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  /* top edge glint */
 }
 
+/* ACTIVE: cap receives light passively — no self-emission */
 .intent-knob.highlighted {
-  border-color: #009898;
-  box-shadow: 0 0 12px rgba(0, 152, 152, .3);
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  /* top glint only */
 }
 
+/* 4. ENGRAVED NOTCH — laser-cut cyan slit */
 .intent-knob-indicator {
   position: absolute;
-  top: 5px;
+  top: 4px;
   left: 50%;
   width: 2px;
-  height: 10px;
+  height: 8px;
   margin-left: -1px;
-  background: #2e5570;
-  transform-origin: 50% calc(100% + 13px);
+  background: #00f2ff;
+  border-radius: 1px;
+  box-shadow: 0 0 8px #00f2ff, inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .intent-knob-indicator.highlighted {
-  background: #009898;
+  background: #00f2ff;
+  box-shadow: 0 0 10px #00f2ff, 0 0 20px rgba(0, 242, 255, 0.4);
 }
 
+
 /* Hangar — fixed height strip at bottom */
-.main-chassis > .mfd-panel {
+.main-chassis>.mfd-panel {
   flex-shrink: 0 !important;
   height: 200px !important;
   max-height: 200px !important;
@@ -483,12 +599,12 @@ body {
   position: relative;
   top: 0;
   bottom: auto;
-  
+
   /* Width match and strict sizing */
   width: 100% !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  
+
   /* 1U Metal Module Styling - Mockup Matte Metal */
   /* Remove horizontal padding so it aligns exactly with the 100vw chassis */
   padding: 8px 0 !important;
@@ -519,47 +635,135 @@ body {
   display: flex;
   min-height: 0;
   background: transparent;
-  perspective: 700px;        /* tighter = more dramatic 3D depth */
+  /* 1800px = realistic viewer distance — side expansion ±38px vs ±101px at 700px
+     Foreshortening (rotateX 38° = 21%) is independent of perspective value */
+  perspective: 1800px;
   perspective-origin: center top;
   position: relative;
 }
 
+/* ── Two-phase Hangar Faceplate Animation ──
+   Phase 1: slide down ~14px (no rotation) — panel clears the cavity edge
+   Phase 2: slide continues + rotateX kicks in — bottom kicks out toward user */
+@keyframes hangar-open {
+  0% {
+    transform: translateY(0px) rotateX(0deg);
+  }
+
+  20% {
+    transform: translateY(18px) rotateX(0deg);
+  }
+
+  100% {
+    transform: translateY(100px) rotateX(38deg);
+  }
+}
+
+@keyframes hangar-close {
+  0% {
+    transform: translateY(100px) rotateX(38deg);
+  }
+
+  80% {
+    transform: translateY(18px) rotateX(0deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotateX(0deg);
+  }
+}
+
+/* Hesitation-before-seal: panel glides home fast, almost stops 4px short,
+   then slowly completes the mechanical seal */
+@keyframes hangar-close-seal {
+  0% {
+    transform: translateY(100px) rotateX(38deg);
+  }
+
+  /* open */
+  52% {
+    transform: translateY(6px) rotateX(1deg);
+  }
+
+  /* fast return, nearly home */
+  68% {
+    transform: translateY(4px) rotateX(0.4deg);
+  }
+
+  /* HESITATION begins */
+  84% {
+    transform: translateY(2px) rotateX(0.1deg);
+  }
+
+  /* barely moving */
+  100% {
+    transform: translateY(0px) rotateX(0deg);
+  }
+
+  /* sealed */
+}
+
 /* coach-panel is now the animated faceplate element */
-.hangar-layer > .coach-panel {
+.hangar-layer>.coach-panel {
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  position: relative;       /* stacking context */
-  z-index: 2;               /* sits above intent-knob-bay */
+  position: relative;
+  z-index: 2;
   transform-origin: top center;
   transform: translateY(0px) rotateX(0deg);
-  /* Open: 520ms slow deceleration — motorized heavy feel */
-  transition:
-    transform 520ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 520ms ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  /* CLOSE: slow mechanical seal — 1.2s with ~4° backward tilt at seal point */
+  transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1.10);
   will-change: transform;
 }
 
-.hangar-layer.intent-open > .coach-panel {
-  /* translateY: panel slides down, rotateX: bottom kicks toward user */
-  transform: translateY(72px) rotateX(26deg);
+.hangar-layer.intent-open>.coach-panel {
+  /* OPEN: fast decisive kick-out — 540ms */
+  transform: translateY(100px) rotateX(38deg);
+  transition: transform 540ms cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.5),
-    0 4px 8px rgba(0, 0, 0, 0.3);
+    0 22px 44px rgba(0, 0, 0, 0.75),
+    0 8px 18px rgba(0, 0, 0, 0.55),
+    0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Closing: hesitation-before-seal animation — triggered by Rust with 1600ms timeout */
+.hangar-layer.intent-closing>.coach-panel {
+  animation: hangar-close-seal 1600ms cubic-bezier(0.4, 0, 0.1, 1) forwards;
+  transition: none;
+}
+
+/* Layer 2: Tilted surface lighting
+   At rotateX(26deg) the bottom of the panel swings toward the viewer
+   but away from the overhead light source — it receives less illumination */
+.hangar-layer.intent-open>.coach-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(to bottom,
+      transparent 0%,
+      /* hinge area — still facing light */
+      rgba(0, 0, 0, 0.10) 50%,
+      rgba(0, 0, 0, 0.28) 100%
+      /* bottom edge — angled away from overhead */
+    );
 }
 
 /* Knob engine bay — static, always behind Hangar */
 .intent-knob-bay {
   position: absolute;
-  bottom: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
+  align-items: stretch;
+  justify-content: stretch;
   z-index: 1;
   pointer-events: none;
+  /* No portal rim border — cavity should appear to sink, not be raised */
 }
 
 .hangar-layer.intent-open .intent-knob-bay {
@@ -588,7 +792,8 @@ body {
   box-shadow:
     inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
     inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
-    inset 0 0 15px rgba(0, 0, 0, 0.8), /* 360-Degree inner shadow for recessed feel */
+    inset 0 0 15px rgba(0, 0, 0, 0.8),
+    /* 360-Degree inner shadow for recessed feel */
     8px 8px 25px rgba(0, 0, 0, 0.6);
 
   border-radius: 16px;
@@ -602,8 +807,8 @@ body {
 }
 
 /* Override inner panels zero-gap policy ONLY for left/center */
-.siamese-insights > .mfd-panel,
-.siamese-session > .mfd-panel {
+.siamese-insights>.mfd-panel,
+.siamese-session>.mfd-panel {
   border: none !important;
   margin: 0 !important;
   padding: 8px 10px 10px 10px !important;
@@ -612,34 +817,52 @@ body {
   box-shadow: none !important;
 }
 
-.siamese-col > .mfd-panel {
+.siamese-col>.mfd-panel {
   flex: 1;
 }
 
 /* Screws already removed from UI — rules no longer needed */
 
 /* PSA — Αριστερά */
-.siamese-session  { flex: 1.5; }
+.siamese-session {
+  flex: 1.5;
+}
+
 /* Spectral — Κέντρο (HERO) */
-.siamese-insights { flex: 1.7; }
+.siamese-insights {
+  flex: 1.7;
+}
+
 /* Rack — Δεξιά (Controls) */
-.siamese-reserved { flex: 0.8; }
+.siamese-reserved {
+  flex: 0.8;
+}
 
 /* Hangar coach width fix */
 .hangar-layer .mfd-panel {
   flex: 1;
   width: 100%;
+  height: 100%;
+  /* fill full coach-panel height — prevents gap from scroll collapse */
 }
 
 .hangar-layer .mfd-panel {
   width: 100% !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 4px 18px 8px 18px !important;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Force single compositing layer: no child may create its own GPU layer */
+.hangar-layer .coach-panel *:not(.intent-knob-bay):not(.intent-bay) {
+  border-radius: 0 !important;
+  overflow: hidden !important;
 }
 
 /* Remove the huge 18px top margin from the glass screen to shrink the top gap */
-.hangar-layer .mfd-panel > div:nth-child(2) {
+.hangar-layer .mfd-panel>div:nth-child(2) {
   margin-top: 4px !important;
 }
 
@@ -689,7 +912,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   /* Make it a black recessed glass area */
   background: #000000;
   border-radius: 6px;
@@ -727,7 +950,8 @@ body {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  flex: 1; /* evenly divide space */
+  flex: 1;
+  /* evenly divide space */
 }
 
 /* Make the 3 mastering modules stack perfectly flush like a 500-Series rack */
@@ -771,4 +995,3 @@ body {
   border: 1px solid #141c26;
   letter-spacing: 0;
 }
-

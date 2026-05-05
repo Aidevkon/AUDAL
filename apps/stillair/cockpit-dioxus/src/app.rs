@@ -18,6 +18,7 @@
 
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use gloo_timers::future::TimeoutFuture;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
 use crate::panels::{
@@ -75,7 +76,8 @@ pub fn App() -> Element {
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
-    let mut intent_open: Signal<bool> = use_signal(|| false);
+    let mut intent_open:    Signal<bool> = use_signal(|| false);
+    let mut intent_closing: Signal<bool> = use_signal(|| false);
     let mut current_state = use_signal(|| TransportState::Stopped);
     let tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
@@ -378,7 +380,12 @@ pub fn App() -> Element {
             }
 
             // ── Hangar — 25% Bottom ──────────────────────────────────────────
-            div { class: if *intent_open.read() { "hangar-layer intent-open" } else { "hangar-layer" },
+            div {
+                class: {
+                    if *intent_open.read()    { "hangar-layer intent-open" }
+                    else if *intent_closing.read() { "hangar-layer intent-closing" }
+                    else                      { "hangar-layer" }
+                },
                 div { class: "intent-knob-bay",
                     IntentBay {
                         open: *intent_open.read(),
@@ -387,8 +394,17 @@ pub fn App() -> Element {
                         space_angle: *space_angle.read(),
                         loud_angle: *loud_angle.read(),
                         on_down_tone: move |_| {
-                            let current = *intent_open.read();
-                            intent_open.set(!current);
+                            if *intent_open.read() {
+                                // Close: remove open immediately, play seal animation for 1600ms
+                                intent_open.set(false);
+                                intent_closing.set(true);
+                                spawn_local(async move {
+                                    TimeoutFuture::new(1_600).await;
+                                    intent_closing.set(false);
+                                });
+                            } else if !*intent_closing.read() {
+                                intent_open.set(true);
+                            }
                         },
                         on_down_dyn: move |_| {},
                         on_down_space: move |_| {},

@@ -12,23 +12,23 @@ pub struct IntentKnobProps {
 #[component]
 pub fn IntentKnob(props: IntentKnobProps) -> Element {
     let hl_class = if props.highlighted { "highlighted" } else { "" };
+    let socket_class = if props.highlighted {
+        "intent-knob-socket socket-active"
+    } else {
+        "intent-knob-socket"
+    };
     rsx! {
         div { class: "intent-knob-container",
-            div {
-                class: "intent-knob-lcd",
-                {
-                    let val = props.angle / 27.0; // -135..135 → -5.0..+5.0
-                    let sign = if val >= 0.0 { "+" } else { "" };
-                    format!("{sign}{val:.1}")
-                }
-            }
             div { class: "intent-knob-label", "{props.label}" }
-            div { 
-                class: "intent-knob {hl_class}",
-                onmousedown: move |e| props.on_down.call(e),
-                div { 
-                    class: "intent-knob-indicator {hl_class}",
-                    style: "transform: rotate({props.angle}deg);"
+            // ── Cavity socket — conical sinkhole ──
+            div { class: "{socket_class}",
+                // ── Knob cap rotates entirely — conic-gradient brushing turns with it ──
+                div {
+                    class: "intent-knob {hl_class}",
+                    style: "transform: rotate({props.angle}deg);",
+                    onmousedown: move |e| props.on_down.call(e),
+                    // Indicator is fixed on knob face — rotates with parent
+                    div { class: "intent-knob-indicator {hl_class}" }
                 }
             }
             div { class: "intent-knob-range", "{props.range}" }
