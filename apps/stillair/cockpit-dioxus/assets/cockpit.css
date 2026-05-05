@@ -27,12 +27,28 @@
   --z-intent: 40;
   --z-work: 20;
   --z-hangar: 10;
+  --breathing: 12px;
+  /* studio breathing room around chassis */
 }
 
-html,
+html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 body {
   height: 100%;
+  width: 100%;
   overflow: hidden;
+  margin: 0;
+  padding: var(--breathing);
+  /* breathing room — cockpit floats in studio space */
+  box-sizing: border-box;
+  background: #000;
+  /* studio background behind the chassis */
 }
 
 /* Main chassis — root flex column */
@@ -40,10 +56,12 @@ body {
   position: relative;
   display: flex !important;
   flex-direction: column !important;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden !important;
   background: var(--bg);
+  /* GPU containment: prevents hangar trapezoid from overflowing into breathing room */
+  clip-path: inset(0);
 }
 
 /* PFR — fixed height, never shrinks, never dims */
@@ -71,8 +89,8 @@ body {
 .cockpit-work-layer {
   flex: 1 !important;
   min-height: 0 !important;
-  height: calc(100vh - var(--chassis-transport-h) - 200px) !important;
-  max-height: calc(100vh - var(--chassis-transport-h) - 200px) !important;
+  height: calc(100vh - var(--chassis-transport-h) - 200px - 2 * var(--breathing)) !important;
+  max-height: calc(100vh - var(--chassis-transport-h) - 200px - 2 * var(--breathing)) !important;
   display: flex !important;
   flex-direction: row !important;
   overflow: hidden !important;
@@ -85,13 +103,16 @@ body {
 .chain-oled-container {
   filter: saturate(1) brightness(1);
   will-change: filter;
-  transition: filter 400ms ease;
+  /* delay = close animation duration — screens brighten only after panel is sealed */
+  transition: filter 400ms ease 800ms;
 }
 
 /* Dim ONLY the glass/OLED screen content — metal chassis stays at full brightness */
 .cockpit-work-layer.intent-active .module-screen,
 .cockpit-work-layer.intent-active .chain-oled-container {
   filter: saturate(0.15) brightness(0.72);
+  /* delay = open animation duration — filter only kicks in when panel is fully open */
+  transition: filter 400ms ease 52ms;
 }
 
 
@@ -590,7 +611,8 @@ body {
 .app-shell {
   display: flex !important;
   flex-direction: column !important;
-  height: 100vh;
+  height: 100%;
+  /* respect body padding — no 100vh overflow */
   overflow: hidden;
 }
 
@@ -715,7 +737,7 @@ body {
   transform: translateY(0px) rotateX(0deg);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   /* CLOSE: slow mechanical seal — 1.2s with ~4° backward tilt at seal point */
-  transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1.10);
+  transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1);
   will-change: transform;
 }
 
