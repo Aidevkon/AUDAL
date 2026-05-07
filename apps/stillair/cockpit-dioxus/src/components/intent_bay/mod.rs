@@ -5,7 +5,6 @@ use knob::IntentKnob;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct IntentBayProps {
-    pub open: bool,
     pub tone_angle: f32,
     pub dyn_angle: f32,
     pub space_angle: f32,

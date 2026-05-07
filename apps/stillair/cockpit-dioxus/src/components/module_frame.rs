@@ -25,7 +25,7 @@ pub struct ModuleFrameProps {
     /// The inner panel content
     pub children: Element,
     /// Show corner screws (default: true — set false for moving panels)
-    #[props(default = true)]
+    #[props(default = false)]
     pub show_screws: bool,
 }
 

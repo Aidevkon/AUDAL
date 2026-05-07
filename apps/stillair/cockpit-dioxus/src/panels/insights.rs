@@ -104,7 +104,7 @@ pub fn InsightsPanel(
 
     rsx! {
         ModuleFrame {
-            title: "SPECTRAL DYNAMICS & INSIGHTS".to_string(),
+            title: "SPECTRAL DYNAMICS".to_string(),
             panel_class: "panel-insights".to_string(),
             header_style: "color:var(--accent-insights);".to_string(),
             is_scrollable: false,

@@ -899,6 +899,10 @@ body {
   align-items: center;
 }
 
+.panel-title-left {
+  padding-left: 8px;
+}
+
 .panel-title-right {
   font-family: 'Share Tech Mono', monospace;
   font-size: 11px;

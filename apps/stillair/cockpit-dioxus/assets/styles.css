@@ -1013,7 +1013,7 @@ body {
     width: calc(100% - 2px);
     height: calc(100% - 2px);
     margin: 1px;
-    border-radius: 2px;
+    border-radius: 10px;
     position: relative;
     overflow: hidden;
     z-index: 1;
@@ -1029,25 +1029,8 @@ body {
          — the anodized oxide absorbs light, so no bright base
     */
     background:
-        /* Horizontal micro-brush grain */
-        repeating-linear-gradient(180deg,
-            rgba(255, 255, 255, 0.000) 0px,
-            rgba(255, 255, 255, 0.000) 1px,
-            rgba(255, 255, 255, 0.018) 1px,
-            rgba(255, 255, 255, 0.018) 2px),
-        /* Vertical light-falloff: rim-shadow at top, diffuse peak, depth at bottom */
-        linear-gradient(180deg,
-            #171a1e 0%,
-            /* seam shadow — slightly darker than panel, not recessed */
-            #1c1f24 18%,
-            /* transition out of seam occlusion */
-            #21252a 35%,
-            /* diffuse light peak */
-            #1e2126 65%,
-            /* falloff */
-            #191c20 100%
-            /* bottom recession */
-        );
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        #1c2028;
 
     /* ── Borders: perimeter lighting physics ────────────────
 
@@ -1125,7 +1108,34 @@ body {
     justify-content: center;
     align-items: center;
     gap: 16px;
-    /* Space between STOP pill and ABORT column */
+}
+
+/* Dev trigger pill — HA button */
+.btn-pill,
+.btn-pill-red {
+    padding: 4px 10px;
+    background: #0a0a0a;
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.50);
+    transition: opacity 80ms ease;
+}
+
+.btn-pill:hover,
+.btn-pill-red:hover {
+    opacity: 0.80;
+}
+
+.btn-pill:active,
+.btn-pill-red:active {
+    opacity: 0.55;
 }
 
 .transport-controls {
@@ -2363,12 +2373,29 @@ body {
 .fm0-slot {
     width: 68px;
     height: 68px;
-    background: linear-gradient(135deg, #2b2e35, #17191d);
     border-radius: 8px;
     position: relative;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-    border: 1px solid #000;
     flex-shrink: 0;
+    /* Satin-matte milled aluminum — same material as ABORT cap */
+    background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.02" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.035"/></svg>'),
+        linear-gradient(168deg,
+            #1c2028 0%,
+            #272e3a 18%,
+            #323a48 32%,
+            #434b5c 44%,
+            #525c6e 47%,
+            #434b5c 50%,
+            #323a48 62%,
+            #272e3a 78%,
+            #1c2028 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.07),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.70),
+        inset 0 6px 14px rgba(0, 0, 0, 0.55),
+        0 3px 10px rgba(0, 0, 0, 0.72),
+        0 1px 2px rgba(0, 0, 0, 0.50);
 }
 
 .fm0-slot .dsp-label {
@@ -2431,6 +2458,8 @@ body {
     height: 34px;
     border-radius: 8px;
     background: #090b0f;
+    overflow: hidden;
+    /* light stays inside the cavity */
     box-shadow: inset 0 8px 16px rgba(0, 0, 0, 1), inset 0 2px 6px rgba(0, 0, 0, 0.9);
     display: flex;
     align-items: center;
@@ -2455,7 +2484,10 @@ body {
 
 .fm0-led.active {
     background: #cbf9ff !important;
-    box-shadow: 0 0 12px #00e5ff, 0 0 24px #00e5ff, 0 0 40px rgba(0, 229, 255, 0.5) !important;
+    /* Glow fills the cavity walls — clipped by overflow:hidden on pit */
+    box-shadow:
+        0 0 8px rgba(0, 229, 255, 0.95),
+        0 0 16px rgba(0, 229, 255, 0.50) !important;
 }
 
 /* Annunciators: Square Modules */
@@ -2649,8 +2681,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
+    justify-content: center;
+    gap: 5px;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -2783,211 +2815,724 @@ body {
     line-height: 1.1 !important;
 }
 
-/* Glowing Scrub Trench */
+
+
+/* Glowing Scrub Trench (Deep Inset Bevel) */
 .transport-scrub-trench {
-    width: 70%;
-    height: 6px;
-    background: #040507;
-    border-radius: 3px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 1), 0 1px 0 rgba(255, 255, 255, 0.05);
-    border: 1px solid #000;
-    overflow: hidden;
+    width: 85%;
+    height: 32px;
+    margin: 8px auto 0;
+
+    /* 1. The Vertical Gradient (Depth Physics) */
+    background:
+        linear-gradient(180deg, #1c1e24 0%, #323842 15%, #3e4450 50%, #2f343e 85%, #1a1c22 100%);
+    border-radius: 16px;
+
+    /* 2. The Inset "Edge" Glow & Outer bevel */
+    box-shadow:
+        inset 0 6px 10px rgba(0, 0, 0, 0.7),
+        inset 0 1px 2px rgba(0, 0, 0, 0.9),
+        0 1px 1px rgba(255, 255, 255, 0.2);
+
+    /* 3. Material Interaction (Metallic Response) */
+    filter: brightness(1.1) contrast(1.2);
+
+    position: relative;
     cursor: pointer;
-    margin: 0 auto;
+}
+
+/* The inner dark track */
+.transport-scrub-trench::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    right: 8px;
+    transform: translateY(-50%);
+    height: 4px;
+    background: #040507;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* The ruler ticks (using ::before) */
+.transport-scrub-trench::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 20px;
+    right: 20px;
+    height: 5px;
+    background-image:
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.8) 0px, rgba(0, 0, 0, 0.8) 1px, transparent 1px, transparent 16px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0px, rgba(0, 0, 0, 0.5) 1px, transparent 1px, transparent 4px);
+    background-size: 100% 5px, 100% 3px;
+    background-repeat: no-repeat;
+    background-position: bottom left, bottom left;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .transport-scrub-trench-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
     height: 100%;
-    background: var(--accent-cyan);
-    box-shadow: 0 0 8px var(--accent-cyan);
-    border-radius: 2px;
+    background: transparent;
+    /* LED glow follows fill position — only where scrubbed */
+    box-shadow: 4px 0 12px 2px rgba(0, 242, 255, 0.4);
     transition: width 0.1s linear;
+    z-index: 2;
 }
 
-/* =========================================================================
-   ABORT ZONE (Critical Telemetry & Actuator)
-   ========================================================================= */
-
-.abort-column {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    /* Spacing between top indicator, button, and bottom strip */
-}
-
-/* 1. ABORT PENDING Indicator */
-.abort-pending-indicator {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-family: 'Share Tech Mono', monospace, var(--font-mono);
-    font-size: 0.6rem;
-    font-weight: 700;
-    color: #ff3333;
-    letter-spacing: 0.05em;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: #110000;
-    border: 1px solid #330000;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
-    text-shadow: 0 0 6px rgba(255, 0, 0, 0.6);
-}
-
-.abort-dot {
-    font-size: 0.8rem;
-    line-height: 1;
-    color: #ff3333;
-    text-shadow: 0 0 8px #ff0000, 0 0 16px #ff0000;
-}
-
-/* 2. The Guarded Switch Seat */
-.abort-guard-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    position: relative;
-    /* Creating the recessed flat seat exactly as in the mockup */
-    background: #131416;
-    padding: 6px 6px;
-    border-radius: 8px;
-    border: 1px solid #080809;
-    box-shadow:
-        inset 0 4px 8px rgba(0, 0, 0, 0.8),
-        inset 0 1px 3px rgba(0, 0, 0, 0.9),
-        0 1px 1px rgba(255, 255, 255, 0.05);
-}
-
-/* The Metal Cages (Robust Cylindrical Chrome) */
-.abort-guard-left,
-.abort-guard-right {
-    width: 6px;
-    height: 46px;
-    border-radius: 3px;
-    /* Beautiful brushed cylindrical metal */
-    background: linear-gradient(90deg, #222 0%, #aeb4c9 30%, #eef0f5 50%, #8a90a3 70%, #111 100%);
-    box-shadow:
-        4px 0px 8px rgba(0, 0, 0, 0.9),
-        /* Cast shadow inside the recess */
-        inset 0 1px 2px rgba(255, 255, 255, 0.8),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.8);
-    position: relative;
-    z-index: 5;
-}
-
-/* Metal Cages Mounting Points (Curved inward into the panel) */
-.abort-guard-left::before,
-.abort-guard-left::after,
-.abort-guard-right::before,
-.abort-guard-right::after {
+/* Scrub thumb handle */
+.transport-scrub-trench-fill::after {
     content: '';
     position: absolute;
-    width: 6px;
-    height: 8px;
-    background: linear-gradient(0deg, #111 0%, #aeb4c9 50%, #111 100%);
-    z-index: -1;
+    right: -16px;
+    /* Center 32px handle on current width */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 24px;
+
+    background-image:
+        /* 1. Red Line */
+        linear-gradient(#ff2a2a, #ff2a2a),
+        /* 2. Red Line Glow */
+        linear-gradient(rgba(255, 42, 42, 0.4), rgba(255, 42, 42, 0.4)),
+        /* 3. Red Dot */
+        radial-gradient(circle, #ff2a2a 40%, transparent 60%),
+        /* 4. Red Dot Glow */
+        radial-gradient(circle, rgba(255, 42, 42, 0.5) 40%, transparent 60%),
+        /* 5. Concave Light/Shadow (indentation) */
+        linear-gradient(90deg,
+            rgba(255, 255, 255, 0.1) 0%,
+            transparent 10%,
+            rgba(0, 0, 0, 0.3) 30%,
+            rgba(0, 0, 0, 0.5) 50%,
+            rgba(0, 0, 0, 0.3) 70%,
+            transparent 90%,
+            rgba(255, 255, 255, 0.05) 100%),
+        /* 6. Base Metal */
+        linear-gradient(180deg, #515866 0%, #343945 25%, #252933 75%, #181b22 100%);
+
+    background-size:
+        2px 14px,
+        /* Red Line */
+        6px 18px,
+        /* Red Line Glow */
+        3px 3px,
+        /* Red Dot */
+        8px 8px,
+        /* Red Dot Glow */
+        100% 100%,
+        /* Concave Light */
+        100% 100%;
+    /* Base Metal */
+
+    background-position:
+        15px center,
+        /* Red Line (centered at 16px) */
+        13px center,
+        /* Red Line Glow */
+        25px center,
+        /* Red Dot */
+        22.5px center,
+        /* Red Dot Glow */
+        0 0,
+        0 0;
+
+    background-repeat: no-repeat;
+
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.85);
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.25),
+        inset 1px 0 2px rgba(255, 255, 255, 0.15),
+        inset -1px 0 2px rgba(255, 255, 255, 0.05),
+        -2px 4px 6px rgba(0, 0, 0, 0.4),
+        2px 4px 10px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
 }
 
-.abort-guard-left::before,
-.abort-guard-right::before {
-    top: -4px;
-    border-radius: 3px 3px 0 0;
-    box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.3);
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ABORT ZONE — Flip-Guard Cap + Cavity + PA-Family Red Actuator
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* LED rim: slow pulse at idle */
+@keyframes abort-rim-idle {
+
+    0%,
+    100% {
+        box-shadow: 0 0 4px rgba(160, 0, 0, 0.30), 0 0 8px rgba(140, 0, 0, 0.15), inset 0 0 3px rgba(140, 0, 0, 0.10);
+        border-color: rgba(160, 0, 0, 0.35);
+    }
+
+    50% {
+        box-shadow: 0 0 7px rgba(200, 0, 0, 0.45), 0 0 14px rgba(180, 0, 0, 0.22), inset 0 0 5px rgba(180, 0, 0, 0.15);
+        border-color: rgba(200, 0, 0, 0.50);
+    }
 }
 
-.abort-guard-left::after,
-.abort-guard-right::after {
-    bottom: -4px;
-    border-radius: 0 0 3px 3px;
-    box-shadow: inset 0 -2px 2px rgba(0, 0, 0, 0.8);
+/* LED rim: fast pulse when armed (cap open) */
+@keyframes abort-rim-armed {
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px rgba(220, 0, 0, 0.55), 0 0 16px rgba(200, 0, 0, 0.30), inset 0 0 5px rgba(200, 0, 0, 0.20);
+        border-color: rgba(220, 0, 0, 0.65);
+    }
+
+    50% {
+        box-shadow: 0 0 16px rgba(255, 0, 0, 0.80), 0 0 28px rgba(230, 0, 0, 0.45), inset 0 0 10px rgba(230, 0, 0, 0.35);
+        border-color: rgba(255, 30, 30, 0.90);
+    }
 }
 
-/* The Deep Red Jewel Button */
-.btn-abort-guarded {
-    width: 52px;
-    height: 40px;
-    border-radius: 6px;
-    padding: 0;
+/* CNC letter red bleed */
+@keyframes cnc-bleed {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.8));
+    }
+}
+
+/* ── Outer housing shell ── */
+.abort-housing {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        #1c2028;
+    border-radius: 8px;
+    padding: 7px;
+    box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.04),
+        inset 0 -4px 10px rgba(0, 0, 0, 0.88),
+        0 4px 12px rgba(0, 0, 0, 0.80),
+        0 0 0 1px rgba(0, 0, 0, 0.65);
+    border: 1px solid #080809;
+}
+
+.abort-column {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    perspective: 320px;
+    perspective-origin: 50% 50%;
+}
+
+/* ── Flip Cap (Satin-Matte Milled Aluminum + CNC Letters) ── */
+/* Hangar architecture: transition ONLY transform, everything else discrete */
+.abort-cover {
+    position: relative;
+    z-index: 2;
+    width: 68px;
+    height: 48px;
+    border-radius: 2px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    border: none;
-
-    /* The premium dark red gem gradient */
-    background: linear-gradient(180deg, #611717 0%, #4a0d0d 45%, #330505 100%);
-
-    /* Complex optical bevels */
+    /* FIX 1: Pivot at pin center (3px = center of 6px strip) */
+    transform-origin: center 3px;
+    transform: rotateX(0deg);
+    /* FIX 3: 1px upward bite — lid overlaps strip groove, seals light gap */
+    margin-top: -1px;
+    /* CLOSE: slow heavy fall — transform only, GPU composited */
+    transition: transform 3000ms cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform;
+    /* Satin-matte milled aluminum with vertical heat-sink fins */
+    background:
+        repeating-linear-gradient(90deg, transparent 0, transparent 2px, rgba(0, 0, 0, 0.15) 3px, rgba(255, 255, 255, 0.03) 4px),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.02" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        linear-gradient(168deg,
+            #1c2028 0%,
+            #272e3a 18%,
+            #323a48 32%,
+            #434b5c 44%,
+            #525c6e 47%,
+            #434b5c 50%,
+            #323a48 62%,
+            #272e3a 78%,
+            #1c2028 100%);
+    /* Closed state borders */
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    /* Closed state shadows — matching strip edge treatment */
     box-shadow:
-        inset 0 2px 0 rgba(255, 100, 100, 0.4),
-        /* Top spec catch */
-        inset 0 -1.5px 1px rgba(0, 0, 0, 0.9),
-        /* Bottom dark edge */
-        inset 0 0 16px rgba(0, 0, 0, 0.7),
-        /* Deep internal darkening */
-        0 4px 8px rgba(0, 0, 0, 0.8),
-        /* Ambient cast shadow */
-        0 0 0 1px rgba(0, 0, 0, 0.8);
-    /* Structural edge */
+        inset 0 2px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+        inset 0 6px 14px rgba(0, 0, 0, 0.55),
+        0 3px 10px rgba(0, 0, 0, 0.72),
+        0 1px 2px rgba(0, 0, 0, 0.50);
+    /* Watch-bracelet notch — CNC cut removes center 50%, leaves 25% lug ears */
+    clip-path: polygon(0% 0%,
+            25% 0%,
+            25% 14%,
+            75% 14%,
+            75% 0%,
+            100% 0%,
+            100% 100%,
+            0% 100%);
+}
 
+/* FIX 2: Light-lock flange — internal lip occludes red gap at 0deg closed */
+.abort-cover::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to bottom, #1c2028 0%, #272e3a 70%, rgba(30, 35, 42, 0.0) 100%);
+    z-index: 3;
+    pointer-events: none;
+}
+
+
+.abort-column.armed .abort-cover,
+.abort-column.triggered .abort-cover {
+    transform: rotateX(160deg);
+    transition: transform 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* CNC-cut "ABORT" — red LED bleeds through aluminum */
+.abort-cnc {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.60rem;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    user-select: none;
+    position: relative;
+    z-index: 3;
+    /* Ensure holes sit above the cap's red reflection */
+
+    /* 1. CSS Masking / negative space */
+    color: transparent;
+    background: radial-gradient(ellipse at 50% 120%, rgba(255, 40, 40, 0.95) 0%, rgba(120, 10, 10, 0.8) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    /* 2. Metal Thickness (Inner Depth) */
+    text-shadow:
+        0px 1px 0px rgba(255, 255, 255, 0.2),
+        /* bottom edge highlight */
+        0px -1px 0px rgba(0, 0, 0, 0.6);
+    /* top edge occlusion */
+
+    animation: cnc-bleed 2.8s ease-in-out infinite;
+    transition: all 380ms ease;
+}
+
+/* Cap open: holes are angled — LED light no longer passes straight through.
+   Letters appear as dark cuts in aluminum, glow extinguishes. */
+.abort-column.armed .abort-cnc {
+    animation: none;
+    /* 3. Occlusion Shadow (Dark interior of the holes) */
+    background: #060709;
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    text-shadow:
+        0px 1px 0px rgba(255, 255, 255, 0.2),
+        0px -1px 0px rgba(0, 0, 0, 0.8);
+
+    filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.9));
+    /* wall shadows */
+}
+
+/* Red LED reflection on the back face of the aluminum cap.
+   When the cap flips open (+112deg), its back face becomes visible to the viewer.
+   The cavity LED casts red light from the hinge side — radiates from top edge downward. */
+/* (axle moved to .abort-column::before — stays fixed on faceplate) */
+
+.abort-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    /* Reflection from hinge side — back face visible at +112deg */
+    background: radial-gradient(130% 50% at 50% -10%,
+            rgba(220, 0, 0, 0.30) 0%,
+            rgba(180, 0, 0, 0.14) 45%,
+            rgba(0, 0, 0, 0.00) 80%);
+    opacity: 0;
+    transition: opacity 380ms ease;
+    /* matches cap rotation */
+    pointer-events: none;
+}
+
+.abort-column.armed .abort-cover::after {
+    opacity: 1;
+}
+
+/* Base Cavity Style (IdleClosed) */
+.abort-cavity {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    padding: 8px;
+    background:
+        linear-gradient(to top, rgba(255, 0, 0, 0.32) 0%, transparent 80%),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        #1c2028;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05),
+        inset 0 10px 28px rgba(0, 0, 0, 0.98),
+        inset 0 5px 14px rgba(0, 0, 0, 0.95),
+        inset 0 0 8px rgba(0, 0, 0, 0.90),
+        /* 80% of triggered: inset 0 -5px 10px -2px rgba(255,0,0,0.7) */
+        inset 0 -5px 10px -2px rgba(255, 0, 0, 0.56);
+    border: 1px solid #060709;
+    filter: brightness(1.2);
+    transition: background 150ms ease, filter 150ms ease, box-shadow 150ms ease;
+}
+
+/* ── Pivot wire — single 1px axis line, no object ── */
+.abort-cavity::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 25%;
+    right: 25%;
+    height: 1px;
+    background: rgba(180, 185, 195, 0.5);
+    box-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+    z-index: 2;
+}
+
+@keyframes cavity-pulse {
+
+    0%,
+    100% {
+        filter: brightness(1.0) contrast(1.1);
+    }
+
+    50% {
+        filter: brightness(1.2) contrast(1.2);
+    }
+}
+
+@keyframes neon-pulse-armed {
+
+    0%,
+    100% {
+        opacity: 0.3;
+    }
+
+    50% {
+        opacity: 1.0;
+    }
+}
+
+@keyframes button-pulse-armed {
+
+    0%,
+    100% {
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.80;
+    }
+}
+
+/* Armed Cavity: Pulsing light bleed on walls */
+.abort-column.armed .abort-cavity {
+    background:
+        linear-gradient(to top, rgba(255, 0, 0, 0.25) 0%, transparent 80%),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        #1c2028;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05),
+        /* Panel Bevel (Faceplate) */
+        inset 0px -5px 10px -2px rgba(255, 0, 0, 0.4),
+        inset 0 10px 28px rgba(0, 0, 0, 0.98),
+        inset 0 5px 14px rgba(0, 0, 0, 0.95),
+        inset 0 0 8px rgba(0, 0, 0, 0.90);
+    animation: cavity-pulse 2s ease-in-out infinite;
+}
+
+/* Triggered Cavity: Solid max glow light bleed */
+.abort-column.triggered .abort-cavity {
+    background:
+        linear-gradient(to top, rgba(255, 0, 0, 0.4) 0%, transparent 80%),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        #1c2028;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05),
+        /* Panel Bevel (Faceplate) */
+        inset 0px -5px 10px -2px rgba(255, 0, 0, 0.7),
+        inset 0 10px 28px rgba(0, 0, 0, 0.98),
+        inset 0 5px 14px rgba(0, 0, 0, 0.95),
+        inset 0 0 8px rgba(0, 0, 0, 0.90);
+    filter: brightness(1.5);
+    transition: none !important;
+}
+
+/* Cooldown Cavity: Total Blackout */
+.abort-column.cooldown .abort-cavity {
+    background: #1c2028;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    transition: none !important;
+}
+
+/* ── Inner Socket — pa-housing equivalent ── */
+.abort-inner-socket {
+    width: 54px;
+    height: 40px;
+    background: #141518;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-sizing: border-box;
+    box-shadow:
+        /* Tiered metallic steps */
+        inset 0 0 0 2px #181a1f,
+        inset 0 0 2px 2px rgba(0, 0, 0, 0.8),
+        inset 0 0 0 4px #101114,
+        inset 0 0 2px 4px rgba(0, 0, 0, 0.9),
+        /* Existing depth */
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.85),
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: box-shadow 150ms ease;
+}
+
+/* Permanent fiber optic red ring at the bottom of the cavity */
+.abort-inner-socket::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: 5px;
+
+    /* The physical ring */
+    border: 1.5px solid rgba(255, 30, 30, 0.9);
+
+    /* Multi-layered Light Diffusion (Outward Only) */
+    box-shadow:
+        /* Immediate outer bleed */
+        0 0 8px rgba(255, 0, 0, 0.6),
+        /* Ambient floor illumination */
+        0 0 15px rgba(255, 0, 0, 0.4);
+
+    opacity: 0.15;
+    /* Standby/Idle state */
+    transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+    pointer-events: none;
+    transform: translateZ(0);
+    /* Prevent hardware acceleration jitters */
+}
+
+.abort-column.armed .abort-inner-socket::before {
+    opacity: 0.7;
+    border-color: rgba(255, 60, 60, 1);
+    animation: neon-pulse-armed 2s ease-in-out infinite;
+}
+
+.abort-column.triggered .abort-inner-socket::before {
+    animation: none;
+    opacity: 1.0;
+    border-color: #ffffff;
+    box-shadow:
+        0 0 15px rgba(255, 0, 0, 0.8),
+        0 0 35px rgba(255, 0, 0, 0.6);
+    filter: brightness(1.5);
+    transition: none !important;
+}
+
+/* Cooldown blackout for the socket */
+.abort-column.cooldown .abort-inner-socket::before {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+/* Housing catches red light when armed */
+.abort-column.armed .abort-inner-socket {
+    box-shadow:
+        0 0 45px rgba(255, 59, 48, 0.18),
+        /* ambient glow on flat panel */
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.85),
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        /* physical depth */
+        inset 0 0 8px rgba(255, 59, 48, 0.35),
+        /* inner rim light */
+        inset 0 -2px 3px rgba(255, 59, 48, 0.15);
+    /* bounce light off bottom wall */
+}
+
+/* ── Abort Lens — pa-lens, permanently dark-red ── */
+.abort-inner-button {
+    position: relative;
+    z-index: 2;
+    /* Prevent filter from hoisting the ring above the button */
+    width: 46px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Dark-red background — same logic as led-amber (permanently dark) */
+    background: radial-gradient(circle, #3d0505 0%, #150000 100%);
+    /* Restored edge highlight as very faint/red-tinted so it doesn't look like glossy plastic but anchors the physical edge */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 50, 50, 0.20),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.80),
+        inset 0 0 12px rgba(0, 0, 0, 0.70),
+        0 2px 4px rgba(0, 0, 0, 0.90),
+        0 0 0 1px rgba(0, 0, 0, 0.50);
     transition: transform 40ms ease, box-shadow 40ms ease;
 }
 
-.btn-abort-guarded:active {
-    transform: translateY(2px);
+/* Pressed/Triggered: Lens catches red specular AND physically depresses (via shadow) */
+.abort-inner-button:active,
+.abort-column.triggered .abort-inner-button {
+    /* removed translateY to prevent physical shifting off-center relative to the ring */
     box-shadow:
-        inset 0 1px 0 rgba(255, 100, 100, 0.2),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.9),
-        inset 0 0 20px rgba(0, 0, 0, 0.9),
-        0 1px 2px rgba(0, 0, 0, 0.9),
-        0 0 0 1px rgba(0, 0, 0, 0.8);
+        inset 0 1.5px 2px rgba(255, 0, 0, 0.35),
+        inset 0 0.5px 0 rgba(255, 50, 50, 0.20),
+        inset 0 -1.5px 1px rgba(0, 0, 0, 0.80),
+        inset 0 0 12px rgba(0, 0, 0, 0.70),
+        0 0px 1px rgba(0, 0, 0, 0.90),
+        0 0 0 1px rgba(0, 0, 0, 0.50);
 }
 
-.abort-label {
+/* ── pa-led equivalent ── */
+.abort-jewel-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    filter: blur(4px);
+    pointer-events: none;
+    opacity: 0;
+    /* IdleClosed */
+    background: radial-gradient(circle at 50% 65%,
+            rgba(255, 0, 0, 0.80) 0%,
+            rgba(255, 0, 0, 0.55) 20%,
+            rgba(150, 0, 0, 0.25) 45%,
+            rgba(0, 0, 0, 0.00) 70%);
+}
+
+/* Armed: Pulsing button glow */
+.abort-column.armed .abort-jewel-glow {
+    animation: button-pulse-armed 2s ease-in-out infinite -1s;
+}
+
+/* Triggered: Solid glow */
+.abort-inner-button:active .abort-jewel-glow,
+.abort-column.triggered .abort-jewel-glow {
+    animation: none;
+    opacity: 0.80;
+    transition: none !important;
+}
+
+/* Cooldown blackout for the button glow */
+.abort-column.cooldown .abort-jewel-glow {
+    opacity: 0 !important;
+    transition: none !important;
+}
+
+@keyframes abort-label-pulse {
+
+    0%,
+    100% {
+        color: #ffffff;
+        filter: brightness(1.0);
+        text-shadow:
+            0 1px 0 rgba(100, 0, 0, 0),
+            0 -1px 1px rgba(255, 0, 0, 0),
+            -1px 0 2px rgba(255, 0, 0, 0),
+            1px 0 2px rgba(255, 0, 0, 0),
+            0 2px 3px rgba(255, 0, 0, 0),
+            0 0 8px rgba(255, 0, 0, 0);
+    }
+
+    50% {
+        color: #ff0000;
+        filter: brightness(1.1);
+        text-shadow:
+            0 1px 0 rgba(100, 0, 0, 0.75),
+            0 -1px 1px rgba(255, 0, 0, 0.65),
+            -1px 0 2px rgba(255, 0, 0, 0.55),
+            1px 0 2px rgba(255, 0, 0, 0.55),
+            0 2px 3px rgba(255, 0, 0, 0.65),
+            0 0 8px rgba(255, 0, 0, 0.90);
+    }
+}
+
+/* ── pa-label equivalent on the abort lens ── */
+.abort-inner-label {
+    position: relative;
+    z-index: 2;
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #ff9999;
-    /* Soft pink-red engraving */
-    letter-spacing: 0.05em;
+    font-size: 0.60rem;
+    font-weight: 300;
+    letter-spacing: 0.16em;
+    color: rgba(255, 255, 255, 0.75);
+    transform: translateY(1px);
+    pointer-events: none;
+    user-select: none;
+    transition: color 40ms ease, text-shadow 40ms ease, filter 40ms ease;
+}
 
-    /* Matte engraving physics (NO glow!) */
+/* Armed: Pulsing red text */
+.abort-column.armed .abort-inner-label {
+    animation: abort-label-pulse 2s ease-in-out infinite -1s;
+}
+
+/* Triggered/Pressed: Solid red text */
+.abort-inner-button:active .abort-inner-label,
+.abort-column.triggered .abort-inner-label {
+    animation: none;
+    opacity: 1;
+    color: #ff0000;
+    filter: brightness(1.2);
     text-shadow:
-        0 -1px 1px rgba(0, 0, 0, 0.9),
-        /* Deep cut shadow */
-        0 1px 0 rgba(255, 150, 150, 0.2);
-    /* Soft bottom reflection */
+        0 1px 0 rgba(100, 0, 0, 0.75),
+        0 -1px 1px rgba(255, 0, 0, 0.65),
+        -1px 0 2px rgba(255, 0, 0, 0.55),
+        1px 0 2px rgba(255, 0, 0, 0.55),
+        0 2px 3px rgba(255, 0, 0, 0.65),
+        0 0 8px rgba(255, 0, 0, 0.90);
+    transition: none !important;
 }
 
-/* 3. Bottom 6-Dot LED Strip */
-.abort-led-strip {
-    display: flex;
-    gap: 4px;
-    padding: 4px 8px;
-    background: #090a0b;
-    border-radius: 6px;
-    border: 1px solid #000;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.abort-led-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: #1a0505;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.abort-led-dot.active-bright {
-    background: #ff3333;
-    box-shadow: 0 0 6px #ff0000, 0 0 12px #ff0000, inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-.abort-led-dot.active-dim {
-    background: #aa1111;
-    box-shadow: 0 0 4px rgba(255, 0, 0, 0.5), inset 0 1px 0 rgba(255, 100, 100, 0.3);
+/* Cooldown blackout for the label */
+.abort-column.cooldown .abort-inner-label {
+    color: #ffffff !important;
+    text-shadow: none !important;
+    opacity: 0 !important;
+    transition: none !important;
 }
 
 /* --- THE PHYSICAL SEAT --- */
@@ -3007,6 +3552,39 @@ body {
         inset 0 2px 4px rgba(0, 0, 0, 0.9),
         inset 0 -2px 3px rgba(255, 255, 255, 0.03);
     border: 1px solid #080809;
+    transition: box-shadow 150ms ease;
+}
+
+/* Light rim and ambient glow when Amber actuator is active */
+.button-base-seat:has(.transport-actuator.led-amber.active) {
+    box-shadow:
+        0 0 45px rgba(255, 138, 0, 0.18),
+        /* ambient glow on flat panel */
+        0 1px 1px rgba(255, 255, 255, 0.06),
+        0 -1px 2px rgba(0, 0, 0, 0.4),
+        inset 0 6px 10px rgba(0, 0, 0, 0.7),
+        inset 0 2px 4px rgba(0, 0, 0, 0.9),
+        /* physical depth */
+        inset 0 0 8px rgba(255, 138, 0, 0.35),
+        /* inner rim light */
+        inset 0 -2px 3px rgba(255, 138, 0, 0.15);
+    /* bounce light off bottom wall */
+}
+
+/* Light rim and ambient glow when Red actuator is active */
+.button-base-seat:has(.transport-actuator.led-red.active) {
+    box-shadow:
+        0 0 45px rgba(255, 59, 48, 0.18),
+        /* ambient glow on flat panel */
+        0 1px 1px rgba(255, 255, 255, 0.06),
+        0 -1px 2px rgba(0, 0, 0, 0.4),
+        inset 0 6px 10px rgba(0, 0, 0, 0.7),
+        inset 0 2px 4px rgba(0, 0, 0, 0.9),
+        /* physical depth */
+        inset 0 0 8px rgba(255, 59, 48, 0.35),
+        /* inner rim light */
+        inset 0 -2px 3px rgba(255, 59, 48, 0.15);
+    /* bounce light off bottom wall */
 }
 
 /* --- THE ACTUATOR WRAPPER --- */
@@ -3247,21 +3825,25 @@ body {
     justify-content: center;
     position: relative;
     box-sizing: border-box;
+    /* Root fix: Contain the translateY(2px) press so it doesn't reflow the parent panel */
+    overflow: hidden;
 }
 
 /* --- TRANSPORT TOP LABEL --- */
 .transport-top-label {
     height: 8px;
     font-family: var(--font-mono);
-    font-size: 0.65rem;
-    color: #a0a0a0;
-    font-weight: 500;
-    letter-spacing: 0.05em;
+    font-size: 0.55rem;
+    /* smaller — engraving, not heading */
+    color: #6a6a6a;
+    /* more muted — recedes behind buttons */
+    font-weight: 400;
+    letter-spacing: 0.08em;
     display: flex;
     align-items: center;
     justify-content: center;
     white-space: nowrap;
-    text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.8);
+    text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.9);
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;

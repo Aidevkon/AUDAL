@@ -30,6 +30,7 @@ use crate::components::intent_bay::IntentBay;
 use crate::components::{
     annunciator::Annunciator,
     transport_button::{TransportActuator, LedColor, SkipActuator},
+    screw::Screw,
 };
 
 
@@ -65,6 +66,14 @@ async fn invoke_playback(
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum AbortState {
+    IdleClosed,
+    Armed,
+    Triggered,
+    Cooldown,
+}
+
 // ── App root ──────────────────────────────────────────────────────────────────
 
 #[allow(non_snake_case)]
@@ -78,6 +87,7 @@ pub fn App() -> Element {
     let mut show_mastered: Signal<bool> = use_signal(|| false);
     let mut intent_open:    Signal<bool> = use_signal(|| false);
     let mut intent_closing: Signal<bool> = use_signal(|| false);
+    let mut abort_state: Signal<AbortState> = use_signal(|| AbortState::IdleClosed);
     let mut current_state = use_signal(|| TransportState::Stopped);
     let tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let dyn_angle: Signal<f32> = use_signal(|| 0.0_f32);
@@ -179,13 +189,18 @@ pub fn App() -> Element {
                 // Center: Transport & Time
                 div { class: "transport-center",
                     div { class: "insert-panel",
-                            div { class: "transport-mfd-pit",
+                        Screw { top: 8, left: 8 }
+                        Screw { top: 8, right: 8 }
+                        Screw { bottom: 8, left: 8 }
+                        Screw { bottom: 8, right: 8 }
+                        
+                        div { class: "transport-mfd-pit",
                                 // Top row of controls and timecode
                                 div { class: "control-housing",
                                     div { class: "mfd-controls-row",
                                         // SKIP BACK
                                         div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "SKIP-BACKWARD" }
+                                            div { class: "transport-top-label", "SKIP BWD" }
                                             div { class: "button-base-seat-narrow",
                                                 SkipActuator {
                                                     label: "{lbl_skip_back}",
@@ -218,7 +233,7 @@ pub fn App() -> Element {
 
                                         // SKIP FORWARD
                                         div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "SKIP-FORWARD" }
+                                            div { class: "transport-top-label", "SKIP FWD" }
                                             div { class: "button-base-seat-narrow",
                                                 SkipActuator {
                                                     label: "{lbl_skip_fwd}",
@@ -312,42 +327,59 @@ pub fn App() -> Element {
                             let current = *intent_open.read();
                             intent_open.set(!current);
                         },
-                        "STOP"
+                        "HA"
                     }
 
-                    // The ABORT Column (Top Indicator, Switch, Bottom LED Strip)
-                    div { class: "abort-column",
-                        // 1. Top Indicator
-                        div { class: "abort-pending-indicator",
-                            span { class: "abort-dot", "•" }
-                            " ABORT PENDING"
+                    // ABORT — Flip-Guard Cap + Deep Cavity + PA-Family Red Actuator
+                    div { class: "abort-housing",
+                      div {
+                        class: match *abort_state.read() {
+                            AbortState::IdleClosed => "abort-column",
+                            AbortState::Armed => "abort-column armed",
+                            AbortState::Triggered => "abort-column triggered",
+                            AbortState::Cooldown => "abort-column cooldown",
+                        },
+
+                        // Layer 1: Flip cap (satin-matte milled aluminum + CNC letters)
+                        div {
+                            class: "abort-cover",
+                            onclick: move |_| {
+                                let current = *abort_state.read();
+                                match current {
+                                    AbortState::IdleClosed => abort_state.set(AbortState::Armed),
+                                    AbortState::Armed | AbortState::Triggered => abort_state.set(AbortState::IdleClosed),
+                                    AbortState::Cooldown => {}, // Block manual close during blackout
+                                }
+                            },
+                            span { class: "abort-cnc", "ABORT" }
                         }
-                        
-                        // 2. The Guarded Switch
-                        div { class: "abort-guard-wrapper",
-                            div { class: "abort-guard-left" }
-                            button {
-                                class: "btn-abort-guarded",
-                                onclick: move |_| {
-                                    let mut s = session_state.write();
-                                    *s = None;
-                                    let mut m = mode.write();
-                                    *m = CockpitMode::Idle;
-                                },
-                                span { class: "abort-label", "ABORT" }
+
+                        // Layer 2: Deep cavity — PA-family red actuator inside
+                        div { class: "abort-cavity",
+                            div { class: "abort-inner-socket",
+                                button {
+                                    class: "abort-inner-button",
+                                    style: if *abort_state.read() != AbortState::Armed { "pointer-events: none;" } else { "" },
+                                    onclick: move |_| {
+                                        if *abort_state.read() != AbortState::Armed { return; }
+                                        let mut s = session_state.write();
+                                        *s = None;
+                                        let mut m = mode.write();
+                                        *m = CockpitMode::Idle;
+                                        abort_state.set(AbortState::Triggered);
+                                        spawn_local(async move {
+                                            gloo_timers::future::TimeoutFuture::new(4_000).await;
+                                            abort_state.set(AbortState::Cooldown);
+                                            gloo_timers::future::TimeoutFuture::new(200).await;
+                                            abort_state.set(AbortState::IdleClosed);
+                                        });
+                                    },
+                                    div { class: "abort-jewel-glow" }
+                                    span { class: "abort-inner-label", "ABORT" }
+                                }
                             }
-                            div { class: "abort-guard-right" }
                         }
-                        
-                        // 3. Bottom 6-Dot LED Strip
-                        div { class: "abort-led-strip",
-                            div { class: "abort-led-dot active-bright" }
-                            div { class: "abort-led-dot active-dim" }
-                            div { class: "abort-led-dot" }
-                            div { class: "abort-led-dot" }
-                            div { class: "abort-led-dot" }
-                            div { class: "abort-led-dot" }
-                        }
+                      }
                     }
                         }
                     }
@@ -388,7 +420,6 @@ pub fn App() -> Element {
                 },
                 div { class: "intent-knob-bay",
                     IntentBay {
-                        open: *intent_open.read(),
                         tone_angle: *tone_angle.read(),
                         dyn_angle: *dyn_angle.read(),
                         space_angle: *space_angle.read(),
