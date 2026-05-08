@@ -7,3 +7,4 @@ pub mod intent_bay;
 pub mod primary_signal_analyzer;
 pub mod sampling_siamese;
 pub mod transport_button;
+pub mod ab_toggle;
