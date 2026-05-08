@@ -75,12 +75,7 @@
 
 /* Position label */
 .scrub-knob__position {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 6px;
-    font-weight: 700;
-    color: rgba(255,183,3,0.7);
-    letter-spacing: 0.05em;
-    margin-top: 8px;
+    display: none;
 }
 
 /* Arc rail below knob */
@@ -113,6 +108,7 @@
     align-items: center;
     width: 56px;
     padding-bottom: 12px;
+    align-self: center;
 }
 
 /* Active press state */
