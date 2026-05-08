@@ -1,0 +1,55 @@
+/*
+ * styles.css — Still Air Cockpit · Hardware Aesthetic v3
+ * Authority: ui-agent-context.md v2.1
+ *
+ * ARCHITECTURE:
+ *   .panel-screw-wrapper (position:relative, overflow:visible)
+ *     .mfd-panel (overflow:hidden — clips content only)
+ *     .screw × 4 (siblings — never clipped)
+ *
+ * MATERIAL LANGUAGE:
+ *   Panel bezels: brushed metal linear-gradient(145deg)
+ *   OLED cells:   true black #000000 with deep inset shadows
+ *   Screws:       bright metallic, negative offset, sit ON bezel edge
+ *   Titles:       0.875rem, letter-pressed / engraved look
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   2. Reset & Root
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+    overflow: visible;
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-shell,
+#main {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    /* respect body padding — no 100vh overflow */
+    width: 100%;
+    /* respect body padding — no 100vw overflow */
+    overflow: hidden;
+    background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.025) 0%, transparent 40%, rgba(0, 0, 0, 0.15) 100%),
+        var(--bg-base);
+}
+

@@ -1,0 +1,97 @@
+:root {
+    /* Backgrounds */
+    --bg-base: #111318;
+    --bg-panel: #15181f;
+    --bg-elevated: #1e2128;
+    --bg-overlay: #0d0f14;
+    --bg-app: #0d0f14;
+    --bg-panel-inset: #080809;
+    /* TRUE BLACK — OLED cells */
+    --bg-meter: #080809;
+    --bg-finding-row: #1e2128;
+    --bg-track-active: #1a3a38;
+
+    /* Borders */
+    --border-subtle: #2a2d35;
+    --border-active: #3d4155;
+    --border-panel: #2a2d35;
+    --border-inset: #1a1a1a;
+    --bracket-color: #2a2d35;
+    --screw-slot: #090b10;
+
+    /* Accent palette */
+    --accent-session: #FFD60A;
+    --accent-insights: #00d1ff;
+    --accent-coach: #4ade80;
+    --accent-cyan: #00d4c8;
+    --accent-cyan-dim: #007a74;
+    --accent-cyan-glow: rgba(0, 212, 200, 0.25);
+    --accent-cyan-glow-sm: rgba(0, 212, 200, 0.12);
+    --accent-amber: #c8a832;
+    --accent-amber-dim: #7a6420;
+    --accent-gold: #d4a844;
+    --accent-magenta: #e040a0;
+
+    /* Severity */
+    --severity-high: #ef4444;
+    --severity-medium: #f59e0b;
+    --severity-low: #fde047;
+    --severity-info: #6b7280;
+
+    /* Hardware / Glass */
+    --bg-glass: #080809;
+    --bg-cell: #0a0c10;
+    --text-title: #c8c8c8;
+
+    /* Text */
+    --text-primary: #e8eaf0;
+    --text-secondary: #8b8fa8;
+    --text-muted: #4a4d5e;
+    --text-label: #4a4a4a;
+    --text-accent: #00d4c8;
+    --text-inverse: #111318;
+
+    /* State */
+    --state-idle: #4a4d5e;
+    --state-active: #4ade80;
+    --state-running: #00d1ff;
+    --state-complete: #FFD60A;
+    --state-fault: #ef4444;
+
+    /* Buttons */
+    --btn-master-bg: #FFD60A;
+    --btn-master-text: #111318;
+    --btn-neutral-bg: #1e2128;
+    --btn-neutral-text: #8b8fa8;
+    --btn-neutral-border: #2a2d35;
+
+    /* Typography */
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --text-xs: 0.625rem;
+    --text-sm: 0.75rem;
+    --text-base: 0.875rem;
+    --text-lg: 1rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --tracking-wide: 0.05em;
+    --tracking-wider: 0.1em;
+    --tracking-widest: 0.15em;
+
+    /* Spacing */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    /* Chassis dimensions */
+    --chassis-transport-h: 140px;
+    --chassis-header-h: 44px;
+    --panel-inset: 12px;
+    --bezel-radius: 6px;
+    --panel-radius: 4px;
+    --screw-size: 24px;
+}

@@ -1,0 +1,296 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   5. Panel Screw Wrapper — positioning context for screws
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   6. MFD Panel — BRUSHED METAL CHASSIS
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.mfd-panel {
+    background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+        repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+    border-radius: 16px;
+    box-shadow:
+        inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
+        inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
+        8px 8px 25px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    padding: 24px 32px 48px 32px;
+    overflow: hidden;
+}
+
+.mfd-panel::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   7. Corner Screws — BRIGHT METALLIC, NEGATIVE OFFSET
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.screw {
+    position: absolute;
+    width: var(--screw-size, 24px);
+    height: var(--screw-size, 24px);
+    border-radius: 50%;
+    /* Dark, sharp hole */
+    background: #030405;
+    border: none;
+    box-shadow:
+        inset 0.5px 0.5px 1px rgba(0, 0, 0, 1),
+        inset -0.5px -0.5px 0.5px rgba(255, 255, 255, 0.15),
+        1px 1px 1px rgba(255, 255, 255, 0.05);
+    z-index: 20;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Metal Torx screw head sitting inside the hole */
+.screw::before {
+    content: "";
+    position: absolute;
+    width: 75%;
+    /* Thick sharp gap */
+    height: 75%;
+    border-radius: 50%;
+    /* Revert to Dark Gunmetal / Brushed Black Chrome */
+    background:
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+        repeating-radial-gradient(circle, transparent, transparent 1px, rgba(255, 255, 255, 0.01) 1px, rgba(255, 255, 255, 0.01) 2px),
+        linear-gradient(135deg, #1a1b1f 0%, #0d0f11 100%);
+    box-shadow: none;
+}
+
+/* Torx inset */
+.screw::after {
+    content: "";
+    position: absolute;
+    width: 60%;
+    /* Medium precise cut */
+    height: 60%;
+    background: linear-gradient(135deg, #050506 0%, #1a1a1c 100%);
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 62.5,28.4 89,27.5 75,50 89,72.5 62.5,71.6 50,95 37.5,71.6 11,72.5 25,50 11,27.5 37.5,28.4" fill="black" stroke="black" stroke-width="12" stroke-linejoin="round"/></svg>');
+    mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,5 62.5,28.4 89,27.5 75,50 89,72.5 62.5,71.6 50,95 37.5,71.6 11,72.5 25,50 11,27.5 37.5,28.4" fill="black" stroke="black" stroke-width="12" stroke-linejoin="round"/></svg>');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    filter: drop-shadow(1px 1px 0.5px rgba(255, 255, 255, 0.08));
+}
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   8. Panel Title — ENGRAVED LOOK
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Trick to override inline styles without touching .rs files or !important */
+@keyframes m1-title-override {
+    to {
+        color: #7b8087;
+        font-weight: 500;
+        text-shadow: -1px -1px 0px rgba(0, 0, 0, 0.9), 1px 1px 0px rgba(255, 255, 255, 0.15);
+        border-bottom: none;
+        padding: 0 12px 10px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1;
+        margin: 0;
+    }
+}
+
+.panel-title {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 4px 12px 8px;
+    flex-shrink: 0;
+    position: relative;
+    color: var(--text-title);
+    background: transparent;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+    /* Apply override to beat inline styles */
+    animation: m1-title-override 0.001s forwards;
+}
+
+/* Accent underline glow */
+.panel-title::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: 0;
+    left: 35%;
+    right: 35%;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent-insights, #00d1ff);
+    opacity: 0.8;
+    box-shadow: 0 0 10px var(--accent-insights, #00d1ff);
+    pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   9. Panel Body
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-active) transparent;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #080809;
+    box-shadow:
+        inset 0 4px 20px rgba(0, 0, 0, 0.95),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   10. OLED Screen Cells — TRUE BLACK with deep inset
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.oled-screen {
+    background: #080809;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    box-shadow:
+        inset 0 2px 12px rgba(0, 0, 0, 0.95),
+        inset 0 0 30px rgba(0, 0, 0, 0.7),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    position: relative;
+}
+
+/* Low-power mode override */
+[data-low-power="true"] * {
+    box-shadow: none;
+    filter: none;
+    text-shadow: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   11. Insights Panel Layout
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ALL Panels Glass Screen Wrapper */
+@keyframes force-glass-padding {
+    to {
+        padding: 16px;
+    }
+}
+
+.mfd-panel>div:nth-child(2) {
+    background: var(--bg-glass);
+    border: 3px solid #030405;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 3px solid rgba(255, 255, 255, 0.06);
+    border-right: 3px solid rgba(255, 255, 255, 0.02);
+    box-shadow: inset 0px 8px 20px rgba(0, 0, 0, 1);
+    border-radius: 12px;
+    margin: 18px 0 0 0;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    animation: force-glass-padding 0.001s forwards;
+}
+
+/* Environment reflection on the glass */
+.mfd-panel>div:nth-child(2)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 50%, rgba(255, 255, 255, 0.01) 100%);
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 50;
+}
+
+.mfd-panel.panel-insights>div:nth-child(2) {
+    /* OLED Teal bleed outward onto the chassis */
+    box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0.9), 0 0 15px rgba(62, 199, 196, 0.05);
+}
+
+.insights-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.insights-spectrum-cell {
+    flex: 0 0 55%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 10px 14px;
+}
+
+.insights-bottom-row {
+    flex: 1;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.insights-scope-cell {
+    flex: 0 0 45%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 10px 14px;
+}
+
+.insights-meters-cell {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 10px 14px;
+}
+
