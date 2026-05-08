@@ -291,7 +291,7 @@ pub fn App() -> Element {
                                     }
                                     // Level 2 — Scrub Bar (inside control-housing)
                                     div {
-                                        class: "transport-scrub-trench",
+                                        class: "scrub-knob-assembly",
                                         id: "transport-scrub",
                                         onclick: move |evt| {
                                             if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
@@ -310,9 +310,60 @@ pub fn App() -> Element {
                                                 });
                                             }
                                         },
+                                        div { class: "scrub-knob-wrapper",
+                                            div { class: "scrub-knob__bezel",
+                                                svg {
+                                                    class: "scrub-knob__knurl",
+                                                    view_box: "0 0 100 100",
+                                                    for i in 0..36_u32 {
+                                                        line {
+                                                            x1: "50",
+                                                            y1: "4",
+                                                            x2: "50",
+                                                            y2: "10",
+                                                            stroke: "rgba(255,255,255,0.12)",
+                                                            stroke_width: "1.5",
+                                                            transform: "rotate({i * 10} 50 50)",
+                                                        }
+                                                    }
+                                                }
+                                                div { class: "scrub-knob__cap",
+                                                    span { class: "scrub-knob__position", "SCRUB" }
+                                                }
+                                            }
+                                        }
+                                        // Arc rail with progress
+                                        svg {
+                                            class: "scrub-knob__rail",
+                                            view_box: "0 0 80 14",
+                                            // Background ticks
+                                            for i in 0..17_u32 {
+                                                line {
+                                                    x1: "{4 + i * 4}",
+                                                    y1: "8",
+                                                    x2: "{4 + i * 4}",
+                                                    y2: "13",
+                                                    stroke: "rgba(255,255,255,0.12)",
+                                                    stroke_width: "1",
+                                                }
+                                            }
+                                            // Center tick — taller
+                                            line {
+                                                x1: "40", y1: "4",
+                                                x2: "40", y2: "13",
+                                                stroke: "rgba(255,255,255,0.25)",
+                                                stroke_width: "1.5",
+                                            }
+                                        }
+                                        // Progress indicator
                                         div {
-                                            class: "transport-scrub-trench-fill",
-                                            style: format!("width:{}%", scrub_len),
+                                            class: "scrub-knob__fill-arc",
+                                            div {
+                                                style: format!(
+                                                    "height:3px;background:#ffb703;box-shadow:0 0 6px rgba(255,183,3,0.6);border-radius:2px;width:{}%;margin-top:10px;",
+                                                    scrub_len
+                                                ),
+                                            }
                                         }
                                     }
                                 }

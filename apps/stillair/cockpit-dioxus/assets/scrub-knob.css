@@ -1,0 +1,123 @@
+/* ═══════════════════════════════════════════════════
+   Scrub Knob — Knurled Encoder · OB Van Style
+   ═══════════════════════════════════════════════════ */
+
+.scrub-knob-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Outer bezel — knurled ring */
+.scrub-knob__bezel {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #2a2d35 0%, #1a1c22 50%, #0d0f14 100%);
+    box-shadow:
+        0 4px 16px rgba(0,0,0,0.9),
+        inset 0 1px 1px rgba(255,255,255,0.12),
+        inset 0 -2px 4px rgba(0,0,0,0.8);
+    border: 1px solid #000;
+}
+
+/* SVG knurl */
+.scrub-knob__knurl {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Center cap */
+.scrub-knob__cap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at 35% 30%,
+        #2e3240 0%,
+        #1a1c24 45%,
+        #0a0c12 100%
+    );
+    box-shadow:
+        inset 0 2px 4px rgba(255,255,255,0.08),
+        inset 0 -3px 8px rgba(0,0,0,0.9),
+        0 2px 8px rgba(0,0,0,0.8);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Position marker line */
+.scrub-knob__cap::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 10px;
+    background: #ffb703;
+    border-radius: 1px;
+    box-shadow: 0 0 6px rgba(255,183,3,0.8);
+}
+
+/* Position label */
+.scrub-knob__position {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(255,183,3,0.7);
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+}
+
+/* Arc rail below knob */
+.scrub-knob__rail {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 14px;
+    pointer-events: none;
+}
+
+/* Progress fill overlay — driven by inline width style */
+.scrub-knob__fill-arc {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 14px;
+    pointer-events: none;
+}
+
+/* Wrapper that keeps knob + rail together */
+.scrub-knob-assembly {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 80px;
+    padding-bottom: 18px;
+}
+
+/* Active press state */
+.scrub-knob-wrapper:active .scrub-knob__cap {
+    box-shadow:
+        inset 0 3px 8px rgba(0,0,0,0.95),
+        inset 0 -1px 2px rgba(0,0,0,0.8);
+}
