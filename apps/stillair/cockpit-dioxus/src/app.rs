@@ -288,10 +288,9 @@ pub fn App() -> Element {
                                                 }
                                             }
                                         }
-                                    }
-                                    // Level 2 — Scrub Bar (inside control-housing)
-                                    div {
-                                        class: "scrub-knob-assembly",
+                                        // Scrub Knob — inline with transport buttons
+                                        div {
+                                            class: "scrub-knob-assembly",
                                         id: "transport-scrub",
                                         onclick: move |evt| {
                                             if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
@@ -360,10 +359,11 @@ pub fn App() -> Element {
                                             class: "scrub-knob__fill-arc",
                                             div {
                                                 style: format!(
-                                                    "height:3px;background:#ffb703;box-shadow:0 0 6px rgba(255,183,3,0.6);border-radius:2px;width:{}%;margin-top:10px;",
+                                                    "height:3px;background:#ffb703;box-shadow:0 0 6px rgba(255,183,3,0.6);border-radius:2px;width:{}%;margin-top:7px;",
                                                     scrub_len
                                                 ),
                                             }
+                                        }
                                         }
                                     }
                                 }
