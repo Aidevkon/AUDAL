@@ -4,8 +4,8 @@
 
 .scrub-knob-wrapper {
     position: relative;
-    width: 72px;
-    height: 72px;
+    width: 84px;
+    height: 84px;
     flex-shrink: 0;
     cursor: pointer;
     user-select: none;
@@ -23,6 +23,7 @@
         0 4px 10px rgba(0,0,0,0.75),
         inset 0 1px 0 rgba(255,255,255,0.06);
     border: 1px solid #000;
+    overflow: hidden;
 }
 
 /* SVG knurl */
@@ -41,8 +42,8 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     background: #141518;
     box-shadow:
@@ -56,18 +57,9 @@
     justify-content: center;
 }
 
-/* Position marker line */
+/* Static marker removed — rotating .scrub-knob__marker is used instead */
 .scrub-knob__cap::after {
-    content: '';
-    position: absolute;
-    top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2px;
-    height: 10px;
-    background: #ffb703;
-    border-radius: 1px;
-    box-shadow: 0 0 6px rgba(255,183,3,0.8);
+    content: none;
 }
 
 /* Position label */
@@ -103,7 +95,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 72px;
+    width: 84px;
     padding-bottom: 0;
     align-self: center;
 }
@@ -137,10 +129,10 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 2px;
-    height: 14px;
+    width: 2.5px;
+    height: 18px;
     transform-origin: bottom center;
-    background: linear-gradient(to top, #ffb703, transparent);
-    border-radius: 1px;
-    box-shadow: 0 0 4px rgba(255,183,3,0.8);
+    background: linear-gradient(to top, #ffb703, rgba(255,183,3,0.4));
+    border-radius: 2px;
+    box-shadow: 0 0 6px rgba(255,183,3,0.9), 0 0 12px rgba(255,183,3,0.4);
 }

@@ -340,7 +340,7 @@ pub fn App() -> Element {
                                                 // Arc ticks SVG — 180° bottom half, 17 ticks
                                                 svg {
                                                     class: "scrub-knob__arc",
-                                                    view_box: "0 0 72 72",
+                                                    view_box: "0 0 84 84",
                                                     xmlns: "http://www.w3.org/2000/svg",
                                                     {
                                                         // 17 ticks from 180° to 360° (bottom half)
@@ -351,19 +351,19 @@ pub fn App() -> Element {
                                                             // angle: 180° to 360°, mapped across ticks
                                                             let angle_deg = 180.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
                                                             let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
-                                                            let cx = 36.0_f64;
-                                                            let cy = 36.0_f64;
-                                                            let r_outer = 34.0_f64;
-                                                            let r_inner = 29.0_f64;
+                                                            let cx = 42.0_f64;
+                                                            let cy = 42.0_f64;
+                                                            let r_outer = 40.0_f64;
+                                                            let r_inner = 34.0_f64;
                                                             let x1 = cx + r_inner * angle_rad.cos();
                                                             let y1 = cy + r_inner * angle_rad.sin();
                                                             let x2 = cx + r_outer * angle_rad.cos();
                                                             let y2 = cy + r_outer * angle_rad.sin();
                                                             let is_active = i <= active_count;
                                                             let color = if is_active {
-                                                                "rgba(255,183,3,0.9)"
+                                                                "#ffb703"
                                                             } else {
-                                                                "rgba(255,183,3,0.15)"
+                                                                "rgba(255,183,3,0.35)"
                                                             };
                                                             let width = if i == 8 { "2" } else { "1.5" }; // center tick wider
                                                             rsx! {
