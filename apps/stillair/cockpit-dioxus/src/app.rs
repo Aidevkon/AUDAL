@@ -446,7 +446,7 @@ pub fn App() -> Element {
                                     AbortState::Cooldown => {}, // Block manual close during blackout
                                 }
                             },
-                            span { class: "abort-cnc", "ABORT" }
+                            div { class: "abort-cover-frame" }
                         }
 
                         // Layer 2: Deep cavity — PA-family red actuator inside

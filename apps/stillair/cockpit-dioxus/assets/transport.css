@@ -1579,8 +1579,8 @@
 .abort-cover {
     position: relative;
     z-index: 2;
-    width: 68px;
-    height: 48px;
+    width: 78px;
+    height: 58px;
     border-radius: 2px;
     cursor: pointer;
     display: flex;
@@ -1595,40 +1595,7 @@
     transition: transform 3000ms cubic-bezier(0.25, 1, 0.5, 1);
     will-change: transform;
     /* Satin-matte milled aluminum with vertical heat-sink fins */
-    background:
-        repeating-linear-gradient(90deg, transparent 0, transparent 2px, rgba(0, 0, 0, 0.15) 3px, rgba(255, 255, 255, 0.03) 4px),
-        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.02" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
-        linear-gradient(168deg,
-            #1c2028 0%,
-            #272e3a 18%,
-            #323a48 32%,
-            #434b5c 44%,
-            #525c6e 47%,
-            #434b5c 50%,
-            #323a48 62%,
-            #272e3a 78%,
-            #1c2028 100%);
-    /* Closed state borders */
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
-    border-left: 1px solid rgba(255, 255, 255, 0.05);
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-    /* Closed state shadows — matching strip edge treatment */
-    box-shadow:
-        inset 0 2px 0 rgba(255, 255, 255, 0.4),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.5),
-        inset 0 6px 14px rgba(0, 0, 0, 0.55),
-        0 3px 10px rgba(0, 0, 0, 0.72),
-        0 1px 2px rgba(0, 0, 0, 0.50);
-    /* Watch-bracelet notch — CNC cut removes center 50%, leaves 25% lug ears */
-    clip-path: polygon(0% 0%,
-            25% 0%,
-            25% 14%,
-            75% 14%,
-            75% 0%,
-            100% 0%,
-            100% 100%,
-            0% 100%);
+    background: transparent;
 }
 
 /* FIX 2: Light-lock flange — internal lip occludes red gap at 0deg closed */
@@ -1644,6 +1611,34 @@
     pointer-events: none;
 }
 
+.abort-cover::before {
+    content: '';
+    position: absolute;
+    /* Full center — only metal frame edges remain */
+    top: 14%;
+    left: 6%;
+    right: 6%;
+    bottom: 6%;
+    border-radius: 3px;
+    /* Highly transparent glass — button visible through */
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.08) 0%,
+            rgba(255, 255, 255, 0.02) 50%,
+            rgba(255, 255, 255, 0.05) 100%);
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+    /* Thin glass edges — catch-light only */
+    border-top: 1px solid rgba(255, 255, 255, 0.50);
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+        inset 0 1px 3px rgba(255, 255, 255, 0.10),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    z-index: 1;
+}
+
 
 .abort-column.armed .abort-cover,
 .abort-column.triggered .abort-cover {
@@ -1651,49 +1646,44 @@
     transition: transform 1200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* CNC-cut "ABORT" — red LED bleeds through aluminum */
-.abort-cnc {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.60rem;
-    font-weight: 700;
-    letter-spacing: 0.20em;
-    user-select: none;
-    position: relative;
-    z-index: 3;
-    /* Ensure holes sit above the cap's red reflection */
+/* Metal frame containing the hole for the glass window */
+.abort-cover-frame {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 2px;
 
-    /* 1. CSS Masking / negative space */
-    color: transparent;
-    background: radial-gradient(ellipse at 50% 120%, rgba(255, 40, 40, 0.95) 0%, rgba(120, 10, 10, 0.8) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
+    background:
+        repeating-linear-gradient(90deg, transparent 0, transparent 2px, rgba(0, 0, 0, 0.15) 3px, rgba(255, 255, 255, 0.03) 4px),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.02" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
+        linear-gradient(168deg, #1c2028 0%, #272e3a 18%, #323a48 32%, #434b5c 44%, #525c6e 47%, #434b5c 50%, #323a48 62%, #272e3a 78%, #1c2028 100%);
 
-    /* 2. Metal Thickness (Inner Depth) */
-    text-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.2),
-        /* bottom edge highlight */
-        0px -1px 0px rgba(0, 0, 0, 0.6);
-    /* top edge occlusion */
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
 
-    animation: cnc-bleed 2.8s ease-in-out infinite;
-    transition: all 380ms ease;
-}
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+        inset 0 6px 14px rgba(0, 0, 0, 0.55),
+        0 3px 10px rgba(0, 0, 0, 0.72),
+        0 1px 2px rgba(0, 0, 0, 0.50);
 
-/* Cap open: holes are angled — LED light no longer passes straight through.
-   Letters appear as dark cuts in aluminum, glow extinguishes. */
-.abort-column.armed .abort-cnc {
-    animation: none;
-    /* 3. Occlusion Shadow (Dark interior of the holes) */
-    background: #060709;
-    -webkit-background-clip: text;
-    background-clip: text;
+    clip-path: polygon(0% 0%, 25% 0%, 25% 14%, 75% 14%, 75% 0%, 100% 0%, 100% 100%, 0% 100%);
 
-    text-shadow:
-        0px 1px 0px rgba(255, 255, 255, 0.2),
-        0px -1px 0px rgba(0, 0, 0, 0.8);
-
-    filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.9));
-    /* wall shadows */
+    /* Cut out the center hole (top: 14%, left/right/bottom: 6%) */
+    -webkit-mask:
+        linear-gradient(#fff, #fff) top / 100% 14% no-repeat,
+        linear-gradient(#fff, #fff) bottom / 100% 6% no-repeat,
+        linear-gradient(#fff, #fff) left / 6% 100% no-repeat,
+        linear-gradient(#fff, #fff) right / 6% 100% no-repeat;
+    mask:
+        linear-gradient(#fff, #fff) top / 100% 14% no-repeat,
+        linear-gradient(#fff, #fff) bottom / 100% 6% no-repeat,
+        linear-gradient(#fff, #fff) left / 6% 100% no-repeat,
+        linear-gradient(#fff, #fff) right / 6% 100% no-repeat;
 }
 
 /* Red LED reflection on the back face of the aluminum cap.
@@ -1724,16 +1714,17 @@
 /* Base Cavity Style (IdleClosed) */
 .abort-cavity {
     position: absolute;
-    top: 6px;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    /* Perfectly align with the hole in the metal cover */
+    top: 14%;
+    left: 6%;
+    right: 6%;
+    bottom: 6%;
     z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 2px;
-    padding: 8px;
+    padding: 0;
     background:
         linear-gradient(to top, rgba(255, 0, 0, 0.32) 0%, transparent 80%),
         url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
@@ -1841,8 +1832,8 @@
 
 /* ── Inner Socket — pa-housing equivalent ── */
 .abort-inner-socket {
-    width: 54px;
-    height: 40px;
+    width: 60px;
+    height: 38px;
     background: #141518;
     border-radius: 6px;
     display: flex;
@@ -1868,8 +1859,9 @@
 .abort-inner-socket::before {
     content: "";
     position: absolute;
-    inset: 1px;
-    border-radius: 5px;
+    /* Leave a 1.5px gap of air between the 46x26 button and the ring */
+    inset: 3px 4px;
+    border-radius: 7px;
 
     /* The physical ring */
     border: 1.5px solid rgba(255, 30, 30, 0.9);
@@ -1934,7 +1926,7 @@
     z-index: 2;
     /* Prevent filter from hoisting the ring above the button */
     width: 46px;
-    height: 32px;
+    height: 26px;
     border-radius: 6px;
     border: none;
     outline: none;
@@ -2039,7 +2031,7 @@
     font-family: var(--font-mono);
     font-size: 0.60rem;
     font-weight: 300;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     color: rgba(255, 255, 255, 0.75);
     transform: translateY(1px);
     pointer-events: none;
