@@ -383,6 +383,29 @@ pub fn App() -> Element {
                                                 }
                                             }
                                         }
+                                        AbToggle {
+                                            state: (*ab_state.read()).clone(),
+                                            on_mousedown: move |_| {
+                                                let now = js_sys::Date::now() as u64;
+                                                ab_press_time.set(now);
+                                            },
+                                            on_mouseup: move |_| {
+                                                let press_duration = js_sys::Date::now() as u64
+                                                    - *ab_press_time.read();
+                                                if press_duration >= 300 {
+                                                    // long press — return to A
+                                                    ab_state.set(AbToggleState::A);
+                                                }
+                                            },
+                                            on_click: move |_| {
+                                                let next = match *ab_state.read() {
+                                                    AbToggleState::A => AbToggleState::B,
+                                                    AbToggleState::B => AbToggleState::A,
+                                                    AbToggleState::Toggled => AbToggleState::A,
+                                                };
+                                                ab_state.set(next);
+                                            },
+                                        }
                                     }
                                 }
                             }
@@ -400,29 +423,6 @@ pub fn App() -> Element {
                             intent_open.set(!current);
                         },
                         "HA"
-                    }
-                    AbToggle {
-                        state: (*ab_state.read()).clone(),
-                        on_mousedown: move |_| {
-                            let now = js_sys::Date::now() as u64;
-                            ab_press_time.set(now);
-                        },
-                        on_mouseup: move |_| {
-                            let press_duration = js_sys::Date::now() as u64
-                                - *ab_press_time.read();
-                            if press_duration >= 300 {
-                                // long press — return to A
-                                ab_state.set(AbToggleState::A);
-                            }
-                        },
-                        on_click: move |_| {
-                            let next = match *ab_state.read() {
-                                AbToggleState::A => AbToggleState::B,
-                                AbToggleState::B => AbToggleState::A,
-                                AbToggleState::Toggled => AbToggleState::A,
-                            };
-                            ab_state.set(next);
-                        },
                     }
 
                     // ABORT — Flip-Guard Cap + Deep Cavity + PA-Family Red Actuator
