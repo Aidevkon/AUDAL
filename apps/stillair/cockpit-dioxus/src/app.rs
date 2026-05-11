@@ -246,6 +246,14 @@ pub fn App() -> Element {
                                                         class: "scrub-knob__arc",
                                                         view_box: "0 0 64 64",
                                                         xmlns: "http://www.w3.org/2000/svg",
+                                                        defs {
+                                                            filter { id: "glow", x: "-50%", y: "-50%", width: "200%", height: "200%",
+                                                                feGaussianBlur {
+                                                                    _in: "SourceGraphic",
+                                                                    std_deviation: "1.5",
+                                                                }
+                                                            }
+                                                        }
                                                         {
                                                             let total_ticks = 17_u32;
                                                             let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
@@ -255,15 +263,24 @@ pub fn App() -> Element {
                                                                 let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
                                                                 let cx = 32.0_f64;
                                                                 let cy = 32.0_f64;
-                                                                let r_outer = 30.0_f64;
-                                                                let r_inner = 25.0_f64;
+                                                                let r_outer = 31.0_f64;
+                                                                let r_inner = 27.0_f64;
                                                                 let x1 = cx + r_inner * angle_rad.cos();
                                                                 let y1 = cy + r_inner * angle_rad.sin();
                                                                 let x2 = cx + r_outer * angle_rad.cos();
                                                                 let y2 = cy + r_outer * angle_rad.sin();
                                                                 let is_active = i <= active_count;
-                                                                let color = if is_active { "#ffb703" } else { "rgba(255,183,3,0.35)" };
-                                                                let width = if i == 8 { "2" } else { "1.5" };
+                                                                // 3-tier: super-bright current, active trail, dim inactive
+                                                                let is_current = i == active_count;
+                                                                let color = if is_current {
+                                                                    "#ffe066"          // super-bright — current position indicator
+                                                                } else if is_active {
+                                                                    "#ffb703"          // active trail
+                                                                } else {
+                                                                    "rgba(255,183,3,0.18)"  // dim inactive
+                                                                };
+                                                                let width = if is_current { "2.5" } else if is_active { "1.8" } else { "1.2" };
+                                                                let filter = if is_current { "url(#glow)" } else { "" };
                                                                 rsx! {
                                                                     line {
                                                                         key: "{i}",
@@ -272,12 +289,13 @@ pub fn App() -> Element {
                                                                         stroke: "{color}",
                                                                         stroke_width: "{width}",
                                                                         stroke_linecap: "round",
+                                                                        filter: "{filter}",
                                                                     }
                                                                 }
                                                             })
                                                         }
                                                     }
-                                                }
+                                                } // Added missing closing brace for scrub-knob__trench
                                                 // Layer 2: Cap — raised physical encoder knob
                                                 div { class: "scrub-knob__cap",
                                                     svg {
