@@ -247,8 +247,7 @@ pub fn App() -> Element {
                                                     format!("--active-angle: {:.2}deg;", active_angle_deg)
                                                 },
                                                 div { class: "scrub-knob__trench" }
-                                                div { class: "scrub-knob__spill-glow" }
-                                                div { class: "scrub-knob__arc-layer",
+                                                div { class: "scrub-knob__oled-ring",
                                                     svg {
                                                         class: "scrub-knob__arc",
                                                         view_box: "0 0 72 72",
@@ -296,7 +295,10 @@ pub fn App() -> Element {
                                                             })
                                                         }
                                                     }
-                                                    }
+                                                }
+                                                div { class: "scrub-knob__glass" }
+                                                div { class: "scrub-knob__spill-glow" }
+                                                div { class: "scrub-knob__occlusion-mask" }
                                                 div { class: "scrub-knob__rotor",
                                                     div { class: "scrub-knob__rim-highlight" }
                                                     div { class: "scrub-knob__skirt" }
