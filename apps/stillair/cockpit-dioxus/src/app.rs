@@ -239,21 +239,14 @@ pub fn App() -> Element {
                                                     });
                                                 }
                                             },
-                                                                                        div { class: "scrub-knob-wrapper",
+                                            div { class: "transport-top-label", style: "visibility: hidden;", "SCRUB" }
+                                            div { class: "scrub-knob-wrapper",
                                                 // Layer 1: Trench — flat recessed cavity in chassis
                                                 div { class: "scrub-knob__trench",
                                                     svg {
                                                         class: "scrub-knob__arc",
-                                                        view_box: "0 0 64 64",
+                                                        view_box: "0 0 72 72",
                                                         xmlns: "http://www.w3.org/2000/svg",
-                                                        defs {
-                                                            filter { id: "glow", x: "-50%", y: "-50%", width: "200%", height: "200%",
-                                                                feGaussianBlur {
-                                                                    _in: "SourceGraphic",
-                                                                    std_deviation: "1.5",
-                                                                }
-                                                            }
-                                                        }
                                                         {
                                                             let total_ticks = 17_u32;
                                                             let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
@@ -261,10 +254,10 @@ pub fn App() -> Element {
                                                                 // BOTTOM ARC: 0° to 180° (smile)
                                                                 let angle_deg = 0.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
                                                                 let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
-                                                                let cx = 32.0_f64;
-                                                                let cy = 32.0_f64;
-                                                                let r_outer = 31.0_f64;
-                                                                let r_inner = 27.0_f64;
+                                                                let cx = 36.0_f64;
+                                                                let cy = 36.0_f64;
+                                                                let r_outer = 36.0_f64;
+                                                                let r_inner = 31.0_f64;
                                                                 let x1 = cx + r_inner * angle_rad.cos();
                                                                 let y1 = cy + r_inner * angle_rad.sin();
                                                                 let x2 = cx + r_outer * angle_rad.cos();
@@ -273,54 +266,31 @@ pub fn App() -> Element {
                                                                 // 3-tier: super-bright current, active trail, dim inactive
                                                                 let is_current = i == active_count;
                                                                 let color = if is_current {
-                                                                    "#ffe066"          // super-bright — current position indicator
+                                                                    "#fff5e6"          // White-hot amber — current position indicator
                                                                 } else if is_active {
                                                                     "#ffb703"          // active trail
                                                                 } else {
-                                                                    "rgba(255,183,3,0.18)"  // dim inactive
+                                                                    "rgba(255,183,3,0.3)"  // dim inactive
                                                                 };
-                                                                let width = if is_current { "2.5" } else if is_active { "1.8" } else { "1.2" };
-                                                                let filter = if is_current { "url(#glow)" } else { "" };
+                                                                let width = if is_current { "4" } else { "3" };
+                                                                let line_class = if is_current { "scrub-knob__tick scrub-knob__tick--active" } else { "scrub-knob__tick" };
                                                                 rsx! {
                                                                     line {
                                                                         key: "{i}",
+                                                                        class: "{line_class}",
                                                                         x1: "{x1:.2}", y1: "{y1:.2}",
                                                                         x2: "{x2:.2}", y2: "{y2:.2}",
                                                                         stroke: "{color}",
                                                                         stroke_width: "{width}",
                                                                         stroke_linecap: "round",
-                                                                        filter: "{filter}",
                                                                     }
                                                                 }
                                                             })
                                                         }
                                                     }
                                                 } // Added missing closing brace for scrub-knob__trench
-                                                // Layer 2: Cap — raised physical encoder knob
-                                                div { class: "scrub-knob__cap",
-                                                    svg {
-                                                        class: "scrub-knob__knurl",
-                                                        view_box: "0 0 42 42",
-                                                        xmlns: "http://www.w3.org/2000/svg",
-                                                        for i in 0..36_u32 {
-                                                            line {
-                                                                x1: "21", y1: "1",
-                                                                x2: "21", y2: "5",
-                                                                stroke: "rgba(255,255,255,0.15)",
-                                                                stroke_width: "1.2",
-                                                                transform: "rotate({i * 10} 21 21)",
-                                                            }
-                                                        }
-                                                    }
-                                                    // Amber marker — matches bottom arc start position
-                                                    div {
-                                                        class: "scrub-knob__marker",
-                                                        style: format!(
-                                                            "transform: translate(-50%, -50%) rotate({}deg);",
-                                                            scrub_len * 1.8
-                                                        ),
-                                                    }
-                                                }
+                                                // Layer 2: Cap — raised physical knob base (skirt)
+                                                div { class: "scrub-knob__cap" }
                                             }
                                         }
 // SKIP FORWARD
