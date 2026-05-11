@@ -19,6 +19,8 @@
     display: flex;
     width: 100%;
     height: 100%;
+    min-width: 800px;
+    overflow: hidden;
 
     /* Main chassis metal stack */
     background:
@@ -139,6 +141,7 @@
 .insert-panel {
     /* ── Structural: fills the transport-rim opening flush ── */
     width: calc(100% - 2px);
+    flex-shrink: 0;
     height: calc(100% - 2px);
     margin: 1px;
     border-radius: 10px;
@@ -1122,6 +1125,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
+    flex-shrink: 0;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
