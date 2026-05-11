@@ -1,19 +1,21 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-    "python.languageServer": "Pylance",
-    "python.terminal.activateEnvInSelectedTerminal": true,
-    // --- ΤΕΡΜΑ ΤΟ SPINNING ---
-    "python.analysis.exclude": [
-        "**/target/**",
-        "**/.venv/**",
-        "**/.git/**",
-        "**/dist/**"
+    "antigravity.indexing.include": [
+        "apps/stillair/cockpit-dioxus/src/**/*",
+        "aether/src/**/*",
+        "cockpit/src/**/*"
     ],
-    "files.watcherExclude": {
-        "**/target/**": true,
-        "**/.venv/**": true,
-        "**/.git/**": true
-    },
-    "python.analysis.indexing": false, // Το κλείνουμε προσωρινά για να ηρεμήσει
-    "python.analysis.typeCheckingMode": "basic"
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "rust-analyzer.files.excludeDirs": [
+        "target",
+        "dist",
+        "apps/stillair/cockpit-dioxus/target",
+        "apps/stillair/cockpit-dioxus/dist"
+    ],
+    "rust-analyzer.cargo.buildScripts.enable": false,
+    "rust-analyzer.procMacro.enable": true,
+    "antigravity.agent.context.maxFiles": 120,
+    "antigravity.agent.context.maxTokens": 32000,
+    "antigravity.agent.context.followImports": true,
+    "antigravity.agent.context.includeTests": false,
+    "antigravity.agent.context.preferLocalSymbols": true
 }
