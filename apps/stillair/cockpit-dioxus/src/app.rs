@@ -240,7 +240,12 @@ pub fn App() -> Element {
                                                 }
                                             },
                                             div { class: "transport-top-label", style: "visibility: hidden;", "SCRUB" }
-                                            div { class: "scrub-knob-wrapper",
+                                            div {
+                                                class: "scrub-knob-wrapper",
+                                                style: {
+                                                    let active_angle_deg = (scrub_len / 100.0) * 180.0 - 90.0;
+                                                    format!("--active-angle: {:.2}deg;", active_angle_deg)
+                                                },
                                                 // Layer 1: Trench — flat recessed cavity in chassis
                                                 div { class: "scrub-knob__trench",
                                                     svg {
@@ -266,11 +271,11 @@ pub fn App() -> Element {
                                                                 // 3-tier: super-bright current, active trail, dim inactive
                                                                 let is_current = i == active_count;
                                                                 let color = if is_current {
-                                                                    "#fff5e6"          // White-hot amber — current position indicator
+                                                                    "#ffe699"          // Warm bright yellow-amber (not pure white)
                                                                 } else if is_active {
                                                                     "#ffb703"          // active trail
                                                                 } else {
-                                                                    "rgba(255,183,3,0.3)"  // dim inactive
+                                                                    "#8a6311"          // solid dark amber
                                                                 };
                                                                 let width = if is_current { "4" } else { "3" };
                                                                 let line_class = if is_current { "scrub-knob__tick scrub-knob__tick--active" } else { "scrub-knob__tick" };

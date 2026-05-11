@@ -31,10 +31,38 @@
     border-radius: 50%;
     overflow: visible;
     background: #0a0b0d;
-    box-shadow: 
-        inset 0 4px 14px rgba(0,0,0,1),
-        inset 0 2px 6px rgba(0,0,0,0.95);
+    box-shadow:
+        inset 0 4px 14px rgba(0, 0, 0, 1),
+        inset 0 2px 6px rgba(0, 0, 0, 0.95);
     border: 1px solid #000;
+}
+
+/* Dynamic Rim Highlight */
+.scrub-knob__trench::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    box-shadow: inset 0 -1px 2px rgba(255, 183, 3, 0.3);
+    transform: rotate(var(--active-angle, 0deg));
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: screen;
+}
+
+/* Localized Light Spill (Halo) */
+.scrub-knob__trench::after {
+    content: "";
+    position: absolute;
+    width: 24px;
+    height: 12px;
+    background: radial-gradient(ellipse at center, rgba(255, 183, 3, 0.25) 0%, transparent 80%);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(var(--active-angle, 0deg)) translateY(32px);
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: screen;
 }
 
 /* Arc ticks SVG — on trench wall, bottom half */
@@ -53,21 +81,34 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 2;
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: #1a1c22;
+    border: 1px solid #000;
     box-shadow:
-        inset 1px 1px 1px rgba(255, 255, 255, 0.4),
+        /* Inner Depth */
         inset -1px -1px 2px rgba(0, 0, 0, 0.8),
-        0 4px 8px rgba(0, 0, 0, 0.9),
-        0 2px 4px rgba(0, 0, 0, 0.8),
-        0 0 0 1px rgba(0, 0, 0, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+        /* Contact Physics / Ambient Occlusion */
+        0 0 3px 1px rgba(0, 0, 0, 0.95),
+        0 0 12px 2px rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
     transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+/* Dynamic Knob Reflection */
+.scrub-knob__cap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 100%, rgba(255, 183, 3, 0.15) 0%, transparent 50%);
+    transform: rotate(var(--active-angle, 0deg));
+    pointer-events: none;
+    z-index: 5;
+    mix-blend-mode: screen;
 }
 
 /* Raised Top — smaller cylinder with Stop button texture */
@@ -80,36 +121,33 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background-image:
-        linear-gradient(180deg, #353840 0%, #202227 100%),
-        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
-    background-blend-mode: overlay;
+    background-image: linear-gradient(180deg, #353840 0%, #202227 100%);
     box-shadow:
-        inset 0 1px 2px rgba(255,255,255,0.1),
-        inset 0 -1px 4px rgba(0,0,0,0.8),
-        0 3px 6px rgba(0,0,0,0.6),
-        0 6px 12px rgba(0,0,0,0.4);
+        inset 0 1px 2px rgba(255, 255, 255, 0.1),
+        inset 0 -1px 4px rgba(0, 0, 0, 0.8),
+        0 3px 6px rgba(0, 0, 0, 0.6),
+        0 6px 12px rgba(0, 0, 0, 0.4);
     border: 1px solid #14151a;
 }
 
 .scrub-knob-wrapper:active .scrub-knob__cap {
     transform: translate(-50%, -48%);
     box-shadow:
-        inset 1px 1px 1px rgba(255, 255, 255, 0.2),
         inset -1px -1px 2px rgba(0, 0, 0, 0.6),
-        0 2px 4px rgba(0, 0, 0, 0.9),
-        0 1px 2px rgba(0, 0, 0, 0.8),
-        0 0 0 1px rgba(0, 0, 0, 0.6);
+        /* Tighter contact when pressed */
+        0 0 2px 1px rgba(0, 0, 0, 1),
+        0 0 8px 1px rgba(0, 0, 0, 0.9);
 }
 
-/* Inactive Status LED opacity */
+/* Inactive Status LED glow (Low Power Mode) */
 .scrub-knob__tick:not(.scrub-knob__tick--active) {
-    opacity: 0.8;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 1px rgba(255, 183, 3, 0.4));
 }
 
 /* Active Status LED glow */
 .scrub-knob__tick--active {
-    filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px #ffb703) drop-shadow(0 0 15px rgba(255,183,3,0.6));
+    filter: drop-shadow(0 0 3px #ffb703) drop-shadow(0 0 6px #ffb703);
     stroke-width: 4px;
 }
 
@@ -120,5 +158,3 @@
 .scrub-knob__fill-arc {
     display: none;
 }
-
-
