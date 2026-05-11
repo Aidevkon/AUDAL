@@ -239,76 +239,68 @@ pub fn App() -> Element {
                                                     });
                                                 }
                                             },
-                                            div { class: "scrub-knob-wrapper",
-                                                // Bezel + knurl
-                                                div { class: "scrub-knob__bezel",
+                                                                                        div { class: "scrub-knob-wrapper",
+                                                // Layer 1: Trench — flat recessed cavity in chassis
+                                                div { class: "scrub-knob__trench",
                                                     svg {
-                                                        class: "scrub-knob__knurl",
-                                                        view_box: "0 0 100 100",
-                                                        for i in 0..36_u32 {
-                                                            line {
-                                                                x1: "50", y1: "4",
-                                                                x2: "50", y2: "10",
-                                                                stroke: "rgba(255,255,255,0.12)",
-                                                                stroke_width: "1.5",
-                                                                transform: "rotate({i * 10} 50 50)",
-                                                            }
-                                                        }
-                                                    }
-                                                    div { class: "scrub-knob__cap",
-                                                        // position marker — rotates based on scrub_len
-                                                        // 180° = start, 360° = end → offset = 180 + scrub_len * 1.8
-                                                        div {
-                                                            class: "scrub-knob__marker",
-                                                            style: format!(
-                                                                "transform: translate(-50%, -50%) rotate({}deg);",
-                                                                180.0 + scrub_len * 1.8
-                                                            ),
+                                                        class: "scrub-knob__arc",
+                                                        view_box: "0 0 64 64",
+                                                        xmlns: "http://www.w3.org/2000/svg",
+                                                        {
+                                                            let total_ticks = 17_u32;
+                                                            let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
+                                                            (0..total_ticks).map(move |i| {
+                                                                // BOTTOM ARC: 0° to 180° (smile)
+                                                                let angle_deg = 0.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
+                                                                let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
+                                                                let cx = 32.0_f64;
+                                                                let cy = 32.0_f64;
+                                                                let r_outer = 30.0_f64;
+                                                                let r_inner = 25.0_f64;
+                                                                let x1 = cx + r_inner * angle_rad.cos();
+                                                                let y1 = cy + r_inner * angle_rad.sin();
+                                                                let x2 = cx + r_outer * angle_rad.cos();
+                                                                let y2 = cy + r_outer * angle_rad.sin();
+                                                                let is_active = i <= active_count;
+                                                                let color = if is_active { "#ffb703" } else { "rgba(255,183,3,0.35)" };
+                                                                let width = if i == 8 { "2" } else { "1.5" };
+                                                                rsx! {
+                                                                    line {
+                                                                        key: "{i}",
+                                                                        x1: "{x1:.2}", y1: "{y1:.2}",
+                                                                        x2: "{x2:.2}", y2: "{y2:.2}",
+                                                                        stroke: "{color}",
+                                                                        stroke_width: "{width}",
+                                                                        stroke_linecap: "round",
+                                                                    }
+                                                                }
+                                                            })
                                                         }
                                                     }
                                                 }
-                                                // Arc ticks SVG — 180° bottom half, 17 ticks
-                                                svg {
-                                                    class: "scrub-knob__arc",
-                                                    view_box: "0 0 64 64",
-                                                    xmlns: "http://www.w3.org/2000/svg",
-                                                    {
-                                                        // 17 ticks from 180° to 360° (bottom half)
-                                                        // tick i is "active" if i/16 <= scrub_len/100
-                                                        let total_ticks = 17_u32;
-                                                        let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
-                                                        (0..total_ticks).map(move |i| {
-                                                            // angle: 180° to 360°, mapped across ticks
-                                                            let angle_deg = 180.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
-                                                            let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
-                                                            let cx = 32.0_f64;
-                                                            let cy = 32.0_f64;
-                                                            let r_outer = 30.0_f64;
-                                                            let r_inner = 25.0_f64;
-                                                            let x1 = cx + r_inner * angle_rad.cos();
-                                                            let y1 = cy + r_inner * angle_rad.sin();
-                                                            let x2 = cx + r_outer * angle_rad.cos();
-                                                            let y2 = cy + r_outer * angle_rad.sin();
-                                                            let is_active = i <= active_count;
-                                                            let color = if is_active {
-                                                                "#ffb703"
-                                                            } else {
-                                                                "rgba(255,183,3,0.35)"
-                                                            };
-                                                            let width = if i == 8 { "2" } else { "1.5" }; // center tick wider
-                                                            rsx! {
-                                                                line {
-                                                                    key: "{i}",
-                                                                    x1: "{x1:.2}",
-                                                                    y1: "{y1:.2}",
-                                                                    x2: "{x2:.2}",
-                                                                    y2: "{y2:.2}",
-                                                                    stroke: "{color}",
-                                                                    stroke_width: "{width}",
-                                                                    stroke_linecap: "round",
-                                                                }
+                                                // Layer 2: Cap — raised physical encoder knob
+                                                div { class: "scrub-knob__cap",
+                                                    svg {
+                                                        class: "scrub-knob__knurl",
+                                                        view_box: "0 0 42 42",
+                                                        xmlns: "http://www.w3.org/2000/svg",
+                                                        for i in 0..36_u32 {
+                                                            line {
+                                                                x1: "21", y1: "1",
+                                                                x2: "21", y2: "5",
+                                                                stroke: "rgba(255,255,255,0.15)",
+                                                                stroke_width: "1.2",
+                                                                transform: "rotate({i * 10} 21 21)",
                                                             }
-                                                        })
+                                                        }
+                                                    }
+                                                    // Amber marker — matches bottom arc start position
+                                                    div {
+                                                        class: "scrub-knob__marker",
+                                                        style: format!(
+                                                            "transform: translate(-50%, -50%) rotate({}deg);",
+                                                            scrub_len * 1.8
+                                                        ),
                                                     }
                                                 }
                                             }

@@ -1,6 +1,18 @@
 /* ═══════════════════════════════════════════════════
    Scrub Knob — Knurled Encoder · OB Van Style
+   Hierarchy: trench (base) → arc ticks → cap (raised knob)
+   Arc: bottom half only (smile — 0° to 180°)
    ═══════════════════════════════════════════════════ */
+
+.scrub-knob-assembly {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 64px;
+    padding-bottom: 0;
+    align-self: center;
+}
 
 .scrub-knob-wrapper {
     position: relative;
@@ -11,32 +23,29 @@
     user-select: none;
 }
 
-/* Outer bezel — knurled ring */
-.scrub-knob__bezel {
+/* Trench — flat recessed cavity machined into chassis */
+.scrub-knob__trench {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: #141518;
+    background: #0a0b0d;
     box-shadow:
-        inset 0 1px 2px rgba(255,255,255,0.05),
-        inset 0 -3px 6px rgba(0,0,0,0.85),
-        0 4px 10px rgba(0,0,0,0.75),
-        inset 0 1px 0 rgba(255,255,255,0.06);
+        inset 0 4px 12px rgba(0,0,0,0.95),
+        inset 0 2px 6px rgba(0,0,0,0.9),
+        inset 0 0 0 1px rgba(0,0,0,0.8);
     border: 1px solid #000;
-    overflow: hidden;
 }
 
-/* SVG knurl */
-.scrub-knob__knurl {
+/* Arc ticks SVG — on trench wall, bottom half */
+.scrub-knob__arc {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    border-radius: 50%;
     pointer-events: none;
 }
 
-/* Center cap */
+/* Cap — raised physical encoder knob above trench */
 .scrub-knob__cap {
     position: absolute;
     top: 50%;
@@ -48,91 +57,53 @@
     background: #141518;
     box-shadow:
         inset 0 1px 2px rgba(255,255,255,0.05),
-        inset 0 -3px 6px rgba(0,0,0,0.85),
-        0 2px 6px rgba(0,0,0,0.75),
-        inset 0 1px 0 rgba(255,255,255,0.06);
+        inset 0 -2px 4px rgba(0,0,0,0.9),
+        0 4px 8px rgba(0,0,0,0.9),
+        0 2px 4px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(0,0,0,0.6);
     border: 1px solid rgba(255,255,255,0.04);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* Static marker removed — rotating .scrub-knob__marker is used instead */
-.scrub-knob__cap::after {
-    content: none;
-}
-
-/* Position label */
-.scrub-knob__position {
-    display: none;
-}
-
-/* Arc rail below knob */
-.scrub-knob__rail {
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 56px;
-    height: 14px;
-    pointer-events: none;
-}
-
-/* Progress fill overlay — driven by inline width style */
-.scrub-knob__fill-arc {
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 56px;
-    height: 14px;
-    pointer-events: none;
-}
-
-/* Wrapper that keeps knob + rail together */
-.scrub-knob-assembly {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 64px;
-    padding-bottom: 0;
-    align-self: center;
-}
-
-/* Active press state */
 .scrub-knob-wrapper:active .scrub-knob__cap {
     box-shadow:
-        inset 0 3px 8px rgba(0,0,0,0.95),
-        inset 0 -1px 2px rgba(0,0,0,0.8);
+        inset 0 2px 6px rgba(0,0,0,0.95),
+        0 1px 2px rgba(0,0,0,0.8);
 }
 
-.scrub-knob__rail {
-    display: none;
-}
-.scrub-knob__fill-arc {
-    display: none;
-}
-
-/* Arc ticks SVG wrapper */
-.scrub-knob__arc {
+/* Knurl SVG — grip texture on cap surface */
+.scrub-knob__knurl {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
+    border-radius: 50%;
     pointer-events: none;
 }
 
-/* Rotating position marker */
+/* Amber marker — position indicator on cap */
 .scrub-knob__marker {
     position: absolute;
     top: 50%;
     left: 50%;
     width: 2.5px;
-    height: 18px;
+    height: 14px;
     transform-origin: bottom center;
     background: linear-gradient(to top, #ffb703, rgba(255,183,3,0.4));
     border-radius: 2px;
     box-shadow: 0 0 6px rgba(255,183,3,0.9), 0 0 12px rgba(255,183,3,0.4);
+}
+
+/* Hide obsolete elements */
+.scrub-knob__bezel,
+.scrub-knob__position,
+.scrub-knob__rail,
+.scrub-knob__fill-arc {
+    display: none;
+}
+
+.scrub-knob__cap::after {
+    content: none;
 }
