@@ -218,76 +218,6 @@ pub fn App() -> Element {
                                             }
                                         }
 
-                                        // Middle: OLED Timecode
-                                        div { class: "lcd-bezel",
-                                            div {
-                                                class: "transport-vfd-display transport-time",
-                                                id: "transport-position",
-                                                {
-                                                    format!(
-                                                        "00:{:02}:{:02}:{:03}",
-                                                        position_ms / 60000,
-                                                        (position_ms / 1000) % 60,
-                                                        position_ms % 1000,
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // SKIP FORWARD
-                                        div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "SKIP FWD" }
-                                            div { class: "button-base-seat-narrow",
-                                                SkipActuator {
-                                                    label: "{lbl_skip_fwd}",
-                                                    on_click: move |_| {
-                                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                                        let ps = playback_state.clone();
-                                                        spawn_local(async move {
-                                                            invoke_playback("seek", Some(new_ms), ps).await;
-                                                        });
-                                                    },
-                                                }
-                                            }
-                                        }
-
-                                        // PLAY
-                                        div { class: "transport-btn-col",
-                                            div { class: if current_state() == TransportState::Playing { "transport-led-pill amber-active" } else { "transport-led-pill" } }
-                                            div { class: "button-base-seat",
-                                                TransportActuator {
-                                                    label: "PLAY".to_string(),
-                                                    color: LedColor::Amber,
-                                                    active: current_state() == TransportState::Playing,
-                                                    on_click: move |_| {
-                                                        current_state.set(TransportState::Playing);
-                                                        let ps = playback_state.clone();
-                                                        spawn_local(async move {
-                                                            invoke_playback("play", None, ps).await;
-                                                        });
-                                                    },
-                                                }
-                                            }
-                                        }
-
-                                        // STOP
-                                        div { class: "transport-btn-col",
-                                            div { class: if current_state() == TransportState::Stopped { "transport-led-pill red-active" } else { "transport-led-pill" } }
-                                            div { class: "button-base-seat",
-                                                TransportActuator {
-                                                    label: "STOP".to_string(),
-                                                    color: LedColor::Red,
-                                                    active: current_state() == TransportState::Stopped,
-                                                    on_click: move |_| {
-                                                        current_state.set(TransportState::Stopped);
-                                                        let ps = playback_state.clone();
-                                                        spawn_local(async move {
-                                                            invoke_playback("stop", None, ps).await;
-                                                        });
-                                                    },
-                                                }
-                                            }
-                                        }
                                         // Scrub Knob — inline with transport buttons
                                         div {
                                             class: "scrub-knob-assembly",
@@ -340,7 +270,7 @@ pub fn App() -> Element {
                                                 // Arc ticks SVG — 180° bottom half, 17 ticks
                                                 svg {
                                                     class: "scrub-knob__arc",
-                                                    view_box: "0 0 84 84",
+                                                    view_box: "0 0 64 64",
                                                     xmlns: "http://www.w3.org/2000/svg",
                                                     {
                                                         // 17 ticks from 180° to 360° (bottom half)
@@ -351,10 +281,10 @@ pub fn App() -> Element {
                                                             // angle: 180° to 360°, mapped across ticks
                                                             let angle_deg = 180.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
                                                             let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
-                                                            let cx = 42.0_f64;
-                                                            let cy = 42.0_f64;
-                                                            let r_outer = 40.0_f64;
-                                                            let r_inner = 34.0_f64;
+                                                            let cx = 32.0_f64;
+                                                            let cy = 32.0_f64;
+                                                            let r_outer = 30.0_f64;
+                                                            let r_inner = 25.0_f64;
                                                             let x1 = cx + r_inner * angle_rad.cos();
                                                             let y1 = cy + r_inner * angle_rad.sin();
                                                             let x2 = cx + r_outer * angle_rad.cos();
@@ -383,7 +313,77 @@ pub fn App() -> Element {
                                                 }
                                             }
                                         }
-                                        AbToggle {
+// SKIP FORWARD
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "SKIP FWD" }
+                                            div { class: "button-base-seat-narrow",
+                                                SkipActuator {
+                                                    label: "{lbl_skip_fwd}",
+                                                    on_click: move |_| {
+                                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(new_ms), ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
+
+                                        // Middle: OLED Timecode
+                                        div { class: "lcd-bezel",
+                                            div {
+                                                class: "transport-vfd-display transport-time",
+                                                id: "transport-position",
+                                                {
+                                                    format!(
+                                                        "00:{:02}:{:02}:{:03}",
+                                                        position_ms / 60000,
+                                                        (position_ms / 1000) % 60,
+                                                        position_ms % 1000,
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // STOP
+                                        div { class: "transport-btn-col",
+                                            div { class: if current_state() == TransportState::Stopped { "transport-led-pill red-active" } else { "transport-led-pill" } }
+                                            div { class: "button-base-seat",
+                                                TransportActuator {
+                                                    label: "STOP".to_string(),
+                                                    color: LedColor::Red,
+                                                    active: current_state() == TransportState::Stopped,
+                                                    on_click: move |_| {
+                                                        current_state.set(TransportState::Stopped);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("stop", None, ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
+                                        // PLAY
+                                        div { class: "transport-btn-col",
+                                            div { class: if current_state() == TransportState::Playing { "transport-led-pill amber-active" } else { "transport-led-pill" } }
+                                            div { class: "button-base-seat",
+                                                TransportActuator {
+                                                    label: "PLAY".to_string(),
+                                                    color: LedColor::Amber,
+                                                    active: current_state() == TransportState::Playing,
+                                                    on_click: move |_| {
+                                                        current_state.set(TransportState::Playing);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("play", None, ps).await;
+                                                        });
+                                                    },
+                                                }
+                                            }
+                                        }
+
+                                                                                AbToggle {
                                             state: (*ab_state.read()).clone(),
                                             on_mousedown: move |_| {
                                                 let now = js_sys::Date::now() as u64;
