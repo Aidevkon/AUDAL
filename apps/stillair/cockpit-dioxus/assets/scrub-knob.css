@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════
    Scrub Knob — Knurled Encoder · OB Van Style
-   Hierarchy: trench (base) → arc ticks → cap (raised knob)
-   Arc: bottom half only (smile — 0° to 180°)
+   Corrected Layering (z-index) + OLED Tick Visibility Fix
    ═══════════════════════════════════════════════════ */
 
 .scrub-knob-assembly {
@@ -24,7 +23,7 @@
     user-select: none;
 }
 
-/* Trench — flat recessed cavity machined into chassis */
+/* Trench — base layer */
 .scrub-knob__trench {
     position: absolute;
     inset: 0;
@@ -32,21 +31,29 @@
     overflow: visible;
     background: #0a0b0d;
     border: 1px solid #000;
+    z-index: 1;
 }
 
-/* Dynamic Rim Highlight - Reflection on the edge of the knob */
-.scrub-knob__rim-highlight {
+/* OLED Ring (ticks) */
+.scrub-knob__oled-ring {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Glass Cover */
+.scrub-knob__glass {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    box-shadow: inset 0 -2px 3px rgba(255, 183, 3, 0.4);
-    transform: rotate(var(--active-angle, 0deg));
+    backdrop-filter: blur(1px) brightness(0.85);
+    background: rgba(10, 11, 13, 0.2);
     pointer-events: none;
-    z-index: 6;
-    mix-blend-mode: screen;
+    z-index: 3;
 }
 
-/* Localized Light Spill (Halo) */
+/* Spill Glow */
 .scrub-knob__spill-glow {
     position: absolute;
     width: 24px;
@@ -56,108 +63,49 @@
     top: 50%;
     transform: translate(-50%, -50%) rotate(var(--active-angle, 0deg)) translateY(32px);
     pointer-events: none;
-    z-index: 1;
+    z-index: 4;
     mix-blend-mode: screen;
 }
 
-/* OLED Ring layer (deepest light source) */
-.scrub-knob__oled-ring {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-}
-
-/* Glass Cover (sits above OLEDs, adds blur and tint) */
-.scrub-knob__glass {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    backdrop-filter: blur(1px) brightness(0.85);
-    background: rgba(10, 11, 13, 0.2);
-    pointer-events: none;
-    z-index: 1;
-}
-.scrub-knob__arc {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-}
-
-/* Ambient Occlusion Mask - deep chassis shadow over the LEDs */
+/* Occlusion Mask */
 .scrub-knob__occlusion-mask {
     position: absolute;
     inset: 0;
     border-radius: 50%;
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
     box-shadow:
         inset 0 4px 14px rgba(0, 0, 0, 1),
         inset 0 2px 6px rgba(0, 0, 0, 0.95);
 }
 
-/* Layer 2: Rotor (The physical rotary dial) */
+/* Rotor */
 .scrub-knob__rotor {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 2;
+    z-index: 6;
     width: 44px;
     height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Rotary dial - no :active depth push needed */
 }
 
-/* Skirt — the knurled/side grip area */
-.scrub-knob__skirt {
+/* Rim Highlight */
+.scrub-knob__rim-highlight {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: #1a1c22;
-    border: 1px solid #000;
-    box-shadow:
-        /* Inner Depth */
-        inset -1px -1px 2px rgba(0, 0, 0, 0.8),
-        /* Contact Physics / Ambient Occlusion */
-        0 0 3px 1px rgba(0, 0, 0, 0.95),
-        0 0 12px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Dynamic reflection on the skirt from the active LED */
-.scrub-knob__skirt-reflection {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 100%, rgba(255, 183, 3, 0.15) 0%, transparent 50%);
+    box-shadow: inset 0 -2px 3px rgba(255, 183, 3, 0.4);
     transform: rotate(var(--active-angle, 0deg));
     pointer-events: none;
-    z-index: 5;
+    z-index: 7;
     mix-blend-mode: screen;
 }
 
-/* The top flat metal surface */
-.scrub-knob__faceplate {
-    position: absolute;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    /* Strict FWD/BWD transport button material sync */
-    background-image: linear-gradient(180deg, #353840 0%, #202227 100%);
-    box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, 0.1),
-        inset 0 -1px 4px rgba(0, 0, 0, 0.8),
-        0 3px 6px rgba(0, 0, 0, 0.6),
-        0 6px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid #14151a;
-    z-index: 10;
-}
-
-/* Curved metal edge specular catch */
+/* Specular Highlight */
 .scrub-knob__specular-highlight {
     position: absolute;
     width: 34px;
@@ -165,18 +113,27 @@
     border-radius: 50%;
     box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.25);
     pointer-events: none;
-    z-index: 11;
+    z-index: 8;
 }
 
-/* Inactive Status LED glow (Low Power Mode) */
+/* Ticks — base */
+.scrub-knob__tick {
+    mix-blend-mode: screen;
+    stroke: #ffb703;
+    stroke-opacity: 0.75;
+}
+
+/* Inactive Ticks */
 .scrub-knob__tick:not(.scrub-knob__tick--active) {
-    opacity: 0.9;
-    filter: drop-shadow(0 0 1px rgba(255, 183, 3, 0.4));
+    opacity: 1;
+    filter: brightness(1.25) drop-shadow(0 0 1px #ffb703) drop-shadow(0 0 3px rgba(255, 183, 3, 0.8));
 }
 
-/* Active Status LED glow */
+/* Active Ticks */
 .scrub-knob__tick--active {
-    filter: drop-shadow(0 0 3px #ffb703) drop-shadow(0 0 6px #ffb703);
+    stroke: #fff2cc;
+    stroke-opacity: 1;
+    filter: brightness(1.4) drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px #ffb703) drop-shadow(0 0 10px rgba(255, 183, 3, 0.9));
     stroke-width: 4px;
 }
 
