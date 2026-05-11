@@ -246,8 +246,9 @@ pub fn App() -> Element {
                                                     let active_angle_deg = (scrub_len / 100.0) * 180.0 - 90.0;
                                                     format!("--active-angle: {:.2}deg;", active_angle_deg)
                                                 },
-                                                // Layer 1: Trench — flat recessed cavity in chassis
-                                                div { class: "scrub-knob__trench",
+                                                div { class: "scrub-knob__trench" }
+                                                div { class: "scrub-knob__spill-glow" }
+                                                div { class: "scrub-knob__arc-layer",
                                                     svg {
                                                         class: "scrub-knob__arc",
                                                         view_box: "0 0 72 72",
@@ -261,8 +262,10 @@ pub fn App() -> Element {
                                                                 let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
                                                                 let cx = 36.0_f64;
                                                                 let cy = 36.0_f64;
-                                                                let r_outer = 36.0_f64;
-                                                                let r_inner = 31.0_f64;
+                                                                // Moat is between 22px (cap) and 36px (trench). Center is 29px.
+                                                                // A 6px long tick centered at 29px means 26px to 32px.
+                                                                let r_inner = 26.0_f64;
+                                                                let r_outer = 32.0_f64;
                                                                 let x1 = cx + r_inner * angle_rad.cos();
                                                                 let y1 = cy + r_inner * angle_rad.sin();
                                                                 let x2 = cx + r_outer * angle_rad.cos();
@@ -277,7 +280,7 @@ pub fn App() -> Element {
                                                                 } else {
                                                                     "#8a6311"          // solid dark amber
                                                                 };
-                                                                let width = if is_current { "4" } else { "3" };
+                                                                let width = if is_current { "5" } else { "4" };
                                                                 let line_class = if is_current { "scrub-knob__tick scrub-knob__tick--active" } else { "scrub-knob__tick" };
                                                                 rsx! {
                                                                     line {
@@ -293,9 +296,14 @@ pub fn App() -> Element {
                                                             })
                                                         }
                                                     }
-                                                } // Added missing closing brace for scrub-knob__trench
-                                                // Layer 2: Cap — raised physical knob base (skirt)
-                                                div { class: "scrub-knob__cap" }
+                                                    }
+                                                div { class: "scrub-knob__rotor",
+                                                    div { class: "scrub-knob__rim-highlight" }
+                                                    div { class: "scrub-knob__skirt" }
+                                                    div { class: "scrub-knob__skirt-reflection" }
+                                                    div { class: "scrub-knob__faceplate" }
+                                                    div { class: "scrub-knob__specular-highlight" }
+                                                }
                                             }
                                         }
 // SKIP FORWARD

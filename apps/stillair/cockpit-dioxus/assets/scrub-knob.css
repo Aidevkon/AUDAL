@@ -37,22 +37,20 @@
     border: 1px solid #000;
 }
 
-/* Dynamic Rim Highlight */
-.scrub-knob__trench::before {
-    content: "";
+/* Dynamic Rim Highlight - Reflection on the edge of the knob */
+.scrub-knob__rim-highlight {
     position: absolute;
-    inset: -1px;
+    inset: 0;
     border-radius: 50%;
-    box-shadow: inset 0 -1px 2px rgba(255, 183, 3, 0.3);
+    box-shadow: inset 0 -2px 3px rgba(255, 183, 3, 0.4);
     transform: rotate(var(--active-angle, 0deg));
     pointer-events: none;
-    z-index: 2;
+    z-index: 6;
     mix-blend-mode: screen;
 }
 
 /* Localized Light Spill (Halo) */
-.scrub-knob__trench::after {
-    content: "";
+.scrub-knob__spill-glow {
     position: absolute;
     width: 24px;
     height: 12px;
@@ -65,7 +63,13 @@
     mix-blend-mode: screen;
 }
 
-/* Arc ticks SVG — on trench wall, bottom half */
+/* Arc ticks layer */
+.scrub-knob__arc-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
 .scrub-knob__arc {
     position: absolute;
     inset: 0;
@@ -74,8 +78,8 @@
     pointer-events: none;
 }
 
-/* Cap Base (Skirt) — flat wider cylindrical base */
-.scrub-knob__cap {
+/* Layer 2: Rotor (The physical rotary dial) */
+.scrub-knob__rotor {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -83,6 +87,16 @@
     z-index: 2;
     width: 44px;
     height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Rotary dial - no :active depth push needed */
+}
+
+/* Skirt — the knurled/side grip area */
+.scrub-knob__skirt {
+    position: absolute;
+    inset: 0;
     border-radius: 50%;
     background: #1a1c22;
     border: 1px solid #000;
@@ -92,15 +106,10 @@
         /* Contact Physics / Ambient Occlusion */
         0 0 3px 1px rgba(0, 0, 0, 0.95),
         0 0 12px 2px rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
 
-/* Dynamic Knob Reflection */
-.scrub-knob__cap::before {
-    content: '';
+/* Dynamic reflection on the skirt from the active LED */
+.scrub-knob__skirt-reflection {
     position: absolute;
     inset: 0;
     border-radius: 50%;
@@ -111,16 +120,13 @@
     mix-blend-mode: screen;
 }
 
-/* Raised Top — smaller cylinder with Stop button texture */
-.scrub-knob__cap::after {
-    content: '';
+/* The top flat metal surface */
+.scrub-knob__faceplate {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     width: 34px;
     height: 34px;
     border-radius: 50%;
+    /* Strict FWD/BWD transport button material sync */
     background-image: linear-gradient(180deg, #353840 0%, #202227 100%);
     box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.1),
@@ -128,15 +134,18 @@
         0 3px 6px rgba(0, 0, 0, 0.6),
         0 6px 12px rgba(0, 0, 0, 0.4);
     border: 1px solid #14151a;
+    z-index: 10;
 }
 
-.scrub-knob-wrapper:active .scrub-knob__cap {
-    transform: translate(-50%, -48%);
-    box-shadow:
-        inset -1px -1px 2px rgba(0, 0, 0, 0.6),
-        /* Tighter contact when pressed */
-        0 0 2px 1px rgba(0, 0, 0, 1),
-        0 0 8px 1px rgba(0, 0, 0, 0.9);
+/* Curved metal edge specular catch */
+.scrub-knob__specular-highlight {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+    z-index: 11;
 }
 
 /* Inactive Status LED glow (Low Power Mode) */
