@@ -32,6 +32,7 @@ use crate::components::{
     transport_button::{TransportActuator, LedColor, SkipActuator},
     screw::Screw,
     ab_toggle::{AbToggle, AbToggleState},
+    timecode::TimecodeDisplay,
 };
 
 
@@ -330,8 +331,8 @@ pub fn App() -> Element {
                                             div {
                                                 class: "transport-vfd-display transport-time",
                                                 id: "transport-position",
-                                                {
-                                                    format!(
+                                                TimecodeDisplay {
+                                                    value: format!(
                                                         "00:{:02}:{:02}:{:03}",
                                                         position_ms / 60000,
                                                         (position_ms / 1000) % 60,

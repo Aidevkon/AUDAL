@@ -505,9 +505,12 @@
 }
 
 .dsp-led.active::after {
-    background: #00e5ff;
-    /* bright cyan */
-    box-shadow: 0 0 6px #00e5ff, 0 0 12px rgba(0, 229, 255, 0.4);
+    /* Blue LED spec — #66c8ff, bloom capped at 6px */
+    background: #66c8ff;
+    box-shadow:
+        0 0 2px rgba(80, 180, 255, 0.55),
+        0 0 4px rgba(60, 160, 240, 0.40),
+        0 0 6px rgba(40, 140, 220, 0.28);
 }
 
 .dsp-slot.fm0-slot .dsp-led {
@@ -516,7 +519,11 @@
 }
 
 .dsp-slot.fm0-slot .dsp-led::after {
-    box-shadow: 0 0 10px #00e5ff, 0 0 20px rgba(0, 229, 255, 0.5);
+    /* Blue LED spec — FM0 master, same family, +20% luminance */
+    box-shadow:
+        0 0 2px rgba(80, 180, 255, 0.65),
+        0 0 4px rgba(60, 160, 240, 0.50),
+        0 0 6px rgba(40, 140, 220, 0.38);
 }
 
 .transport-vfd-display.transport-time {
@@ -621,12 +628,13 @@
 
 /* Active: grounded glow — inside the socket, not floating */
 .dsp-pit>.dsp-led.active {
-    background: #cbf9ff;
+    /* Blue LED spec — #66c8ff, bloom capped at 6px */
+    background: #a8dbff;
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.6),
         0 1px 1px rgba(255, 255, 255, 0.06),
-        0 0 5px rgba(0, 229, 255, 0.7),
-        0 0 10px rgba(0, 200, 232, 0.35);
+        0 0 3px rgba(80, 180, 255, 0.70),
+        0 0 6px rgba(60, 160, 240, 0.38);
 }
 
 
@@ -784,27 +792,33 @@
 
     20% {
         opacity: 1;
-        box-shadow: 0 0 10px #00e5ff;
+        box-shadow:
+            0 0 2px rgba(80, 180, 255, 0.55),
+            0 0 6px rgba(60, 160, 240, 0.40);
     }
 
     40% {
         opacity: 0.2;
-        box-shadow: 0 0 2px #00e5ff;
+        box-shadow: 0 0 2px rgba(80, 180, 255, 0.30);
     }
 
     60% {
         opacity: 1;
-        box-shadow: 0 0 12px #00e5ff;
+        box-shadow:
+            0 0 2px rgba(80, 180, 255, 0.55),
+            0 0 6px rgba(60, 160, 240, 0.40);
     }
 
     80% {
         opacity: 0.4;
-        box-shadow: 0 0 4px #00e5ff;
+        box-shadow: 0 0 3px rgba(80, 180, 255, 0.35);
     }
 
     100% {
         opacity: 1;
-        box-shadow: 0 0 12px #00e5ff;
+        box-shadow:
+            0 0 2px rgba(80, 180, 255, 0.55),
+            0 0 6px rgba(60, 160, 240, 0.40);
     }
 }
 
@@ -2297,13 +2311,11 @@
 .transport-actuator.led-amber.active .pa-label {
     color: #ff8a00;
     filter: blur(0.35px) brightness(1.1);
+    /* Amber LED spec — capped at 6px per unified grammar */
     text-shadow:
-        0 1px 0 rgba(120, 60, 20, 0.75),
-        0 -1px 1px rgba(255, 138, 0, 0.65),
-        -1px 0 2px rgba(255, 138, 0, 0.55),
-        1px 0 2px rgba(255, 138, 0, 0.55),
-        0 2px 3px rgba(255, 138, 0, 0.65),
-        0 0 8px rgba(255, 138, 0, 0.85);
+        0 0 2px rgba(255, 180, 60, 0.55),
+        0 0 4px rgba(255, 160, 40, 0.40),
+        0 0 6px rgba(255, 140, 30, 0.28);
 }
 
 /* 2. .led-red (The STOP Actuator) */
@@ -2328,15 +2340,13 @@
 
 .transport-actuator.led-red:active .pa-label,
 .transport-actuator.led-red.active .pa-label {
-    color: #ff0000;
+    color: #ff2222;
     filter: blur(0.35px) brightness(1.1);
+    /* Red LED spec — capped at 6px per unified grammar */
     text-shadow:
-        0 1px 0 rgba(100, 0, 0, 0.75),
-        0 -1px 1px rgba(255, 0, 0, 0.65),
-        -1px 0 2px rgba(255, 0, 0, 0.55),
-        1px 0 2px rgba(255, 0, 0, 0.55),
-        0 2px 3px rgba(255, 0, 0, 0.65),
-        0 0 8px rgba(255, 0, 0, 0.9);
+        0 0 2px rgba(255, 80, 80, 0.55),
+        0 0 4px rgba(255, 60, 60, 0.40),
+        0 0 6px rgba(255, 40, 40, 0.28);
 }
 
 /* =========================================================================
@@ -2402,7 +2412,7 @@
     font-size: 0.55rem;
     /* smaller — engraving, not heading */
     /* bone-phosphor: warm undertone + 0.5% amber LED reflectivity */
-    color: #f0e9d8;
+    color: #ece3d1;
     font-weight: 400;
     letter-spacing: 0.08em;
     display: flex;
@@ -2411,7 +2421,7 @@
     white-space: nowrap;
     /* Deeper cavity engraving — carved INTO the satin housing */
     text-shadow:
-        0 1px 1px rgba(0, 0, 0, 0.65),
+        0 1px 1px rgba(0, 0, 0, 0.68),
         0 -1px 1px rgba(255, 255, 255, 0.06);
     background: transparent !important;
     border: none !important;
@@ -2497,7 +2507,7 @@
     text-shadow:
         0 0 2px rgba(255, 180, 60, 0.55),
         0 0 4px rgba(255, 160, 40, 0.40),
-        0 0 6px rgba(255, 140, 30, 0.25);
+        0 0 6px rgba(255, 140, 30, 0.28);
 
     /* Part C — grounds the icon visually inside the housing lens */
     filter: brightness(1.08) contrast(1.02);
@@ -2517,4 +2527,26 @@
             transparent 75%);
     pointer-events: none;
     z-index: -1;
+}
+/* =========================================================================
+   Timecode LED Display — unified with DSP LED blue grammar
+   ========================================================================= */
+
+/* .timecode-display sits inside .transport-vfd-display.transport-time */
+/* Inherits font-size (24px), letter-spacing, and layout from the container */
+.timecode-display {
+    color: #66c8ff;
+    /* unified blue core — matches .dsp-led.active::after */
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+
+    /* LED bloom model — identical diffusion/falloff to DSP annunciators */
+    text-shadow:
+        0 0 2px rgba(80, 180, 255, 0.55),
+        0 0 4px rgba(60, 160, 240, 0.40),
+        0 0 6px rgba(40, 140, 220, 0.28);
+
+    /* Slight luminance lift to match annunciator active state */
+    filter: brightness(1.02);
 }
