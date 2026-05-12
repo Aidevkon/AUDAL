@@ -24,7 +24,7 @@
     flex: 1;
     min-height: 0;
     min-width: 0;
-    padding: 14px 32px 48px 32px;
+    padding: 17px 32px 48px 32px;
     overflow: hidden;
 }
 
@@ -213,7 +213,7 @@
     border-right: 3px solid rgba(255, 255, 255, 0.02);
     box-shadow: inset 0px 8px 20px rgba(0, 0, 0, 1);
     border-radius: 12px;
-    margin: 10px 0 0 0;
+    margin: 7px 0 0 0;
     flex: 1;
     min-height: 0;
     position: relative;
