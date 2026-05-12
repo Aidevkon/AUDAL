@@ -868,11 +868,27 @@ body {
   /* fill full coach-panel height — prevents gap from scroll collapse */
 }
 
+/* Hangar Frame - Upside-Down Flip */
 .hangar-layer .mfd-panel {
   width: 100% !important;
   height: 100% !important;
   margin: 0 !important;
-  padding: 4px 18px 8px 18px !important;
+  padding: 8px 18px 4px 18px !important;
+  flex-direction: column-reverse !important;
+  
+  /* 1. Flip gradient direction: darker top, lighter bottom */
+  background:
+      url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+      repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
+      linear-gradient(to bottom, #17191d 0%, #2b2e35 100%) !important;
+
+  /* 2. Bevel Stack: thin rim top, thick shadow bottom */
+  box-shadow:
+      inset 0 2.5px 2px rgba(255, 255, 255, 0.18),
+      inset 0 -3.5px 4px rgba(0, 0, 0, 0.85),
+      0 8px 25px rgba(0, 0, 0, 0.6) !important;
+
+  /* 3. Radius compensation: 0 symmetric radius inherited */
   border-radius: 0 !important;
   overflow: hidden !important;
 }
@@ -883,9 +899,15 @@ body {
   overflow: hidden !important;
 }
 
-/* Remove the huge 18px top margin from the glass screen to shrink the top gap */
+/* Glass screen adjustments for flipped orientation */
 .hangar-layer .mfd-panel>div:nth-child(2) {
-  margin-top: 4px !important;
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+}
+
+.hangar-layer .panel-title {
+  padding-top: 8px !important;
+  padding-bottom: 2px !important;
 }
 
 /* Remove the blue neon glow lines under all panel titles */
