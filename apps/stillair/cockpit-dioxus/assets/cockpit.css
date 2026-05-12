@@ -785,10 +785,13 @@ body {
   transform: translateY(0px) rotateX(0deg);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   /* CLOSE: slow mechanical seal */
-  transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1);
+  transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1),
+              box-shadow 400ms ease;  /* box-shadow fade prevents snap-flicker at seal */
   will-change: transform;
   /* override .chassis-bezel overflow:hidden — panel must be visible as 3D trapezoid */
   overflow: visible;
+  /* GPU layer stability — prevents compositor layer destruction flash at animation end */
+  backface-visibility: hidden;
 
   /* ── Unified macOS-style flat metal surface ──
      Same design language as .sampling-siamese: flat vertical plane,
@@ -798,16 +801,22 @@ body {
     repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.012) 1px, rgba(255, 255, 255, 0.012) 2px),
     linear-gradient(180deg, #262a30 0%, #1f2227 100%);
 
-  /* Symmetric bevel — matches siamese frame */
+  /* Symmetric bevel + zero-opacity outer shadows
+     MUST match the open-state shadow layer count (5 inset + 3 non-inset)
+     so the browser can interpolate box-shadow without snapping. */
   box-shadow:
-    /* ── TOP LIP (mirror of siamese bottom bevel — seam-matched) ── */
-    inset 0 2.5px 2px rgba(255, 255, 255, 0.26),        /* top rim-light — pure +Y, gradient-compensated */
-    inset 0 2.5px 3px rgba(0, 0, 0, 0.85),               /* top shadow falloff — matched to siamese        */
+    /* ── TOP LIP ── */
+    inset 0  2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0  2.5px 3px rgba(0, 0, 0, 0.85),
     /* ── BOTTOM LIP ── */
-    inset 0     -2.5px 2px rgba(255, 255, 255, 0.26),    /* bottom rim-light         */
-    inset 0     -2.5px 3px rgba(0, 0, 0, 0.85),          /* bottom shadow falloff    */
+    inset 0 -2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0 -2.5px 3px rgba(0, 0, 0, 0.85),
     /* ── DEPTH ── */
-    inset 0 0 15px rgba(0, 0, 0, 0.8);                   /* 360° inner depth shadow  */
+    inset 0 0 15px rgba(0, 0, 0, 0.8),
+    /* ── OUTER (at 0 opacity in closed state — animates to full in open state) ── */
+    0 22px 44px rgba(0, 0, 0, 0),
+    0  8px 18px rgba(0, 0, 0, 0),
+    0  -1px  0px rgba(255, 255, 255, 0);
   /* Global drop-shadow isolated in ::before — ::after is reserved for tilt-lighting */
 }
 
@@ -822,20 +831,39 @@ body {
   box-shadow: 8px 8px 25px rgba(0, 0, 0, 0.6);
 }
 
-.hangar-layer.intent-open>.coach-panel {
+.hangar-layer.intent-open > .coach-panel {
   /* OPEN: fast decisive kick-out — 540ms */
   transform: translateY(100px) rotateX(38deg);
-  transition: transform 540ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 540ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 540ms ease;
+  /* Full bevel + outer drop-shadow at full opacity.
+     Layer count MUST match closed state (5 inset + 3 non-inset) for interpolation. */
   box-shadow:
+    inset 0  2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0  2.5px 3px rgba(0, 0, 0, 0.85),
+    inset 0 -2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0 -2.5px 3px rgba(0, 0, 0, 0.85),
+    inset 0 0 15px rgba(0, 0, 0, 0.8),
     0 22px 44px rgba(0, 0, 0, 0.75),
-    0 8px 18px rgba(0, 0, 0, 0.55),
-    0 -1px 0 rgba(255, 255, 255, 0.04);
+    0  8px 18px rgba(0, 0, 0, 0.55),
+    0  -1px  0px rgba(255, 255, 255, 0.04);
 }
 
 /* Closing: hesitation-before-seal animation — triggered by Rust with 1600ms timeout */
-.hangar-layer.intent-closing>.coach-panel {
+.hangar-layer.intent-closing > .coach-panel {
   animation: hangar-close-seal 1600ms cubic-bezier(0.4, 0, 0.1, 1) forwards;
   transition: none;
+  /* Preserve open box-shadow at close start — prevents snap when .intent-open is removed.
+     When .intent-closing is removed (animation end), base rule transition fades back. */
+  box-shadow:
+    inset 0  2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0  2.5px 3px rgba(0, 0, 0, 0.85),
+    inset 0 -2.5px 2px rgba(255, 255, 255, 0.26),
+    inset 0 -2.5px 3px rgba(0, 0, 0, 0.85),
+    inset 0 0 15px rgba(0, 0, 0, 0.8),
+    0 22px 44px rgba(0, 0, 0, 0.75),
+    0  8px 18px rgba(0, 0, 0, 0.55),
+    0  -1px  0px rgba(255, 255, 255, 0.04);
 }
 
 /* Layer 2: Tilted surface lighting
