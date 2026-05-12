@@ -220,16 +220,27 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    border-radius: 3px;
-    padding: 2px 6px;
-    /* Deep cavity shadow + top rim highlight — no fill */
+
+    /* Hardware bezel proportions */
+    border-radius: 8px;
+    padding: 6px 14px;
+
+    /* Recessed panel background — slightly cooler than housing black */
+    background: linear-gradient(180deg, #0d0f14 0%, #080a0f 100%);
+
+    /* Perimeter: top catch-light, sides/bottom opaque border */
+    border-top:    1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.70);
+    border-left:   1px solid rgba(255, 255, 255, 0.05);
+    border-right:  1px solid rgba(255, 255, 255, 0.05);
+
+    /* Depth: cavity shadow + outer elevation drop */
     box-shadow:
-        inset 0 2px 6px rgba(0, 0, 0, 0.85),
-        /* cavity depth */
-        inset 0 1px 0 rgba(255, 255, 255, 0.1),
-        /* top rim catch-light */
-        inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-    /* bottom edge shadow */
+        inset 0 2px 8px  rgba(0, 0, 0, 0.90),  /* deep cavity */
+        inset 0 1px 0    rgba(255, 255, 255, 0.08), /* inner top rim */
+        inset 0 -1px 0   rgba(0, 0, 0, 0.50),   /* inner bottom lip */
+        0 2px 6px        rgba(0, 0, 0, 0.70),   /* outer elevation shadow */
+        0 0 0 1px        rgba(0, 0, 0, 0.85);   /* outer edge ring */
 }
 
 .transport-right {
@@ -2505,12 +2516,12 @@
     /* Amber LED backlight — warm, soft, through-polycarbonate diffusion */
     color: #ffcc55;
     text-shadow:
-        0 0 2px rgba(255, 180, 60, 0.55),
-        0 0 4px rgba(255, 160, 40, 0.40),
-        0 0 6px rgba(255, 140, 30, 0.28);
+        0 0 2px rgba(255, 180, 60, 0.50),
+        0 0 4px rgba(255, 160, 40, 0.36),
+        0 0 6px rgba(255, 140, 30, 0.22);
 
-    /* Part C — grounds the icon visually inside the housing lens */
-    filter: brightness(1.08) contrast(1.02);
+    /* Luminance unified with OLED time window — reduced density */
+    filter: brightness(1.04) contrast(1.02);
 
     pointer-events: none;
 }
@@ -2549,4 +2560,152 @@
 
     /* Slight luminance lift to match annunciator active state */
     filter: brightness(1.02);
+}
+
+/* =========================================================================
+   VFD Glass Reflection Layer — premium hardware finish
+   ========================================================================= */
+
+.transport-vfd-display.transport-time {
+    position: relative; /* anchor for ::before pseudo-element */
+    overflow: hidden;   /* prevent highlight bleed */
+}
+
+.transport-vfd-display.transport-time::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    /* Subtle diagonal glass highlight */
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.02) 35%,
+        rgba(255, 255, 255, 0.00) 60%,
+        rgba(255, 255, 255, 0.06) 100%
+    );
+
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.22; /* calibrated for satin-black housing */
+}
+
+/* =========================================================================
+   OLED Transport Screen — 3-layer architecture (same as scrub OLED ring)
+   ========================================================================= */
+
+/* SUBSTRATE LAYER — OLED bed */
+.transport-vfd-display.transport-time {
+    position: relative;
+    overflow: hidden;
+
+    /* OLED substrate: deep black with radial falloff */
+    background: radial-gradient(
+        circle at 50% 50%,
+        #06080d 0%,
+        #03040a 55%,
+        #000000 100%
+    );
+
+    /* Slight recess into housing */
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 0 14px rgba(0, 0, 0, 0.85);
+}
+
+/* GLASS LAYER — reflection highlight */
+.transport-vfd-display.transport-time::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.10) 0%,
+        rgba(255, 255, 255, 0.03) 35%,
+        rgba(255, 255, 255, 0.00) 60%,
+        rgba(255, 255, 255, 0.06) 100%
+    );
+
+    mix-blend-mode: screen;
+    opacity: 0.20;
+    pointer-events: none;
+}
+
+/* GLASS LAYER — inner vignette (same optical recess as scrub ring) */
+.transport-vfd-display.transport-time::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 2px;
+
+    box-shadow:
+        0 0 22px rgba(0, 0, 0, 0.90) inset;
+
+    pointer-events: none;
+}
+
+/* =========================================================================
+   OLED Flush Glass Mask + Occlusion Line
+   Note: ::mask and ::edge are invalid CSS — effects folded into
+   the substrate rule and existing pseudo-elements per CSS specification.
+   ========================================================================= */
+
+/* SUBSTRATE — perimeter black mask added as gradient layer + occlusion border line */
+.transport-vfd-display.transport-time {
+    /* Perimeter black mask: radial vignette on top of OLED bed */
+    background:
+        radial-gradient(
+            circle at 50% 50%,
+            transparent 0%,
+            transparent 65%,
+            rgba(0, 0, 0, 0.55) 85%,
+            rgba(0, 0, 0, 0.85) 100%
+        ),
+        radial-gradient(
+            circle at 50% 50%,
+            #06080d 0%,
+            #03040a 55%,
+            #000000 100%
+        );
+
+    /* Occlusion border line + recess shadow */
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.06),  /* glass edge catch-light */
+        0 0 0 2px rgba(0, 0, 0, 0.40),         /* bonding mask shadow */
+        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
+}
+
+/* GLASS LAYER ::before — z-index: above vignette */
+.transport-vfd-display.transport-time::before {
+    z-index: 4;
+}
+
+/* GLASS VIGNETTE ::after — z-index: below reflection */
+.transport-vfd-display.transport-time::after {
+    z-index: 2;
+}
+
+/* =========================================================================
+   Occlusion Line Micro-tune — softer bonding seam
+   Note: ::edge is not a valid CSS pseudo-element; effect folded into
+   box-shadow on the substrate rule per CSS specification.
+   ========================================================================= */
+.transport-vfd-display.transport-time {
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04),  /* glass edge — 0.5px optical seam */
+        0 0 0 2px rgba(0, 0, 0, 0.35),         /* outer absorption ring */
+        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
+}
+
+/* =========================================================================
+   Occlusion Seam Micro-tune — thinner, more optical
+   Note: ::edge is not a valid CSS pseudo-element.
+   Effect implemented as box-shadow cascade on substrate rule.
+   ========================================================================= */
+.transport-vfd-display.transport-time {
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.035), /* thinner optical seam */
+        0 0 0 2px rgba(0, 0, 0, 0.32),         /* softer absorption ring */
+        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
 }
