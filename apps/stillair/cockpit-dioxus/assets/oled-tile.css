@@ -11,18 +11,18 @@
     gap: 8px;
 }
 
-/* Slot identifier label — mirrors transport-top-label phosphor engraving */
+/* Slot identifier label — exact transport-top-label grammar */
 .oled-tile__label {
     font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.10em;
+    font-size: 0.55rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #ece3d1;
+    white-space: nowrap;
     text-shadow:
-        0 1px 1px rgba(0, 0, 0, 0.85),
-        0 -1px 0 rgba(0, 0, 0, 0.60);
-    filter: brightness(0.98) contrast(1.02);
+        0 1px 1px rgba(0, 0, 0, 0.68),
+        0 -1px 1px rgba(255, 255, 255, 0.06);
 }
 .oled-tile {
     display: inline-flex;
