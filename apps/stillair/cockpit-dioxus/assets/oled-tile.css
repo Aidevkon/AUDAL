@@ -9,10 +9,10 @@
     justify-content: center;
     position: relative;
     border-radius: 6px;
-    /* Explicit dimensions — 52×36px, matches fm0-pit proportions (4:3 screen ratio) */
-    width: 52px;
-    height: 36px;
-    padding: 4px 6px;
+    /* Portrait — matches vertical DSP annunciator family */
+    width: 40px;
+    height: 56px;
+    padding: 4px 5px;
     flex-shrink: 0;
     align-self: center;
     /* Same recessed panel as lcd-bezel */
@@ -51,9 +51,9 @@
 /* Emissive text — cyan phosphor */
 .oled-tile__text {
     font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     line-height: 1;
     position: relative;
