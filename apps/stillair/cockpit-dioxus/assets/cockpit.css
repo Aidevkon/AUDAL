@@ -909,13 +909,7 @@ body {
   flex: 0.8;
 }
 
-/* Hangar coach width fix */
-.hangar-layer .mfd-panel {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  /* fill full coach-panel height — prevents gap from scroll collapse */
-}
+
 
 /* Hangar Frame - Upside-Down Flip */
 .hangar-layer .mfd-panel {

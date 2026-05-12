@@ -10,14 +10,23 @@
 
 .mfd-panel {
     background:
-        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.08"/></svg>'),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.01" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.04"/></svg>'),
+        /* P2.1: noise opacity 0.08 → 0.04 — matches siamese substrate */
         repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.015) 1px, rgba(255, 255, 255, 0.015) 2px),
-        linear-gradient(135deg, #2b2e35 0%, #17191d 100%);
+        linear-gradient(180deg, #22252b 0%, #1a1c20 100%);
+        /* P2.1: 135deg diagonal → 180deg flat vertical plane — matches siamese */
     border-radius: 16px;
     box-shadow:
-        inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
-        inset -2.5px -2.5px 3px rgba(0, 0, 0, 0.85),
-        8px 8px 25px rgba(0, 0, 0, 0.6);
+        /* P2.1: corrected to pure ±Y vectors — matches siamese bezel architecture */
+        /* ── TOP LIP ── */
+        inset 0  2.5px 2px rgba(255, 255, 255, 0.26),  /* top rim-light — pure +Y, gradient-compensated */
+        inset 0  2.5px 3px rgba(0, 0, 0, 0.85),         /* top shadow falloff */
+        /* ── BOTTOM LIP ── */
+        inset 0 -2.5px 2px rgba(255, 255, 255, 0.26),  /* bottom rim-light — pure -Y */
+        inset 0 -2.5px 3px rgba(0, 0, 0, 0.85),         /* bottom shadow falloff */
+        /* ── DEPTH ── */
+        inset 0 0 15px rgba(0, 0, 0, 0.8);
+        /* 360° inner depth shadow — drop-shadow moved to ::after */
     display: flex;
     flex-direction: column;
     position: relative;
@@ -36,6 +45,17 @@
     border-radius: 10px;
     pointer-events: none;
     z-index: 0;
+}
+
+/* P2.1: drop-shadow isolated here — does not interfere with bevel stack */
+.mfd-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    pointer-events: none;
+    z-index: -1;
+    box-shadow: 8px 8px 25px rgba(0, 0, 0, 0.6);
 }
 
 
