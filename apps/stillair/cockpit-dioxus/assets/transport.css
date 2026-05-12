@@ -2160,7 +2160,9 @@
         inset 0 2px 0 rgba(255, 255, 255, 0.35),
         inset 0 -1px 1px rgba(0, 0, 0, 0.5),
         inset 0 4px 12px rgba(0, 0, 0, 0.55),
-        0 4px 10px rgba(0, 0, 0, 0.75);
+        0 4px 10px rgba(0, 0, 0, 0.75),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+        /* micro-AO: bottom-edge grounding */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2363,13 +2365,27 @@
 .pa-housing-narrow {
     width: 46px;
     height: 58px;
-    background: #101113;
+    /* Satin milled aluminum — same material family as abort cover frame & pa-housing */
+    background:
+        repeating-linear-gradient(90deg,
+            transparent 0,
+            transparent 2px,
+            rgba(0, 0, 0, 0.15) 3px,
+            rgba(255, 255, 255, 0.03) 4px),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8 0.02" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.035"/></svg>'),
+        linear-gradient(168deg, #1c2028 0%, #272e3a 18%, #323a48 32%, #434b5c 44%, #525c6e 47%, #434b5c 50%, #323a48 62%, #272e3a 78%, #1c2028 100%);
     border-radius: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, 0.03),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.85),
+        inset 0 2px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.5),
+        inset 0 4px 12px rgba(0, 0, 0, 0.55),
         0 2px 6px rgba(0, 0, 0, 0.8),
-        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+        /* micro-AO: bottom-edge grounding */
     display: flex;
     align-items: center;
     justify-content: center;
