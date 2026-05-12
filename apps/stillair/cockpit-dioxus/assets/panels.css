@@ -24,7 +24,7 @@
     flex: 1;
     min-height: 0;
     min-width: 0;
-    padding: 20px 32px 48px 32px;
+    padding: 16px 32px 48px 32px;
     overflow: hidden;
 }
 
@@ -110,7 +110,7 @@
         font-weight: 500;
         text-shadow: -1px -1px 0px rgba(0, 0, 0, 0.9), 1px 1px 0px rgba(255, 255, 255, 0.15);
         border-bottom: none;
-        padding: 0 12px 10px;
+        padding: 0 12px 4px;
         text-align: center;
         font-size: 13px;
         line-height: 1;
@@ -213,7 +213,7 @@
     border-right: 3px solid rgba(255, 255, 255, 0.02);
     box-shadow: inset 0px 8px 20px rgba(0, 0, 0, 1);
     border-radius: 12px;
-    margin: 18px 0 0 0;
+    margin: 8px 0 0 0;
     flex: 1;
     min-height: 0;
     position: relative;
@@ -293,4 +293,3 @@
     box-shadow: none;
     padding: 10px 14px;
 }
-
