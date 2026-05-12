@@ -59,7 +59,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden !important;
-  background: var(--bg);
+  background: #20242a;  /* P1.2: substrate nudge — equidistant between siamese (#22252b) and hangar (#1f2227) surfaces */
   /* GPU containment: prevents hangar trapezoid from overflowing into breathing room */
   clip-path: inset(0);
 }
@@ -85,12 +85,12 @@ body {
   pointer-events: none;
 }
 
-/* Cockpit work layer — fills space between PFR and Hangar */
+/* Cockpit work layer — fills all space between transport bar and hangar */
 .cockpit-work-layer {
-  flex: 1 !important;
+  flex: 1 1 auto !important;   /* P1.1: grows to fill exact remaining space — no leftover gap */
   min-height: 0 !important;
-  height: calc(100vh - var(--chassis-transport-h) - 200px - 2 * var(--breathing)) !important;
-  max-height: calc(100vh - var(--chassis-transport-h) - 200px - 2 * var(--breathing)) !important;
+  /* P1.1: removed height/max-height calc — they used undefined --chassis-transport-h token
+     and fought flex: 1, producing a 10% unaccounted space that leaked as substrate gap */
   display: flex !important;
   flex-direction: row !important;
   overflow: hidden !important;
@@ -642,8 +642,7 @@ body {
 }
 
 .work-layer {
-  flex: 0 0 62%;
-  /* Middle 65% */
+  flex: 1 1 auto;   /* P1.1: fills available space — no percentage leftover */
   display: flex;
   flex-direction: row;
   min-height: 0;
@@ -653,7 +652,8 @@ body {
 }
 
 .hangar-layer {
-  flex: 0 0 28%;
+  flex: 0 0 200px;   /* P1.1: fixed height — no percentage basis, no leftover contribution */
+  height: 200px;     /* explicit fallback for non-flex contexts */
   width: 100%;
   display: flex;
   min-height: 0;
@@ -857,6 +857,7 @@ body {
 
   border-radius: 16px;
   padding: 4px 8px 8px 8px;
+  margin-bottom: 1px;  /* hardware seam — bevel occlusion breathing space vs hangar top */
 }
 
 /* Global drop-shadow isolated here — does not interfere with bevel stack */
