@@ -2709,3 +2709,48 @@
         0 0 0 2px rgba(0, 0, 0, 0.32),         /* softer absorption ring */
         0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
 }
+
+/* =========================================================================
+   FM0 / DSP Annunciator — 3-State Animation System
+   States: IDLE (no class) | SEARCH (.searching) | LOCK (.locked)
+   ::after targets both fm0-pit (master) and dsp-pit (slot annunciators)
+   ========================================================================= */
+
+/* Base: ensure pseudo-elements are non-interactive in all states */
+.dsp-pit::after,
+.fm0-pit::after {
+    pointer-events: none;
+}
+
+/* SEARCH — ping-pong cyan bar (active + searching = true) */
+.dsp-pit.searching::after,
+.fm0-pit.searching::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    height: 2px;
+    width: 20%;
+    background: #66e0ff;
+    border-radius: 2px;
+    animation: fhq-pingpong 900ms ease-in-out infinite alternate;
+}
+
+@keyframes fhq-pingpong {
+    from { transform: translateX(0%); }
+    to   { transform: translateX(400%); }
+}
+
+/* LOCK — stable full-width underline (active = true, searching = false) */
+.dsp-pit.locked::after,
+.fm0-pit.locked::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: #66e0ff;
+    border-radius: 2px;
+    /* No animation — stable locked state */
+}
