@@ -33,6 +33,7 @@ use crate::components::{
     screw::Screw,
     ab_toggle::{AbToggle, AbToggleState},
     timecode::TimecodeDisplay,
+    oled_tile::{OledTile, OledTileState},
 };
 
 
@@ -157,11 +158,9 @@ pub fn App() -> Element {
                         // Left: Annunciator Zone
                         div { class: "transport-left dsp-annunciators",
                             div { class: "fm0-zone",
-                                Annunciator {
-                                    label: "FM0".to_string(),
-                                    is_master: true,
-                                    active: true,
-                                }
+                                OledTile { state: OledTileState::Lock }
+                                div { class: "oled-tile__screw-bl" }
+                                div { class: "oled-tile__screw-br" }
                             }
                             div { class: "dsp-chassis",
                         div { class: "dsp-slots-wrapper",
