@@ -579,7 +579,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 13px; /* compensates label height diff vs oled-tile__label: 8px forced vs ~13px auto */
     background: transparent;
     border: none;
     box-shadow: none;
