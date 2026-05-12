@@ -846,11 +846,14 @@ body {
   box-shadow: 8px 8px 25px rgba(0, 0, 0, 0.6);
 }
 
-.hangar-layer.intent-open>.coach-panel {
-  /* OPEN: fast decisive kick-out — 540ms */
-  transform: translateY(100px) rotateX(38deg);
-  transition: transform 540ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 540ms ease;
+.hangar-layer.intent-open > .coach-panel {
+  /* OPEN: two-phase mechanical kick-out via @keyframes hangar-open
+     Phase 1 (0→20%): translateY(18px) — panel clears the cavity edge, no rotation
+     Phase 2 (20→100%): translateY(100px) + rotateX(38deg) — full alpine tilt
+     animation owns transform; transition owns box-shadow independently */
+  animation: hangar-open 540ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform: translateY(100px) rotateX(38deg); /* safety net — matches 100% keyframe */
+  transition: box-shadow 540ms ease;
   /* Full bevel + outer drop-shadow at full opacity.
      Layer count MUST match closed state (5 inset + 3 non-inset) for interpolation. */
   box-shadow:
