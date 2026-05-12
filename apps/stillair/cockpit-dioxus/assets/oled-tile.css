@@ -55,15 +55,16 @@
 }
 
 .oled-tile {
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between; /* text → top, bar → bottom (mirrors dsp-pit) */
     position: relative;
     border-radius: 6px;
     /* Screen fills housing — auto-sized by housing dimensions */
     width: 100%;
     height: 100%;
-    padding: 4px 5px;
+    padding: 6px 5px 5px; /* top breathing room for text, tight bottom for bar */
     flex-shrink: 0;
     align-self: center;
     /* Same recessed panel as lcd-bezel */
