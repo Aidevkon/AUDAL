@@ -917,15 +917,18 @@ body {
 
 .panel-title {
   display: flex !important;
-  justify-content: space-between;
+  justify-content: center !important;
   align-items: center;
+  position: relative;
 }
 
 .panel-title-left {
-  padding-left: 8px;
+  padding-left: 0 !important;
 }
 
 .panel-title-right {
+  position: absolute;
+  right: 12px;
   font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
   color: #a4b5c4;
