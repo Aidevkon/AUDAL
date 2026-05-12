@@ -38,7 +38,7 @@ pub fn ModuleFrame(props: ModuleFrameProps) -> Element {
     };
 
     rsx! {
-        div { class: "mfd-panel {props.panel_class}",
+        div { class: "mfd-panel chassis-bezel chassis-substrate {props.panel_class}",
 
             // ── Hardware physical cut-out header ──
             div {

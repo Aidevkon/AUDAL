@@ -530,7 +530,7 @@ pub fn App() -> Element {
                         on_down_loud: move |_| {},
                     }
                 }
-                div { class: "coach-panel",
+                div { class: "coach-panel chassis-bezel",
                     CoachPanel { mode, session_state }
                 }
             }

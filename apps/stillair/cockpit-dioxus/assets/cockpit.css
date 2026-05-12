@@ -901,7 +901,7 @@ body {
 
   border-radius: 16px;
   padding: 4px 8px 8px 8px;
-  margin-bottom: 1px;  /* hardware seam — bevel occlusion breathing space vs hangar top */
+  /* margin-bottom now owned by .chassis-seam (P3.3) — applied via Rust class mount */
 }
 
 /* Global drop-shadow isolated here — does not interfere with bevel stack */

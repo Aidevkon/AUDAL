@@ -17,7 +17,7 @@ pub struct SamplingSiameseProps {
 pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
     rsx! {
         div {
-            class: "sampling-siamese",
+            class: "sampling-siamese chassis-bezel chassis-substrate chassis-seam",
             
             // SESSION - LEFT (PSA)
             div { class: "siamese-col siamese-session",
