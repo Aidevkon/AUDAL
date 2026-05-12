@@ -225,6 +225,7 @@
     position: relative;
 
     /* Hardware bezel proportions */
+    margin-top: 13px; /* Compensate for adjacent LED pills to align with button centers */
     border-radius: 8px;
     padding: 6px 14px;
 

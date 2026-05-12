@@ -44,9 +44,7 @@
     width: 76px !important;
     height: 64px !important;
 
-    /* Same pill housing as dsp-pit */
-    border-radius: 14px;
-    /* matches dsp-pit: same radius = same osculation point */
+    border-radius: 14px;  /* correct hardware curvature */
     border: 1px solid #080809;
     background: linear-gradient(135deg, #131417 0%, #18191c 100%);
     box-shadow:
