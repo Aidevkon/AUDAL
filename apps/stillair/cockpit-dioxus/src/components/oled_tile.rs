@@ -20,20 +20,17 @@ pub fn OledTile(props: OledTileProps) -> Element {
         OledTileState::Lock   => "oled-tile oled-tile--lock",
     };
 
-    // Screen content — dynamic per state
     let screen_label = match props.state {
         OledTileState::Idle | OledTileState::Search => "FM0",
         OledTileState::Lock => "FHQ",
     };
 
-    // data-state string for CSS targeting and devtools inspection
     let data_state = match props.state {
         OledTileState::Idle   => "idle",
         OledTileState::Search => "search",
         OledTileState::Lock   => "lock",
     };
 
-    // Human-readable status for screen readers
     let aria_label = match props.state {
         OledTileState::Idle   => "FM0 — idle, no signal",
         OledTileState::Search => "FM0 — searching for signal",
@@ -55,14 +52,17 @@ pub fn OledTile(props: OledTileProps) -> Element {
                 "FM0"
             }
 
-            // OLED screen module
+            // Hardware housing — same material family as dsp-pit
             div {
-                class: "{tile_class}",
+                class: "oled-tile-housing",
                 "data-state": "{data_state}",
                 title: "{aria_label}",
 
-                span { class: "oled-tile__text", "{screen_label}" }
-                div { class: "oled-tile__bar" }
+                // OLED screen — recessed inside housing
+                div { class: "{tile_class}",
+                    span { class: "oled-tile__text", "{screen_label}" }
+                    div { class: "oled-tile__bar" }
+                }
             }
         }
     }
