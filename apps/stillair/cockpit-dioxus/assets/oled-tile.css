@@ -30,9 +30,9 @@
     justify-content: center;
     position: relative;
     border-radius: 6px;
-    /* Portrait — label above handles top ~20px; tile is the screen module */
-    width: 40px;
-    height: 50px;
+    /* 1:1 dsp-pit parity: 38px × 59px (calculated from pit padding+content+border) */
+    width: 38px;
+    height: 59px;
     padding: 4px 5px;
     flex-shrink: 0;
     align-self: center;
