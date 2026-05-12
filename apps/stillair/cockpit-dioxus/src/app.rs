@@ -159,8 +159,6 @@ pub fn App() -> Element {
                         div { class: "transport-left dsp-annunciators",
                             div { class: "fm0-zone",
                                 OledTile { state: OledTileState::Lock }
-                                div { class: "oled-tile__screw-bl" }
-                                div { class: "oled-tile__screw-br" }
                             }
                             div { class: "dsp-chassis",
                         div { class: "dsp-slots-wrapper",
