@@ -460,7 +460,7 @@
 .dsp-annunciators {
     display: flex;
     gap: 16px;
-    align-items: center;
+    align-items: flex-start; /* top-align FHQ tile with DSP slot tops */
 }
 
 .dsp-slot {
