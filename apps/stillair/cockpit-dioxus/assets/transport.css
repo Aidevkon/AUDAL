@@ -229,18 +229,23 @@
     background: linear-gradient(180deg, #0d0f14 0%, #080a0f 100%);
 
     /* Perimeter: top catch-light, sides/bottom opaque border */
-    border-top:    1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
     border-bottom: 1px solid rgba(0, 0, 0, 0.70);
-    border-left:   1px solid rgba(255, 255, 255, 0.05);
-    border-right:  1px solid rgba(255, 255, 255, 0.05);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
 
     /* Depth: cavity shadow + outer elevation drop */
     box-shadow:
-        inset 0 2px 8px  rgba(0, 0, 0, 0.90),  /* deep cavity */
-        inset 0 1px 0    rgba(255, 255, 255, 0.08), /* inner top rim */
-        inset 0 -1px 0   rgba(0, 0, 0, 0.50),   /* inner bottom lip */
-        0 2px 6px        rgba(0, 0, 0, 0.70),   /* outer elevation shadow */
-        0 0 0 1px        rgba(0, 0, 0, 0.85);   /* outer edge ring */
+        inset 0 2px 8px rgba(0, 0, 0, 0.90),
+        /* deep cavity */
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        /* inner top rim */
+        inset 0 -1px 0 rgba(0, 0, 0, 0.50),
+        /* inner bottom lip */
+        0 2px 6px rgba(0, 0, 0, 0.70),
+        /* outer elevation shadow */
+        0 0 0 1px rgba(0, 0, 0, 0.85);
+    /* outer edge ring */
 }
 
 .transport-right {
@@ -460,7 +465,7 @@
 .dsp-annunciators {
     display: flex;
     gap: 16px;
-    align-items: flex-start; /* top-align FHQ tile with DSP slot tops */
+    align-items: flex-start;
 }
 
 .dsp-slot {
@@ -2539,6 +2544,7 @@
     pointer-events: none;
     z-index: -1;
 }
+
 /* =========================================================================
    Timecode LED Display — unified with DSP LED blue grammar
    ========================================================================= */
@@ -2567,8 +2573,10 @@
    ========================================================================= */
 
 .transport-vfd-display.transport-time {
-    position: relative; /* anchor for ::before pseudo-element */
-    overflow: hidden;   /* prevent highlight bleed */
+    position: relative;
+    /* anchor for ::before pseudo-element */
+    overflow: hidden;
+    /* prevent highlight bleed */
 }
 
 .transport-vfd-display.transport-time::before {
@@ -2577,17 +2585,16 @@
     inset: 0;
 
     /* Subtle diagonal glass highlight */
-    background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.02) 35%,
-        rgba(255, 255, 255, 0.00) 60%,
-        rgba(255, 255, 255, 0.06) 100%
-    );
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.08) 0%,
+            rgba(255, 255, 255, 0.02) 35%,
+            rgba(255, 255, 255, 0.00) 60%,
+            rgba(255, 255, 255, 0.06) 100%);
 
     pointer-events: none;
     mix-blend-mode: screen;
-    opacity: 0.22; /* calibrated for satin-black housing */
+    opacity: 0.22;
+    /* calibrated for satin-black housing */
 }
 
 /* =========================================================================
@@ -2600,12 +2607,10 @@
     overflow: hidden;
 
     /* OLED substrate: deep black with radial falloff */
-    background: radial-gradient(
-        circle at 50% 50%,
-        #06080d 0%,
-        #03040a 55%,
-        #000000 100%
-    );
+    background: radial-gradient(circle at 50% 50%,
+            #06080d 0%,
+            #03040a 55%,
+            #000000 100%);
 
     /* Slight recess into housing */
     box-shadow:
@@ -2619,13 +2624,11 @@
     position: absolute;
     inset: 0;
 
-    background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.10) 0%,
-        rgba(255, 255, 255, 0.03) 35%,
-        rgba(255, 255, 255, 0.00) 60%,
-        rgba(255, 255, 255, 0.06) 100%
-    );
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.10) 0%,
+            rgba(255, 255, 255, 0.03) 35%,
+            rgba(255, 255, 255, 0.00) 60%,
+            rgba(255, 255, 255, 0.06) 100%);
 
     mix-blend-mode: screen;
     opacity: 0.20;
@@ -2655,25 +2658,24 @@
 .transport-vfd-display.transport-time {
     /* Perimeter black mask: radial vignette on top of OLED bed */
     background:
-        radial-gradient(
-            circle at 50% 50%,
+        radial-gradient(circle at 50% 50%,
             transparent 0%,
             transparent 65%,
             rgba(0, 0, 0, 0.55) 85%,
-            rgba(0, 0, 0, 0.85) 100%
-        ),
-        radial-gradient(
-            circle at 50% 50%,
+            rgba(0, 0, 0, 0.85) 100%),
+        radial-gradient(circle at 50% 50%,
             #06080d 0%,
             #03040a 55%,
-            #000000 100%
-        );
+            #000000 100%);
 
     /* Occlusion border line + recess shadow */
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.06),  /* glass edge catch-light */
-        0 0 0 2px rgba(0, 0, 0, 0.40),         /* bonding mask shadow */
-        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
+        0 0 0 1px rgba(255, 255, 255, 0.06),
+        /* glass edge catch-light */
+        0 0 0 2px rgba(0, 0, 0, 0.40),
+        /* bonding mask shadow */
+        0 0 14px rgba(0, 0, 0, 0.85);
+    /* housing recess */
 }
 
 /* GLASS LAYER ::before — z-index: above vignette */
@@ -2693,9 +2695,12 @@
    ========================================================================= */
 .transport-vfd-display.transport-time {
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.04),  /* glass edge — 0.5px optical seam */
-        0 0 0 2px rgba(0, 0, 0, 0.35),         /* outer absorption ring */
-        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        /* glass edge — 0.5px optical seam */
+        0 0 0 2px rgba(0, 0, 0, 0.35),
+        /* outer absorption ring */
+        0 0 14px rgba(0, 0, 0, 0.85);
+    /* housing recess */
 }
 
 /* =========================================================================
@@ -2705,9 +2710,12 @@
    ========================================================================= */
 .transport-vfd-display.transport-time {
     box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.035), /* thinner optical seam */
-        0 0 0 2px rgba(0, 0, 0, 0.32),         /* softer absorption ring */
-        0 0 14px rgba(0, 0, 0, 0.85);           /* housing recess */
+        0 0 0 1px rgba(255, 255, 255, 0.035),
+        /* thinner optical seam */
+        0 0 0 2px rgba(0, 0, 0, 0.32),
+        /* softer absorption ring */
+        0 0 14px rgba(0, 0, 0, 0.85);
+    /* housing recess */
 }
 
 /* =========================================================================
@@ -2737,8 +2745,13 @@
 }
 
 @keyframes fhq-pingpong {
-    from { transform: translateX(0%); }
-    to   { transform: translateX(400%); }
+    from {
+        transform: translateX(0%);
+    }
+
+    to {
+        transform: translateX(400%);
+    }
 }
 
 /* LOCK — stable full-width underline (active = true, searching = false) */
@@ -2750,7 +2763,8 @@
     left: 0;
     height: 2px;
     width: 100%;
-    background: rgba(102, 224, 255, 0.38); /* subtle — indicator, not primary element */
+    background: rgba(102, 224, 255, 0.38);
+    /* subtle — indicator, not primary element */
     border-radius: 2px;
     /* No animation — stable locked state */
 }
