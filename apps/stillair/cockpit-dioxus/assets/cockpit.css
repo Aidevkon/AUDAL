@@ -696,11 +696,11 @@ body {
 }
 
 .hangar-layer {
-  flex: 0 0 200px;   /* P1.1: fixed height — no percentage basis, no leftover contribution */
-  height: 200px;     /* explicit fallback for non-flex contexts */
+  flex: 0 0 28%;     /* viewport-proportional — safe: work-layer flex:1 absorbs any remainder */
+  height: auto;      /* controlled by flex-basis, not fixed pixels */
+  min-height: 200px; /* safety floor — prevents collapse at very small viewports */
   width: 100%;
   display: flex;
-  min-height: 0;
   background: transparent;
   /* 1800px = realistic viewer distance — side expansion ±38px vs ±101px at 700px
      Foreshortening (rotateX 38° = 21%) is independent of perspective value */
