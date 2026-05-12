@@ -5,10 +5,12 @@
 
 /* Column wrapper — mirrors dsp-slot-col */
 .oled-tile-col {
+    height: 48px;         /* same total height as dsp-slot-col */
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px; /* matches dsp-slot-col gap — housing top aligns with pit top */
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* Slot identifier label — exact transport-top-label grammar */
@@ -39,7 +41,7 @@
 
     /* Exact dsp-pit dimensions — top AND bottom align with pit */
     width: 38px;
-    height: 59px;
+    height: 36px;         /* same height as dsp-pit */
 
     /* Same pill housing as dsp-pit */
     border-radius: 14px;     /* matches dsp-pit: same radius = same osculation point */
@@ -62,8 +64,8 @@
     position: relative;
     border-radius: 6px;
     /* Screen fills housing — auto-sized by housing dimensions */
+    height: 28px;         /* same visual footprint as dsp-led area */
     width: 100%;
-    height: 100%;
     padding: 6px 5px 2px; /* bottom: 2px + housing 4px = 6px total = dsp-pit padding-bottom */
     flex-shrink: 0;
     align-self: center;
