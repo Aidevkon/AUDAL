@@ -114,7 +114,8 @@
     height: 100%;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;  /* top-anchor: labels align across the bar */
+    padding-top: 10px;        /* uniform offset from transport bar top */
 }
 
 .transport-center {
@@ -253,7 +254,8 @@
     height: 100%;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;  /* top-anchor: matches transport-left */
+    padding-top: 10px;        /* same offset — labels align across the bar */
     gap: 16px;
 }
 
