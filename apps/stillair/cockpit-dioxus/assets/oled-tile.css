@@ -34,14 +34,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px;          /* tighter: 59px housing = dsp-pit height */
+    box-sizing: border-box;  /* 38x59 = TOTAL dimensions, not content-box */
+    padding: 4px;
 
     /* Exact dsp-pit dimensions — top AND bottom align with pit */
     width: 38px;
     height: 59px;
 
     /* Same pill housing as dsp-pit */
-    border-radius: 14px;
+    border-radius: 12px;     /* 14px too round for 38px width — fine-tuned */
     border: 1px solid #080809;
     background: linear-gradient(135deg, #131417 0%, #18191c 100%);
     box-shadow:
