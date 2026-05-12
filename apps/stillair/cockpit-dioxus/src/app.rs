@@ -203,7 +203,7 @@ pub fn App() -> Element {
                                     div { class: "mfd-controls-row",
                                         // SKIP BACK
                                         div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "SKIP BWD" }
+                                            div { class: "transport-top-label", "–5" }
                                             div { class: "button-base-seat-narrow",
                                                 SkipActuator {
                                                     label: "{lbl_skip_back}",
@@ -310,7 +310,7 @@ pub fn App() -> Element {
                                         }
 // SKIP FORWARD
                                         div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "SKIP FWD" }
+                                            div { class: "transport-top-label", "+5" }
                                             div { class: "button-base-seat-narrow",
                                                 SkipActuator {
                                                     label: "{lbl_skip_fwd}",
