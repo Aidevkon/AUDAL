@@ -20,19 +20,20 @@ pub fn OledTile(props: OledTileProps) -> Element {
         OledTileState::Lock   => "oled-tile oled-tile--lock",
     };
 
-    let label = match props.state {
+    // Screen content — dynamic per state
+    let screen_label = match props.state {
         OledTileState::Idle | OledTileState::Search => "FM0",
         OledTileState::Lock => "FHQ",
     };
 
     rsx! {
-        div { class: "{tile_class}",
-            // Substrate — true black OLED base
-            div { class: "oled-tile__substrate",
-                // Glass reflection layer handled via ::before in CSS
-                // Emissive text
-                span { class: "oled-tile__text", "{label}" }
-                // Status bar — ping-pong (Search) or underline (Lock)
+        // Column wrapper — mirrors dsp-slot-col structure exactly
+        div { class: "oled-tile-col",
+            // Slot identifier label — always "FM0", mirrors transport-top-label
+            span { class: "oled-tile__label", "FM0" }
+            // OLED screen module
+            div { class: "{tile_class}",
+                span { class: "oled-tile__text", "{screen_label}" }
                 div { class: "oled-tile__bar" }
             }
         }
