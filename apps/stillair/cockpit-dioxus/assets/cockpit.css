@@ -629,7 +629,8 @@ body {
 
   /* 1U Metal Module Styling - Mockup Matte Metal */
   /* Remove horizontal padding so it aligns exactly with the 100vw chassis */
-  padding: 8px 0 !important;
+  padding: 8px 0 0 0 !important;    /* top 8px | sides 0 | bottom: see below */
+  padding-bottom: 9px !important;   /* +1px micro-seam — natural bevel occlusion, not a dark gap */
 }
 
 .transport-frame {
@@ -647,7 +648,7 @@ body {
   flex-direction: row;
   min-height: 0;
   padding: 0;
-  padding-top: 6px !important;
+  padding-top: 0px !important;   /* gap closed — seam controlled by transport-bar bottom padding */
   margin: 0;
 }
 
@@ -750,9 +751,9 @@ body {
 
   /* Symmetric bevel — matches siamese frame */
   box-shadow:
-    /* ── TOP LIP ── */
-    inset 2.5px  2.5px 2px rgba(255, 255, 255, 0.18),   /* top-left rim-light       */
-    inset 0      2.5px 3px rgba(0, 0, 0, 0.85),          /* top inset shadow falloff */
+    /* ── TOP LIP (mirror of siamese bottom bevel — seam-matched) ── */
+    inset 0 2.5px 2px rgba(255, 255, 255, 0.26),        /* top rim-light — pure +Y, gradient-compensated */
+    inset 0 2.5px 3px rgba(0, 0, 0, 0.85),               /* top shadow falloff — matched to siamese        */
     /* ── BOTTOM LIP ── */
     inset 0     -2.5px 2px rgba(255, 255, 255, 0.26),    /* bottom rim-light         */
     inset 0     -2.5px 3px rgba(0, 0, 0, 0.85),          /* bottom shadow falloff    */
