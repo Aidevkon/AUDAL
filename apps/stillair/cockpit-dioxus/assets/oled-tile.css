@@ -9,9 +9,10 @@
     justify-content: center;
     position: relative;
     border-radius: 6px;
-    padding: 5px 6px;
-    /* Explicit dimensions — matches fm0-pit proportions */
+    /* Explicit dimensions — 52×36px, matches fm0-pit proportions (4:3 screen ratio) */
     width: 52px;
+    height: 36px;
+    padding: 4px 6px;
     flex-shrink: 0;
     align-self: center;
     /* Same recessed panel as lcd-bezel */
