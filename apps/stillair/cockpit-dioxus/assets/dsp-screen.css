@@ -1,0 +1,123 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   dsp-screen.css — OLED glass material for Active Processing Chain
+   Hierarchy: .dsp-screen > .oled-tile > .oled-header / .oled-content
+   No metal, no chassis classes. Pure black glass instrument screen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── dsp-screen: black glass container ───────────────────────────────────── */
+.dsp-screen {
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── oled-tile: single instrument row ────────────────────────────────────── */
+.oled-tile {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #050607;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid #000;
+  /* separator line between tiles */
+}
+
+.oled-tile:last-child {
+  border-bottom: none;
+}
+
+/* ── oled-header: label left, readout right ──────────────────────────────── */
+.oled-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  height: 18px;
+  padding: 0 7px;
+  gap: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+/* Module identification label */
+.oled-label {
+  flex: 1;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: rgba(160, 170, 180, 0.55);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Telemetry readout */
+.oled-readout {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(130, 195, 215, 0.80);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── oled-subheader: secondary readout row (sat tile only) ───────────────── */
+.oled-subheader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  height: 14px;
+  padding: 0 7px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.oled-sub {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 6.5px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  color: rgba(120, 140, 150, 0.45);
+  text-transform: uppercase;
+}
+
+/* ── oled-content: graph bay ─────────────────────────────────────────────── */
+/* sat-tile: flex row — knee curve (70%) + THD bar (30%) side by side        */
+/* eq/comp/lim tiles: single full-width SVG                                  */
+.oled-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  background: #000000;
+  overflow: hidden;
+}
+
+.oled-content svg {
+  display: block;
+  height: 100%;
+}
+
+/* ── sat-curve: soft-clip knee curve (70% of content width) ─────────────── */
+.sat-curve {
+  flex: 7;
+}
+
+/* ── sat-thd: THD vertical bar (30% of content width) ───────────────────── */
+.sat-thd {
+  flex: 3;
+}
+
+/* ── eq / comp / lim: single SVG fills full content width ───────────────── */
+.oled-tile--eq .oled-content svg,
+.oled-tile--comp .oled-content svg,
+.oled-tile--lim .oled-content svg {
+  width: 100%;
+}

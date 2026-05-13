@@ -26,15 +26,14 @@ pub fn EQModule(state: EQState) -> Element {
 
     rsx! {
         div {
-            class: "chain-module-container chain-eq-panel",
-            
-            div { class: "chain-header",
-                span { class: "chain-header-title", "EQ — 4-BAND PAR" }
-                span { class: "chain-ro-badge", "{readout_val}" }
-            }
+            class: "oled-tile oled-tile--eq",
 
-            div { class: "chain-oled-container",
-                svg { class: "chain-svg", view_box: "0 0 240 60", preserve_aspect_ratio: "none",
+            div { class: "oled-header",
+                span { class: "oled-label", "EQ — 4-BAND PAR" }
+                span { class: "oled-readout", "{readout_val}" }
+            }
+            div { class: "oled-content",
+                svg { view_box: "0 0 240 60", preserve_aspect_ratio: "none",
                     // zero line
                     line { x1: "0", y1: "30", x2: "240", y2: "30",
                            stroke: "#0e1c28", stroke_width: "0.5" }

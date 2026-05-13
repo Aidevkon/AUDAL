@@ -55,6 +55,16 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
                     limiter: crate::components::active_processing_chain::types::LimiterState {
                         ceiling_dbtp: -1.0, release_auto: true, isp_factor: 4,
                         curve_points: vec![(0.0, 1.0), (0.5, 0.3), (1.0, 0.2)],
+                    },
+                    sat: crate::components::active_processing_chain::SatTelemetry {
+                        thd_percent: 1.8,
+                        knee_curve: {
+                            let mut k = [0.0f32; 64];
+                            for i in 0..64 { k[i] = (i as f32 / 63.0).powf(0.72); }
+                            k
+                        },
+                        headroom_db: 3.4,
+                        harmonic_density: 0.35,
                     }
                 }
             }

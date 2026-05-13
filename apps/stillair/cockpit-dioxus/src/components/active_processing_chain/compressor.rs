@@ -18,15 +18,14 @@ pub fn CompressorModule(state: CompressorState) -> Element {
 
     rsx! {
         div {
-            class: "chain-module-container chain-comp-panel",
-            
-            div { class: "chain-header",
-                span { class: "chain-header-title", "COMPRESSOR - OPTICAL" }
-                span { class: "chain-ro-badge", "{readout_val}" }
-            }
+            class: "oled-tile oled-tile--comp",
 
-            div { class: "chain-oled-container",
-                svg { class: "chain-svg", view_box: "0 0 240 60", preserve_aspect_ratio: "none",
+            div { class: "oled-header",
+                span { class: "oled-label", "COMPRESSOR — OPTICAL" }
+                span { class: "oled-readout", "{readout_val}" }
+            }
+            div { class: "oled-content",
+                svg { view_box: "0 0 240 60", preserve_aspect_ratio: "none",
                     // threshold line
                     line { x1: "{thresh_x}", y1: "0", x2: "{thresh_x}", y2: "60",
                            stroke: "rgba(0,152,152,.2)", stroke_width: "0.5", stroke_dasharray: "2,2" }

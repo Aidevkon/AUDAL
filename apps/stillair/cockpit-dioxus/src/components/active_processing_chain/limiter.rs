@@ -19,15 +19,14 @@ pub fn LimiterModule(state: LimiterState) -> Element {
 
     rsx! {
         div {
-            class: "chain-module-container chain-limit-panel",
-            
-            div { class: "chain-header",
-                span { class: "chain-header-title", "LIMITER - BRICKWALL" }
-                span { class: "chain-ro-badge", "{readout_val}" }
-            }
+            class: "oled-tile oled-tile--lim",
 
-            div { class: "chain-oled-container",
-                svg { class: "chain-svg", view_box: "0 0 240 60", preserve_aspect_ratio: "none",
+            div { class: "oled-header",
+                span { class: "oled-label", "LIMITER — BRICKWALL" }
+                span { class: "oled-readout", "{readout_val}" }
+            }
+            div { class: "oled-content",
+                svg { view_box: "0 0 240 60", preserve_aspect_ratio: "none",
                     // ceiling line
                     line { x1: "0", y1: "{ceil_y}", x2: "240", y2: "{ceil_y}",
                            stroke: "rgba(232,56,32,.35)", stroke_width: "1.0", stroke_dasharray: "3,2" }

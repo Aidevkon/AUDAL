@@ -23,3 +23,11 @@ pub struct LimiterState {
     pub isp_factor: u8,      // 4 or 8
     pub curve_points: Vec<(f32, f32)>,
 }
+
+#[derive(Clone, PartialEq)]
+pub struct SatTelemetry {
+    pub thd_percent: f32,         // 0.0..12.0 — total harmonic distortion %
+    pub knee_curve: [f32; 64],    // normalized 0..1 soft-clip transfer function
+    pub headroom_db: f32,         // remaining headroom before clip
+    pub harmonic_density: f32,    // 0.0..1.0 — harmonic energy ratio
+}
