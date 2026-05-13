@@ -1036,10 +1036,11 @@ body {
   overflow: hidden !important;
 }
 
-/* Force single compositing layer: no child may create its own GPU layer */
+/* Flatten inner geometry: no child may have its own radius inside the animated panel.
+   overflow:hidden removed — it created a BFC on every child, causing multiple paint
+   passes inside the GPU compositor layer during animation:hangar-open → flicker. */
 .hangar-layer .coach-panel *:not(.intent-knob-bay):not(.intent-bay) {
   border-radius: 0 !important;
-  overflow: hidden !important;
 }
 
 /* Glass screen adjustments for flipped orientation */
