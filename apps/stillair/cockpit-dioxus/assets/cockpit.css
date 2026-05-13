@@ -743,20 +743,6 @@ body {
   }
 }
 
-@keyframes hangar-close {
-  0% {
-    transform: translateY(100px) rotateX(38deg);
-  }
-
-  80% {
-    transform: translateY(18px) rotateX(0deg);
-  }
-
-  100% {
-    transform: translateY(0px) rotateX(0deg);
-  }
-}
-
 /* Hesitation-before-seal: panel glides home fast, almost stops 4px short,
    then slowly completes the mechanical seal */
 @keyframes hangar-close-seal {
@@ -910,6 +896,15 @@ body {
   opacity: 1;
 }
 
+/* Hold tilt-lighting through close-seal — panel remains physically tilted for 1600ms.
+   Delay 1400ms so overlay fades only in the last 200ms as the panel nears the sealed
+   position. Without this, the light fades 200ms into a 1600ms close, leaving the panel
+   tilted but unlit for 1400ms (physically incorrect). */
+.hangar-layer.intent-closing > .coach-panel::after {
+  opacity: 0;
+  transition: opacity 200ms ease 1400ms;
+}
+
 /* Knob engine bay — static, always behind Hangar */
 .intent-knob-bay {
   position: absolute;
@@ -952,8 +947,8 @@ body {
   /* Global drop-shadow moved to ::after — keeps bottom lip unobscured */
   box-shadow:
     /* ── TOP LIP ── */
-    inset 2.5px 2.5px 2px rgba(255, 255, 255, 0.18),
-    /* top-left rim-light       */
+    inset 0 2.5px 2px rgba(255, 255, 255, 0.26),
+    /* top rim-light — pure +Y, gradient-compensated — unified with chassis-bezel spec */
     inset 0 2.5px 3px rgba(0, 0, 0, 0.85),
     /* top inset shadow falloff */
     /* ── BOTTOM LIP (diagnostic-corrected: pure -Y vector, gradient-compensated) ── */
@@ -1028,8 +1023,12 @@ body {
   margin: 0 !important;
   padding: 8px 18px 4px 18px !important;
   flex-direction: column-reverse !important;
-  /* 1. Gradient and Bevels reverted to default top-lit style */
-
+  /* 1. Suppress ModuleFrame chassis-substrate bg + chassis-bezel bevel — same pattern
+     as .siamese-insights > .mfd-panel (cockpit.css:997-998). Without these, the mfd-panel
+     renders its own metal surface and 5-inset bevel INSIDE the coach-panel faceplate
+     (double bevel artifact). */
+  background: transparent !important;
+  box-shadow: none !important;
 
   /* 3. Radius compensation: 0 symmetric radius inherited */
   border-radius: 0 !important;
@@ -1054,8 +1053,10 @@ body {
   padding-bottom: 2px !important;
 }
 
-/* Remove the blue neon glow lines under all panel titles */
-.panel-title::after {
+/* Remove blue neon glow line under hangar panel title only —
+   the flipped column-reverse orientation conflicts with the upside-down header.
+   All other panels (session, insights, chain) retain the OLED accent underline. */
+.hangar-layer .panel-title::after {
   display: none !important;
 }
 
