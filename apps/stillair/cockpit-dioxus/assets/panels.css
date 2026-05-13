@@ -154,21 +154,7 @@
     animation: m1-title-override 0.001s forwards;
 }
 
-/* Accent underline glow */
-.panel-title::after {
-    content: '';
-    display: block;
-    position: absolute;
-    bottom: 0;
-    left: 35%;
-    right: 35%;
-    height: 2px;
-    border-radius: 2px;
-    background: var(--accent-insights, #00d1ff);
-    opacity: 0.8;
-    box-shadow: 0 0 10px var(--accent-insights, #00d1ff);
-    pointer-events: none;
-}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    9. Panel Body

@@ -1053,12 +1053,6 @@ body {
   padding-bottom: 2px !important;
 }
 
-/* Remove blue neon glow line under hangar panel title only —
-   the flipped column-reverse orientation conflicts with the upside-down header.
-   All other panels (session, insights, chain) retain the OLED accent underline. */
-.hangar-layer .panel-title::after {
-  display: none !important;
-}
 
 .panel-title {
   display: flex !important;
