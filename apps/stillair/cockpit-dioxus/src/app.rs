@@ -152,7 +152,7 @@ pub fn App() -> Element {
 
             // ── Transport bar (bottom strip) — Phase 12B ──────────────────────
             footer { id: "transport-bar", class: "transport-bar",
-                div { class: "chassis chassis-bezel chassis-seam transport-rim",
+                div { class: "chassis-bezel transport-rim",
 
                     div { class: "transport-panel",
                         // Left: Annunciator Zone
