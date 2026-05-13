@@ -802,7 +802,9 @@ body {
   transition: transform 1200ms cubic-bezier(0.25, 0, 0.15, 1),
     box-shadow 400ms ease;
   /* box-shadow fade prevents snap-flicker at seal */
-  will-change: transform;
+  /* will-change: transform removed — triple GPU promotion conflict:
+     backface-visibility:hidden + animation already pin the compositor layer.
+     Adding will-change created a third promotion mode causing first-frame tears. */
   /* override .chassis-bezel overflow:hidden — panel must be visible as 3D trapezoid */
   overflow: visible;
   /* GPU layer stability — prevents compositor layer destruction flash at animation end */
@@ -885,21 +887,27 @@ body {
 }
 
 /* Layer 2: Tilted surface lighting
-   At rotateX(26deg) the bottom of the panel swings toward the viewer
-   but away from the overhead light source — it receives less illumination */
-.hangar-layer.intent-open>.coach-panel::after {
+   Base rule: always present, invisible. Fades in when panel opens.
+   Avoids 1-frame paint stall from ::after appearing on the same frame
+   as animation:hangar-open starts (compositor stall → flicker). */
+.hangar-layer > .coach-panel::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 10;
+  opacity: 0;
+  transition: opacity 200ms ease;
   background: linear-gradient(to bottom,
       transparent 0%,
-      /* hinge area — still facing light */
       rgba(0, 0, 0, 0.10) 50%,
       rgba(0, 0, 0, 0.28) 100%
-      /* bottom edge — angled away from overhead */
     );
+}
+
+/* Fade in tilt-lighting when open — panel bottom angles away from overhead light */
+.hangar-layer.intent-open > .coach-panel::after {
+  opacity: 1;
 }
 
 /* Knob engine bay — static, always behind Hangar */
