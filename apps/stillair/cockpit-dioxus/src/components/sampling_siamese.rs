@@ -42,7 +42,7 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
             }
             
             // MASTERING CHAIN - RIGHT (25%)
-            div { class: "siamese-col siamese-reserved",
+            div { class: "siamese-col siamese-dsp",
                 div { class: "mfd-panel",
                     div { class: "panel-title", "DSP CHAIN" }
                     crate::components::active_processing_chain::ActiveProcessingChain {

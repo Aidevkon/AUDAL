@@ -984,7 +984,8 @@ body {
 
 /* Override inner panels zero-gap policy ONLY for left/center */
 .siamese-insights>.mfd-panel,
-.siamese-session>.mfd-panel {
+.siamese-session>.mfd-panel,
+.siamese-dsp>.mfd-panel {
   border: none !important;
   margin: 0 !important;
   padding: 14px 10px 10px 10px !important;
@@ -1009,9 +1010,9 @@ body {
   flex: 1.7;
 }
 
-/* Rack — Δεξιά (Controls) */
-.siamese-reserved {
-  flex: 0.8;
+/* DSP Chain — Δεξιά */
+.siamese-dsp {
+  flex: 1.0;
 }
 
 
