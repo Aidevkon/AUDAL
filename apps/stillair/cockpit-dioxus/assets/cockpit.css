@@ -1087,7 +1087,8 @@ body {
 }
 
 /* Active Processing Chain (Mastering Rack) layout */
-.active-processing-chain {
+.active-processing-chain,
+.dsp-screen {
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
