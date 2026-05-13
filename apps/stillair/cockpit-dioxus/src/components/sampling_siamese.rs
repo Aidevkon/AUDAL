@@ -43,28 +43,31 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
             
             // MASTERING CHAIN - RIGHT (25%)
             div { class: "siamese-col siamese-reserved",
-                crate::components::active_processing_chain::ActiveProcessingChain {
-                    eq: crate::components::active_processing_chain::types::EQState {
-                        low_db: 2.5, mid_db: -1.0, presence_db: 0.0, air_db: 1.5,
-                        curve_points: vec![(0.0, 0.5), (0.1, 0.4), (0.5, 0.6), (0.8, 0.5), (1.0, 0.3)],
-                    },
-                    compressor: crate::components::active_processing_chain::types::CompressorState {
-                        threshold_db: -18.0, ratio: 4.0, gain_reduction_db: -3.2, makeup_db: 2.0,
-                        curve_points: vec![(0.0, 1.0), (0.5, 0.5), (1.0, 0.2)],
-                    },
-                    limiter: crate::components::active_processing_chain::types::LimiterState {
-                        ceiling_dbtp: -1.0, release_auto: true, isp_factor: 4,
-                        curve_points: vec![(0.0, 1.0), (0.5, 0.3), (1.0, 0.2)],
-                    },
-                    sat: crate::components::active_processing_chain::SatTelemetry {
-                        thd_percent: 1.8,
-                        knee_curve: {
-                            let mut k = [0.0f32; 64];
-                            for i in 0..64 { k[i] = (i as f32 / 63.0).powf(0.72); }
-                            k
+                div { class: "mfd-panel",
+                    div { class: "panel-title", "DSP CHAIN" }
+                    crate::components::active_processing_chain::ActiveProcessingChain {
+                        eq: crate::components::active_processing_chain::types::EQState {
+                            low_db: 2.5, mid_db: -1.0, presence_db: 0.0, air_db: 1.5,
+                            curve_points: vec![(0.0, 0.5), (0.1, 0.4), (0.5, 0.6), (0.8, 0.5), (1.0, 0.3)],
                         },
-                        headroom_db: 3.4,
-                        harmonic_density: 0.35,
+                        compressor: crate::components::active_processing_chain::types::CompressorState {
+                            threshold_db: -18.0, ratio: 4.0, gain_reduction_db: -3.2, makeup_db: 2.0,
+                            curve_points: vec![(0.0, 1.0), (0.5, 0.5), (1.0, 0.2)],
+                        },
+                        limiter: crate::components::active_processing_chain::types::LimiterState {
+                            ceiling_dbtp: -1.0, release_auto: true, isp_factor: 4,
+                            curve_points: vec![(0.0, 1.0), (0.5, 0.3), (1.0, 0.2)],
+                        },
+                        sat: crate::components::active_processing_chain::SatTelemetry {
+                            thd_percent: 1.8,
+                            knee_curve: {
+                                let mut k = [0.0f32; 64];
+                                for i in 0..64 { k[i] = (i as f32 / 63.0).powf(0.72); }
+                                k
+                            },
+                            headroom_db: 3.4,
+                            harmonic_density: 0.35,
+                        }
                     }
                 }
             }
