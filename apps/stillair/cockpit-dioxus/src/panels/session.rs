@@ -76,6 +76,7 @@ pub fn SessionPanel(
 #[component]
 fn DropZone(mode: Signal<CockpitMode>) -> Element {
     let on_load = move |_| {
+        #[cfg(debug_assertions)]
         web_sys::console::log_1(&JsValue::from_str("[session] LOAD NEW clicked"));
         spawn_local(async move {
             match invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
@@ -236,8 +237,10 @@ fn MasterButton(
     preset_id:     String,
 ) -> Element {
     let on_master = move |_| {
+        #[cfg(debug_assertions)]
         web_sys::console::log_1(&JsValue::from_str("[session] MASTER CLICKED"));
         let mode_val = format!("{:?}", mode.read().clone());
+        #[cfg(debug_assertions)]
         web_sys::console::log_1(&JsValue::from_str(
             &format!("[session] current mode: {}", mode_val)
         ));
@@ -248,12 +251,14 @@ fn MasterButton(
         // Use spawn_local — the correct WASM async primitive.
         // Dioxus spawn() may not drive JsFuture correctly in web target.
         spawn_local(async move {
+            #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] spawn_local started"));
             mode.set(CockpitMode::Mastering {
                 path:      p.clone(),
                 preset_id: pr.clone(),
             });
 
+            #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
             let blob_id = match invoke::<String, _>(
                 "trigger_mastering",
@@ -261,6 +266,7 @@ fn MasterButton(
             ).await {
                 Ok(id)  => id,
                 Err(e)  => {
+                    #[cfg(debug_assertions)]
                     web_sys::console::log_1(&JsValue::from_str(
                         &format!("[session] trigger_mastering FAILED: {e}")
                     ));
@@ -271,11 +277,13 @@ fn MasterButton(
                     return;
                 }
             };
+            #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str(
                 &format!("[session] mastering done, blob_id={blob_id}")
             ));
 
             // Single IPC call: all session data in one shot (P9-008)
+            #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] calling get_session_state..."));
             let state = match invoke::<crate::types::SessionStateJson, _>(
                 "get_session_state",
@@ -283,6 +291,7 @@ fn MasterButton(
             ).await {
                 Ok(s)   => s,
                 Err(e)  => {
+                    #[cfg(debug_assertions)]
                     web_sys::console::log_1(&JsValue::from_str(
                         &format!("[session] get_session_state FAILED: {e}")
                     ));
@@ -293,6 +302,7 @@ fn MasterButton(
                     return;
                 }
             };
+            #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] session state ok, transitioning to FM5"));
 
             // FM5: set session state + fetch visualization data
@@ -487,13 +497,19 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                                     "export_pdf_report",
                                     serde_json::json!({ "blobId": b }),
                                 ).await {
-                                    Ok(path) => web_sys::console::log_1(
-                                        &format!("[PDF] saved: {path}").into()
-                                    ),
+                                    Ok(path) => {
+                                        #[cfg(debug_assertions)]
+                                        web_sys::console::log_1(
+                                            &format!("[PDF] saved: {path}").into()
+                                        );
+                                    }
                                     Err(e) if e.contains("Cancelled") => {}
-                                    Err(e) => web_sys::console::log_1(
-                                        &format!("[PDF] error: {e}").into()
-                                    ),
+                                    Err(e) => {
+                                        #[cfg(debug_assertions)]
+                                        web_sys::console::log_1(
+                                            &format!("[PDF] error: {e}").into()
+                                        );
+                                    }
                                 }
                             });
                         },
