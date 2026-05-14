@@ -15,10 +15,10 @@
   border-radius: 50%;
   background: #030303;
   box-shadow:
-    0 1px 1px rgba(255,255,255,0.1),
-    inset 0 8px 12px rgba(0,0,0,0.9),
+    0 1px 1px rgba(255,255,255,0.08),
     inset 0 1px 4px rgba(0,0,0,1),
-    inset 0 -2px 6px rgba(0,0,0,0.6);
+    inset 0 8px 15px rgba(0,0,0,0.9),
+    inset 0 -2px 6px rgba(0,0,0,0.8);
 }
 
 .ab-oled-screen {
@@ -67,10 +67,11 @@
   letter-spacing: 0.06em;
 }
 
-/* Inactive state */
+/* Inactive state — unpowered phosphor */
 .ab-state--a,
 .ab-state--b {
   color: rgba(255,183,3,0.25);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.8);
 }
 
 /* Active state (explicit .active class on element) */
@@ -107,15 +108,16 @@
   border-radius: 50%;
   pointer-events: none;
   background:
-    /* Top specular crescent (light source) */
-    radial-gradient(ellipse 80% 50% at 50% -10%,
-      rgba(255,255,255,0.4) 0%,
-      rgba(255,255,255,0) 50%),
-    /* Glass thickness / spherical vignette (transparent center, dark edges) */
+    /* Hard specular crescent */
+    radial-gradient(ellipse 75% 45% at 50% 0%,
+      rgba(255,255,255,0.45) 0%,
+      rgba(255,255,255,0.1) 25%,
+      transparent 28%),
+    /* Spherical vignette */
     radial-gradient(circle at 50% 50%,
-      transparent 55%,
-      rgba(0,0,0,0.5) 85%,
-      rgba(0,0,0,0.9) 100%);
+      transparent 50%,
+      rgba(0,0,0,0.4) 80%,
+      rgba(0,0,0,0.95) 100%);
   box-shadow:
     inset 0 4px 6px -2px rgba(255,255,255,0.5),  /* Top inner rim light (sharp bounce) */
     inset 0 -12px 20px rgba(0,0,0,0.8),           /* Bottom spherical shadow (dome weight) */
