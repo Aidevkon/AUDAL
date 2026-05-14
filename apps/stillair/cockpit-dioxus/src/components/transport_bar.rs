@@ -208,7 +208,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     });
                                                 }
                                             },
-                                            div { class: "transport-top-label", style: "visibility: hidden;", "SCRUB" }
+                                            div { class: "transport-top-label", "SCRUB" }
                                             div {
                                                 class: "scrub-knob-wrapper",
                                                 style: {
@@ -349,7 +349,9 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                             }
                                         }
 
-                                        AbToggle {
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "A/B" }
+                                            AbToggle {
                                             state: (*ab_state.read()).clone(),
                                             on_mousedown: move |_| {
                                                 let now = js_sys::Date::now() as u64;
@@ -370,7 +372,8 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     AbToggleState::Toggled => AbToggleState::A,
                                                 };
                                                 ab_state.set(next);
-                                            },
+                                            }
+                                        },
                                         }
                                     }
                                 }
