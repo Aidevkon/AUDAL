@@ -32,21 +32,23 @@ pub fn AbToggle(props: AbToggleProps) -> Element {
             onmouseup:   move |_| props.on_mouseup.call(()),
             onclick:     move |_| props.on_click.call(()),
 
-            div { class: "ab-cavity",
-                div { class: "ab-oled-screen",
-                    div { class: "ab-state ab-state--a",
-                        span { class: "ab-letter", "A" }
-                        span { class: "ab-sub", "BYPASS" }
-                    }
-                    div { class: if active_b { "ab-state ab-state--b active" } else { "ab-state ab-state--b" },
-                        span { class: "ab-letter",
-                            "B"
-                            sup { class: "ab-super", "MST" }
+            div { class: "ab-actuator",
+                div { class: "ab-cavity",
+                    div { class: "ab-oled-screen",
+                        div { class: "ab-state ab-state--a",
+                            span { class: "ab-letter", "A" }
+                            span { class: "ab-sub", "BYPASS" }
                         }
-                        span { class: "ab-sub", "MASTER" }
+                        div { class: if active_b { "ab-state ab-state--b active" } else { "ab-state ab-state--b" },
+                            span { class: "ab-letter",
+                                "B"
+                                sup { class: "ab-super", "MST" }
+                            }
+                            span { class: "ab-sub", "MASTER" }
+                        }
                     }
+                    div { class: "ab-domed-lens" }
                 }
-                div { class: "ab-domed-lens" }
             }
         }
     }
