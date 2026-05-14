@@ -25,3 +25,8 @@ gloo-timers           = { version = "0.3", features = ["futures"] }  # P12B-004:
 # ui-isolation-check.sh invariant:
 # sp314-dsp, lineos-telemetry, lineos-rule-engine, m0d, adapter-runtime
 # xaak, cpal, ringbuf MUST NOT appear in this dependency tree.
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
