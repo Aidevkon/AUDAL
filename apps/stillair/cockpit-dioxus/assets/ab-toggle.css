@@ -15,9 +15,10 @@
   border-radius: 50%;
   background: #050505;
   box-shadow:
-    inset 0 8px 15px rgba(0,0,0,1),
-    inset 0 2px 4px rgba(0,0,0,0.8),
-    inset 0 -2px 6px rgba(255,183,3,0.04);
+    0 1px 1px rgba(255,255,255,0.1),
+    inset 0 8px 12px rgba(0,0,0,0.9),
+    inset 0 1px 4px rgba(0,0,0,1),
+    inset 0 -2px 6px rgba(0,0,0,0.6);
 }
 
 .ab-oled-screen {
@@ -26,8 +27,9 @@
   transform: translate(-50%, -50%);
   width: 54px; height: 28px;
   border-radius: 4px;
-  background: rgba(20,15,5,0.4);
-  border: 1px solid rgba(255,183,3,0.05);
+  background: rgba(5,4,3,0.6);
+  border: 1px solid rgba(255,183,3,0.03);
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -51,7 +53,7 @@
 
 .ab-sub {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 4.5px;
+  font-size: 0.6em;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -61,7 +63,7 @@
   font-size: 4px;
   font-weight: 700;
   position: absolute;
-  top: -2px; right: -6px;
+  top: -4px; right: -7px;
   letter-spacing: 0.06em;
 }
 
@@ -83,7 +85,7 @@
 
 /* A active when root state is ab-toggle--a */
 .ab-toggle--a .ab-state--a {
-  color: #ffeedd;
+  color: #fff1e0;
   text-shadow:
     0 0 4px #ffb703,
     0 0 12px #ff8800,
@@ -93,7 +95,7 @@
 /* B active when root state is ab-toggle--b or ab-toggle--toggled */
 .ab-toggle--b .ab-state--b,
 .ab-toggle--toggled .ab-state--b {
-  color: #ffeedd;
+  color: #fff1e0;
   text-shadow:
     0 0 4px #ffb703,
     0 0 12px #ff8800,
@@ -105,11 +107,11 @@
   inset: 0;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 15%,
-    rgba(255,255,255,0.28) 0%,
-    rgba(255,255,255,0.08) 20%,
-    rgba(255,255,255,0) 50%);
-  box-shadow: inset 0 -6px 10px rgba(0,0,0,0.6);
+  background: radial-gradient(ellipse 90% 40% at 50% 0%,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.02) 40%,
+    transparent 100%);
+  box-shadow: inset 0 -4px 8px rgba(0,0,0,0.5);
 }
 
 /* Press depression */
