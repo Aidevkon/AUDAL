@@ -41,19 +41,27 @@
   transition: box-shadow 0.3s ease-in-out;
 }
 
-/* Ambient spill: A active — soft wide bleed from left */
+/* Ambient spill: A active — perimeter glow biased left */
 .ab-toggle--a .ab-oled-screen {
   box-shadow:
-    inset 25px 0 20px -15px rgba(255, 183, 3, 0.25),
-    inset 0 0 10px rgba(0, 0, 0, 0.85);
+    inset 10px 0 12px -8px rgba(255, 183, 3, 0.30),
+    inset 0 0 6px rgba(255, 183, 3, 0.14),
+    inset 0 0 10px rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(255, 183, 3, 0.18),
+    0 0 24px rgba(255, 140, 0, 0.10),
+    0 0 40px rgba(255, 140, 0, 0.05);
 }
 
-/* Ambient spill: B active — soft wide bleed from right */
+/* Ambient spill: B active — perimeter glow biased right */
 .ab-toggle--b .ab-oled-screen,
 .ab-toggle--toggled .ab-oled-screen {
   box-shadow:
-    inset -25px 0 20px -15px rgba(255, 183, 3, 0.25),
-    inset 0 0 10px rgba(0, 0, 0, 0.85);
+    inset -10px 0 12px -8px rgba(255, 183, 3, 0.30),
+    inset 0 0 6px rgba(255, 183, 3, 0.14),
+    inset 0 0 10px rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(255, 183, 3, 0.18),
+    0 0 24px rgba(255, 140, 0, 0.10),
+    0 0 40px rgba(255, 140, 0, 0.05);
 }
 
 .ab-state {
@@ -103,7 +111,9 @@
   text-shadow:
     0 0 4px #ffb703,
     0 0 10px #ff8800,
-    0 0 22px rgba(255, 140, 0, 0.18);
+    0 0 22px rgba(255, 140, 0, 0.35),
+    0 0 40px rgba(255, 140, 0, 0.15),
+    0 0 60px rgba(255, 120, 0, 0.08);
 }
 
 /* BYPASS/MASTER label: dim vs active letter */
