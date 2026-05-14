@@ -25,7 +25,7 @@
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) scale(1.05);
-  width: 54px; height: 28px;
+  width: 52px; height: 26px;
   border-radius: 4px;
   background: rgba(5,4,3,0.6);
   border: 1px solid rgba(255,183,3,0.03);
@@ -37,19 +37,19 @@
   transition: box-shadow 0.3s ease-in-out;
 }
 
-/* Ambient spill: A active → golden glow on left inner wall */
+/* Ambient spill: A active — soft wide bleed from left */
 .ab-toggle--a .ab-oled-screen {
   box-shadow:
-    inset 10px 0 15px -5px rgba(255,183,3,0.15),
-    inset 0 0 10px rgba(0,0,0,0.8);
+    inset 25px 0 20px -15px rgba(255,183,3,0.25),
+    inset 0 0 10px rgba(0,0,0,0.85);
 }
 
-/* Ambient spill: B active → golden glow on right inner wall */
+/* Ambient spill: B active — soft wide bleed from right */
 .ab-toggle--b .ab-oled-screen,
 .ab-toggle--toggled .ab-oled-screen {
   box-shadow:
-    inset -10px 0 15px -5px rgba(255,183,3,0.15),
-    inset 0 0 10px rgba(0,0,0,0.8);
+    inset -25px 0 20px -15px rgba(255,183,3,0.25),
+    inset 0 0 10px rgba(0,0,0,0.85);
 }
 
 .ab-state {
@@ -95,9 +95,10 @@
 .ab-state--b.active {
   color: #ffeedd;
   text-shadow:
-    0 0 4px #ffb703,
-    0 0 12px #ff8800,
-    0 0 20px rgba(255,136,0,0.4);
+    -0.5px 0 1px rgba(0,255,255,0.6),     /* Cyan refraction shift */
+    0.5px 0 1px rgba(255,0,0,0.6),        /* Red refraction shift */
+    0 0 4px #ffb703,                       /* Core amber bloom */
+    0 0 12px #ff8800;                      /* Wide ambient glow */
 }
 
 /* A active when root state is ab-toggle--a */
