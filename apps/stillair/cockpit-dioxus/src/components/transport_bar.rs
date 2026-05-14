@@ -351,29 +351,32 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
 
                                         div { class: "transport-btn-col",
                                             div { class: "transport-top-label", "A/B" }
-                                            AbToggle {
-                                            state: (*ab_state.read()).clone(),
-                                            on_mousedown: move |_| {
-                                                let now = js_sys::Date::now() as u64;
-                                                ab_press_time.set(now);
-                                            },
-                                            on_mouseup: move |_| {
-                                                let press_duration = js_sys::Date::now() as u64
-                                                    - *ab_press_time.read();
-                                                if press_duration >= 300 {
-                                                    // long press — return to A
-                                                    ab_state.set(AbToggleState::A);
+                                            div { class: "ab-toggle-seat",
+                                                AbToggle {
+                                                state: (*ab_state.read()).clone(),
+                                                on_mousedown: move |_| {
+                                                    let now = js_sys::Date::now() as u64;
+                                                    ab_press_time.set(now);
+                                                },
+                                                on_mouseup: move |_| {
+                                                    let press_duration = js_sys::Date::now() as u64
+                                                        - *ab_press_time.read();
+                                                    if press_duration >= 300 {
+                                                        // long press — return to A
+                                                        ab_state.set(AbToggleState::A);
+                                                    }
+                                                },
+                                                on_click: move |_| {
+                                                    let next = match *ab_state.read() {
+                                                        AbToggleState::A       => AbToggleState::B,
+                                                        AbToggleState::B       => AbToggleState::A,
+                                                        AbToggleState::Toggled => AbToggleState::A,
+                                                    };
+                                                    ab_state.set(next);
                                                 }
-                                            },
-                                            on_click: move |_| {
-                                                let next = match *ab_state.read() {
-                                                    AbToggleState::A       => AbToggleState::B,
-                                                    AbToggleState::B       => AbToggleState::A,
-                                                    AbToggleState::Toggled => AbToggleState::A,
-                                                };
-                                                ab_state.set(next);
                                             }
-                                        },
+                                                div { class: "ab-ring" }
+                                            }
                                         }
                                     }
                                 }

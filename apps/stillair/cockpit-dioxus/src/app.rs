@@ -36,8 +36,8 @@ use crate::components::transport_bar::TransportBar;
 #[allow(non_snake_case)]
 pub fn App() -> Element {
     // ── Signals ──────────────────────────────────────────────────────────────
-    let mut mode           = use_signal(|| CockpitMode::Idle);
-    let mut session_state  = use_signal(|| None::<SessionStateJson>);
+    let mode           = use_signal(|| CockpitMode::Idle);
+    let session_state  = use_signal(|| None::<SessionStateJson>);
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
