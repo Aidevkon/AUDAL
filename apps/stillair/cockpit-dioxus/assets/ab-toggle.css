@@ -125,20 +125,28 @@
   border-radius: 50%;
   pointer-events: none;
   background:
-    /* Hard specular crescent */
     radial-gradient(ellipse 75% 45% at 50% 0%,
-      rgba(255,255,255,0.45) 0%,
-      rgba(255,255,255,0.1) 25%,
+      rgba(255,255,255,0.50) 0%,
+      rgba(255,255,255,0.10) 25%,
       transparent 28%),
-    /* Spherical vignette */
+    radial-gradient(ellipse 55% 35% at 50% 12%,
+      rgba(255,255,255,0.06) 0%,
+      transparent 65%),
     radial-gradient(circle at 50% 50%,
-      transparent 50%,
-      rgba(0,0,0,0.4) 80%,
-      rgba(0,0,0,0.95) 100%);
+      transparent 48%,
+      rgba(255,183,3,0.04) 55%,
+      transparent 60%),
+    radial-gradient(circle at 50% 50%,
+      transparent 45%,
+      rgba(0,0,0,0.50) 75%,
+      rgba(0,0,0,1.00) 100%);
   box-shadow:
-    inset 0 4px 6px -2px rgba(255,255,255,0.5),  /* Top inner rim light (sharp bounce) */
-    inset 0 -12px 20px rgba(0,0,0,0.8),           /* Bottom spherical shadow (dome weight) */
-    inset 0 -1px 3px rgba(255,255,255,0.15);      /* Bottom ambient bounce from chassis */
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 1px 1px rgba(255,255,255,0.08),
+    inset 0 5px 8px -3px rgba(255,255,255,0.60),
+    inset 0 -14px 22px rgba(0,0,0,0.85),
+    inset 0 -1px 3px rgba(255,220,160,0.12),
+    inset 0 1px 1px rgba(0,0,0,0.55);
 }
 
 /* Press depression */
