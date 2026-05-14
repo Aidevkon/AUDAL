@@ -23,10 +23,7 @@ pub fn AbToggle(props: AbToggleProps) -> Element {
         AbToggleState::Toggled => "ab-toggle ab-toggle--toggled",
     };
 
-    let (top_label, top_sub, bot_label, bot_sub) = match props.state {
-        AbToggleState::A => ("A", "BYPASS", "B", "MASTER"),
-        AbToggleState::B | AbToggleState::Toggled => ("A", "BYPASS", "B", "MASTER"),
-    };
+    let active_b = matches!(props.state, AbToggleState::B | AbToggleState::Toggled);
 
     rsx! {
         div {
@@ -35,43 +32,21 @@ pub fn AbToggle(props: AbToggleProps) -> Element {
             onmouseup:   move |_| props.on_mouseup.call(()),
             onclick:     move |_| props.on_click.call(()),
 
-            // Knurled bezel ring
-            div { class: "ab-toggle__bezel",
-                // SVG knurled pattern
-                svg {
-                    class: "ab-toggle__knurl",
-                    view_box: "0 0 100 100",
-                    // 36 tick marks around the ring
-                    for i in 0..36_u32 {
-                        line {
-                            x1: "50",
-                            y1: "4",
-                            x2: "50",
-                            y2: "10",
-                            stroke: "rgba(255,255,255,0.15)",
-                            stroke_width: "1.5",
-                            transform: "rotate({i * 10} 50 50)",
+            div { class: "ab-cavity",
+                div { class: "ab-oled-screen",
+                    div { class: "ab-state ab-state--a",
+                        span { class: "ab-letter", "A" }
+                        span { class: "ab-sub", "BYPASS" }
+                    }
+                    div { class: if active_b { "ab-state ab-state--b active" } else { "ab-state ab-state--b" },
+                        span { class: "ab-letter",
+                            "B"
+                            sup { class: "ab-super", "MST" }
                         }
+                        span { class: "ab-sub", "MASTER" }
                     }
                 }
-
-                // Domed lens cap
-                div { class: "ab-toggle__cap",
-                    // Context ring glow
-                    div { class: "ab-toggle__ring" }
-                    // OLED display face
-                    div { class: "ab-toggle__face",
-                        div { class: "ab-toggle__label-a",
-                            span { class: "ab-toggle__letter", "{top_label}" }
-                            span { class: "ab-toggle__sub",    "{top_sub}" }
-                        }
-                        div { class: "ab-toggle__divider" }
-                        div { class: "ab-toggle__label-b",
-                            span { class: "ab-toggle__letter", "{bot_label}" }
-                            span { class: "ab-toggle__sub",    "{bot_sub}" }
-                        }
-                    }
-                }
+                div { class: "ab-domed-lens" }
             }
         }
     }
