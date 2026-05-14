@@ -13,12 +13,25 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #030303;
+  background:
+    /* CAVITY FLOOR DEPTH */
+    radial-gradient(circle at 50% 65%,
+      #050505 0%,
+      #020202 55%,
+      #000000 100%);
+
   box-shadow:
+    /* PANEL TOP EDGE SHEEN */
     0 1px 1px rgba(255, 255, 255, 0.08),
-    inset 0 1px 4px rgba(0, 0, 0, 1),
-    inset 0 8px 15px rgba(0, 0, 0, 0.9),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.8);
+
+    /* CAVITY WALL DARKENING (UPPER) */
+    inset 0 3px 6px rgba(0, 0, 0, 0.95),
+
+    /* CAVITY FLOOR DEPTH (LOWER) */
+    inset 0 -10px 18px rgba(0, 0, 0, 0.95),
+
+    /* RIM OCCLUSION — MICRO SHADOW AROUND DOME SEAT */
+    inset 0 0 4px rgba(0, 0, 0, 0.85);
 }
 
 .ab-oled-screen {
@@ -140,6 +153,18 @@
     radial-gradient(ellipse 8% 20% at 50% 12%,
       rgba(255, 255, 255, 0.06) 0%,
       transparent 100%),
+    /* SUBTLE DUST — micro-particles, top-biased */
+    radial-gradient(circle at 50% 20%,
+      rgba(255, 255, 255, 0.015) 0%,
+      rgba(255, 255, 255, 0.010) 12%,
+      rgba(255, 255, 255, 0.006) 22%,
+      transparent 38%),
+    /* MICRO-HALO v2 — 0.5px soft aura */
+    radial-gradient(circle at 50% 50%,
+      rgba(255, 255, 255, 0.035) 46%,
+      rgba(255, 255, 255, 0.020) 49%,
+      rgba(255, 255, 255, 0.010) 51%,
+      transparent 54%),
     radial-gradient(circle at 50% 50%,
       transparent 48%,
       rgba(255, 183, 3, 0.04) 55%,
@@ -147,7 +172,7 @@
     radial-gradient(circle at 50% 50%,
       transparent 45%,
       rgba(0, 0, 0, 0.50) 75%,
-      rgba(0, 0, 0, 0.30) 100%);
+      rgba(0, 0, 0, 1.00) 100%);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.06),
     0 1px 1px rgba(255, 255, 255, 0.08),
