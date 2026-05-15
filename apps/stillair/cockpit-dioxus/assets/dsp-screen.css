@@ -4,36 +4,31 @@
    No metal, no chassis classes. Pure black glass instrument screen.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── dsp-screen: glass instrument panel ──────────────────────────────────── */
+/* ── dsp-screen: black glass container ───────────────────────────────────── */
 .dsp-screen {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  background: #000000;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
-  gap: 10px;
-  padding: 12px;
-  position: relative;
 }
 
-
-/* ── oled-tile → instrument cell (insights-cell pattern) ─────────────────── */
+/* ── oled-tile: single instrument row ────────────────────────────────────── */
 .oled-tile {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  position: relative;
-  background: var(--bg-cell, #0a0b0e);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  box-shadow: none;
-  padding: 0;
+  background: #050607;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid #000;
+  /* separator line between tiles */
 }
 
 .oled-tile:last-child {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: none;
 }
 
 /* ── oled-header: label left, readout right ──────────────────────────────── */
@@ -45,7 +40,7 @@
   height: 18px;
   padding: 0 7px;
   gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
 }
 
 /* Module identification label */
@@ -81,7 +76,7 @@
   flex-shrink: 0;
   height: 14px;
   padding: 0 7px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
 }
 
 .oled-sub {
@@ -101,7 +96,7 @@
   min-height: 0;
   display: flex;
   flex-direction: row;
-  background: transparent;
+  background: #000000;
   overflow: hidden;
 }
 
