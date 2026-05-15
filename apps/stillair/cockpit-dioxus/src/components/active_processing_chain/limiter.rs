@@ -9,39 +9,53 @@ pub fn lim_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
     path
 }
 
+/// Limiter display — compact row inside the chain-cell.
+/// Label + ceiling readout header + mini SVG curve with ceiling line.
+/// Mirrors VuPanel row style from InsightsPanel.
 #[component]
-pub fn LimiterModule(state: LimiterState) -> Element {
-    let ceil_y = (state.ceiling_dbtp.abs() / 12.0 * 60.0).clamp(0.0, 60.0);
-    
-    // Pseudo telemetry readout
-    // In actual implementation, we might want to sum up real gain reduction from limit block
-    let readout_val = format!("{:.2}", state.ceiling_dbtp); // just showing mock ceiling
+pub fn LimDisplay(state: LimiterState) -> Element {
+    let ceil_y = (state.ceiling_dbtp.abs() / 12.0 * 48.0).clamp(0.0, 48.0);
+    let readout = format!("{:.2} dBTP", state.ceiling_dbtp);
+    let isp = if state.release_auto { format!("ISP×{} AUTO", state.isp_factor) } else { format!("ISP×{}", state.isp_factor) };
 
     rsx! {
-        div {
-            class: "oled-tile oled-tile--lim",
+        div { class: "dsp-module-row",
 
-            div { class: "oled-header",
-                span { class: "oled-label", "LIMITER — BRICKWALL" }
-                span { class: "oled-readout", "{readout_val}" }
+            div { class: "dsp-module-header",
+                span { class: "dsp-module-label", "LIMITER — BRICKWALL" }
+                span { class: "dsp-module-value dsp-module-value--lim", "{readout}" }
             }
-            div { class: "oled-content",
-                svg { view_box: "0 0 240 60", preserve_aspect_ratio: "none",
+
+            div { class: "dsp-module-graph",
+                svg { view_box: "0 0 200 48", preserve_aspect_ratio: "none",
                     // ceiling line
-                    line { x1: "0", y1: "{ceil_y}", x2: "240", y2: "{ceil_y}",
-                           stroke: "rgba(232,56,32,.35)", stroke_width: "1.0", stroke_dasharray: "3,2" }
-                    text { x: "238", y: "{ceil_y - 2.0}", fill: "rgba(232,56,32,.45)", font_size: "6px", text_anchor: "end", "{state.ceiling_dbtp:.1} dBTP" }
+                    line {
+                        x1: "0", y1: "{ceil_y}",
+                        x2: "200", y2: "{ceil_y}",
+                        stroke: "rgba(232,56,32,0.40)",
+                        stroke_width: "0.8",
+                        stroke_dasharray: "3,2",
+                    }
+                    // ceiling label
+                    text {
+                        x: "198", y: "{ceil_y - 2.0}",
+                        fill: "rgba(232,56,32,0.50)",
+                        font_size: "5px",
+                        text_anchor: "end",
+                        "{isp}"
+                    }
                     // curve fill
                     path {
-                        d: "{lim_fill_path(&state.curve_points, 240.0, 60.0)}",
-                        fill: "rgba(232,56,32,.1)"
+                        d: "{lim_fill_path(&state.curve_points, 200.0, 48.0)}",
+                        fill: "rgba(232,56,32,0.10)",
                     }
                     // curve stroke
                     path {
-                        d: "{eq_stroke_path(&state.curve_points, 240.0, 60.0)}",
+                        d: "{eq_stroke_path(&state.curve_points, 200.0, 48.0)}",
                         fill: "none",
                         stroke: "#e83820",
-                        stroke_width: "1.5"
+                        stroke_width: "1.4",
+                        stroke_linejoin: "round",
                     }
                 }
             }

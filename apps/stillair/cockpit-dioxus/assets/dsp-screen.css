@@ -1,123 +1,224 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   dsp-screen.css — OLED glass material for Active Processing Chain
-   Hierarchy: .dsp-screen > .oled-tile > .oled-header / .oled-content
-   No metal, no chassis classes. Pure black glass instrument screen.
+   dsp-screen.css — DSP Chain glass screen (mirrors InsightsPanel layout)
+   Hierarchy: .dsp-screen > .dsp-body > cells
+   Top cell (55%): EQ spectrum
+   Bottom row: SAT scope (45%) + chain readouts (flex:1)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── dsp-screen: black glass container ───────────────────────────────────── */
 .dsp-screen {
   display: flex;
   flex-direction: column;
-  background: #000000;
   width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-/* ── oled-tile: single instrument row ────────────────────────────────────── */
-.oled-tile {
+/* ── dsp-body: inner layout — mirrors .insights-body ─────────────────────── */
+.dsp-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── dsp-eq-cell: EQ spectrum (top, ~55%) ────────────────────────────────── */
+/* mirrors .insights-spectrum-cell */
+.dsp-eq-cell {
+  flex: 0 0 55%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-cell);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+/* ── dsp-bottom-row: flex row for sat + chain readouts ───────────────────── */
+/* mirrors .insights-bottom-row */
+.dsp-bottom-row {
+  flex: 1;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── dsp-sat-cell: SAT knee scope (bottom-left, ~45%) ───────────────────── */
+/* mirrors .insights-scope-cell */
+.dsp-sat-cell {
+  flex: 0 0 45%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-cell);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+/* ── dsp-chain-cell: Comp + Lim readouts (bottom-right) ─────────────────── */
+/* mirrors .insights-meters-cell */
+.dsp-chain-cell {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-cell);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+/* ── EQ spectrum wrap (mirrors .spectrum-wrap) ───────────────────────────── */
+.dsp-spectrum-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.dsp-spectrum-svg {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Footer strip: EQ readouts (mirrors .spectrum-footer) */
+.dsp-spectrum-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 2px 0;
+  flex-shrink: 0;
+}
+
+.dsp-eq-readout {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(119, 85, 238, 0.80);  /* violet — EQ color */
+  white-space: nowrap;
+}
+
+.dsp-eq-label {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 6.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: rgba(160, 170, 180, 0.45);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── SAT scope wrap (mirrors .scope-wrap) ────────────────────────────────── */
+.dsp-sat-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 4px;
+}
+
+.dsp-sat-wrap svg {
+  width: 100%;
+  height: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: visible;
+}
+
+.dsp-sat-footer {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dsp-sat-label {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 6px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  color: rgba(200, 160, 32, 0.65);
+  text-transform: uppercase;
+}
+
+/* ── Chain readouts panel (mirrors .vu-panel) ────────────────────────────── */
+.dsp-chain-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  gap: 6px;
+}
+
+/* Module row: label + graph + value */
+.dsp-module-row {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: #050607;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid #000;
-  /* separator line between tiles */
+  gap: 2px;
 }
 
-.oled-tile:last-child {
-  border-bottom: none;
-}
-
-/* ── oled-header: label left, readout right ──────────────────────────────── */
-.oled-header {
+.dsp-module-header {
   display: flex;
-  flex-direction: row;
+  justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  height: 18px;
-  padding: 0 7px;
-  gap: 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
 }
 
-/* Module identification label */
-.oled-label {
-  flex: 1;
+.dsp-module-label {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 7px;
+  font-size: 6px;
   font-weight: 600;
   letter-spacing: 0.14em;
-  color: rgba(160, 170, 180, 0.55);
+  color: rgba(160, 170, 180, 0.45);
   text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* Telemetry readout */
-.oled-readout {
+.dsp-module-value {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 7.5px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: rgba(130, 195, 215, 0.80);
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
-/* ── oled-subheader: secondary readout row (sat tile only) ───────────────── */
-.oled-subheader {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  flex-shrink: 0;
-  height: 14px;
-  padding: 0 7px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
-}
+.dsp-module-value--comp { color: rgba(0, 152, 152, 0.90); }
+.dsp-module-value--lim  { color: rgba(232, 56, 32, 0.90); }
 
-.oled-sub {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 6.5px;
-  font-weight: 500;
-  letter-spacing: 0.10em;
-  color: rgba(120, 140, 150, 0.45);
-  text-transform: uppercase;
-}
-
-/* ── oled-content: graph bay ─────────────────────────────────────────────── */
-/* sat-tile: flex row — knee curve (70%) + THD bar (30%) side by side        */
-/* eq/comp/lim tiles: single full-width SVG                                  */
-.oled-content {
+/* Mini SVG graph inside each module row */
+.dsp-module-graph {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: row;
-  background: #000000;
   overflow: hidden;
 }
 
-.oled-content svg {
+.dsp-module-graph svg {
   display: block;
+  width: 100%;
   height: 100%;
 }
 
-/* ── sat-curve: soft-clip knee curve (70% of content width) ─────────────── */
-.sat-curve {
-  flex: 7;
-}
-
-/* ── sat-thd: THD vertical bar (30% of content width) ───────────────────── */
-.sat-thd {
-  flex: 3;
-}
-
-/* ── eq / comp / lim: single SVG fills full content width ───────────────── */
-.oled-tile--eq .oled-content svg,
-.oled-tile--comp .oled-content svg,
-.oled-tile--lim .oled-content svg {
-  width: 100%;
+/* Divider between comp and lim */
+.dsp-chain-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  margin: 0 2px;
 }

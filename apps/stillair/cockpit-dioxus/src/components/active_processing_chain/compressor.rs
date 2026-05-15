@@ -9,37 +9,44 @@ pub fn comp_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String 
     path
 }
 
+/// Compressor display — compact row inside the chain-cell.
+/// Label + GR readout header + mini SVG transfer curve.
+/// Mirrors VuPanel row style from InsightsPanel.
 #[component]
-pub fn CompressorModule(state: CompressorState) -> Element {
-    let thresh_x = ((state.threshold_db + 40.0) / 40.0 * 240.0).clamp(0.0, 240.0);
-    
-    // Pseudo telemetry number
-    let readout_val = format!("{:+.1}", state.gain_reduction_db);
+pub fn CompDisplay(state: CompressorState) -> Element {
+    let thresh_x = ((state.threshold_db + 40.0) / 40.0 * 200.0).clamp(0.0, 200.0);
+    let readout = format!("{:+.1} GR", state.gain_reduction_db);
 
     rsx! {
-        div {
-            class: "oled-tile oled-tile--comp",
+        div { class: "dsp-module-row",
 
-            div { class: "oled-header",
-                span { class: "oled-label", "COMPRESSOR — OPTICAL" }
-                span { class: "oled-readout", "{readout_val}" }
+            div { class: "dsp-module-header",
+                span { class: "dsp-module-label", "COMPRESSOR — OPTICAL" }
+                span { class: "dsp-module-value dsp-module-value--comp", "{readout}" }
             }
-            div { class: "oled-content",
-                svg { view_box: "0 0 240 60", preserve_aspect_ratio: "none",
-                    // threshold line
-                    line { x1: "{thresh_x}", y1: "0", x2: "{thresh_x}", y2: "60",
-                           stroke: "rgba(0,152,152,.2)", stroke_width: "0.5", stroke_dasharray: "2,2" }
+
+            div { class: "dsp-module-graph",
+                svg { view_box: "0 0 200 48", preserve_aspect_ratio: "none",
+                    // threshold marker
+                    line {
+                        x1: "{thresh_x}", y1: "0",
+                        x2: "{thresh_x}", y2: "48",
+                        stroke: "rgba(0,152,152,0.25)",
+                        stroke_width: "0.6",
+                        stroke_dasharray: "2,2",
+                    }
                     // curve fill
                     path {
-                        d: "{comp_fill_path(&state.curve_points, 240.0, 60.0)}",
-                        fill: "rgba(0,152,152,.1)"
+                        d: "{comp_fill_path(&state.curve_points, 200.0, 48.0)}",
+                        fill: "rgba(0,152,152,0.10)",
                     }
                     // curve stroke
                     path {
-                        d: "{eq_stroke_path(&state.curve_points, 240.0, 60.0)}",
+                        d: "{eq_stroke_path(&state.curve_points, 200.0, 48.0)}",
                         fill: "none",
                         stroke: "#009898",
-                        stroke_width: "1.5"
+                        stroke_width: "1.4",
+                        stroke_linejoin: "round",
                     }
                 }
             }
