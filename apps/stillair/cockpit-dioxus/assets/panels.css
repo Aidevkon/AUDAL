@@ -244,53 +244,217 @@
     box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0.9), 0 0 15px rgba(62, 199, 196, 0.05);
 }
 
-.insights-body {
+/* ═══════════════════════════════════════════════════════════════════════════════
+   11. SPATIAL TELEMETRY — 4-cell vertical layout
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.spatial-body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    gap: 8px;
+    padding: 12px;
     min-height: 0;
     overflow: hidden;
 }
 
-.insights-spectrum-cell {
-    flex: 0 0 55%;
+/* Cell 1: Lissajous scope — 35% height */
+.spatial-scope-cell {
+    flex: 0 0 35%;
     min-height: 0;
     overflow: hidden;
     position: relative;
     background: var(--bg-cell);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
-    box-shadow: none;
-    padding: 10px 14px;
-}
-
-.insights-bottom-row {
-    flex: 1;
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 12px;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.insights-scope-cell {
-    flex: 0 0 45%;
-    min-height: 0;
-    overflow: hidden;
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 8px;
+}
+
+/* Scope SVG fill */
+.scope-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.scope-wrap svg {
+    width: 100%;
+    height: 100%;
+    max-width: 200px;
+    max-height: 200px;
+}
+
+/* Cell 2: Mid/Side/Width strip — 15% height */
+.spatial-ms-cell {
+    flex: 0 0 15%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
     background: var(--bg-cell);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
-    box-shadow: none;
-    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
 }
 
-.insights-meters-cell {
+.spatial-ms-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    gap: 0;
+}
+
+.spatial-ms-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+.spatial-ms-sep {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+}
+
+.spatial-ms-label {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 6px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: rgba(160, 170, 180, 0.45);
+    text-transform: uppercase;
+}
+
+.spatial-ms-value {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--accent-insights);
+}
+
+.spatial-ms-value--side {
+    color: var(--accent-magenta);
+}
+
+.spatial-ms-value--angle {
+    color: var(--accent-amber);
+}
+
+/* Cell 3: Correlation meter — 13% height */
+.spatial-corr-cell {
+    flex: 0 0 13%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6px 14px;
+    gap: 5px;
+}
+
+.corr-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 5px;
+}
+
+.corr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.corr-label {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 6.5px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: rgba(160, 170, 180, 0.45);
+    text-transform: uppercase;
+}
+
+.corr-value {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.corr-track-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.corr-scale {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 1px;
+}
+
+.corr-scale-mark {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 5.5px;
+    color: rgba(160, 170, 180, 0.30);
+    letter-spacing: 0.05em;
+}
+
+.corr-track {
+    position: relative;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: visible;
+}
+
+.corr-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 3px;
+    opacity: 0.55;
+    transition: width 0.3s ease;
+}
+
+.corr-center-line {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    width: 1px;
+    height: calc(100% + 4px);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.corr-pip {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: left 0.3s ease;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* Cell 4: Spatial heat map — flex:1 */
+.spatial-heatmap-cell {
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -298,6 +462,67 @@
     background: var(--bg-cell);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
-    box-shadow: none;
-    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 14px;
+    gap: 5px;
 }
+
+.heatmap-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    gap: 4px;
+}
+
+.heatmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.heatmap-title {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 6.5px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: rgba(160, 170, 180, 0.40);
+    text-transform: uppercase;
+}
+
+.heatmap-ch-label {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    color: var(--accent-insights);
+}
+
+.heatmap-ch-label--r {
+    color: var(--accent-magenta);
+}
+
+.heatmap-canvas {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.heatmap-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.heatmap-hotspot {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 6.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.heatmap-hotspot--l { color: var(--accent-amber); }
+.heatmap-hotspot--r { color: var(--accent-magenta); }
