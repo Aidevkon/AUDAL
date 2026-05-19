@@ -1,16 +1,17 @@
 //! panels/insights.rs — SPATIAL TELEMETRY panel · Phase 14
 //! Layout:
-//!   ┌────────────────────────────────────┐
-//!   │  LISSAJOUS SCOPE  (full width 35%) │
-//!   ├────────────────────────────────────┤
-//!   │  MID / SIDE / WIDTH / VECTOR  15%  │
-//!   ├────────────────────────────────────┤
-//!   │  CORRELATION METER           13%   │
-//!   ├────────────────────────────────────┤
-//!   │  SPATIAL HEAT MAP         flex:1   │
-//!   └────────────────────────────────────┘
+//!   ┌──────────────────┬─────────────────────┐
+//!   │  LISSAJOUS       │  MID   62%          │
+//!   │  (square, 45%w)  │  SIDE  38%          │  ~50% height
+//!   │                  │  WIDTH 0.62         │
+//!   │                  │  VECTOR +14°        │
+//!   ├──────────────────┴─────────────────────┤
+//!   │  CORRELATION ────────●──── +0.21       │  ~12% height
+//!   ├────────────────────────────────────────┤
+//!   │  L ████████░░░░░░░░░░░░░░░░░░░░░░░ R  │  flex:1
+//!   └────────────────────────────────────────┘
 //! Laws: ❌ No SVG path computation  ❌ No inline hex  ❌ No std::f32 methods
-//! M/S fields: demo values until backend amendment.
+//! M/S fields: demo until backend amendment.
 
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
@@ -39,7 +40,7 @@ const DEMO_LISS_D2: &str =
     "M 60,60 L 74,80 L 80,60 L 74,40 L 60,60 \
      L 46,80 L 40,60 L 46,40 L 60,60 L 70,88 L 60,60 L 50,88 L 60,60";
 
-// Demo M/S values — pending backend amendment
+// Demo M/S — pending backend amendment
 const DEMO_MID_PCT:  f32 = 62.0;
 const DEMO_SIDE_PCT: f32 = 38.0;
 
@@ -60,11 +61,13 @@ pub fn InsightsPanel(
     let liss_detail1 = viz.as_ref().map(|v| v.lissajous_path_detail1.as_str()).unwrap_or(DEMO_LISS_D1).to_string();
     let liss_detail2 = viz.as_ref().map(|v| v.lissajous_path_detail2.as_str()).unwrap_or(DEMO_LISS_D2).to_string();
 
-    // Real data where available, demo fallback
     let (correlation, width, phase_coh) = match state.as_ref() {
         Some(s) => (s.quality.stereo_correlation, s.quality.stereo_width, s.quality.phase_coherence),
         None    => (0.21_f32, 0.62_f32, 0.31_f32),
     };
+
+    let width_str  = format!("{:.2}", width);
+    let angle_str  = format!("+{:.0}°", phase_coh * 45.0);
 
     rsx! {
         ModuleFrame {
@@ -75,32 +78,54 @@ pub fn InsightsPanel(
 
             div { class: "spatial-body",
 
-                // 1. Lissajous scope
-                div { class: "spatial-scope-cell oled-screen",
-                    StereoScope {
-                        path_outer:   liss_outer,
-                        path_inner:   liss_inner,
-                        path_detail1: liss_detail1,
-                        path_detail2: liss_detail2,
+                // ── TOP ROW: Lissajous (left) + Metrics stack (right) ─────────
+                div { class: "spatial-top-row",
+
+                    // Left: square goniometer
+                    div { class: "spatial-scope-cell oled-screen",
+                        StereoScope {
+                            path_outer:   liss_outer,
+                            path_inner:   liss_inner,
+                            path_detail1: liss_detail1,
+                            path_detail2: liss_detail2,
+                        }
+                    }
+
+                    // Right: 4 stacked metric readouts
+                    div { class: "spatial-metrics-col",
+                        MetricRow {
+                            label: "MID",
+                            value: format!("{:.0}%", DEMO_MID_PCT),
+                            color: "var(--accent-insights)",
+                            bar_pct: DEMO_MID_PCT,
+                        }
+                        MetricRow {
+                            label: "SIDE",
+                            value: format!("{:.0}%", DEMO_SIDE_PCT),
+                            color: "var(--accent-magenta)",
+                            bar_pct: DEMO_SIDE_PCT,
+                        }
+                        MetricRow {
+                            label: "WIDTH",
+                            value: width_str,
+                            color: "var(--accent-insights)",
+                            bar_pct: width * 100.0,
+                        }
+                        MetricRow {
+                            label: "VECTOR",
+                            value: angle_str,
+                            color: "var(--accent-amber)",
+                            bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                        }
                     }
                 }
 
-                // 2. Mid / Side / Width / Vector strip
-                div { class: "spatial-ms-cell oled-screen",
-                    MidSideReadout {
-                        mid_pct:       DEMO_MID_PCT,
-                        side_pct:      DEMO_SIDE_PCT,
-                        width,
-                        phase_coh,
-                    }
-                }
-
-                // 3. Correlation meter
+                // ── CORRELATION: full-width horizontal meter ──────────────────
                 div { class: "spatial-corr-cell oled-screen",
                     CorrelationMeter { correlation }
                 }
 
-                // 4. Spatial heat map (demo until backend amendment)
+                // ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────
                 div { class: "spatial-heatmap-cell oled-screen",
                     SpatialHeatMap {}
                 }
@@ -143,7 +168,8 @@ fn StereoScope(
                     path { d: "{path_outer}", fill: "none",
                            stroke: "var(--accent-insights)", stroke_width: "1.6", opacity: "0.9" }
                 }
-                circle { cx: "60", cy: "60", r: "2", fill: "var(--accent-insights)", opacity: "1.0" }
+                circle { cx: "60", cy: "60", r: "2",
+                          fill: "var(--accent-insights)", opacity: "1.0" }
             }
         }
     }
@@ -152,7 +178,8 @@ fn StereoScope(
 #[component]
 fn StereoGrid() -> Element {
     rsx! {
-        g { stroke: "var(--accent-insights)", stroke_width: "0.8", opacity: "0.22", fill: "none",
+        g { stroke: "var(--accent-insights)", stroke_width: "0.8",
+            opacity: "0.22", fill: "none",
             circle { cx: "60", cy: "60", r: "50" }
             circle { cx: "60", cy: "60", r: "33" }
             circle { cx: "60", cy: "60", r: "16" }
@@ -164,35 +191,20 @@ fn StereoGrid() -> Element {
     }
 }
 
-// ── MidSideReadout ────────────────────────────────────────────────────────────
+// ── MetricRow — stacked readout tile with mini progress bar ───────────────────
 
 #[component]
-fn MidSideReadout(mid_pct: f32, side_pct: f32, width: f32, phase_coh: f32) -> Element {
-    let width_str  = format!("{:.2}", width);
-    // Approximate vector angle: phase_coherence 0..1 → 0..45°
-    let angle_deg  = phase_coh * 45.0;
-    let angle_str  = format!("+{:.0}°", angle_deg);
-
+fn MetricRow(label: &'static str, value: String, color: &'static str, bar_pct: f32) -> Element {
     rsx! {
-        div { class: "spatial-ms-row",
-            div { class: "spatial-ms-item",
-                div { class: "spatial-ms-label", "MID" }
-                div { class: "spatial-ms-value", "{mid_pct:.0}%" }
+        div { class: "metric-row oled-screen",
+            div { class: "metric-row-header",
+                span { class: "metric-label", "{label}" }
+                span { class: "metric-value", style: "color: {color};", "{value}" }
             }
-            div { class: "spatial-ms-sep" }
-            div { class: "spatial-ms-item",
-                div { class: "spatial-ms-label", "SIDE" }
-                div { class: "spatial-ms-value spatial-ms-value--side", "{side_pct:.0}%" }
-            }
-            div { class: "spatial-ms-sep" }
-            div { class: "spatial-ms-item",
-                div { class: "spatial-ms-label", "WIDTH" }
-                div { class: "spatial-ms-value", "{width_str}" }
-            }
-            div { class: "spatial-ms-sep" }
-            div { class: "spatial-ms-item",
-                div { class: "spatial-ms-label", "VECTOR" }
-                div { class: "spatial-ms-value spatial-ms-value--angle", "{angle_str}" }
+            // Mini bar
+            div { class: "metric-bar-track",
+                div { class: "metric-bar-fill",
+                      style: "width: {bar_pct:.1}%; background: {color};" }
             }
         }
     }
@@ -202,14 +214,12 @@ fn MidSideReadout(mid_pct: f32, side_pct: f32, width: f32, phase_coh: f32) -> El
 
 #[component]
 fn CorrelationMeter(correlation: f32) -> Element {
-    // Map -1..+1 → 0..100%
     let fill_pct = ((correlation + 1.0) / 2.0 * 100.0).clamp(0.0, 100.0);
     let corr_str = if correlation >= 0.0 {
         format!("+{:.2}", correlation)
     } else {
         format!("{:.2}", correlation)
     };
-    // Color: positive = teal, near-zero = amber, negative = red
     let pip_color = if correlation > 0.4 {
         "var(--accent-insights)"
     } else if correlation > 0.0 {
@@ -225,13 +235,11 @@ fn CorrelationMeter(correlation: f32) -> Element {
                 span { class: "corr-value", style: "color: {pip_color};", "{corr_str}" }
             }
             div { class: "corr-track-wrap",
-                // Scale labels
                 div { class: "corr-scale",
                     span { class: "corr-scale-mark", "-1" }
                     span { class: "corr-scale-mark", "0" }
                     span { class: "corr-scale-mark", "+1" }
                 }
-                // Bar track
                 div { class: "corr-track",
                     div { class: "corr-fill",
                           style: "width: {fill_pct:.1}%; background: {pip_color};" }
@@ -246,8 +254,6 @@ fn CorrelationMeter(correlation: f32) -> Element {
 
 // ── SpatialHeatMap ────────────────────────────────────────────────────────────
 
-/// Demo heat map — static SVG until backend amendment provides
-/// per-band L/R energy data via VisualizationDataJson.
 #[component]
 fn SpatialHeatMap() -> Element {
     rsx! {
@@ -276,7 +282,6 @@ fn SpatialHeatMap() -> Element {
                         }
                     }
 
-                    // Heat bars (3 rows — decreasing intensity)
                     rect { x: "0", y: "4",  width: "400", height: "16", fill: "url(#hm-grad)" }
                     rect { x: "0", y: "22", width: "400", height: "11", fill: "url(#hm-grad)", opacity: "0.55" }
                     rect { x: "0", y: "35", width: "400", height: "7",  fill: "url(#hm-grad)", opacity: "0.28" }
@@ -285,7 +290,6 @@ fn SpatialHeatMap() -> Element {
                     line { x1: "265", y1: "2", x2: "265", y2: "48",
                            stroke: "var(--accent-amber)", stroke_width: "1.2",
                            stroke_dasharray: "2,2", opacity: "0.75" }
-
                     // R hotspot: 180Hz ≈ x=330
                     line { x1: "330", y1: "2", x2: "330", y2: "48",
                            stroke: "var(--accent-magenta)", stroke_width: "1.2",
