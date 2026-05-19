@@ -261,7 +261,7 @@
 /* ── TOP ROW: Lissajous (left) + Metric stack (right) ────────────────────── */
 
 .spatial-top-row {
-    flex: 0 0 52%;
+    flex: 1;
     display: flex;
     flex-direction: row;
     gap: 8px;
@@ -293,12 +293,13 @@
 }
 
 .scope-wrap svg {
-    /* Square: constrain by whichever dimension is smaller */
-    width: 100%;
+    /* Square: derive size from height, constrain width */
     height: 100%;
-    max-width: 240px;
-    max-height: 240px;
+    width: auto;
     aspect-ratio: 1 / 1;
+    max-width: 100%;
+    display: block;
+    margin: auto;
 }
 
 /* Right: stacked metric readout tiles */
@@ -328,7 +329,8 @@
 .metric-row-header {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 8px;
 }
 
 .metric-label {
@@ -338,6 +340,8 @@
     letter-spacing: 0.18em;
     color: rgba(160, 170, 180, 0.45);
     text-transform: uppercase;
+    flex-shrink: 0;
+    min-width: 42px;
 }
 
 .metric-value {
@@ -365,7 +369,7 @@
 /* ── CORRELATION: full-width horizontal meter ─────────────────────────────── */
 
 .spatial-corr-cell {
-    flex: 0 0 12%;
+    flex: 0 0 11%;
     min-height: 0;
     overflow: hidden;
     position: relative;
@@ -376,7 +380,7 @@
     flex-direction: column;
     justify-content: center;
     padding: 6px 14px;
-    gap: 5px;
+    gap: 4px;
 }
 
 .corr-wrap {
@@ -465,7 +469,7 @@
 /* ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────────────────── */
 
 .spatial-heatmap-cell {
-    flex: 1;
+    flex: 0 0 18%;
     min-height: 0;
     overflow: hidden;
     position: relative;
@@ -474,8 +478,8 @@
     border-radius: 10px;
     display: flex;
     flex-direction: column;
-    padding: 8px 14px;
-    gap: 5px;
+    padding: 7px 14px;
+    gap: 4px;
 }
 
 .heatmap-wrap {

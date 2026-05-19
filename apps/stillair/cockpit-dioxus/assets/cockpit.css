@@ -543,12 +543,19 @@ body {
   color: #009898;
 }
 
-.insights-body {
+/* Spatial Telemetry body — force fill of module-screen */
+.insights-body,
+.spatial-body {
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
 }
 
+/* module-screen must be a flex container so spatial-body flex:1 works */
+.module-screen {
+  display: flex !important;
+  flex-direction: column !important;
+}
 
 
 /* --- MONOBLOC CHASSIS --- */
