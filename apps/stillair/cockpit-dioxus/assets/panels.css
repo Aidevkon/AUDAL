@@ -538,6 +538,8 @@
 
 .heatmap-hotspot--l { color: var(--accent-amber); }
 .heatmap-hotspot--r { color: var(--accent-magenta); }
+
+.spatial-body {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -815,3 +817,183 @@
 
 .heatmap-hotspot--l { color: var(--accent-amber); }
 .heatmap-hotspot--r { color: var(--accent-magenta); }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   12. PRIMARY SIGNAL ANALYZER (Left MFD)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.psa-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 8px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Cell 1: Source Info Header */
+.psa-header-cell {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.psa-header-text {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.psa-header-val {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+/* Cell 2: Spectrogram */
+.psa-spectrogram-cell {
+    flex: 1; /* ~22% */
+    min-height: 0;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+}
+
+/* Cell 3: Loudness Meters & Controls */
+.psa-loudness-cell {
+    flex: 0 0 auto;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    gap: 8px;
+}
+
+.psa-meter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.psa-meter-label {
+    flex: 0 0 75px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 8px;
+    color: rgba(160, 170, 180, 0.6);
+    letter-spacing: 0.1em;
+}
+
+.psa-meter-val {
+    flex: 0 0 60px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 10px;
+    color: var(--accent-insights);
+    font-weight: 700;
+    text-align: right;
+}
+
+.psa-meter-bar-container {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.psa-meter-bar-fill {
+    height: 100%;
+    background: var(--accent-insights);
+    border-radius: 2px;
+}
+
+.psa-controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.psa-control-item {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 8px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.psa-load-btn {
+    background: transparent;
+    border: 1px solid var(--accent-session);
+    color: var(--accent-session);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 8px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.psa-load-btn:hover {
+    background: rgba(var(--accent-session-rgb), 0.1);
+}
+
+/* Cell 4: A/B Spectral */
+.psa-ab-cell {
+    flex: 1.2; /* ~28% */
+    min-height: 0;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+}
+
+/* Cell 5: Loudness Trace */
+.psa-trace-cell {
+    flex: 1; /* ~22% */
+    min-height: 0;
+    position: relative;
+    background: var(--bg-cell);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+}
+
+.psa-cell-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.psa-canvas {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    width: 100%;
+}

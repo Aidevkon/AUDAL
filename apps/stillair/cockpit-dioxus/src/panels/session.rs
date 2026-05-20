@@ -10,6 +10,7 @@
 
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
+use crate::components::primary_signal_analyzer::PrimarySignalAnalyzer;
 use serde_json::json;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -43,17 +44,58 @@ pub fn SessionPanel(
             is_scrollable: true,
             
             { match mode.read().clone() {
-                        CockpitMode::Idle => rsx! {
-                            DropZone { mode }
+                        CockpitMode::Idle => {
+                            let mut m = mode;
+                            let on_load = move |_| {
+                                spawn_local(async move {
+                                    match crate::ipc::invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
+                                        Ok(Some(meta)) => {
+                                            m.set(CockpitMode::FileLoaded {
+                                                path:   meta.path.clone(),
+                                                name:   meta.name.clone(),
+                                                format: meta.format.clone(),
+                                            });
+                                        }
+                                        Ok(None) => {}
+                                        Err(e) => m.set(CockpitMode::Fault {
+                                            code:    AscCode::IoErr,
+                                            message: format!("File open failed: {e}"),
+                                        }),
+                                    }
+                                });
+                            };
+                            rsx! {
+                                PrimarySignalAnalyzer {
+                                    filename: "NO FILE LOADED".to_string(),
+                                    format: "---".to_string(),
+                                    on_load_new: on_load,
+                                }
+                            }
                         },
-                        CockpitMode::FileLoaded { name, format, path } => rsx! {
-                            FileInfo { name: name.clone(), format: format.clone() }
-                            PresetMenu { mode, path, name }
+                        CockpitMode::FileLoaded { name, format, path } => {
+                            let mut m = mode;
+                            let on_load = move |_| m.set(CockpitMode::Idle); // Go back to drop zone
+                            rsx! {
+                                PrimarySignalAnalyzer {
+                                    filename: name.clone(),
+                                    format: format.clone(),
+                                    on_load_new: on_load,
+                                }
+                                PresetMenu { mode, path, name }
+                            }
                         },
-                        CockpitMode::PresetSelected { path, name, preset_id } => rsx! {
-                            FileInfo { name: name.clone(), format: String::new() }
-                            SelectedPreset { preset_id: preset_id.clone() }
-                            MasterButton { mode, session_state, viz_data, path, name, preset_id }
+                        CockpitMode::PresetSelected { path, name, preset_id } => {
+                            let mut m = mode;
+                            let on_load = move |_| m.set(CockpitMode::Idle);
+                            rsx! {
+                                PrimarySignalAnalyzer {
+                                    filename: name.clone(),
+                                    format: String::new(),
+                                    on_load_new: on_load,
+                                }
+                                SelectedPreset { preset_id: preset_id.clone() }
+                                MasterButton { mode, session_state, viz_data, path, name, preset_id }
+                            }
                         },
                         CockpitMode::Mastering { .. } => rsx! {
                             MasteringProgress {}
@@ -71,92 +113,7 @@ pub fn SessionPanel(
         }
     }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
 
-#[component]
-fn DropZone(mode: Signal<CockpitMode>) -> Element {
-    let on_load = move |_| {
-        #[cfg(debug_assertions)]
-        web_sys::console::log_1(&JsValue::from_str("[session] LOAD NEW clicked"));
-        spawn_local(async move {
-            match invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
-                Ok(Some(meta)) => {
-                    mode.set(CockpitMode::FileLoaded {
-                        path:   meta.path.clone(),
-                        name:   meta.name.clone(),
-                        format: meta.format.clone(),
-                    });
-                }
-                Ok(None) => {} // user cancelled dialog
-                Err(e) => mode.set(CockpitMode::Fault {
-                    code:    AscCode::IoErr,
-                    message: format!("File open failed: {e}"),
-                }),
-            }
-        });
-    };
-
-    rsx! {
-        div {
-            style: "display:flex; flex-direction:column; align-items:center;
-                    justify-content:center; height:100%; padding:2rem;
-                    text-align:center;",
-
-            // Drop zone visual
-            div {
-                style: "border:2px dashed var(--border-medium); border-radius:8px;
-                        padding:3rem 2rem; width:100%; box-sizing:border-box;
-                        color:var(--text-muted); font-size:0.85rem;
-                        letter-spacing:0.05em; margin-bottom:1.5rem;",
-                div { style: "font-size:2rem; margin-bottom:1rem; opacity:0.4;", "⬇" }
-                "DROP AUDIO FILE"
-                div { style: "font-size:0.7rem; margin-top:0.5rem; opacity:0.6;",
-                    "WAV  ·  FLAC  ·  MP3  ·  AIFF"
-                }
-            }
-
-            // Load New button
-            button {
-                id: "btn-load-new",
-                onclick: on_load,
-                style: "background:var(--accent-session); color:#fff;
-                        border:none; border-radius:4px; padding:0.6rem 1.5rem;
-                        font-size:0.75rem; letter-spacing:0.15em;
-                        text-transform:uppercase; cursor:pointer;
-                        font-weight:600; width:100%;
-                        transition:opacity 0.15s ease;",
-                "LOAD NEW"
-            }
-        }
-    }
-}
-
-#[component]
-fn FileInfo(name: String, format: String) -> Element {
-    rsx! {
-        div {
-            style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
-            div {
-                style: "color:var(--text-secondary); font-size:0.65rem;
-                        letter-spacing:0.15em; text-transform:uppercase;
-                        margin-bottom:0.4rem;",
-                "AUDIO SOURCE"
-            }
-            div {
-                style: "color:var(--text-primary); font-size:0.9rem;
-                        font-weight:500; word-break:break-all;",
-                "{name}"
-            }
-            if !format.is_empty() {
-                div {
-                    style: "color:var(--text-muted); font-size:0.7rem;
-                            margin-top:0.25rem; text-transform:uppercase;",
-                    "{format}"
-                }
-            }
-        }
-    }
-}
 
 #[component]
 fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element {
