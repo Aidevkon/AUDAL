@@ -1,6 +1,5 @@
 //! Stage 5 - Saturation (Harmonic Excitement)
-//! Ported from sm-core. No changes needed - already pure algorithmic, no std::f32.
-//! fast_tanh: Pade approximation - deterministic, no external math library needed.
+//! Ported from sm-core. libm::tanhf only — no std::f32 transcendental methods.
 //! Authority: LineOS Constitution v2.0 §09.1
 
 use crate::types::audio::AudioChunk;
@@ -16,26 +15,15 @@ impl Stage5Saturate {
         Self { drive, _channels: channels }
     }
 
-    /// Fast Pade approximation of tanh(x) with hard clamp.
-    /// Pade is accurate for |x| < ~2.0 (typical DSP signal range after compression).
-    /// Values outside this range are clamped to [-1, 1] - saturation is the correct behavior.
-    #[inline(always)]
-    fn fast_tanh(x: f32) -> f32 {
-        let x2 = x * x;
-        let y  = x * (27.0 + x2) / (27.0 + 9.0 * x2);
-        // Clamp to [-1, 1]: ensures bounded output regardless of input magnitude
-        if y > 1.0 { 1.0 } else if y < -1.0 { -1.0 } else { y }
-    }
-
     pub fn process_chunk(&mut self, chunk: &mut AudioChunk) {
         if self.drive <= 1.0 {
             return;
         }
 
-        let inverse_drive = 1.0 / Self::fast_tanh(self.drive);
+        let inverse_drive = 1.0 / libm::tanhf(self.drive);
 
         for sample in chunk.samples.iter_mut() {
-            *sample = Self::fast_tanh(*sample * self.drive) * inverse_drive;
+            *sample = libm::tanhf(*sample * self.drive) * inverse_drive;
         }
     }
 }
@@ -59,17 +47,16 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_tanh_unity_at_zero() {
-        assert_eq!(Stage5Saturate::fast_tanh(0.0), 0.0);
+    fn test_tanhf_unity_at_zero() {
+        assert_eq!(libm::tanhf(0.0), 0.0);
     }
 
     #[test]
-    fn test_fast_tanh_bounded() {
-        // fast_tanh must always return values in [-1, 1] (with clamp)
+    fn test_tanhf_bounded() {
         for i in -1000..=1000 {
             let x = i as f32 * 0.1;
-            let y = Stage5Saturate::fast_tanh(x);
-            assert!(y.abs() <= 1.0 + 1e-5, "fast_tanh({x}) = {y} - unbounded!");
+            let y = libm::tanhf(x);
+            assert!(libm::fabsf(y) <= 1.0 + 1e-5, "tanhf({x}) = {y} - unbounded!");
         }
     }
 }

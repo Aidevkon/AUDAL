@@ -45,7 +45,7 @@ fn make_test_chunk() -> AudioChunk {
 }
 
 fn run_pipeline(chunk: &AudioChunk, seed: u64) -> Vec<u8> {
-    let pipeline = MasteringPipeline::new(test_constants());
+    let mut pipeline = MasteringPipeline::new(test_constants());
     let intent = MasteringIntent {
         seed,
         target_lufs:  Some(-14.0),

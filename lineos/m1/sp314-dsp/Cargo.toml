@@ -1,6 +1,6 @@
 [package]
 name        = "sp314-dsp"
-version     = "0.1.0"
+version     = "0.3.0"
 edition     = "2021"
 license     = "MIT"
 # Authority: LineOS Constitution v2.0 §05 · Creator OS Constitution v2.6 §05

@@ -214,7 +214,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     };
 
     let constants = schema.pipeline.clone();
-    let pipeline  = MasteringPipeline::new(constants);
+    let mut pipeline = MasteringPipeline::new(constants);
 
     // Run sp314-dsp in blocking thread (no_std/alloc/sync)
     let hash_bytes = path_hash;

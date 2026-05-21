@@ -1,0 +1,192 @@
+# Creator OS — Cursor Rules
+# Constitution: v2.6 (update to v2.7 after next push)
+# Architecture: ARCHITECTURE.md v3.4
+# Last updated: 2026-05-20
+
+## SYSTEM IDENTITY
+
+You are working on Creator OS — a governed, deterministic, local-first
+operating system for audio, video, and image production.
+
+It is a five-layer system:
+  Creator OS   ← constitutional layer (governance, contracts, invariants)
+  LineOS       ← deterministic execution substrate (Rust, WASM, DSP)
+  Aether       ← ML enrichment layer (inference, adapters, coaching)
+  Apps         ← user-facing products (Still Air A1, MotionCraft A2)
+  Marketplace  ← ecosystem layer (engines, packs, assets)
+
+## LANGUAGE RULES
+
+- `lineos/`, `aether/`, `engines/`, `crates/`, `apps/` → Rust ONLY
+- `backend/` → Elixir/Phoenix ONLY
+- Elixir is NEVER permitted outside `backend/`
+- No Python runtime in the execution path
+- No FFmpeg (use symphonia, rav1e, mp4parse-rs)
+
+## DETERMINISM INVARIANTS (UNBREAKABLE)
+
+- Same input + seed → identical output, always
+- `std::f32::tanh()` and `std::f64` methods in DSP pipeline → FORBIDDEN. Use `libm`
+- `rand::thread_rng()` in production pipelines → FORBIDDEN
+- `Date::now()` in deterministic code → FORBIDDEN
+- `let _ =` anywhere in production code → FORBIDDEN (silent failure)
+
+## LAYER BOUNDARIES (CONSTITUTIONAL)
+
+### LineOS M1 — Deterministic Zone
+- Pure DSP math only: rustfft, rubato, dasp, libm, symphonia, rav1e, mp4parse-rs
+- NO ML weights, NO inference, NO neural networks
+- NO stochastic components of any kind
+
+### Aether — ML Enrichment Layer
+- ML-origin components ONLY: deepfilter-rs, Demucs, Silero VAD, Real-ESRGAN, Piper
+- candle, ort (ONNX) for inference
+- ALL LLM calls via `creator-os/shared/adapter-runtime/` ONLY
+
+### Adapter Boundary
+- Raw ML or LLM output NEVER crosses into LineOS
+- After `validate_output()`, output is treated as deterministic
+- Boundary contract: `creator-os/contracts/feature-vector.schema.json`
+
+### LLM Adapter Rules
+- ALL LLM API calls → `creator-os/shared/adapter-runtime/llm-client.rs` ONLY
+- No adapter may call LLM API directly
+- `retry.rs` in adapter-runtime is the ONLY permitted retry implementation
+- Every adapter MUST implement `LLMAdapter` trait
+- Input/Output MUST be typed structs — NO `serde_json::Value`
+- `validate_output()` MUST be called before any output crosses Adapter Boundary
+
+## FORBIDDEN DEPENDENCIES
+
+- `ffmpeg` → use symphonia / rav1e / mp4parse-rs
+- `reqwest` outside adapter-runtime → FORBIDDEN
+- `ring` crate → use `ed25519-dalek` + `blake3`
+- `whisper-rs` / `whisper.cpp` → use Candle Whisper
+- `hound`, `lewton`, `claxon` → use symphonia
+- `rodio` in DSP path → UI preview only
+- GPL-licensed crates → MIT or Apache 2.0 only
+- `serde_json::Value` as Engine input type → use typed structs
+- Per-frame IPC calls to E12/E13 → batch dispatch only
+
+## M0 TRUST BOUNDARY
+
+- ALL marketplace assets validated by M0 before loading
+- Validation: manifest → signature → permissions → digest
+- No engine loads without M0 validation
+- No subprocess spawned outside M0 mediation
+- Video processing NEVER bypasses M0
+
+## CONTRACT SYSTEM
+
+All contracts live in `creator-os/contracts/`. NEVER define contracts elsewhere.
+
+Key contracts:
+- `golden-blob.schema.json` — master output
+- `feature-vector.schema.json` — Adapter Boundary
+- `project.schema.json` — per-track persistence (Schema Agent only)
+- `engineer-conditions.schema.json` — Coach Core → Reactor
+- `behaviour-vector.schema.json` — Behaviour Layer output
+- `reactor-intent.schema.json` — Reactor → Operator
+- `operator-surfacing.schema.json` — Operator → UI
+- `pipeline-execution.schema.json` — Operator → OpenClaw
+- `session-vector.schema.json` — Session Agent → Operator
+- `hermes-command.schema.json` — remote automation gateway
+- `collab-session.schema.json` — WebRTC session state
+- `collab-event.schema.json` — WebRTC event envelope
+
+Schema Agent (`creator-os/shared/schema-agent/`) is the ONLY permitted
+access point for `project.schema.json`. Never read/write it directly.
+
+## COCKPIT ARCHITECTURE (v3.4)
+
+### Component Responsibilities
+- `Reducer` — pure function, SOLE authority for CockpitMode transitions
+- `Reactor` — pure function, consumes BehaviourVector, produces ReactorIntent
+- `Operator` — stateful, SOLE DSP execution authority, SOLE JINI invocation authority
+- `OpenClaw` — deterministic executor, never self-triggers
+- `Behaviour Layer` — DSP findings → semantic BehaviourVector (firewall)
+
+### DSP Execution Rules
+- DSP execution requires: Operator authority + user_confirmed: true
+- NOTHING else may trigger DSP: not Reactor, not JINI, not Collaboration Layer
+- CockpitMode is written ONLY by the Reducer
+
+### Behaviour Layer Firewall
+- JINI, Reactor, Operator NEVER receive raw DSP metrics
+- No LUFS, no TP, no RMS, no FFT, no Hz ranges outside Behaviour Layer
+- Only BehaviourVector (5 semantic fields) crosses this boundary
+
+### Agent Zone Rules
+- Agents NEVER mutate Cockpit state directly
+- Agents NEVER trigger DSP execution
+- Agents NEVER bypass the Operator
+- Agents NEVER produce ReactorIntent
+- Hermes Agent is the ONLY path for remote commands to reach Operator
+
+### Collaboration Layer Rules
+- NEVER transmits DSP metrics, ML output, persona, pipeline lineage
+- NEVER triggers DSP execution
+- NEVER calls OpenClaw
+- Host migration is FORBIDDEN (host_peer_id is immutable)
+
+## ENGINE REGISTRY
+
+| ID | Name | Layer |
+|----|------|-------|
+| E1 | speakforge | Aether |
+| E4 | deepfilter | Aether |
+| E7 | link2suno | Aether |
+| E11 | sp314-dsp | LineOS M1 |
+| E12 | video-engine | LineOS |
+| E13 | av-forge | LineOS |
+
+Core engine IDs are PERMANENT. Never reassign.
+
+## BUILD ORDER
+
+1. crates/
+2. creator-os/shared/adapter-runtime/
+3. creator-os/shared/schema-agent/
+4. lineos/m0/
+5. lineos/m1/ audio: sp314-dsp → telemetry → metadata → insights → rule-engine
+6. lineos/m1/ AV: av-core
+7. engines/ (E11, E12, E13)
+8. aether/persona/
+9. aether/devices/
+10. aether/adapters/ + aether/coaching/
+11. pipelines/
+12. apps/cockpit/behaviour/
+13. apps/cockpit/reducer/
+14. apps/cockpit/reactor/
+15. apps/cockpit/operator/
+16. apps/cockpit/agents/
+17. apps/runtime/openclaw/
+18. apps/runtime/collaboration/
+19. apps/stillair/
+20. backend/
+
+## QUICK REFERENCE — WHAT GOES WHERE
+
+| What | Where |
+|------|-------|
+| LLM calls | creator-os/shared/adapter-runtime/ ONLY |
+| project.schema.json access | creator-os/shared/schema-agent/ ONLY |
+| DSP math | lineos/m1/ (pure, no ML) |
+| ML inference | aether/ (with weights) |
+| CockpitMode transitions | apps/cockpit/reducer/ ONLY |
+| DSP execution requests | apps/cockpit/operator/ ONLY |
+| Remote command routing | apps/cockpit/agents/hermes/ ONLY |
+| WebRTC session | apps/runtime/collaboration/ |
+| Pipeline execution | apps/runtime/openclaw/ |
+
+## MAXIMS
+
+- If it is not in a constitution, it does not exist.
+- If it is not in a contract, it is not an interface.
+- If it bypasses M0, it is a security violation.
+- If it crosses the Adapter Boundary unvalidated, it is a determinism violation.
+- If it uses ML weights, it belongs in Aether.
+- If it is in the deterministic zone, it must be deterministic.
+- If it triggers DSP without Operator authority and user confirmation, it is a violation.
+- If JINI sees raw DSP metrics, it is a Behaviour Layer breach.
+- If CockpitMode is written outside the Reducer, it is a constitutional breach.

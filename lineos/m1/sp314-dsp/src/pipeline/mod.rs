@@ -8,6 +8,12 @@
 //! - Thresholds from PipelineConstants (bmr-128.schema.json) — never hardcoded
 //! - master() returns GoldenBlob (audio)
 
+pub mod gain_budget;
+pub mod signal_priority;
+pub mod stage_pool;
+pub mod validate;
+pub mod warnings;
+
 pub mod stage1_analyze;
 pub mod stage2_eq;
 pub mod stage3_deess;
@@ -23,7 +29,12 @@ use crate::analysis::AnalysisAccumulator;
 use crate::types::audio::AudioChunk;
 use crate::types::config::PipelineConstants;
 use crate::types::golden_blob::{BlobType, GoldenBlob};
+use crate::types::mastering_preset::MasteringPreset;
 use crate::types::metrics::QualityMetrics;
+
+use stage_pool::StagePool;
+use validate::{validate_input, validate_preset, MAX_POOL_FRAMES};
+use warnings::WarningAggregator;
 
 use stage1_analyze::Stage1Analyze;
 use stage2_eq::Stage2Eq;
@@ -91,12 +102,16 @@ pub struct MasteringIntent {
 /// Immutable between phase releases per LineOS Constitution §05.1.
 pub struct MasteringPipeline {
     constants: PipelineConstants,
+    pool:      StagePool,
 }
 
 impl MasteringPipeline {
     /// Create a pipeline with constants loaded from bmr-128.schema.json.
     pub fn new(constants: PipelineConstants) -> Self {
-        Self { constants }
+        Self {
+            constants,
+            pool: StagePool::new(),
+        }
     }
 
     /// Run the full 8-stage pipeline over `chunks` and return a GoldenBlob.
@@ -107,7 +122,7 @@ impl MasteringPipeline {
     ///
     /// Returns Err on anomaly detection (fatal per M0 Constitution §04.3).
     pub fn master(
-        &self,
+        &mut self,
         intent:      &MasteringIntent,
         chunks:      &[AudioChunk],
         input_hash:  [u8; 32],
@@ -115,6 +130,25 @@ impl MasteringPipeline {
         if chunks.is_empty() {
             return Err("MasteringPipeline: no audio chunks provided");
         }
+
+        let preset = MasteringPreset::from_intent(
+            intent.export_16bit,
+            intent.seed,
+            intent.target_lufs,
+        );
+        validate_preset(&preset)?;
+
+        if chunks.len() == 1 {
+            validate_input(&chunks[0].samples)?;
+        } else {
+            let total_samples: usize = chunks.iter().map(|c| c.samples.len()).sum();
+            if total_samples > MAX_POOL_FRAMES * 2 {
+                return Err("sp314-dsp: input exceeds maximum sample count");
+            }
+        }
+
+        self.pool.reset();
+        let warnings = WarningAggregator::new();
 
         let sample_rate = chunks[0].sample_rate;
         let channels    = chunks[0].channels;
@@ -138,7 +172,12 @@ impl MasteringPipeline {
             sample_rate, channels,
             c.eq_hpf_freq_hz, c.eq_air_shelf_hz,
         );
-        let mut stage3 = Stage3DeEss::new(sample_rate, channels);
+        let mut stage3 = Stage3DeEss::new(
+            sample_rate,
+            channels,
+            c.dess_band_low_hz,
+            c.dess_band_high_hz,
+        );
         let mut stage4 = Stage4Compress::new(
             sample_rate, channels,
             c.comp_threshold_dbfs, c.comp_ratio_default, c.comp_knee_db,
@@ -195,6 +234,7 @@ impl MasteringPipeline {
             quality_metrics,
             seed:            intent.seed,
             input_hash,
+            warnings:        warnings.records().to_vec(),
         })
     }
 }
@@ -251,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_silence() {
-        let pipeline = MasteringPipeline::new(test_constants());
+        let mut pipeline = MasteringPipeline::new(test_constants());
         let intent = MasteringIntent {
             seed:         0x1337BEEF,
             target_lufs:  Some(-14.0),
@@ -268,7 +308,7 @@ mod tests {
 
     #[test]
     fn test_pipeline_empty_input() {
-        let pipeline = MasteringPipeline::new(test_constants());
+        let mut pipeline = MasteringPipeline::new(test_constants());
         let intent = MasteringIntent {
             seed: 42, target_lufs: None, export_16bit: false,
         };

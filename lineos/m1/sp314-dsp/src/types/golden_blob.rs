@@ -5,6 +5,7 @@
 
 use alloc::vec::Vec;
 use super::metrics::QualityMetrics;
+use super::warnings::WarningRecord;
 
 #[derive(Debug, Clone)]
 pub enum BlobType {
@@ -26,4 +27,6 @@ pub struct GoldenBlob {
     pub seed:            u64,
     /// SHA-256 of raw input audio — for audit trail
     pub input_hash:      [u8; 32],
+    /// Aggregated non-fatal pipeline warnings (v2.9 `WarningAggregator` snapshot)
+    pub warnings:        Vec<WarningRecord>,
 }
