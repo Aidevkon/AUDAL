@@ -16,12 +16,14 @@ pub mod validate;
 pub mod warnings;
 
 // ── v2.9 / v2.9.1 new modules ────────────────────────────────────────────────
-// Sandbox steps [3] and [4a] — not wired into master() yet.
-pub mod math;               // §N1 — Kahan energy accumulation (v2.9.1)
-pub mod input_profile;      // §Input Profile Detection (v2.9)
-pub mod stage1_5a_analyzer; // §Stage 1.5a — Loudness Analyzer (v2.9)
-pub mod stage1_5b_segmenter;  // §Stage 1.5b — Segmenter (v2.9)
+// [4d] wired: input_profile + 1.5a/b/c. [6] declared — not yet wired.
+pub mod math;                  // §N1 + §N10 — Kahan + finalize_sample (v2.9.1)
+pub mod input_profile;         // §Input Profile Detection (v2.9)
+pub mod stage1_5a_analyzer;    // §Stage 1.5a — Loudness Analyzer (v2.9)
+pub mod stage1_5b_segmenter;   // §Stage 1.5b — Segmenter (v2.9)
 pub mod stage1_5c_synthesizer; // §Stage 1.5c — Synthesizer (v2.9)
+pub mod stage2_stereo;         // §Stage 2    — Stereo Processing (v2.9)
+pub mod stage2_5_mono;         // §Stage 2.5  — Mono Compatibility (v2.9)
 
 pub mod stage1_analyze;
 pub mod stage2_eq;

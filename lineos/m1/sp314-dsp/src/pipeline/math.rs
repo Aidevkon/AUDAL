@@ -1,6 +1,6 @@
-//! Numerical math primitives — sp314-dsp v2.9.1 §N1 (Kahan Summation).
+//! Numerical math primitives — sp314-dsp v2.9.1 §N1 + §N10.
 //!
-//! Authority: sp314-dsp-v2-9-1-amendment.md §N1
+//! Authority: sp314-dsp-v2-9-1-amendment.md §N1 (Kahan), §N10 (finalize_sample)
 //! Constitutional rules:
 //!   - libm only — no std::f32 methods in pipeline
 //!   - No f64 upcast — f32 throughout (determinism contract)
@@ -9,6 +9,38 @@
 //! These functions replace naive `sum += x * x` energy accumulators
 //! throughout the pipeline wherever energy is accumulated over long
 //! sequences (Stage 1.5a, Stage 8.1/8.2/8.3/8.5, BandCoupling).
+
+// ── Stage output boundary ────────────────────────────────────────────────────
+
+/// Denormal flush threshold — below this magnitude is treated as zero.
+/// Prevents denormal performance penalty without FTZ/DAZ (§Key Invariants).
+const DENORMAL_THRESHOLD: f32 = 1.0e-15;
+
+/// Quantization step for sample values — eliminates sub-LSB accumulation drift.
+/// Per §N10: `quantize(0.000001)` at every stage output boundary.
+const QUANTIZE_STEP: f32 = 0.000001;
+
+/// Stage output boundary — applied to every output sample.
+///
+/// Per spec §N10 Signal Scaling Policy (amendment §Key Invariants):
+///   1. flush_denormal: values < DENORMAL_THRESHOLD → 0.0 (no FTZ/DAZ)
+///   2. quantize: round to nearest QUANTIZE_STEP (0.000001)
+///   3. clamp: hard clip to [-1.0, 1.0]
+///
+/// # Determinism
+/// Bit-identical across platforms because:
+/// - libm::roundf is deterministic
+/// - All three operations are monotone (no branching on float state)
+/// - No FTZ/DAZ flags mutated — scoped inline only
+#[inline]
+pub fn finalize_sample(x: f32) -> f32 {
+    // 1. Flush denormals inline — no FTZ/DAZ, no thread globals
+    let flushed = if libm::fabsf(x) < DENORMAL_THRESHOLD { 0.0 } else { x };
+    // 2. Quantize — eliminate sub-LSB drift
+    let quantized = libm::roundf(flushed / QUANTIZE_STEP) * QUANTIZE_STEP;
+    // 3. Clamp to [-1.0, 1.0]
+    libm::fminf(1.0, libm::fmaxf(-1.0, quantized))
+}
 
 /// Kahan compensated sum of squares.
 ///
