@@ -84,7 +84,7 @@ use stage3_eq::process_eq;
 use stage4_compress::process_compress;
 use stage5_saturate::process_saturate;
 use stage5_5_prelimit::process_prelimit;
-use stage6_limit::process_limit;
+use stage6_limit::{process_limit, LimiterState};
 use stage7_dither::process_dither;
 use stage8_metering::compute_metering;
 
@@ -154,6 +154,8 @@ pub struct MasteringPipeline {
     pub last_loudness_plan:    Option<LoudnessPlan>,
     /// Per-block lookahead queue — stored for Stage 6.2 (wired in later step).
     pub last_lookahead_frames: Vec<LookaheadFrame>,
+    /// Persistent envelope follower state for Stage 6.
+    pub limiter_state:         LimiterState,
 }
 
 impl MasteringPipeline {
@@ -164,6 +166,7 @@ impl MasteringPipeline {
             pool:                  StagePool::new(),
             last_loudness_plan:    None,
             last_lookahead_frames: Vec::new(),
+            limiter_state:         LimiterState::new(2, 48_000.0), // Support up to 2 channels
         }
     }
 
@@ -201,6 +204,7 @@ impl MasteringPipeline {
         }
 
         self.pool.reset();
+        self.limiter_state.reset();
         let warnings = WarningAggregator::new();
 
         let sample_rate = chunks[0].sample_rate;
@@ -351,6 +355,7 @@ impl MasteringPipeline {
                 &preset,
                 intent.target_lufs,
                 &self.last_lookahead_frames,
+                &mut self.limiter_state,
                 &mut aggregator,
                 block_size,
                 block_offset,

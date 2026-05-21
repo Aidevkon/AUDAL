@@ -48,8 +48,7 @@ pub const TRUE_PEAK_RECONSTRUCTION_MARGIN_DB: f32 = 0.3;
 /// §Stage 6.2: LimiterOverwork threshold: GR > 6 dB.
 const LIMITER_OVERWORK_GR_DB: f32 = 6.0;
 
-/// §Stage 6.2: Sustained overwork window: 100ms @ 48kHz = 4800 samples.
-const OVERWORK_SUSTAIN_SAMPLES: usize = 4800;
+
 
 /// §Stage 6.3: LUFS target convergence tolerance.
 const LUFS_CONVERGENCE_LU: f32 = 0.2;
@@ -78,6 +77,35 @@ fn apply_ceiling(sample: f32, level_db: f32, ceiling_db: f32) -> f32 {
     finalize_sample(sample * gr_linear)
 }
 
+// ── LimiterState ─────────────────────────────────────────────────────────────
+
+pub struct LimiterState {
+    pub followers:               Vec<LogEnvelopeFollower>,
+    pub overwork_sample_counter: usize,
+    pub overwork_warning_armed:  bool,
+}
+
+impl LimiterState {
+    pub fn new(channels: usize, sample_rate: f32) -> Self {
+        let followers = (0..channels)
+            .map(|_| LogEnvelopeFollower::new(LIMITER_ATTACK_MS, LIMITER_RELEASE_BODY_MS, sample_rate))
+            .collect();
+        Self {
+            followers,
+            overwork_sample_counter: 0,
+            overwork_warning_armed:  true,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for f in &mut self.followers {
+            f.level_db = -144.0;
+        }
+        self.overwork_sample_counter = 0;
+        self.overwork_warning_armed  = true;
+    }
+}
+
 // ── process_limit ─────────────────────────────────────────────────────────────
 
 /// Process `pcm` in-place through Stage 6 (6.1→6.2→6.3→6.4→6.5).
@@ -89,8 +117,8 @@ fn apply_ceiling(sample: f32, level_db: f32, ceiling_db: f32) -> f32 {
 /// - `preset`          — mastering preset (ceiling, lufs_target)
 /// - `intent_lufs`     — target LUFS from planning pass (`None` = skip 6.3)
 /// - `lookahead_frames`— per-block frames from Stage 1.5c (may be empty)
+/// - `limiter_state`   — persistent state for the envelope follower
 /// - `aggregator`      — warning sink
-/// - `block_size`      — samples per block (for overwork detection)
 /// - `block_offset`    — current block index
 ///
 /// # Returns
@@ -103,6 +131,7 @@ pub fn process_limit(
     preset:           &MasteringPreset,
     intent_lufs:      Option<f32>,
     lookahead_frames: &[LookaheadFrame],
+    limiter_state:    &mut LimiterState,
     aggregator:       &mut WarningAggregator,
     _block_size:      usize,
     block_offset:     u64,
@@ -135,13 +164,14 @@ pub fn process_limit(
         let is_transient = lookahead.map(|f| f.transient_flag).unwrap_or(false);
         let release_ms = if is_transient { LIMITER_RELEASE_TRANSIENT_MS } else { LIMITER_RELEASE_BODY_MS };
 
-        let mut followers: Vec<LogEnvelopeFollower> = (0..ch)
-            .map(|_| LogEnvelopeFollower::new(LIMITER_ATTACK_MS, release_ms, sample_rate))
-            .collect();
+        for f in &mut limiter_state.followers {
+            // Recompute release coefficient per block based on transient flag.
+            f.release_coeff = if release_ms <= 0.0 { 1.0 } else { 1.0 - libm::expf(-1.0 / (release_ms * 0.001 * sample_rate)) };
+        }
 
         let frame_count = pcm.len() / ch;
-        // Overwork detection: track consecutive samples with GR > 6dB
-        let mut overwork_count: usize = 0;
+        // Overwork detection: tracking across blocks
+        let overwork_window_samples = libm::roundf(sample_rate * 0.1) as usize;
 
         for frame in 0..frame_count {
             for c in 0..ch {
@@ -151,22 +181,25 @@ pub fn process_limit(
 
                 // Convert to dB for log envelope follower
                 let level_db = LinearGain(ax.max(1e-9)).to_db().0;
-                let env_db   = followers[c].process(level_db);
+                let env_db   = limiter_state.followers[c].process(level_db);
 
                 let gr_db = libm::fminf(0.0, effective_ceiling_db - env_db);
 
                 // Overwork detection: GR > 6dB
                 if libm::fabsf(gr_db) > LIMITER_OVERWORK_GR_DB {
-                    overwork_count += 1;
-                } else {
-                    overwork_count = 0;
+                    limiter_state.overwork_sample_counter += 1;
+                } else if limiter_state.overwork_sample_counter < overwork_window_samples {
+                    // Only reset counter when signal drops below threshold AND counter has not yet reached window
+                    limiter_state.overwork_sample_counter = 0;
                 }
-                if overwork_count >= OVERWORK_SUSTAIN_SAMPLES {
+
+                if limiter_state.overwork_sample_counter >= overwork_window_samples && limiter_state.overwork_warning_armed {
                     aggregator.push(
                         PipelineWarning::LimiterOverwork { source: LimiterOverworkSource::LimiterStage },
                         block_offset,
                     );
-                    overwork_count = 0; // reset to avoid re-firing every sample
+                    limiter_state.overwork_sample_counter = 0; // Reset after warning fires
+                    limiter_state.overwork_warning_armed = false; // Prevent spamming
                 }
 
                 pcm[i] = apply_ceiling(x, env_db, effective_ceiling_db);
@@ -254,8 +287,9 @@ mod tests {
     fn test_limit_silence_passes_isp() {
         let mut pcm = alloc::vec![0.0f32; 512];
         let mut agg = WarningAggregator::new();
+        let mut state = LimiterState::new(1, 48_000.0);
         let result = process_limit(&mut pcm, 1, 48_000.0, &preset(-14.0),
-            None, &[], &mut agg, 128, 0);
+            None, &[], &mut state, &mut agg, 128, 0);
         assert!(result.is_ok(), "silence must pass ISP");
         assert!(result.unwrap(), "silence: true_peak_verified = true");
     }
@@ -267,8 +301,9 @@ mod tests {
             .map(|i| 1.5 * libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48_000.0))
             .collect();
         let mut agg = WarningAggregator::new();
+        let mut state = LimiterState::new(1, 48_000.0);
         let result = process_limit(&mut pcm, 1, 48_000.0, &preset(-14.0),
-            None, &[], &mut agg, 128, 0);
+            None, &[], &mut state, &mut agg, 128, 0);
         assert!(result.is_ok(), "loud signal must not trip ISP after limiting");
         for s in &pcm {
             assert!(s.is_finite(), "output must be finite");
@@ -301,8 +336,9 @@ mod tests {
         let mut agg = WarningAggregator::new();
         // Note: limiter may attenuate heavily; ISP check is the final gate.
         // This test verifies the ISP path exists and returns Err when triggered.
+        let mut state = LimiterState::new(1, 48_000.0);
         let result = process_limit(&mut pcm, 1, 48_000.0, &tight_preset,
-            None, &[], &mut agg, 128, 0);
+            None, &[], &mut state, &mut agg, 128, 0);
         // Either passes ISP (fully attenuated) or returns Err — both are valid.
         // The important thing is no panic and a valid Result.
         assert!(result.is_ok() || result == Err("isp_violation"));
@@ -319,8 +355,9 @@ mod tests {
             ..preset(-14.0)
         };
         let mut agg = WarningAggregator::new();
+        let mut state = LimiterState::new(1, 48_000.0);
         let result = process_limit(&mut pcm, 1, 48_000.0, &raw_preset,
-            None, &[], &mut agg, 128, 0);
+            None, &[], &mut state, &mut agg, 128, 0);
         assert!(result.is_ok());
         let miss = agg.records().iter().any(|r| r.warning == PipelineWarning::LufsTargetMiss);
         assert!(!miss, "raw preset must not emit LufsTargetMiss");
