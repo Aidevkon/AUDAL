@@ -3,7 +3,7 @@
 //! Authority: LineOS Constitution v2.0 §07
 
 use serde::{Deserialize, Serialize};
-use sp314_dsp::types::{golden_blob::GoldenBlob, metrics::Ebu128Measurement};
+use sp314_dsp::types::{golden_blob::{GoldenBlob, GoldenInputProfile}, metrics::Ebu128Measurement};
 
 /// Project manifest — produced once per mastering session.
 /// Contains the session's input hash (from GoldenBlob) + measurement summary.
@@ -66,6 +66,7 @@ mod tests {
             seed:            0x1337BEEF,
             input_hash:      [0xABu8; 32],
             warnings:        vec![],
+            input_profile:   GoldenInputProfile::Normal,
         }
     }
 

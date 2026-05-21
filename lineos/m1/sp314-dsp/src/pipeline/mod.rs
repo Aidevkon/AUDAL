@@ -7,6 +7,7 @@
 //! - No AppError — errors are &'static str (no_std)
 //! - Thresholds from PipelineConstants (bmr-128.schema.json) — never hardcoded
 //! - master() returns GoldenBlob (audio)
+//! - Step [4d]: Stage 1.5 planning pass wired at master() entry
 
 pub mod gain_budget;
 pub mod signal_priority;
@@ -36,13 +37,20 @@ use alloc::vec::Vec;
 use crate::analysis::AnalysisAccumulator;
 use crate::types::audio::AudioChunk;
 use crate::types::config::PipelineConstants;
-use crate::types::golden_blob::{BlobType, GoldenBlob};
+use crate::types::golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
 use crate::types::mastering_preset::MasteringPreset;
 use crate::types::metrics::QualityMetrics;
+
 
 use stage_pool::StagePool;
 use validate::{validate_input, validate_preset, MAX_POOL_FRAMES};
 use warnings::WarningAggregator;
+
+// Stage 1.5 planning pass — Step [4d]
+use input_profile::{detect_input_profile, InputProfile};
+use stage1_5a_analyzer::Stage1_5aAnalyzer;
+use stage1_5b_segmenter::{segment, LoudnessSegment};
+use stage1_5c_synthesizer::{synthesize, LookaheadFrame, LoudnessPlan};
 
 use stage1_analyze::Stage1Analyze;
 use stage2_eq::Stage2Eq;
@@ -108,9 +116,17 @@ pub struct MasteringIntent {
 
 /// The 8-stage audio mastering pipeline.
 /// Immutable between phase releases per LineOS Constitution §05.1.
+///
+/// Step [4d]: `last_loudness_plan` and `last_lookahead_frames` store the
+/// Stage 1.5 planning-pass outputs from the most recent `master()` call.
+/// Stage 6 will consume these in a future step.
 pub struct MasteringPipeline {
-    constants: PipelineConstants,
-    pool:      StagePool,
+    constants:             PipelineConstants,
+    pool:                  StagePool,
+    /// Stage 1.5c output — stored for Stage 6 (wired in later step).
+    pub last_loudness_plan:    Option<LoudnessPlan>,
+    /// Per-block lookahead queue — stored for Stage 6.2 (wired in later step).
+    pub last_lookahead_frames: Vec<LookaheadFrame>,
 }
 
 impl MasteringPipeline {
@@ -118,7 +134,9 @@ impl MasteringPipeline {
     pub fn new(constants: PipelineConstants) -> Self {
         Self {
             constants,
-            pool: StagePool::new(),
+            pool:                  StagePool::new(),
+            last_loudness_plan:    None,
+            last_lookahead_frames: Vec::new(),
         }
     }
 
@@ -161,6 +179,44 @@ impl MasteringPipeline {
         let sample_rate = chunks[0].sample_rate;
         let channels    = chunks[0].channels;
         let c           = &self.constants;
+
+        // ── Stage 1.5 Planning Pass (Step [4d]) ──────────────────────────────
+        // Build a flat, read-only PCM view across all chunks.
+        let flat_pcm: Vec<f32> = {
+            let total: usize = chunks.iter().map(|ch| ch.samples.len()).sum();
+            let mut v = Vec::with_capacity(total);
+            for ch in chunks {
+                v.extend_from_slice(&ch.samples);
+            }
+            v
+        };
+
+        // 1. InputProfile detection — §Input Profile Detection
+        let pipeline_profile = detect_input_profile(&flat_pcm, channels);
+        if pipeline_profile == InputProfile::DCOnly {
+            return Err("sp314-dsp: dc_only_rejected");
+        }
+        let golden_profile = match pipeline_profile {
+            InputProfile::Normal       => GoldenInputProfile::Normal,
+            InputProfile::Silence      => GoldenInputProfile::Silence,
+            InputProfile::Clipped      => GoldenInputProfile::Clipped,
+            InputProfile::HighDynamic  => GoldenInputProfile::HighDynamic,
+            InputProfile::DCOnly       => GoldenInputProfile::DCOnly,
+            InputProfile::MonoInStereo => GoldenInputProfile::MonoInStereo,
+        };
+
+        // 2. Stage 1.5a — Loudness Analyzer
+        let stats = Stage1_5aAnalyzer::new(sample_rate, channels).analyze(&flat_pcm);
+
+        // 3. Stage 1.5b — Segmenter
+        let segments: Vec<LoudnessSegment> = segment(&stats, sample_rate);
+
+        // 4. Stage 1.5c — Synthesizer → store for Stage 6 (later step)
+        let (loudness_plan, lookahead_frames) =
+            synthesize(&segments, &stats, intent.target_lufs);
+        self.last_loudness_plan    = Some(loudness_plan);
+        self.last_lookahead_frames = lookahead_frames;
+        // ─────────────────────────────────────────────────────────────────────
 
         // ── Pass 1: Analysis ──────────────────────────────────────────────────
         let mut analysis_acc = AnalysisAccumulator::new(sample_rate, channels);
@@ -243,6 +299,7 @@ impl MasteringPipeline {
             seed:            intent.seed,
             input_hash,
             warnings:        warnings.records().to_vec(),
+            input_profile:   golden_profile,
         })
     }
 }

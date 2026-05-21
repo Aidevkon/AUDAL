@@ -7,6 +7,19 @@ use alloc::vec::Vec;
 use super::metrics::QualityMetrics;
 use super::warnings::WarningRecord;
 
+/// Input profile snapshot recorded at pipeline entry.
+/// Mirrors `pipeline::input_profile::InputProfile` — kept in `types/` to avoid
+/// a cycle between the `types` and `pipeline` layers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GoldenInputProfile {
+    Normal,
+    Silence,
+    Clipped,
+    HighDynamic,
+    DCOnly,
+    MonoInStereo,
+}
+
 #[derive(Debug, Clone)]
 pub enum BlobType {
     Audio,
@@ -29,4 +42,6 @@ pub struct GoldenBlob {
     pub input_hash:      [u8; 32],
     /// Aggregated non-fatal pipeline warnings (v2.9 `WarningAggregator` snapshot)
     pub warnings:        Vec<WarningRecord>,
+    /// Input profile detected at pipeline entry (v2.9 §Input Profile Detection)
+    pub input_profile:   GoldenInputProfile,
 }
