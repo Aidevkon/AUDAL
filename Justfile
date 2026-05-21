@@ -209,3 +209,28 @@ clean:
     cargo clean
     rm -rf lineos/cockpit/dist/
     rm -rf lineos/m0/assets/wasm/*.wasm
+
+# ─────────────────────────────────────────
+# DEV RUNTIME (M0 stack)
+# ─────────────────────────────────────────
+
+# Start the full M0 stack (m0d + Caddy) for local development.
+# Fixes FM-ERR ASC 0X02 — M0 unreachable error in Tauri app.
+# Requires: m0d already built (run `just build` first if not).
+# Ports: :7400 Caddy proxy, :7401 health, :7402 mastering API.
+dev-start:
+    @echo "→ Starting m0d..."
+    @./target/release/m0d > /tmp/m0d.log 2>&1 &
+    @sleep 2
+    @echo "→ Starting Caddy..."
+    @caddy start --config lineos/m0/config/caddy.json
+    @sleep 1
+    @curl -sf http://127.0.0.1:7400/health \
+        && echo "✅ M0 stack ready" \
+        || echo "❌ M0 stack failed — check /tmp/m0d.log"
+
+# Stop the M0 stack (Caddy + m0d).
+dev-stop:
+    @caddy stop 2>/dev/null || true
+    @pkill m0d 2>/dev/null || true
+    @echo "✅ M0 stack stopped"
