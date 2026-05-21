@@ -190,8 +190,15 @@ pub fn process_limit(
                 let deviation = target_lufs - measured_lufs;
 
                 if libm::fabsf(deviation) > LUFS_CONVERGENCE_LU {
+                    // Cap gain to prevent ISP overshoot: gain may not push true peak above ceiling
+                    // Max allowed gain = ceiling - current_peak (in dB)
+                    let peak_lin = pcm.iter().map(|s| libm::fabsf(*s)).fold(0.0f32, f32::max);
+                    let peak_db  = LinearGain(peak_lin.max(1e-9)).to_db().0;
+                    let max_gain_db = libm::fmaxf(0.0, preset.true_peak_ceil - peak_db);
+                    let capped_gain_db = libm::fminf(deviation, max_gain_db);
+
                     // Apply corrective gain (pass 1)
-                    let gain_lin = Decibels(deviation).to_linear().0;
+                    let gain_lin = Decibels(capped_gain_db).to_linear().0;
                     for s in pcm.iter_mut() {
                         *s = finalize_sample(*s * gain_lin);
                     }

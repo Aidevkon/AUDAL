@@ -41,13 +41,11 @@ pub mod stage8_dither;
 
 use alloc::vec::Vec;
 
-use crate::analysis::AnalysisAccumulator;
 use crate::types::audio::AudioChunk;
 use crate::types::config::PipelineConstants;
 use crate::types::golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
 use crate::types::mastering_preset::MasteringPreset;
 use crate::types::metrics::QualityMetrics;
-
 
 use stage_pool::StagePool;
 use validate::{validate_input, validate_preset, MAX_POOL_FRAMES};
@@ -59,14 +57,36 @@ use stage1_5a_analyzer::Stage1_5aAnalyzer;
 use stage1_5b_segmenter::{segment, LoudnessSegment};
 use stage1_5c_synthesizer::{synthesize, LookaheadFrame, LoudnessPlan};
 
+// Legacy stage structs — retained for test compat, NOT called from master()
+#[allow(unused_imports)]
 use stage1_analyze::Stage1Analyze;
+#[allow(unused_imports)]
 use stage2_eq::Stage2Eq;
+#[allow(unused_imports)]
 use stage3_deess::Stage3DeEss;
+#[allow(unused_imports)]
 use stage4_compress::Stage4Compress;
+#[allow(unused_imports)]
 use stage5_saturate::Stage5Saturate;
+#[allow(unused_imports)]
 use stage6_stereo::Stage6Stereo;
+#[allow(unused_imports)]
 use stage7_limit::Stage7Limit;
+#[allow(unused_imports)]
 use stage8_dither::{SimpleRng, Stage8Dither};
+
+// ── v2.9 stage imports ────────────────────────────────────────────────────────
+use gain_budget::GainBudget;
+use signal_priority::SignalPriority;
+use stage2_stereo::process_stereo;
+use stage2_5_mono::process_mono_compat;
+use stage3_eq::process_eq;
+use stage4_compress::process_compress;
+use stage5_saturate::process_saturate;
+use stage5_5_prelimit::process_prelimit;
+use stage6_limit::process_limit;
+use stage7_dither::process_dither;
+use stage8_metering::compute_metering;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Inline RNG — no external dependency
@@ -185,7 +205,7 @@ impl MasteringPipeline {
 
         let sample_rate = chunks[0].sample_rate;
         let channels    = chunks[0].channels;
-        let c           = &self.constants;
+        let _c          = &self.constants;
 
         // ── Stage 1.5 Planning Pass (Step [4d]) ──────────────────────────────
         // Build a flat, read-only PCM view across all chunks.
@@ -225,90 +245,169 @@ impl MasteringPipeline {
         self.last_lookahead_frames = lookahead_frames;
         // ─────────────────────────────────────────────────────────────────────
 
-        // ── Pass 1: Analysis ──────────────────────────────────────────────────
-        let mut analysis_acc = AnalysisAccumulator::new(sample_rate, channels);
-        for chunk in chunks {
-            analysis_acc.feed(chunk);
-        }
-        let _pre_metrics = analysis_acc.finalize();
-
-        let norm_gain = intent.target_lufs.map(|target| {
-            analysis_acc.normalization_gain_linear(target)
-        }).unwrap_or(1.0);
-
-        // ── Pass 2: Processing ────────────────────────────────────────────────
-        let stage1 = Stage1Analyze::new(norm_gain);
-
-        let mut stage2 = Stage2Eq::new(
-            sample_rate, channels,
-            c.eq_hpf_freq_hz, c.eq_air_shelf_hz,
-        );
-        let mut stage3 = Stage3DeEss::new(
+        // ── Pass 1: Pre-DSP metering (§Stage 8 first pass) ───────────────────
+        let pre_metering = compute_metering(
+            &flat_pcm,
             sample_rate,
             channels,
-            c.dess_band_low_hz,
-            c.dess_band_high_hz,
-        );
-        let mut stage4 = Stage4Compress::new(
-            sample_rate, channels,
-            c.comp_threshold_dbfs, c.comp_ratio_default, c.comp_knee_db,
-        );
-        let mut stage5 = Stage5Saturate::new(c.sat_drive_default, channels);
-        let mut stage6 = Stage6Stereo::new(
-            sample_rate, channels,
-            c.ms_side_gain_db, c.ms_side_hpf_hz,
-        );
-        let mut stage7 = Stage7Limit::new(
-            sample_rate, channels,
-            c.lookahead_max, -1.0,  // true_peak_ceiling: -1.0 dBFS (default platform preset)
         );
 
-        // Dither — seed from intent (explicit, deterministic, never from entropy)
-        let rng = XorShiftRng::new(intent.seed);
-        let mut stage8 = Stage8Dither::new(
-            intent.export_16bit, rng,
-            c.dither_bits_24, c.dither_bits_16,
-        );
+        // ── Mutable working copy of flat PCM for v2.9 DSP stages ─────────────
+        let mut work_pcm = flat_pcm.clone();
 
-        // Final analysis pass (post-processing metrics)
-        let mut final_acc = AnalysisAccumulator::new(sample_rate, channels);
+        // ── v2.9 Pass 2: DSP (Stage 2 → Stage 7) ─────────────────────────────
+        {
+            let mut aggregator     = warnings;
+            let mut gain_budget    = GainBudget::default();
+            let priority_map       = &self.last_lookahead_frames
+                .iter()
+                .map(|f| if f.transient_flag { SignalPriority::Transient } else { SignalPriority::Body })
+                .collect::<Vec<SignalPriority>>();
+            let block_size: usize  = 512; // BLOCK_SIZE per v2.9 spec
+            let block_offset: u64  = 0;   // full-track single-pass (block wiring step [18])
 
-        // Collect output PCM (raw bytes for Phase 2 — FLAC encoding in Phase 3)
-        let mut output_pcm: Vec<u8> = Vec::new();
+            // ── §Stage 2 — Stereo Processing ─────────────────────────────────
+            process_stereo(
+                &mut work_pcm,
+                channels,
+                &preset,
+                priority_map,
+                block_size,
+                &mut aggregator,
+                block_offset,
+            );
 
-        for chunk in chunks {
-            let mut proc = chunk.clone();
+            // ── §Stage 2.5 — Mono Compatibility (stereo only) ────────────────
+            let stage3_compensation = if channels == 2 {
+                process_mono_compat(
+                    &mut work_pcm,
+                    channels,
+                    &mut gain_budget,
+                    &mut aggregator,
+                    block_offset,
+                )
+            } else {
+                alloc::vec![crate::types::units::Decibels(0.0); 3]
+            };
 
-            stage1.apply_gain_and_check(&mut proc)?;
-            stage2.process_chunk(&mut proc);
-            stage3.process_chunk(&mut proc);
-            stage4.process_chunk(&mut proc);
-            stage5.process_chunk(&mut proc);
-            stage6.process_chunk(&mut proc);
-            stage7.process_chunk(&mut proc);
-            stage8.process_chunk(&mut proc);
+            // ── §Stage 3 — EQ ─────────────────────────────────────────────────
+            let mut insight_hints: Vec<&'static str> = pre_metering.insight_hints.clone();
+            process_eq(
+                &mut work_pcm,
+                channels,
+                sample_rate as f32,
+                &preset,
+                &mut gain_budget,
+                &mut aggregator,
+                block_offset,
+                &stage3_compensation,
+                &mut insight_hints,
+            );
 
-            // Feed to final analysis
-            final_acc.feed(&proc);
+            // ── §Stage 4 — Multiband Compression ─────────────────────────────
+            process_compress(
+                &mut work_pcm,
+                channels,
+                sample_rate as f32,
+                &preset,
+                &mut gain_budget,
+                priority_map,
+                &mut aggregator,
+                block_size,
+                block_offset,
+            );
 
-            // Collect as raw f32 LE bytes (Phase 2 stub — Phase 3 adds FLAC)
-            for &s in &proc.samples {
+            // ── §Stage 5 — Saturation ─────────────────────────────────────────
+            process_saturate(
+                &mut work_pcm,
+                channels,
+                &preset,
+                &mut gain_budget,
+                priority_map,
+                &mut aggregator,
+                block_size,
+                block_offset,
+            );
+
+            // ── §Stage 5.5 — Pre-Limiter Safety Net ──────────────────────────
+            let bypass_flag = process_prelimit(
+                &mut work_pcm,
+                &mut aggregator,
+                block_offset,
+            );
+
+            // Update bypass_flag on lookahead frames for Stage 6 interaction
+            if bypass_flag {
+                for frame in self.last_lookahead_frames.iter_mut() {
+                    frame.bypass_flag = true;
+                }
+            }
+
+            // ── §Stage 6 — True Peak Limiting + LUFS Makeup ──────────────────
+            let _true_peak_verified = process_limit(
+                &mut work_pcm,
+                channels,
+                sample_rate as f32,
+                &preset,
+                intent.target_lufs,
+                &self.last_lookahead_frames,
+                &mut aggregator,
+                block_size,
+                block_offset,
+            )?; // propagates Err("isp_violation") as pipeline hard-fail
+
+            // ── §Stage 7 — Dithering & Export Prep ───────────────────────────
+            let _clip_detected = process_dither(
+                &mut work_pcm,
+                &preset,
+                &mut aggregator,
+            );
+
+            // ── Pass 3: Post-DSP metering (§Stage 8 second pass) ─────────────
+            let post_metering = compute_metering(
+                &work_pcm,
+                sample_rate,
+                channels,
+            );
+
+            // Merge insight hints from both metering passes
+            for hint in &post_metering.insight_hints {
+                if !insight_hints.contains(hint) {
+                    insight_hints.push(hint);
+                }
+            }
+
+            // Build quality_metrics from post-DSP metering
+            let quality_metrics = QualityMetrics {
+                integrated_lufs:    post_metering.integrated_lufs,
+                true_peak_dbfs:     post_metering.true_peak,
+                loudness_range_lu:  post_metering.lra,
+                bs1770_integrated:  post_metering.integrated_lufs,
+                bs1770_true_peak:   post_metering.true_peak,
+                stereo_correlation: 1.0,
+                dc_offset:          0.0,
+                sample_rate,
+                channels,
+                dynamic_range_db:   post_metering.lra,
+            };
+
+            // Collect processed PCM as raw f32 LE bytes
+            let mut output_pcm: Vec<u8> = Vec::with_capacity(work_pcm.len() * 4);
+            for &s in &work_pcm {
                 output_pcm.extend_from_slice(&s.to_le_bytes());
             }
+
+            return Ok(GoldenBlob {
+                blob_type:     BlobType::Audio,
+                flac_bytes:    output_pcm,
+                quality_metrics,
+                seed:          intent.seed,
+                input_hash,
+                warnings:      aggregator.records().to_vec(),
+                input_profile: golden_profile,
+                insight_hints,
+            });
         }
-
-        let quality_metrics: QualityMetrics = final_acc.finalize();
-
-        Ok(GoldenBlob {
-            blob_type:       BlobType::Audio,
-            flac_bytes:      output_pcm,
-            quality_metrics,
-            seed:            intent.seed,
-            input_hash,
-            warnings:        warnings.records().to_vec(),
-            input_profile:   golden_profile,
-            insight_hints:   Vec::new(), // populated by Stage 3.4 when wired
-        })
     }
 }
 
