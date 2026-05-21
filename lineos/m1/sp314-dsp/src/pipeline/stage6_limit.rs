@@ -30,7 +30,7 @@
 
 use alloc::vec::Vec;
 
-use crate::pipeline::math::{finalize_sample, kahan_mean_square, LogEnvelopeFollower};
+use crate::pipeline::math::{finalize_sample, LogEnvelopeFollower};
 use crate::pipeline::stage1_5c_synthesizer::LookaheadFrame;
 use crate::pipeline::warnings::{LimiterOverworkSource, PipelineWarning, WarningAggregator};
 use crate::types::mastering_preset::MasteringPreset;
@@ -178,22 +178,18 @@ pub fn process_limit(
     {
         let target_lufs = intent_lufs.unwrap_or(preset.lufs_target);
         if target_lufs != 0.0 {
-            // Simplified: estimate integrated LUFS from block RMS (K-weighting proxy)
-            // Full BS.1770-4 deferred to Sandbox step [14+]
             let frame_count = pcm.len() / ch;
             if frame_count > 0 {
                 // Pass 1
-                let rms_sq = kahan_mean_square(pcm);
-                let rms    = libm::sqrtf(rms_sq.max(1e-18));
-                let measured_lufs = LinearGain(rms).to_db().0 - 0.691; // K-weight offset approximation
+                let metering_pass1 = crate::pipeline::stage8_metering::compute_metering(pcm, sample_rate as u32, channels);
+                let measured_lufs = metering_pass1.integrated_lufs;
 
                 let deviation = target_lufs - measured_lufs;
 
-                if libm::fabsf(deviation) > LUFS_CONVERGENCE_LU {
+                if libm::fabsf(deviation) > LUFS_CONVERGENCE_LU && measured_lufs.is_finite() {
                     // Cap gain to prevent ISP overshoot: gain may not push true peak above ceiling
                     // Max allowed gain = ceiling - current_peak (in dB)
-                    let peak_lin = pcm.iter().map(|s| libm::fabsf(*s)).fold(0.0f32, f32::max);
-                    let peak_db  = LinearGain(peak_lin.max(1e-9)).to_db().0;
+                    let peak_db = LinearGain(metering_pass1.true_peak.max(1e-9)).to_db().0;
                     let max_gain_db = libm::fmaxf(0.0, preset.true_peak_ceil - peak_db);
                     let capped_gain_db = libm::fminf(deviation, max_gain_db);
 
@@ -204,10 +200,9 @@ pub fn process_limit(
                     }
 
                     // Pass 2: re-measure and check convergence
-                    let rms_sq2      = kahan_mean_square(pcm);
-                    let rms2         = libm::sqrtf(rms_sq2.max(1e-18));
-                    let measured2    = LinearGain(rms2).to_db().0 - 0.691;
-                    let deviation2   = target_lufs - measured2;
+                    let metering_pass2 = crate::pipeline::stage8_metering::compute_metering(pcm, sample_rate as u32, channels);
+                    let measured2 = metering_pass2.integrated_lufs;
+                    let deviation2 = target_lufs - measured2;
 
                     if libm::fabsf(deviation2) > LUFS_CONVERGENCE_LU {
                         aggregator.push(PipelineWarning::LufsTargetMiss, block_offset);
@@ -223,10 +218,9 @@ pub fn process_limit(
     // ── §6.5 ISP check ────────────────────────────────────────────────────────
     {
         let isp_limit_lin = Decibels(preset.true_peak_ceil + ISP_HEADROOM_DB).to_linear().0;
-        for &s in pcm.iter() {
-            if libm::fabsf(s) > isp_limit_lin {
-                return Err("isp_violation");
-            }
+        let final_metering = crate::pipeline::stage8_metering::compute_metering(pcm, sample_rate as u32, channels);
+        if final_metering.true_peak > isp_limit_lin {
+            return Err("isp_violation");
         }
     }
 
@@ -269,7 +263,7 @@ mod tests {
     #[test]
     fn test_limit_output_bounded() {
         // Loud signal must be attenuated to within ceiling.
-        let mut pcm: alloc::vec::Vec<f32> = (0..512)
+        let mut pcm: alloc::vec::Vec<f32> = (0..48_000)
             .map(|i| 1.5 * libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48_000.0))
             .collect();
         let mut agg = WarningAggregator::new();
