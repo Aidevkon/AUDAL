@@ -24,6 +24,7 @@ pub mod stage1_5b_segmenter;   // §Stage 1.5b — Segmenter (v2.9)
 pub mod stage1_5c_synthesizer; // §Stage 1.5c — Synthesizer (v2.9)
 pub mod stage2_stereo;         // §Stage 2    — Stereo Processing (v2.9)
 pub mod stage2_5_mono;         // §Stage 2.5  — Mono Compatibility (v2.9)
+pub mod stage3_eq;             // §Stage 3    — EQ (v2.9, call order 3.1→3.2→3.3→3.4)
 
 pub mod stage1_analyze;
 pub mod stage2_eq;
@@ -302,6 +303,7 @@ impl MasteringPipeline {
             input_hash,
             warnings:        warnings.records().to_vec(),
             input_profile:   golden_profile,
+            insight_hints:   Vec::new(), // populated by Stage 3.4 when wired
         })
     }
 }

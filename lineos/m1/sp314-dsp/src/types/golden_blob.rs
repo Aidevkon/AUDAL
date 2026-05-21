@@ -44,4 +44,7 @@ pub struct GoldenBlob {
     pub warnings:        Vec<WarningRecord>,
     /// Input profile detected at pipeline entry (v2.9 §Input Profile Detection)
     pub input_profile:   GoldenInputProfile,
+    /// Static insight hints from the pipeline (Stage 3.4, §Stage 8.10).
+    /// Static strings only — no heap-allocated formatting permitted.
+    pub insight_hints:   Vec<&'static str>,
 }

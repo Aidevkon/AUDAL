@@ -67,6 +67,7 @@ mod tests {
             input_hash:      [0xABu8; 32],
             warnings:        vec![],
             input_profile:   GoldenInputProfile::Normal,
+            insight_hints:   vec![],
         }
     }
 
