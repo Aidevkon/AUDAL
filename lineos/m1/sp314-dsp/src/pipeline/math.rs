@@ -91,6 +91,54 @@ pub fn kahan_mean_square(samples: &[f32]) -> f32 {
     kahan_sum_squares(samples) / (samples.len() as f32)
 }
 
+// ── Welford Online Variance ───────────────────────────────────────────────────
+
+/// Welford online mean and variance accumulator per §N2 (v2.9.1 amendment).
+///
+/// Single-pass, O(1) memory, numerically stable.
+/// Per: Welford (1962), "Note on a Method for Calculating Corrected
+/// Sums of Squares and Products."
+///
+/// # Determinism
+/// Same `update()` sequence → identical `variance()`. Bit-identical.
+/// Accumulator must be reset (`WelfordAccumulator::new()`) between runs.
+pub struct WelfordAccumulator {
+    count: u64,
+    mean:  f32,
+    m2:    f32,  // sum of squared deviations from running mean
+}
+
+impl WelfordAccumulator {
+    pub fn new() -> Self {
+        Self { count: 0, mean: 0.0, m2: 0.0 }
+    }
+
+    /// Add one observation.
+    pub fn update(&mut self, x: f32) {
+        self.count += 1;
+        let delta  = x - self.mean;
+        self.mean += delta / (self.count as f32);
+        let delta2 = x - self.mean;
+        self.m2   += delta * delta2;
+    }
+
+    /// Population variance (divide by N). Returns 0.0 for fewer than 2 observations.
+    pub fn variance(&self) -> f32 {
+        if self.count < 2 { return 0.0; }
+        self.m2 / (self.count as f32)
+    }
+
+    /// Running mean.
+    pub fn mean(&self) -> f32 { self.mean }
+
+    /// Observation count.
+    pub fn count(&self) -> u64 { self.count }
+}
+
+impl Default for WelfordAccumulator {
+    fn default() -> Self { Self::new() }
+}
+
 // ── Log Domain Envelope Follower ─────────────────────────────────────────────
 
 /// Log domain envelope follower per §N4 (v2.9.1 amendment).
@@ -267,5 +315,44 @@ mod tests {
         let f = LogEnvelopeFollower::new(40.0, 120.0, 48_000.0);
         assert!(f.attack_coeff.is_finite()  && f.attack_coeff  > 0.0);
         assert!(f.release_coeff.is_finite() && f.release_coeff > 0.0);
+    }
+
+    // ── WelfordAccumulator tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_welford_empty() {
+        let w = WelfordAccumulator::new();
+        assert_eq!(w.count(), 0);
+        assert_eq!(w.mean(), 0.0);
+        assert_eq!(w.variance(), 0.0);
+    }
+
+    #[test]
+    fn test_welford_single_observation() {
+        let mut w = WelfordAccumulator::new();
+        w.update(5.0);
+        assert_eq!(w.count(), 1);
+        assert_eq!(w.mean(), 5.0);
+        assert_eq!(w.variance(), 0.0, "variance undefined for n<2 → 0.0");
+    }
+
+    #[test]
+    fn test_welford_uniform_variance_zero() {
+        let mut w = WelfordAccumulator::new();
+        for _ in 0..100 { w.update(3.0); }
+        assert!(libm::fabsf(w.variance()) < 1e-6, "uniform input → variance ≈ 0");
+        assert!(libm::fabsf(w.mean() - 3.0) < 1e-6, "mean must equal constant");
+    }
+
+    #[test]
+    fn test_welford_known_variance() {
+        // [2, 4, 4, 4, 5, 5, 7, 9] — population variance = 4.0
+        let data = [2.0f32, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        let mut w = WelfordAccumulator::new();
+        for &x in &data { w.update(x); }
+        assert!(libm::fabsf(w.mean() - 5.0) < 1e-5,
+            "mean should be 5.0, got {}", w.mean());
+        assert!(libm::fabsf(w.variance() - 4.0) < 1e-4,
+            "variance should be 4.0, got {}", w.variance());
     }
 }
