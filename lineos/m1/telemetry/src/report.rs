@@ -100,7 +100,7 @@ mod tests {
             })
             .collect();
         let chunk = AudioChunk { samples, sample_rate: sr, channels: ch };
-        let pipeline = MasteringPipeline::new(test_constants());
+        let mut pipeline = MasteringPipeline::new(test_constants());
         let intent = MasteringIntent { seed: 0x1337BEEF, target_lufs: Some(-14.0), export_16bit: true };
         pipeline.master(&intent, &[chunk], [0u8; 32]).expect("test pipeline should succeed")
     }

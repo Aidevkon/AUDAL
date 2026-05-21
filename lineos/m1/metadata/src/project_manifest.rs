@@ -65,6 +65,7 @@ mod tests {
             quality_metrics: QualityMetrics::default(),
             seed:            0x1337BEEF,
             input_hash:      [0xABu8; 32],
+            warnings:        vec![],
         }
     }
 

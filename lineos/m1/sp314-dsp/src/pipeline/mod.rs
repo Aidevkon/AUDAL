@@ -14,6 +14,12 @@ pub mod stage_pool;
 pub mod validate;
 pub mod warnings;
 
+// ── v2.9 / v2.9.1 new modules ────────────────────────────────────────────────
+// Sandbox steps [3] and [4a] — not wired into master() yet.
+pub mod math;             // §N1 — Kahan energy accumulation (v2.9.1)
+pub mod input_profile;    // §Input Profile Detection (v2.9)
+pub mod stage1_5a_analyzer; // §Stage 1.5a — Loudness Analyzer (v2.9)
+
 pub mod stage1_analyze;
 pub mod stage2_eq;
 pub mod stage3_deess;
