@@ -32,6 +32,7 @@ pub mod stage3_deess;
 pub mod stage4_compress;
 pub mod stage5_saturate;
 pub mod stage5_5_prelimit;     // §Stage 5.5  — Pre-Limiter Safety Net (v2.9)
+pub mod stage6_limit;          // §Stage 6    — Limiting + Oversampling (v2.9)
 pub mod stage6_stereo;
 pub mod stage7_limit;
 pub mod stage8_dither;
