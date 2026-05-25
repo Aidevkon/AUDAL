@@ -50,14 +50,17 @@ impl Sp314MasteringEngine {
         comp_config.mid_config.threshold_db += pad_db;
         comp_config.side_config.threshold_db += pad_db;
 
+        let mut harmonic_config = config.harmonic_config.unwrap_or_else(|| {
+            crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
+        });
+        harmonic_config.drive_compensation = 1.99526166_f32; // K_harmonic, proven via THD matching
+
         Ok(Self {
             eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
                          .map_err(|_| "EQ config error")?,
             comp:    CompressorV3::new(comp_config, sample_rate),
             aligner: PhaseAligner::new(crossover_hz, sample_rate),
-            harmonic: HarmonicEngine::new(config.harmonic_config.unwrap_or_else(|| {
-                crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
-            })),
+            harmonic: HarmonicEngine::new(harmonic_config),
             limiter: BrickwallLimiter::new(config.limiter_config, sample_rate),
             restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone(), pad_db),
             config,

@@ -373,20 +373,110 @@ def main():
         json.dump(telemetry_data, f, indent=2)
 
     # --- PROMPT 14 Fixtures ---
-    lookahead = 240
-    ceiling_linear = 10 ** (-0.5 / 20.0)
-    signal_amplitude = 1.0
-    expected_gr = ceiling_linear / signal_amplitude
-    
-    release_ms = 100.0
+    # --- PROMPT 14 Fixtures (UPDATED DYNAMIC LIMITER) ---
     sample_rate = 48000
+    release_ms = 100.0
+    ceiling_db = -0.5
+    ceiling_linear = 10 ** (ceiling_db / 20.0)
+    lookahead = int(round(sample_rate * 0.005))
     release_coeff = 1.0 - math.exp(-2.2 / (release_ms * 0.001 * sample_rate))
+
+    class RingBuffer:
+        def __init__(self, size):
+            self.buffer = [0.0] * size
+            self.write_pos = 0
+
+        def push_and_pop(self, x):
+            if len(self.buffer) == 0: return x
+            delayed = self.buffer[self.write_pos]
+            self.buffer[self.write_pos] = float(x)
+            self.write_pos += 1
+            if self.write_pos >= len(self.buffer):
+                self.write_pos = 0
+            return delayed
+
+        def max_abs(self):
+            if not self.buffer: return 0.0
+            return max(abs(v) for v in self.buffer)
+
+    class PeakFollower:
+        def __init__(self, release_coeff, ceiling_linear, lookahead_samples):
+            self.envelope = 0.0
+            self.release_coeff = float(release_coeff)
+            self.ceiling = float(ceiling_linear)
+            self.lookahead_samples = max(1, lookahead_samples)
+            self.ramp_step = 0.0
+            self.decay_floor_db = 0.01
+
+        def process(self, true_peak):
+            true_peak = float(true_peak)
+            if true_peak > self.envelope:
+                min_required_step = (true_peak - self.envelope) / float(self.lookahead_samples)
+                if min_required_step > self.ramp_step:
+                    self.ramp_step = min_required_step
+                self.envelope += self.ramp_step
+                if self.envelope > true_peak:
+                    self.envelope = true_peak
+                    self.ramp_step = 0.0
+            else:
+                self.ramp_step = 0.0
+                self.envelope += (true_peak - self.envelope) * self.release_coeff
+
+            if abs(self.envelope) < 1e-15:
+                self.envelope = 0.0
+
+            if self.envelope <= self.ceiling:
+                return 1.0
+            else:
+                gr = self.ceiling / self.envelope
+                gr_db = 20.0 * math.log10(gr)
+                if gr_db > -self.decay_floor_db:
+                    return 1.0
+                else:
+                    return gr
+
+    class BrickwallLimiter:
+        def __init__(self):
+            self.delay_l = RingBuffer(lookahead)
+            self.delay_r = RingBuffer(lookahead)
+            self.follower = PeakFollower(release_coeff, ceiling_linear, lookahead)
+
+        def process(self, left, right):
+            max_delayed_l = self.delay_l.max_abs()
+            max_delayed_r = self.delay_r.max_abs()
+            delayed_peak = max(max_delayed_l, max_delayed_r)
+
+            current_peak = max(abs(left), abs(right))
+            true_peak = max(current_peak, delayed_peak)
+
+            gain_reduction = self.follower.process(true_peak)
+
+            delayed_l = self.delay_l.push_and_pop(left)
+            delayed_r = self.delay_r.push_and_pop(right)
+
+            return delayed_l * gain_reduction, delayed_r * gain_reduction
+
+    # Simulate 1000 samples of a loud peak
+    limiter = BrickwallLimiter()
+    test_len = 1000
+    test_l = np.zeros(test_len, dtype=np.float32)
+    test_r = np.zeros(test_len, dtype=np.float32)
+    # Feed an impulse at t=100
+    test_l[100] = 2.0
+    test_r[100] = 1.5
+
+    out_l = np.zeros(test_len, dtype=np.float32)
+    out_r = np.zeros(test_len, dtype=np.float32)
+
+    for i in range(test_len):
+        out_l[i], out_r[i] = limiter.process(test_l[i], test_r[i])
 
     limiter_data = {
         "lookahead_samples": lookahead,
         "ceiling_linear": ceiling_linear,
-        "expected_gr": expected_gr,
         "release_coeff": release_coeff,
+        "simulation_test_max_l": float(np.max(out_l)),
+        "simulation_test_max_r": float(np.max(out_r)),
         "tolerance": 1e-5
     }
     with open(os.path.join(out_dir, "limiter_reference.json"), "w") as f:

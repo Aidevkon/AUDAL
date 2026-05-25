@@ -1,0 +1,51 @@
+{
+  "pad_db": -6.0,
+  "pad_linear": 0.5011872336272722,
+  "per_drive": [
+    {
+      "drive": 0.1,
+      "reference_thd_percent": 0.083126,
+      "K_harmonic": 1.99526184,
+      "verification_thd_percent": 0.083126,
+      "error_percent": 4e-08
+    },
+    {
+      "drive": 0.5,
+      "reference_thd_percent": 1.961782,
+      "K_harmonic": 1.99526221,
+      "verification_thd_percent": 1.961782,
+      "error_percent": 2e-07
+    },
+    {
+      "drive": 1.0,
+      "reference_thd_percent": 6.706482,
+      "K_harmonic": 1.99526242,
+      "verification_thd_percent": 6.706483,
+      "error_percent": 6e-07
+    },
+    {
+      "drive": 2.0,
+      "reference_thd_percent": 17.340613,
+      "K_harmonic": 1.99526212,
+      "verification_thd_percent": 17.340612,
+      "error_percent": 1.87e-06
+    },
+    {
+      "drive": 5.0,
+      "reference_thd_percent": 33.298205,
+      "K_harmonic": 1.99526364,
+      "verification_thd_percent": 33.298214,
+      "error_percent": 8.79e-06
+    },
+    {
+      "drive": 10.0,
+      "reference_thd_percent": 39.630663,
+      "K_harmonic": 1.99526302,
+      "verification_thd_percent": 39.630665,
+      "error_percent": 1.89e-06
+    }
+  ],
+  "global_K_harmonic": 1.99526166,
+  "global_error_percent": 2.87e-06,
+  "method": "THD_fundamental_blackman_harris"
+}
