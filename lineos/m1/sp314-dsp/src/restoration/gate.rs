@@ -18,10 +18,10 @@ pub struct NoiseGate {
 }
 
 impl NoiseGate {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f32, pad_db_shift: f32) -> Self {
         Self {
-            // -45 dBFS threshold — below this, gate closes
-            threshold_linear: libm::powf(10.0, -45.0 / 20.0),
+            // -45 dBFS threshold — shifted by pad_db
+            threshold_linear: libm::powf(10.0, (-45.0 + pad_db_shift) / 20.0),
             attack_coef:  expf(-1.0 / (sample_rate * 0.001)),  // 1ms open
             release_coef: expf(-1.0 / (sample_rate * 0.100)),  // 100ms close
             hold_samples: (sample_rate * 0.050) as usize,      // 50ms hold

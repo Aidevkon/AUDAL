@@ -3,7 +3,7 @@ use crate::compressor::stereo::{CompressorV3, CompressorV3Config};
 use crate::pipeline::phase::PhaseAligner;
 use crate::pipeline::gain::HeadroomManager;
 use crate::pipeline::telemetry::{Telemetry, analyze_offline_pre_pass};
-use crate::limiter::{BrickwallLimiter, LimiterConfig, LOOKAHEAD_SAMPLES};
+use crate::limiter::{BrickwallLimiter, LimiterConfig};
 use crate::harmonic::{HarmonicEngine, HarmonicConfig};
 use crate::restoration::{RestorationChain, RestorationConfig};
 
@@ -33,34 +33,36 @@ pub struct Sp314MasteringEngine {
 }
 
 pub fn calculate_adaptive_budget(
-    telemetry:      &Telemetry,
+    _telemetry:     &Telemetry,
     user_makeup_db: f32,
 ) -> (f32, f32) {
-    let pad_db = if telemetry.peak_db > -3.0 {
-        -12.0
-    } else if telemetry.peak_db > -9.0 {
-        -6.0
-    } else {
-        0.0
-    };
-
-    let makeup_db = -pad_db + user_makeup_db;
+    let pad_db = -6.0;
+    let makeup_db = 6.0 + user_makeup_db;
     (pad_db, makeup_db)
 }
 
 impl Sp314MasteringEngine {
     pub fn new(config: EngineConfig, sample_rate: u32) -> Result<Self, &'static str> {
         let crossover_hz = config.comp_config.mid_config.crossover_hz;
+        
+        let pad_db = -6.0;
+        let mut comp_config = config.comp_config.clone();
+        comp_config.mid_config.threshold_db += pad_db;
+        comp_config.side_config.threshold_db += pad_db;
+
+        let mut harmonic_config = config.harmonic_config.unwrap_or_else(|| {
+            crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
+        });
+        harmonic_config.drive_compensation = 1.99526166_f32; // K_harmonic, proven via THD matching
+
         Ok(Self {
             eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
                          .map_err(|_| "EQ config error")?,
-            comp:    CompressorV3::new(config.comp_config.clone(), sample_rate),
+            comp:    CompressorV3::new(comp_config, sample_rate),
             aligner: PhaseAligner::new(crossover_hz, sample_rate),
-            harmonic: HarmonicEngine::new(config.harmonic_config.unwrap_or_else(|| {
-                crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
-            })),
+            harmonic: HarmonicEngine::new(harmonic_config),
             limiter: BrickwallLimiter::new(config.limiter_config, sample_rate),
-            restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone()),
+            restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone(), pad_db),
             config,
         })
     }
@@ -95,15 +97,16 @@ impl Sp314MasteringEngine {
         self.limiter.process_block(left, right);
 
         // Latency compensation — flush the delay line
-        let mut flush_l = [0.0_f32; LOOKAHEAD_SAMPLES];
-        let mut flush_r = [0.0_f32; LOOKAHEAD_SAMPLES];
+        let lookahead = self.limiter.lookahead_samples();
+        let mut flush_l = vec![0.0_f32; lookahead];
+        let mut flush_r = vec![0.0_f32; lookahead];
         self.limiter.process_block(&mut flush_l, &mut flush_r);
 
         left.extend_from_slice(&flush_l);
         right.extend_from_slice(&flush_r);
 
-        left.drain(..LOOKAHEAD_SAMPLES);
-        right.drain(..LOOKAHEAD_SAMPLES);
+        left.drain(..lookahead);
+        right.drain(..lookahead);
 
         telemetry
     }

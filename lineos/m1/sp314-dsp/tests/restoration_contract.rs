@@ -5,7 +5,7 @@ use sp314_dsp::restoration::RestorationChain;
 
 #[test]
 fn dehum_removes_50hz_sine() {
-    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice());
+    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32);
     let len = 96000;
     let mut left = vec![0.0_f32; len];
     let mut right = vec![0.0_f32; len];
@@ -29,7 +29,7 @@ fn dehum_removes_50hz_sine() {
     // we can just run pure 50Hz and pure 1kHz through the chain separately
     // to measure the energy reduction, since the chain is mostly linear.
     // Wait, the De-Esser is nonlinear, but it won't react to -12 dBFS low frequencies.
-    let mut chain_50 = RestorationChain::new(48000.0, RestorationConfig::voice());
+    let mut chain_50 = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32);
     let mut left_50 = vec![0.0_f32; len];
     let mut right_50 = vec![0.0_f32; len];
     for i in 0..len {
@@ -53,7 +53,7 @@ fn dehum_removes_50hz_sine() {
 
     assert!(output_energy_50 < ref_energy_50 * 0.01, "50Hz energy not reduced below 1%");
 
-    let mut chain_1k = RestorationChain::new(48000.0, RestorationConfig::voice());
+    let mut chain_1k = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32);
     let mut left_1k = vec![0.0_f32; len];
     let mut right_1k = vec![0.0_f32; len];
     for i in 0..len {
@@ -80,7 +80,7 @@ fn dehum_removes_50hz_sine() {
 
 #[test]
 fn deess_reduces_high_frequency_bursts() {
-    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice());
+    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32);
     
     let len = 4096;
     let mut left = vec![0.0_f32; len * 2];
@@ -127,7 +127,7 @@ use sp314_dsp::pipeline::presets::MasteringTarget;
 
 #[test]
 fn noise_gate_closes_on_silence() {
-    let mut gate = NoiseGate::new(48000.0);
+    let mut gate = NoiseGate::new(48000.0, -6.0_f32);
     let mut _last_l = 1.0;
     
     // warm up with silence for 48000 samples (1 second) to fully close
@@ -143,7 +143,7 @@ fn noise_gate_closes_on_silence() {
 
 #[test]
 fn noise_gate_opens_on_signal() {
-    let mut gate = NoiseGate::new(48000.0);
+    let mut gate = NoiseGate::new(48000.0, -6.0_f32);
     
     // warm up with silence
     for _ in 0..5000 {
@@ -161,7 +161,7 @@ fn noise_gate_opens_on_signal() {
 
 #[test]
 fn noise_gate_hold_prevents_chatter() {
-    let mut gate = NoiseGate::new(48000.0);
+    let mut gate = NoiseGate::new(48000.0, -6.0_f32);
     
     // Open gate
     for _ in 0..1000 {
@@ -185,7 +185,7 @@ fn noise_gate_hold_prevents_chatter() {
 
 #[test]
 fn lowcut_removes_sub_80hz() {
-    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice());
+    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32);
     let len = 48000;
     let mut left = vec![0.0_f32; len];
     let mut right = vec![0.0_f32; len];

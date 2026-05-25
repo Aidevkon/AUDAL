@@ -1,7 +1,8 @@
 {
   "lookahead_samples": 240,
   "ceiling_linear": 0.9440608762859234,
-  "expected_gr": 0.9440608762859234,
   "release_coeff": 0.00045822831465625047,
+  "simulation_test_max_l": 0.9440608620643616,
+  "simulation_test_max_r": 0.7080456614494324,
   "tolerance": 1e-05
 }

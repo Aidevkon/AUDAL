@@ -5,6 +5,7 @@
 #[derive(Clone, Debug, Copy)]
 pub struct HarmonicConfig {
     pub drive: f32,
+    pub drive_compensation: f32,
     pub even_amount: f32,
     pub odd_amount: f32,
     pub mix: f32,
@@ -14,6 +15,7 @@ impl Default for HarmonicConfig {
     fn default() -> Self {
         Self {
             drive: 2.0,
+            drive_compensation: 1.0,
             even_amount: 0.6,
             odd_amount: 0.2,
             mix: 0.3,
@@ -35,12 +37,13 @@ impl HarmonicEngine {
     #[inline]
     fn process_sample(&self, x: f32) -> f32 {
         let drive = self.config.drive;
+        let compensated_drive = drive * self.config.drive_compensation;
         let even_amt = self.config.even_amount;
         let odd_amt = self.config.odd_amount;
         let mix = self.config.mix;
 
         // Odd harmonics (tube/presence) — symmetric soft clip
-        let y_odd = libm::tanhf(drive * x);
+        let y_odd = libm::tanhf(compensated_drive * x);
 
         // Even harmonics (tape/warmth) — asymmetric signed squaring
         let y_even = x + (x * libm::fabsf(x)) * 0.5;

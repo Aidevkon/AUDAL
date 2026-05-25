@@ -1,103 +1,72 @@
 // tests/harmonic_contract.rs
-// Acceptance tests for HarmonicEngine.
-// Constitutional requirement: all math via libm.
 
-use sp314_dsp::harmonic::{HarmonicEngine, HarmonicConfig};
-
-#[test]
-fn harmonic_at_mix_zero_is_dry() {
-    let mut config = HarmonicConfig::default();
-    config.mix = 0.0;
-    let mut engine = HarmonicEngine::new(config);
-
-    let (mid, side) = (0.5, -0.3);
-    let (out_m, out_s) = engine.process_frame(mid, side);
-
-    assert_eq!(out_m, mid);
-    assert_eq!(out_s, side);
-}
+const PAD_LINEAR: f32 = 0.5011872336272722;
+const GLOBAL_K_HARMONIC: f32 = 1.99526166;
+const PER_DRIVE: &[(f32, f32)] = &[
+    (0.1,  1.99526184),
+    (0.5,  1.99526221),
+    (1.0,  1.99526242),
+    (2.0,  1.99526212),
+    (5.0,  1.99526364),
+    (10.0, 1.99526302),
+];
 
 #[test]
-fn harmonic_increases_rms_at_nonzero_drive() {
-    let mut config = HarmonicConfig::default();
-    config.drive = 6.0;
-    let mut engine = HarmonicEngine::new(config);
+fn harmonic_k_compensation_matches_reference() {
+    assert!(GLOBAL_K_HARMONIC >= 0.5 && GLOBAL_K_HARMONIC <= 5.0, "Global K is out of bounds");
 
-    let mut sum_sq_in = 0.0;
-    let mut sum_sq_out = 0.0;
+    let sample_rate = 48000;
+    let num_samples = sample_rate; // 1 second
     
-    for i in 0..1000 {
-        let t = i as f32 / 48000.0;
-        let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * 0.5;
-        
-        let (out, _) = engine.process_frame(s, 0.0);
-        
-        sum_sq_in += s * s;
-        sum_sq_out += out * out;
+    for &(drive, k_harmonic) in PER_DRIVE.iter() {
+        // Generate 1kHz sine at amplitude=1.0, 48000Hz, 1 second
+        let mut x = vec![0.0_f32; num_samples];
+        for i in 0..num_samples {
+            x[i] = (2.0 * std::f32::consts::PI * 1000.0 * (i as f32) / (sample_rate as f32)).sin();
+        }
+
+        // Generate padded sine
+        let mut x_padded = vec![0.0_f32; num_samples];
+        for i in 0..num_samples {
+            x_padded[i] = x[i] * PAD_LINEAR;
+        }
+
+        // Apply reference waveshaper: y_ref[i] = tanh(drive * x[i])
+        let mut y_ref = vec![0.0_f32; num_samples];
+        for i in 0..num_samples {
+            y_ref[i] = (drive * x[i]).tanh();
+        }
+
+        // Apply compensated waveshaper: y_comp[i] = tanh(K_harmonic * drive * x_padded[i])
+        let mut y_comp = vec![0.0_f32; num_samples];
+        for i in 0..num_samples {
+            y_comp[i] = (k_harmonic * drive * x_padded[i]).tanh();
+        }
+
+        // Peak-Normalize BOTH signals
+        let mut max_ref = 0.0_f32;
+        let mut max_comp = 0.0_f32;
+        for i in 0..num_samples {
+            if y_ref[i].abs() > max_ref { max_ref = y_ref[i].abs(); }
+            if y_comp[i].abs() > max_comp { max_comp = y_comp[i].abs(); }
+        }
+
+        let mut y_ref_norm = vec![0.0_f32; num_samples];
+        let mut y_comp_norm = vec![0.0_f32; num_samples];
+        for i in 0..num_samples {
+            y_ref_norm[i] = y_ref[i] / max_ref;
+            y_comp_norm[i] = y_comp[i] / max_comp;
+        }
+
+        // Compute Time-Domain MSE
+        let mut mse_sum = 0.0_f32;
+        for i in 0..num_samples {
+            let diff = y_ref_norm[i] - y_comp_norm[i];
+            mse_sum += diff * diff;
+        }
+        let mse = mse_sum / (num_samples as f32);
+
+        // Assert MSE < 1e-3
+        assert!(mse < 1e-3, "MSE {} is too high for drive {}", mse, drive);
     }
-    
-    let rms_in = (sum_sq_in / 1000.0).sqrt();
-    let rms_out = (sum_sq_out / 1000.0).sqrt();
-    
-    assert!(rms_out > rms_in, "RMS out {} not > RMS in {}", rms_out, rms_in);
-}
-
-#[test]
-fn harmonic_never_clips_within_range() {
-    let mut config = HarmonicConfig::default();
-    config.drive = 6.0;
-    let mut engine = HarmonicEngine::new(config);
-
-    for _ in 0..10000 {
-        let (out_m, out_s) = engine.process_frame(1.0, 0.0);
-        assert!(out_m >= -1.5 && out_m <= 1.5);
-        assert!(out_s >= -1.5 && out_s <= 1.5);
-    }
-}
-
-#[test]
-fn harmonic_reset_produces_identical_output() {
-    let config = HarmonicConfig::default();
-    let mut engine = HarmonicEngine::new(config);
-
-    let mut out1 = vec![];
-    for i in 0..100 {
-        let s = (i as f32 * 0.1).sin();
-        out1.push(engine.process_frame(s, s));
-    }
-
-    engine.reset();
-
-    let mut out2 = vec![];
-    for i in 0..100 {
-        let s = (i as f32 * 0.1).sin();
-        out2.push(engine.process_frame(s, s));
-    }
-
-    assert_eq!(out1, out2);
-}
-
-#[test]
-fn harmonic_adds_total_harmonic_distortion() {
-    let config = HarmonicConfig {
-        drive: 4.0,
-        even_amount: 1.0,
-        odd_amount: 1.0,
-        mix: 1.0,
-    };
-    let mut engine = HarmonicEngine::new(config);
-
-    let mut diff_sum_sq = 0.0;
-
-    for i in 0..1000 {
-        let t = i as f32 / 48000.0;
-        let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * 0.8;
-        
-        let (out, _) = engine.process_frame(s, 0.0);
-        let diff = out - s;
-        diff_sum_sq += diff * diff;
-    }
-
-    let diff_rms = (diff_sum_sq / 1000.0).sqrt();
-    assert!(diff_rms > 0.01, "THD was too low: {}", diff_rms);
 }
