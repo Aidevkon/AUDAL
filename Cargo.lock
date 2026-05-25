@@ -5078,7 +5078,6 @@ dependencies = [
  "hound",
  "libm",
  "ringbuf 0.3.3",
- "rubato",
  "rustfft",
  "serde",
  "serde_json",

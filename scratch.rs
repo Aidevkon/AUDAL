@@ -1,13 +1,2 @@
-use openclaw::OpenClawEngine;
-use pipelineforge::conditions::{ConditionSet, EngineerCondition};
-use pipelineforge::forge::Pipelineforge;
-
-fn main() {
-    let conditions = ConditionSet {
-        conditions: vec![EngineerCondition::MuddyMix],
-        target_lufs: -14.0,
-        sample_rate: 48000,
-    };
-    let json = Pipelineforge::forge(&conditions).unwrap();
-    println!("{}", json);
-}
+use lineos_types::metrics::Ebu128Measurement;
+// Actually I don't need to write a full rust file, I can just see the logic.

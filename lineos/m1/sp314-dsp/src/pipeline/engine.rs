@@ -80,7 +80,7 @@ impl Sp314MasteringEngine {
             calculate_adaptive_budget(&telemetry, self.config.target_makeup_db);
         let headroom = HeadroomManager::new(pad_db, makeup_db);
 
-        let mix = self.config.parallel_mix;
+
 
         headroom.apply_input_pad(left, right);
 

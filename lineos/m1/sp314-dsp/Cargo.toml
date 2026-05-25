@@ -7,10 +7,9 @@ license = "MIT"
 [dependencies]
 libm = "0.2"
 rustfft = "6"
-rubato = "0.15"
-sha2 = "0.10"
-hex  = "0.4"
-ringbuf = "0.3"
+sha2 = { version = "0.10", optional = true }
+hex  = { version = "0.4", optional = true }
+ringbuf = { version = "0.3", optional = true }
 hound = { version = "3.5", optional = true }
 flacenc = { version = "0.3", optional = true }
 
@@ -28,7 +27,7 @@ claxon = "0.4"
 
 [features]
 default = []
-cli = ["cpal", "hound", "flacenc"]
+cli = ["cpal", "hound", "flacenc", "ringbuf", "sha2", "hex"]
 
 [[bin]]
 name = "test_engine"

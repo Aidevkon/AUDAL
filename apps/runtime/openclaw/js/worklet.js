@@ -1,4 +1,4 @@
-import init, { OpenClawEngine } from './openclaw_wasm.js';
+import init, { OpenClawEngine } from './e11.js';
 
 class OpenClawWorklet extends AudioWorkletProcessor {
     constructor() {

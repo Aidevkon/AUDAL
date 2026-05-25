@@ -17,29 +17,40 @@ pub fn measure_integrated_lufs(left: &[f32], right: &[f32]) -> f32 {
         return -144.0_f32; // too short for even one block
     }
 
-    // K-Weighting filters (one per channel, stack allocated)
     let mut filter_l = KWeightingFilter::new();
     let mut filter_r = KWeightingFilter::new();
 
-    // Collect per-block mean squares
-    let mut block_mean_squares: Vec<f32> = Vec::new();
+    // Pass 1: Filter linearly and yield per-hop sums
+    let filtered_power_iter = left.iter().zip(right.iter()).map(|(&l, &r)| {
+        let wl = filter_l.process(l);
+        let wr = filter_r.process(r);
+        wl * wl + wr * wr
+    });
 
-    let mut block_start = 0;
-    while block_start + BLOCK_SAMPLES <= len {
-        let mut sum_sq = 0.0_f32;
+    let mut block_mean_squares = Vec::new();
+    let mut hop_sums = [0.0_f32; 4];
+    let mut hop_idx = 0;
+    
+    let mut current_sum = 0.0_f32;
+    let mut sample_count = 0;
 
-        for i in block_start..(block_start + BLOCK_SAMPLES) {
-            let wl = filter_l.process(left[i]);
-            let wr = filter_r.process(right[i]);
-            // Stereo: mean of L² + R² per sample
-            sum_sq += wl * wl + wr * wr;
+    // Pass 2: Gate using small fixed-size window
+    for power in filtered_power_iter {
+        current_sum += power;
+        sample_count += 1;
+
+        if sample_count == HOP_SAMPLES {
+            hop_sums[hop_idx % 4] = current_sum;
+            hop_idx += 1;
+
+            if hop_idx >= 4 {
+                let block_power: f32 = hop_sums.iter().sum();
+                block_mean_squares.push(block_power / (BLOCK_SAMPLES as f32));
+            }
+
+            current_sum = 0.0;
+            sample_count = 0;
         }
-
-        // Mean square for this block (sum of powers, divide by block_size)
-        let mean_sq = sum_sq / (BLOCK_SAMPLES as f32);
-        block_mean_squares.push(mean_sq);
-
-        block_start += HOP_SAMPLES; // 100ms hop = 75% overlap
     }
 
     integrated_lufs(&block_mean_squares)

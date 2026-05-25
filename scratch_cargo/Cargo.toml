@@ -1,0 +1,7 @@
+[package]
+name = "scratch_cargo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp314-dsp = { path = "../lineos/m1/sp314-dsp" }

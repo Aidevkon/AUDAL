@@ -1,4 +1,4 @@
-/* @ts-self-types="./openclaw.d.ts" */
+/* @ts-self-types="./e11.d.ts" */
 
 export class OpenClawEngine {
     __destroy_into_raw() {
@@ -366,7 +366,7 @@ async function __wbg_init(module_or_path) {
     }
 
     if (module_or_path === undefined) {
-        module_or_path = new URL('openclaw_bg.wasm', import.meta.url);
+        module_or_path = new URL('e11.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 

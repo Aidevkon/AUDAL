@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 //! # sp314-dsp v3.0.0
 //!
 //! LineOS M1 Deterministic Mastering Engine.

@@ -19,7 +19,7 @@ pub struct CompressorBand {
     env_high:     EnvelopeFollower,
     config:       CompressorBandConfig,
     makeup_linear: f32,
-    sample_rate:  u32,
+
 }
 
 impl CompressorBand {
@@ -35,7 +35,7 @@ impl CompressorBand {
             env_high,
             config,
             makeup_linear,
-            sample_rate,
+
         }
     }
 
