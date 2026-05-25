@@ -1,0 +1,35 @@
+{
+  "crossover_hz": 150.0,
+  "sample_rate": 48000,
+  "note": "PhaseAligner must match CrossoverLR4 phase. Use np.unwrap() \u2014 do NOT hardcode phase values.",
+  "generation": "scipy.signal.freqz + np.unwrap(np.angle(h)) \u2014 exact values computed at fixture generation time",
+  "phase_checks": [
+    {
+      "freq_hz": 150.0,
+      "expected_phase_deg": -179.99999999994355,
+      "tolerance_deg": 1.0
+    },
+    {
+      "freq_hz": 20.0,
+      "expected_phase_deg": -21.73355989496981,
+      "tolerance_deg": 5.0
+    },
+    {
+      "freq_hz": 10000.0,
+      "expected_phase_deg": -357.92640137489906,
+      "tolerance_deg": 5.0
+    }
+  ],
+  "magnitude_checks": [
+    {
+      "freq_hz": 150.0,
+      "expected_magnitude_db": 8.708108461131636e-10,
+      "tolerance_db": 0.1
+    },
+    {
+      "freq_hz": 1000.0,
+      "expected_magnitude_db": 8.690114110607553e-10,
+      "tolerance_db": 0.1
+    }
+  ]
+}

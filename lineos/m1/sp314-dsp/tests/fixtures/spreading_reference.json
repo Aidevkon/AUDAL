@@ -1,0 +1,47 @@
+{
+  "source": "ISO 11172-3:1993 Annex D + Architecture Decisions v1.3 \u00a7G1",
+  "semantics": "attenuation_db \u2014 subtract from masker energy to get contribution",
+  "spot_checks": [
+    {
+      "dz": 0.0,
+      "expected_db": 0.0,
+      "tolerance": 0.001
+    },
+    {
+      "dz": 0.5,
+      "expected_db": 8.5,
+      "tolerance": 0.001
+    },
+    {
+      "dz": 1.0,
+      "expected_db": 17.0,
+      "tolerance": 0.001
+    },
+    {
+      "dz": 2.0,
+      "expected_db": 27.0,
+      "tolerance": 0.001
+    },
+    {
+      "dz": 8.0,
+      "expected_db": 87.0,
+      "tolerance": 0.001
+    },
+    {
+      "dz": 9.0,
+      "expected_db": 87.0,
+      "tolerance": 0.001,
+      "note": "constant beyond 8 Bark"
+    },
+    {
+      "dz": 24.0,
+      "expected_db": 87.0,
+      "tolerance": 0.001,
+      "note": "constant beyond 8 Bark"
+    },
+    {
+      "note_cap": "Cap triggers at dz > 8.0 (MPEG-1 spec). Formula: 17+10*(8-1)=87 exactly at boundary."
+    }
+  ],
+  "symmetry_note": "Implementation uses |i-j|. Symmetric approximation is intentional for MaskingAwareEQ scope."
+}

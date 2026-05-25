@@ -8,6 +8,7 @@ license     = "MIT"
 
 [dependencies]
 sp314-dsp  = { path = "../sp314-dsp" }
+lineos-types = { path = "../lineos-types" }
 libm       = "0.2"
 serde      = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1", optional = true }

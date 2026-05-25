@@ -1,0 +1,11 @@
+use crate::node::DspNode;
+
+pub struct OutputNode;
+
+impl DspNode for OutputNode {
+    fn process_stereo(&mut self, _left: &mut [f32], _right: &mut [f32]) {}
+    fn set_parameter(&mut self, _name: &str, _value: f32) {}
+    fn get_output(&self, _name: &str) -> Option<f32> { None }
+    fn reset(&mut self) {}
+    fn node_type(&self) -> &'static str { "Output" }
+}

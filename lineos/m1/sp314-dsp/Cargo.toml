@@ -1,28 +1,46 @@
 [package]
-name        = "sp314-dsp"
-version     = "0.3.0"
-edition     = "2021"
-license     = "MIT"
-# Authority: LineOS Constitution v2.0 §05 · Creator OS Constitution v2.6 §05
-# ML Origin Rule: pure algorithmic DSP — no ML weights
-# Immutable between phase releases.
-
-[lib]
-crate-type = ["cdylib", "rlib"]
+name = "sp314-dsp"
+version = "3.0.0"
+edition = "2021"
+license = "MIT"
 
 [dependencies]
-libm       = "0.2"
-serde      = { version = "1", default-features = false, features = ["derive", "alloc"] }
-serde_json = { version = "1", optional = true }
+libm = "0.2"
+rustfft = "6"
+rubato = "0.15"
+sha2 = "0.10"
+hex  = "0.4"
+ringbuf = "0.3"
+hound = { version = "3.5", optional = true }
+flacenc = { version = "0.3", optional = true }
 
-[features]
-# std is the default for native builds (cargo check / cargo test / cargo build --release)
-# For WASM target (wasm32-unknown-unknown), Cargo automatically disables std-dependent crates.
-# The #![cfg_attr(not(feature = "std"), no_std)] guard activates only when std is explicitly disabled.
-default = ["std"]
-std     = ["serde_json", "serde/std"]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.cpal]
+version  = "0.15"
+optional = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ctrlc = "3.4"
 
 [dev-dependencies]
-serde_json = "1"
-libm       = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+claxon = "0.4"
 
+[features]
+default = []
+cli = ["cpal", "hound", "flacenc"]
+
+[[bin]]
+name = "test_engine"
+path = "src/bin/test_engine.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "sp314_master"
+path = "src/bin/sp314_master.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "sp314_live"
+path = "src/bin/sp314_live.rs"
+required-features = ["cli"]

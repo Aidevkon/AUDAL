@@ -22,6 +22,10 @@ anyhow       = "1"
 chrono       = { version = "0.4", features = ["serde"] }
 uuid         = { version = "1", features = ["v4"] }
 sp314-dsp    = { path = "../../m1/sp314-dsp" }
+lineos-types = { path = "../../m1/lineos-types" }
+pipelineforge = { path = "../../../pipelines/pipelineforge" }
+openclaw      = { path = "../../../apps/runtime/openclaw" }
+sp314-nodes   = { path = "../../m1/sp314-nodes" }
 lineos-telemetry = { path = "../../m1/telemetry" }  # Phase 9: real LRA/momentary/short-term
 # P7-001: Audio decode — M0 responsibility (never in sp314-dsp)
 # Authority: LineOS Constitution v2.0 §05 · Phase 7 master prompt

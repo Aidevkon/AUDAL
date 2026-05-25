@@ -7,7 +7,7 @@ license     = "MIT"
 # Comparator rule: evaluates pass/fail from measurements — never raw audio.
 
 [dependencies]
-sp314-dsp        = { path = "../sp314-dsp" }
+lineos-types     = { path = "../lineos-types" }
 lineos-telemetry = { path = "../telemetry" }
 lineos-metadata  = { path = "../metadata" }
 serde            = { version = "1", features = ["derive"] }

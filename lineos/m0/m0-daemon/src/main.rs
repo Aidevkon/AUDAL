@@ -16,6 +16,7 @@ mod health;
 mod marketplace;
 mod policy;
 mod registry;
+pub mod dsp;
 
 use anyhow::Result;
 use app_state::AppState;

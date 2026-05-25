@@ -1,9 +1,9 @@
 # ARCHITECTURE.md
 
 **System:** Creator OS + LineOS + Aether + Marketplace  
-**Version:** 3.0  
+**Version:** 3.5  
 **Status:** 🔒 CANONICAL  
-**Last updated:** 2026-04-09  
+**Last updated:** 2026-05-25  
 **Constitution:** `creator-os/constitution/creator-os-constitution-v2.5.md`
 
 ---
@@ -18,6 +18,30 @@ If you are looking for a specific component, jump to the relevant section.
 
 This document does not replace the constitutions. It maps the territory.  
 For binding rules, go to:
+
+## v3.5 — 2026-05-25
+
+### New Crates
+- `lineos/m1/sp314-nodes` v0.1.0 — primitive DSP nodes + DspNode trait
+- `pipelines/pipelineforge` v0.1.0 — Engineer Conditions → DAG routing
+- `apps/runtime/openclaw` v0.1.0 — WASM executor + AudioWorklet bridge
+- `lineos/m1/lineos-types` v0.1.0 — shared types, v2.9 → v3 migration
+
+### E11 Engine
+- Assembled at `lineos/m0/assets/wasm/e11.wasm` (480KB)
+- Capabilities: offline mastering, stem processing, TimeAwareBehaviour,
+  parameter glide, section crossfade
+- SHA256 locked in `e11-manifest.json`
+
+### Migration Status
+- All 6 v2.9-dependent crates migrated to lineos-types (3a complete)
+- m0-daemon wired to pipelineforge + openclaw (3b complete)
+- Remaining 5 crates: 3b pending (MasteringPipeline replacement)
+
+### Pending
+- E12/E13 engines (AV pipeline — future scope)
+- lineos-types 3b for telemetry, metadata, insights, rule-engine, stillair
+- research/math-tuning branch created (idle)
 - `creator-os/constitution/creator-os-constitution-v2.5.md`
 - `lineos/constitution/lineos-constitution.md`
 - `aether/constitution/aether-constitution.md`

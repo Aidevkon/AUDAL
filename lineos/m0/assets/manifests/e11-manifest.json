@@ -1,0 +1,30 @@
+{
+  "engine_id": "e11",
+  "version": "0.1.0",
+  "description": "LineOS M1 Deterministic Mastering Engine",
+  "wasm_path": "lineos/m0/assets/wasm/e11.wasm",
+  "js_path": "lineos/m0/assets/wasm/e11.js",
+  "sha256": "37349952a362006b1489a9ec1a47129add95f0dc4e5b03e9f99e5b94e53d8f71",
+  "size_bytes": 491955,
+  "capabilities": [
+    "offline_mastering",
+    "stem_processing",
+    "time_aware_behaviour",
+    "parameter_glide",
+    "section_crossfade"
+  ],
+  "constitutional": {
+    "deterministic": true,
+    "zero_allocation_rt": true,
+    "libm_only": true,
+    "no_ml_weights": true
+  },
+  "dependencies": {
+    "sp314_dsp": "3.0.0",
+    "sp314_nodes": "0.1.0",
+    "pipelineforge": "0.1.0",
+    "openclaw": "0.1.0"
+  },
+  "golden_blob_hash": "75f70f78815534c62921aa76a5e7deb001e063ab4839d84dad1539768f7e573d",
+  "_comment_golden_blob_hash": "SHA256 of sp314-dsp reference GoldenBlob output — used for DSP regression testing. Not the WASM binary hash (that is 'sha256' above)."
+}

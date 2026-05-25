@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "lineos/m0/m0-daemon",
+    "lineos/m0/m0-daemon", # restored — migrating to lineos-types
+    "lineos/m1/lineos-types",
     "lineos/m1/sp314-dsp",
     "lineos/m1/telemetry",
     "lineos/m1/metadata",
@@ -11,7 +12,7 @@ members = [
     "lineos/m1/lame-sys",           # Phase 13A: LAME dynamic FFI (LGPL compliant)
     "apps/stillair/src-tauri",
     "apps/stillair/cockpit-dioxus",   # Phase 11: Dioxus 0.6 Cockpit
-    "creator-os/shared/adapter-runtime",  # Phase 8: Aether LLM adapter runtime
+    "creator-os/shared/adapter-runtime", "lineos/m1/sp314-nodes", "pipelines/pipelineforge", "apps/runtime/openclaw",  # Phase 8: Aether LLM adapter runtime
 ]
 # Phase 1:  m0-daemon             per P1-001
 # Phase 2:  sp314-dsp             per P2-001
@@ -20,3 +21,6 @@ members = [
 # Phase 5:  stillair + stillair-frontend  per P5-001
 # Phase 8:  adapter-runtime       per P8-002
 # Phase 11: cockpit-dioxus        per P11-001
+
+[profile.release]
+opt-level = 'z'

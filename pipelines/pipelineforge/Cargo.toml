@@ -1,0 +1,12 @@
+[package]
+name    = "pipelineforge"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+sp314-nodes = { path = "../../lineos/m1/sp314-nodes" }
+serde       = { version = "1.0", features = ["derive"] }
+serde_json  = "1.0"
+
+[dev-dependencies]

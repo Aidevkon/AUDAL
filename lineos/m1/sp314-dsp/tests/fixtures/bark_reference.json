@@ -1,0 +1,72 @@
+{
+  "source": "ISO 11172-3:1993 Annex D, Table D.1",
+  "sample_rate_hz": 48000,
+  "num_bands": 25,
+  "boundaries_hz": [
+    20,
+    100,
+    200,
+    300,
+    400,
+    510,
+    630,
+    770,
+    920,
+    1080,
+    1270,
+    1480,
+    1720,
+    2000,
+    2320,
+    2700,
+    3150,
+    3700,
+    4400,
+    5300,
+    6400,
+    7700,
+    9500,
+    12000,
+    15500,
+    20000
+  ],
+  "bin_to_band_checks": [
+    {
+      "fft_size": 1024,
+      "bin": 0,
+      "expected_band": 0,
+      "note": "DC bin"
+    },
+    {
+      "fft_size": 1024,
+      "bin": 1,
+      "expected_band": 0,
+      "note": "~47Hz"
+    },
+    {
+      "fft_size": 1024,
+      "bin": 21,
+      "expected_band": 8,
+      "note": "~984Hz (between 920 and 1080)"
+    },
+    {
+      "fft_size": 1024,
+      "bin": 22,
+      "expected_band": 8,
+      "note": "~1031Hz (between 920 and 1080)"
+    },
+    {
+      "fft_size": 1024,
+      "bin": 511,
+      "expected_band": 24,
+      "note": "Nyquist \u2014 last band"
+    },
+    {
+      "fft_size": 1024,
+      "bin": 512,
+      "expected_band": 24,
+      "note": "above Nyquist \u2014 clamp"
+    }
+  ],
+  "no_panic_check": "All bins 0..=512 for fft_size=1024 must map to [0..24]"
+}

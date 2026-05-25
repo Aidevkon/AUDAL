@@ -1,0 +1,30 @@
+{
+  "formula": "exp(-2.2 / (time_ms * 0.001 * sample_rate))",
+  "note": "10-90% rise/fall definition. NOT the 63.2% tau formula.",
+  "cases": [
+    {
+      "time_ms": 1.0,
+      "sample_rate": 48000,
+      "expected_coeff": 0.9552011491162884,
+      "tolerance": 1e-05
+    },
+    {
+      "time_ms": 10.0,
+      "sample_rate": 48000,
+      "expected_coeff": 0.9954271541102877,
+      "tolerance": 1e-05
+    },
+    {
+      "time_ms": 100.0,
+      "sample_rate": 48000,
+      "expected_coeff": 0.9995417716853437,
+      "tolerance": 1e-05
+    },
+    {
+      "time_ms": 10.0,
+      "sample_rate": 44100,
+      "expected_coeff": 0.9950237605772614,
+      "tolerance": 1e-05
+    }
+  ]
+}

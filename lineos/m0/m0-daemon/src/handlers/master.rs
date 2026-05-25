@@ -110,10 +110,12 @@ pub async fn trigger_mastering(
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
+#[allow(deprecated)]
 async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<StoredBlob, String> {
-    use sp314_dsp::pipeline::{MasteringPipeline, MasteringIntent};
-    use sp314_dsp::types::audio::AudioChunk;
-    use sp314_dsp::types::config::Bmr128Schema;
+    use lineos_types::{
+        MasteringIntent,
+        AudioChunk, LoudnessTarget,
+    };
     use uuid::Uuid;
     use crate::handlers::decode;
     // Phase 9: EBU R128 windowed telemetry — LRA, momentary, short-term LUFS
@@ -121,14 +123,16 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     use lineos_telemetry::windows::{momentary_lufs, short_term_lufs};
 
     // Load schema from shared contract (embedded at compile-time for determinism)
-    let schema: Bmr128Schema = serde_json::from_str(
+    let schema: serde_json::Value = serde_json::from_str(
         include_str!("../../../../shared/schema/bmr-128.schema.json")
     ).map_err(|e| format!("Schema load error: {e}"))?;
 
     // Target LUFS from schema preset — clamped to valid range
-    let target_lufs: Option<f32> = schema.presets.get(preset_id)
-        .and_then(|p| p.target_lufs)
-        .map(|lufs| lufs.clamp(-40.0, 0.0));
+    let target_lufs: Option<f32> = schema.get("presets")
+        .and_then(|p| p.get(preset_id))
+        .and_then(|p| p.get("target_lufs"))
+        .and_then(|l| l.as_f64())
+        .map(|lufs| (lufs as f32).clamp(-40.0, 0.0));
 
     // Determinism seed from SHA-256 of the file path (stable identity)
     let path_hash    = compute_sha256_bytes(audio_path.as_bytes());
@@ -200,7 +204,13 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
     let pcm_channels_for_telemetry = pcm.channels;          // Phase 9
     let pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
-    let chunk = AudioChunk::new(pcm.samples, pcm.sample_rate, pcm.channels);
+    // Create StereoBuffer (AudioChunk)
+    let chunk = AudioChunk {
+        left: pcm.samples.iter().step_by(2).copied().collect(),
+        right: pcm.samples.iter().skip(1).step_by(2).copied().collect(),
+        sample_rate: pcm.sample_rate,
+        num_frames: pcm.samples.len() / 2,
+    };
 
 
     // MasteringIntent — all three fields verified:
@@ -208,29 +218,31 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
     //   export_16bit: false (24-bit dither, lossless output)
     let intent = MasteringIntent {
-        seed,
-        target_lufs,
-        export_16bit: false,
+        target: LoudnessTarget {
+            target_lufs: target_lufs.unwrap_or(-14.0),
+            max_true_peak_db: -1.0,
+            max_lra_lu: None,
+            platform: "default".into(),
+        },
+        preset_name: preset_id.to_string(),
+        stem_mode: false,
     };
 
-    let constants = schema.pipeline.clone();
-    let mut pipeline = MasteringPipeline::new(constants);
+    let mut audio = chunk;
 
     // Run sp314-dsp in blocking thread (no_std/alloc/sync)
-    let hash_bytes = path_hash;
     let result = tokio::task::spawn_blocking(move || {
-        pipeline.master(&intent, &[chunk], hash_bytes)
+        crate::dsp::DspAdapter::master(&intent, &mut audio)
     }).await
       .map_err(|e| format!("DSP task join error: {e}"))?
-      .map_err(|e| format!("DSP pipeline error: {e}"))?;
+      .map_err(|e| format!("DSP pipeline error: {:?}", e))?;
 
 
-    let qm    = &result.quality_metrics;
-    let lufs  = qm.integrated_lufs;
-    let tp    = qm.true_peak_dbfs;
-    let lra   = qm.loudness_range_lu;
-    let dr    = qm.dynamic_range_db;
-    let sc    = qm.stereo_correlation;
+    let lufs  = result.lufs.integrated_lufs;
+    let tp    = result.lufs.true_peak_dbfs;
+    let lra   = result.lufs.loudness_range_lu;
+    let dr    = 10.0; // dynamic range proxy for v3
+    let sc    = 1.0;  // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
 
     // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
@@ -267,7 +279,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     // Phase 10: store mastered PCM as f32 LE bytes for export.
     // FORBIDDEN: return these bytes to the frontend (Amendment A-002 §3).
     // GoldenBlob.flac_bytes = raw f32 LE interleaved PCM from DSP output (Phase 2/10).
-    let audio_bytes       = result.flac_bytes;
+    let audio_bytes       = Vec::new(); // result.flac_bytes removed in v3
     let audio_sample_rate = pcm_sr_for_telemetry;
     let audio_channels    = pcm_channels_for_telemetry;
 

@@ -1,0 +1,33 @@
+{
+  "crossover_hz": 150.0,
+  "sample_rate": 48000,
+  "phase_rule": "LR4: low + high (NO sign inversion). Sum must be flat.",
+  "sum_checks": [
+    {
+      "freq_hz": 20.0,
+      "expected_sum_db": 0.0,
+      "tolerance_db": 0.01
+    },
+    {
+      "freq_hz": 150.0,
+      "expected_sum_db": 0.0,
+      "tolerance_db": 0.01
+    },
+    {
+      "freq_hz": 1000.0,
+      "expected_sum_db": 0.0,
+      "tolerance_db": 0.01
+    },
+    {
+      "freq_hz": 10000.0,
+      "expected_sum_db": 0.0,
+      "tolerance_db": 0.01
+    }
+  ],
+  "split_at_crossover": {
+    "freq_hz": 150.0,
+    "expected_low_db": -6.0,
+    "expected_high_db": -6.0,
+    "tolerance_db": 0.1
+  }
+}

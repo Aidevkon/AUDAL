@@ -1,0 +1,782 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/runtime/openclaw/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+warning: use of deprecated unit struct `mastering::MasteringPipeline`: Use pipelineforge::Pipelineforge + openclaw::OpenClawEngine instead
+  --> lineos/m1/lineos-types/src/lib.rs:27:38
+   |
+27 | pub use mastering::{MasteringIntent, MasteringPipeline};
+   |                                      ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `lineos-types` (lib) generated 1 warning
+warning: unused variable: `duration_seconds`
+  --> lineos/m1/telemetry/src/report.rs:32:9
+   |
+32 |     let duration_seconds = if sr > 0 && ch > 0 {
+   |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_duration_seconds`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `blob`
+  --> lineos/m1/telemetry/src/report.rs:52:18
+   |
+52 | fn pcm_from_blob(blob: &GoldenBlob) -> Vec<f32> {
+   |                  ^^^^ help: if this is intentional, prefix it with an underscore: `_blob`
+
+warning: `lineos-telemetry` (lib) generated 2 warnings (run `cargo fix --lib -p lineos-telemetry` to apply 2 suggestions)
+warning: unused variable: `blob`
+  --> lineos/m1/metadata/src/project_manifest.rs:27:21
+   |
+27 |     pub fn generate(blob: &GoldenBlob, measurement: &Ebu128Measurement) -> Self {
+   |                     ^^^^ help: if this is intentional, prefix it with an underscore: `_blob`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `hex_encode` is never used
+  --> lineos/m1/metadata/src/project_manifest.rs:47:4
+   |
+47 | fn hex_encode(bytes: &[u8]) -> String {
+   |    ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `lineos-metadata` (lib) generated 2 warnings (run `cargo fix --lib -p lineos-metadata` to apply 1 suggestion)
+warning: unused import: `super::*`
+  --> lineos/m1/rule-engine/src/thresholds.rs:76:9
+   |
+76 |     use super::*;
+   |         ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::BTreeMap`
+  --> lineos/m1/rule-engine/src/thresholds.rs:78:9
+   |
+78 |     use std::collections::BTreeMap;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `lineos-rule-engine` (lib test) generated 2 warnings (run `cargo fix --lib -p lineos-rule-engine --tests` to apply 2 suggestions)
+warning: function `make_test_blob` is never used
+  --> apps/stillair/src-tauri/src/commands/insights.rs:51:8
+   |
+51 |     fn make_test_blob(preset: &str, lufs: f32) -> GoldenBlobJson {
+   |        ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `stillair` (lib test) generated 1 warning
+warning: unused import: `super::*`
+   --> lineos/m1/insights/src/evaluator.rs:126:9
+    |
+126 |     use super::*;
+    |         ^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `Bmr128Schema`, `Ebu128Measurement`, `PipelineConstants`, and `PresetThresholds`
+   --> lineos/m1/insights/src/evaluator.rs:127:24
+    |
+127 |     use lineos_types::{Bmr128Schema, PipelineConstants, PresetThresholds, Ebu128Measurement};
+    |                        ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::BTreeMap`
+   --> lineos/m1/insights/src/evaluator.rs:128:9
+    |
+128 |     use std::collections::BTreeMap;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `manifest`
+  --> lineos/m1/metadata/src/project_manifest.rs:97:13
+   |
+97 |         let manifest = ProjectManifest::generate(&blob, &m);
+   |             ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_manifest`
+
+warning: `lineos-insights` (lib test) generated 3 warnings (run `cargo fix --lib -p lineos-insights --tests` to apply 3 suggestions)
+warning: `lineos-metadata` (lib test) generated 3 warnings (2 duplicates) (run `cargo fix --lib -p lineos-metadata --tests` to apply 1 suggestion)
+   Compiling sp314-dsp v3.0.0 (/home/aidevcon/Documents/creator-os/lineos/m1/sp314-dsp)
+warning: unused imports: `AudioChunk`, `MasteringIntent`, `MasteringPipeline`, and `PipelineConstants`
+  --> lineos/m1/telemetry/src/report.rs:60:24
+   |
+60 |     use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
+   |                        ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated unit struct `lineos_types::MasteringPipeline`: Use pipelineforge::Pipelineforge + openclaw::OpenClawEngine instead
+  --> lineos/m1/telemetry/src/report.rs:60:41
+   |
+60 |     use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
+   |                                         ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: function `make_test_blob` is never used
+  --> lineos/m1/telemetry/src/report.rs:62:8
+   |
+62 |     fn make_test_blob() -> GoldenBlob {
+   |        ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `lineos-telemetry` (lib test) generated 5 warnings (2 duplicates) (run `cargo fix --lib -p lineos-telemetry --tests` to apply 1 suggestion)
+warning: `lineos-types` (lib test) generated 1 warning (1 duplicate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+     Running unittests src/lib.rs (target/debug/deps/adapter_runtime-ddfaa20d736f4734)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lame_sys-6ca9787ec70e0a04)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_insights-c3b430f35591692d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_metadata-622822e8ab4c077c)
+
+running 9 tests
+test bmr128::tests::test_bmr128_passes_within_tolerance ... ok
+test bmr128::tests::test_bmr128_fails_true_peak_exceeded ... ok
+test bmr128::tests::test_bmr128_fails_lufs_out_of_tolerance ... ok
+test bmr128::tests::test_bmr128_raw_preset_no_lufs_check ... ok
+test ebu_report::tests::test_ebu_report_json_contains_schema ... ok
+test ebu_report::tests::test_ebu_report_round_trips ... ok
+test project_manifest::tests::test_manifest_generates ... ok
+test bmr128::tests::test_bmr128_serializes_to_json ... ok
+test project_manifest::tests::test_manifest_json ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_rule_engine-98fdf7618edc446e)
+
+running 49 tests
+test evaluator::tests::test_all_issues_collected ... ok
+test evaluator::tests::test_lufs_compliance_issue_has_correct_id ... ok
+test evaluator::tests::test_clean_track_no_issues ... ok
+test evaluator::tests::test_lufs_too_loud_recommendation ... ok
+test evaluator::tests::test_lufs_too_quiet_recommendation ... ok
+test evaluator::tests::test_raw_preset_no_lufs_issue ... ok
+test evaluator::tests::test_true_peak_exceeded_recommendation ... ok
+test rules::dynamics::tests::test_dynamic_range_at_minimum_no_trigger ... ok
+test rules::dynamics::tests::test_dynamic_range_low_severity ... ok
+test rules::dynamics::tests::test_dynamic_range_low_triggers ... ok
+test rules::dynamics::tests::test_lra_at_max_no_trigger ... ok
+test rules::dynamics::tests::test_lra_tags_streaming ... ok
+test rules::dynamics::tests::test_lra_too_high_triggers ... ok
+test rules::loudness::tests::test_apple_music_preset_at_target_no_trigger ... ok
+test rules::loudness::tests::test_apple_music_preset_triggers_with_correct_tag ... ok
+test rules::loudness::tests::test_at_target_no_trigger ... ok
+test rules::loudness::tests::test_at_tolerance_boundary_no_trigger ... ok
+test rules::loudness::tests::test_below_target_is_low ... ok
+test rules::loudness::tests::test_delta_1_1_is_medium ... ok
+test rules::loudness::tests::test_delta_2_0_is_medium ... ok
+test rules::loudness::tests::test_delta_2_1_is_high ... ok
+test rules::loudness::tests::test_just_inside_upper_tolerance_no_trigger ... ok
+test rules::loudness::tests::test_just_outside_tolerance_is_low ... ok
+test rules::loudness::tests::test_large_delta_negative_is_high ... ok
+test rules::loudness::tests::test_params_are_correct ... ok
+test rules::loudness::tests::test_raw_preset_no_trigger ... ok
+test rules::loudness::tests::test_tag_reflects_preset_name ... ok
+test rules::peak::tests::test_true_peak_at_ceiling_no_trigger ... ok
+test rules::peak::tests::test_true_peak_below_ceiling_no_trigger ... ok
+test rules::peak::tests::test_true_peak_exceeded_triggers ... ok
+test rules::peak::tests::test_true_peak_params_correct ... ok
+test rules::peak::tests::test_true_peak_tags_critical ... ok
+test rules::registry::tests::test_lufs_compliance_is_first ... ok
+test rules::registry::tests::test_no_old_loudness_rule_ids ... ok
+test rules::registry::tests::test_rules_count ... ok
+test rules::registry::tests::test_rules_ids_unique ... ok
+test rules::stereo::tests::test_dc_offset_negative_magnitude ... ok
+test rules::stereo::tests::test_dc_offset_ok ... ok
+test rules::stereo::tests::test_dc_offset_triggers ... ok
+test rules::stereo::tests::test_stereo_corr_at_min_no_trigger ... ok
+test rules::stereo::tests::test_stereo_corr_at_warning_medium_not_high ... ok
+test rules::stereo::tests::test_stereo_corr_high_severity_below_warning ... ok
+test rules::stereo::tests::test_stereo_corr_medium_severity_below_min ... ok
+test rules::stereo::tests::test_stereo_corr_ok_no_trigger ... ok
+test types::coach_findings::tests::test_empty_findings_no_issues ... ok
+test types::coach_findings::tests::test_coach_findings_json_round_trip ... ok
+test types::coach_findings::tests::test_has_blocking_detects_high ... ok
+test types::coach_findings::tests::test_severity_ordered ... ok
+test types::coach_findings::tests::test_severity_serializes_lowercase ... ok
+
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/determinism.rs (target/debug/deps/determinism-e0d2321a671ce8fd)
+
+running 15 tests
+test test_apple_music_preset_lufs_compliance_tag ... ok
+test test_clean_track_no_issues ... ok
+test test_determinism_100_runs ... ok
+test test_determinism_broadcast_preset_100_runs ... ok
+test test_determinism_clean_track_100_runs ... ok
+test test_lufs_exactly_at_tolerance_boundary ... ok
+test test_lufs_compliance_high_severity_above_2lu ... ok
+test test_lufs_too_loud_triggers_compliance_and_reduce_recommendation ... ok
+test test_findings_serialize_to_json ... ok
+test test_determinism_all_rules_triggered_100_runs ... ok
+test test_true_peak_priority_over_lufs ... ok
+test test_lufs_too_quiet_triggers_compliance_and_increase_recommendation ... ok
+test test_true_peak_exceeded_is_high_severity ... ok
+test test_raw_preset_no_lufs_compliance ... ok
+test test_weak_stereo_high_severity ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_telemetry-3bfd3ee979f39c26)
+
+running 11 tests
+test lra::tests::test_lra_empty_returns_zero ... ok
+test report::tests::test_measure_uses_blob_values ... ok
+test lra::tests::test_ms_to_lufs_silence ... ok
+test report::tests::test_measure_produces_valid_output ... ok
+test windows::tests::test_momentary_too_short ... ok
+test windows::tests::test_short_term_too_short ... ok
+test windows::tests::test_momentary_silence ... ok
+test lra::tests::test_lra_too_few_windows ... ok
+test windows::tests::test_short_term_loud_signal ... ok
+test lra::tests::test_lra_silence_is_zero ... ok
+test lra::tests::test_lra_nonnegative ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_types-e13476188c299613)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/types_contract.rs (target/debug/deps/types_contract-ed848194d61dde45)
+
+running 5 tests
+test loudness_target_spotify_correct ... ok
+test mastering_intent_spotify ... ok
+test v29_aliases_work ... ok
+test stereo_buffer_duration_correct ... ok
+test golden_blob_serializes_roundtrip ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/m0d-ad5053d47ee773cf)
+
+running 63 tests
+test audit::tests::audit_fail_on_nonexistent_path ... ok
+test blob_store::tests::test_blob_store_get_missing_returns_none ... ok
+test blob_store::tests::test_blob_store_insert_get ... ok
+test blob_store::tests::test_stored_blob_serializes_to_json ... ok
+test handlers::blob::tests::test_blob_store_returns_none_for_unknown_id ... ok
+test audit::tests::audit_all_7_event_types_serialize ... ok
+test audit::tests::audit_write_creates_ndjson_line ... ok
+test audit::tests::audit_test_writable_succeeds ... ok
+test cdn::tests::cdn_hash_mismatch_prevents_serve ... ok
+test cdn::tests::cdn_verify_all_detects_tamper ... ok
+test handlers::decode::tests::test_decode_error_display ... ok
+test handlers::blob::tests::test_stored_blob_json_no_audio_bytes ... ok
+test handlers::decode::tests::test_decode_nonexistent_file ... ok
+test handlers::decode::tests::test_decode_invalid_format ... ok
+test handlers::decode::tests::test_downmix_mono_via_downmix ... ok
+test handlers::decode::tests::test_downmix_quad_to_stereo ... ok
+test cdn::tests::cdn_serves_correct_asset ... ok
+test cdn::tests::cdn_verify_all_passes_with_correct_hashes ... ok
+test handlers::decode::tests::test_mono_to_stereo ... ok
+test handlers::decode::tests::test_target_constants ... ok
+test handlers::export::tests::test_export_format_extension ... ok
+test handlers::decode::tests::test_mono_to_stereo_empty ... ok
+test handlers::export::tests::test_export_format_from_str ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_48000 ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_zero ... ok
+test handlers::export::tests::test_pcm_bytes_empty ... ok
+test handlers::export::tests::test_pcm_bytes_roundtrip ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_mp3_bitstream ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_in_range ... ok
+test handlers::master::tests::test_derive_seed_non_zero ... ok
+test handlers::master::tests::test_compute_rms_silence ... ok
+test handlers::master::tests::test_platform_ok_tp_exceeded ... ok
+test handlers::master::tests::test_gain_overflow_guard ... ok
+test handlers::master::tests::test_platform_ok_at_target ... ok
+test handlers::master::tests::test_platform_ok_too_loud ... ok
+test handlers::master::tests::test_sha256_bytes_deterministic ... ok
+test handlers::master::tests::test_compute_rms_half_amp ... ok
+test handlers::master::tests::test_silence_guard_threshold ... ok
+test handlers::master::tests::test_target_lufs_clamped ... ok
+test health::tests::health_criteria_default_c6_c7_true ... ok
+test health::tests::health_gate_all_criteria_required ... ok
+test health::tests::health_gate_fails_if_any_criterion_missing ... ok
+test health::tests::health_gate_passes_when_all_set ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_revoked_key ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_unsigned_engine ... ok
+test marketplace::revocation::tests::revocation_detects_revoked_key ... ok
+test marketplace::revocation::tests::revocation_empty_list_passes_all ... ok
+test marketplace::revocation::tests::revocation_passes_valid_key ... ok
+test policy::tests::policy_allows_declared_destination ... ok
+test policy::tests::policy_blocks_undeclared_destination ... ok
+test policy::tests::policy_deny_by_default_with_no_allow_rules ... ok
+test policy::tests::policy_loaded_from_actual_config ... ok
+test registry::tests::registry_correct_hash_passes ... ok
+test registry::tests::registry_load_fails_on_missing_file ... ok
+test handlers::decode::tests::test_resample_passthrough_48k ... ok
+test registry::tests::registry_hash_mismatch_is_fatal ... ok
+test registry::tests::registry_pending_stub_skips_verification ... ok
+test registry::tests::registry_revoked_keys_accessible ... ok
+test registry::tests::registry_unregistered_asset_is_fatal ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_wrong_digest ... ok
+test marketplace::gatekeeper::tests::gatekeeper_accepts_valid_engine ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_undeclared_permission ... ok
+test handlers::decode::tests::test_decode_real_mp3_file ... ok
+
+test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.71s
+
+     Running unittests src/lib.rs (target/debug/deps/openclaw-b55af147df02f23c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/openclaw_contract.rs (target/debug/deps/openclaw_contract-0cc098e2c590683b)
+
+running 18 tests
+test glider_is_linear ... ok
+test biquad_glide_produces_no_nan ... ok
+test glider_reaches_target_after_glide_duration ... ok
+test engine_initializes_from_topology_json ... ok
+test scheduler_advances_and_detects_boundary ... ok
+test engine_processes_silence_without_panic ... ok
+test engine_processes_sine_wave ... ok
+test global_glide_ms_applies_to_all_nodes ... ok
+test set_node_parameter_does_not_panic ... ok
+test engine_reset_produces_identical_output ... ok
+test crossfader_produces_valid_output ... ok
+test process_stems_sums_four_channels ... ok
+test stem_buffer_decodes_flac_bytes ... ok
+test stem_buffer_read_block_pads_silence ... ok
+test stem_engine_processes_without_panic ... ok
+test set_stem_node_parameter_updates_correct_stem ... ok
+test stem_seek_advances_correctly ... ok
+test engine_switches_section_glitch_free ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+     Running unittests src/lib.rs (target/debug/deps/pipelineforge-5ae4da448d0d8420)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipelineforge_contract.rs (target/debug/deps/pipelineforge_contract-7855c6f797ad1dd0)
+
+running 6 tests
+test hum_removal_always_first ... ok
+test muddy_mix_selects_lowmid_clarity ... ok
+test lufs_normalization_always_last ... ok
+test empty_conditions_produces_lufs_only ... ok
+test muddy_and_pump_produces_valid_dag ... ok
+test forged_topology_loads_into_dsp_graph ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/sp314_dsp-2a9b6f96954dc68e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/scratch_bq.rs (target/debug/deps/scratch_bq-0a547fa7b4ef2a2e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/autotune_contract.rs (target/debug/deps/autotune_contract-5113c1152442ea7c)
+
+running 5 tests
+test autotuner_transparent_returns_zero_immediately ... ok
+test autotuner_chunk_finds_loudest_section ... ok
+test autotuner_converges_to_target_lufs ... ok
+test autotuner_respects_clipping_limit ... ok
+test autotuner_is_fully_deterministic ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.63s
+
+     Running tests/compressor_contract.rs (target/debug/deps/compressor_contract-4fe5faa7643f1319)
+
+running 28 tests
+test compressor_band_output_within_headroom ... ok
+test compressor_band_reset_produces_identical_output ... ok
+test compressor_v3_identity_no_gain_reduction ... ok
+test compressor_band_reduces_loud_signal ... ok
+test compressor_v3_output_within_headroom ... ok
+test compressor_band_passes_quiet_signal ... ok
+test compressor_v3_ms_encode_decode_roundtrip ... ok
+test compressor_v3_reset_produces_identical_output ... ok
+test compressor_v3_mid_independent_of_side ... ok
+test compressor_v3_mono_signal_side_is_zero ... ok
+test crossover_lr4_no_phase_inversion ... ok
+test crossover_lr4_reset_clears_state ... ok
+test envelope_attack_follows_linear_domain ... ok
+test envelope_output_is_db ... ok
+test crossover_lr4_split_at_crossover_freq ... ok
+test envelope_release_sample_rate_correct ... ok
+test envelope_rc_coeff_matches_reference ... ok
+test crossover_lr4_deterministic ... ok
+test gain_computer_output_always_negative ... ok
+test compressor_band_deterministic_100_runs ... ok
+test gain_computer_zero_at_ratio_1 ... ok
+test gain_computer_zero_below_knee ... ok
+test gain_computer_c1_continuous ... ok
+test gain_computer_matches_reference ... ok
+test crossover_lr4_sum_is_flat ... ok
+test envelope_no_denormals_on_silence ... ok
+test compressor_band_no_nan_no_inf ... ok
+test compressor_v3_deterministic_100_runs ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/determinism.rs (target/debug/deps/determinism-56079b61c36b6163)
+
+running 1 test
+test dummy_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/engine_calibration_contract.rs (target/debug/deps/engine_calibration_contract-d2857c5986c4a75b)
+
+running 5 tests
+test test_engine_null_state_is_transparent ... ok
+test test_engine_eq_adds_energy_without_clipping ... ok
+test test_full_pipeline_is_deterministic ... ok
+test test_presets_respect_headroom ... ok
+test test_autotuner_converges_for_all_presets has been running for over 60 seconds
+test test_autotuner_converges_for_all_presets ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 102.26s
+
+     Running tests/engine_contract.rs (target/debug/deps/engine_contract-f72da96be3a536c7)
+
+running 7 tests
+test engine_adaptive_budget_selects_correct_pad ... ok
+test engine_telemetry_matches_reference ... ok
+test engine_is_fully_deterministic ... ok
+test engine_limiter_is_transparent_on_quiet_signal ... ok
+test engine_limiter_prevents_clipping ... ok
+test engine_parallel_blend_at_100_percent_is_fully_wet ... ok
+test engine_parallel_blend_at_zero_percent_bypasses_compressor ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+
+     Running tests/harmonic_contract.rs (target/debug/deps/harmonic_contract-594f0cc08d15f040)
+
+running 5 tests
+test harmonic_at_mix_zero_is_dry ... ok
+test harmonic_adds_total_harmonic_distortion ... ok
+test harmonic_reset_produces_identical_output ... ok
+test harmonic_increases_rms_at_nonzero_drive ... ok
+test harmonic_never_clips_within_range ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/io_contract.rs (target/debug/deps/io_contract-bd6c8622055bd0e8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/limiter_contract.rs (target/debug/deps/limiter_contract-f799384a7bc22a4f)
+
+running 10 tests
+test limiter_decay_floor_prevents_pumping ... ok
+test limiter_peak_follower_instantaneous_attack ... ok
+test limiter_ring_buffer_delays_by_n_samples ... ok
+test limiter_ring_buffer_wraps_correctly ... ok
+test limiter_no_denormals_after_silence ... ok
+test limiter_peak_follower_stereo_linked ... ok
+test limiter_lookahead_alignment ... ok
+test limiter_reset_clears_state ... ok
+test limiter_deterministic ... ok
+test limiter_ceiling_never_exceeded ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/masking_eq_contract.rs (target/debug/deps/masking_eq_contract-fabd85572f211c6b)
+
+running 12 tests
+test denormal_flush_prevents_subnormal_states ... ok
+test biquad_0db_gain_produces_pole_zero_cancellation ... ok
+test biquad_coefficients_match_rbj_reference ... ok
+test biquad_frequency_response_at_center ... ok
+test biquad_stable_no_nan_no_inf ... ok
+test cold_start_no_silence ... ok
+test process_block_no_allocation ... ok
+test coeff_transition_linear_step ... ok
+test process_block_output_within_headroom ... ok
+test coeff_hard_clamp_at_hop_boundary ... ok
+test process_block_no_nan_no_inf ... ok
+test process_block_deterministic_100_runs ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.60s
+
+     Running tests/metering_contract.rs (target/debug/deps/metering_contract-5ce75924506145d7)
+
+running 9 tests
+test kweight_filter_coefficients_match_standard ... ok
+test lufs_absolute_gate_removes_quiet_blocks ... ok
+test lufs_relative_gate_removes_quiet_blocks ... ok
+test kweight_filter_attenuates_sub_bass ... ok
+test kweight_filter_boosts_high_frequencies ... ok
+test telemetry_includes_lufs ... ok
+test lufs_silence_returns_floor ... ok
+test lufs_1khz_sine_matches_reference ... ok
+test lufs_integrated_is_deterministic ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/pipeline_integration.rs (target/debug/deps/pipeline_integration-8b3b69a3bc879d40)
+
+running 4 tests
+test test_reset_produces_identical_output ... ok
+test test_no_comb_filtering_in_parallel_topology ... ok
+test test_no_clipping_on_max_boost_with_transient ... ok
+test test_no_artifacts_at_eq_block_boundaries ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+
+     Running tests/pipeline_primitives_contract.rs (target/debug/deps/pipeline_primitives_contract-da251f8422d731c4)
+
+running 13 tests
+test headroom_input_pad_is_minus_6db ... ok
+test dither_prng_never_zero_state ... ok
+test dither_seeded_deterministic ... ok
+test headroom_output_clips_at_unity ... ok
+test headroom_output_makeup_is_plus_6db ... ok
+test phase_aligner_deterministic ... ok
+test phase_aligner_reset_clears_state ... ok
+test dither_noise_bounded_by_plus_minus_1_lsb ... ok
+test stereo_eq_reset_restores_identity ... ok
+test stereo_eq_linked_analysis_preserves_center_image ... ok
+test phase_aligner_magnitude_is_flat ... ok
+test stereo_eq_process_block_deterministic ... ok
+test phase_aligner_matches_crossover_phase ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/presets_contract.rs (target/debug/deps/presets_contract-ec8e8a7c96a148c8)
+
+running 8 tests
+test presets_display_names_are_non_empty ... ok
+test presets_target_rms_values_are_ordered ... ok
+test presets_all_have_soft_knee ... ok
+test presets_transparent_has_unity_ratio ... ok
+test presets_all_variants_construct_without_panic ... ok
+test presets_transparent_has_zero_eq_boost ... ok
+test presets_all_use_150hz_crossover ... ok
+test presets_transparent_target_rms_is_none ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/psychoacoustic_contract.rs (target/debug/deps/psychoacoustic_contract-aea04b9eab3048ac)
+
+running 16 tests
+test iso226_boundary_clamping_high_frequency ... ok
+test iso226_boundary_clamping_low_frequency ... ok
+test iso226_no_panic_on_boundary_inputs ... ok
+test bark_bin_to_band_spot_checks ... ok
+test iso226_c1_continuity_at_interior_points ... ok
+test bark_no_panic_on_any_valid_bin ... ok
+test iso226_phon_interpolation_valid_range ... ok
+test iso226_returns_exact_value_at_reference_points ... ok
+test spreading_monotonic_increasing ... ok
+test spreading_always_non_negative ... ok
+test spreading_zero_at_zero_distance ... ok
+test spreading_capped_at_noise_floor ... ok
+test bark_result_always_in_valid_range ... ok
+test spreading_spot_checks ... ok
+test mask_per_bin_no_panic_fft_sizes ... ok
+test mask_deterministic_100_runs ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/realtime_contract.rs (target/debug/deps/realtime_contract-bfb155a2b458371b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/restoration_contract.rs (target/debug/deps/restoration_contract-eee5ede16e9b9c50)
+
+running 7 tests
+test music_preset_bypasses_gate_and_hum ... ok
+test noise_gate_hold_prevents_chatter ... ok
+test noise_gate_opens_on_signal ... ok
+test noise_gate_closes_on_silence ... ok
+test deess_reduces_high_frequency_bursts ... ok
+test lowcut_removes_sub_80hz ... ok
+test dehum_removes_50hz_sine ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/deps/sp314_nodes-c29d4c20d6fc0e8b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/nodes_contract.rs (target/debug/deps/nodes_contract-fd466ea05ec3286c)
+
+running 6 tests
+test gain_node_unity_is_passthrough ... ok
+test ms_matrix_roundtrip ... ok
+test graph_reset_produces_identical_output ... ok
+test rms_detector_exposes_envelope ... ok
+test dynamic_eq_from_topology ... ok
+test biquad_lowpass_attenuates_high_frequencies ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/stillair_lib-64e20798a966c958)
+
+running 9 tests
+test commands::session::tests::test_compliance_derived_from_loudness_flags ... ok
+test ipc::m0_client::tests::test_m0_error_blob_not_found ... ok
+test ipc::m0_client::tests::test_m0_error_serializes_as_string ... ok
+test commands::session::tests::test_session_state_json_serializes ... ok
+test ipc::m0_client::tests::test_golden_blob_json_has_all_spec_fields ... ok
+test commands::mastering::tests::test_load_audio_file_flac_stub ... ok
+test commands::mastering::tests::test_audio_extensions_coverage ... ok
+test commands::mastering::tests::test_load_audio_file_rejects_txt ... ok
+test commands::mastering::tests::test_load_audio_file_wav_stub ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/stillair-dec1fbf95af99376)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/stillair_cockpit-c2f94c86ef44af33)
+
+running 1 test
+test components::intent_bay::knob::tests::intent_knob_normalization ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/stillair_cockpit-f34000e0c8308f06)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/xaak-97e5584554964507)
+
+running 13 tests
+test engine::tests::test_load_sets_kernel ... ok
+test engine::tests::test_load_replaces_kernel ... ok
+test engine::tests::test_state_none_before_load ... ok
+test engine::tests::test_state_after_load ... ok
+test engine::tests::test_seek_updates_position ... ok
+test engine::tests::test_state_not_exposed_pcm ... ok
+test tests::test_pcm_len_matches_transfer ... ok
+test engine::tests::test_stop_resets_position ... ok
+test tests::test_duration_ms_calculation ... ok
+test tests::test_playback_state_no_pcm ... ok
+test tests::test_stream_from_past_end_returns_empty ... ok
+test tests::test_stream_from_zero_returns_consumer ... ok
+test tests::test_stream_from_seek_mid ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests adapter_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lame_sys
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lineos_insights
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lineos_metadata
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lineos_rule_engine
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lineos_telemetry
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lineos_types
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests openclaw
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests pipelineforge
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sp314_dsp
+
+running 1 test
+test lineos/m1/sp314-dsp/src/lib.rs - (line 15) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+   Doc-tests sp314_nodes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests stillair_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests stillair_cockpit
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xaak
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

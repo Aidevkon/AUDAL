@@ -11,7 +11,7 @@ license     = "MIT"
 crate-type = ["rlib"]
 
 [dependencies]
-sp314-dsp        = { path = "../sp314-dsp" }
+lineos-types     = { path = "../lineos-types" }
 lineos-insights  = { path = "../insights" }
 serde            = { version = "1", features = ["derive"] }
 serde_json       = "1"

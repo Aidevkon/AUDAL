@@ -1,0 +1,6 @@
+{
+  "sample_rate": 48000,
+  "test_signal": "1kHz_sine_3s_0.1_amplitude",
+  "expected_lufs": -19.993237,
+  "tolerance": 0.5
+}
