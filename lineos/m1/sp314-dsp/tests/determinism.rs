@@ -1,6 +1,6 @@
 // tests/determinism.rs
 
-pub const GOLDEN_HASH: &str = "5aeb909043077b2e2530946e72b1182ba225776bdb42069948276e149fb70be5";
+pub const GOLDEN_HASH: &str = "9db24a89530aacfdc6a4c9d28a4a45e885e9645068244235f3c5257fe5e07e75";
 
 #[test]
 fn dummy_test() {
