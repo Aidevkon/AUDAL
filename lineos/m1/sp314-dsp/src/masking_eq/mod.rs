@@ -36,11 +36,11 @@ pub struct MaskingAwareEQ {
     fft_io:      Vec<Complex<f32>>,
     fft_scratch: Vec<Complex<f32>>,
 
-    filter_states_l: [[f32; 2]; EQ_BANDS],
-    filter_states_r: [[f32; 2]; EQ_BANDS],
-    current_coeffs: [[f32; 5]; EQ_BANDS],
-    target_coeffs:  [[f32; 5]; EQ_BANDS],
-    coeff_step:     [[f32; 5]; EQ_BANDS],
+    filter_states_l: [biquad::BiquadState; EQ_BANDS],
+    filter_states_r: [biquad::BiquadState; EQ_BANDS],
+    current_coeffs: [biquad::BiquadCoeffs; EQ_BANDS],
+    target_coeffs:  [biquad::BiquadCoeffs; EQ_BANDS],
+    coeff_step:     [[f64; 5]; EQ_BANDS],
 
     config: MaskingEQConfig,
     sample_rate: u32,
@@ -70,11 +70,11 @@ impl MaskingAwareEQ {
             *item = 0.5 * (1.0 - libm::cosf(2.0 * core::f32::consts::PI * i as f32 / (FFT_SIZE as f32 - 1.0)));
         }
 
-        let current_coeffs = [[1.0_f32, 0.0, 0.0, 0.0, 0.0]; EQ_BANDS];
-        let target_coeffs  = [[1.0_f32, 0.0, 0.0, 0.0, 0.0]; EQ_BANDS];
-        let coeff_step     = [[0.0_f32; 5]; EQ_BANDS];
-        let filter_states_l  = [[0.0_f32; 2]; EQ_BANDS];
-        let filter_states_r  = [[0.0_f32; 2]; EQ_BANDS];
+        let current_coeffs = [biquad::BiquadCoeffs::new(); EQ_BANDS];
+        let target_coeffs  = [biquad::BiquadCoeffs::new(); EQ_BANDS];
+        let coeff_step     = [[0.0_f64; 5]; EQ_BANDS];
+        let filter_states_l  = [biquad::BiquadState::new(); EQ_BANDS];
+        let filter_states_r  = [biquad::BiquadState::new(); EQ_BANDS];
 
         Ok(Self {
             analysis_buffer: vec![0.0; FFT_SIZE],
@@ -111,23 +111,25 @@ impl MaskingAwareEQ {
             }
 
             for b in 0..EQ_BANDS {
-                for c in 0..5 {
-                    self.current_coeffs[b][c] += self.coeff_step[b][c];
-                }
+                self.current_coeffs[b].b0 += self.coeff_step[b][0];
+                self.current_coeffs[b].b1 += self.coeff_step[b][1];
+                self.current_coeffs[b].b2 += self.coeff_step[b][2];
+                self.current_coeffs[b].a1 += self.coeff_step[b][3];
+                self.current_coeffs[b].a2 += self.coeff_step[b][4];
             }
 
             let mut y_l = left[i];
             for b in 0..EQ_BANDS {
-                y_l = biquad::process_biquad(y_l, &self.current_coeffs[b], &mut self.filter_states_l[b]);
+                y_l = biquad::process_tdf2(y_l, &self.current_coeffs[b], &mut self.filter_states_l[b]);
             }
 
             let mut y_r = right[i];
             for b in 0..EQ_BANDS {
-                y_r = biquad::process_biquad(y_r, &self.current_coeffs[b], &mut self.filter_states_r[b]);
+                y_r = biquad::process_tdf2(y_r, &self.current_coeffs[b], &mut self.filter_states_r[b]);
             }
 
-            left[i]  = libm::fmaxf(-2.0_f32, libm::fminf(2.0_f32, y_l));
-            right[i] = libm::fmaxf(-2.0_f32, libm::fminf(2.0_f32, y_r));
+            left[i]  = y_l;
+            right[i] = y_r;
         }
     }
 
@@ -169,20 +171,24 @@ impl MaskingAwareEQ {
                 0.0
             };
 
-            self.target_coeffs[b] = biquad::rbj_peaking_coeffs(center_hz, allowed_boost, BAND_Q, self.sample_rate);
+            let biquad_coeffs = biquad::rbj_bell(center_hz as f64, allowed_boost as f64, BAND_Q as f64, self.sample_rate as f64);
+            self.target_coeffs[b] = biquad_coeffs;
             
-            for c in 0..5 {
-                self.coeff_step[b][c] = (self.target_coeffs[b][c] - self.current_coeffs[b][c]) / HOP_SIZE as f32;
-            }
+            let hop_f64 = HOP_SIZE as f64;
+            self.coeff_step[b][0] = (biquad_coeffs.b0 - self.current_coeffs[b].b0) / hop_f64;
+            self.coeff_step[b][1] = (biquad_coeffs.b1 - self.current_coeffs[b].b1) / hop_f64;
+            self.coeff_step[b][2] = (biquad_coeffs.b2 - self.current_coeffs[b].b2) / hop_f64;
+            self.coeff_step[b][3] = (biquad_coeffs.a1 - self.current_coeffs[b].a1) / hop_f64;
+            self.coeff_step[b][4] = (biquad_coeffs.a2 - self.current_coeffs[b].a2) / hop_f64;
         }
     }
 
     pub fn reset(&mut self) {
-        self.current_coeffs = [[1.0_f32, 0.0, 0.0, 0.0, 0.0]; EQ_BANDS];
-        self.target_coeffs  = [[1.0_f32, 0.0, 0.0, 0.0, 0.0]; EQ_BANDS];
-        self.coeff_step     = [[0.0_f32; 5]; EQ_BANDS];
-        self.filter_states_l  = [[0.0_f32; 2]; EQ_BANDS];
-        self.filter_states_r  = [[0.0_f32; 2]; EQ_BANDS];
+        self.current_coeffs = [biquad::BiquadCoeffs::new(); EQ_BANDS];
+        self.target_coeffs  = [biquad::BiquadCoeffs::new(); EQ_BANDS];
+        self.coeff_step     = [[0.0_f64; 5]; EQ_BANDS];
+        self.filter_states_l  = [biquad::BiquadState::new(); EQ_BANDS];
+        self.filter_states_r  = [biquad::BiquadState::new(); EQ_BANDS];
         self.write_pos      = 0;
         self.samples_in_hop = 0;
         self.analysis_buffer.fill(0.0);
