@@ -1,25 +1,25 @@
 // tests/limiter_contract.rs
 
 use sp314_dsp::limiter::{
-    BrickwallLimiter, LimiterConfig, LOOKAHEAD_SAMPLES, PeakFollower, DEFAULT_CEILING_LINEAR
+    BrickwallLimiter, LimiterConfig, PeakFollower, DEFAULT_CEILING_LINEAR
 };
 use sp314_dsp::limiter::delay::RingBuffer;
 
 #[test]
 fn limiter_ring_buffer_delays_by_n_samples() {
-    let mut rb: RingBuffer<LOOKAHEAD_SAMPLES> = RingBuffer::new();
+    let mut rb: RingBuffer = RingBuffer::new(240);
     let mut out = Vec::new();
     // Feed impulse
     out.push(rb.push_and_pop(1.0));
     // Feed 0.0s
-    for _ in 0..(LOOKAHEAD_SAMPLES + 10) {
+    for _ in 0..(240 + 10) {
         out.push(rb.push_and_pop(0.0));
     }
     
     // Check output
     for i in 0..out.len() {
-        if i == LOOKAHEAD_SAMPLES {
-            assert_eq!(out[i], 1.0, "Impulse should appear at LOOKAHEAD_SAMPLES");
+        if i == 240 {
+            assert_eq!(out[i], 1.0, "Impulse should appear at 240");
         } else {
             assert_eq!(out[i], 0.0, "All other outputs should be 0.0");
         }
@@ -28,12 +28,12 @@ fn limiter_ring_buffer_delays_by_n_samples() {
 
 #[test]
 fn limiter_ring_buffer_wraps_correctly() {
-    let mut rb: RingBuffer<LOOKAHEAD_SAMPLES> = RingBuffer::new();
-    for i in 0..(3 * LOOKAHEAD_SAMPLES) {
+    let mut rb: RingBuffer = RingBuffer::new(240);
+    for i in 0..(3 * 240) {
         let val = (i as f32) + 1.0;
         let delayed = rb.push_and_pop(val);
-        if i >= LOOKAHEAD_SAMPLES {
-            assert_eq!(delayed, val - LOOKAHEAD_SAMPLES as f32);
+        if i >= 240 {
+            assert_eq!(delayed, val - 240 as f32);
         } else {
             assert_eq!(delayed, 0.0);
         }
@@ -41,12 +41,20 @@ fn limiter_ring_buffer_wraps_correctly() {
 }
 
 #[test]
-fn limiter_peak_follower_instantaneous_attack() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000);
-    // Instant step to 1.0
+fn limiter_peak_follower_linear_attack_ramp() {
+    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
+    // Feed 1.0 peak
     let gr = follower.process(1.0);
-    // Should be applied immediately (sample 0)
-    assert!((gr - DEFAULT_CEILING_LINEAR).abs() < 1e-5, "Attack must be instantaneous");
+    // Because it ramps over 240 samples, the first sample's envelope is 1.0/240
+    // which is below the ceiling (0.9441), so GR is 1.0
+    assert_eq!(gr, 1.0, "Attack must ramp linearly, no immediate ducking");
+
+    // After 240 samples of processing 1.0, it should reach the peak
+    for _ in 1..240 {
+        follower.process(1.0);
+    }
+    let gr_final = follower.process(1.0);
+    assert!((gr_final - DEFAULT_CEILING_LINEAR).abs() < 1e-4, "Must reach full reduction after lookahead window");
 }
 
 #[test]
@@ -59,12 +67,12 @@ fn limiter_peak_follower_stereo_linked() {
     // Let's flush the delay buffer
     let mut out_l = 0.0;
     let mut out_r = 0.0;
-    for _ in 0..LOOKAHEAD_SAMPLES {
+    for _ in 0..240 {
         out_l = 0.0;
         out_r = 0.0;
         limiter.process(&mut out_l, &mut out_r);
     }
-    // At exactly LOOKAHEAD_SAMPLES, the impulse (0, 1) exits.
+    // At exactly 240, the impulse (0, 1) exits.
     assert_eq!(out_l, 0.0);
     assert!((out_r - DEFAULT_CEILING_LINEAR).abs() < 1e-4, "Right channel should be limited to ceiling, was {}", out_r);
     
@@ -73,7 +81,7 @@ fn limiter_peak_follower_stereo_linked() {
     let mut left = 0.5_f32;
     let mut right = 1.0_f32;
     limiter.process(&mut left, &mut right);
-    for _ in 0..LOOKAHEAD_SAMPLES {
+    for _ in 0..240 {
         out_l = 0.0;
         out_r = 0.0;
         limiter.process(&mut out_l, &mut out_r);
@@ -102,7 +110,7 @@ fn limiter_ceiling_never_exceeded() {
 
 #[test]
 fn limiter_decay_floor_prevents_pumping() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000);
+    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
     follower.process(1.0); // loud transient
     
     let mut gr = 0.0;
@@ -118,7 +126,7 @@ fn limiter_decay_floor_prevents_pumping() {
 
 #[test]
 fn limiter_no_denormals_after_silence() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000);
+    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
     follower.process(1.0);
     for _ in 0..100000 {
         follower.process(0.0);
@@ -169,7 +177,7 @@ fn limiter_lookahead_alignment() {
     let mut limiter = BrickwallLimiter::new(LimiterConfig::default(), 48000);
     
     // Feed silence for 240 samples
-    for _ in 0..LOOKAHEAD_SAMPLES {
+    for _ in 0..240 {
         let mut l = 0.0;
         let mut r = 0.0;
         limiter.process(&mut l, &mut r);
@@ -187,7 +195,7 @@ fn limiter_lookahead_alignment() {
     // If the delayed sample was non-zero, it would be reduced.
     // Let's do a better test: Feed DC 0.5, then a peak of 2.0.
     limiter.reset();
-    for _ in 0..LOOKAHEAD_SAMPLES {
+    for _ in 0..240 {
         let mut l = 0.5;
         let mut r = 0.5;
         limiter.process(&mut l, &mut r);
@@ -206,9 +214,7 @@ fn limiter_lookahead_alignment() {
     let mut r = 2.0;
     limiter.process(&mut l, &mut r);
     // The output here is the sample from 240 samples ago, which was 0.5.
-    // Because the TRUE PEAK is now 2.0, the gain reduction is applied to this output!
-    // GR = 0.9441 / 2.0 = 0.47205
-    // Output should be 0.5 * 0.47205
-    let expected_gr = DEFAULT_CEILING_LINEAR / 2.0;
-    assert!((l - 0.5 * expected_gr).abs() < 1e-4, "Lookahead gain reduction not applied to early samples");
+    // Because the TRUE PEAK is now 2.0, the gain reduction ramps up linearly.
+    // The initial ducking should be very small or zero, avoiding pre-clicks.
+    assert!((l - 0.5).abs() < 1e-4, "Lookahead gain reduction ramps smoothly, avoiding pre-clicks");
 }

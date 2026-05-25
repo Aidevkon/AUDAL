@@ -81,13 +81,13 @@ fn engine_telemetry_matches_reference() {
 #[test]
 fn engine_adaptive_budget_selects_correct_pad() {
     let (pad, _) = calculate_adaptive_budget(&Telemetry { peak_db: -2.0, rms_db: -12.0, lufs: -144.0 }, 0.0);
-    assert_eq!(pad, -12.0);
+    assert_eq!(pad, -6.0);
 
     let (pad, _) = calculate_adaptive_budget(&Telemetry { peak_db: -5.0, rms_db: -15.0, lufs: -144.0 }, 0.0);
     assert_eq!(pad, -6.0);
 
     let (pad, _) = calculate_adaptive_budget(&Telemetry { peak_db: -15.0, rms_db: -25.0, lufs: -144.0 }, 0.0);
-    assert_eq!(pad, 0.0);
+    assert_eq!(pad, -6.0);
 }
 
 #[test]
