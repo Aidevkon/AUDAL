@@ -42,6 +42,8 @@ pub struct MaskingAwareEQ {
     current_gain_db: [f64; EQ_BANDS],
     target_gain_db:  [f64; EQ_BANDS],
     gain_step_db:    [f64; EQ_BANDS],
+    cos_w0:          [f64; EQ_BANDS],
+    alpha:           [f64; EQ_BANDS],
 
     config: MaskingEQConfig,
     sample_rate: u32,
@@ -78,6 +80,17 @@ impl MaskingAwareEQ {
         let filter_states_l  = [biquad::BiquadState::new(); EQ_BANDS];
         let filter_states_r  = [biquad::BiquadState::new(); EQ_BANDS];
 
+        let mut cos_w0 = [0.0_f64; EQ_BANDS];
+        let mut alpha  = [0.0_f64; EQ_BANDS];
+        for b in 0..EQ_BANDS {
+            let w0 = 2.0_f64 * core::f64::consts::PI
+                * (BAND_CENTER_HZ[b] as f64)
+                / (sample_rate as f64);
+            cos_w0[b] = libm::cos(w0);
+            alpha[b]  = libm::sin(w0)
+                / (2.0_f64 * (BAND_Q as f64));
+        }
+
         Ok(Self {
             analysis_buffer: vec![0.0; FFT_SIZE],
             write_pos: 0,
@@ -92,6 +105,8 @@ impl MaskingAwareEQ {
             current_gain_db,
             target_gain_db,
             gain_step_db,
+            cos_w0,
+            alpha,
             config,
             sample_rate,
         })
@@ -115,11 +130,10 @@ impl MaskingAwareEQ {
 
             for b in 0..EQ_BANDS {
                 self.current_gain_db[b] += self.gain_step_db[b];
-                self.current_coeffs[b] = biquad::rbj_bell(
-                    BAND_CENTER_HZ[b] as f64,
+                self.current_coeffs[b] = biquad::rbj_bell_fast(
+                    self.cos_w0[b],
+                    self.alpha[b],
                     self.current_gain_db[b],
-                    BAND_Q as f64,
-                    self.sample_rate as f64,
                 );
             }
 

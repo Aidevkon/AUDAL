@@ -67,6 +67,22 @@ pub fn rbj_bell(center_hz: f64, gain_db: f64, q: f64, sample_rate: f64) -> Biqua
     }
 }
 
+pub fn rbj_bell_fast(
+    cos_w0: f64,
+    alpha: f64,
+    gain_db: f64,
+) -> BiquadCoeffs {
+    let a  = libm::pow(10.0_f64, gain_db / 40.0_f64);
+    let a0 = 1.0_f64 + alpha / a;
+    BiquadCoeffs {
+        b0: (1.0_f64 + alpha * a)  / a0,
+        b1: (-2.0_f64 * cos_w0)    / a0,
+        b2: (1.0_f64 - alpha * a)  / a0,
+        a1: (-2.0_f64 * cos_w0)    / a0,
+        a2: (1.0_f64 - alpha / a)  / a0,
+    }
+}
+
 pub fn rbj_low_shelf(center_hz: f64, gain_db: f64, q: f64, sample_rate: f64) -> BiquadCoeffs {
     let a     = libm::pow(10.0, gain_db / 40.0);
     let w0    = 2.0 * core::f64::consts::PI * center_hz / sample_rate;
