@@ -1,6 +1,6 @@
 #[test]
 fn stft_perfect_reconstruction_sine() {
-    use sp314_dsp::stft::{StftEngine, FFT_SIZE, HOP_SIZE};
+    use sp314_dsp::stft::{StftEngine, FFT_SIZE};
 
     let mut engine = StftEngine::new();
     let n = FFT_SIZE * 8;  // 8 frames

@@ -24,7 +24,7 @@ pub struct ProjectManifest {
 }
 
 impl ProjectManifest {
-    pub fn generate(blob: &GoldenBlob, measurement: &Ebu128Measurement) -> Self {
+    pub fn generate(_blob: &GoldenBlob, measurement: &Ebu128Measurement) -> Self {
         Self {
             version:            "1.0".to_string(),
             input_hash:         "TODO".to_string(), // TODO: 3b — input_hash string logic removed
@@ -43,14 +43,6 @@ impl ProjectManifest {
     }
 }
 
-/// Encode a byte slice as a lowercase hex string.
-fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-        use std::fmt::Write;
-        let _ = write!(s, "{b:02x}");
-        s
-    })
-}
 
 #[cfg(test)]
 mod tests {

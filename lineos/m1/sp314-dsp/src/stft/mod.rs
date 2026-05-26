@@ -110,3 +110,6 @@ impl StftEngine {
         output
     }
 }
+
+pub mod spectral_flux;
+pub use spectral_flux::SpectralFluxDetector;
