@@ -174,8 +174,8 @@ impl DspGraph {
     }
 
     pub fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
-        debug_assert_eq!(left.len(), self.block_size);
-        debug_assert_eq!(right.len(), self.block_size);
+        debug_assert!(left.len() <= self.block_size);
+        debug_assert!(right.len() <= self.block_size);
 
         // 1. Resolve parameter modulation edges
         for edge in &self.param_edges {
@@ -190,8 +190,14 @@ impl DspGraph {
 
             if node_type == "Input" {
                 let (buf_l, buf_r) = self.buffers.get_mut(node_id).unwrap();
-                buf_l.copy_from_slice(left);
-                buf_r.copy_from_slice(right);
+                let len = left.len().min(self.block_size);
+                buf_l[..len].copy_from_slice(&left[..len]);
+                buf_r[..len].copy_from_slice(&right[..len]);
+                // Zero-pad remainder if chunk shorter than block_size
+                for i in len..self.block_size {
+                    buf_l[i] = 0.0_f32;
+                    buf_r[i] = 0.0_f32;
+                }
                 self.nodes.get_mut(node_id).unwrap().process_stereo(buf_l, buf_r);
                 continue;
             }

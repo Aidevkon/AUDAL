@@ -45,7 +45,7 @@ pub async fn trigger_mastering(
             &format!("path={} preset={}", req.audio_path, req.preset_id))
     ).ok();
 
-    const ALLOWED: &[&str] = &["spotify", "youtube", "apple_music", "tidal", "broadcast", "raw", "amazon"];
+    const ALLOWED: &[&str] = &["spotify", "youtube", "apple_music", "apple_podcast", "tidal", "broadcast", "raw", "amazon"];
     if !ALLOWED.contains(&req.preset_id.as_str()) {
         state.audit.write(
             AuditEntry::new("m0d.mastering_rejected", AuditLevel::Audit,
@@ -231,11 +231,12 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let mut audio = chunk;
 
     // Run sp314-dsp in blocking thread (no_std/alloc/sync)
-    let result = tokio::task::spawn_blocking(move || {
-        crate::dsp::DspAdapter::master(&intent, &mut audio)
+    let (result, audio) = tokio::task::spawn_blocking(move || {
+        let res = crate::dsp::DspAdapter::master(&intent, &mut audio);
+        (res, audio)
     }).await
-      .map_err(|e| format!("DSP task join error: {e}"))?
-      .map_err(|e| format!("DSP pipeline error: {:?}", e))?;
+      .map_err(|e| format!("DSP task join error: {e}"))?;
+    let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
 
 
     let lufs  = result.lufs.integrated_lufs;
@@ -279,7 +280,13 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     // Phase 10: store mastered PCM as f32 LE bytes for export.
     // FORBIDDEN: return these bytes to the frontend (Amendment A-002 §3).
     // GoldenBlob.flac_bytes = raw f32 LE interleaved PCM from DSP output (Phase 2/10).
-    let audio_bytes       = Vec::new(); // result.flac_bytes removed in v3
+    let audio_bytes: Vec<u8> = audio.left.iter()
+        .zip(audio.right.iter())
+        .flat_map(|(l, r)| {
+            l.to_le_bytes().into_iter()
+             .chain(r.to_le_bytes().into_iter())
+        })
+        .collect();
     let audio_sample_rate = pcm_sr_for_telemetry;
     let audio_channels    = pcm_channels_for_telemetry;
 

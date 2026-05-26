@@ -45,10 +45,22 @@ impl DspAdapter {
         while frame < num_frames {
             let end = (frame + block_size).min(num_frames);
             let block_len = end - frame;
-            graph.process_block(
-                &mut audio.left[frame..end],
-                &mut audio.right[frame..end],
-            );
+            if block_len < block_size {
+                let mut pad_l = vec![0.0_f32; block_size];
+                let mut pad_r = vec![0.0_f32; block_size];
+                pad_l[..block_len].copy_from_slice(&audio.left[frame..end]);
+                pad_r[..block_len].copy_from_slice(&audio.right[frame..end]);
+                
+                graph.process_block(&mut pad_l, &mut pad_r);
+                
+                audio.left[frame..end].copy_from_slice(&pad_l[..block_len]);
+                audio.right[frame..end].copy_from_slice(&pad_r[..block_len]);
+            } else {
+                graph.process_block(
+                    &mut audio.left[frame..end],
+                    &mut audio.right[frame..end],
+                );
+            }
             frame += block_len;
         }
 

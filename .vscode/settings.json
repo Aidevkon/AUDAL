@@ -4,6 +4,7 @@
         "lineos/m1/sp314-nodes/**/*",
         "lineos/m1/lineos-types/**/*",
         "lineos/m0/m0-daemon/**/*",
+        "lineos/m1/xaak/**/*",
         "lineos/m1/telemetry/**/*",
         "lineos/m1/metadata/**/*",
         "lineos/m1/insights/**/*",
@@ -13,8 +14,8 @@
         "apps/stillair/cockpit-dioxus/src/**/*",
         "apps/stillair/src-tauri/**/*"
     ],
-    "antigravity.agent.context.maxFiles": 200,
-    "antigravity.agent.context.maxTokens": 80000,
+    "antigravity.agent.context.maxFiles": 150,
+    "antigravity.agent.context.maxTokens": 60000,
     "antigravity.agent.context.followImports": true,
     "antigravity.agent.context.includeTests": true,
     "antigravity.agent.context.preferLocalSymbols": true
