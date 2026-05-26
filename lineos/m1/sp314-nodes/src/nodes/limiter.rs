@@ -14,6 +14,7 @@ impl LimiterNode {
             release_ms: 100.0,
             ceiling_db,
             midside_eq_enabled: false,
+            true_peak_enabled: true,
         };
         Self {
             limiter: BrickwallLimiter::new(config, sample_rate as u32),
@@ -35,6 +36,7 @@ impl DspNode for LimiterNode {
                 release_ms: 100.0,
                 ceiling_db: self.ceiling_db,
                 midside_eq_enabled: false,
+                true_peak_enabled: true,
             };
             // Note: Re-creating the limiter flushes the lookahead delay line.
             // This is acceptable only when re-configuring before processing, 
