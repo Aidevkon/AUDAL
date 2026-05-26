@@ -136,19 +136,15 @@ pub fn autotune(
             // Too hot — pull back
             max_gain = mid;
         } else if output_lufs < target_lufs {
-            // Too quiet — push up
-            min_gain = mid;
+            // Too quiet — push up, save as best candidate
+            min_gain    = mid;
             best_makeup = mid;
             best_rms    = output_rms;
             best_lufs   = output_lufs;
             best_clip   = clip_ratio;
         } else {
-            // Too loud — pull back
+            // Too loud — pull back, do NOT save as best
             max_gain = mid;
-            best_makeup = mid;
-            best_rms    = output_rms;
-            best_lufs   = output_lufs;
-            best_clip   = clip_ratio;
         }
 
         if max_gain - min_gain < AUTOTUNE_TOLERANCE_DB { break; }
