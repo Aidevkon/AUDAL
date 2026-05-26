@@ -3,18 +3,22 @@
 
 use crate::limiter::delay::RingBuffer;
 use crate::limiter::envelope::PeakFollower;
+use crate::limiter::midside::MidSideProcessor;
 
 pub struct BrickwallLimiter {
     delay_l:  RingBuffer,
     delay_r:  RingBuffer,
     follower: PeakFollower,
     lookahead: usize,
+    midside:            MidSideProcessor,
+    midside_eq_enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LimiterConfig {
     pub release_ms:      f32,   // default: 100.0
     pub ceiling_db:      f32,   // default: -0.5
+    pub midside_eq_enabled: bool,  // default: false
 }
 
 impl Default for LimiterConfig {
@@ -22,6 +26,7 @@ impl Default for LimiterConfig {
         Self {
             release_ms:  100.0_f32,
             ceiling_db:  -0.5_f32,
+            midside_eq_enabled: false,
         }
     }
 }
@@ -35,11 +40,20 @@ impl BrickwallLimiter {
             delay_r:  RingBuffer::new(lookahead),
             follower: PeakFollower::new(config.release_ms, ceiling_linear, sample_rate, lookahead),
             lookahead,
+            midside:            MidSideProcessor::new(),
+            midside_eq_enabled: config.midside_eq_enabled,
         }
     }
 
     #[inline]
     pub fn process(&mut self, left: &mut f32, right: &mut f32) {
+        // Apply Mid/Side HP EQ if enabled
+        // Must run BEFORE delay line and sidechain
+        if self.midside_eq_enabled {
+            let (l, r) = self.midside.process(*left, *right);
+            *left  = l;
+            *right = r;
+        }
         let max_delayed_l = self.delay_l.max_abs();
         let max_delayed_r = self.delay_r.max_abs();
         let delayed_peak  = libm::fmaxf(max_delayed_l, max_delayed_r);
@@ -67,6 +81,7 @@ impl BrickwallLimiter {
         self.delay_l.reset();
         self.delay_r.reset();
         self.follower.reset();
+        self.midside.reset();
     }
 
     pub fn lookahead_samples(&self) -> usize {
