@@ -14,6 +14,7 @@ pub struct MasteringIntent {
     pub target:      LoudnessTarget,
     pub preset_name: String,
     pub stem_mode:   bool,
+    pub target_makeup_db: f32,
 }
 
 impl MasteringIntent {
@@ -22,6 +23,7 @@ impl MasteringIntent {
             target:      LoudnessTarget::spotify(),
             preset_name: "SpotifyV3".into(),
             stem_mode:   false,
+            target_makeup_db: 0.0,
         }
     }
     pub fn podcast() -> Self {
@@ -29,6 +31,7 @@ impl MasteringIntent {
             target:      LoudnessTarget::podcast(),
             preset_name: "Podcast".into(),
             stem_mode:   false,
+            target_makeup_db: 0.0,
         }
     }
 }
