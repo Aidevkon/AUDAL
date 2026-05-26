@@ -119,3 +119,6 @@ pub use hpss::HpssProcessor;
 
 pub mod stem_renderer;
 pub use stem_renderer::StemRenderer;
+
+pub mod nmf;
+pub use nmf::NmfEngine;
