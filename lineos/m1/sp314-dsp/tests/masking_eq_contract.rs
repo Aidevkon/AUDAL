@@ -5,11 +5,6 @@ use sp314_dsp::masking_eq::{
     biquad::{rbj_peaking_coeffs, process_biquad}, HOP_SIZE, EQ_BANDS
 };
 
-fn load_fixture(name: &str) -> Value {
-    let path = format!("tests/fixtures/{}.json", name);
-    let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read {}", path));
-    serde_json::from_str(&content).expect("Failed to parse JSON")
-}
 
 
 

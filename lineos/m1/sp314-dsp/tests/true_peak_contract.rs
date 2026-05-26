@@ -1,5 +1,5 @@
 const DIGITAL_PEAK: f32 = 0.9;
-const TRUE_PEAK_MIN: f32 = 0.9; 
+
 
 #[test]
 fn true_peak_exceeds_digital_peak() {

@@ -29,7 +29,7 @@ pub fn measure(blob: &GoldenBlob) -> Ebu128Measurement {
     lra_calc.feed_samples(&samples, ch);
     let loudness_range_lu = lra_calc.compute();
 
-    let duration_seconds = if sr > 0 && ch > 0 {
+    let _duration_seconds = if sr > 0 && ch > 0 {
         samples.len() as f32 / (sr as f32 * ch as f32)
     } else {
         0.0
@@ -49,7 +49,7 @@ pub fn measure(blob: &GoldenBlob) -> Ebu128Measurement {
 
 /// Parse raw f32 LE PCM from Golden Blob flac_bytes.
 /// Phase 3 stub: Phase 4 replaces with symphonia FLAC decode.
-fn pcm_from_blob(blob: &GoldenBlob) -> Vec<f32> {
+fn pcm_from_blob(_blob: &GoldenBlob) -> Vec<f32> {
     // TODO: 3b — flac_bytes removed in v3
     Vec::new()
 }
@@ -59,29 +59,7 @@ mod tests {
     use super::*;
     use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
 
-    fn make_test_blob() -> GoldenBlob {
-        // TODO: 3b — update to Pipelineforge
-        GoldenBlob {
-            output_lufs: lineos_types::LufsReport {
-                integrated_lufs: -14.0,
-                true_peak_dbfs: -1.0,
-                loudness_range_lu: 0.0,
-                short_term_lufs: None,
-            },
-            input_profile: lineos_types::GoldenInputProfile {
-                dynamic_range_lu: 10.0,
-                stereo_correlation: 1.0,
-                integrated_lufs: -14.0,
-                true_peak_dbfs: -1.0,
-                crest_factor_db: 5.0,
-                spectral_centroid: 1000.0,
-            },
-            blob_type: lineos_types::BlobType::Audio,
-            sha256: "aabbccdd".to_string(),
-            preset_name: "spotify".to_string(),
-            engine_version: "1.0".to_string(),
-        }
-    }
+
 
     #[test]
     fn test_measure_produces_valid_output() {
