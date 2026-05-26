@@ -113,3 +113,6 @@ impl StftEngine {
 
 pub mod spectral_flux;
 pub use spectral_flux::SpectralFluxDetector;
+
+pub mod hpss;
+pub use hpss::HpssProcessor;
