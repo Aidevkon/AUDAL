@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-05-26T00:29:34.064093Z",
+  "ffmpeg_version": "7.0.2",
+  "files": {
+    "test_input": {
+      "path": "/home/aidevcon/Music/test.wav",
+      "integrated_lufs": -11.5,
+      "lra": 2.0,
+      "true_peak_dbtp": -0.7
+    },
+    "test_mastered": {
+      "path": "/home/aidevcon/Music/test_mastered.wav",
+      "integrated_lufs": -15.9,
+      "lra": 2.0,
+      "true_peak_dbtp": -3.1
+    },
+    "mastered_real": {
+      "path": "/home/aidevcon/Music/mastered.wav",
+      "integrated_lufs": -19.9,
+      "lra": 5.9,
+      "true_peak_dbtp": -0.5
+    }
+  },
+  "sp314_validation": {
+    "sp314_input_lufs": -11.5,
+    "sp314_output_lufs": -15.9,
+    "ffmpeg_input_lufs": -11.5,
+    "ffmpeg_output_lufs": -15.9,
+    "input_delta_lu": 0.0,
+    "output_delta_lu": 0.0,
+    "input_within_tolerance": true,
+    "output_within_tolerance": true
+  },
+  "validation": {
+    "true_peak_under_ceiling": true,
+    "ceiling_dbtp": -0.5,
+    "lufs_change_db": -4.4,
+    "sp314_vs_ffmpeg_delta": 0.0
+  }
+}
