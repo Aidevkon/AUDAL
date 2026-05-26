@@ -42,6 +42,7 @@ fn default_engine_config() -> EngineConfig {
         limiter_config: sp314_dsp::limiter::LimiterConfig::default(),
         restoration_config: sp314_dsp::restoration::RestorationConfig::bypass(),
         harmonic_config: None,
+        clipper_enabled: false,
     }
 }
 

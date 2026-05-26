@@ -4,6 +4,7 @@ use crate::pipeline::phase::PhaseAligner;
 use crate::pipeline::gain::HeadroomManager;
 use crate::pipeline::telemetry::{Telemetry, analyze_offline_pre_pass};
 use crate::limiter::{BrickwallLimiter, LimiterConfig};
+use crate::limiter::clipper::OversampledSoftClipper;
 use crate::harmonic::{HarmonicEngine, HarmonicConfig};
 use crate::restoration::{RestorationChain, RestorationConfig};
 
@@ -18,6 +19,7 @@ pub struct EngineConfig {
     pub limiter_config:   LimiterConfig,
     pub restoration_config: RestorationConfig,
     pub harmonic_config:  Option<HarmonicConfig>,
+    pub clipper_enabled: bool,
 }
 
 /// The core deterministic mastering engine.
@@ -28,6 +30,7 @@ pub struct Sp314MasteringEngine {
     pub aligner: PhaseAligner,
     pub harmonic: HarmonicEngine,
     pub limiter: BrickwallLimiter,
+    pub clipper: OversampledSoftClipper,
     pub restoration: RestorationChain,
     pub config:  EngineConfig,
 }
@@ -62,6 +65,7 @@ impl Sp314MasteringEngine {
             aligner: PhaseAligner::new(crossover_hz, sample_rate),
             harmonic: HarmonicEngine::new(harmonic_config),
             limiter: BrickwallLimiter::new(config.limiter_config, sample_rate),
+            clipper: OversampledSoftClipper::new(config.clipper_enabled),
             restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone(), pad_db),
             config,
         })
@@ -93,6 +97,17 @@ impl Sp314MasteringEngine {
         self.process_stereo_block_internal(left, right);
 
         headroom.apply_output_makeup_no_clip(left, right);
+
+        // Soft clipper (oversampled, unity gain)
+        if self.config.clipper_enabled {
+            for i in 0..left.len() {
+                let (l, r) = self.clipper.process(
+                    left[i], right[i]
+                );
+                left[i]  = l;
+                right[i] = r;
+            }
+        }
 
         self.limiter.process_block(left, right);
 
