@@ -1,0 +1,24 @@
+{
+  "sample_rate": 48000,
+  "fast_release": {
+    "ms": 30.0,
+    "coeff": 0.0015266113194140063,
+    "half_decay_ms": 9.458333333333332
+  },
+  "slow_release": {
+    "ms": 300.0,
+    "coeff": 0.00015276610784742406,
+    "half_decay_ms": 94.52083333333333
+  },
+  "blend": {
+    "attack_ms": 1.0,
+    "attack_coeff": 0.044798850883711605,
+    "release_ms": 100.0,
+    "release_coeff": 0.00045822831465625047
+  },
+  "theory": {
+    "blend_0_means": "pure fast release \u2014 transient mode",
+    "blend_1_means": "pure slow release \u2014 sustained LF mode",
+    "slope_threshold": 0.001
+  }
+}
