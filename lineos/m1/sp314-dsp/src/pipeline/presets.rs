@@ -109,6 +109,7 @@ fn transparent_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::bypass(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -130,6 +131,7 @@ fn spotify_v3_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::music(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -151,6 +153,7 @@ fn podcast_voice_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::voice(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -172,6 +175,7 @@ fn loud_master_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::music(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -193,6 +197,7 @@ fn aggressive_edm_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::music(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -214,6 +219,7 @@ fn classical_acoustic_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::music(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -235,6 +241,7 @@ fn broadcast_video_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::voice(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
 
@@ -255,5 +262,6 @@ fn atsc_a85_config(_sample_rate: u32) -> EngineConfig {
         limiter_config:   LimiterConfig::default(),
         restoration_config: RestorationConfig::voice(),
         harmonic_config:  None,
+        clipper_enabled: false,
     }
 }
