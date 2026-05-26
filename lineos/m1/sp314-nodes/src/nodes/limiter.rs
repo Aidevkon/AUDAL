@@ -13,6 +13,7 @@ impl LimiterNode {
         let config = LimiterConfig {
             release_ms: 100.0,
             ceiling_db,
+            true_peak_enabled: true,
         };
         Self {
             limiter: BrickwallLimiter::new(config, sample_rate as u32),
@@ -33,6 +34,7 @@ impl DspNode for LimiterNode {
             let config = LimiterConfig {
                 release_ms: 100.0,
                 ceiling_db: self.ceiling_db,
+                true_peak_enabled: true,
             };
             // Note: Re-creating the limiter flushes the lookahead delay line.
             // This is acceptable only when re-configuring before processing, 
