@@ -116,3 +116,6 @@ pub use spectral_flux::SpectralFluxDetector;
 
 pub mod hpss;
 pub use hpss::HpssProcessor;
+
+pub mod stem_renderer;
+pub use stem_renderer::StemRenderer;
