@@ -9,6 +9,7 @@
         "lineos/m1/metadata/**/*",
         "lineos/m1/insights/**/*",
         "lineos/m1/rule-engine/**/*",
+        "lineos/m1/sp314-dsp/src/stft/**/*",
         "pipelines/pipelineforge/**/*",
         "apps/runtime/openclaw/**/*",
         "apps/stillair/cockpit-dioxus/src/**/*",

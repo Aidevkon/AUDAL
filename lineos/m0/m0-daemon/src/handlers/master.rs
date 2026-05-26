@@ -12,6 +12,8 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
+use sp314_dsp::pipeline::autotune::autotune;
+use sp314_dsp::pipeline::presets::MasteringTarget;
 use uuid::Uuid;
 
 use crate::app_state::AppState;
@@ -213,6 +215,32 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     };
 
 
+    // Autotune: find optimal makeup_db for target LUFS
+    let mastering_target = match preset_id {
+        "spotify"      => MasteringTarget::SpotifyV3,
+        "apple_music"  => MasteringTarget::SpotifyV3,
+        "apple_podcast"=> MasteringTarget::SpotifyV3,
+        "youtube"      => MasteringTarget::SpotifyV3,
+        "tidal"        => MasteringTarget::SpotifyV3,
+        _              => MasteringTarget::SpotifyV3,
+    };
+    let base_config = mastering_target.engine_config(
+        chunk.sample_rate);
+    let autotune_result = autotune(
+        &chunk.left,
+        &chunk.right,
+        base_config,
+        mastering_target,
+        chunk.sample_rate,
+    );
+    tracing::info!(
+        "Autotune: makeup_db={:.2} lufs={:.2} iter={} ok={}",
+        autotune_result.makeup_db,
+        autotune_result.achieved_lufs,
+        autotune_result.iterations,
+        autotune_result.converged,
+    );
+
     // MasteringIntent — all three fields verified:
     //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
     //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
@@ -226,6 +254,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
         },
         preset_name: preset_id.to_string(),
         stem_mode: false,
+        target_makeup_db: autotune_result.makeup_db,
     };
 
     let mut audio = chunk;
@@ -239,7 +268,17 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
 
 
-    let lufs  = result.lufs.integrated_lufs;
+    // Build interleaved post-master samples for telemetry
+    let post_master_samples: Vec<f32> = audio.left.iter()
+        .zip(audio.right.iter())
+        .flat_map(|(l, r)| [*l, *r])
+        .collect();
+    let post_master_sr       = pcm_sr_for_telemetry;
+    let post_master_channels = 2_u16;
+
+    // Measure integrated LUFS on post-master output
+    let lufs = sp314_dsp::metering::measure_integrated_lufs(&audio.left, &audio.right);
+    tracing::info!("Post-DSP integrated LUFS: {:.4}", lufs);
     let tp    = result.lufs.true_peak_dbfs;
     let lra   = result.lufs.loudness_range_lu;
     let dr    = 10.0; // dynamic range proxy for v3
@@ -251,9 +290,9 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     // LRA measures source material dynamic range — per EBU Tech 3342.
     // Uses libm — no std::f32 methods per LineOS Constitution §09.1.
     let telemetry_lra = tokio::task::spawn_blocking({
-        let samples  = pcm_samples_for_telemetry.clone();
-        let sr       = pcm_sr_for_telemetry;
-        let channels = pcm_channels_for_telemetry;
+        let samples  = post_master_samples.clone();
+        let sr       = post_master_sr;
+        let channels = post_master_channels;
         move || {
             let mut calc = LraCalculator::new(sr);
             calc.feed_samples(&samples, channels);
@@ -262,14 +301,14 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     }).await.unwrap_or(lra);   // fallback to sp314-dsp value on join failure
 
     let telemetry_momentary  = momentary_lufs(
-        &pcm_samples_for_telemetry,
-        pcm_sr_for_telemetry,
-        pcm_channels_for_telemetry,
+        &post_master_samples,
+        post_master_sr,
+        post_master_channels,
     );
     let telemetry_short_term = short_term_lufs(
-        &pcm_samples_for_telemetry,
-        pcm_sr_for_telemetry,
-        pcm_channels_for_telemetry,
+        &post_master_samples,
+        post_master_sr,
+        post_master_channels,
     );
 
     tracing::info!(

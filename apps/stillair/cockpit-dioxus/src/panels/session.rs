@@ -131,6 +131,7 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
                 for (preset_id, label) in PRESETS {
                     {
                         let pid  = preset_id.to_string();
+                        let pid2 = pid.clone();
                         let lbl  = label.to_string();
                         let p    = path.clone();
                         let n    = name.clone();
@@ -142,7 +143,7 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
                                     mode.set(CockpitMode::PresetSelected {
                                         path:      p.clone(),
                                         name:      n.clone(),
-                                        preset_id: pid.clone(),
+                                        preset_id: pid2.clone(),
                                     });
                                 },
                                 style: "background:var(--surface-panel);
@@ -404,12 +405,13 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                 for fmt in ["flac", "wav", "mp3", "aiff"] {
                     {
                         let f   = fmt.to_string();
+                        let f2  = f.clone();
                         let sel = export_format.read().clone() == fmt;
                         rsx! {
                             button {
                                 key: "{f}",
                                 id:  "fmt-{f}",
-                                onclick: move |_| export_format.set(f.clone()),
+                                onclick: move |_| export_format.set(f2.clone()),
                                 style: if sel {
                                     "background:var(--accent-session); color:#fff;
                                      border:none; border-radius:3px; padding:0.35rem 0.75rem;
