@@ -1,0 +1,14 @@
+{
+  "filter_type": "highpass_butterworth",
+  "cutoff_hz": 100.0,
+  "q_factor": 0.70710678,
+  "sample_rate": 48000.0,
+  "purpose": "Mid-Side EQ HP filter \u2014 DC blocking for S channel",
+  "coefficients": {
+    "b0": 0.9907866979251796,
+    "b1": -1.9815733958503592,
+    "b2": 0.9907866979251796,
+    "a1": -1.9814885091140801,
+    "a2": 0.9816582825866383
+  }
+}
