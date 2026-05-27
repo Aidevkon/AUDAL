@@ -23,6 +23,7 @@ name = "aether"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "lineos-types",
  "serde",
  "serde_json",
  "sha2",
@@ -5088,6 +5089,7 @@ dependencies = [
  "hex",
  "hound",
  "libm",
+ "lineos-types",
  "ringbuf 0.3.3",
  "rustfft",
  "serde",

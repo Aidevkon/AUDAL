@@ -19,8 +19,10 @@ pub mod errors;
 pub mod golden_blob;
 pub mod mastering;
 pub mod metrics;
+pub mod analysis;
 
 // Convenience re-exports for migration
+pub use analysis::{StemFeatures, StemMetrics, MixMetrics};
 pub use audio::{AudioChunk, StereoBuffer};
 pub use config::{Bmr128Schema, LoudnessTarget, PipelineConstants, PresetThresholds};
 pub use golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
