@@ -43,3 +43,8 @@ required-features = ["cli"]
 name = "sp314_live"
 path = "src/bin/sp314_live.rs"
 required-features = ["cli"]
+
+[[bin]]
+name = "sp314_stems"
+path = "src/bin/sp314_stems.rs"
+required-features = ["cli"]
