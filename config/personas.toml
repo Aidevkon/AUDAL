@@ -1,0 +1,233 @@
+# Creator OS — Built-in Personas
+# Authority: spec/locked/S-003_persona_schema.md v1.1
+# Compile-time embedded via include_str!()
+
+[[personas]]
+id              = "warm_analog"
+display_name    = "Warm Analog"
+description     = "Tape-like warmth with harmonic bloom and low-mid body"
+chaos_intensity = 0.6
+
+[personas.macros.warmth]
+default = 0.7
+min     = 0.0
+max     = 1.0
+curve   = "Log"
+
+[personas.macros.punch]
+default = 0.4
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.forwardness]
+default = 0.4
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.smoothness]
+default = 0.6
+min     = 0.0
+max     = 1.0
+curve   = "Exp"
+
+[personas.dsp_base]
+low_shelf_gain_db   = 1.5
+low_shelf_freq_hz   = 180.0
+high_shelf_gain_db  = -0.5
+high_shelf_freq_hz  = 10000.0
+comp_threshold_db   = -18.0
+comp_ratio          = 2.5
+comp_attack_ms      = 30.0
+comp_release_ms     = 150.0
+saturation_drive    = 0.4
+saturation_mix      = 0.6
+stereo_width        = 1.0
+
+[personas.zone_priorities]
+dialogue = 6
+bass     = 7
+air      = 4
+presence = 5
+
+[personas.chaos]
+width_depth   = 0.3
+drive_depth   = 0.8
+release_depth = 0.5
+attack_depth  = 0.2
+air_depth     = 0.3
+
+# ─────────────────────────────────────────
+
+[[personas]]
+id              = "clean_punch"
+display_name    = "Clean Punch"
+description     = "Transient emphasis with tight dynamics and minimal colour"
+chaos_intensity = 0.4
+
+[personas.macros.warmth]
+default = 0.3
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.punch]
+default = 0.8
+min     = 0.0
+max     = 1.0
+curve   = "Log"
+
+[personas.macros.forwardness]
+default = 0.6
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.smoothness]
+default = 0.3
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.dsp_base]
+low_shelf_gain_db   = 0.0
+low_shelf_freq_hz   = 120.0
+high_shelf_gain_db  = 0.5
+high_shelf_freq_hz  = 12000.0
+comp_threshold_db   = -20.0
+comp_ratio          = 4.0
+comp_attack_ms      = 8.0
+comp_release_ms     = 80.0
+saturation_drive    = 0.1
+saturation_mix      = 0.2
+stereo_width        = 1.0
+
+[personas.zone_priorities]
+dialogue = 8
+bass     = 5
+air      = 6
+presence = 7
+
+[personas.chaos]
+width_depth   = 0.2
+drive_depth   = 0.2
+release_depth = 0.7
+attack_depth  = 0.8
+air_depth     = 0.2
+
+# ─────────────────────────────────────────
+
+[[personas]]
+id              = "hybrid_hifi"
+display_name    = "Hybrid HiFi"
+description     = "Wide stereo image with air shimmer and clean transients"
+chaos_intensity = 0.5
+
+[personas.macros.warmth]
+default = 0.4
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.punch]
+default = 0.5
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.forwardness]
+default = 0.6
+min     = 0.0
+max     = 1.0
+curve   = "Log"
+
+[personas.macros.smoothness]
+default = 0.6
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.dsp_base]
+low_shelf_gain_db   = 0.5
+low_shelf_freq_hz   = 150.0
+high_shelf_gain_db  = 1.0
+high_shelf_freq_hz  = 12000.0
+comp_threshold_db   = -16.0
+comp_ratio          = 2.0
+comp_attack_ms      = 20.0
+comp_release_ms     = 120.0
+saturation_drive    = 0.15
+saturation_mix      = 0.3
+stereo_width        = 1.05
+
+[personas.zone_priorities]
+dialogue = 5
+bass     = 5
+air      = 8
+presence = 5
+
+[personas.chaos]
+width_depth   = 0.8
+drive_depth   = 0.1
+release_depth = 0.3
+attack_depth  = 0.2
+air_depth     = 0.7
+
+# ─────────────────────────────────────────
+
+[[personas]]
+id              = "cinematic_wide"
+display_name    = "Cinematic Wide"
+description     = "Deep spatial imaging with dramatic dynamics for film and scoring"
+chaos_intensity = 0.7
+
+[personas.macros.warmth]
+default = 0.6
+min     = 0.0
+max     = 1.0
+curve   = "Log"
+
+[personas.macros.punch]
+default = 0.5
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.forwardness]
+default = 0.4
+min     = 0.0
+max     = 1.0
+curve   = "Linear"
+
+[personas.macros.smoothness]
+default = 0.7
+min     = 0.0
+max     = 1.0
+curve   = "Exp"
+
+[personas.dsp_base]
+low_shelf_gain_db   = 2.0
+low_shelf_freq_hz   = 200.0
+high_shelf_gain_db  = 0.5
+high_shelf_freq_hz  = 11000.0
+comp_threshold_db   = -22.0
+comp_ratio          = 3.0
+comp_attack_ms      = 40.0
+comp_release_ms     = 200.0
+saturation_drive    = 0.3
+saturation_mix      = 0.5
+stereo_width        = 1.1
+
+[personas.zone_priorities]
+dialogue = 4
+bass     = 9
+air      = 5
+presence = 4
+
+[personas.chaos]
+width_depth   = 0.9
+drive_depth   = 0.5
+release_depth = 0.6
+attack_depth  = 0.4
+air_depth     = 0.5

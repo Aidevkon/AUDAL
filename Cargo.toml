@@ -13,6 +13,7 @@ members = [
     "apps/stillair/src-tauri",
     "apps/stillair/cockpit-dioxus",   # Phase 11: Dioxus 0.6 Cockpit
     "creator-os/shared/adapter-runtime", "lineos/m1/sp314-nodes", "pipelines/pipelineforge", "apps/runtime/openclaw",  # Phase 8: Aether LLM adapter runtime
+    "aether",
 ]
 # Phase 1:  m0-daemon             per P1-001
 # Phase 2:  sp314-dsp             per P2-001
