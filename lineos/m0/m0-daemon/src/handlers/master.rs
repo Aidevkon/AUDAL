@@ -12,8 +12,7 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use sp314_dsp::pipeline::autotune::autotune;
-use sp314_dsp::pipeline::presets::MasteringTarget;
+use crate::dsp::autotune::autotune_dsp;
 use uuid::Uuid;
 
 use crate::app_state::AppState;
@@ -207,40 +206,39 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let pcm_channels_for_telemetry = pcm.channels;          // Phase 9
     let pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
     // Create StereoBuffer (AudioChunk)
-    let chunk = AudioChunk {
+    let mut chunk = AudioChunk {
         left: pcm.samples.iter().step_by(2).copied().collect(),
         right: pcm.samples.iter().skip(1).step_by(2).copied().collect(),
         sample_rate: pcm.sample_rate,
         num_frames: pcm.samples.len() / 2,
     };
 
-
-    // Autotune: find optimal makeup_db for target LUFS
-    let mastering_target = match preset_id {
-        "spotify"       => MasteringTarget::SpotifyV3,
-        "apple_music"   => MasteringTarget::SpotifyV3,
-        "apple_podcast" => MasteringTarget::SpotifyV3,
-        "youtube"       => MasteringTarget::SpotifyV3,
-        "tidal"         => MasteringTarget::SpotifyV3,
-        "broadcast"     => MasteringTarget::BroadcastVideo,
-        _               => MasteringTarget::SpotifyV3,
-    };
-    let base_config = mastering_target.engine_config(
-        chunk.sample_rate);
-    let autotune_result = autotune(
-        &chunk.left,
-        &chunk.right,
-        base_config,
-        mastering_target,
-        chunk.sample_rate,
-    );
+    // M0-native autotune — uses exact production pipeline
+    // No more engine divergence (sp314-dsp vs DspAdapter)
+    let autotune_result = autotune_dsp(&chunk, &MasteringIntent {
+        target: LoudnessTarget {
+            target_lufs:      target_lufs.unwrap_or(-14.0),
+            max_true_peak_db: -1.0,
+            max_lra_lu:       None,
+            platform:         "default".into(),
+        },
+        preset_name:      preset_id.to_string(),
+        stem_mode:        false,
+        target_makeup_db: 0.0,
+    });
     tracing::info!(
-        "Autotune: makeup_db={:.2} lufs={:.2} iter={} ok={}",
-        autotune_result.makeup_db,
+        "Autotune (native): input_gain_db={:.2} lufs={:.2} iter={} ok={}",
+        autotune_result.input_gain_db,
         autotune_result.achieved_lufs,
         autotune_result.iterations,
         autotune_result.converged,
     );
+
+    // Apply autotune input gain to audio
+    let gain_linear = 10.0_f32
+        .powf(autotune_result.input_gain_db / 20.0_f32);
+    for s in chunk.left.iter_mut()  { *s *= gain_linear; }
+    for s in chunk.right.iter_mut() { *s *= gain_linear; }
 
     // MasteringIntent — all three fields verified:
     //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
@@ -248,14 +246,14 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     //   export_16bit: false (24-bit dither, lossless output)
     let intent = MasteringIntent {
         target: LoudnessTarget {
-            target_lufs: target_lufs.unwrap_or(-14.0),
+            target_lufs:      target_lufs.unwrap_or(-14.0),
             max_true_peak_db: -1.0,
-            max_lra_lu: None,
-            platform: "default".into(),
+            max_lra_lu:       None,
+            platform:         "default".into(),
         },
-        preset_name: preset_id.to_string(),
-        stem_mode: false,
-        target_makeup_db: autotune_result.makeup_db,
+        preset_name:      preset_id.to_string(),
+        stem_mode:        false,
+        target_makeup_db: 0.0,  // input gain applied above
     };
 
     let mut audio = chunk;

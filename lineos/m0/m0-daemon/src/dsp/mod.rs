@@ -3,6 +3,8 @@
 // Replaces MasteringPipeline::master() from v2.9.
 // Orchestrates: pipelineforge → sp314-nodes DspGraph → process_offline
 
+pub mod autotune;
+
 use pipelineforge::conditions::{ConditionSet, EngineerCondition};
 use pipelineforge::forge::Pipelineforge;
 use sp314_nodes::graph::DspGraph;
