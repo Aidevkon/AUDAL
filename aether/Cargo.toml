@@ -9,6 +9,7 @@ path = "lib.rs"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 toml  = "0.8"
+sha2  = "0.10"
 libm  = "0.2"
 
 [dev-dependencies]
