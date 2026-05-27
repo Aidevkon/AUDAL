@@ -64,6 +64,29 @@ impl DspAdapter {
             frame += block_len;
         }
 
+        // Post-process LUFS correction — mathematically exact
+        // Measure actual output LUFS and correct to target
+        use sp314_dsp::metering::measure_integrated_lufs;
+        let output_lufs = measure_integrated_lufs(
+            &audio.left, &audio.right);
+        let target_lufs = intent.target.target_lufs;
+
+        if output_lufs > -69.0 {
+            let correction_db = target_lufs - output_lufs;
+            // Clamp correction to ±6dB to avoid wild swings
+            let correction_db = correction_db
+                .max(-6.0_f32)
+                .min(6.0_f32);
+            let correction_linear = 10.0_f32
+                .powf(correction_db / 20.0_f32);
+            for s in audio.left.iter_mut() {
+                *s *= correction_linear;
+            }
+            for s in audio.right.iter_mut() {
+                *s *= correction_linear;
+            }
+        }
+
         // 5. Measure output LUFS
         // Use sp314-dsp metering if available, or compute simple RMS
         let output_lufs = Self::measure_lufs(&audio.left, &audio.right, audio.sample_rate);

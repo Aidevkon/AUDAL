@@ -88,11 +88,15 @@ pub fn autotune(
         Some(t) => t,
     };
 
-    // Find highest energy chunk
-    let chunk_start = find_highest_energy_chunk(left, right);
-    let chunk_end   = (chunk_start + AUTOTUNE_CHUNK_SAMPLES).min(left.len());
-    let chunk_l     = &left[chunk_start..chunk_end];
-    let chunk_r     = &right[chunk_start..chunk_end];
+    const FULL_FILE_THRESHOLD: usize = 48_000 * 30;
+
+    let (chunk_l, chunk_r) = if left.len() <= FULL_FILE_THRESHOLD {
+        (left, right)
+    } else {
+        let start = find_highest_energy_chunk(left, right);
+        let end = (start + AUTOTUNE_CHUNK_SAMPLES).min(left.len());
+        (&left[start..end], &right[start..end])
+    };
 
     let mut min_gain = AUTOTUNE_MIN_GAIN_DB;
     let mut max_gain = AUTOTUNE_MAX_GAIN_DB;
