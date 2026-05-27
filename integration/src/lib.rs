@@ -5,6 +5,9 @@ pub mod config;
 pub mod error;
 pub mod firewall;
 pub mod proof_log;
+pub mod overrides;
+
+pub use overrides::DspOverrides;
 
 pub use config::{DspConfig, DspEqConfig, DspDynamicsConfig,
                  DspSatConfig, DspStereoConfig, ZoneBand,
