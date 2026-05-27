@@ -39,3 +39,6 @@ pub mod io;
 pub mod realtime;
 pub mod restoration;
 pub mod stft;
+
+pub mod analysis;
+pub use analysis::{StemFeatures, StemMetrics, MixMetrics, StemFeatureAnalyzer};

@@ -13,7 +13,12 @@
         "pipelines/pipelineforge/**/*",
         "apps/runtime/openclaw/**/*",
         "apps/stillair/cockpit-dioxus/src/**/*",
-        "apps/stillair/src-tauri/**/*"
+        "apps/stillair/src-tauri/**/*",
+        "aether/**/*",
+        "integration/**/*",
+        "proof/**/*",
+        "contracts/**/*",
+        "spec/locked/**/*"
     ],
     "antigravity.agent.context.maxFiles": 150,
     "antigravity.agent.context.maxTokens": 60000,
