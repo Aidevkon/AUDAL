@@ -4106,6 +4106,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "proof"
+version = "0.1.0"
+dependencies = [
+ "aether",
+ "integration",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.39.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
