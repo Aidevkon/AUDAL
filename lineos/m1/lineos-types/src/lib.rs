@@ -24,5 +24,5 @@ pub mod metrics;
 pub use audio::{AudioChunk, StereoBuffer};
 pub use config::{Bmr128Schema, LoudnessTarget, PipelineConstants, PresetThresholds};
 pub use golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
-pub use mastering::{MasteringIntent, MasteringPipeline};
+pub use mastering::MasteringIntent;
 pub use metrics::{Ebu128Measurement, LufsReport};

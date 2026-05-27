@@ -11,3 +11,5 @@ pub mod transport_bar;
 pub mod ab_toggle;
 pub mod timecode;
 pub mod oled_tile;
+pub mod pdf_preview;
+pub use pdf_preview::PdfPreviewModal;

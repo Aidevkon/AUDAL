@@ -5124,6 +5124,7 @@ name = "stillair"
 version = "0.1.0"
 dependencies = [
  "adapter-runtime",
+ "base64 0.22.1",
  "chrono",
  "dirs 5.0.1",
  "libm",

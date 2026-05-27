@@ -12,6 +12,7 @@
 //!
 //! No re-running DSP during export — reads stored metrics from GoldenBlobJson.
 
+use base64::{Engine, engine::general_purpose::STANDARD};
 use printpdf::*;
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -50,6 +51,34 @@ pub async fn export_pdf_report(
     eprintln!("[report] BMR-128 PDF saved: blob_id={} path={}", blob.id, output_path);
 
     Ok(output_path)
+}
+
+/// Returns PDF as base64 string for in-app preview.
+/// Saves to temp file, reads back as base64.
+/// Frontend renders it via <embed> or <iframe> with data URI.
+#[tauri::command]
+pub async fn preview_pdf_report(
+    blob_id: String,
+) -> Result<String, String> {
+    let client = M0Client::new();
+    let blob   = client.get_blob(&blob_id).await
+        .map_err(|e| format!("IO_ERR:0x02:{e}"))?;
+
+    // Write to temp file
+    let tmp_path = std::env::temp_dir()
+        .join(format!("bmr128_{}.pdf", &blob_id[..8]));
+    let tmp_str  = tmp_path.to_string_lossy().to_string();
+
+    generate_bmr128_pdf(&blob, &tmp_str)?;
+
+    let pdf_bytes = tokio::fs::read(&tmp_path).await
+        .map_err(|e| format!("Failed to read temp PDF: {e}"))?;
+    
+    // Optionally delete temp file here
+    let _ = tokio::fs::remove_file(&tmp_path).await;
+
+    let base64_str = STANDARD.encode(&pdf_bytes);
+    Ok(base64_str)
 }
 
 /// Generate a BMR-128 PDF compliance report and write to `path`.

@@ -56,8 +56,8 @@ fn pcm_from_blob(_blob: &GoldenBlob) -> Vec<f32> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
+    // use super::*;
+    // use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
 
 
 

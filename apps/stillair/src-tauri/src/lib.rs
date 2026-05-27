@@ -35,6 +35,7 @@ pub fn run() {
             commands::playback::get_live_telemetry,   // P12B-005: live LUFS
             // Phase 13B: BMR-128 PDF report
             commands::report::export_pdf_report,
+            commands::report::preview_pdf_report,
             // Phase 14: precomputed SVG paths (UI Agent Context v2.1 §2)
             commands::visualization::get_visualization_data,
         ])

@@ -11,6 +11,7 @@
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::primary_signal_analyzer::PrimarySignalAnalyzer;
+
 use serde_json::json;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -354,6 +355,7 @@ fn GoldenBlobBadge() -> Element {
 #[component]
 fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
     let mut export_format = use_signal(|| "flac".to_string());
+    let mut pdf_preview_ctx = use_context::<Signal<Option<String>>>();
 
     let on_export = {
         let bid = blob_id.clone();
@@ -445,32 +447,12 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
 
             // PDF Report button (Phase 13B: BMR-128 PDF)
             {
-                let bid = blob_id.clone();
+                let _bid = blob_id.clone();
                 rsx! {
                     button {
                         id: "btn-pdf-report",
                         onclick: move |_| {
-                            let b = bid.clone();
-                            spawn_local(async move {
-                                match crate::ipc::invoke::<String, _>(
-                                    "export_pdf_report",
-                                    serde_json::json!({ "blobId": b }),
-                                ).await {
-                                    Ok(path) => {
-                                        #[cfg(debug_assertions)]
-                                        web_sys::console::log_1(
-                                            &format!("[PDF] saved: {path}").into()
-                                        );
-                                    }
-                                    Err(e) if e.contains("Cancelled") => {}
-                                    Err(e) => {
-                                        #[cfg(debug_assertions)]
-                                        web_sys::console::log_1(
-                                            &format!("[PDF] error: {e}").into()
-                                        );
-                                    }
-                                }
-                            });
+                            pdf_preview_ctx.set(Some(blob_id.clone()));
                         },
                         style: "background:var(--surface-panel); color:var(--text-muted);
                                 border:1px solid var(--border-subtle); border-radius:4px;

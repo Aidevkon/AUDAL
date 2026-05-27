@@ -86,7 +86,7 @@ mod tests {
     fn test_manifest_generates() {
         let blob = fake_blob();
         let m = test_measurement();
-        let manifest = ProjectManifest::generate(&blob, &m);
+        let _manifest = ProjectManifest::generate(&blob, &m);
         // TODO: 3b — fix tests
     }
 

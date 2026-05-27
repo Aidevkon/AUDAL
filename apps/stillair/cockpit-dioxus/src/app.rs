@@ -41,6 +41,7 @@ pub fn App() -> Element {
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
+    let mut pdf_preview_ctx = use_context_provider(|| Signal::new(None::<String>));
     let mut intent_open:    Signal<bool> = use_signal(|| false);
     let mut intent_closing: Signal<bool> = use_signal(|| false);
     let tone_angle: Signal<f32> = use_signal(|| 0.0_f32);
@@ -84,6 +85,13 @@ pub fn App() -> Element {
                     on_close: move |_| {
                         show_mastered.set(false);
                     },
+                }
+            }
+
+            if let Some(blob_id) = pdf_preview_ctx.read().as_ref() {
+                crate::components::PdfPreviewModal {
+                    blob_id: blob_id.clone(),
+                    on_close: move |_| pdf_preview_ctx.set(None),
                 }
             }
 

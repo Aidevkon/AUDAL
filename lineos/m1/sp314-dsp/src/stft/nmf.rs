@@ -7,7 +7,7 @@ fn xorshift32(state: &mut u32) -> f32 {
     *state ^= *state << 13;
     *state ^= *state >> 17;
     *state ^= *state << 5;
-    (*state as f32 / u32::MAX as f32)
+    *state as f32 / u32::MAX as f32
 }
 
 pub struct NmfEngine {

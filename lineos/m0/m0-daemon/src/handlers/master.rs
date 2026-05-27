@@ -202,7 +202,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
 
     // Build AudioChunk — always 48000 Hz stereo after decode.
     // Clone samples first so telemetry can read full-track PCM after DSP completes.
-    let pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
+    let _pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
     let pcm_channels_for_telemetry = pcm.channels;          // Phase 9
     let pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
     // Create StereoBuffer (AudioChunk)

@@ -73,9 +73,9 @@ impl Thresholds {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     
-    use std::collections::BTreeMap;
+    // use std::collections::BTreeMap;
 
     /* TODO: 3b — restore tests
     fn make_schema() -> Bmr128Schema {
