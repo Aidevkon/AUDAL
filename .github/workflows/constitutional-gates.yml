@@ -1,0 +1,54 @@
+name: Constitutional Gates
+
+on:
+  pull_request:
+    branches: [canonical]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: G-001 Aether Boundary
+        run: bash infra/ci/checks/aether-boundary-check.sh
+
+      - name: G-002 ML Origin
+        run: bash infra/ci/checks/ml-origin-check.sh
+
+      - name: G-003 LLM Contract
+        run: bash infra/ci/checks/llm-contract-check.sh
+
+      - name: G-004 Layer Isolation
+        run: bash infra/ci/checks/layer-isolation-check.sh
+
+      - name: G-005 No serde_json::Value
+        run: bash infra/ci/checks/no-value-check.sh
+
+      - name: G-006 No whisper-rs
+        run: bash infra/ci/checks/no-whisper-check.sh
+
+      - name: G-007 License Audit
+        run: cargo deny check licenses
+
+      - name: G-008 Determinism
+        run: bash infra/ci/checks/v3-determinism-check.sh
+
+      - name: G-009 No rand in DSP
+        run: bash infra/ci/checks/no-rand-dsp-check.sh
+
+      - name: G-010 No std::f32 in DSP
+        run: bash infra/ci/checks/no-std-float-check.sh
+
+      - name: G-011 Spec Coverage (warn)
+        run: bash infra/ci/checks/spec-coverage-check.sh
+        continue-on-error: true
+
+      - name: G-012 Contract Tests
+        run: cargo test --workspace
