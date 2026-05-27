@@ -11,3 +11,7 @@ pub use zone::{SemanticZone, ZoneAdjustment, ZoneAdjustments,
                CYMBAL_HARSH_CREST_THRESHOLD,
                SUB_RUMBLE_ENERGY_THRESHOLD};
 pub use resolver::SemanticZoneResolver;
+
+pub mod editor;
+pub use editor::{ZoneEditor, ZoneEditorState, ZoneEditorTier,
+                 ZoneVisual, ZoneEditorError, zone_color};
