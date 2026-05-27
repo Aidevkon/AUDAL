@@ -217,12 +217,13 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
 
     // Autotune: find optimal makeup_db for target LUFS
     let mastering_target = match preset_id {
-        "spotify"      => MasteringTarget::SpotifyV3,
-        "apple_music"  => MasteringTarget::SpotifyV3,
-        "apple_podcast"=> MasteringTarget::SpotifyV3,
-        "youtube"      => MasteringTarget::SpotifyV3,
-        "tidal"        => MasteringTarget::SpotifyV3,
-        _              => MasteringTarget::SpotifyV3,
+        "spotify"       => MasteringTarget::SpotifyV3,
+        "apple_music"   => MasteringTarget::SpotifyV3,
+        "apple_podcast" => MasteringTarget::SpotifyV3,
+        "youtube"       => MasteringTarget::SpotifyV3,
+        "tidal"         => MasteringTarget::SpotifyV3,
+        "broadcast"     => MasteringTarget::BroadcastVideo,
+        _               => MasteringTarget::SpotifyV3,
     };
     let base_config = mastering_target.engine_config(
         chunk.sample_rate);

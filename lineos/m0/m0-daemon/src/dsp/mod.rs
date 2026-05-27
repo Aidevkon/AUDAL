@@ -73,10 +73,10 @@ impl DspAdapter {
 
         if output_lufs > -69.0 {
             let correction_db = target_lufs - output_lufs;
-            // Clamp correction to ±6dB to avoid wild swings
+            // Clamp correction to ±18dB to avoid wild swings
             let correction_db = correction_db
-                .max(-6.0_f32)
-                .min(6.0_f32);
+                .max(-18.0_f32)
+                .min(18.0_f32);
             let correction_linear = 10.0_f32
                 .powf(correction_db / 20.0_f32);
             for s in audio.left.iter_mut() {
