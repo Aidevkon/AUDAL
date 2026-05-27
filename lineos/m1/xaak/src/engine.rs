@@ -16,12 +16,19 @@ use crate::{XaakKernel, PlaybackState, PcmTransfer, player::CpalPlayer};
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AbTarget { A, B }
+
 pub enum PlaybackCmd {
     Load(PcmTransfer),
+    /// Load original (pre-master) PCM for B side
+    LoadOriginal(PcmTransfer),
     Play,
     Pause,
     Stop,
     Seek(u64),
+    /// Switch A/B at current position (sample-accurate)
+    AbSwitch { target: AbTarget },
     /// Caller sends a SyncSender; worker replies with Option<PlaybackState>.
     GetState(SyncSender<Option<PlaybackState>>),
 }
@@ -48,6 +55,14 @@ impl PlaybackHandle {
 
     pub fn load(&self, transfer: PcmTransfer) {
         let _ = self.tx.send(PlaybackCmd::Load(transfer));
+    }
+
+    pub fn load_original(&self, transfer: PcmTransfer) {
+        let _ = self.tx.send(PlaybackCmd::LoadOriginal(transfer));
+    }
+
+    pub fn ab_switch(&self, target: AbTarget) {
+        let _ = self.tx.send(PlaybackCmd::AbSwitch { target });
     }
 
     pub fn play(&self) {
@@ -77,19 +92,25 @@ impl PlaybackHandle {
 // ── PlaybackWorker — owns cpal::Stream on a dedicated thread ─────────────────
 
 struct PlaybackWorker {
-    kernel:   Option<XaakKernel>,
-    player:   CpalPlayer,
-    position: Arc<Mutex<u64>>,
-    playing:  bool,
+    kernel:       Option<XaakKernel>,
+    kernel_b:     Option<XaakKernel>,
+    ab_target:    AbTarget,
+    gain_match:   bool,
+    player:       CpalPlayer,
+    position:     Arc<Mutex<u64>>,
+    playing:      bool,
 }
 
 impl PlaybackWorker {
     fn new() -> Self {
         Self {
-            kernel:   None,
-            player:   CpalPlayer::new(),
-            position: Arc::new(Mutex::new(0)),
-            playing:  false,
+            kernel:     None,
+            kernel_b:   None,
+            ab_target:  AbTarget::A,
+            gain_match: true,
+            player:     CpalPlayer::new(),
+            position:   Arc::new(Mutex::new(0)),
+            playing:    false,
         }
     }
 
@@ -98,8 +119,10 @@ impl PlaybackWorker {
         let mut worker = Self::new();
         for cmd in rx {
             match cmd {
-                PlaybackCmd::Load(transfer)    => worker.load(transfer),
-                PlaybackCmd::Play              => { let _ = worker.play(); }
+                PlaybackCmd::Load(transfer)      => worker.load(transfer),
+                PlaybackCmd::LoadOriginal(t)     => worker.load_original(t),
+                PlaybackCmd::AbSwitch { target } => worker.ab_switch(target),
+                PlaybackCmd::Play                => { let _ = worker.play(); }
                 PlaybackCmd::Pause             => worker.pause(),
                 PlaybackCmd::Stop              => worker.stop(),
                 PlaybackCmd::Seek(ms)          => { let _ = worker.seek(ms); }
@@ -119,8 +142,22 @@ impl PlaybackWorker {
         self.kernel = Some(XaakKernel::load(transfer));
     }
 
+    pub fn load_original(&mut self, transfer: PcmTransfer) {
+        self.kernel_b = Some(XaakKernel::load(transfer));
+    }
+
+    pub fn ab_switch(&mut self, target: AbTarget) {
+        let pos = self.position_ms();
+        self.ab_target = target;
+        // restart playback from same position
+        let _ = self.seek(pos);
+    }
+
     fn play(&mut self) -> Result<(), String> {
-        let kernel = self.kernel.as_mut()
+        let kernel = match self.ab_target {
+            AbTarget::A => self.kernel.as_mut(),
+            AbTarget::B => self.kernel_b.as_mut(),
+        }
             .ok_or_else(|| "xaak: play() — no PCM loaded".to_string())?;
         let pos_ms   = *self.position.lock().unwrap();
         let consumer = kernel.stream_from(pos_ms);
@@ -156,13 +193,22 @@ impl PlaybackWorker {
     }
 
     fn state(&self) -> Option<PlaybackState> {
-        self.kernel.as_ref().map(|k| PlaybackState {
+        let k_opt = match self.ab_target {
+            AbTarget::A => self.kernel.as_ref(),
+            AbTarget::B => self.kernel_b.as_ref(),
+        };
+        k_opt.map(|k| PlaybackState {
             blob_id:     k.blob_id().to_string(),
             position_ms: self.position_ms(),
             duration_ms: k.duration_ms(),
             is_playing:  self.playing,
             sample_rate: k.sample_rate(),
             channels:    k.channels(),
+            ab_target:   match self.ab_target {
+                AbTarget::A => "a".to_string(),
+                AbTarget::B => "b".to_string(),
+            },
+            gain_match:  self.gain_match,
         })
     }
 }
@@ -222,6 +268,8 @@ impl PlaybackEngine {
             is_playing:  self.playing,
             sample_rate: k.sample_rate(),
             channels:    k.channels(),
+            ab_target:   "a".to_string(),
+            gain_match:  true,
         })
     }
 

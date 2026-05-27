@@ -372,7 +372,16 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                         AbToggleState::B       => AbToggleState::A,
                                                         AbToggleState::Toggled => AbToggleState::A,
                                                     };
+                                                    // Wire to M0 playback
+                                                    let action = match &next {
+                                                        AbToggleState::A | AbToggleState::Toggled => "ab_a",
+                                                        AbToggleState::B => "ab_b",
+                                                    };
                                                     ab_state.set(next);
+                                                    let ps = playback_state.clone();
+                                                    spawn_local(async move {
+                                                        invoke_playback(action, None, ps).await;
+                                                    });
                                                 }
                                             }
                                                 div { class: "ab-ring" }

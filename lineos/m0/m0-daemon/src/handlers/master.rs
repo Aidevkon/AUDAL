@@ -19,7 +19,7 @@ use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
 use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvenance};
 // Phase 12A (A-003 §1): PCM ownership transfer to xaak after mastering
-use xaak::PcmTransfer;
+use xaak::{PcmTransfer, engine::AbTarget};
 
 #[derive(Debug, Deserialize)]
 pub struct MasterRequest {
@@ -60,7 +60,7 @@ pub async fn trigger_mastering(
     }
 
     match run_dsp(&req.audio_path, &req.preset_id, start).await {
-        Ok(blob) => {
+        Ok((blob, chunk_original, target_lufs)) => {
             let blob_id  = blob.id.clone();
 
             // Phase 12A (A-003 §2): Transfer PCM ownership to xaak before storing blob.
@@ -83,6 +83,45 @@ pub async fn trigger_mastering(
 
             // PlaybackHandle.load() is non-blocking — sends over mpsc channel.
             state.playback.load(transfer);
+
+            // Load original PCM for A/B comparison (B side)
+            // Gain match: normalize to same LUFS as mastered
+            let original_samples: Vec<f32> = {
+                let orig_l = chunk_original.left.clone();
+                let orig_r = chunk_original.right.clone();
+                orig_l.iter()
+                    .zip(orig_r.iter())
+                    .flat_map(|(l, r)| [*l, *r])
+                    .collect()
+            };
+
+            // Apply gain match (normalize B to A's LUFS)
+            use sp314_dsp::metering::measure_integrated_lufs;
+            let orig_l_ref: Vec<f32> = original_samples
+                .iter().step_by(2).copied().collect();
+            let orig_r_ref: Vec<f32> = original_samples
+                .iter().skip(1).step_by(2).copied().collect();
+            let orig_lufs = measure_integrated_lufs(
+                &orig_l_ref, &orig_r_ref);
+            let master_lufs = target_lufs.unwrap_or(-14.0);
+
+            let gain_match_db = master_lufs - orig_lufs;
+            let gain_match_linear = 10.0_f32
+                .powf(gain_match_db.clamp(-18.0, 18.0) / 20.0_f32);
+
+            let matched_samples: Vec<f32> = original_samples
+                .iter()
+                .map(|s| s * gain_match_linear)
+                .collect();
+
+            let original_transfer = PcmTransfer {
+                samples:     matched_samples,
+                sample_rate: chunk_original.sample_rate,
+                channels:    2,
+                blob_id:     xaak_blob_id,
+            };
+            state.playback.load_original(original_transfer);
+
             tracing::info!(
                 blob_id = %blob_id,
                 "m0d: PCM transferred to xaak (A-003 §2)"
@@ -112,7 +151,7 @@ pub async fn trigger_mastering(
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
-async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<StoredBlob, String> {
+async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
     use lineos_types::{
         MasteringIntent,
         AudioChunk, LoudnessTarget,
@@ -212,6 +251,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
         sample_rate: pcm.sample_rate,
         num_frames: pcm.samples.len() / 2,
     };
+    let chunk_original = chunk.clone();
 
     // M0-native autotune — uses exact production pipeline
     // No more engine divergence (sp314-dsp vs DspAdapter)
@@ -328,7 +368,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
     let audio_sample_rate = pcm_sr_for_telemetry;
     let audio_channels    = pcm_channels_for_telemetry;
 
-    Ok(StoredBlob {
+    Ok((StoredBlob {
         id:               Uuid::new_v4().to_string(),
         version:          "1.0".into(),
         blob_type:        "audio".into(),
@@ -377,7 +417,7 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<St
         audio_bytes:  audio_bytes,
         sample_rate:  audio_sample_rate,
         channels:     audio_channels,
-    })
+    }, chunk_original, target_lufs))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

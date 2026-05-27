@@ -9,7 +9,7 @@ use axum::{Json, extract::State};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
-use xaak::PlaybackState;
+use xaak::{PlaybackState, engine::AbTarget};
 
 // ── Request / Response types ──────────────────────────────────────────────────
 
@@ -41,6 +41,14 @@ pub async fn playback_control(
         "stop"  => { state.playback.stop();  Ok(()) }
         "seek"  => {
             state.playback.seek(req.position_ms.unwrap_or(0));
+            Ok(())
+        }
+        "ab_a" => {
+            state.playback.ab_switch(AbTarget::A);
+            Ok(())
+        }
+        "ab_b" => {
+            state.playback.ab_switch(AbTarget::B);
             Ok(())
         }
         other => Err(format!("unknown action: {other}")),

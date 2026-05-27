@@ -143,6 +143,8 @@ pub struct PlaybackState {
     pub is_playing:  bool,
     pub sample_rate: u32,
     pub channels:    u16,
+    pub ab_target:   String,
+    pub gain_match:  bool,
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -207,6 +209,8 @@ mod tests {
             is_playing:  true,
             sample_rate: TARGET_SAMPLE_RATE,
             channels:    TARGET_CHANNELS,
+            ab_target:   "a".to_string(),
+            gain_match:  true,
         };
         let json = serde_json::to_string(&state).unwrap();
         // Must NOT contain any PCM — just metrics
