@@ -170,7 +170,6 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 .insert-panel {
-    /* ── Structural: fills the transport-rim opening flush ── */
     width: calc(100% - 2px);
     flex-shrink: 0;
     height: calc(100% - 2px);
@@ -180,41 +179,9 @@
     overflow: hidden;
     z-index: 1;
 
-    /* ── Material: dark anodized aluminium ──────────────────
-
-       Layer 1 (top): horizontal micro-brush grain
-         — very fine repeating lines, barely visible, no color cast
-       Layer 2: soft vertical vignette
-         — slightly darker at top (rim shadow) and bottom (depth)
-         — peak brightness at 35% height (where diffuse light lands)
-       Layer 3 (base): flat dark charcoal
-         — the anodized oxide absorbs light, so no bright base
-    */
-    background:
-        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.8" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.035"/></svg>'),
-        #1c2028;
-
-    /* ── Borders: perimeter lighting physics ────────────────
-
-       Top:    darkest — the rim casts hard shadow downward
-       Left:   faint catch-light from front-left source
-       Right:  slightly darker, away from source
-       Bottom: near-zero — ground-reflected light, barely visible
-    */
-    border-top: 1px solid rgba(0, 0, 0, 0.75);
-    border-left: 1px solid rgba(255, 255, 255, 0.06);
-    border-right: 1px solid rgba(0, 0, 0, 0.40);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-
-    /* ── Inset shadows: depth and rim occlusion ─────────────
-
-       Top inset: the hard shadow from the overhanging rim
-       Left inset: subtle AO from the left wall of the opening
-    */
-    box-shadow:
-        inset 0 4px 8px rgba(0, 0, 0, 0.55),
-        inset 0 1px 2px rgba(0, 0, 0, 0.80),
-        inset 2px 0 4px rgba(0, 0, 0, 0.20);
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 /* ── Ensure all child containers are transparent ── */
@@ -2802,4 +2769,77 @@
     /* subtle — indicator, not primary element */
     border-radius: 2px;
     /* No animation — stable locked state */
+}
+/* ── Phase C0: OLED Touch MFD Surface ── */
+
+.oled-glass-surface {
+    /* Override insert-panel matte background with glossy OLED black */
+    background: linear-gradient(180deg, #020202 0%, #050505 100%) !important;
+    box-shadow: 
+        inset 0 4px 10px rgba(0, 0, 0, 0.9),
+        inset 0 1px 2px rgba(255, 255, 255, 0.05),
+        0 0 10px rgba(0, 0, 0, 0.5) !important;
+    /* subtle cyan/amber reflection on the edges */
+    border-top: 1px solid rgba(0, 209, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 183, 3, 0.05) !important;
+}
+
+/* Make physical elements look like they are embedded in cavities */
+.oled-glass-surface .transport-btn-col,
+.oled-glass-surface .scrub-knob-assembly,
+.oled-glass-surface .lcd-bezel,
+.oled-glass-surface .abort-housing,
+.oled-glass-surface .fm0-zone {
+    position: relative;
+    z-index: 2;
+}
+
+/* Glass cavities behind the physical controls */
+.oled-glass-surface .transport-btn-col::before,
+.oled-glass-surface .abort-housing::before,
+.oled-glass-surface .fm0-zone::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: #000;
+    border-radius: 6px;
+    z-index: -1;
+    box-shadow: 
+        inset 0 2px 4px rgba(0,0,0,0.8),
+        0 1px 1px rgba(255,255,255,0.05);
+}
+
+.dsp-annunciators-oled {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding-top: 10px;
+    flex: 1;
+    justify-content: center;
+}
+
+.dsp-chassis-oled {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    background: transparent;
+}
+
+.dsp-slots-wrapper-oled {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.oled-annunciator {
+    font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #00d1ff; /* Cyan phosphor */
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 0 4px rgba(0, 209, 255, 0.6);
+    padding: 2px 6px;
+    border: 1px solid rgba(0, 209, 255, 0.2);
+    border-radius: 2px;
+    background: rgba(0, 209, 255, 0.05);
 }

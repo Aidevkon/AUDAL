@@ -4,6 +4,16 @@
 
 use serde::{Deserialize, Serialize};
 
+// ── Cockpit Tier ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(non_camel_case_types)]
+pub enum CockpitTier {
+    Tier1_BlackBox,
+    Tier2_Medium,
+    Tier3_Pro,
+}
+
 // ── LoudnessMetricsJson ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

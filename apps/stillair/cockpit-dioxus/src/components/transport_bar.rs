@@ -10,7 +10,6 @@ use wasm_bindgen_futures::spawn_local;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson};
 use crate::components::{
-    annunciator::Annunciator,
     transport_button::{TransportActuator, LedColor, SkipActuator},
     screw::Screw,
     ab_toggle::{AbToggle, AbToggleState},
@@ -63,6 +62,7 @@ async fn invoke_playback(
 pub struct TransportBarProps {
     pub mode:           Signal<CockpitMode>,
     pub session_state:  Signal<Option<SessionStateJson>>,
+    pub tier:           Signal<crate::types::CockpitTier>,
     pub intent_open:    Signal<bool>,
     pub intent_closing: Signal<bool>,
 }
@@ -73,6 +73,7 @@ pub struct TransportBarProps {
 pub fn TransportBar(props: TransportBarProps) -> Element {
     let mut mode          = props.mode;
     let mut session_state = props.session_state;
+    let tier              = props.tier;
     let mut intent_open   = props.intent_open;
 
     // ── Internal signals ─────────────────────────────────────────────────────
@@ -127,34 +128,18 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
         footer { id: "transport-bar", class: "transport-bar",
             div { class: "chassis-bezel transport-rim",
 
-                div { class: "transport-panel",
+                div { class: "transport-panel oled-glass-surface",
                     // Left: Annunciator Zone
-                    div { class: "transport-left dsp-annunciators",
+                    div { class: "transport-left dsp-annunciators-oled",
                         div { class: "fm0-zone",
                             OledTile { state: OledTileState::Lock }
                         }
-                        div { class: "dsp-chassis",
-                            div { class: "dsp-slots-wrapper",
-                                Annunciator {
-                                    label: "EQ".to_string(),
-                                    active: true,
-                                    pipeline_stages: 3,
-                                }
-                                Annunciator {
-                                    label: "COMP".to_string(),
-                                    active: true,
-                                    pipeline_stages: 3,
-                                }
-                                Annunciator {
-                                    label: "SAT".to_string(),
-                                    active: true,
-                                    pipeline_stages: 3,
-                                }
-                                Annunciator {
-                                    label: "LIMIT".to_string(),
-                                    active: true,
-                                    pipeline_stages: 3,
-                                }
+                        div { class: "dsp-chassis-oled",
+                            div { class: "dsp-slots-wrapper-oled",
+                                div { class: "oled-annunciator", "EQ" }
+                                div { class: "oled-annunciator", "COMP" }
+                                div { class: "oled-annunciator", "SAT" }
+                                div { class: "oled-annunciator", "LIMIT" }
                             }
                         }
                     }
@@ -171,126 +156,132 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                 div { class: "control-housing",
                                     div { class: "mfd-controls-row",
                                         // SKIP BACK
-                                        div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "–5" }
-                                            div { class: "button-base-seat-narrow",
-                                                SkipActuator {
-                                                    label: "{lbl_skip_back}",
-                                                    on_click: move |_| {
-                                                        let new_ms = position_ms.saturating_sub(5_000);
-                                                        let ps = playback_state.clone();
-                                                        spawn_local(async move {
-                                                            invoke_playback("seek", Some(new_ms), ps).await;
-                                                        });
-                                                    },
+                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
+                                            div { class: "transport-btn-col",
+                                                div { class: "transport-top-label", "–5" }
+                                                div { class: "button-base-seat-narrow",
+                                                    SkipActuator {
+                                                        label: "{lbl_skip_back}",
+                                                        on_click: move |_| {
+                                                            let new_ms = position_ms.saturating_sub(5_000);
+                                                            let ps = playback_state.clone();
+                                                            spawn_local(async move {
+                                                                invoke_playback("seek", Some(new_ms), ps).await;
+                                                            });
+                                                        },
+                                                    }
                                                 }
                                             }
                                         }
 
                                         // Scrub Knob — inline with transport buttons
-                                        div {
-                                            class: "scrub-knob-assembly",
-                                            id: "transport-scrub",
-                                            onclick: move |evt| {
-                                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
-                                                    return;
-                                                }
-                                                let client_x = evt.client_coordinates().x;
-                                                let window = web_sys::window().unwrap();
-                                                let doc = window.document().unwrap();
-                                                if let Some(el) = doc.get_element_by_id("transport-scrub") {
-                                                    let rect = el.get_bounding_client_rect();
-                                                    let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
-                                                    let seek_ms = (frac * duration_ms as f64) as u64;
-                                                    let ps = playback_state.clone();
-                                                    spawn_local(async move {
-                                                        invoke_playback("seek", Some(seek_ms), ps).await;
-                                                    });
-                                                }
-                                            },
-                                            div { class: "transport-top-label", "SCRUB" }
+                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
                                             div {
-                                                class: "scrub-knob-wrapper",
-                                                style: {
-                                                    let active_angle_deg = (scrub_len / 100.0) * 180.0 - 90.0;
-                                                    format!("--active-angle: {:.2}deg;", active_angle_deg)
+                                                class: "scrub-knob-assembly",
+                                                id: "transport-scrub",
+                                                onclick: move |evt| {
+                                                    if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
+                                                        return;
+                                                    }
+                                                    let client_x = evt.client_coordinates().x;
+                                                    let window = web_sys::window().unwrap();
+                                                    let doc = window.document().unwrap();
+                                                    if let Some(el) = doc.get_element_by_id("transport-scrub") {
+                                                        let rect = el.get_bounding_client_rect();
+                                                        let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                                                        let seek_ms = (frac * duration_ms as f64) as u64;
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(seek_ms), ps).await;
+                                                        });
+                                                    }
                                                 },
-                                                div { class: "scrub-knob__trench" }
-                                                div { class: "scrub-knob__oled-ring",
-                                                    svg {
-                                                        class: "scrub-knob__arc",
-                                                        view_box: "0 0 72 72",
-                                                        xmlns: "http://www.w3.org/2000/svg",
-                                                        {
-                                                            let total_ticks = 17_u32;
-                                                            let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
-                                                            (0..total_ticks).map(move |i| {
-                                                                // BOTTOM ARC: 0° to 180° (smile)
-                                                                let angle_deg = 0.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
-                                                                let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
-                                                                let cx = 36.0_f64;
-                                                                let cy = 36.0_f64;
-                                                                // Moat is between 22px (cap) and 36px (trench). Center is 29px.
-                                                                // A 6px long tick centered at 29px means 26px to 32px.
-                                                                let r_inner = 26.0_f64;
-                                                                let r_outer = 32.0_f64;
-                                                                let x1 = cx + r_inner * angle_rad.cos();
-                                                                let y1 = cy + r_inner * angle_rad.sin();
-                                                                let x2 = cx + r_outer * angle_rad.cos();
-                                                                let y2 = cy + r_outer * angle_rad.sin();
-                                                                let is_active = i <= active_count;
-                                                                // 3-tier: super-bright current, active trail, dim inactive
-                                                                let is_current = i == active_count;
-                                                                let color = if is_current {
-                                                                    "#ffe699"
-                                                                } else if is_active {
-                                                                    "#ffb703"
-                                                                } else {
-                                                                    "#8a6311"
-                                                                };
-                                                                let width = if is_current { "5" } else { "4" };
-                                                                let line_class = if is_current { "scrub-knob__tick scrub-knob__tick--active" } else { "scrub-knob__tick" };
-                                                                rsx! {
-                                                                    line {
-                                                                        key: "{i}",
-                                                                        class: "{line_class}",
-                                                                        x1: "{x1:.2}", y1: "{y1:.2}",
-                                                                        x2: "{x2:.2}", y2: "{y2:.2}",
-                                                                        stroke: "{color}",
-                                                                        stroke_width: "{width}",
-                                                                        stroke_linecap: "round",
+                                                div { class: "transport-top-label", "SCRUB" }
+                                                div {
+                                                    class: "scrub-knob-wrapper",
+                                                    style: {
+                                                        let active_angle_deg = (scrub_len / 100.0) * 180.0 - 90.0;
+                                                        format!("--active-angle: {:.2}deg;", active_angle_deg)
+                                                    },
+                                                    div { class: "scrub-knob__trench" }
+                                                    div { class: "scrub-knob__oled-ring",
+                                                        svg {
+                                                            class: "scrub-knob__arc",
+                                                            view_box: "0 0 72 72",
+                                                            xmlns: "http://www.w3.org/2000/svg",
+                                                            {
+                                                                let total_ticks = 17_u32;
+                                                                let active_count = ((scrub_len / 100.0) * (total_ticks - 1) as f64).round() as u32;
+                                                                (0..total_ticks).map(move |i| {
+                                                                    // BOTTOM ARC: 0° to 180° (smile)
+                                                                    let angle_deg = 0.0 + (i as f64 / (total_ticks - 1) as f64) * 180.0;
+                                                                    let angle_rad = angle_deg * std::f64::consts::PI / 180.0;
+                                                                    let cx = 36.0_f64;
+                                                                    let cy = 36.0_f64;
+                                                                    // Moat is between 22px (cap) and 36px (trench). Center is 29px.
+                                                                    // A 6px long tick centered at 29px means 26px to 32px.
+                                                                    let r_inner = 26.0_f64;
+                                                                    let r_outer = 32.0_f64;
+                                                                    let x1 = cx + r_inner * angle_rad.cos();
+                                                                    let y1 = cy + r_inner * angle_rad.sin();
+                                                                    let x2 = cx + r_outer * angle_rad.cos();
+                                                                    let y2 = cy + r_outer * angle_rad.sin();
+                                                                    let is_active = i <= active_count;
+                                                                    // 3-tier: super-bright current, active trail, dim inactive
+                                                                    let is_current = i == active_count;
+                                                                    let color = if is_current {
+                                                                        "#ffe699"
+                                                                    } else if is_active {
+                                                                        "#ffb703"
+                                                                    } else {
+                                                                        "#8a6311"
+                                                                    };
+                                                                    let width = if is_current { "5" } else { "4" };
+                                                                    let line_class = if is_current { "scrub-knob__tick scrub-knob__tick--active" } else { "scrub-knob__tick" };
+                                                                    rsx! {
+                                                                        line {
+                                                                            key: "{i}",
+                                                                            class: "{line_class}",
+                                                                            x1: "{x1:.2}", y1: "{y1:.2}",
+                                                                            x2: "{x2:.2}", y2: "{y2:.2}",
+                                                                            stroke: "{color}",
+                                                                            stroke_width: "{width}",
+                                                                            stroke_linecap: "round",
+                                                                        }
                                                                     }
-                                                                }
-                                                            })
+                                                                })
+                                                            }
                                                         }
                                                     }
-                                                }
-                                                div { class: "scrub-knob__glass" }
-                                                div { class: "scrub-knob__spill-glow" }
-                                                div { class: "scrub-knob__occlusion-mask" }
-                                                div { class: "scrub-knob__rotor",
-                                                    div { class: "scrub-knob__rim-highlight" }
-                                                    div { class: "scrub-knob__skirt" }
-                                                    div { class: "scrub-knob__skirt-reflection" }
-                                                    div { class: "scrub-knob__faceplate" }
-                                                    div { class: "scrub-knob__specular-highlight" }
+                                                    div { class: "scrub-knob__glass" }
+                                                    div { class: "scrub-knob__spill-glow" }
+                                                    div { class: "scrub-knob__occlusion-mask" }
+                                                    div { class: "scrub-knob__rotor",
+                                                        div { class: "scrub-knob__rim-highlight" }
+                                                        div { class: "scrub-knob__skirt" }
+                                                        div { class: "scrub-knob__skirt-reflection" }
+                                                        div { class: "scrub-knob__faceplate" }
+                                                        div { class: "scrub-knob__specular-highlight" }
+                                                    }
                                                 }
                                             }
                                         }
 
                                         // SKIP FORWARD
-                                        div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "+5" }
-                                            div { class: "button-base-seat-narrow",
-                                                SkipActuator {
-                                                    label: "{lbl_skip_fwd}",
-                                                    on_click: move |_| {
-                                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                                        let ps = playback_state.clone();
-                                                        spawn_local(async move {
-                                                            invoke_playback("seek", Some(new_ms), ps).await;
-                                                        });
-                                                    },
+                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
+                                            div { class: "transport-btn-col",
+                                                div { class: "transport-top-label", "+5" }
+                                                div { class: "button-base-seat-narrow",
+                                                    SkipActuator {
+                                                        label: "{lbl_skip_fwd}",
+                                                        on_click: move |_| {
+                                                            let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                                            let ps = playback_state.clone();
+                                                            spawn_local(async move {
+                                                                invoke_playback("seek", Some(new_ms), ps).await;
+                                                            });
+                                                        },
+                                                    }
                                                 }
                                             }
                                         }
@@ -349,42 +340,44 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                             }
                                         }
 
-                                        div { class: "transport-btn-col",
-                                            div { class: "transport-top-label", "A/B" }
-                                            div { class: "ab-toggle-seat",
-                                                AbToggle {
-                                                state: (*ab_state.read()).clone(),
-                                                on_mousedown: move |_| {
-                                                    let now = js_sys::Date::now() as u64;
-                                                    ab_press_time.set(now);
-                                                },
-                                                on_mouseup: move |_| {
-                                                    let press_duration = js_sys::Date::now() as u64
-                                                        - *ab_press_time.read();
-                                                    if press_duration >= 300 {
-                                                        // long press — return to A
-                                                        ab_state.set(AbToggleState::A);
+                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
+                                            div { class: "transport-btn-col",
+                                                div { class: "transport-top-label", "A/B" }
+                                                div { class: "ab-toggle-seat",
+                                                    AbToggle {
+                                                    state: (*ab_state.read()).clone(),
+                                                    on_mousedown: move |_| {
+                                                        let now = js_sys::Date::now() as u64;
+                                                        ab_press_time.set(now);
+                                                    },
+                                                    on_mouseup: move |_| {
+                                                        let press_duration = js_sys::Date::now() as u64
+                                                            - *ab_press_time.read();
+                                                        if press_duration >= 300 {
+                                                            // long press — return to A
+                                                            ab_state.set(AbToggleState::A);
+                                                        }
+                                                    },
+                                                    on_click: move |_| {
+                                                        let next = match *ab_state.read() {
+                                                            AbToggleState::A       => AbToggleState::B,
+                                                            AbToggleState::B       => AbToggleState::A,
+                                                            AbToggleState::Toggled => AbToggleState::A,
+                                                        };
+                                                        // Wire to M0 playback
+                                                        let action = match &next {
+                                                            AbToggleState::A | AbToggleState::Toggled => "ab_a",
+                                                            AbToggleState::B => "ab_b",
+                                                        };
+                                                        ab_state.set(next);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback(action, None, ps).await;
+                                                        });
                                                     }
-                                                },
-                                                on_click: move |_| {
-                                                    let next = match *ab_state.read() {
-                                                        AbToggleState::A       => AbToggleState::B,
-                                                        AbToggleState::B       => AbToggleState::A,
-                                                        AbToggleState::Toggled => AbToggleState::A,
-                                                    };
-                                                    // Wire to M0 playback
-                                                    let action = match &next {
-                                                        AbToggleState::A | AbToggleState::Toggled => "ab_a",
-                                                        AbToggleState::B => "ab_b",
-                                                    };
-                                                    ab_state.set(next);
-                                                    let ps = playback_state.clone();
-                                                    spawn_local(async move {
-                                                        invoke_playback(action, None, ps).await;
-                                                    });
                                                 }
-                                            }
-                                                div { class: "ab-ring" }
+                                                    div { class: "ab-ring" }
+                                                }
                                             }
                                         }
                                     }
@@ -396,13 +389,15 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                     // Right: Critical Zone
                     div { class: "transport-right abort-zone",
                         // HA button — toggles intent bay
-                        button {
-                            class: "btn-pill btn-pill-red",
-                            onclick: move |_| {
-                                let current = *intent_open.read();
-                                intent_open.set(!current);
-                            },
-                            "HA"
+                        if *tier.read() >= crate::types::CockpitTier::Tier3_Pro {
+                            button {
+                                class: "btn-pill btn-pill-red",
+                                onclick: move |_| {
+                                    let current = *intent_open.read();
+                                    intent_open.set(!current);
+                                },
+                                "HA"
+                            }
                         }
 
                         // ABORT — Flip-Guard Cap + Deep Cavity + PA-Family Red Actuator

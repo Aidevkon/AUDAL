@@ -20,7 +20,7 @@ use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use gloo_timers::future::TimeoutFuture;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{SessionStateJson, VisualizationDataJson};
+use crate::types::{SessionStateJson, VisualizationDataJson, CockpitTier};
 use crate::panels::{
     coach::CoachPanel,
     mastered::MasteredView,
@@ -38,6 +38,7 @@ pub fn App() -> Element {
     // ── Signals ──────────────────────────────────────────────────────────────
     let mode           = use_signal(|| CockpitMode::Idle);
     let session_state  = use_signal(|| None::<SessionStateJson>);
+    let tier           = use_signal(|| CockpitTier::Tier3_Pro);
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
@@ -58,6 +59,7 @@ pub fn App() -> Element {
             // only the footer re-renders on position updates, not the full tree.
             TransportBar {
                 mode,
+                tier,
                 session_state,
                 intent_open,
                 intent_closing,
