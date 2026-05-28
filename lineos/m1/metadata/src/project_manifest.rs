@@ -67,9 +67,13 @@ mod tests {
                 spectral_centroid: 1000.0,
             },
             blob_type: BlobType::Audio,
-            sha256: "aabbccdd".to_string(),
-            preset_name: "spotify".to_string(),
-            engine_version: "1.0".to_string(),
+            sha256: "fakehash".to_string(),
+            preset_name: "Spotify".to_string(),
+            engine_version: "1.0.0".to_string(),
+            schema_version: 1,
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
         }
     }
 

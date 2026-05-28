@@ -147,7 +147,6 @@ mod tests {
     use super::*;
     use aether::personas::manager::PersonaManager;
     use aether::mapping::mapper::MacroMicroMapper;
-    use aether::mapping::types::MicroDelta;
     use aether::semantic::ZoneAdjustments;
     use aether::chaos::ChaosDelta;
 

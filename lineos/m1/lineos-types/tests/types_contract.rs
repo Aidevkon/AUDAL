@@ -34,6 +34,10 @@ fn golden_blob_serializes_roundtrip() {
         sha256: "dummyhash".to_string(),
         preset_name: "SpotifyV3".to_string(),
         engine_version: "v3.0.0".to_string(),
+        schema_version: 1,
+        aether_cert: None,
+        aether_persona: None,
+        aether_config: None,
     };
 
     let json = serde_json::to_string(&blob).unwrap();

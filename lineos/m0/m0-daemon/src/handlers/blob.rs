@@ -56,11 +56,15 @@ mod tests {
                 clips_detected: 0, clip_free: true,
             },
             provenance: StoredProvenance {
-                engine_id: "E11".into(), engine_version: "0.4.0".into(),
-                processing_time_ms: 1234, host_os: "linux-x86_64".into(),
+                engine_id: "test".into(), engine_version: "1.0".into(),
+                processing_time_ms: 0, host_os: "linux".into(),
                 created_by: "test".into(), aether_enriched: false,
                 aether_devices: vec![],
             },
+            schema_version: 1,
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
             audio_bytes:  vec![],  // empty for tests
             sample_rate:  48000,
             channels:     2,

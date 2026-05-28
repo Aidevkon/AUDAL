@@ -4,7 +4,7 @@
 use serde::Serialize;
 use aether::personas::config::{PersonaConfig, MacroControls};
 use aether::mapping::types::MicroDelta;
-use aether::semantic::{ZoneAdjustments, ZoneAdjustment};
+use aether::semantic::{ZoneAdjustments};
 use aether::chaos::ChaosDelta;
 use crate::config::*;
 use crate::error::FirewallError;
