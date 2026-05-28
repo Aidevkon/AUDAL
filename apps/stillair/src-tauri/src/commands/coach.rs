@@ -11,9 +11,9 @@
 //! Authority: Phase 8 P8-008 (A/B config)
 
 use tauri::command;
-use crate::aether::coach_adapter::CoachAdapter;
+use crate::coach_narrative::coach_adapter::CoachAdapter;
 use crate::commands::insights::CoachFindingsJson;
-use crate::aether::CoachNarrativeJson;
+use crate::coach_narrative::CoachNarrativeJson;
 
 /// Generate a plain-language coaching narrative from CoachFindings.
 ///

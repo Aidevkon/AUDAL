@@ -14,7 +14,7 @@
 
 pub mod commands;
 pub mod ipc;
-pub mod aether;   // Phase 8: Aether Coach — LLM narrative layer
+pub mod coach_narrative;   // Phase 8: Aether Coach — LLM narrative layer
 
 pub fn run() {
     tauri::Builder::default()

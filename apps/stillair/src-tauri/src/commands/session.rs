@@ -25,7 +25,7 @@
 use serde::{Deserialize, Serialize};
 use tokio::time::{timeout, Duration};
 
-use crate::aether::CoachNarrativeJson;
+use crate::coach_narrative::CoachNarrativeJson;
 use crate::commands::insights::{evaluate_findings, CoachFindingsJson};
 use crate::commands::coach::get_coach_narrative;
 use crate::ipc::m0_client::{GoldenBlobJson, LoudnessMetricsJson, M0Client, QualityMetricsJson};
