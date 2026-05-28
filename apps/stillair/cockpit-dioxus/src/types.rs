@@ -133,6 +133,12 @@ pub struct SessionStateJson {
     pub compliance: ComplianceJson,
     pub findings:   CoachFindingsJson,
     pub narrative:  Option<CoachNarrativeJson>,
+    #[serde(default)]
+    pub aether_cert:    Option<String>,
+    #[serde(default)]
+    pub aether_persona: Option<String>,
+    #[serde(default)]
+    pub aether_config:  Option<String>,
 }
 
 // ── ExportResult ─────────────────────────────────────────────────────────────

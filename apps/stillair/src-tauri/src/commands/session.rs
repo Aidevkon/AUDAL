@@ -81,6 +81,13 @@ pub struct SessionStateJson {
     /// Unavailability is non-fatal: Ollama may not be running, provider
     /// may be misconfigured, or narrative generation may have timed out.
     pub narrative:  Option<CoachNarrativeJson>,
+
+    #[serde(default)]
+    pub aether_cert:    Option<String>,
+    #[serde(default)]
+    pub aether_persona: Option<String>,
+    #[serde(default)]
+    pub aether_config:  Option<String>,
 }
 
 // ── Tauri command ─────────────────────────────────────────────────────────────
@@ -153,6 +160,9 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         compliance,
         findings,
         narrative,
+        aether_cert:    blob.aether_cert.clone(),
+        aether_persona: blob.aether_persona.clone(),
+        aether_config:  blob.aether_config.clone(),
     })
 }
 
@@ -228,6 +238,9 @@ mod tests {
                 recommendation: "Master sounds great. No critical issues.".into(),
             },
             narrative: None,
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("\"blob_id\":\"test-blob-001\""));

@@ -262,7 +262,17 @@ pub struct GoldenBlobJson {
     pub quality:          QualityMetricsJson,
     /// Full audit trail.
     pub provenance:       ProvenanceJson,
+    #[serde(default = "default_schema_v1_gc")]
+    pub schema_version:   u32,
+    #[serde(default)]
+    pub aether_cert:      Option<String>,
+    #[serde(default)]
+    pub aether_persona:   Option<String>,
+    #[serde(default)]
+    pub aether_config:    Option<String>,
 }
+
+fn default_schema_v1_gc() -> u32 { 1 }
 
 /// BS.1770-4 canonical values + EBU R128 + platform compliance flags.
 /// Authority: golden-blob-spec.md §LoudnessMetrics
@@ -399,6 +409,10 @@ mod tests {
                 aether_enriched:    false,
                 aether_devices:     vec![],
             },
+            schema_version:   1,
+            aether_cert:      None,
+            aether_persona:   None,
+            aether_config:    None,
         };
 
         // Spec §Determinism: JSON round-trip must be lossless
