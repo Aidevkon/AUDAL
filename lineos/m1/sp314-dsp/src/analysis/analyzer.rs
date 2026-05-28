@@ -129,4 +129,114 @@ impl StemFeatureAnalyzer {
         let n = a.len().min(b.len()).min(c.len()).min(d.len());
         (0..n).map(|i| a[i] + b[i] + c[i] + d[i]).collect()
     }
+
+    /// Analyze a stereo PCM signal — mix metrics only.
+    /// Stems (bass, vocals, drums, other) = StemMetrics::default().
+    /// Lightweight alternative to analyze() — no NMF/STFT separation.
+    /// TODO v2.0: Replace with real stem separation (S-001 FourStems)
+    ///            when stem separation is integrated into m0-daemon.
+    pub fn analyze_stereo(
+        left:        &[f32],
+        right:       &[f32],
+        sample_rate: u32,
+    ) -> StemFeatures {
+        use super::spectral::spectral_centroid_hz;
+        use super::dynamics::{rms_db, dynamic_range_db};
+        use super::stereo::{stereo_correlation, stereo_width};
+
+        if left.is_empty() || right.is_empty() {
+            return StemFeatures {
+                bass:   StemMetrics::default(),
+                vocals: StemMetrics::default(),
+                drums:  StemMetrics::default(),
+                other:  StemMetrics::default(),
+                mix:    MixMetrics::default(),
+            };
+        }
+
+        // Interleave for stereo functions
+        let stereo: Vec<f32> = left.iter().zip(right.iter())
+            .flat_map(|(&l, &r)| [l, r])
+            .collect();
+
+        // Mix centroid: average of L and R centroids (S-008)
+        let centroid = (spectral_centroid_hz(left,  sample_rate)
+                      + spectral_centroid_hz(right, sample_rate))
+                      * 0.5;
+
+        // Integrated LUFS on stereo pair
+        let lufs = crate::metering::measure_integrated_lufs(left, right);
+
+        // RMS: average of L and R
+        let _rms  = (rms_db(left) + rms_db(right)) * 0.5;
+
+        // Dynamic range on L channel (representative)
+        let dyn_range = dynamic_range_db(left, sample_rate);
+
+        // Stereo metrics
+        let corr  = stereo_correlation(&stereo);
+        let width = stereo_width(&stereo);
+
+        // Energy ratios: all equal (no stem separation)
+        // TODO v2.0: use real NMF stem energies
+        let equal_ratio = 0.25_f32;
+
+        let mix = MixMetrics {
+            integrated_lufs:     lufs,
+            true_peak_dbtp:      -1.0,   // TODO v2.0: real true peak
+            loudness_range:      0.0,    // TODO v2.0: LraCalculator
+            stereo_correlation:  corr,
+            stereo_width:        width,
+            dynamic_range_db:    dyn_range,
+            stem_energy_ratios:  [equal_ratio; 4],
+            spectral_centroid_hz: centroid,
+        };
+
+        StemFeatures {
+            bass:   StemMetrics::default(),
+            vocals: StemMetrics::default(),
+            drums:  StemMetrics::default(),
+            other:  StemMetrics::default(),
+            mix,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::features::{StemMetrics, MixMetrics};
+
+    #[test]
+    fn analyze_stereo_mix_metrics_reasonable() {
+        // Sine-like signal: centroid should be above 0
+        let signal: Vec<f32> = (0..4800)
+            .map(|i| libm::sinf(2.0 * 3.14159 * 440.0
+                                * i as f32 / 48000.0))
+            .collect();
+        let result = StemFeatureAnalyzer::analyze_stereo(
+            &signal, &signal, 48000);
+        assert!(result.mix.spectral_centroid_hz > 0.0);
+        assert!(result.mix.stereo_correlation > 0.99); // L==R
+        assert_eq!(result.mix.stem_energy_ratios, [0.25; 4]);
+    }
+
+    #[test]
+    fn analyze_stereo_empty_returns_default() {
+        let result = StemFeatureAnalyzer::analyze_stereo(
+            &[], &[], 48000);
+        assert_eq!(result.mix.integrated_lufs,
+                   MixMetrics::default().integrated_lufs);
+    }
+
+    #[test]
+    fn analyze_stereo_stems_are_default() {
+        let signal = vec![0.1_f32; 4800];
+        let result = StemFeatureAnalyzer::analyze_stereo(
+            &signal, &signal, 48000);
+        assert_eq!(result.bass,   StemMetrics::default());
+        assert_eq!(result.vocals, StemMetrics::default());
+        assert_eq!(result.drums,  StemMetrics::default());
+        assert_eq!(result.other,  StemMetrics::default());
+    }
 }
