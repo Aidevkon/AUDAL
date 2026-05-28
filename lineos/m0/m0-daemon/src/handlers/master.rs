@@ -361,6 +361,13 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
       .map_err(|e| format!("DSP task join error: {e}"))?;
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
 
+    let mut audio = audio;
+    use sp314_dsp::verification::{PostFlightVerifier, VerificationConfig};
+    let verify_cfg = VerificationConfig::from_target(&intent.target);
+    let verify_result = PostFlightVerifier::verify_and_trim(&mut audio, &verify_cfg);
+    if let Some(warn) = &verify_result.warning {
+        tracing::warn!("[S-013] ⚠️  {}", warn);
+    }
 
     // Build interleaved post-master samples for telemetry
     let post_master_samples: Vec<f32> = audio.left.iter()

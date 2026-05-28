@@ -38,6 +38,7 @@ pub mod io;
 #[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
 pub mod realtime;
 pub mod restoration;
+pub mod verification;
 pub mod stft;
 
 pub mod analysis;
