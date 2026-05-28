@@ -25,6 +25,14 @@ use xaak::PcmTransfer;
 pub struct MasterRequest {
     pub audio_path: String,
     pub preset_id:  String,
+    pub persona_id:  Option<String>,
+    pub warmth:      Option<f32>,
+    pub punch:       Option<f32>,
+    pub forwardness: Option<f32>,
+    pub smoothness:  Option<f32>,
+    pub chaos_seed:  Option<u64>,
+    pub project_id:  Option<String>,
+    pub track_id:    Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -32,6 +40,9 @@ pub struct MasterResponse {
     pub blob_id: String,
     pub status:  &'static str,   // "ok" | "error"
     pub message: Option<String>,
+    pub aether_error: Option<String>,
+    pub persona_id:   Option<String>,
+    pub converged:    Option<bool>,
 }
 
 /// POST /master — run sp314-dsp → store blob → return blob_id.
@@ -56,10 +67,13 @@ pub async fn trigger_mastering(
             blob_id: String::new(),
             status:  "error",
             message: Some(format!("preset not allowed: {}", req.preset_id)),
+            aether_error: None,
+            persona_id: None,
+            converged: None,
         });
     }
 
-    match run_dsp(&req.audio_path, &req.preset_id, start).await {
+    match run_dsp(&req, start).await {
         Ok((blob, chunk_original, target_lufs)) => {
             let blob_id  = blob.id.clone();
 
@@ -127,21 +141,34 @@ pub async fn trigger_mastering(
                 "m0d: PCM transferred to xaak (A-003 §2)"
             );
 
+            let persona_id = blob.aether_persona.clone();
+
             state.blob_store.insert(blob);
             state.audit.write(
                 AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,
                     &format!("blob={blob_id} elapsed={}ms", start.elapsed().as_millis()))
             ).ok();
-            Json(MasterResponse { blob_id, status: "ok", message: None })
+            Json(MasterResponse { 
+                blob_id, 
+                status: "ok", 
+                message: None,
+                aether_error: None,
+                persona_id,
+                converged: Some(true)
+            })
         }
         Err(e) => {
             state.audit.write(
                 AuditEntry::new("m0d.mastering_failed", AuditLevel::Audit, &e)
             ).ok();
+            let aether_error = if e.contains("AetherBridge") { Some(e.clone()) } else { None };
             Json(MasterResponse {
                 blob_id: String::new(),
                 status:  "error",
                 message: Some(e),
+                aether_error,
+                persona_id: None,
+                converged: None,
             })
         }
     }
@@ -151,7 +178,9 @@ pub async fn trigger_mastering(
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
-async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+async fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+    let audio_path = &req.audio_path;
+    let preset_id = &req.preset_id;
     use lineos_types::{
         MasteringIntent,
         AudioChunk, LoudnessTarget,
@@ -296,12 +325,32 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<(S
         target_makeup_db: 0.0,  // input gain applied above
     };
 
+    // A1: Extract features
+    use sp314_dsp::analysis::StemFeatureAnalyzer;
+    let features = StemFeatureAnalyzer::analyze_stereo(&chunk.left, &chunk.right, chunk.sample_rate);
+
+    // A2: Pre-DSP Aether processing
+    let aether_req = aether_bridge::AetherRequest {
+        persona_id:  req.persona_id.clone(),
+        warmth:      req.warmth,
+        punch:       req.punch,
+        forwardness: req.forwardness,
+        smoothness:  req.smoothness,
+        chaos_seed:  req.chaos_seed,
+        project_id:  req.project_id.clone(),
+        track_id:    req.track_id.clone(),
+        preset_name: Some(req.preset_id.clone()),
+    };
+
+    let (dsp_config, proof_log, persona_config) = aether_bridge::build_dsp_config(&aether_req, &features)
+        .map_err(|e| format!("AetherBridge error: {}", e))?;
+
     let mut audio = chunk;
 
     // Run sp314-dsp in blocking thread (no_std/alloc/sync)
-    let (result, audio) = tokio::task::spawn_blocking(move || {
-        let res = crate::dsp::DspAdapter::master(&intent, &mut audio);
-        (res, audio)
+    let (result, audio, dsp_config) = tokio::task::spawn_blocking(move || {
+        let res = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
+        (res, audio, dsp_config)
     }).await
       .map_err(|e| format!("DSP task join error: {e}"))?;
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
@@ -368,6 +417,19 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<(S
     let audio_sample_rate = pcm_sr_for_telemetry;
     let audio_channels    = pcm_channels_for_telemetry;
 
+    let cert = aether_bridge::generate_certificate(
+        &_pcm_samples_for_telemetry,
+        &post_master_samples,
+        &persona_config,
+        &dsp_config,
+        &proof_log,
+        &aether_req,
+        env!("CARGO_PKG_VERSION"),
+    );
+
+    let cert_json = serde_json::to_string(&cert).unwrap_or_default();
+    let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
+
     Ok((StoredBlob {
         id:               Uuid::new_v4().to_string(),
         version:          "1.0".into(),
@@ -410,9 +472,13 @@ async fn run_dsp(audio_path: &str, preset_id: &str, start: Instant) -> Result<(S
             processing_time_ms: elapsed,
             host_os:            std::env::consts::OS.to_string(),
             created_by:         "stillair-cockpit".into(),
-            aether_enriched:    false,
+            aether_enriched:    true,
             aether_devices:     vec![],
         },
+        schema_version: 2,
+        aether_cert:    Some(cert_json),
+        aether_persona: Some(persona_config.id),
+        aether_config:  Some(config_json),
         // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
         audio_bytes:  audio_bytes,
         sample_rate:  audio_sample_rate,

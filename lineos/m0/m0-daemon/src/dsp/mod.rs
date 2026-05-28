@@ -21,6 +21,7 @@ impl DspAdapter {
     pub fn master(
         intent: &MasteringIntent,
         audio: &mut StereoBuffer,
+        aether_config: Option<&integration::config::DspConfig>,
     ) -> Result<MasteringResult, DspError> {
 
         // 1. Build EngineerConditions from intent
@@ -31,8 +32,12 @@ impl DspAdapter {
             .map_err(|e| DspError::ForgeError(format!("{:?}", e)))?;
 
         // 3. Build DspGraph
-        let topology = DspTopology::from_json(&topology_json)
+        let mut topology = DspTopology::from_json(&topology_json)
             .map_err(|e| DspError::TopologyError(format!("{:?}", e)))?;
+
+        if let Some(config) = aether_config {
+            Self::apply_topology_overrides(&mut topology, config);
+        }
 
         let block_size = 512;
         let mut graph = DspGraph::from_topology(
@@ -97,6 +102,19 @@ impl DspAdapter {
             lufs: output_lufs,
             preset_name: intent.preset_name.clone(),
         })
+    }
+
+    /// Apply deterministic Aether overrides to the DSP graph topology.
+    fn apply_topology_overrides(topology: &mut DspTopology, config: &integration::config::DspConfig) {
+        for node in &mut topology.nodes {
+            if node.node_type == "Compressor" {
+                if let Some(obj) = node.parameters.as_object_mut() {
+                    obj.insert("threshold_db".into(), serde_json::json!(config.dynamics.comp_threshold_db));
+                    obj.insert("ratio".into(), serde_json::json!(config.dynamics.comp_ratio));
+                }
+            }
+            // TODO v2: Map eq, sat, stereo to exact node IDs.
+        }
     }
 
     /// Translate MasteringIntent → EngineerConditions for Pipelineforge.

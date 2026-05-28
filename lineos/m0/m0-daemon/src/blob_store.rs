@@ -13,6 +13,8 @@ fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Err
     s.serialize_str(&v.to_string())
 }
 
+fn default_schema_v1() -> u32 { 1 }
+
 /// Golden Blob as stored by M0.
 /// Audio bytes stored separately — only metrics/metadata serialized to JSON.
 /// Field contract: golden-blob-spec.md v1.0 §Structure
@@ -38,6 +40,16 @@ pub struct StoredBlob {
 
     // Provenance — golden-blob-spec.md §Provenance
     pub provenance: StoredProvenance,
+
+    // Mirror GoldenBlob v2 fields
+    #[serde(default = "default_schema_v1")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub aether_cert:    Option<String>,
+    #[serde(default)]
+    pub aether_persona: Option<String>,
+    #[serde(default)]
+    pub aether_config:  Option<String>,
 
     // Audio payload — not serialized to JSON (never sent to frontend).
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
@@ -171,6 +183,10 @@ mod tests {
                 aether_enriched:    false,
                 aether_devices:     vec![],
             },
+            schema_version: 1,
+            aether_cert:    None,
+            aether_persona: None,
+            aether_config:  None,
             audio_bytes:  vec![],   // empty for tests
             sample_rate:  48000,
             channels:     2,
