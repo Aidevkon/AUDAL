@@ -11,7 +11,7 @@ mod app_state;
 mod audit;
 mod blob_store;
 mod cdn;
-mod handlers;
+pub mod handlers;
 mod health;
 mod marketplace;
 mod policy;

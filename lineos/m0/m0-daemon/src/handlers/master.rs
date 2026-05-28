@@ -73,7 +73,7 @@ pub async fn trigger_mastering(
         });
     }
 
-    match run_dsp(&req, start).await {
+    match run_dsp_internal(&req, start).await {
         Ok((blob, chunk_original, target_lufs)) => {
             let blob_id  = blob.id.clone();
 
@@ -178,7 +178,13 @@ pub async fn trigger_mastering(
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
-async fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+#[cfg(any(test, feature = "test_utils"))]
+pub async fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+    run_dsp_internal(req, start).await
+}
+
+#[inline(always)]
+async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
     use lineos_types::{

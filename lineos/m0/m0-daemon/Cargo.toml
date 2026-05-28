@@ -62,3 +62,10 @@ lame-sys = { path = "../../m1/lame-sys" }
 tokio-test = "0.4"
 tempfile   = "3"
 rand       = "0.8"
+
+[features]
+test_utils = []
+
+[lib]
+name = "m0d"
+path = "src/main.rs"
