@@ -16,6 +16,7 @@ members = [
     "aether",
     "integration",
     "proof",
+    "shared/aether-bridge",
 ]
 # Phase 1:  m0-daemon             per P1-001
 # Phase 2:  sp314-dsp             per P2-001

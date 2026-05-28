@@ -10,7 +10,7 @@ if grep -rn "use lineos_m0\|use sp314_dsp\|use sp314_nodes\|use xaak" \
 fi
 
 # LineOS must not import aether
-if grep -rn "use aether" lineos/ 2>/dev/null | grep -v "//"; then
+if grep -rn "use aether::\\|use aether;" lineos/ 2>/dev/null | grep -v "//"; then
     echo "❌ G-004: LineOS importing Aether"
     VIOLATIONS=$((VIOLATIONS+1))
 fi

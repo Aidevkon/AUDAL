@@ -35,4 +35,14 @@ pub struct GoldenBlob {
     pub sha256:        String,
     pub preset_name:   String,
     pub engine_version: String,
+    #[serde(default = "default_schema_v1")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub aether_cert:    Option<String>,
+    #[serde(default)]
+    pub aether_persona: Option<String>,
+    #[serde(default)]
+    pub aether_config:  Option<String>,
 }
+
+fn default_schema_v1() -> u32 { 1 }
