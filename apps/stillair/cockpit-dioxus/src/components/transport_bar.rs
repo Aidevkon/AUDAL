@@ -11,7 +11,6 @@ use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson};
 use crate::components::{
     transport_button::{TransportActuator, LedColor, SkipActuator},
-    screw::Screw,
     ab_toggle::{AbToggle, AbToggleState},
     timecode::TimecodeDisplay,
     oled_tile::{OledTile, OledTileState},
@@ -65,6 +64,7 @@ pub struct TransportBarProps {
     pub tier:           Signal<crate::types::CockpitTier>,
     pub intent_open:    Signal<bool>,
     pub intent_closing: Signal<bool>,
+    pub presentation:   crate::state::cockpit_presentation::CockpitPresentation,
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -75,6 +75,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     let mut session_state = props.session_state;
     let tier              = props.tier;
     let mut intent_open   = props.intent_open;
+    let presentation      = &props.presentation;
 
     // ── Internal signals ─────────────────────────────────────────────────────
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
@@ -147,42 +148,36 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                     // Center: Transport & Time
                     div { class: "transport-center",
                         div { class: "insert-panel",
-                            Screw { top: 8, left: 8 }
-                            Screw { top: 8, right: 8 }
-                            Screw { bottom: 8, left: 8 }
-                            Screw { bottom: 8, right: 8 }
-
                             div { class: "transport-mfd-pit",
                                 div { class: "control-housing",
                                     div { class: "mfd-controls-row",
-                                        // SKIP BACK
-                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
-                                            div { class: "transport-btn-col",
-                                                div { class: "transport-top-label", "–5" }
-                                                div { class: "button-base-seat-narrow",
-                                                    SkipActuator {
-                                                        label: "{lbl_skip_back}",
-                                                        on_click: move |_| {
-                                                            let new_ms = position_ms.saturating_sub(5_000);
-                                                            let ps = playback_state.clone();
-                                                            spawn_local(async move {
-                                                                invoke_playback("seek", Some(new_ms), ps).await;
-                                                            });
-                                                        },
-                                                    }
+                                        // SKIP BACK — visible at all tiers (ADR-C0.3)
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "–5" }
+                                            div { class: "button-base-seat-narrow",
+                                                SkipActuator {
+                                                    label: "{lbl_skip_back}",
+                                                    on_click: move |_| {
+                                                        let new_ms = position_ms.saturating_sub(5_000);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(new_ms), ps).await;
+                                                        });
+                                                    },
                                                 }
                                             }
                                         }
 
-                                        // Scrub Knob — inline with transport buttons
-                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
-                                            div {
-                                                class: "scrub-knob-assembly",
-                                                id: "transport-scrub",
-                                                onclick: move |evt| {
-                                                    if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
-                                                        return;
-                                                    }
+                                        // Scrub Knob — visible at all tiers (ADR-C0.2)
+                                        div {
+                                            class: "scrub-knob-assembly",
+                                            id: "transport-scrub",
+                                            onclick: move |evt| {
+                                                // ADR-C0.2: scrub input gated at Tier2+ (display-only at Tier1)
+                                                if *tier.read() < crate::types::CockpitTier::Tier2_Medium { return; }
+                                                if !matches!(*mode.read(), CockpitMode::CoachReady { .. }) || duration_ms == 0 {
+                                                    return;
+                                                }
                                                     let client_x = evt.client_coordinates().x;
                                                     let window = web_sys::window().unwrap();
                                                     let doc = window.document().unwrap();
@@ -265,23 +260,20 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     }
                                                 }
                                             }
-                                        }
 
-                                        // SKIP FORWARD
-                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
-                                            div { class: "transport-btn-col",
-                                                div { class: "transport-top-label", "+5" }
-                                                div { class: "button-base-seat-narrow",
-                                                    SkipActuator {
-                                                        label: "{lbl_skip_fwd}",
-                                                        on_click: move |_| {
-                                                            let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                                            let ps = playback_state.clone();
-                                                            spawn_local(async move {
-                                                                invoke_playback("seek", Some(new_ms), ps).await;
-                                                            });
-                                                        },
-                                                    }
+                                        // SKIP FORWARD — visible at all tiers (ADR-C0.3)
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "+5" }
+                                            div { class: "button-base-seat-narrow",
+                                                SkipActuator {
+                                                    label: "{lbl_skip_fwd}",
+                                                    on_click: move |_| {
+                                                        let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
+                                                        let ps = playback_state.clone();
+                                                        spawn_local(async move {
+                                                            invoke_playback("seek", Some(new_ms), ps).await;
+                                                        });
+                                                    },
                                                 }
                                             }
                                         }
@@ -340,11 +332,11 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                             }
                                         }
 
-                                        if *tier.read() >= crate::types::CockpitTier::Tier2_Medium {
-                                            div { class: "transport-btn-col",
-                                                div { class: "transport-top-label", "A/B" }
-                                                div { class: "ab-toggle-seat",
-                                                    AbToggle {
+                                        // A/B Toggle — visible at all tiers (ADR-C0.4)
+                                        div { class: "transport-btn-col",
+                                            div { class: "transport-top-label", "A/B" }
+                                            div { class: "ab-toggle-seat",
+                                                AbToggle {
                                                     state: (*ab_state.read()).clone(),
                                                     on_mousedown: move |_| {
                                                         let now = js_sys::Date::now() as u64;
@@ -376,8 +368,6 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                         });
                                                     }
                                                 }
-                                                    div { class: "ab-ring" }
-                                                }
                                             }
                                         }
                                     }
@@ -388,8 +378,8 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
 
                     // Right: Critical Zone
                     div { class: "transport-right abort-zone",
-                        // HA button — toggles intent bay
-                        if *tier.read() >= crate::types::CockpitTier::Tier3_Pro {
+                        // HA — visible at Tier2+ (ADR-C0.5, via CockpitPresentation)
+                        if presentation.show_ha_button {
                             button {
                                 class: "btn-pill btn-pill-red",
                                 onclick: move |_| {
@@ -400,55 +390,48 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                             }
                         }
 
-                        // ABORT — Flip-Guard Cap + Deep Cavity + PA-Family Red Actuator
-                        div { class: "abort-housing",
-                            div {
-                                class: match *abort_state.read() {
-                                    AbortState::IdleClosed => "abort-column",
-                                    AbortState::Armed      => "abort-column armed",
-                                    AbortState::Triggered  => "abort-column triggered",
-                                    AbortState::Cooldown   => "abort-column cooldown",
-                                },
-
-                                // Layer 1: Flip cap
-                                div {
-                                    class: "abort-cover",
-                                    onclick: move |_| {
-                                        let current = *abort_state.read();
-                                        match current {
-                                            AbortState::IdleClosed => abort_state.set(AbortState::Armed),
-                                            AbortState::Armed | AbortState::Triggered => abort_state.set(AbortState::IdleClosed),
-                                            AbortState::Cooldown => {},
-                                        }
+                        // ABORT — OLED Touchscreen Button
+                        button {
+                            class: match *abort_state.read() {
+                                AbortState::IdleClosed => "oled-abort-btn idle",
+                                AbortState::Armed      => "oled-abort-btn armed",
+                                AbortState::Triggered  => "oled-abort-btn triggered",
+                                AbortState::Cooldown   => "oled-abort-btn cooldown",
+                            },
+                            onclick: move |_| {
+                                let current = *abort_state.read();
+                                match current {
+                                    AbortState::IdleClosed => {
+                                        abort_state.set(AbortState::Armed);
+                                        let mut state_clone = abort_state.clone();
+                                        spawn_local(async move {
+                                            gloo_timers::future::TimeoutFuture::new(3_000).await;
+                                            if *state_clone.read() == AbortState::Armed {
+                                                state_clone.set(AbortState::IdleClosed);
+                                            }
+                                        });
                                     },
-                                    div { class: "abort-cover-frame" }
+                                    AbortState::Armed => {
+                                        let mut s = session_state.write();
+                                        *s = None;
+                                        let mut m = mode.write();
+                                        *m = CockpitMode::Idle;
+                                        abort_state.set(AbortState::Triggered);
+                                        spawn_local(async move {
+                                            gloo_timers::future::TimeoutFuture::new(4_000).await;
+                                            abort_state.set(AbortState::Cooldown);
+                                            gloo_timers::future::TimeoutFuture::new(200).await;
+                                            abort_state.set(AbortState::IdleClosed);
+                                        });
+                                    },
+                                    _ => {}
                                 }
-
-                                // Layer 2: Deep cavity — PA-family red actuator inside
-                                div { class: "abort-cavity",
-                                    div { class: "abort-inner-socket",
-                                        button {
-                                            class: "abort-inner-button",
-                                            style: if *abort_state.read() != AbortState::Armed { "pointer-events: none;" } else { "" },
-                                            onclick: move |_| {
-                                                if *abort_state.read() != AbortState::Armed { return; }
-                                                let mut s = session_state.write();
-                                                *s = None;
-                                                let mut m = mode.write();
-                                                *m = CockpitMode::Idle;
-                                                abort_state.set(AbortState::Triggered);
-                                                spawn_local(async move {
-                                                    gloo_timers::future::TimeoutFuture::new(4_000).await;
-                                                    abort_state.set(AbortState::Cooldown);
-                                                    gloo_timers::future::TimeoutFuture::new(200).await;
-                                                    abort_state.set(AbortState::IdleClosed);
-                                                });
-                                            },
-                                            div { class: "abort-jewel-glow" }
-                                            span { class: "abort-inner-label", "ABORT" }
-                                        }
-                                    }
-                                }
+                            },
+                            match *abort_state.read() {
+                                AbortState::IdleClosed => "ABORT",
+                                AbortState::Armed      => "ARMED",
+                                AbortState::Triggered  => "ABORTED",
+                                AbortState::Cooldown   => "",
                             }
                         }
                     }

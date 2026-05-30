@@ -2796,8 +2796,7 @@
 
 /* Glass cavities behind the physical controls */
 .oled-glass-surface .transport-btn-col::before,
-.oled-glass-surface .abort-housing::before,
-.oled-glass-surface .fm0-zone::before {
+.oled-glass-surface .abort-housing::before {
     content: '';
     position: absolute;
     inset: -2px;
@@ -2842,4 +2841,56 @@
     border: 1px solid rgba(0, 209, 255, 0.2);
     border-radius: 2px;
     background: rgba(0, 209, 255, 0.05);
+}
+
+/* ── OLED Touchscreen Abort Button ── */
+.oled-abort-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+    border-radius: 4px;
+    padding: 8px 0;
+    width: 92px; /* Fixed width to prevent jumping during state changes */
+    text-align: center;
+    box-sizing: border-box;
+    font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(255, 59, 48, 0.7);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+
+.oled-abort-btn.idle:hover {
+    background: rgba(255, 59, 48, 0.1);
+    border-color: rgba(255, 59, 48, 0.6);
+    color: #ff3b30;
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.2);
+}
+
+.oled-abort-btn.armed {
+    color: #ff3b30;
+    border-color: #ff3b30;
+    background: rgba(255, 59, 48, 0.2);
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.5);
+    animation: abort-pulse 1s infinite alternate;
+}
+
+@keyframes abort-pulse {
+    from { box-shadow: 0 0 10px rgba(255, 59, 48, 0.4); }
+    to { box-shadow: 0 0 30px rgba(255, 59, 48, 0.8); }
+}
+
+.oled-abort-btn.triggered {
+    color: #fff;
+    background: #ff3b30;
+    border-color: #fff;
+    box-shadow: 0 0 40px rgba(255, 59, 48, 1.0);
+    animation: none;
+}
+
+.oled-abort-btn.cooldown {
+    opacity: 0.2;
+    pointer-events: none;
 }

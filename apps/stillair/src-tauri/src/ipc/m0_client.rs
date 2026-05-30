@@ -13,13 +13,14 @@ use reqwest::{Client, ClientBuilder};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// M0 base URL — always localhost:7400 (Caddy proxy, never direct).
-/// Used for: /master, /blob/:id, /export
-const M0_BASE: &str = "http://127.0.0.1:7400";
+/// M0 health endpoint — port 7401 (dedicated health router).
+const M0_HEALTH_BASE: &str = "http://127.0.0.1:7401";
 
-/// M0 playback server URL — port 7402 (xaak playback, NOT proxied through Caddy).
-/// Used for: /playback/control, /playback/state, /playback/telemetry
-/// Caddy on :7400 only forwards mastering routes (:7401); playback is :7402 directly.
+/// M0 mastering/blob/export API — port 7402 (direct, bypassing Caddy).
+/// Caddy proxy on :7400 was never configured; talk to M0 directly.
+const M0_BASE: &str = "http://127.0.0.1:7402";
+
+/// M0 playback server URL — also port 7402 (xaak playback on same router).
 const M0_PLAYBACK_BASE: &str = "http://127.0.0.1:7402";
 
 /// Per-request timeouts.
@@ -47,7 +48,7 @@ impl M0Client {
     /// Guard for ASC 0x05 (WasmPanic / daemon unreachable).
     pub async fn health(&self) -> Result<M0HealthResponse, M0Error> {
         let resp = self.client
-            .get(format!("{M0_BASE}/health"))
+            .get(format!("{M0_HEALTH_BASE}/health"))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 

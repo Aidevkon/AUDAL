@@ -39,6 +39,7 @@ pub fn App() -> Element {
     let mode           = use_signal(|| CockpitMode::Idle);
     let session_state  = use_signal(|| None::<SessionStateJson>);
     let tier           = use_signal(|| CockpitTier::Tier3_Pro);
+    let presentation   = crate::state::cockpit_presentation::CockpitPresentation::from_tier(*tier.read());
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
@@ -63,6 +64,7 @@ pub fn App() -> Element {
                 session_state,
                 intent_open,
                 intent_closing,
+                presentation,
             }
 
             // ── Work Layer — 65% Middle ──────────────────────────────────────

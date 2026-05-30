@@ -353,6 +353,9 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let mut audio = chunk;
 
+    // Clone target before spawn_blocking consumes intent (fix E0382)
+    let intent_target_for_verify = intent.target.clone();
+
     // Run sp314-dsp in blocking thread (no_std/alloc/sync)
     let (result, audio, dsp_config) = tokio::task::spawn_blocking(move || {
         let res = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
@@ -363,7 +366,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let mut audio = audio;
     use sp314_dsp::verification::{PostFlightVerifier, VerificationConfig};
-    let verify_cfg = VerificationConfig::from_target(&intent.target);
+    let verify_cfg = VerificationConfig::from_target(&intent_target_for_verify);
     let verify_result = PostFlightVerifier::verify_and_trim(&mut audio, &verify_cfg);
     if let Some(warn) = &verify_result.warning {
         tracing::warn!("[S-013] ⚠️  {}", warn);

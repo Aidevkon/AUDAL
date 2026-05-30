@@ -23,3 +23,16 @@ ignore = []
 stage = "pre_build"
 command = "echo"
 command_arguments = ["Building Still Air Cockpit (Dioxus 0.6 web)..."]
+
+# ── M0 Proxy — enables Chrome-native development without Tauri ────────────────
+# Trunk forwards /m0/ → M0 mastering API (port 7402)
+# Trunk forwards /m0-health/ → M0 health endpoint (port 7401)
+# This avoids CORS issues entirely — browser only talks to trunk's origin.
+[[proxy]]
+rewrite = "/m0/"
+backend = "http://127.0.0.1:7402/"
+
+[[proxy]]
+rewrite = "/m0-health/"
+backend = "http://127.0.0.1:7401/"
+
