@@ -2,6 +2,8 @@ pub const N_COMPONENTS: usize = 3;
 pub const N_ITER:       usize = 100;
 const EPS:      f32 = 1e-10_f32;
 const LAMBDA_H: f32 = 0.1;
+const CONV_CHECK_INTERVAL: usize = 10;
+const CONV_TOL: f32 = 1e-4;
 
 /// Deterministic xorshift32 PRNG (seed=42)
 fn xorshift32(state: &mut u32) -> f32 {
@@ -37,7 +39,8 @@ impl NmfEngine {
         // Pre-allocate V_approx buffer (reused each iteration)
         let mut v_approx = vec![0.0_f32; n_bins * n_frames];
 
-        for _ in 0..N_ITER {
+        let mut prev_error = f32::MAX;
+        for iter in 0..N_ITER {
             // Step 1: V_approx = W * H
             for b in 0..n_bins {
                 for f in 0..n_frames {
@@ -101,6 +104,23 @@ impl NmfEngine {
                 for f in 0..n_frames {
                     h[c * n_frames + f] *= col_sum;
                 }
+            }
+
+            // Convergence check every CONV_CHECK_INTERVAL iterations
+            if iter % CONV_CHECK_INTERVAL == 0 && iter > 0 {
+                let mut sum_sq = 0.0_f32;
+                for b in 0..n_bins {
+                    for f in 0..n_frames {
+                        let diff = frames[f][b] - v_approx[b * n_frames + f];
+                        sum_sq += diff * diff;
+                    }
+                }
+                let error = libm::sqrtf(sum_sq);
+                let rel_improvement = (prev_error - error) / prev_error.max(EPS);
+                if rel_improvement < CONV_TOL {
+                    break;
+                }
+                prev_error = error;
             }
         }
 
