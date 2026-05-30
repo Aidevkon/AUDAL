@@ -42,4 +42,4 @@ pub mod verification;
 pub mod stft;
 
 pub mod analysis;
-pub use analysis::{StemFeatures, StemMetrics, MixMetrics, StemFeatureAnalyzer};
+pub use analysis::{StemFeatures, StemMetrics, MixMetrics, StemFeatureAnalyzer, PreAnalyzer};
