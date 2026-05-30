@@ -19,38 +19,38 @@ impl StemFeatureAnalyzer {
     /// Analyze 4 stereo interleaved stems from S-001 (FourStems).
     /// Returns StemFeatures with all metrics computed.
     pub fn analyze(stems: &FourStems, sample_rate: u32) -> StemFeatures {
-        let bass   = Self::analyze_stem(&stems.bass,   sample_rate);
-        let vocals = Self::analyze_stem(&stems.vocals, sample_rate);
-        let drums  = Self::analyze_stem(&stems.drums,  sample_rate);
-        let other  = Self::analyze_stem(&stems.other,  sample_rate);
+        let bass      = Self::analyze_stem(&stems.bass,      sample_rate);
+        let harmonics = Self::analyze_stem(&stems.harmonics, sample_rate);
+        let drums     = Self::analyze_stem(&stems.drums,     sample_rate);
+        let ambience  = Self::analyze_stem(&stems.ambience,  sample_rate);
 
         // Mix energy for ratios
         let mix_energy = Self::stereo_energy(&stems.bass)
-                       + Self::stereo_energy(&stems.vocals)
+                       + Self::stereo_energy(&stems.harmonics)
                        + Self::stereo_energy(&stems.drums)
-                       + Self::stereo_energy(&stems.other);
+                       + Self::stereo_energy(&stems.ambience);
 
-        let bass_ratio   = Self::energy_ratio(&stems.bass,   mix_energy);
-        let vocals_ratio = Self::energy_ratio(&stems.vocals, mix_energy);
-        let drums_ratio  = Self::energy_ratio(&stems.drums,  mix_energy);
-        let other_ratio  = Self::energy_ratio(&stems.other,  mix_energy);
+        let bass_ratio      = Self::energy_ratio(&stems.bass,      mix_energy);
+        let harmonics_ratio = Self::energy_ratio(&stems.harmonics, mix_energy);
+        let drums_ratio     = Self::energy_ratio(&stems.drums,     mix_energy);
+        let ambience_ratio  = Self::energy_ratio(&stems.ambience,  mix_energy);
 
         // Sum check assertion (constitutional)
         debug_assert!(
-            bass_ratio + vocals_ratio + drums_ratio + other_ratio
+            bass_ratio + harmonics_ratio + drums_ratio + ambience_ratio
                 <= 1.0 + ENERGY_RATIO_EPSILON
         );
 
         // Mix: combine all stems
         let mix_stereo = Self::combine_stereo(
-            &stems.bass, &stems.vocals, &stems.drums, &stems.other);
+            &stems.bass, &stems.harmonics, &stems.drums, &stems.ambience);
         let mix_l: Vec<f32> = mix_stereo.iter().step_by(2).copied().collect();
         let mix_r: Vec<f32> = mix_stereo.iter().skip(1).step_by(2).copied().collect();
 
         // Mix centroid: energy-weighted average of stem centroids (S-008)
-        let ratios = [bass_ratio, vocals_ratio, drums_ratio, other_ratio];
-        let centroids = [bass.spectral_centroid_hz, vocals.spectral_centroid_hz,
-                         drums.spectral_centroid_hz, other.spectral_centroid_hz];
+        let ratios = [bass_ratio, harmonics_ratio, drums_ratio, ambience_ratio];
+        let centroids = [bass.spectral_centroid_hz, harmonics.spectral_centroid_hz,
+                         drums.spectral_centroid_hz, ambience.spectral_centroid_hz];
         let total_w: f32 = ratios.iter().sum();
         let mix_centroid = if total_w > 1e-10 {
             ratios.iter().zip(centroids.iter())
@@ -65,12 +65,12 @@ impl StemFeatureAnalyzer {
             stereo_correlation: stereo_correlation(&mix_stereo),
             stereo_width:       stereo_width(&mix_stereo),
             dynamic_range_db:   dynamic_range_db(&mix_l, sample_rate),
-            stem_energy_ratios: [bass_ratio, vocals_ratio,
-                                  drums_ratio, other_ratio],
+            stem_energy_ratios: [bass_ratio, harmonics_ratio,
+                                  drums_ratio, ambience_ratio],
             spectral_centroid_hz: mix_centroid,
         };
 
-        StemFeatures { bass, vocals, drums, other, mix }
+        StemFeatures { bass, harmonics, drums, ambience, mix }
     }
 
     fn analyze_stem(stereo: &[f32], sample_rate: u32) -> StemMetrics {
@@ -146,11 +146,11 @@ impl StemFeatureAnalyzer {
 
         if left.is_empty() || right.is_empty() {
             return StemFeatures {
-                bass:   StemMetrics::default(),
-                vocals: StemMetrics::default(),
-                drums:  StemMetrics::default(),
-                other:  StemMetrics::default(),
-                mix:    MixMetrics::default(),
+                bass:      StemMetrics::default(),
+                harmonics: StemMetrics::default(),
+                drums:     StemMetrics::default(),
+                ambience:  StemMetrics::default(),
+                mix:       MixMetrics::default(),
             };
         }
 
@@ -193,10 +193,10 @@ impl StemFeatureAnalyzer {
         };
 
         StemFeatures {
-            bass:   StemMetrics::default(),
-            vocals: StemMetrics::default(),
-            drums:  StemMetrics::default(),
-            other:  StemMetrics::default(),
+            bass:      StemMetrics::default(),
+            harmonics: StemMetrics::default(),
+            drums:     StemMetrics::default(),
+            ambience:  StemMetrics::default(),
             mix,
         }
     }
@@ -235,8 +235,8 @@ mod tests {
         let result = StemFeatureAnalyzer::analyze_stereo(
             &signal, &signal, 48000);
         assert_eq!(result.bass,   StemMetrics::default());
-        assert_eq!(result.vocals, StemMetrics::default());
+        assert_eq!(result.harmonics, StemMetrics::default());
         assert_eq!(result.drums,  StemMetrics::default());
-        assert_eq!(result.other,  StemMetrics::default());
+        assert_eq!(result.ambience,  StemMetrics::default());
     }
 }

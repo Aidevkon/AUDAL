@@ -11,11 +11,11 @@ pub const ENERGY_RATIO_EPSILON:   f32   = 1e-4;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemFeatures {
-    pub bass:   StemMetrics,
-    pub vocals: StemMetrics,
-    pub drums:  StemMetrics,
-    pub other:  StemMetrics,
-    pub mix:    MixMetrics,
+    pub bass:      StemMetrics,
+    pub harmonics: StemMetrics,
+    pub drums:     StemMetrics,
+    pub ambience:  StemMetrics,
+    pub mix:       MixMetrics,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -61,7 +61,7 @@ pub struct MixMetrics {
     pub stereo_correlation:    f32,
     pub stereo_width:          f32,
     pub dynamic_range_db:      f32,
-    pub stem_energy_ratios:    [f32; 4],  // [bass, vocals, drums, other]
+    pub stem_energy_ratios:    [f32; 4],  // [bass, harmonics, drums, ambience]
     /// Energy-weighted average of stem centroids (S-008 requirement)
     pub spectral_centroid_hz:  f32,
 }
