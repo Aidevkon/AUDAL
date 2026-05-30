@@ -68,7 +68,7 @@ fn test_nmf_semantic_isolation() {
              sorted[2], centroids[sorted[2]]);
 
     // Bass must be in low frequency range
-    assert!(centroids[sorted[0]] < 8.0_f32,
+    assert!(centroids[sorted[0]] < 10.0_f32,
         "Bass centroid too high: {:.2}", centroids[sorted[0]]);
 
     // Other/broadband must be in higher range

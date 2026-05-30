@@ -1,6 +1,7 @@
 pub const N_COMPONENTS: usize = 3;
 pub const N_ITER:       usize = 100;
-const EPS: f32 = 1e-10_f32;
+const EPS:      f32 = 1e-10_f32;
+const LAMBDA_H: f32 = 0.1;
 
 /// Deterministic xorshift32 PRNG (seed=42)
 fn xorshift32(state: &mut u32) -> f32 {
@@ -58,7 +59,7 @@ impl NmfEngine {
                         num += w_bc * frames[f][b];
                         den += w_bc * v_approx[b * n_frames + f];
                     }
-                    h[c * n_frames + f] *= num / (den + EPS);
+                    h[c * n_frames + f] *= num / (den + LAMBDA_H + EPS);
                 }
             }
 
@@ -84,6 +85,21 @@ impl NmfEngine {
                         den += v_approx[b * n_frames + f] * h_cf;
                     }
                     w[b * k + c] *= num / (den + EPS);
+                }
+            }
+
+            // Normalize W columns (L1), absorb scale into H rows
+            // Prevents scale ambiguity accumulating over iterations (NMF upgrade 1)
+            for c in 0..k {
+                let col_sum: f32 = (0..n_bins)
+                    .map(|b| w[b * k + c])
+                    .sum::<f32>()
+                    .max(EPS);
+                for b in 0..n_bins {
+                    w[b * k + c] /= col_sum;
+                }
+                for f in 0..n_frames {
+                    h[c * n_frames + f] *= col_sum;
                 }
             }
         }
