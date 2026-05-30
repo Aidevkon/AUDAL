@@ -59,7 +59,8 @@ impl FourStemRenderer {
             .collect();
 
         // Step 5: NMF on harmonic spectrogram → Bass, Vocals, Other
-        let nmf = NmfEngine::fit(&harmonic_mag);
+        let mut nmf = NmfEngine::default();
+        nmf.fit(&harmonic_mag);
         let centroids = nmf.centroids(N_BINS);
 
         // Sort by centroid: lowest=Bass, highest=Ambience, middle=Harmonics

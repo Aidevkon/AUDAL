@@ -14,20 +14,29 @@ fn xorshift32(state: &mut u32) -> f32 {
 }
 
 pub struct NmfEngine {
-    /// W: basis matrix [n_bins × N_COMPONENTS] row-major
+    pub n_components: usize,
+    /// W: basis matrix [n_bins × n_components] row-major
     pub w: Vec<f32>,
-    /// H: activation matrix [N_COMPONENTS × n_frames] row-major
+    /// H: activation matrix [n_components × n_frames] row-major
     pub h: Vec<f32>,
 }
 
 impl NmfEngine {
 
+    pub fn new(n_components: usize) -> Self {
+        Self { n_components, w: Vec::new(), h: Vec::new() }
+    }
+
+    pub fn default() -> Self {
+        Self::new(N_COMPONENTS)
+    }
+
     /// Run NMF on magnitude spectrogram.
     /// frames: &[Vec<f32>] — outer=time (n_frames), inner=freq (n_bins)
-    pub fn fit(frames: &[Vec<f32>]) -> Self {
+    pub fn fit(&mut self, frames: &[Vec<f32>]) {
         let n_frames = frames.len();
         let n_bins   = if n_frames > 0 { frames[0].len() } else { 0 };
-        let k        = N_COMPONENTS;
+        let k        = self.n_components;
 
         // Initialize W and H with fixed seed=42
         let mut seed: u32 = 42;
@@ -124,12 +133,13 @@ impl NmfEngine {
             }
         }
 
-        Self { w, h }
+        self.w = w;
+        self.h = h;
     }
 
     /// Spectral centroid per component.
     pub fn centroids(&self, n_bins: usize) -> Vec<f32> {
-        let k = N_COMPONENTS;
+        let k = self.n_components;
         let mut result = vec![0.0_f32; k];
         for c in 0..k {
             let mut num = 0.0_f32;
@@ -152,7 +162,7 @@ impl NmfEngine {
         n_bins: usize,
         n_frames: usize,
     ) -> Vec<Vec<f32>> {
-        let k = N_COMPONENTS;
+        let k = self.n_components;
         let mut mask = vec![vec![0.0_f32; n_bins]; n_frames];
         for f in 0..n_frames {
             for b in 0..n_bins {

@@ -29,7 +29,8 @@ fn test_nmf_semantic_isolation() {
         }
     }
 
-    let engine = NmfEngine::fit(&frames);
+    let mut engine = NmfEngine::default();
+    engine.fit(&frames);
 
     // Reconstruction MSE
     let mut mse = 0.0_f32;
@@ -83,7 +84,8 @@ fn test_nmf_masks_sum_to_unity() {
     let n_bins   = 8_usize;
     let n_frames = 4_usize;
     let frames   = vec![vec![0.5_f32; n_bins]; n_frames];
-    let engine   = NmfEngine::fit(&frames);
+    let mut engine = NmfEngine::default();
+    engine.fit(&frames);
 
     let mut max_err = 0.0_f32;
     for f in 0..n_frames {
