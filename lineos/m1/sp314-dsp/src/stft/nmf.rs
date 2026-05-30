@@ -1,6 +1,9 @@
 pub const N_COMPONENTS: usize = 3;
 pub const N_ITER:       usize = 100;
-const EPS: f32 = 1e-10_f32;
+const EPS:      f32 = 1e-10_f32;
+const LAMBDA_H: f32 = 0.1;
+const CONV_CHECK_INTERVAL: usize = 10;
+const CONV_TOL: f32 = 1e-4;
 
 /// Deterministic xorshift32 PRNG (seed=42)
 fn xorshift32(state: &mut u32) -> f32 {
@@ -11,20 +14,29 @@ fn xorshift32(state: &mut u32) -> f32 {
 }
 
 pub struct NmfEngine {
-    /// W: basis matrix [n_bins × N_COMPONENTS] row-major
+    pub n_components: usize,
+    /// W: basis matrix [n_bins × n_components] row-major
     pub w: Vec<f32>,
-    /// H: activation matrix [N_COMPONENTS × n_frames] row-major
+    /// H: activation matrix [n_components × n_frames] row-major
     pub h: Vec<f32>,
 }
 
 impl NmfEngine {
 
+    pub fn new(n_components: usize) -> Self {
+        Self { n_components, w: Vec::new(), h: Vec::new() }
+    }
+
+    pub fn default() -> Self {
+        Self::new(N_COMPONENTS)
+    }
+
     /// Run NMF on magnitude spectrogram.
     /// frames: &[Vec<f32>] — outer=time (n_frames), inner=freq (n_bins)
-    pub fn fit(frames: &[Vec<f32>]) -> Self {
+    pub fn fit(&mut self, frames: &[Vec<f32>]) {
         let n_frames = frames.len();
         let n_bins   = if n_frames > 0 { frames[0].len() } else { 0 };
-        let k        = N_COMPONENTS;
+        let k        = self.n_components;
 
         // Initialize W and H with fixed seed=42
         let mut seed: u32 = 42;
@@ -36,7 +48,8 @@ impl NmfEngine {
         // Pre-allocate V_approx buffer (reused each iteration)
         let mut v_approx = vec![0.0_f32; n_bins * n_frames];
 
-        for _ in 0..N_ITER {
+        let mut prev_error = f32::MAX;
+        for iter in 0..N_ITER {
             // Step 1: V_approx = W * H
             for b in 0..n_bins {
                 for f in 0..n_frames {
@@ -58,7 +71,7 @@ impl NmfEngine {
                         num += w_bc * frames[f][b];
                         den += w_bc * v_approx[b * n_frames + f];
                     }
-                    h[c * n_frames + f] *= num / (den + EPS);
+                    h[c * n_frames + f] *= num / (den + LAMBDA_H + EPS);
                 }
             }
 
@@ -86,14 +99,47 @@ impl NmfEngine {
                     w[b * k + c] *= num / (den + EPS);
                 }
             }
+
+            // Normalize W columns (L1), absorb scale into H rows
+            // Prevents scale ambiguity accumulating over iterations (NMF upgrade 1)
+            for c in 0..k {
+                let col_sum: f32 = (0..n_bins)
+                    .map(|b| w[b * k + c])
+                    .sum::<f32>()
+                    .max(EPS);
+                for b in 0..n_bins {
+                    w[b * k + c] /= col_sum;
+                }
+                for f in 0..n_frames {
+                    h[c * n_frames + f] *= col_sum;
+                }
+            }
+
+            // Convergence check every CONV_CHECK_INTERVAL iterations
+            if iter % CONV_CHECK_INTERVAL == 0 && iter > 0 {
+                let mut sum_sq = 0.0_f32;
+                for b in 0..n_bins {
+                    for f in 0..n_frames {
+                        let diff = frames[f][b] - v_approx[b * n_frames + f];
+                        sum_sq += diff * diff;
+                    }
+                }
+                let error = libm::sqrtf(sum_sq);
+                let rel_improvement = (prev_error - error) / prev_error.max(EPS);
+                if rel_improvement < CONV_TOL {
+                    break;
+                }
+                prev_error = error;
+            }
         }
 
-        Self { w, h }
+        self.w = w;
+        self.h = h;
     }
 
     /// Spectral centroid per component.
     pub fn centroids(&self, n_bins: usize) -> Vec<f32> {
-        let k = N_COMPONENTS;
+        let k = self.n_components;
         let mut result = vec![0.0_f32; k];
         for c in 0..k {
             let mut num = 0.0_f32;
@@ -116,7 +162,7 @@ impl NmfEngine {
         n_bins: usize,
         n_frames: usize,
     ) -> Vec<Vec<f32>> {
-        let k = N_COMPONENTS;
+        let k = self.n_components;
         let mut mask = vec![vec![0.0_f32; n_bins]; n_frames];
         for f in 0..n_frames {
             for b in 0..n_bins {

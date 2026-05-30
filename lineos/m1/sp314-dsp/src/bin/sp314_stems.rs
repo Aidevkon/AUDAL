@@ -1,8 +1,8 @@
 // src/bin/sp314_stems.rs
 // E14 Four-Stem Separator CLI
 // Usage: sp314_stems <input.wav>
-// Output: <name>_bass.wav, <name>_vocals.wav,
-//         <name>_drums.wav, <name>_other.wav
+// Output: <name>_bass.wav, <name>_harmonics.wav,
+//         <name>_drums.wav, <name>_ambience.wav
 
 use sp314_dsp::io::{WavReader, WavWriter};
 use sp314_dsp::stft::stem_renderer::FourStemRenderer;
@@ -23,9 +23,9 @@ fn print_usage_and_exit() -> ! {
     println!();
     println!("Output files:");
     println!("  <name>_bass.wav");
-    println!("  <name>_vocals.wav");
+    println!("  <name>_harmonics.wav");
     println!("  <name>_drums.wav");
-    println!("  <name>_other.wav");
+    println!("  <name>_ambience.wav");
     std::process::exit(1);
 }
 
@@ -80,20 +80,20 @@ fn main() {
     println!("  Done in {}ms", elapsed);
 
     // Write output stems
-    let bass_path   = stem_path(input_path, "bass");
-    let vocals_path = stem_path(input_path, "vocals");
-    let drums_path  = stem_path(input_path, "drums");
-    let other_path  = stem_path(input_path, "other");
+    let bass_path      = stem_path(input_path, "bass");
+    let harmonics_path = stem_path(input_path, "harmonics");
+    let drums_path     = stem_path(input_path, "drums");
+    let ambience_path  = stem_path(input_path, "ambience");
 
     println!("\nWriting stems:");
-    write_wav(&bass_path,   &stems.bass,   sample_rate);
+    write_wav(&bass_path,      &stems.bass,      sample_rate);
     println!("  ✓ {}", bass_path);
-    write_wav(&vocals_path, &stems.vocals, sample_rate);
-    println!("  ✓ {}", vocals_path);
-    write_wav(&drums_path,  &stems.drums,  sample_rate);
+    write_wav(&harmonics_path, &stems.harmonics, sample_rate);
+    println!("  ✓ {}", harmonics_path);
+    write_wav(&drums_path,     &stems.drums,     sample_rate);
     println!("  ✓ {}", drums_path);
-    write_wav(&other_path,  &stems.other,  sample_rate);
-    println!("  ✓ {}", other_path);
+    write_wav(&ambience_path,  &stems.ambience,  sample_rate);
+    println!("  ✓ {}", ambience_path);
 
     println!("\n=== Done ===");
 }

@@ -10,10 +10,10 @@ pub struct FourStemRenderer {
 
 /// Output of the 4-stem separation.
 pub struct FourStems {
-    pub bass:   Vec<f32>,
-    pub vocals: Vec<f32>,
-    pub drums:  Vec<f32>,
-    pub other:  Vec<f32>,
+    pub bass:      Vec<f32>,
+    pub harmonics: Vec<f32>,
+    pub drums:     Vec<f32>,
+    pub ambience:  Vec<f32>,
 }
 
 impl FourStemRenderer {
@@ -28,10 +28,10 @@ impl FourStemRenderer {
         let n = signal.len();
         if n == 0 {
             return FourStems {
-                bass:   Vec::new(),
-                vocals: Vec::new(),
-                drums:  Vec::new(),
-                other:  Vec::new(),
+                bass:      Vec::new(),
+                harmonics: Vec::new(),
+                drums:     Vec::new(),
+                ambience:  Vec::new(),
             };
         }
 
@@ -59,27 +59,28 @@ impl FourStemRenderer {
             .collect();
 
         // Step 5: NMF on harmonic spectrogram → Bass, Vocals, Other
-        let nmf = NmfEngine::fit(&harmonic_mag);
+        let mut nmf = NmfEngine::default();
+        nmf.fit(&harmonic_mag);
         let centroids = nmf.centroids(N_BINS);
 
-        // Sort by centroid: lowest=Bass, highest=Other, middle=Vocals
+        // Sort by centroid: lowest=Bass, highest=Ambience, middle=Harmonics
         let mut sorted: Vec<usize> = (0..N_COMPONENTS).collect();
         sorted.sort_by(|&a, &b|
             centroids[a].total_cmp(&centroids[b]));
-        let bass_comp   = sorted[0];
-        let vocals_comp = sorted[1];
-        let other_comp  = sorted[2];
+        let bass_comp      = sorted[0];
+        let harmonics_comp = sorted[1];
+        let ambience_comp  = sorted[2];
 
         // Step 6: Build NMF Wiener masks
-        let mask_bass   = nmf.component_mask(bass_comp,   N_BINS, n_frames);
-        let mask_vocals = nmf.component_mask(vocals_comp, N_BINS, n_frames);
-        let mask_other  = nmf.component_mask(other_comp,  N_BINS, n_frames);
+        let mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
+        let mask_harmonics = nmf.component_mask(harmonics_comp, N_BINS, n_frames);
+        let mask_ambience  = nmf.component_mask(ambience_comp,  N_BINS, n_frames);
 
         // Step 7: Combine HPSS + NMF masks and apply in Cartesian domain
-        let mut frames_bass   = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
-        let mut frames_vocals = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
-        let mut frames_drums  = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
-        let mut frames_other  = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
+        let mut frames_bass      = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
+        let mut frames_harmonics = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
+        let mut frames_drums     = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
+        let mut frames_ambience  = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
 
         for t in 0..n_frames {
             for b in 0..N_BINS {
@@ -89,23 +90,23 @@ impl FourStemRenderer {
                 let mp = mask_p[t][b];
 
                 // Harmonic stems: HPSS harmonic × NMF component mask
-                let mb = mask_bass[t][b]   * mh;
-                let mv = mask_vocals[t][b] * mh;
-                let mo = mask_other[t][b]  * mh;
+                let mb = mask_bass[t][b]      * mh;
+                let mv = mask_harmonics[t][b] * mh;
+                let mo = mask_ambience[t][b]  * mh;
 
-                frames_bass[t][b]   = Complex::new(re * mb, im * mb);
-                frames_vocals[t][b] = Complex::new(re * mv, im * mv);
-                frames_drums[t][b]  = Complex::new(re * mp, im * mp);
-                frames_other[t][b]  = Complex::new(re * mo, im * mo);
+                frames_bass[t][b]      = Complex::new(re * mb, im * mb);
+                frames_harmonics[t][b] = Complex::new(re * mv, im * mv);
+                frames_drums[t][b]     = Complex::new(re * mp, im * mp);
+                frames_ambience[t][b]  = Complex::new(re * mo, im * mo);
             }
         }
 
         // Step 8: iSTFT for all 4 stems
         FourStems {
-            bass:   self.engine.inverse(&frames_bass,   n),
-            vocals: self.engine.inverse(&frames_vocals, n),
-            drums:  self.engine.inverse(&frames_drums,  n),
-            other:  self.engine.inverse(&frames_other,  n),
+            bass:      self.engine.inverse(&frames_bass,      n),
+            harmonics: self.engine.inverse(&frames_harmonics, n),
+            drums:     self.engine.inverse(&frames_drums,     n),
+            ambience:  self.engine.inverse(&frames_ambience,  n),
         }
     }
 }
@@ -123,7 +124,7 @@ impl StemRenderer {
         let stems = self.inner.render(signal);
         let mut harmonic = vec![0.0_f32; stems.bass.len()];
         for i in 0..stems.bass.len() {
-            harmonic[i] = stems.bass[i] + stems.vocals[i] + stems.other[i];
+            harmonic[i] = stems.bass[i] + stems.harmonics[i] + stems.ambience[i];
         }
         (harmonic, stems.drums)
     }

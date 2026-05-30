@@ -8,9 +8,9 @@ fn four_stem_lengths_match_input() {
     let stems = renderer.render(&signal);
 
     assert_eq!(stems.bass.len(),   n);
-    assert_eq!(stems.vocals.len(), n);
+    assert_eq!(stems.harmonics.len(), n);
     assert_eq!(stems.drums.len(),  n);
-    assert_eq!(stems.other.len(),  n);
+    assert_eq!(stems.ambience.len(),  n);
 }
 
 #[test]
@@ -38,9 +38,9 @@ fn four_stem_perfect_reconstruction() {
     let mut max_err = 0.0_f32;
     for i in margin..n - margin {
         let sum = stems.bass[i]
-                + stems.vocals[i]
+                + stems.harmonics[i]
                 + stems.drums[i]
-                + stems.other[i];
+                + stems.ambience[i];
         let err = (signal[i] - sum).abs();
         if err > max_err { max_err = err; }
     }

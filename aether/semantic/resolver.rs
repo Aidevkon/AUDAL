@@ -40,7 +40,7 @@ impl SemanticZoneResolver {
         });
 
         // Cymbal harshness — stem crest factor threshold
-        if features.vocals.spectral_crest_factor
+        if features.harmonics.spectral_crest_factor
             > CYMBAL_HARSH_CREST_THRESHOLD {
             zones.push(SemanticZone {
                 id: "cymbal_harsh".into(), center_hz: 9000.0,
@@ -179,11 +179,11 @@ mod tests {
     fn test_stem_features() -> StemFeatures {
         use lineos_types::analysis::{StemMetrics, MixMetrics};
         StemFeatures {
-            bass:   StemMetrics::default(),
-            vocals: StemMetrics::default(),
-            drums:  StemMetrics::default(),
-            other:  StemMetrics::default(),
-            mix:    MixMetrics::default(),
+            bass:      StemMetrics::default(),
+            harmonics: StemMetrics::default(),
+            drums:     StemMetrics::default(),
+            ambience:  StemMetrics::default(),
+            mix:       MixMetrics::default(),
         }
     }
 
