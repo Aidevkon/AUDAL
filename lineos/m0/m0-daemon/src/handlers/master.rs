@@ -335,6 +335,33 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     use sp314_dsp::analysis::StemFeatureAnalyzer;
     let features = StemFeatureAnalyzer::analyze_stereo(&chunk.left, &chunk.right, chunk.sample_rate);
 
+    // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
+    // Runs once per session on raw stereo PCM, before Aether.
+    use sp314_dsp::analysis::PreAnalyzer;
+    let pre_analysis = PreAnalyzer::run(&chunk.left, &chunk.right, chunk.sample_rate);
+    tracing::info!(
+        "pre-analysis: lufs={:.1} tp={:.1} lra={:.1} td={:.1}/s corr={:.2} \
+         profile=[{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}] \
+         zones=[sub={} box={} harsh={} phase={} res={}]",
+        pre_analysis.integrated_lufs,
+        pre_analysis.true_peak_dbtp,
+        pre_analysis.loudness_range,
+        pre_analysis.transient_density,
+        pre_analysis.global_phase_correlation,
+        pre_analysis.spectral_profile_db[0],
+        pre_analysis.spectral_profile_db[1],
+        pre_analysis.spectral_profile_db[2],
+        pre_analysis.spectral_profile_db[3],
+        pre_analysis.spectral_profile_db[4],
+        pre_analysis.spectral_profile_db[5],
+        pre_analysis.zone_flags.zone_sub_rumble,
+        pre_analysis.zone_flags.zone_boxiness,
+        pre_analysis.zone_flags.zone_cymbal_harsh,
+        pre_analysis.zone_flags.zone_phase_issue,
+        pre_analysis.zone_flags.zone_harsh_resonance,
+    );
+    let _ = pre_analysis; // Phase 6 will pass this to build_dsp_config
+
     // A2: Pre-DSP Aether processing
     let aether_req = aether_bridge::AetherRequest {
         persona_id:  req.persona_id.clone(),
