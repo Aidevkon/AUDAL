@@ -75,7 +75,7 @@ impl ZoneEditor {
     pub fn build(persona:  &PersonaConfig,
                  features: &StemFeatures,
                  tier:     ZoneEditorTier) -> ZoneEditorState {
-        let zones    = SemanticZoneResolver::build_zones(persona, features);
+        let zones    = SemanticZoneResolver::build_zones(persona, features, None);
         let resolved = SemanticZoneResolver::resolve(&zones);
         let visuals  = compute_visuals(&zones, &resolved);
         let has_collisions = visuals.iter().any(|v| v.in_collision);
@@ -200,11 +200,11 @@ mod tests {
 
     fn test_stem_features() -> StemFeatures {
         StemFeatures {
-            bass:   StemMetrics::default(),
-            vocals: StemMetrics::default(),
-            drums:  StemMetrics::default(),
-            other:  StemMetrics::default(),
-            mix:    MixMetrics::default(),
+            bass:      StemMetrics::default(),
+            harmonics: StemMetrics::default(),
+            drums:     StemMetrics::default(),
+            ambience:  StemMetrics::default(),
+            mix:       MixMetrics::default(),
         }
     }
 

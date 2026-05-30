@@ -360,7 +360,6 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         pre_analysis.zone_flags.zone_phase_issue,
         pre_analysis.zone_flags.zone_harsh_resonance,
     );
-    let _ = pre_analysis; // Phase 6 will pass this to build_dsp_config
 
     // A2: Pre-DSP Aether processing
     let aether_req = aether_bridge::AetherRequest {
@@ -375,7 +374,11 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         preset_name: Some(req.preset_id.clone()),
     };
 
-    let (dsp_config, proof_log, persona_config) = aether_bridge::build_dsp_config(&aether_req, &features)
+    let (dsp_config, proof_log, persona_config) = aether_bridge::build_dsp_config(
+        &aether_req,
+        &features,
+        Some(&pre_analysis),
+    )
         .map_err(|e| format!("AetherBridge error: {}", e))?;
 
     let mut audio = chunk;

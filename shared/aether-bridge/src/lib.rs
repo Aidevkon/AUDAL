@@ -14,6 +14,7 @@ use integration::proof_log::ProofLog;
 use proof::proof::ExecutionProof;
 use proof::certificate::ExecutionCertificate;
 use lineos_types::analysis::StemFeatures;
+use lineos_types::pre_analysis::PreAnalysisData;
 
 /// Aether tuning parameters from the caller.
 /// Decoupled from MasterRequest (m0 network DTO).
@@ -69,8 +70,9 @@ impl std::fmt::Display for AetherBridgeError {
 /// DspConfig is passed to sp314-dsp for rendering.
 /// ProofLog is passed to generate_certificate() after render.
 pub fn build_dsp_config(
-    req:      &AetherRequest,
-    features: &StemFeatures,
+    req:          &AetherRequest,
+    features:     &StemFeatures,
+    pre_analysis: Option<&PreAnalysisData>,
 ) -> Result<(DspConfig, ProofLog, PersonaConfig), AetherBridgeError> {
 
     let mgr     = PersonaManager::load();
@@ -109,7 +111,7 @@ pub fn build_dsp_config(
 
     let modulated = ChaosEngine::apply(&micro, &chaos_delta);
     let zones     = SemanticZoneResolver::auto_carve(
-                        &persona, features);
+                        &persona, features, pre_analysis);
 
     let mut proof_log = ProofLog::new();
     let dsp_config    = IntegrationFirewall::build(
@@ -156,11 +158,11 @@ mod tests {
 
     fn test_features() -> StemFeatures {
         StemFeatures {
-            bass:   StemMetrics::default(),
-            vocals: StemMetrics::default(),
-            drums:  StemMetrics::default(),
-            other:  StemMetrics::default(),
-            mix:    MixMetrics::default(),
+            bass:      StemMetrics::default(),
+            harmonics: StemMetrics::default(),
+            drums:     StemMetrics::default(),
+            ambience:  StemMetrics::default(),
+            mix:       MixMetrics::default(),
         }
     }
 
@@ -168,7 +170,7 @@ mod tests {
     fn bridge_build_dsp_config_default_persona() {
         let req      = AetherRequest::default();
         let features = test_features();
-        let result   = build_dsp_config(&req, &features);
+        let result   = build_dsp_config(&req, &features, None);
         assert!(result.is_ok());
         let (cfg, _, persona) = result.unwrap();
         assert_eq!(persona.id, "warm_analog");
@@ -184,7 +186,7 @@ mod tests {
                 persona_id: Some(id.into()),
                 ..Default::default()
             };
-            assert!(build_dsp_config(&req, &features).is_ok(),
+            assert!(build_dsp_config(&req, &features, None).is_ok(),
                 "Failed for persona: {}", id);
         }
     }
@@ -197,7 +199,7 @@ mod tests {
         };
         let features = test_features();
         assert!(matches!(
-            build_dsp_config(&req, &features),
+            build_dsp_config(&req, &features, None),
             Err(AetherBridgeError::PersonaNotFound(_))
         ));
     }
@@ -209,9 +211,9 @@ mod tests {
             ..Default::default()
         };
         let features = test_features();
-        let (cfg1, _, _) = build_dsp_config(&req, &features)
+        let (cfg1, _, _) = build_dsp_config(&req, &features, None)
             .unwrap();
-        let (cfg2, _, _) = build_dsp_config(&req, &features)
+        let (cfg2, _, _) = build_dsp_config(&req, &features, None)
             .unwrap();
         assert_eq!(cfg1.eq.low_shelf_gain_db,
                    cfg2.eq.low_shelf_gain_db);
@@ -230,7 +232,7 @@ mod tests {
         };
         let features = test_features();
         let (cfg, log, persona) =
-            build_dsp_config(&req, &features).unwrap();
+            build_dsp_config(&req, &features, None).unwrap();
 
         let input  = vec![0.1_f32; 1000];
         let output = vec![0.05_f32; 1000];
@@ -254,7 +256,7 @@ mod tests {
         };
         let features = test_features();
         let (cfg, log, persona) =
-            build_dsp_config(&req, &features).unwrap();
+            build_dsp_config(&req, &features, None).unwrap();
 
         let input   = vec![0.1_f32; 100];
         let output1 = vec![0.05_f32; 100];

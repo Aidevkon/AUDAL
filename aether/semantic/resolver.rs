@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 use lineos_types::analysis::StemFeatures;
+use lineos_types::pre_analysis::PreAnalysisData;
 use crate::personas::config::PersonaConfig;
 use super::zone::*;
 
@@ -13,8 +14,10 @@ pub struct SemanticZoneResolver;
 
 impl SemanticZoneResolver {
     /// Build default zone set from persona priorities and stem features.
-    pub fn build_zones(persona:  &PersonaConfig,
-                       features: &StemFeatures) -> Vec<SemanticZone> {
+    pub fn build_zones(persona:      &PersonaConfig,
+                       features:     &StemFeatures,
+                       pre_analysis: Option<&PreAnalysisData>,
+    ) -> Vec<SemanticZone> {
         let mut zones = vec![];
 
         zones.push(SemanticZone {
@@ -39,9 +42,18 @@ impl SemanticZoneResolver {
             active: true,
         });
 
-        // Cymbal harshness — stem crest factor threshold
-        if features.harmonics.spectral_crest_factor
-            > CYMBAL_HARSH_CREST_THRESHOLD {
+        // Zone flags — from PreAnalysis if available, fallback to stem features
+        let cymbal_harsh = pre_analysis
+            .map(|pa| pa.zone_flags.zone_cymbal_harsh)
+            .unwrap_or(features.harmonics.spectral_crest_factor
+                > CYMBAL_HARSH_CREST_THRESHOLD);
+
+        let sub_rumble = pre_analysis
+            .map(|pa| pa.zone_flags.zone_sub_rumble)
+            .unwrap_or(features.mix.stem_energy_ratios[0]
+                > SUB_RUMBLE_ENERGY_THRESHOLD);
+
+        if cymbal_harsh {
             zones.push(SemanticZone {
                 id: "cymbal_harsh".into(), center_hz: 9000.0,
                 bandwidth_hz: 5000.0, gain_db: -1.5,
@@ -49,9 +61,7 @@ impl SemanticZoneResolver {
             });
         }
 
-        // Sub rumble — bass energy ratio threshold
-        if features.mix.stem_energy_ratios[0]
-            > SUB_RUMBLE_ENERGY_THRESHOLD {
+        if sub_rumble {
             zones.push(SemanticZone {
                 id: "sub_rumble".into(), center_hz: 40.0,
                 bandwidth_hz: 40.0, gain_db: -1.0,
@@ -78,9 +88,11 @@ impl SemanticZoneResolver {
     }
 
     /// Full pipeline: build zones + resolve.
-    pub fn auto_carve(persona:  &PersonaConfig,
-                      features: &StemFeatures) -> ZoneAdjustments {
-        Self::resolve(&Self::build_zones(persona, features))
+    pub fn auto_carve(persona:      &PersonaConfig,
+                      features:     &StemFeatures,
+                      pre_analysis: Option<&PreAnalysisData>,
+    ) -> ZoneAdjustments {
+        Self::resolve(&Self::build_zones(persona, features, pre_analysis))
     }
 
     /// Union-find: group overlapping active zones into components.
@@ -200,8 +212,8 @@ mod tests {
         let p = PersonaManager::load().default_persona().clone();
         let f = test_stem_features();
         assert_eq!(
-            SemanticZoneResolver::auto_carve(&p, &f),
-            SemanticZoneResolver::auto_carve(&p, &f)
+            SemanticZoneResolver::auto_carve(&p, &f, None),
+            SemanticZoneResolver::auto_carve(&p, &f, None)
         );
     }
 

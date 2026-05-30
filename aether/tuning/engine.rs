@@ -99,11 +99,11 @@ mod tests {
 
     fn test_features() -> StemFeatures {
         StemFeatures {
-            bass:   StemMetrics::default(),
-            vocals: StemMetrics::default(),
-            drums:  StemMetrics::default(),
-            other:  StemMetrics::default(),
-            mix:    MixMetrics::default(),
+            bass:      StemMetrics::default(),
+            harmonics: StemMetrics::default(),
+            drums:     StemMetrics::default(),
+            ambience:  StemMetrics::default(),
+            mix:       MixMetrics::default(),
         }
     }
 
