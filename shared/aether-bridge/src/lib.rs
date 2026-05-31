@@ -272,4 +272,50 @@ mod tests {
 
         assert_ne!(c1.output_pcm_hash, c2.output_pcm_hash);
     }
+
+    #[test]
+    fn bridge_pre_analysis_zone_flags_wire_through() {
+        use lineos_types::pre_analysis::PreAnalysisData;
+
+        let req      = AetherRequest::default();
+        let features = test_features();
+
+        // Construct pre_analysis with zone flags active
+        let mut pa = PreAnalysisData::silent();
+        pa.zone_flags.zone_sub_rumble   = true;
+        pa.zone_flags.zone_cymbal_harsh = true;
+
+        let (cfg, _, _) = build_dsp_config(&req, &features, Some(&pa)).unwrap();
+
+        // Cymbal harsh zone: resolved band above 5000 Hz with negative gain
+        let harsh_band = cfg.eq.zone_bands.iter()
+            .find(|b| b.center_hz > 5000.0 && b.gain_db < 0.0);
+        assert!(harsh_band.is_some(),
+            "zone_cymbal_harsh=true must produce a high-mid cut band. \
+             Got bands: {:?}", cfg.eq.zone_bands);
+
+        // Sub rumble zone: when active, S-007 merges it with bass zone.
+        // Verify more bands exist than without pre_analysis flags.
+        let (cfg_none, _, _) = build_dsp_config(&req, &features, None).unwrap();
+        assert!(cfg.eq.zone_bands.len() >= cfg_none.eq.zone_bands.len(),
+            "Zone flags active must produce >= bands than inactive. \
+             With flags: {}, without: {}",
+            cfg.eq.zone_bands.len(), cfg_none.eq.zone_bands.len());
+    }
+
+    #[test]
+    fn bridge_no_pre_analysis_no_corrective_zones() {
+        let req      = AetherRequest::default();
+        let features = test_features();
+
+        // Without pre_analysis and with default (zero) StemFeatures,
+        // no corrective zones should fire
+        let (cfg, _, _) = build_dsp_config(&req, &features, None).unwrap();
+
+        let sub_band = cfg.eq.zone_bands.iter()
+            .find(|b| b.center_hz < 100.0 && b.gain_db < 0.0);
+        assert!(sub_band.is_none(),
+            "No sub_rumble zone expected without pre_analysis. \
+             Got bands: {:?}", cfg.eq.zone_bands);
+    }
 }
