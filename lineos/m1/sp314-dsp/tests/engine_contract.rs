@@ -217,3 +217,62 @@ fn engine_limiter_is_transparent_on_quiet_signal() {
     
     assert!((rms_out_db - rms_in_db).abs() < 0.1, "Quiet signal altered! In RMS: {}, Out RMS: {}", rms_in_db, rms_out_db);
 }
+
+#[test]
+fn engine_harmonic_pipeline_end_to_end() {
+    use sp314_dsp::harmonic::HarmonicConfig;
+
+    let mut config = default_engine_config();
+    config.harmonic_config = Some(HarmonicConfig {
+        drive:              2.0,
+        drive_compensation: 1.0, // engine.rs will override from pad_db
+        even_amount:        0.6,
+        odd_amount:         0.2,
+        mix:                0.3,
+    });
+    config.parallel_mix = 1.0; // fully wet — ensures harmonics are in the output
+
+    let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+
+    // 1kHz sine at -12 dBFS: amplitude = 10^(-12/20) ≈ 0.251
+    let n = 48000_usize;
+    let amp = libm::powf(10.0_f32, -12.0_f32 / 20.0_f32);
+    let mut left  = vec![0.0_f32; n];
+    let mut right = vec![0.0_f32; n];
+    for i in 0..n {
+        let s = amp * libm::sinf(
+            2.0_f32 * core::f32::consts::PI * 1000.0_f32 * (i as f32) / 48000.0_f32);
+        left[i]  = s;
+        right[i] = s;
+    }
+
+    let left_in = left.clone();
+    engine.process_offline(&mut left, &mut right);
+
+    // 1. Output peak must be below 0 dBFS (no clipping)
+    let max_out = left.iter().chain(right.iter())
+        .map(|s| s.abs())
+        .fold(0.0_f32, f32::max);
+    assert!(max_out < 1.0_f32,
+        "Output clipped: peak={:.4}", max_out);
+
+    // 2. Output RMS within 6 dB of input RMS (gain staging sane)
+    let margin = 2000_usize;
+    let rms_in: f32 = left_in[margin..n-margin].iter()
+        .map(|s| s * s).sum::<f32>() / (n - 2 * margin) as f32;
+    let rms_out: f32 = left[margin..left.len()-margin].iter()
+        .map(|s| s * s).sum::<f32>() / (left.len() - 2 * margin) as f32;
+    let rms_in_db  = 10.0_f32 * rms_in.max(1e-20).log10();
+    let rms_out_db = 10.0_f32 * rms_out.max(1e-20).log10();
+    assert!((rms_out_db - rms_in_db).abs() < 6.0_f32,
+        "RMS drift too large: in={:.2} dB, out={:.2} dB", rms_in_db, rms_out_db);
+
+    // 3. Output is not identical to input (harmonics actually processed)
+    let mut diff_sum = 0.0_f32;
+    let compare_len = left_in.len().min(left.len());
+    for i in margin..compare_len-margin {
+        diff_sum += (left[i] - left_in[i]).abs();
+    }
+    assert!(diff_sum > 0.01_f32,
+        "Output identical to input — harmonics not active. diff_sum={:.6}", diff_sum);
+}
