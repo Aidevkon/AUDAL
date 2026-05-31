@@ -181,4 +181,19 @@ mod tests {
         let d2: MicroDelta = serde_json::from_str(&json).unwrap();
         assert_eq!(d, d2);
     }
+
+    #[test]
+    fn warmth_above_zero_produces_nonzero_sat_mix() {
+        use crate::personas::manager::PersonaManager;
+        let persona = PersonaManager::load().default_persona().clone();
+        let controls = MacroControls {
+            warmth:      0.5,
+            punch:       0.0,
+            forwardness: 0.0,
+            smoothness:  0.5,
+        };
+        let delta = MacroMicroMapper::map(&persona, &controls);
+        assert!(delta.sat.mix > 0.0,
+            "warmth=0.5 must produce sat_mix > 0.0, got {}", delta.sat.mix);
+    }
 }
