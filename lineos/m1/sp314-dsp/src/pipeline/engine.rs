@@ -56,7 +56,10 @@ impl Sp314MasteringEngine {
         let mut harmonic_config = config.harmonic_config.unwrap_or_else(|| {
             crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
         });
-        harmonic_config.drive_compensation = 1.99526166_f32; // K_harmonic, proven via THD matching
+        // drive_compensation must match actual input pad — not hardcoded.
+        // offline path: pad_db = -6.0 → 10^(6/20) = 1.99526 (K_harmonic preserved)
+        // realtime path: pad_db = 0.0 → 10^(0/20) = 1.0 (no overcooking)
+        harmonic_config.drive_compensation = libm::powf(10.0_f32, pad_db.abs() / 20.0_f32);
 
         Ok(Self {
             eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
