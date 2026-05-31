@@ -181,3 +181,47 @@ fn test_full_pipeline_is_deterministic() {
             "Full pipeline must be deterministic");
     }
 }
+
+#[test]
+fn test_podcast_voice_ebu_r128_compliance() {
+    use sp314_dsp::metering::measure_integrated_lufs;
+
+    let sample_rate = 48000_u32;
+    let n_samples   = 96000_usize; // 2 seconds — minimum for accurate LUFS
+
+    // 1kHz sine calibrated to -12.0 dBFS RMS
+    let target_rms_linear = 10.0_f32.powf(-12.0 / 20.0);
+    let target_peak = target_rms_linear * std::f32::consts::SQRT_2;
+    let sine = sine_1khz(target_peak, n_samples, sample_rate);
+
+    // Autotune to converge makeup gain for PodcastVoice target (-16 LUFS)
+    let preset = MasteringTarget::PodcastVoice;
+    let config = preset.engine_config(sample_rate);
+    let tune   = autotune(&sine, &sine, config.clone(), preset, sample_rate);
+
+    assert!(tune.converged,
+        "Autotuner must converge for PodcastVoice");
+
+    // Build engine with converged makeup and process
+    let mut final_config = config;
+    final_config.target_makeup_db = tune.makeup_db;
+    let mut engine = Sp314MasteringEngine::new(final_config, sample_rate).unwrap();
+
+    let mut left  = sine.clone();
+    let mut right = sine.clone();
+    engine.process_offline(&mut left, &mut right);
+
+    // Measure output integrated LUFS
+    let output_lufs = measure_integrated_lufs(&left, &right);
+
+    // PodcastVoice target is -16.0 LUFS — allow ±2 dB tolerance
+    // EBU R128 podcast range: -16 to -14 LUFS
+    assert!(output_lufs > -18.0 && output_lufs < -12.0,
+        "PodcastVoice output LUFS out of EBU R128 range: {:.2} LUFS \
+         (expected -18.0 to -12.0)", output_lufs);
+
+    // No clipping
+    let clip_ratio = measure_clipping_ratio_post_process(&left, &right);
+    assert!(clip_ratio <= 0.01,
+        "PodcastVoice clipped at -12 dBFS input. Ratio: {}", clip_ratio);
+}
