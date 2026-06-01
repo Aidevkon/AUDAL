@@ -178,7 +178,6 @@ pub async fn trigger_mastering(
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
-#[cfg(any(test, feature = "test_utils"))]
 pub async fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
     run_dsp_internal(req, start).await
 }

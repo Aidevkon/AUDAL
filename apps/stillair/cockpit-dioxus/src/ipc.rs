@@ -233,7 +233,7 @@ where
         .ok_or("[IPC/browser] no window")?;
 
     // Build fetch request
-    let mut opts = web_sys::RequestInit::new();
+    let opts = web_sys::RequestInit::new();
     opts.set_method(method);
 
     if let Some(ref body_str) = body {
