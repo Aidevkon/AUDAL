@@ -224,6 +224,7 @@ mod tests {
             zone_flags: Some(ZoneFlagsJson::default()),
             verification: Some(VerificationResultJson::default()),
             jini: None,
+            dsp_chain: None,
         }
     }
 

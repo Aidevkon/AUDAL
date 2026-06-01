@@ -459,6 +459,7 @@ mod tests {
                 warning: None,
             }),
             jini: None,
+            dsp_chain: None,
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("\"blob_id\":\"test-blob-001\""));

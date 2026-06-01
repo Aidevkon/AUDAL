@@ -47,33 +47,6 @@ pub fn CoachPanel(
         }
     }
 
-    let demo_findings = vec![
-        FindingData {
-            label: "Active Phase".to_string(),
-            desc: "A/B Analysis".to_string(),
-            pct: 100.0,
-            sev: "low".to_string(),
-        },
-        FindingData {
-            label: "Phase Health".to_string(),
-            desc: "range consistency good".to_string(),
-            pct: 95.0,
-            sev: "low".to_string(),
-        },
-        FindingData {
-            label: "Spectral Analysis".to_string(),
-            desc: "phase coherence check OK".to_string(),
-            pct: 100.0,
-            sev: "low".to_string(),
-        },
-        FindingData {
-            label: "Findings".to_string(),
-            desc: "Dynamic range within target. DC offset nominal.".to_string(),
-            pct: 85.0,
-            sev: "medium".to_string(),
-        },
-    ];
-
     rsx! {
         ModuleFrame {
             show_screws: false,
@@ -139,20 +112,30 @@ pub fn CoachPanel(
                             }
                         },
                         None => rsx! {
-                            // ── FM0: show JINI narrative even without session ─
-                            JiniNarrative {
-                                suggestion: jini_suggestion.read().clone(),
-                                persona:    jini_persona,
-                            }
-
+                            // JINI first-launch — inference-first onboarding
                             div {
-                                style: "padding:0.5rem 0.75rem 0.2rem;
-                                        color:var(--text-muted); font-size:0.6rem;
-                                        letter-spacing:0.2em; text-transform:uppercase;",
-                                "FINDINGS  ({demo_findings.len()})"
-                            }
-                            for f in demo_findings {
-                                DemoFindingRow { finding: f }
+                                style: "padding:1.5rem; display:flex; flex-direction:column; gap:1.5rem;",
+
+                                // JINI greeting
+                                div {
+                                    style: "font-family:monospace; font-size:0.82rem; \
+                                            color:var(--text-primary); line-height:1.8; font-style:italic;",
+                                    "Drop your first file. I'll figure out the rest."
+                                }
+
+                                // Persona selector — always visible
+                                JiniNarrative {
+                                    suggestion: jini_suggestion.read().clone(),
+                                    persona:    jini_persona,
+                                }
+
+                                // Subtle hint
+                                div {
+                                    style: "font-family:monospace; font-size:0.6rem; \
+                                            color:var(--text-muted); letter-spacing:0.15em; \
+                                            text-transform:uppercase;",
+                                    "WAITING FOR INPUT"
+                                }
                             }
                         }
             } }
