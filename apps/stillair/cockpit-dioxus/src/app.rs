@@ -24,6 +24,7 @@ use crate::types::{SessionStateJson, VisualizationDataJson, CockpitTier, JiniSug
 use crate::panels::{
     coach::CoachPanel,
     mastered::MasteredView,
+    wizard::WelcomeWizard,
 };
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::intent_bay::IntentBay;
@@ -54,6 +55,17 @@ pub fn App() -> Element {
     // ── JINI signals (J-P5) ──────────────────────────────────────────────────
     let jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
     let jini_persona:    Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
+    // ── Onboarding wizard (J-P9) ────────────────────────────────────────────
+    let mut wizard_completed: Signal<bool> = use_signal(|| false);
+
+    // Wizard gates the entire cockpit — runs once on first launch
+    if !*wizard_completed.read() {
+        return rsx! {
+            WelcomeWizard {
+                on_complete: move |_state| wizard_completed.set(true),
+            }
+        };
+    }
 
     rsx! {
 
