@@ -33,6 +33,7 @@ const POLYPHASE: [[f32; 18]; 4] = [
 ];
 
 const TAPS_PER_PHASE: usize = 18;
+#[allow(dead_code)]
 const N_PHASES: usize = 4;
 
 // Band crossover frequencies (Constitution §4.4)
