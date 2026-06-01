@@ -85,6 +85,15 @@ pub struct ComplianceJson {
     pub ebu_r128:  bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct ZoneFlagsJson {
+    pub zone_cymbal_harsh:    bool,
+    pub zone_sub_rumble:      bool,
+    pub zone_boxiness:        bool,
+    pub zone_phase_issue:     bool,
+    pub zone_harsh_resonance: bool,
+}
+
 // ── CoachFindings & Narrative ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -149,6 +158,8 @@ pub struct SessionStateJson {
     pub aether_persona: Option<String>,
     #[serde(default)]
     pub aether_config:  Option<String>,
+    #[serde(default)]
+    pub zone_flags: Option<ZoneFlagsJson>,
 }
 
 // ── ExportResult ─────────────────────────────────────────────────────────────

@@ -71,6 +71,45 @@ pub fn detect_findings(session: &SessionStateJson) -> Vec<WizardFinding> {
         });
     }
 
+    // Zone flags from PreAnalysis (RFC-008)
+    if let Some(ref zf) = session.zone_flags {
+        if zf.zone_phase_issue {
+            findings.push(WizardFinding {
+                id: "phase_issue",
+                severity: WizardSeverity::High,
+                mfd: MfdTarget::Mfd2SpatialTelemetry,
+            });
+        }
+        if zf.zone_sub_rumble {
+            findings.push(WizardFinding {
+                id: "sub_rumble",
+                severity: WizardSeverity::Medium,
+                mfd: MfdTarget::Mfd2SpatialTelemetry,
+            });
+        }
+        if zf.zone_cymbal_harsh {
+            findings.push(WizardFinding {
+                id: "cymbal_harsh",
+                severity: WizardSeverity::Medium,
+                mfd: MfdTarget::Mfd1SignalAnalyzer,
+            });
+        }
+        if zf.zone_boxiness {
+            findings.push(WizardFinding {
+                id: "boxiness",
+                severity: WizardSeverity::Low,
+                mfd: MfdTarget::Mfd1SignalAnalyzer,
+            });
+        }
+        if zf.zone_harsh_resonance {
+            findings.push(WizardFinding {
+                id: "harsh_resonance",
+                severity: WizardSeverity::Medium,
+                mfd: MfdTarget::Mfd1SignalAnalyzer,
+            });
+        }
+    }
+
     findings
 }
 
@@ -125,6 +164,7 @@ mod tests {
             aether_cert: None,
             aether_persona: None,
             aether_config: None,
+            zone_flags: Some(ZoneFlagsJson::default()),
         }
     }
 
