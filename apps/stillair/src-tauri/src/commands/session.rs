@@ -65,6 +65,16 @@ pub struct VerificationResultJson {
     pub warning:        Option<String>,
 }
 
+/// JINI suggestion — personality-aware mastering recommendation.
+/// Authority: JINI Spec v1.0 J-P8
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct JiniSuggestionJson {
+    pub narrative:    String,
+    pub action_type:  String,     // "macro_change" | "flavour_switch" | "nothing"
+    pub action_label: String,     // human readable e.g. "Switch to Clean mode"
+    pub confidence:   f32,
+}
+
 /// Complete session snapshot for a mastered Golden Blob.
 ///
 /// Phase 11 (Dioxus Cockpit): this is the single IPC call that replaces
@@ -111,6 +121,11 @@ pub struct SessionStateJson {
 
     #[serde(default)]
     pub verification: Option<VerificationResultJson>,
+
+    /// JINI suggestion — personality-aware mastering recommendation.
+    /// Authority: JINI Spec v1.0 J-P8
+    #[serde(default)]
+    pub jini: Option<JiniSuggestionJson>,
 }
 
 // ── Tauri command ─────────────────────────────────────────────────────────────
@@ -175,6 +190,13 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         ebu_r128:  blob.loudness.ebu_r128_compliant,
     };
 
+    // Step 5 (J-P8): Build JINI suggestion from quality + zone flags
+    let jini = build_jini_suggestion(
+        &blob.quality,
+        &ZoneFlagsJson::default(),
+        blob.loudness.integrated_lufs,
+    );
+
     eprintln!("[get_session_state] DONE — returning SessionStateJson");
     Ok(SessionStateJson {
         blob_id:  blob_id,
@@ -193,7 +215,139 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
             was_trimmed: false,
             warning: None,
         }),
+        jini: Some(jini),
     })
+}
+
+// ── JINI suggestion builder (J-P8) ───────────────────────────────────────────
+
+/// Build a JINI suggestion from quality metrics + zone flags.
+/// Uses lineos-types BehaviourVector mapping — inlined here because
+/// sp314-dsp cannot be imported into Tauri (Amendment A-002 §3).
+/// Rule-based, deterministic. No LLM, no network.
+fn build_jini_suggestion(
+    quality: &QualityMetricsJson,
+    zones:   &ZoneFlagsJson,
+    lufs:    f32,
+) -> JiniSuggestionJson {
+    use lineos_types::*;
+
+    let behaviour = BehaviourVector {
+        loudness: if lufs < -18.0      { LoudnessBehaviour::TooQuiet }
+                  else if lufs > -8.0  { LoudnessBehaviour::TooLoud }
+                  else                 { LoudnessBehaviour::Balanced },
+        spectral: if zones.zone_boxiness       { SpectralBehaviour::Boxy }
+                  else if zones.zone_cymbal_harsh { SpectralBehaviour::Harsh }
+                  else                           { SpectralBehaviour::Neutral },
+        dynamics: if quality.dynamic_range_db < 6.0 { DynamicsBehaviour::Overcompressed }
+                  else                              { DynamicsBehaviour::Stable },
+        stereo:   if quality.stereo_correlation < 0.3 { StereoBehaviour::Unstable }
+                  else if quality.stereo_width < 0.1  { StereoBehaviour::Mono }
+                  else                                { StereoBehaviour::Wide },
+        quality:  if quality.clips_detected > 0 { QualityBehaviour::Clipping }
+                  else                          { QualityBehaviour::Clean },
+    };
+
+    // Priority: Quality → Loudness → Spectral → Dynamics → Stereo
+    // Mirrors sp314-dsp/src/jini/mod.rs rule_based_suggestion() logic
+    let _persona = JiniPersonaId::Intermediate;
+
+    let (narrative, action, confidence) = if behaviour.quality == QualityBehaviour::Clipping {
+        (
+            "Clipping detected — consider reducing input gain before mastering.".to_string(),
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: -0.2,
+                reason: "Clipping detected".to_string(),
+            }),
+            0.95,
+        )
+    } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
+        (
+            "The mix is quite hot — you might want to bring the loudness down for better dynamics.".to_string(),
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: -0.15,
+                reason: "Loudness exceeds target range".to_string(),
+            }),
+            0.85,
+        )
+    } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
+        (
+            "The track is very quiet — a small loudness boost would help it compete.".to_string(),
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: 0.15,
+                reason: "Loudness below target range".to_string(),
+            }),
+            0.80,
+        )
+    } else if behaviour.spectral != SpectralBehaviour::Neutral {
+        let (desc, handle, delta) = match behaviour.spectral {
+            SpectralBehaviour::Boxy  => ("Some boxiness in the low-mids", MacroHandle::Tone, -0.1),
+            SpectralBehaviour::Harsh => ("Harshness in the upper frequencies", MacroHandle::Tone, -0.1),
+            _ => ("Spectral balance could be improved", MacroHandle::Tone, 0.0),
+        };
+        (
+            format!("{desc} — a tone adjustment could help."),
+            Some(JiniAction::SuggestMacroChange {
+                handle,
+                delta,
+                reason: desc.to_string(),
+            }),
+            0.75,
+        )
+    } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed {
+        (
+            "The mix sounds a bit squashed — easing the dynamics could restore some life.".to_string(),
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Dynamics,
+                delta: -0.1,
+                reason: "Over-compressed dynamic range".to_string(),
+            }),
+            0.70,
+        )
+    } else if behaviour.stereo == StereoBehaviour::Unstable {
+        (
+            "Stereo correlation is low — check for phase issues.".to_string(),
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Width,
+                delta: -0.1,
+                reason: "Low stereo correlation".to_string(),
+            }),
+            0.65,
+        )
+    } else {
+        (
+            "Everything looks good — the mix is well-balanced.".to_string(),
+            Some(JiniAction::SuggestNothing),
+            0.90,
+        )
+    };
+
+    let action_ref = action.as_ref().unwrap_or(&JiniAction::SuggestNothing);
+    let action_label = match action_ref {
+        JiniAction::SuggestMacroChange { handle, delta, .. } =>
+            format!("{} {:?} by {:.0}%",
+                if *delta < 0.0 { "Reduce" } else { "Increase" },
+                handle, delta.abs() * 100.0),
+        JiniAction::SuggestFlavourSwitch { to, .. } =>
+            format!("Switch to {:?} mode", to),
+        JiniAction::SuggestNothing => String::new(),
+    };
+
+    let action_type = match action_ref {
+        JiniAction::SuggestMacroChange { .. }   => "macro_change",
+        JiniAction::SuggestFlavourSwitch { .. } => "flavour_switch",
+        JiniAction::SuggestNothing              => "nothing",
+    };
+
+    JiniSuggestionJson {
+        narrative,
+        action_type:  action_type.to_string(),
+        action_label,
+        confidence,
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -278,6 +432,7 @@ mod tests {
                 was_trimmed: false,
                 warning: None,
             }),
+            jini: None,
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("\"blob_id\":\"test-blob-001\""));

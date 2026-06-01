@@ -35,6 +35,18 @@ pub fn CoachPanel(
 ) -> Element {
     let state = session_state.read();
 
+    // J-P8: Sync JINI suggestion from session state into signal
+    {
+        let mut jini_sig = jini_suggestion;
+        if let Some(ref s) = *state {
+            if let Some(ref j) = s.jini {
+                if jini_sig.read().as_ref() != Some(j) {
+                    jini_sig.set(Some(j.clone()));
+                }
+            }
+        }
+    }
+
     let demo_findings = vec![
         FindingData {
             label: "Active Phase".to_string(),

@@ -170,6 +170,9 @@ pub struct SessionStateJson {
     pub zone_flags: Option<ZoneFlagsJson>,
     #[serde(default)]
     pub verification: Option<VerificationResultJson>,
+    /// JINI suggestion — personality-aware mastering recommendation (J-P8).
+    #[serde(default)]
+    pub jini: Option<JiniSuggestionJson>,
 }
 
 // ── ExportResult ─────────────────────────────────────────────────────────────
