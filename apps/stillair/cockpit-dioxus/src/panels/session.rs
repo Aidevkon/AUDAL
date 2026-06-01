@@ -39,6 +39,8 @@ pub fn SessionPanel(
     viz_data:      Signal<Option<VisualizationDataJson>>,
     show_mastered: Signal<bool>,
 ) -> Element {
+    let mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>> = use_signal(|| vec![]);
+
     rsx! {
         ModuleFrame {
             title: "PRIMARY SIGNAL ANALYZER".to_string(),
@@ -96,7 +98,7 @@ pub fn SessionPanel(
                                     on_load_new: on_load,
                                 }
                                 SelectedPreset { preset_id: preset_id.clone() }
-                                MasterButton { mode, session_state, viz_data, path, name, preset_id }
+                                MasterButton { mode, session_state, viz_data, path, name, preset_id, wizard_findings }
                             }
                         },
                         CockpitMode::Mastering { .. } => rsx! {
@@ -191,6 +193,7 @@ fn MasterButton(
     path:          String,
     name:          String,
     preset_id:     String,
+    mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
 ) -> Element {
     let on_master = move |_| {
         #[cfg(debug_assertions)]
@@ -256,9 +259,6 @@ fn MasterButton(
             #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] session state ok, transitioning to FM5"));
 
-            // FM5: set session state + fetch visualization data
-            session_state.set(Some(state));
-
             // P14-003: Fetch viz immediately after session (UI Agent Context §3)
             let bid2 = blob_id.clone();
             if let Ok(viz) = invoke::<VisualizationDataJson, _>(
@@ -267,6 +267,12 @@ fn MasterButton(
             ).await {
                 viz_data.set(Some(viz));
             }
+
+            let findings = crate::wizard::detect_findings(&state);
+            wizard_findings.set(findings);
+
+            // FM5: set session state + fetch visualization data
+            session_state.set(Some(state));
 
             dispatch(mode, CockpitEvent::MasteringComplete { blob_id });
         });

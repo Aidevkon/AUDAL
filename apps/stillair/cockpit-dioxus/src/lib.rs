@@ -8,3 +8,4 @@ pub mod ipc;
 pub mod panels;
 pub mod state;
 pub mod types;
+pub mod wizard;
