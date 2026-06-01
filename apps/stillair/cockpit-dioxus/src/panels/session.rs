@@ -32,6 +32,15 @@ const PRESETS: &[(&str, &str)] = &[
     ("amazon",        "Amazon Music  −14 LUFS"),
 ];
 
+const FLAVOURS: &[(&str, &str)] = &[
+    ("clean",     "CLEAN"),
+    ("warm",      "WARM"),
+    ("punch",     "PUNCH"),
+    ("air",       "AIR"),
+    ("film",      "FILM"),
+    ("broadcast", "BROADCAST"),
+];
+
 #[component]
 pub fn SessionPanel(
     mode:          Signal<CockpitMode>,
@@ -40,6 +49,8 @@ pub fn SessionPanel(
     show_mastered: Signal<bool>,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
 ) -> Element {
+
+    let mut flavour = use_signal(|| "clean".to_string());
 
     rsx! {
         ModuleFrame {
@@ -85,6 +96,7 @@ pub fn SessionPanel(
                                     format: format.clone(),
                                     on_load_new: on_load,
                                 }
+                                FlavourMenu { flavour }
                                 PresetMenu { mode, path, name }
                             }
                         },
@@ -98,7 +110,7 @@ pub fn SessionPanel(
                                     on_load_new: on_load,
                                 }
                                 SelectedPreset { preset_id: preset_id.clone() }
-                                MasterButton { mode, session_state, viz_data, path, name, preset_id, wizard_findings }
+                                MasterButton { mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour }
                             }
                         },
                         CockpitMode::Mastering { .. } => rsx! {
@@ -116,7 +128,45 @@ pub fn SessionPanel(
             }
         }
     }
-
+#[component]
+fn FlavourMenu(mut flavour: Signal<String>) -> Element {
+    rsx! {
+        div {
+            style: "padding:0.75rem 1.5rem 0.5rem;",
+            div {
+                style: "color:var(--text-secondary); font-size:0.6rem; \
+                        letter-spacing:0.15em; text-transform:uppercase; \
+                        margin-bottom:0.5rem;",
+                "CHARACTER"
+            }
+            div {
+                style: "display:flex; gap:0.35rem; flex-wrap:wrap;",
+                for (fid, label) in FLAVOURS {
+                    {
+                        let fid  = fid.to_string();
+                        let fid2 = fid.clone();
+                        let is_active = *flavour.read() == fid;
+                        rsx! {
+                            button {
+                                key: "{fid}",
+                                onclick: move |_| flavour.set(fid2.clone()),
+                                style: format!(
+                                    "font-family:monospace; font-size:0.6rem; \
+                                     letter-spacing:0.15em; padding:4px 10px; \
+                                     background:transparent; cursor:pointer; \
+                                     border:1px solid {}; color:{};",
+                                    if is_active { "var(--accent-cyan)" } else { "var(--border-subtle)" },
+                                    if is_active { "var(--accent-cyan)" } else { "var(--text-muted)" }
+                                ),
+                                "{label}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 
 #[component]
@@ -194,6 +244,7 @@ fn MasterButton(
     name:          String,
     preset_id:     String,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
+    flavour:       Signal<String>,
 ) -> Element {
     let on_master = move |_| {
         #[cfg(debug_assertions)]
@@ -218,7 +269,7 @@ fn MasterButton(
             web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
             let blob_id = match invoke::<String, _>(
                 "trigger_mastering",
-                json!({ "audioPath": p, "presetId": pr }),
+                json!({ "audioPath": p, "presetId": pr, "flavourId": flavour.read().clone() }),
             ).await {
                 Ok(id)  => id,
                 Err(e)  => {
