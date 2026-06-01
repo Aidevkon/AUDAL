@@ -27,6 +27,7 @@ pub struct FindingData {
 pub fn CoachPanel(
     mode:          Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
+    wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>,
 ) -> Element {
     let state = session_state.read();
 
@@ -97,20 +98,43 @@ pub fn CoachPanel(
                             }
 
                             ScoreBar {
-                                pass:   s.findings.issues.is_empty(),
-                                issues: s.findings.issues.len(),
+                                wizard_findings,
                             }
 
-                            if !s.findings.issues.is_empty() {
+                            if !wizard_findings.read().is_empty() {
                                 div {
                                     style: "padding:0.5rem 1.5rem 0.25rem;
                                             color:var(--text-muted); font-size:0.6rem;
                                             letter-spacing:0.2em; text-transform:uppercase;",
-                                    "FINDINGS  ({s.findings.issues.len()})"
+                                    "FINDINGS  ({wizard_findings.read().len()})"
                                 }
                             }
-                            for issue in &s.findings.issues {
-                                FindingRow { issue: issue.clone() }
+                            for finding in wizard_findings.read().iter() {
+                                {
+                                    let severity_str = match finding.severity {
+                                        crate::wizard::WizardSeverity::High   => "high",
+                                        crate::wizard::WizardSeverity::Medium => "medium",
+                                        crate::wizard::WizardSeverity::Low    => "low",
+                                    };
+                                    let mfd_str = match finding.mfd {
+                                        crate::wizard::MfdTarget::Mfd1SignalAnalyzer   => "MFD 1",
+                                        crate::wizard::MfdTarget::Mfd2SpatialTelemetry => "MFD 2",
+                                    };
+                                    rsx! {
+                                        div {
+                                            class: "finding-row hud-severity-{severity_str}",
+                                            style: "font-family: monospace; font-size: 10px; \
+                                                    letter-spacing: 0.1em; text-transform: uppercase; \
+                                                    padding: 6px 8px; border-left: 2px solid currentColor; \
+                                                    display: flex; justify-content: space-between;",
+                                            span { "⚠ {finding.id}" }
+                                            span {
+                                                style: "font-size: 9px; opacity: 0.6;",
+                                                "{mfd_str}"
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             if !s.findings.issues.is_empty() {
@@ -199,14 +223,19 @@ fn DemoFindingRow(finding: FindingData) -> Element {
 }
 
 #[component]
-fn ScoreBar(pass: bool, issues: usize) -> Element {
-    let (label, color) = if pass {
-        ("ALL CLEAR", "var(--accent-cyan)")
-    } else if issues <= 1 {
-        ("MINOR ISSUES", "var(--accent-amber)")
+fn ScoreBar(wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>) -> Element {
+    let has_high   = wizard_findings.read().iter().any(|f| f.severity == crate::wizard::WizardSeverity::High);
+    let has_medium = wizard_findings.read().iter().any(|f| f.severity == crate::wizard::WizardSeverity::Medium);
+
+    let (label, color) = if !has_high && !has_medium {
+        ("ALL CLEAR",     "var(--accent-cyan)")
+    } else if has_medium && !has_high {
+        ("MINOR ISSUES",  "var(--accent-amber)")
     } else {
         ("REVIEW NEEDED", "var(--severity-high)")
     };
+    
+    let issues = wizard_findings.read().len();
 
     rsx! {
         div {

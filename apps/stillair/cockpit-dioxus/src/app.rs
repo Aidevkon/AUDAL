@@ -133,7 +133,7 @@ pub fn App() -> Element {
                     }
                 }
                 div { class: "coach-panel chassis-bezel",
-                    CoachPanel { mode, session_state }
+                    CoachPanel { mode, session_state, wizard_findings }
                 }
             }
         }
