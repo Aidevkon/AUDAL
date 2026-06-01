@@ -18,6 +18,8 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
+use crate::state::cockpit_event::CockpitEvent;
+use crate::state::reducer::dispatch;
 use crate::types::{AudioMeta, SessionStateJson, VisualizationDataJson};
 
 const PRESETS: &[(&str, &str)] = &[
@@ -46,20 +48,19 @@ pub fn SessionPanel(
             
             { match mode.read().clone() {
                         CockpitMode::Idle => {
-                            let mut m = mode;
+                            let m = mode;
                             let on_load = move |_| {
                                 spawn_local(async move {
                                     match crate::ipc::invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
                                         Ok(Some(meta)) => {
-                                            m.set(CockpitMode::FileLoaded {
+                                            dispatch(m, CockpitEvent::FileDropped {
                                                 path:   meta.path.clone(),
                                                 name:   meta.name.clone(),
                                                 format: meta.format.clone(),
                                             });
                                         }
                                         Ok(None) => {}
-                                        Err(e) => m.set(CockpitMode::Fault {
-                                            code:    AscCode::IoErr,
+                                        Err(e) => dispatch(m, CockpitEvent::FileDropFailed {
                                             message: format!("File open failed: {e}"),
                                         }),
                                     }
@@ -74,8 +75,8 @@ pub fn SessionPanel(
                             }
                         },
                         CockpitMode::FileLoaded { name, format, path } => {
-                            let mut m = mode;
-                            let on_load = move |_| m.set(CockpitMode::Idle); // Go back to drop zone
+                            let m = mode;
+                            let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
                             rsx! {
                                 PrimarySignalAnalyzer {
                                     filename: name.clone(),
@@ -86,8 +87,8 @@ pub fn SessionPanel(
                             }
                         },
                         CockpitMode::PresetSelected { path, name, preset_id } => {
-                            let mut m = mode;
-                            let on_load = move |_| m.set(CockpitMode::Idle);
+                            let m = mode;
+                            let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
                             rsx! {
                                 PrimarySignalAnalyzer {
                                     filename: name.clone(),
@@ -134,16 +135,12 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
                         let pid  = preset_id.to_string();
                         let pid2 = pid.clone();
                         let lbl  = label.to_string();
-                        let p    = path.clone();
-                        let n    = name.clone();
                         rsx! {
                             button {
                                 key: "{pid}",
                                 id:  "preset-{pid}",
                                 onclick: move |_| {
-                                    mode.set(CockpitMode::PresetSelected {
-                                        path:      p.clone(),
-                                        name:      n.clone(),
+                                    dispatch(mode, CockpitEvent::PresetSelected {
                                         preset_id: pid2.clone(),
                                     });
                                 },
@@ -212,10 +209,7 @@ fn MasterButton(
         spawn_local(async move {
             #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] spawn_local started"));
-            mode.set(CockpitMode::Mastering {
-                path:      p.clone(),
-                preset_id: pr.clone(),
-            });
+            dispatch(mode, CockpitEvent::MasterTriggered);
 
             #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
@@ -229,8 +223,7 @@ fn MasterButton(
                     web_sys::console::log_1(&JsValue::from_str(
                         &format!("[session] trigger_mastering FAILED: {e}")
                     ));
-                    mode.set(CockpitMode::Fault {
-                        code:    AscCode::IoErr,
+                    dispatch(mode, CockpitEvent::MasteringFailed {
                         message: format!("Mastering failed: {e}"),
                     });
                     return;
@@ -254,8 +247,7 @@ fn MasterButton(
                     web_sys::console::log_1(&JsValue::from_str(
                         &format!("[session] get_session_state FAILED: {e}")
                     ));
-                    mode.set(CockpitMode::Fault {
-                        code:    AscCode::IoErr,
+                    dispatch(mode, CockpitEvent::MasteringFailed {
                         message: format!("Session state failed: {e}"),
                     });
                     return;
@@ -276,7 +268,7 @@ fn MasterButton(
                 viz_data.set(Some(viz));
             }
 
-            mode.set(CockpitMode::CoachReady { blob_id });
+            dispatch(mode, CockpitEvent::MasteringComplete { blob_id });
         });
     };
 
@@ -363,8 +355,7 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
             let b   = bid.clone();
             let fmt = export_format.read().clone();
             spawn_local(async move {
-                mode.set(CockpitMode::Exporting {
-                    blob_id: b.clone(),
+                dispatch(mode, CockpitEvent::ExportTriggered {
                     format:  fmt.clone(),
                 });
 
@@ -374,14 +365,13 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                 ).await {
                     Ok(r) => {
                         eprintln!("[export] written: {} ({})", r.written_path, r.format);
-                        mode.set(CockpitMode::CoachReady { blob_id: b });
+                        dispatch(mode, CockpitEvent::ExportComplete);
                     }
                     Err(e) if e.contains("cancelled") => {
-                        mode.set(CockpitMode::CoachReady { blob_id: b });
+                        dispatch(mode, CockpitEvent::ExportComplete);
                     }
                     Err(e) => {
-                        mode.set(CockpitMode::Fault {
-                            code:    AscCode::IoErr,
+                        dispatch(mode, CockpitEvent::ExportFailed {
                             message: format!("Export failed: {e}"),
                         });
                     }
