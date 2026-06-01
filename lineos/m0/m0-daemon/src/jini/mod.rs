@@ -4,6 +4,8 @@
 //! INV-JINI-5: audio never sent to cloud.
 //! INV-JINI-12: timeout 5s — silent fallback, never error shown to user.
 
+pub mod schema_agent;
+
 use lineos_types::{
     BehaviourVector, JiniPersonaId, JiniSuggestion, JiniAction,
     FlavourId, MacroHandle, OLLAMA_ENDPOINT, GEMMA_MODEL, OLLAMA_TIMEOUT_MS,
@@ -43,14 +45,18 @@ struct LlmAction {
 }
 
 /// Call Gemma 4 via Ollama. Falls back to rule_based_suggestion on any error.
+/// INV-JINI-3: every suggestion validated by Schema Agent before returning.
 pub async fn jini_suggest(
     behaviour: &BehaviourVector,
     persona:   &JiniPersonaId,
 ) -> JiniSuggestion {
-    match ollama_call(behaviour, persona).await {
-        Ok(suggestion) => suggestion,
-        Err(_) => rule_based_suggestion(behaviour, persona),
-    }
+    let fallback = rule_based_suggestion(behaviour, persona);
+    let suggestion = match ollama_call(behaviour, persona).await {
+        Ok(s)  => s,
+        Err(_) => return fallback,
+    };
+    // INV-JINI-3: Schema Agent validates before UI delivery
+    schema_agent::validated_or_fallback(suggestion, fallback)
 }
 
 async fn ollama_call(
