@@ -19,7 +19,8 @@ pub struct MfdHudProps {
 /// Only renders findings that belong to this MFD target.
 #[component]
 pub fn MfdHud(props: MfdHudProps) -> Element {
-    let mfd_findings: Vec<&WizardFinding> = props.findings
+    let valid = validated_findings(&props.findings);
+    let mfd_findings: Vec<&&WizardFinding> = valid
         .iter()
         .filter(|f| f.mfd == props.target)
         .collect();
@@ -84,4 +85,12 @@ fn severity_label(s: &WizardSeverity) -> &'static str {
         WizardSeverity::Medium => "MED",
         WizardSeverity::Low    => "LOW",
     }
+}
+
+fn validated_findings(findings: &[WizardFinding]) -> Vec<&WizardFinding> {
+    let mut seen = std::collections::HashSet::new();
+    findings.iter()
+        .filter(|f| seen.insert(f.id))
+        .take(8)
+        .collect()
 }
