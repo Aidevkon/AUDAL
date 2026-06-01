@@ -223,6 +223,7 @@ mod tests {
             aether_config: None,
             zone_flags: Some(ZoneFlagsJson::default()),
             verification: Some(VerificationResultJson::default()),
+            jini: None,
         }
     }
 

@@ -22,6 +22,7 @@ pub mod metrics;
 pub mod analysis;
 pub mod pre_analysis;
 pub mod jini;
+pub mod onboarding;
 
 // Convenience re-exports for migration
 pub use analysis::{StemFeatures, StemMetrics, MixMetrics};
@@ -42,4 +43,7 @@ pub use jini::{
     // Constants
     SCHEMA_BEGINNER, SCHEMA_INTERMEDIATE, SCHEMA_PRO,
     OLLAMA_TIMEOUT_MS, OLLAMA_ENDPOINT, GEMMA_MODEL,
+};
+pub use onboarding::{
+    WizardState, Vision, TasteProfile, PlatformTarget, OnboardingState,
 };
