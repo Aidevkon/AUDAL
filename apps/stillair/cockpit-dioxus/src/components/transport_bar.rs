@@ -125,6 +125,11 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     let lbl_skip_back = "<<".to_string();
     let lbl_skip_fwd  = ">>".to_string();
 
+    let chain = session_state.read()
+        .as_ref()
+        .and_then(|s| s.dsp_chain.clone())
+        .unwrap_or_default();
+
     rsx! {
         footer { id: "transport-bar", class: "transport-bar",
             div { class: "chassis-bezel transport-rim",
@@ -137,10 +142,10 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                         }
                         div { class: "dsp-chassis-oled",
                             div { class: "dsp-slots-wrapper-oled",
-                                div { class: "oled-annunciator", "EQ" }
-                                div { class: "oled-annunciator", "COMP" }
-                                div { class: "oled-annunciator", "SAT" }
-                                div { class: "oled-annunciator", "LIMIT" }
+                                div { class: if chain.eq_active    { "oled-annunciator active" } else { "oled-annunciator" }, "EQ" }
+                                div { class: if chain.comp_active  { "oled-annunciator active" } else { "oled-annunciator" }, "COMP" }
+                                div { class: if chain.sat_active   { "oled-annunciator active" } else { "oled-annunciator" }, "SAT" }
+                                div { class: if chain.limit_active { "oled-annunciator active" } else { "oled-annunciator" }, "LIMIT" }
                             }
                         }
                     }

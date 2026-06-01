@@ -126,6 +126,17 @@ pub struct SessionStateJson {
     /// Authority: JINI Spec v1.0 J-P8
     #[serde(default)]
     pub jini: Option<JiniSuggestionJson>,
+
+    #[serde(default)]
+    pub dsp_chain: Option<DspChainStateJson>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DspChainStateJson {
+    pub eq_active:   bool,
+    pub comp_active: bool,
+    pub sat_active:  bool,
+    pub limit_active: bool,
 }
 
 // ── Tauri command ─────────────────────────────────────────────────────────────
@@ -197,6 +208,20 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         blob.loudness.integrated_lufs,
     );
 
+    let dsp_chain = blob.aether_config.as_ref().and_then(|cfg_str| {
+        serde_json::from_str::<serde_json::Value>(cfg_str).ok().map(|cfg| {
+            DspChainStateJson {
+                eq_active:    cfg["eq"]["low_shelf_gain_db"].as_f64().unwrap_or(0.0).abs() > 0.01
+                           || cfg["eq"]["high_shelf_gain_db"].as_f64().unwrap_or(0.0).abs() > 0.01
+                           || cfg["eq"]["zone_bands"].as_array().map(|a| !a.is_empty()).unwrap_or(false),
+                comp_active:  cfg["dynamics"]["comp_ratio"].as_f64().unwrap_or(1.0) > 1.0,
+                sat_active:   cfg["sat"]["drive"].as_f64().unwrap_or(0.0) > 0.0
+                           && cfg["sat"]["mix"].as_f64().unwrap_or(0.0) > 0.0,
+                limit_active: true,
+            }
+        })
+    });
+
     eprintln!("[get_session_state] DONE — returning SessionStateJson");
     Ok(SessionStateJson {
         blob_id:  blob_id,
@@ -216,6 +241,7 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
             warning: None,
         }),
         jini: Some(jini),
+        dsp_chain,
     })
 }
 

@@ -173,6 +173,17 @@ pub struct SessionStateJson {
     /// JINI suggestion — personality-aware mastering recommendation (J-P8).
     #[serde(default)]
     pub jini: Option<JiniSuggestionJson>,
+
+    #[serde(default)]
+    pub dsp_chain: Option<DspChainStateJson>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize, Default)]
+pub struct DspChainStateJson {
+    pub eq_active:    bool,
+    pub comp_active:  bool,
+    pub sat_active:   bool,
+    pub limit_active: bool,
 }
 
 // ── ExportResult ─────────────────────────────────────────────────────────────
