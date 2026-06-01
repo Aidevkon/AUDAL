@@ -24,4 +24,10 @@ pub enum CockpitEvent {
 
     // System
     FaultAcknowledged,
+
+    // JINI (J-P6)
+    JiniSuggestionReady     { suggestion: crate::types::JiniSuggestionJson },
+    JiniSuggestionAccepted,
+    JiniSuggestionDismissed,
+    JiniPersonaChanged      { to: crate::types::JiniPersonaState },
 }

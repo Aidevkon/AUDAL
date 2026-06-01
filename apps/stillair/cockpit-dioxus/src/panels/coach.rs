@@ -13,6 +13,8 @@ use wasm_bindgen_futures::spawn_local;
 use serde_json::json;
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::CockpitMode;
+use crate::state::cockpit_event::CockpitEvent;
+use crate::state::reducer::dispatch;
 use crate::types::{IssueJson, SessionStateJson, JiniSuggestionJson, JiniPersonaState};
 
 #[derive(PartialEq, Clone)]
@@ -71,12 +73,13 @@ pub fn CoachPanel(
                             // ── JINI Narrative (replaces NarrativeSummary) ────
                             JiniNarrative {
                                 suggestion: jini_suggestion.read().clone(),
-                                persona:    jini_persona.read().clone(),
+                                persona:    jini_persona,
                             }
 
                             // ── JINI Action Card (replaces RECOMMENDATION) ───
                             JiniActionCard {
                                 suggestion: jini_suggestion.read().clone(),
+                                mode,
                             }
 
                             ScoreBar {
@@ -127,7 +130,7 @@ pub fn CoachPanel(
                             // ── FM0: show JINI narrative even without session ─
                             JiniNarrative {
                                 suggestion: jini_suggestion.read().clone(),
-                                persona:    jini_persona.read().clone(),
+                                persona:    jini_persona,
                             }
 
                             div {
@@ -150,8 +153,9 @@ pub fn CoachPanel(
 #[component]
 fn JiniNarrative(
     suggestion: Option<JiniSuggestionJson>,
-    persona:    JiniPersonaState,
+    persona:    Signal<JiniPersonaState>,
 ) -> Element {
+    let current_persona = persona.read().clone();
     rsx! {
         div {
             style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
@@ -164,15 +168,25 @@ fn JiniNarrative(
                     ("MID", JiniPersonaState::Intermediate),
                     ("PRO", JiniPersonaState::Pro),
                 ] {
-                    div {
-                        style: format!(
-                            "font-family:monospace; font-size:0.55rem; \
-                             letter-spacing:0.15em; cursor:pointer; \
-                             padding:2px 6px; border:1px solid {}; color:{};",
-                            if persona == variant { "var(--accent-cyan)" } else { "var(--border-subtle)" },
-                            if persona == variant { "var(--accent-cyan)" } else { "var(--text-muted)" }
-                        ),
-                        "{label}"
+                    {
+                        let is_active = current_persona == variant;
+                        let variant_clone = variant.clone();
+                        let mut persona_sig = persona;
+                        rsx! {
+                            div {
+                                style: format!(
+                                    "font-family:monospace; font-size:0.55rem; \
+                                     letter-spacing:0.15em; cursor:pointer; \
+                                     padding:2px 6px; border:1px solid {}; color:{};",
+                                    if is_active { "var(--accent-cyan)" } else { "var(--border-subtle)" },
+                                    if is_active { "var(--accent-cyan)" } else { "var(--text-muted)" }
+                                ),
+                                onclick: move |_| {
+                                    persona_sig.set(variant_clone.clone());
+                                },
+                                "{label}"
+                            }
+                        }
                     }
                 }
             }
@@ -204,7 +218,10 @@ fn JiniNarrative(
 }
 
 #[component]
-fn JiniActionCard(suggestion: Option<JiniSuggestionJson>) -> Element {
+fn JiniActionCard(
+    suggestion: Option<JiniSuggestionJson>,
+    mode:       Signal<CockpitMode>,
+) -> Element {
     let Some(ref s) = suggestion else {
         return rsx! {};
     };
@@ -234,6 +251,9 @@ fn JiniActionCard(suggestion: Option<JiniSuggestionJson>) -> Element {
                             letter-spacing:0.15em; padding:4px 12px; \
                             background:transparent; border:1px solid var(--accent-cyan); \
                             color:var(--accent-cyan); cursor:pointer;",
+                    onclick: move |_| {
+                        dispatch(mode, CockpitEvent::JiniSuggestionAccepted);
+                    },
                     "APPLY"
                 }
                 button {
@@ -241,6 +261,9 @@ fn JiniActionCard(suggestion: Option<JiniSuggestionJson>) -> Element {
                             letter-spacing:0.15em; padding:4px 12px; \
                             background:transparent; border:1px solid var(--border-subtle); \
                             color:var(--text-muted); cursor:pointer;",
+                    onclick: move |_| {
+                        dispatch(mode, CockpitEvent::JiniSuggestionDismissed);
+                    },
                     "DISMISS"
                 }
             }

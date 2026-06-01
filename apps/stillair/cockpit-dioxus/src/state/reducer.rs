@@ -63,6 +63,16 @@ pub fn reduce(mode: CockpitMode, event: CockpitEvent) -> CockpitMode {
         (CockpitMode::Fault { .. }, CockpitEvent::FaultAcknowledged) =>
             CockpitMode::Idle,
 
+        // ── JINI transitions (J-P6) ─────────────────────────────────────────
+        // Suggestion ready — mode stays CoachReady, suggestion stored via signal
+        (CockpitMode::CoachReady { blob_id },
+         CockpitEvent::JiniSuggestionReady { .. }) =>
+            CockpitMode::CoachReady { blob_id },
+        // Accept/Dismiss/Persona — side effect only, mode unchanged
+        (mode, CockpitEvent::JiniSuggestionAccepted)  => mode,
+        (mode, CockpitEvent::JiniSuggestionDismissed) => mode,
+        (mode, CockpitEvent::JiniPersonaChanged { .. }) => mode,
+
         // Illegal transitions — return mode unchanged, no panic
         (mode, _) => mode,
     }
