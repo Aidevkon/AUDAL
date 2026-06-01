@@ -94,6 +94,14 @@ pub struct ZoneFlagsJson {
     pub zone_harsh_resonance: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
+pub struct VerificationResultJson {
+    pub passed:          bool,
+    pub trim_applied_db: f32,
+    pub was_trimmed:     bool,
+    pub warning:         Option<String>,
+}
+
 // ── CoachFindings & Narrative ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -160,6 +168,8 @@ pub struct SessionStateJson {
     pub aether_config:  Option<String>,
     #[serde(default)]
     pub zone_flags: Option<ZoneFlagsJson>,
+    #[serde(default)]
+    pub verification: Option<VerificationResultJson>,
 }
 
 // ── ExportResult ─────────────────────────────────────────────────────────────

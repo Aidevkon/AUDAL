@@ -110,6 +110,24 @@ pub fn detect_findings(session: &SessionStateJson) -> Vec<WizardFinding> {
         }
     }
 
+    // PostFlightVerifier results (W-09)
+    if let Some(ref vr) = session.verification {
+        if !vr.passed {
+            findings.push(WizardFinding {
+                id: "verification_failed",
+                severity: WizardSeverity::High,
+                mfd: MfdTarget::Mfd1SignalAnalyzer,
+            });
+        }
+        if vr.was_trimmed {
+            findings.push(WizardFinding {
+                id: "true_peak_clip",
+                severity: WizardSeverity::High,
+                mfd: MfdTarget::Mfd1SignalAnalyzer,
+            });
+        }
+    }
+
     findings
 }
 
@@ -165,6 +183,7 @@ mod tests {
             aether_persona: None,
             aether_config: None,
             zone_flags: Some(ZoneFlagsJson::default()),
+            verification: Some(VerificationResultJson::default()),
         }
     }
 

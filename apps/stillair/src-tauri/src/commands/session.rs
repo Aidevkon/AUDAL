@@ -57,6 +57,14 @@ pub struct ZoneFlagsJson {
     pub zone_harsh_resonance: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VerificationResultJson {
+    pub passed:         bool,
+    pub trim_applied_db: f32,
+    pub was_trimmed:    bool,
+    pub warning:        Option<String>,
+}
+
 /// Complete session snapshot for a mastered Golden Blob.
 ///
 /// Phase 11 (Dioxus Cockpit): this is the single IPC call that replaces
@@ -100,6 +108,9 @@ pub struct SessionStateJson {
     
     #[serde(default)]
     pub zone_flags: Option<ZoneFlagsJson>,
+
+    #[serde(default)]
+    pub verification: Option<VerificationResultJson>,
 }
 
 // ── Tauri command ─────────────────────────────────────────────────────────────
@@ -176,6 +187,12 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         aether_persona: blob.aether_persona.clone(),
         aether_config:  blob.aether_config.clone(),
         zone_flags:     Some(ZoneFlagsJson::default()),
+        verification:   Some(VerificationResultJson {
+            passed: true,
+            trim_applied_db: 0.0,
+            was_trimmed: false,
+            warning: None,
+        }),
     })
 }
 
@@ -255,6 +272,12 @@ mod tests {
             aether_persona: None,
             aether_config: None,
             zone_flags: Some(ZoneFlagsJson::default()),
+            verification: Some(VerificationResultJson {
+                passed: true,
+                trim_applied_db: 0.0,
+                was_trimmed: false,
+                warning: None,
+            }),
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("\"blob_id\":\"test-blob-001\""));
