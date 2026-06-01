@@ -276,3 +276,63 @@ fn engine_harmonic_pipeline_end_to_end() {
     assert!(diff_sum > 0.01_f32,
         "Output identical to input — harmonics not active. diff_sum={:.6}", diff_sum);
 }
+
+#[test]
+fn engine_process_block_harmonic_no_overcook() {
+    use sp314_dsp::harmonic::HarmonicConfig;
+
+    let mut config = default_engine_config();
+    config.harmonic_config = Some(HarmonicConfig {
+        drive:              2.0,
+        drive_compensation: 1.0, // will be set per-path by engine
+        even_amount:        0.6,
+        odd_amount:         0.2,
+        mix:                0.3,
+    });
+    config.parallel_mix = 1.0; // fully wet
+
+    let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+
+    // 1kHz sine at 0.5 amplitude (unpadded signal level)
+    let n = 4096_usize;
+    let mut left  = vec![0.0_f32; n];
+    let mut right = vec![0.0_f32; n];
+    for i in 0..n {
+        let s = 0.5_f32 * libm::sinf(
+            2.0_f32 * core::f32::consts::PI * 1000.0_f32 * (i as f32) / 48000.0_f32);
+        left[i]  = s;
+        right[i] = s;
+    }
+
+    let left_in = left.clone();
+    engine.process_block(&mut left, &mut right);
+
+    // 1. Output peak must be below 0 dBFS (no clipping from over-driven tanh)
+    let max_out = left.iter().chain(right.iter())
+        .map(|s| s.abs())
+        .fold(0.0_f32, f32::max);
+    assert!(max_out < 1.0_f32,
+        "process_block output clipped: peak={:.4}", max_out);
+
+    // 2. Output must not be identical to input (harmonics active)
+    let margin = 100_usize;
+    let mut diff_sum = 0.0_f32;
+    for i in margin..n-margin {
+        diff_sum += (left[i] - left_in[i]).abs();
+    }
+    assert!(diff_sum > 0.01_f32,
+        "process_block output identical to input — harmonics not active");
+
+    // 3. RMS should be within 3 dB of input (no over-saturation)
+    //    With drive_compensation=1.0, tanh(2.0*0.5)=tanh(1.0)≈0.76
+    //    With the old bug (1.995), tanh(3.99*0.5)=tanh(2.0)≈0.96 — much hotter
+    let rms_in: f32 = left_in[margin..n-margin].iter()
+        .map(|s| s * s).sum::<f32>() / (n - 2 * margin) as f32;
+    let rms_out: f32 = left[margin..n-margin].iter()
+        .map(|s| s * s).sum::<f32>() / (n - 2 * margin) as f32;
+    let rms_in_db  = 10.0_f32 * rms_in.max(1e-20).log10();
+    let rms_out_db = 10.0_f32 * rms_out.max(1e-20).log10();
+    assert!((rms_out_db - rms_in_db).abs() < 3.0_f32,
+        "process_block RMS drift too large (overcook?): in={:.2} dB, out={:.2} dB",
+        rms_in_db, rms_out_db);
+}

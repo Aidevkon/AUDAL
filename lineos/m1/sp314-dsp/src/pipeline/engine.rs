@@ -53,13 +53,11 @@ impl Sp314MasteringEngine {
         comp_config.mid_config.threshold_db += pad_db;
         comp_config.side_config.threshold_db += pad_db;
 
-        let mut harmonic_config = config.harmonic_config.unwrap_or_else(|| {
+        let harmonic_config = config.harmonic_config.unwrap_or_else(|| {
             crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
         });
-        // drive_compensation must match actual input pad — not hardcoded.
-        // offline path: pad_db = -6.0 → 10^(6/20) = 1.99526 (K_harmonic preserved)
-        // realtime path: pad_db = 0.0 → 10^(0/20) = 1.0 (no overcooking)
-        harmonic_config.drive_compensation = libm::powf(10.0_f32, pad_db.abs() / 20.0_f32);
+        // drive_compensation is set per-path (process_offline / process_block)
+        // to match the actual pad applied to the signal.
 
         Ok(Self {
             eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
@@ -89,7 +87,9 @@ impl Sp314MasteringEngine {
             calculate_adaptive_budget(&telemetry, self.config.target_makeup_db);
         let headroom = HeadroomManager::new(pad_db, makeup_db);
 
-
+        // Drive compensation must match actual pad applied to signal
+        self.harmonic.set_drive_compensation(
+            libm::powf(10.0_f32, pad_db.abs() / 20.0_f32));
 
         headroom.apply_input_pad(left, right);
 
@@ -167,7 +167,10 @@ impl Sp314MasteringEngine {
         // In real-time, we don't have offline pre-pass telemetry. 
         // We assume pad_db = 0.0 and just apply the target_makeup_db from the config.
         let headroom = HeadroomManager::new(0.0, self.config.target_makeup_db);
-        
+
+        // Real-time: no pad → no drive compensation needed
+        self.harmonic.set_drive_compensation(1.0_f32);
+
         headroom.apply_input_pad(left, right);
         
         self.restoration.process(left, right);

@@ -100,6 +100,13 @@ impl HarmonicEngine {
         }
     }
 
+    /// Update drive compensation at runtime.
+    /// Called by the pipeline to match actual input pad.
+    #[inline]
+    pub fn set_drive_compensation(&mut self, compensation: f32) {
+        self.config.drive_compensation = compensation;
+    }
+
     #[inline]
     fn waveshape(&self, x: f32) -> f32 {
         if self.config.mix == 0.0 { return x; }
