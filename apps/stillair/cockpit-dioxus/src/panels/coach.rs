@@ -1,11 +1,11 @@
-//! panels/coach.rs — Coach Panel (FM5 narrative + findings) · P11-007
-//! Authority: Phase 11 task-decomposition P11-007 · LLM Adapter Amendment v1.1
+//! panels/coach.rs — JINI Panel (personality narrative + findings) · J-P5
+//! Authority: JINI Spec v1.0 §7 · Phase 11 task-decomposition P11-007
 //!
-//! THE COACH panel (right MFD):
-//!   FM5: narrative summary + per-finding cards
-//!   Narrative is Optional — None if Ollama unavailable (non-fatal)
-//!   TEACHER VOICE ENFORCED: no DSP values in coach output
-//!   CorrelationRadar = static placeholder (A-003 §3, no canvas)
+//! THE JINI panel (Hangar Bay, right side):
+//!   - JiniNarrative: persona-aware narrative from JINI engine
+//!   - JiniActionCard: APPLY / DISMISS for suggested macro/flavour changes
+//!   - ScoreBar + WizardFinding rows (unchanged from Coach)
+//!   TEACHER VOICE ENFORCED: no DSP values in JINI output
 
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
@@ -13,7 +13,7 @@ use wasm_bindgen_futures::spawn_local;
 use serde_json::json;
 use crate::ipc::invoke;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{IssueJson, SessionStateJson};
+use crate::types::{IssueJson, SessionStateJson, JiniSuggestionJson, JiniPersonaState};
 
 #[derive(PartialEq, Clone)]
 pub struct FindingData {
@@ -25,9 +25,11 @@ pub struct FindingData {
 
 #[component]
 pub fn CoachPanel(
-    mode:          Signal<CockpitMode>,
-    session_state: Signal<Option<SessionStateJson>>,
+    mode:            Signal<CockpitMode>,
+    session_state:   Signal<Option<SessionStateJson>>,
     wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>,
+    jini_suggestion: Signal<Option<JiniSuggestionJson>>,
+    jini_persona:    Signal<JiniPersonaState>,
 ) -> Element {
     let state = session_state.read();
 
@@ -65,36 +67,16 @@ pub fn CoachPanel(
             is_scrollable: true,
             
             { match state.as_ref() {
-                        Some(s) => rsx! {
-                            if let Some(ref n) = s.narrative {
-                                NarrativeSummary {
-                                    summary:    n.summary.clone(),
-                                    model_used: n.model_used.clone(),
-                                }
-                            } else {
-                                div {
-                                    style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
-                                    div {
-                                        style: "color:var(--text-muted); font-size:0.7rem;
-                                                font-style:italic;",
-                                        "Coach narrative unavailable — Ollama not running."
-                                    }
-                                }
+                        Some(_s) => rsx! {
+                            // ── JINI Narrative (replaces NarrativeSummary) ────
+                            JiniNarrative {
+                                suggestion: jini_suggestion.read().clone(),
+                                persona:    jini_persona.read().clone(),
                             }
 
-                            div {
-                                style: "padding:0.75rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
-                                div {
-                                    style: "color:var(--text-secondary); font-size:0.6rem;
-                                            letter-spacing:0.15em; text-transform:uppercase;
-                                            margin-bottom:0.35rem;",
-                                    "RECOMMENDATION"
-                                }
-                                div {
-                                    style: "color:var(--text-primary); font-size:0.8rem;
-                                            line-height:1.5;",
-                                    "{s.findings.recommendation}"
-                                }
+                            // ── JINI Action Card (replaces RECOMMENDATION) ───
+                            JiniActionCard {
+                                suggestion: jini_suggestion.read().clone(),
                             }
 
                             ScoreBar {
@@ -137,11 +119,17 @@ pub fn CoachPanel(
                                 }
                             }
 
-                            if !s.findings.issues.is_empty() {
+                            if !_s.findings.issues.is_empty() {
                                 // CoachActions removed per request
                             }
                         },
                         None => rsx! {
+                            // ── FM0: show JINI narrative even without session ─
+                            JiniNarrative {
+                                suggestion: jini_suggestion.read().clone(),
+                                persona:    jini_persona.read().clone(),
+                            }
+
                             div {
                                 style: "padding:0.5rem 0.75rem 0.2rem;
                                         color:var(--text-muted); font-size:0.6rem;
@@ -151,43 +139,118 @@ pub fn CoachPanel(
                             for f in demo_findings {
                                 DemoFindingRow { finding: f }
                             }
-                            // CoachActions removed per request
                         }
             } }
         }
     }
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── JINI Sub-components (J-P5) ─────────────────────────────────────────────────
 
 #[component]
-fn NarrativeSummary(summary: String, model_used: String) -> Element {
+fn JiniNarrative(
+    suggestion: Option<JiniSuggestionJson>,
+    persona:    JiniPersonaState,
+) -> Element {
     rsx! {
         div {
             style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
+
+            // Persona selector — always visible
             div {
-                style: "color:var(--text-secondary); font-size:0.6rem;
-                        letter-spacing:0.15em; text-transform:uppercase;
+                style: "display:flex; gap:8px; margin-bottom:0.75rem;",
+                for (label, variant) in [
+                    ("BEGINNER", JiniPersonaState::Beginner),
+                    ("MID", JiniPersonaState::Intermediate),
+                    ("PRO", JiniPersonaState::Pro),
+                ] {
+                    div {
+                        style: format!(
+                            "font-family:monospace; font-size:0.55rem; \
+                             letter-spacing:0.15em; cursor:pointer; \
+                             padding:2px 6px; border:1px solid {}; color:{};",
+                            if persona == variant { "var(--accent-cyan)" } else { "var(--border-subtle)" },
+                            if persona == variant { "var(--accent-cyan)" } else { "var(--text-muted)" }
+                        ),
+                        "{label}"
+                    }
+                }
+            }
+
+            // JINI narrative
+            { match &suggestion {
+                Some(s) if !s.narrative.is_empty() => rsx! {
+                    div {
+                        style: "color:var(--text-secondary); font-size:0.6rem; \
+                                letter-spacing:0.15em; text-transform:uppercase; \
+                                margin-bottom:0.5rem;",
+                        "JINI"
+                    }
+                    div {
+                        style: "color:var(--text-primary); font-size:0.82rem; \
+                                line-height:1.6; font-style:italic;",
+                        "{s.narrative}"
+                    }
+                },
+                _ => rsx! {
+                    div {
+                        style: "color:var(--text-muted); font-size:0.75rem; font-style:italic;",
+                        "Analysing..."
+                    }
+                }
+            } }
+        }
+    }
+}
+
+#[component]
+fn JiniActionCard(suggestion: Option<JiniSuggestionJson>) -> Element {
+    let Some(ref s) = suggestion else {
+        return rsx! {};
+    };
+    if s.action_type == "nothing" || s.action_label.is_empty() {
+        return rsx! {};
+    }
+    rsx! {
+        div {
+            style: "margin: 0.5rem 1.5rem; padding: 0.75rem 1rem; \
+                    border: 1px solid var(--border-subtle); \
+                    background: rgba(0,255,65,0.03);",
+            div {
+                style: "color:var(--text-secondary); font-size:0.6rem; \
+                        letter-spacing:0.15em; text-transform:uppercase; \
                         margin-bottom:0.5rem;",
-                "COACH ANALYSIS"
+                "SUGGESTION"
             }
             div {
-                style: "color:var(--text-primary); font-size:0.82rem;
-                        line-height:1.6; font-style:italic;",
-                "{summary}"
+                style: "color:var(--text-primary); font-size:0.78rem; \
+                        margin-bottom:0.75rem;",
+                "{s.action_label}"
             }
             div {
-                style: "color:var(--text-muted); font-size:0.6rem;
-                        margin-top:0.5rem;",
-                "model: {model_used}"
+                style: "display:flex; gap:8px;",
+                button {
+                    style: "font-family:monospace; font-size:0.6rem; \
+                            letter-spacing:0.15em; padding:4px 12px; \
+                            background:transparent; border:1px solid var(--accent-cyan); \
+                            color:var(--accent-cyan); cursor:pointer;",
+                    "APPLY"
+                }
+                button {
+                    style: "font-family:monospace; font-size:0.6rem; \
+                            letter-spacing:0.15em; padding:4px 12px; \
+                            background:transparent; border:1px solid var(--border-subtle); \
+                            color:var(--text-muted); cursor:pointer;",
+                    "DISMISS"
+                }
             }
         }
     }
 }
-// ── DemoFindingRow — static demo card for FM0 state ──────────────────────────
+
+// ── Legacy Sub-components (preserved) ──────────────────────────────────────────
 
 /// Static finding row for the FM0 demo state.
-/// Takes plain values — no IssueJson. Matches mockup's 3 demo cards.
 #[component]
 fn DemoFindingRow(finding: FindingData) -> Element {
     let pct_label = format!("{:.0}%", finding.pct);
@@ -267,13 +330,11 @@ fn ScoreBar(wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>) 
 /// Colors via CSS variables only — no inline hex.
 #[component]
 fn FindingRow(issue: IssueJson) -> Element {
-    // Score = how close current is to target (0–1 range)
-    // Higher delta = worse. Clamp score to 0–1.
     let score_pct = if issue.target != 0.0 {
         let ratio = (issue.target - issue.delta.abs()) / issue.target.abs();
         (ratio * 100.0).clamp(0.0, 100.0)
     } else {
-        50.0_f32  // unknown target
+        50.0_f32
     };
     let pct_label = format!("{:.0}%", score_pct);
     let sev = issue.severity.as_str();
@@ -283,17 +344,14 @@ fn FindingRow(issue: IssueJson) -> Element {
             key:   "{issue.id}",
             class: "finding-row",
 
-            // Label (fixed width)
             div { class: "finding-row-label", "{issue.id}" }
 
-            // Description (flex grow)
             div {
                 class: "finding-row-description",
                 { format!("current {:.1} → target {:.1} (delta {:+.1})",
                           issue.current, issue.target, issue.delta) }
             }
 
-            // Segmented OLED Mini-bar
             div { class: "finding-mini-bar-track",
                 div {
                     class: "finding-mini-bar-fill {sev}",
@@ -301,10 +359,7 @@ fn FindingRow(issue: IssueJson) -> Element {
                 }
             }
 
-            // Percentage value
             div { class: "finding-row-pct", "{pct_label}" }
-
-            // Severity dot
             div { class: "severity-dot {sev}" }
         }
     }
@@ -313,6 +368,7 @@ fn FindingRow(issue: IssueJson) -> Element {
 /// YES / NO coach action buttons (§4.10).
 /// invoke("coachAction", { action: "yes" | "no" }) on click.
 #[component]
+#[allow(dead_code)]
 fn CoachActions() -> Element {
     rsx! {
         div {
@@ -351,6 +407,7 @@ fn CoachActions() -> Element {
 
 // ── Legacy sub-components (kept for backwards compat during transition) ────────
 
+#[allow(dead_code)]
 #[component]
 fn MetricMini(label: &'static str, value: String) -> Element {
     rsx! {

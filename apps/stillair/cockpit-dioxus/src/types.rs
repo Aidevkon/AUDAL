@@ -203,3 +203,22 @@ pub struct LiveTelemetryJson {
     pub true_peak_dbtp:  f32,
     pub position_ms:     u64,
 }
+
+// ── JINI Suggestion (J-P5 UI layer) ──────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct JiniSuggestionJson {
+    pub narrative:    String,
+    pub action_type:  String,     // "macro_change" | "flavour_switch" | "nothing"
+    pub action_label: String,     // human readable e.g. "Switch to Clean mode"
+    pub confidence:   f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum JiniPersonaState {
+    Beginner,
+    #[default]
+    Intermediate,
+    Pro,
+}
+

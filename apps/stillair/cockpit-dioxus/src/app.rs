@@ -20,7 +20,7 @@ use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use gloo_timers::future::TimeoutFuture;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{SessionStateJson, VisualizationDataJson, CockpitTier};
+use crate::types::{SessionStateJson, VisualizationDataJson, CockpitTier, JiniSuggestionJson, JiniPersonaState};
 use crate::panels::{
     coach::CoachPanel,
     mastered::MasteredView,
@@ -51,6 +51,9 @@ pub fn App() -> Element {
     let dyn_angle: Signal<f32>  = use_signal(|| 0.0_f32);
     let space_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let loud_angle: Signal<f32> = use_signal(|| 0.0_f32);
+    // ── JINI signals (J-P5) ──────────────────────────────────────────────────
+    let jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
+    let jini_persona:    Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
 
     rsx! {
 
@@ -133,7 +136,7 @@ pub fn App() -> Element {
                     }
                 }
                 div { class: "coach-panel chassis-bezel",
-                    CoachPanel { mode, session_state, wizard_findings }
+                    CoachPanel { mode, session_state, wizard_findings, jini_suggestion, jini_persona }
                 }
             }
         }
