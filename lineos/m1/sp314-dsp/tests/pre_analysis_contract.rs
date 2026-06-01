@@ -14,11 +14,17 @@ use sp314_dsp::analysis::PreAnalyzer;
 
 const TOL_CORRELATION: f32 = 1e-6;
 const TOL_WIDTH:       f32 = 1e-6;
+#[allow(dead_code)]
 const TOL_LUFS:        f32 = 0.3;
+#[allow(dead_code)]
 const TOL_LRA:         f32 = 0.3;
+#[allow(dead_code)]
 const TOL_DB:          f32 = 0.1;   // true peak, spectral, crest, side_mid
+#[allow(dead_code)]
 const TOL_ROLLOFF_HZ:  f32 = 50.0;
+#[allow(dead_code)]
 const TOL_DENSITY:     f32 = 0.5;
+#[allow(dead_code)]
 const TOL_PEAK_HZ:     f32 = 5.0;
 
 const SR: u32 = 48000;
@@ -56,6 +62,7 @@ fn gen_sine_1000_mono() -> (Vec<f32>, Vec<f32>) {
 
 /// Generate white noise (decorrelated L≠R), seed=42.
 /// Uses xorshift32 for determinism (no rand crate).
+#[allow(dead_code)]
 fn gen_white_noise_decorrelated() -> (Vec<f32>, Vec<f32>) {
     let n = (DURATION * SR as f32) as usize;
     // We only need this for the deterministic_100 test.

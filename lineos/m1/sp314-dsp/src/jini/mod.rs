@@ -194,7 +194,6 @@ fn render_pro(action: &JiniAction, _b: &BehaviourVector) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lineos_types::*;
 
     #[test]
     fn neutral_behaviour_suggests_nothing() {

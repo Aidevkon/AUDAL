@@ -62,26 +62,32 @@ impl HealthGate {
         self.criteria.read().await.all_pass()
     }
 
+    #[allow(dead_code)]
     pub async fn get_criteria(&self) -> HealthCriteria {
         self.criteria.read().await.clone()
     }
 
+    #[allow(dead_code)]
     pub async fn set_cdn_ready(&self, v: bool) {
         self.criteria.write().await.cdn_ready = v;
     }
 
+    #[allow(dead_code)]
     pub async fn set_registry_loaded(&self, v: bool) {
         self.criteria.write().await.registry_loaded = v;
     }
 
+    #[allow(dead_code)]
     pub async fn set_caddy_running(&self, v: bool) {
         self.criteria.write().await.caddy_running = v;
     }
 
+    #[allow(dead_code)]
     pub async fn set_policy_active(&self, v: bool) {
         self.criteria.write().await.policy_active = v;
     }
 
+    #[allow(dead_code)]
     pub async fn set_audit_writable(&self, v: bool) {
         self.criteria.write().await.audit_writable = v;
     }
@@ -95,6 +101,7 @@ impl Default for HealthGate {
 
 // ─── Axum Response Types ──────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 #[derive(Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
@@ -103,6 +110,7 @@ pub struct HealthResponse {
 
 // ─── Health Handler ───────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub async fn health_handler(
     axum::extract::State(gate): axum::extract::State<HealthGate>,
 ) -> (axum::http::StatusCode, Json<HealthResponse>) {
@@ -125,6 +133,7 @@ pub async fn health_handler(
 }
 
 /// Build the health router (mountable at any prefix).
+#[allow(dead_code)]
 pub fn health_router(gate: HealthGate) -> Router {
     Router::new()
         .route("/health", get(health_handler))

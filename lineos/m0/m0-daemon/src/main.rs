@@ -17,6 +17,7 @@ mod marketplace;
 mod policy;
 mod registry;
 pub mod dsp;
+pub mod jini;
 
 use anyhow::Result;
 use app_state::AppState;
@@ -25,15 +26,23 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 // Environment variable defaults
+#[allow(dead_code)]
 const REGISTRY_PATH:  &str = "lineos/m0/registry/m0-registry.json";
+#[allow(dead_code)]
 const CHECKSUMS_PATH: &str = "lineos/m0/registry/checksums.json";
+#[allow(dead_code)]
 const POLICIES_PATH:  &str = "lineos/m0/config/policies.toml";
+#[allow(dead_code)]
 const AUDIT_LOG_DIR:  &str = "lineos/m0/logs/audit";
+#[allow(dead_code)]
 const ASSETS_ROOT:    &str = "lineos/m0/assets/wasm";
+#[allow(dead_code)]
 const HEALTH_ADDR:    &str = "127.0.0.1:7401";
 /// Mastering API — proxied through Caddy at 127.0.0.1:7400
+#[allow(dead_code)]
 const MASTERING_ADDR: &str = "127.0.0.1:7402";
 
+#[allow(dead_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -138,6 +147,7 @@ async fn main() -> Result<()> {
 /// Build the mastering API Axum router.
 /// Phase 12A adds: POST /playback/control, GET /playback/state
 /// Authority: Phase 6 task-decomposition P6-003 · Phase 12A P12A-007
+#[allow(dead_code)]
 fn mastering_router(state: AppState) -> axum::Router {
     use axum::routing::{get, post};
 
