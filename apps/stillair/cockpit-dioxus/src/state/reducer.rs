@@ -5,6 +5,16 @@
 
 use super::cockpit_mode::{AscCode, CockpitMode};
 use super::cockpit_event::CockpitEvent;
+use dioxus::prelude::*;
+
+/// Dispatch a CockpitEvent through the reducer into the mode Signal.
+/// This is the ONLY place mode mutation happens — components never
+/// call mode.set() directly.
+pub fn dispatch(mut mode: Signal<CockpitMode>, event: CockpitEvent) {
+    let current = mode.read().clone();
+    let next = reduce(current, event);
+    mode.set(next);
+}
 
 pub fn reduce(mode: CockpitMode, event: CockpitEvent) -> CockpitMode {
     match (mode, event) {
