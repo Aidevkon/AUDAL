@@ -38,8 +38,8 @@ pub fn SessionPanel(
     session_state: Signal<Option<SessionStateJson>>,
     viz_data:      Signal<Option<VisualizationDataJson>>,
     show_mastered: Signal<bool>,
+    mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
 ) -> Element {
-    let mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>> = use_signal(|| vec![]);
 
     rsx! {
         ModuleFrame {

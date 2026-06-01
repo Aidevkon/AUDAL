@@ -11,10 +11,11 @@ pub struct SamplingSiameseProps {
     pub playback_state: Signal<Option<PlaybackStateJson>>,
     pub viz_data: Signal<Option<VisualizationDataJson>>,
     pub show_mastered: Signal<bool>,
+    pub wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
 }
 
 #[component]
-pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
+pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
     rsx! {
         div {
             class: "sampling-siamese chassis-bezel chassis-substrate chassis-seam",
@@ -26,6 +27,14 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
                     session_state: props.session_state,
                     viz_data: props.viz_data,
                     show_mastered: props.show_mastered,
+                    wizard_findings: props.wizard_findings,
+                }
+                crate::components::hud_overlay::MfdHud {
+                    findings: props.wizard_findings.read().clone(),
+                    target: crate::wizard::MfdTarget::Mfd1SignalAnalyzer,
+                    on_dismiss: move |id| {
+                        props.wizard_findings.write().retain(|f| f.id != id);
+                    },
                 }
             }
 
@@ -38,6 +47,13 @@ pub fn SamplingSiamese(props: SamplingSiameseProps) -> Element {
                     session_state: props.session_state,
                     playback_state: props.playback_state,
                     viz_data: props.viz_data,
+                }
+                crate::components::hud_overlay::MfdHud {
+                    findings: props.wizard_findings.read().clone(),
+                    target: crate::wizard::MfdTarget::Mfd2SpatialTelemetry,
+                    on_dismiss: move |id| {
+                        props.wizard_findings.write().retain(|f| f.id != id);
+                    },
                 }
             }
             

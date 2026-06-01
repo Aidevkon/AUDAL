@@ -5,6 +5,7 @@ pub mod active_processing_chain;
 pub mod intent_bay;
 pub mod primary_signal_analyzer;
 pub mod sampling_siamese;
+pub mod hud_overlay;
 pub mod transport_button;
 pub mod transport_bar;
 pub mod ab_toggle;

@@ -984,6 +984,7 @@ body {
 }
 
 .siamese-col {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -1195,3 +1196,13 @@ body {
   border: 1px solid #141c26;
   letter-spacing: 0;
 }
+
+/* ── HUD OVERLAY ANIMATIONS (W-01) ── */
+@keyframes stepped-pulse {
+  0%   { opacity: 1.0; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1.0; }
+}
+.hud-severity-low    { animation: stepped-pulse 2.4s steps(2, end) infinite; color: #ffd60a; }
+.hud-severity-medium { animation: stepped-pulse 1.6s steps(2, end) infinite; color: #ff9f0a; }
+.hud-severity-high   { animation: stepped-pulse 0.8s steps(2, end) infinite; color: #ff3b30; }

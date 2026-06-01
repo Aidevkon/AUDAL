@@ -40,6 +40,7 @@ pub fn App() -> Element {
     let session_state  = use_signal(|| None::<SessionStateJson>);
     let tier           = use_signal(|| CockpitTier::Tier3_Pro);
     let presentation   = crate::state::cockpit_presentation::CockpitPresentation::from_tier(*tier.read());
+    let wizard_findings = use_signal(|| Vec::<crate::wizard::WizardFinding>::new());
     let viz_data: Signal<Option<VisualizationDataJson>> = use_signal(|| None);
     // MasteredView overlay visibility (Signal only — no IPC per §5.3)
     let mut show_mastered: Signal<bool> = use_signal(|| false);
@@ -77,6 +78,7 @@ pub fn App() -> Element {
                     session_state,
                     playback_state: use_signal(|| None),
                     viz_data,
+                    wizard_findings,
                     show_mastered: show_mastered.clone(),
                 }
             }
