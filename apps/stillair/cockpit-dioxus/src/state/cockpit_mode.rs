@@ -14,6 +14,9 @@ pub enum AscCode {
     Aborted        = 0x03,
     ValidationFail = 0x04,
     WasmPanic      = 0x05,
+    FileReadError  = 0x10,
+    MasteringError = 0x11,
+    ExportError    = 0x12,
 }
 
 impl AscCode {
@@ -24,6 +27,9 @@ impl AscCode {
             Self::Aborted        => "ASC 0x03",
             Self::ValidationFail => "ASC 0x04",
             Self::WasmPanic      => "ASC 0x05",
+            Self::FileReadError  => "ASC 0x10",
+            Self::MasteringError => "ASC 0x11",
+            Self::ExportError    => "ASC 0x12",
         }
     }
 }
