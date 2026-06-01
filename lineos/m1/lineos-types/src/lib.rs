@@ -21,6 +21,7 @@ pub mod mastering;
 pub mod metrics;
 pub mod analysis;
 pub mod pre_analysis;
+pub mod jini;
 
 // Convenience re-exports for migration
 pub use analysis::{StemFeatures, StemMetrics, MixMetrics};
@@ -30,3 +31,15 @@ pub use config::{Bmr128Schema, LoudnessTarget, PipelineConstants, PresetThreshol
 pub use golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
 pub use mastering::MasteringIntent;
 pub use metrics::{Ebu128Measurement, LufsReport};
+pub use jini::{
+    // Behaviour enums
+    LoudnessBehaviour, SpectralBehaviour, DynamicsBehaviour, StereoBehaviour, QualityBehaviour,
+    // Domain enums
+    FlavourId, SpinoffTarget, StemKind, MacroHandle,
+    // Core JINI types
+    BehaviourVector, MacroState, JiniPersonaId, JiniContext, JiniInput,
+    JiniSuggestion, JiniAction, PersonaSchema, VocabLevel,
+    // Constants
+    SCHEMA_BEGINNER, SCHEMA_INTERMEDIATE, SCHEMA_PRO,
+    OLLAMA_TIMEOUT_MS, OLLAMA_ENDPOINT, GEMMA_MODEL,
+};
