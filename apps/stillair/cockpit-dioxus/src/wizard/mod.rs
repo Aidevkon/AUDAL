@@ -131,6 +131,45 @@ pub fn detect_findings(session: &SessionStateJson) -> Vec<WizardFinding> {
     findings
 }
 
+/// Finding cooldown tracker.
+/// Prevents same finding from re-triggering before cooldown expires.
+/// Relevant only when real-time telemetry polling is added.
+/// Authority: Wizard Constitution v1.1 §6 — 45 second cooldown.
+pub struct CooldownTracker {
+    dismissed_at: std::collections::HashMap<&'static str, f64>,
+    pub cooldown_ms: f64,
+}
+
+impl CooldownTracker {
+    pub fn new() -> Self {
+        Self {
+            dismissed_at: std::collections::HashMap::new(),
+            cooldown_ms: 45_000.0,
+        }
+    }
+
+    pub fn dismiss(&mut self, id: &'static str, now_ms: f64) {
+        self.dismissed_at.insert(id, now_ms);
+    }
+
+    pub fn is_cooled_down(&self, id: &'static str, now_ms: f64) -> bool {
+        match self.dismissed_at.get(id) {
+            None => true,
+            Some(&dismissed) => (now_ms - dismissed) >= self.cooldown_ms,
+        }
+    }
+
+    pub fn filter_findings<'a>(
+        &self,
+        findings: &'a [WizardFinding],
+        now_ms: f64,
+    ) -> Vec<&'a WizardFinding> {
+        findings.iter()
+            .filter(|f| self.is_cooled_down(f.id, now_ms))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
