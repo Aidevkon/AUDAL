@@ -13,6 +13,7 @@ pub enum LoudnessBehaviour {
     TooQuiet,
     SlightlyQuiet,
     Optimal,
+    Balanced,
     SlightlyLoud,
     TooLoud,
 }
@@ -22,6 +23,7 @@ pub enum SpectralBehaviour {
     Muddy,
     Boxy,
     Balanced,
+    Neutral,
     Harsh,
     Bright,
     Thin,
@@ -29,10 +31,14 @@ pub enum SpectralBehaviour {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DynamicsBehaviour {
+    Overcompressed,
     OverCompressed,
     Tight,
     Balanced,
+    Stable,
     Dynamic,
+    Pumping,
+    Undercompressed,
     Uncontrolled,
 }
 
@@ -42,6 +48,7 @@ pub enum StereoBehaviour {
     Narrow,
     Balanced,
     Wide,
+    Unstable,
     PhaseIssue,
 }
 
@@ -51,6 +58,7 @@ pub enum QualityBehaviour {
     MinorIssues,
     Clipping,
     Distorted,
+    Silence,
 }
 
 // ── Shared Domain Enums ──────────────────────────────────────────────────────
@@ -103,6 +111,18 @@ pub struct BehaviourVector {
     pub quality:  QualityBehaviour,
 }
 
+impl BehaviourVector {
+    pub fn neutral() -> Self {
+        Self {
+            loudness: LoudnessBehaviour::Balanced,
+            spectral: SpectralBehaviour::Neutral,
+            dynamics: DynamicsBehaviour::Stable,
+            stereo:   StereoBehaviour::Wide,
+            quality:  QualityBehaviour::Clean,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MacroState {
     pub tone:     f32,
@@ -134,7 +154,7 @@ pub struct JiniInput {
     pub context:        JiniContext,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct JiniSuggestion {
     pub narrative:    String,
     pub action:       Option<JiniAction>,
@@ -142,7 +162,7 @@ pub struct JiniSuggestion {
     pub persona_used: JiniPersonaId,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum JiniAction {
     SuggestMacroChange {
         handle: MacroHandle,
