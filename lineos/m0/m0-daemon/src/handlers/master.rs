@@ -25,6 +25,11 @@ use xaak::PcmTransfer;
 pub struct MasterRequest {
     pub audio_path: String,
     pub preset_id:  String,
+    pub flavour_id: Option<String>,
+    pub intent_warmth: Option<f32>,
+    pub intent_punch: Option<f32>,
+    pub intent_space: Option<f32>,
+    pub intent_loudness: Option<f32>,
     pub persona_id:  Option<String>,
     pub warmth:      Option<f32>,
     pub punch:       Option<f32>,
@@ -375,11 +380,11 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     // A2: Pre-DSP Aether processing
     let aether_req = aether_bridge::AetherRequest {
-        persona_id:  req.persona_id.clone(),
-        warmth:      req.warmth,
-        punch:       req.punch,
-        forwardness: req.forwardness,
-        smoothness:  req.smoothness,
+        persona_id:  req.flavour_id.clone().or(req.persona_id.clone()),
+        warmth:      req.intent_warmth.or(req.warmth),
+        punch:       req.intent_punch.or(req.punch),
+        forwardness: req.intent_space.or(req.forwardness),
+        smoothness:  req.intent_loudness.or(req.smoothness),
         chaos_seed:  req.chaos_seed,
         project_id:  req.project_id.clone(),
         track_id:    req.track_id.clone(),

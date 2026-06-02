@@ -23,6 +23,7 @@ web-sys               = { version = "0.3", features = ["console", "Window", "Doc
                                                        "Response", "Headers"] }
 js-sys                = "0.3"
 gloo-timers           = { version = "0.3", features = ["futures"] }  # P12B-004: 500ms poll
+gloo-events = "0.3.0"
 
 # ui-isolation-check.sh invariant:
 # sp314-dsp, lineos-telemetry, lineos-rule-engine, m0d, adapter-runtime

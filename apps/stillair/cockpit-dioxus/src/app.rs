@@ -83,6 +83,10 @@ pub fn App() -> Element {
                     viz_data,
                     wizard_findings,
                     show_mastered: show_mastered.clone(),
+                    tone_angle,
+                    dyn_angle,
+                    space_angle,
+                    loud_angle,
                 }
             }
 
@@ -113,10 +117,10 @@ pub fn App() -> Element {
                 },
                 div { class: "intent-knob-bay",
                     IntentBay {
-                        tone_angle: *tone_angle.read(),
-                        dyn_angle: *dyn_angle.read(),
-                        space_angle: *space_angle.read(),
-                        loud_angle: *loud_angle.read(),
+                        tone_angle,
+                        dyn_angle,
+                        space_angle,
+                        loud_angle,
                         on_down_tone: move |_| {
                             if *intent_open.read() {
                                 // Close: remove open immediately, play seal animation for 1600ms

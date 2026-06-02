@@ -48,6 +48,10 @@ pub fn SessionPanel(
     viz_data:      Signal<Option<VisualizationDataJson>>,
     show_mastered: Signal<bool>,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
+    tone_angle: Signal<f32>,
+    dyn_angle: Signal<f32>,
+    space_angle: Signal<f32>,
+    loud_angle: Signal<f32>,
 ) -> Element {
 
     let mut flavour = use_signal(|| "clean".to_string());
@@ -110,7 +114,10 @@ pub fn SessionPanel(
                                     on_load_new: on_load,
                                 }
                                 SelectedPreset { preset_id: preset_id.clone() }
-                                MasterButton { mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour }
+                                MasterButton { 
+                                    mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour,
+                                    tone_angle, dyn_angle, space_angle, loud_angle
+                                }
                             }
                         },
                         CockpitMode::Mastering { .. } => rsx! {
@@ -245,6 +252,10 @@ fn MasterButton(
     preset_id:     String,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
     flavour:       Signal<String>,
+    tone_angle: Signal<f32>,
+    dyn_angle: Signal<f32>,
+    space_angle: Signal<f32>,
+    loud_angle: Signal<f32>,
 ) -> Element {
     let on_master = move |_| {
         #[cfg(debug_assertions)]
@@ -269,7 +280,15 @@ fn MasterButton(
             web_sys::console::log_1(&JsValue::from_str("[session] calling trigger_mastering..."));
             let blob_id = match invoke::<String, _>(
                 "trigger_mastering",
-                json!({ "audioPath": p, "presetId": pr, "flavourId": flavour.read().clone() }),
+                json!({
+                    "audioPath":      p,
+                    "presetId":       pr,
+                    "flavourId":      flavour.read().clone(),
+                    "intentWarmth":   ((*tone_angle.read()  / 135.0) + 1.0) / 2.0,
+                    "intentPunch":    ((*dyn_angle.read()   / 135.0) + 1.0) / 2.0,
+                    "intentSpace":    ((*space_angle.read() / 135.0) + 1.0) / 2.0,
+                    "intentLoudness": ((*loud_angle.read()  / 135.0) + 1.0) / 2.0,
+                }),
             ).await {
                 Ok(id)  => id,
                 Err(e)  => {

@@ -147,6 +147,11 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
 pub async fn trigger_mastering(
     audio_path: String,
     preset_id:  String,
+    flavour_id: String,
+    intent_warmth: f32,
+    intent_punch: f32,
+    intent_space: f32,
+    intent_loudness: f32,
 ) -> Result<String, String> {
     eprintln!("[trigger_mastering] START path={audio_path} preset={preset_id}");
     let client = M0Client::new();
@@ -157,7 +162,10 @@ pub async fn trigger_mastering(
     eprintln!("[trigger_mastering] health OK — sending to M0...");
 
     let resp = client
-        .trigger_mastering(MasterRequest { audio_path, preset_id })
+        .trigger_mastering(MasterRequest { 
+            audio_path, preset_id, flavour_id, 
+            intent_warmth, intent_punch, intent_space, intent_loudness 
+        })
         .await
         .map_err(|e| e.to_string())?;
 

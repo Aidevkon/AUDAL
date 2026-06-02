@@ -12,6 +12,10 @@ pub struct SamplingSiameseProps {
     pub viz_data: Signal<Option<VisualizationDataJson>>,
     pub show_mastered: Signal<bool>,
     pub wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
+    pub tone_angle: Signal<f32>,
+    pub dyn_angle: Signal<f32>,
+    pub space_angle: Signal<f32>,
+    pub loud_angle: Signal<f32>,
 }
 
 #[component]
@@ -36,6 +40,10 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                     viz_data: props.viz_data,
                     show_mastered: props.show_mastered,
                     wizard_findings: props.wizard_findings,
+                    tone_angle: props.tone_angle,
+                    dyn_angle: props.dyn_angle,
+                    space_angle: props.space_angle,
+                    loud_angle: props.loud_angle,
                 }
                 crate::components::hud_overlay::MfdHud {
                     findings: props.wizard_findings.read().clone(),

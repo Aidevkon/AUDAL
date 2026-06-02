@@ -199,6 +199,11 @@ pub struct PlaybackControlRequest {
 pub struct MasterRequest {
     pub audio_path: String,
     pub preset_id:  String,
+    pub flavour_id: String,
+    pub intent_warmth: f32,
+    pub intent_punch: f32,
+    pub intent_space: f32,
+    pub intent_loudness: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
