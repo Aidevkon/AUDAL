@@ -188,6 +188,19 @@ pub async fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob,
 }
 
 #[inline(always)]
+fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
+    match flavour_id {
+        "warm"      => "warm_analog",
+        "clean"     => "clean_punch",
+        "punch"     => "clean_punch",
+        "air"       => "hybrid_hifi",
+        "film"      => "cinematic_wide",
+        "broadcast" => "clean_punch",
+        _           => "warm_analog",  // default
+    }
+}
+
+#[inline(always)]
 async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
@@ -335,22 +348,9 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         target_makeup_db: 0.0,  // input gain applied above
     };
 
-    // A1: Full stem separation + per-stem analysis
-    use sp314_dsp::stft::stem_renderer::FourStemRenderer;
+    // A1: Extract features
     use sp314_dsp::analysis::StemFeatureAnalyzer;
-
-    // Downmix to mono for NMF
-    let mono: Vec<f32> = chunk.left.iter()
-        .zip(chunk.right.iter())
-        .map(|(l, r)| (l + r) * 0.5)
-        .collect();
-
-    // NMF stem separation
-    let mut renderer = FourStemRenderer::new();
-    let stems = renderer.render(&mono);
-
-    // Per-stem feature analysis
-    let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
+    let features = StemFeatureAnalyzer::analyze_stereo(&chunk.left, &chunk.right, chunk.sample_rate);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
     // Runs once per session on raw stereo PCM, before Aether.
@@ -379,8 +379,11 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     );
 
     // A2: Pre-DSP Aether processing
+    let mapped_persona = map_flavour_to_persona(
+        req.flavour_id.as_deref().unwrap_or("warm")
+    );
     let aether_req = aether_bridge::AetherRequest {
-        persona_id:  req.flavour_id.clone().or(req.persona_id.clone()),
+        persona_id:  Some(mapped_persona.to_string()),
         warmth:      req.intent_warmth.or(req.warmth),
         punch:       req.intent_punch.or(req.punch),
         forwardness: req.intent_space.or(req.forwardness),
