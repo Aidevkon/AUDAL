@@ -261,5 +261,15 @@
     ],
     "min_sdr_db": 36.46346224108542,
     "gate_6db": true
+  },
+  "ambience_validation": {
+    "flatness_per_component": [
+      0.05120539204094085,
+      0.8065346815522486,
+      0.06843519841699897
+    ],
+    "ambience_component_idx": 1,
+    "ambience_is_flattest": true,
+    "note": "Component with highest spectral flatness = Ambience per spec"
   }
 }

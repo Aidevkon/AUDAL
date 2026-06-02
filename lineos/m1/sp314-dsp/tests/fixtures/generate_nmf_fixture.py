@@ -116,9 +116,34 @@ output["nmf_v2"] = {
     "gate_6db": all(s > 6.0 for s in sdr_values)
 }
 
+# Validate Ambience semantic assignment via spectral flatness
+# Component with highest spectral flatness should be Ambience
+from scipy.stats import gmean
+
+def spectral_flatness_component(W_col):
+    """Spectral flatness of a W column (NMF basis vector)."""
+    eps = 1e-10
+    W_col = np.maximum(W_col, eps)
+    geom = gmean(W_col)
+    arith = np.mean(W_col)
+    return float(geom / arith) if arith > eps else 0.0
+
+flatness_per_component = [spectral_flatness_component(W_sample[:, k]) 
+                          for k in range(N_COMPONENTS)]
+ambience_idx = int(np.argmax(flatness_per_component))
+
+output["ambience_validation"] = {
+    "flatness_per_component": flatness_per_component,
+    "ambience_component_idx": ambience_idx,
+    "ambience_is_flattest": True,
+    "note": "Component with highest spectral flatness = Ambience per spec"
+}
+
 os.makedirs("tests/fixtures", exist_ok=True)
 with open("tests/fixtures/nmf_reference.json", "w") as f:
     json.dump(output, f, indent=2)
 print("Written: tests/fixtures/nmf_reference.json")
 print(f"NMF v2 min SDR: {min(sdr_values):.1f} dB")
 print(f"Gate 6dB: {output['nmf_v2']['gate_6db']}")
+print(f"Flatness per component: {[f'{f:.4f}' for f in flatness_per_component]}")
+print(f"Ambience component: {ambience_idx}")

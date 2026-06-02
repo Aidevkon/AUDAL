@@ -2,8 +2,10 @@
 // One-shot engine test — not part of the library, dev-time only
 
 use sp314_dsp::{
-    pipeline::engine::Sp314MasteringEngine,
-    pipeline::dither::TpdfDither,
+    masking_eq::{MaskingAwareEQ, MaskingEQConfig},
+    compressor::stereo::{CompressorV3, CompressorV3Config},
+    compressor::core::CompressorBandConfig,
+    pipeline::engine::{Sp314MasteringEngine, EngineConfig},
 };
 
 fn main() {
@@ -23,11 +25,11 @@ fn main() {
     // Read samples as f32
     let samples_raw: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Float => {
-            reader.samples::<f32>().map(|s: Result<f32, _>| s.unwrap()).collect()
+            reader.samples::<f32>().map(|s| s.unwrap()).collect()
         }
         hound::SampleFormat::Int => {
             let max_val = (1i32 << (spec.bits_per_sample - 1)) as f32;
-            reader.samples::<i32>().map(|s: Result<i32, _>| s.unwrap() as f32 / max_val).collect()
+            reader.samples::<i32>().map(|s| s.unwrap() as f32 / max_val).collect()
         }
     };
 
@@ -48,43 +50,79 @@ fn main() {
              mins, secs, left.len());
 
     // --- Configure Engine ---
-    let target = sp314_dsp::pipeline::presets::MasteringTarget::SpotifyV3;
-    let base_config = target.engine_config(spec.sample_rate);
+    // Default mastering config — balanced settings
+    let band_config = CompressorBandConfig {
+        threshold_db:      -18.0,
+        ratio:               3.0,
+        knee_db:             2.0,
+        attack_ms:          10.0,
+        release_ms:        150.0,
+        makeup_db:           2.0,
+        crossover_hz:      150.0,
+    };
 
-    // --- Autotune ---
-    println!("\n=== Processing ===");
-    let autotune_result = sp314_dsp::pipeline::autotune::autotune(&left, &right, base_config.clone(), target, spec.sample_rate);
-    println!("Autotuner: makeup_db={:.1}, rms={:.1}, iterations={}, converged={}",
-        autotune_result.makeup_db, autotune_result.achieved_rms,
-        autotune_result.iterations, autotune_result.converged);
+    let comp_config = CompressorV3Config {
+        mid_config:  band_config.clone(),
+        side_config: CompressorBandConfig {
+            threshold_db: -24.0,
+            ratio:          2.0,
+            knee_db:        2.0,
+            attack_ms:     20.0,
+            release_ms:   200.0,
+            makeup_db:      0.0,
+            crossover_hz: 150.0,
+        },
+    };
 
-    let mut tuned_config = base_config;
-    tuned_config.target_makeup_db = autotune_result.makeup_db;
+    let eq_config = MaskingEQConfig {
+        target_db:      [1.5, 1.0, 0.5, 0.0, 0.5, 1.0, 1.5, 1.0],
+        mask_margin_db: 3.0,
+        max_boost_db:   6.0,
+        target_phon:   80.0,
+    };
 
-    let mut engine = Sp314MasteringEngine::new(tuned_config, spec.sample_rate)
+    let engine_config = EngineConfig {
+        eq_config,
+        comp_config,
+        parallel_mix:     0.7,   // 70% wet compression
+        target_makeup_db: 0.0,   // let adaptive budget handle it
+        limiter_config:   sp314_dsp::limiter::LimiterConfig::default(),
+        restoration_config: sp314_dsp::restoration::RestorationConfig::bypass(),
+        harmonic_config:  None,
+        clipper_enabled:  false,
+    };
+
+    let mut engine = Sp314MasteringEngine::new(engine_config, spec.sample_rate)
         .expect("Engine init failed");
 
+    // --- Process ---
+    println!("\n=== Processing ===");
     let telemetry = engine.process_offline(&mut left, &mut right);
 
     println!("  Pre-pass peak:  {:.1} dBFS", telemetry.peak_db);
     println!("  Pre-pass RMS:   {:.1} dBFS", telemetry.rms_db);
-    println!("  Pre-pass LUFS:  {:.1} LUFS", telemetry.lufs);
+
+    let pad = if telemetry.peak_db > -3.0 { -12.0 }
+              else if telemetry.peak_db > -9.0 { -6.0 }
+              else { 0.0 };
+    println!("  Adaptive pad:   {:.1} dB ({})",
+             pad,
+             if pad == -12.0 { "hot track" }
+             else if pad == -6.0 { "normal track" }
+             else { "quiet track" });
 
     // --- Measure output ---
     let out_peak = left.iter().chain(right.iter())
-        .map(|s| libm::fabsf(*s))
+        .map(|s| s.abs())
         .fold(0.0_f32, f32::max);
     let out_rms_sq = (left.iter().map(|s| s*s).sum::<f32>() +
                       right.iter().map(|s| s*s).sum::<f32>())
                      / (2.0 * left.len() as f32);
-    let out_peak_db = if out_peak < 1e-9 { -144.0 } else { 20.0 * libm::log10f(out_peak) };
-    let out_rms_db  = if out_rms_sq < 1e-15 { -144.0 } else { 10.0 * libm::log10f(out_rms_sq) };
+    let out_peak_db = if out_peak < 1e-9 { -144.0 } else { 20.0 * out_peak.log10() };
+    let out_rms_db  = if out_rms_sq < 1e-15 { -144.0 } else { 10.0 * out_rms_sq.log10() };
 
     println!("\n=== Output Metrics ===");
-    println!("  Limiter ceiling: -0.5 dBFS");
-    println!("  Output peak post-limiter: {:.1} dBFS", out_peak_db);
-    let out_telemetry = sp314_dsp::pipeline::telemetry::analyze_offline_pre_pass(&left, &right);
-    println!("  Output LUFS:   {:.1} LUFS", out_telemetry.lufs);
+    println!("  Peak:  {:.1} dBFS", out_peak_db);
     println!("  RMS:   {:.1} dBFS", out_rms_db);
 
     // --- Write output WAV ---
@@ -98,29 +136,22 @@ fn main() {
     let mut writer = hound::WavWriter::create(output_path, out_spec)
         .expect("Failed to create output WAV");
 
-    let mut dither = TpdfDither::new(0x5EED_1234_ABCD_EF01);
+    // 24-bit safe conversion:
+    // max positive = 8388607 (2^23 - 1), max negative = -8388608 (2^23)
+    // Hard clip at 1.0 * 8388608 = 8388608 would panic in hound.
+    // Use asymmetric scaling + clamp to prevent out-of-range panic.
+    let max_pos = 8388607.0_f32;
+    let max_neg = 8388608.0_f32;
 
     for i in 0..left.len() {
-        let l = dither.process_sample(left[i],  left[i]  >= 0.0);
-        let r = dither.process_sample(right[i], right[i] >= 0.0);
-        writer.write_sample(l).unwrap();
-        writer.write_sample(r).unwrap();
+        let l_smp = if left[i]  >= 0.0 { left[i]  * max_pos } else { left[i]  * max_neg };
+        let r_smp = if right[i] >= 0.0 { right[i] * max_pos } else { right[i] * max_neg };
+        writer.write_sample(l_smp.clamp(-8388608.0, 8388607.0) as i32).unwrap();
+        writer.write_sample(r_smp.clamp(-8388608.0, 8388607.0) as i32).unwrap();
     }
     writer.finalize().expect("Failed to write WAV");
 
-    println!("  Dither: TPDF 24-bit (seed: 0x5EED_1234_ABCD_EF01)");
-
     println!("\n=== Output: {} ===", output_path);
     println!("  Format: 24-bit WAV, {} Hz", spec.sample_rate);
-    
-    // SHA-256 of output file — the Golden Hash
-    let file_bytes = std::fs::read(output_path).unwrap();
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(&file_bytes);
-    let result = hasher.finalize();
-    let hex_hash = hex::encode(result);
-    println!("Golden Hash (SHA-256): {}", hex_hash);
-    
     println!("\nDone.");
 }

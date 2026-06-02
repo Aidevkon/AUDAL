@@ -11,12 +11,8 @@ pub const AUTOTUNE_CHUNK_SAMPLES:  usize = 96_000; // 2 seconds @ 48kHz
 
 #[derive(Debug, Clone, Copy)]
 pub struct AutotuneResult {
-    pub makeup_db:      f32,
-    pub achieved_rms:   f32,
-    pub achieved_lufs:  f32,
-    pub clipping_ratio: f32,
-    pub iterations:     usize,
-    pub converged:      bool,
+    pub pre_gain_db: f32,
+    pub estimated_input_lufs: f32,
 }
 
 /// Scan the buffer with 1-second hop and return the index of the
@@ -65,98 +61,22 @@ pub fn measure_clipping_ratio_post_process(left: &[f32], right: &[f32]) -> f32 {
     over as f32 / total
 }
 
-/// Find optimal makeup_db for the given audio and target.
-/// Returns AutotuneResult with the safe makeup_db and convergence info.
-/// All math: libm only. Zero allocation in search loop.
+/// Compute pre-gain to hit target LUFS.
+/// Pure function — no IO, no file reading, no chunk estimation.
+/// Uses PreAnalysis integrated_lufs (full track, EBU R128 gated).
+/// Same input → same output always. INV-AB-1 preserved.
 pub fn autotune(
-    left:        &[f32],
-    right:       &[f32],
-    base_config: EngineConfig,    // preset config — parallel_mix etc locked
-    target:      MasteringTarget,
-    sample_rate: u32,
+    measured_lufs: f32,
+    target_lufs:   f32,
 ) -> AutotuneResult {
-    // Transparent preset → no tuning needed
-    let target_lufs = match target.target_lufs() {
-        None => return AutotuneResult {
-            makeup_db:      0.0,
-            achieved_rms:   0.0,
-            achieved_lufs:  -144.0,
-            clipping_ratio: 0.0,
-            iterations:     0,
-            converged:      true,
-        },
-        Some(t) => t,
+    let pre_gain_db = if measured_lufs.is_finite() && target_lufs.is_finite() {
+        (target_lufs - measured_lufs).clamp(-20.0, 20.0)
+    } else {
+        0.0  // safe fallback
     };
-
-    // Always use representative chunk — never process full file for autotune
-    let (chunk_l, chunk_r) = {
-        let start = find_highest_energy_chunk(left, right);
-        let end = (start + AUTOTUNE_CHUNK_SAMPLES).min(left.len());
-        (&left[start..end], &right[start..end])
-    };
-
-    let mut min_gain = AUTOTUNE_MIN_GAIN_DB;
-    let mut max_gain = AUTOTUNE_MAX_GAIN_DB;
-    let mut best_makeup  = 0.0_f32;
-    let mut best_rms     = -144.0_f32;
-    let mut best_lufs    = -144.0_f32;
-    let mut best_clip    = 0.0_f32;
-    let mut iterations   = 0usize;
-
-    for _ in 0..AUTOTUNE_MAX_ITERATIONS {
-        iterations += 1;
-        let mid = (min_gain + max_gain) / 2.0_f32;
-
-        // Clone chunk for processing (dev-time only — chunk is small, 96k samples)
-        let mut test_l = chunk_l.to_vec();
-        let mut test_r = chunk_r.to_vec();
-
-        // Run engine with this makeup
-        let mut config = base_config.clone();
-        config.target_makeup_db = mid;
-        let mut engine = match Sp314MasteringEngine::new(config, sample_rate) {
-            Ok(e)  => e,
-            Err(_) => break,
-        };
-        engine.process_offline(&mut test_l, &mut test_r);
-
-        let telemetry = analyze_offline_pre_pass(&test_l, &test_r);
-        let output_rms = telemetry.rms_db;
-        let mut output_lufs = telemetry.lufs;
-
-        if output_lufs < -69.0 {
-            output_lufs = telemetry.rms_db;
-        }
-
-        // Clipping ratio: measure on PROCESSED output (test_l, test_r)
-        // NOT on raw chunk — raw signal misses EQ boosts and compression.
-        // Engine hard-clips at ±1.0 — saturated samples detected via >= 0.9999.
-        let clip_ratio = measure_clipping_ratio_post_process(&test_l, &test_r);
-
-        if clip_ratio > AUTOTUNE_MAX_CLIP_RATIO {
-            // Too hot — pull back
-            max_gain = mid;
-        } else if output_lufs < target_lufs {
-            // Too quiet — push up, save as best candidate
-            min_gain    = mid;
-            best_makeup = mid;
-            best_rms    = output_rms;
-            best_lufs   = output_lufs;
-            best_clip   = clip_ratio;
-        } else {
-            // Too loud — pull back, do NOT save as best
-            max_gain = mid;
-        }
-
-        if max_gain - min_gain < AUTOTUNE_TOLERANCE_DB { break; }
-    }
-
+    
     AutotuneResult {
-        makeup_db:      best_makeup,
-        achieved_rms:   best_rms,
-        achieved_lufs:  best_lufs,
-        clipping_ratio: best_clip,
-        iterations,
-        converged:      (max_gain - min_gain) < AUTOTUNE_TOLERANCE_DB,
+        pre_gain_db,
+        estimated_input_lufs: measured_lufs,
     }
 }

@@ -14,6 +14,9 @@ STATUS=$(echo $RESULT | python3 -c "import sys,json; print(json.load(sys.stdin).
 if [ "$STATUS" = "ok" ]; then
     BLOB=$(echo $RESULT | python3 -c "import sys,json; print(json.load(sys.stdin).get('blob_id',''))" 2>/dev/null)
     echo "✅ SUCCESS — blob_id: $BLOB"
+    curl -s --max-time 60 -X POST http://127.0.0.1:7402/export \
+      -H "Content-Type: application/json" \
+      -d "{\"blob_id\":\"$BLOB\",\"format\":\"wav\",\"output_path\":\"/home/aidevcon/Music/test_mastered.wav\"}" > /dev/null
 else
     MSG=$(echo $RESULT | python3 -c "import sys,json; print(json.load(sys.stdin).get('message','unknown'))" 2>/dev/null)
     echo "❌ FAILED — $MSG"

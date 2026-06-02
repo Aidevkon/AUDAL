@@ -12,7 +12,6 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use crate::dsp::autotune::autotune_dsp;
 use uuid::Uuid;
 
 use crate::app_state::AppState;
@@ -305,49 +304,6 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     };
     let chunk_original = chunk.clone();
 
-    // M0-native autotune — uses exact production pipeline
-    // No more engine divergence (sp314-dsp vs DspAdapter)
-    let autotune_result = autotune_dsp(&chunk, &MasteringIntent {
-        target: LoudnessTarget {
-            target_lufs:      target_lufs.unwrap_or(-14.0),
-            max_true_peak_db: -1.0,
-            max_lra_lu:       None,
-            platform:         "default".into(),
-        },
-        preset_name:      preset_id.to_string(),
-        stem_mode:        false,
-        target_makeup_db: 0.0,
-    });
-    tracing::info!(
-        "Autotune (native): input_gain_db={:.2} lufs={:.2} iter={} ok={}",
-        autotune_result.input_gain_db,
-        autotune_result.achieved_lufs,
-        autotune_result.iterations,
-        autotune_result.converged,
-    );
-
-    // Apply autotune input gain to audio
-    let gain_linear = 10.0_f32
-        .powf(autotune_result.input_gain_db / 20.0_f32);
-    for s in chunk.left.iter_mut()  { *s *= gain_linear; }
-    for s in chunk.right.iter_mut() { *s *= gain_linear; }
-
-    // MasteringIntent — all three fields verified:
-    //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
-    //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
-    //   export_16bit: false (24-bit dither, lossless output)
-    let intent = MasteringIntent {
-        target: LoudnessTarget {
-            target_lufs:      target_lufs.unwrap_or(-14.0),
-            max_true_peak_db: -1.0,
-            max_lra_lu:       None,
-            platform:         "default".into(),
-        },
-        preset_name:      preset_id.to_string(),
-        stem_mode:        false,
-        target_makeup_db: 0.0,  // input gain applied above
-    };
-
     // A1: Full stem separation (NMF v2 — representative sample approach)
     use sp314_dsp::stft::stem_renderer::FourStemRenderer;
     use sp314_dsp::analysis::StemFeatureAnalyzer;
@@ -386,6 +342,40 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         pre_analysis.zone_flags.zone_phase_issue,
         pre_analysis.zone_flags.zone_harsh_resonance,
     );
+
+    // Before: autotune reads chunk from file (inaccurate)
+    // After:  autotune uses PreAnalysis full-track LUFS (accurate)
+    let autotune_result = sp314_dsp::pipeline::autotune::autotune(
+        pre_analysis.integrated_lufs,
+        target_lufs.unwrap_or(-14.0),
+    );
+    tracing::info!(
+        "Autotune (pure math): pre_gain_db={:.2} est_lufs={:.2}",
+        autotune_result.pre_gain_db,
+        autotune_result.estimated_input_lufs,
+    );
+
+    // Apply autotune input gain to audio
+    let gain_linear = 10.0_f32
+        .powf(autotune_result.pre_gain_db / 20.0_f32);
+    for s in chunk.left.iter_mut()  { *s *= gain_linear; }
+    for s in chunk.right.iter_mut() { *s *= gain_linear; }
+
+    // MasteringIntent — all three fields verified:
+    //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
+    //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
+    //   export_16bit: false (24-bit dither, lossless output)
+    let intent = MasteringIntent {
+        target: LoudnessTarget {
+            target_lufs:      target_lufs.unwrap_or(-14.0),
+            max_true_peak_db: -1.0,
+            max_lra_lu:       None,
+            platform:         "default".into(),
+        },
+        preset_name:      preset_id.to_string(),
+        stem_mode:        false,
+        target_makeup_db: 0.0,  // input gain applied above
+    };
 
     // A2: Pre-DSP Aether processing
     let mapped_persona = map_flavour_to_persona(

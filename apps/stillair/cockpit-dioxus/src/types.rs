@@ -206,6 +206,12 @@ pub struct PlaybackStateJson {
     pub is_playing:  bool,
     pub sample_rate: u32,
     pub channels:    u16,
+    #[serde(default = "default_active_ab")]
+    pub active_ab:   String,
+}
+
+fn default_active_ab() -> String {
+    "B".to_string()
 }
 
 // ── LiveTelemetryJson — live momentary LUFS during playback ───────────────────

@@ -15,6 +15,23 @@ pub struct PlaybackStateJson {
     pub is_playing:  bool,
     pub sample_rate: u32,
     pub channels:    u16,
+    #[serde(alias = "ab_target", deserialize_with = "deserialize_active_ab", default = "default_active_ab")]
+    pub active_ab:   String,
+}
+
+fn default_active_ab() -> String {
+    "B".to_string()
+}
+
+fn deserialize_active_ab<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = serde::Deserialize::deserialize(deserializer).unwrap_or(None);
+    Ok(match s.as_deref() {
+        Some("a") | Some("A") => "A".to_string(),
+        _ => "B".to_string(),
+    })
 }
 
 /// Live telemetry — momentary LUFS + short-term during playback (P12B-005).

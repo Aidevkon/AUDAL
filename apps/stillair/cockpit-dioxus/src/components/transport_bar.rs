@@ -81,7 +81,6 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
     let mut current_state = use_signal(|| TransportState::Stopped);
     let mut abort_state   = use_signal(|| AbortState::IdleClosed);
-    let mut ab_state      = use_signal(|| AbToggleState::A);
     let mut ab_press_time = use_signal(|| 0u64);
 
     // ── P12B-004: Position polling — 500ms when in CoachReady ────────────────
@@ -120,6 +119,11 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     let position_ms = playback_state.read().as_ref().map(|s| s.position_ms).unwrap_or(0);
     let duration_ms = playback_state.read().as_ref().map(|s| s.duration_ms).unwrap_or(0);
     let scrub_len   = scrub_pct(position_ms, duration_ms);
+
+    let ab_state_derived = playback_state.read().as_ref().map(|s| match s.active_ab.as_str() {
+        "A" => AbToggleState::A,
+        _   => AbToggleState::B,
+    }).unwrap_or(AbToggleState::B);
 
     // Define labels outside rsx! to prevent editor syntax highlighter errors with '<' and '>'
     let lbl_skip_back = "<<".to_string();
@@ -342,7 +346,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                             div { class: "transport-top-label", "A/B" }
                                             div { class: "ab-toggle-seat",
                                                 AbToggle {
-                                                    state: (*ab_state.read()).clone(),
+                                                    state: ab_state_derived.clone(),
                                                     on_mousedown: move |_| {
                                                         let now = js_sys::Date::now() as u64;
                                                         ab_press_time.set(now);
@@ -352,11 +356,14 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                             - *ab_press_time.read();
                                                         if press_duration >= 300 {
                                                             // long press — return to A
-                                                            ab_state.set(AbToggleState::A);
+                                                            let ps = playback_state.clone();
+                                                            spawn_local(async move {
+                                                                invoke_playback("ab_a", None, ps).await;
+                                                            });
                                                         }
                                                     },
                                                     on_click: move |_| {
-                                                        let next = match *ab_state.read() {
+                                                        let next = match ab_state_derived {
                                                             AbToggleState::A       => AbToggleState::B,
                                                             AbToggleState::B       => AbToggleState::A,
                                                             AbToggleState::Toggled => AbToggleState::A,
@@ -366,7 +373,6 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                             AbToggleState::A | AbToggleState::Toggled => "ab_a",
                                                             AbToggleState::B => "ab_b",
                                                         };
-                                                        ab_state.set(next);
                                                         let ps = playback_state.clone();
                                                         spawn_local(async move {
                                                             invoke_playback(action, None, ps).await;
