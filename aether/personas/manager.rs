@@ -57,25 +57,15 @@ impl PersonaManager {
             d.clamp(-PERSONA_OVERRIDE_DELTA_MAX, PERSONA_OVERRIDE_DELTA_MAX);
 
         MacroControls {
-            warmth: clamp(
-                macros.warmth + delta_clamp(override_.warmth_delta),
-                persona.macros.warmth.min,
-                persona.macros.warmth.max,
+            tone: clamp(
+                macros.tone + delta_clamp(override_.tone_delta),
+                persona.macros.tone.min,
+                persona.macros.tone.max,
             ),
-            punch: clamp(
-                macros.punch + delta_clamp(override_.punch_delta),
-                persona.macros.punch.min,
-                persona.macros.punch.max,
-            ),
-            forwardness: clamp(
-                macros.forwardness + delta_clamp(override_.forwardness_delta),
-                persona.macros.forwardness.min,
-                persona.macros.forwardness.max,
-            ),
-            smoothness: clamp(
-                macros.smoothness + delta_clamp(override_.smoothness_delta),
-                persona.macros.smoothness.min,
-                persona.macros.smoothness.max,
+            dynamics: clamp(
+                macros.dynamics + delta_clamp(override_.dynamics_delta),
+                persona.macros.dynamics.min,
+                persona.macros.dynamics.max,
             ),
         }
     }
@@ -111,12 +101,11 @@ mod tests {
         let persona = mgr.get("warm_analog").unwrap();
         let macros  = MacroControls::default_for(persona);
         let ov      = PersonaOverride {
-            warmth_delta: 99.0, punch_delta: -99.0,
-            forwardness_delta: 0.0, smoothness_delta: 0.0,
+            tone_delta: 99.0, dynamics_delta: -99.0,
         };
         let result = PersonaManager::apply_override(persona, &macros, &ov);
-        assert!(result.warmth      <= persona.macros.warmth.max);
-        assert!(result.punch       >= persona.macros.punch.min);
+        assert!(result.tone      <= persona.macros.tone.max);
+        assert!(result.dynamics       >= persona.macros.dynamics.min);
     }
 
     #[test]

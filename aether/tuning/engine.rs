@@ -48,31 +48,20 @@ impl AteEngine {
     pub fn deviation_to_override(dev: &DeviationVector)
         -> PersonaOverride
     {
-        // Warmth: tilt (brightness) + body (low-mid)
-        let warmth_delta = (
+        // Tone: tilt (brightness) + body (low-mid)
+        let tone_delta = (
             dev.delta_tilt_db * ATE_TILT_TO_WARMTH
           + dev.delta_body_db * ATE_BODY_TO_WARMTH
         ).clamp(-PERSONA_OVERRIDE_DELTA_MAX, PERSONA_OVERRIDE_DELTA_MAX);
 
-        // Punch: transients
-        let punch_delta = (
+        // Dynamics: transients
+        let dynamics_delta = (
             dev.delta_transients * ATE_TRANS_TO_PUNCH
         ).clamp(-PERSONA_OVERRIDE_DELTA_MAX, PERSONA_OVERRIDE_DELTA_MAX);
 
-        // Forwardness: loudness + tilt
-        let forwardness_delta = (
-            dev.delta_loudness_lufs * ATE_LOUD_TO_FORWARDNESS
-          + dev.delta_tilt_db      * ATE_TILT_TO_FORWARDNESS
-        ).clamp(-PERSONA_OVERRIDE_DELTA_MAX, PERSONA_OVERRIDE_DELTA_MAX);
-
-        // Smoothness: not mapped in v1.0
-        let smoothness_delta = 0.0_f32;
-
         PersonaOverride {
-            warmth_delta,
-            punch_delta,
-            forwardness_delta,
-            smoothness_delta,
+            tone_delta,
+            dynamics_delta,
         }
     }
 
@@ -151,13 +140,10 @@ mod tests {
             converged:false,
         };
         let ov = AteEngine::deviation_to_override(&dev);
-        assert!(ov.warmth_delta.abs()
+        assert!(ov.tone_delta.abs()
             <= PERSONA_OVERRIDE_DELTA_MAX + 1e-5);
-        assert!(ov.punch_delta.abs()
+        assert!(ov.dynamics_delta.abs()
             <= PERSONA_OVERRIDE_DELTA_MAX + 1e-5);
-        assert!(ov.forwardness_delta.abs()
-            <= PERSONA_OVERRIDE_DELTA_MAX + 1e-5);
-        assert_eq!(ov.smoothness_delta, 0.0);
     }
 
     #[test]
@@ -166,8 +152,8 @@ mod tests {
         let o = test_features_darker();
         let r1 = AteEngine::tune(&r, &o);
         let r2 = AteEngine::tune(&r, &o);
-        assert_eq!(r1.persona_override.warmth_delta,
-                   r2.persona_override.warmth_delta);
+        assert_eq!(r1.persona_override.tone_delta,
+                   r2.persona_override.tone_delta);
     }
 
     #[test]
@@ -177,28 +163,19 @@ mod tests {
     }
 
     #[test]
-    fn ate_warmth_positive_when_output_dark() {
-        // ref brighter than output → warmth_delta > 0
+    fn ate_tone_positive_when_output_dark() {
+        // ref brighter than output → tone_delta > 0
         let reference = test_features_brighter();
         let output    = test_features_darker();
         let dev = AteEngine::compute_deviation(&reference, &output);
         assert!(dev.delta_tilt_db > 0.0,
             "ref brighter → positive tilt");
         let ov = AteEngine::deviation_to_override(&dev);
-        assert!(ov.warmth_delta > 0.0,
-            "positive tilt → positive warmth_delta");
+        assert!(ov.tone_delta > 0.0,
+            "positive tilt → positive tone_delta");
     }
 
-    #[test]
-    fn ate_smoothness_always_zero_v1() {
-        let dev = DeviationVector {
-            delta_tilt_db:1.0, delta_body_db:1.0,
-            delta_transients:1.0, delta_loudness_lufs:1.0,
-            converged:false,
-        };
-        assert_eq!(AteEngine::deviation_to_override(&dev)
-                   .smoothness_delta, 0.0);
-    }
+
 
     #[test]
     fn ate_result_serializable() {

@@ -148,10 +148,8 @@ pub async fn trigger_mastering(
     audio_path: String,
     preset_id:  String,
     flavour_id: String,
-    intent_warmth: f32,
-    intent_punch: f32,
-    intent_space: f32,
-    intent_loudness: f32,
+    intent_tone: f32,
+    intent_dynamics: f32,
     client: tauri::State<'_, M0Client>,
 ) -> Result<String, String> {
     eprintln!("[trigger_mastering] START path={audio_path} preset={preset_id}");
@@ -164,7 +162,7 @@ pub async fn trigger_mastering(
     let resp = client
         .trigger_mastering(MasterRequest { 
             audio_path, preset_id, flavour_id, 
-            intent_warmth, intent_punch, intent_space, intent_loudness 
+            intent_tone, intent_dynamics 
         })
         .await
         .map_err(|e| e.to_string())?;

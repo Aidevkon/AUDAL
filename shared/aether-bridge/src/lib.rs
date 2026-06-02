@@ -21,10 +21,8 @@ use lineos_types::pre_analysis::PreAnalysisData;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AetherRequest {
     pub persona_id:  Option<String>,
-    pub warmth:      Option<f32>,
-    pub punch:       Option<f32>,
-    pub forwardness: Option<f32>,
-    pub smoothness:  Option<f32>,
+    pub tone:        Option<f32>,
+    pub dynamics:    Option<f32>,
     pub chaos_seed:  Option<u64>,
     pub project_id:  Option<String>,
     pub track_id:    Option<String>,
@@ -35,10 +33,8 @@ impl Default for AetherRequest {
     fn default() -> Self {
         Self {
             persona_id:  None,
-            warmth:      None,
-            punch:       None,
-            forwardness: None,
-            smoothness:  None,
+            tone:        None,
+            dynamics:    None,
             chaos_seed:  None,
             project_id:  None,
             track_id:    None,
@@ -83,14 +79,10 @@ pub fn build_dsp_config(
     ))?.clone();
 
     let macros = MacroControls {
-        warmth:      req.warmth.unwrap_or(
-                         persona.macros.warmth.default),
-        punch:       req.punch.unwrap_or(
-                         persona.macros.punch.default),
-        forwardness: req.forwardness.unwrap_or(
-                         persona.macros.forwardness.default),
-        smoothness:  req.smoothness.unwrap_or(
-                         persona.macros.smoothness.default),
+        tone:        req.tone.unwrap_or(
+                         persona.macros.tone.default),
+        dynamics:    req.dynamics.unwrap_or(
+                         persona.macros.dynamics.default),
     };
 
     let micro = MacroMicroMapper::map(&persona, &macros);

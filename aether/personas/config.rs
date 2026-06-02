@@ -59,10 +59,8 @@ pub struct ChaosProfile {
 /// Macro handle grouping for a persona.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MacroHandles {
-    pub warmth:      MacroHandleConfig,
-    pub punch:       MacroHandleConfig,
-    pub forwardness: MacroHandleConfig,
-    pub smoothness:  MacroHandleConfig,
+    pub tone:        MacroHandleConfig,
+    pub dynamics:    MacroHandleConfig,
 }
 
 /// Full persona configuration (parsed from TOML).
@@ -83,26 +81,22 @@ pub struct PersonaConfig {
 /// Clamped to each handle's min/max before use.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MacroControls {
-    pub warmth:      f32,
-    pub forwardness: f32,
-    pub punch:       f32,
-    pub smoothness:  f32,
+    pub tone:        f32,
+    pub dynamics:    f32,
 }
 
 impl MacroControls {
     pub fn default_for(persona: &PersonaConfig) -> Self {
         Self {
-            warmth:      persona.macros.warmth.default,
-            punch:       persona.macros.punch.default,
-            forwardness: persona.macros.forwardness.default,
-            smoothness:  persona.macros.smoothness.default,
+            tone:        persona.macros.tone.default,
+            dynamics:    persona.macros.dynamics.default,
         }
     }
 }
 
 impl Default for MacroControls {
     fn default() -> Self {
-        Self { warmth:0.5, punch:0.5, forwardness:0.5, smoothness:0.5 }
+        Self { tone:0.5, dynamics:0.5 }
     }
 }
 
@@ -110,15 +104,12 @@ impl Default for MacroControls {
 /// Applied on top of PersonaConfig — original TOML never modified.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PersonaOverride {
-    pub warmth_delta:      f32,
-    pub punch_delta:       f32,
-    pub forwardness_delta: f32,
-    pub smoothness_delta:  f32,
+    pub tone_delta:        f32,
+    pub dynamics_delta:    f32,
 }
 
 impl Default for PersonaOverride {
     fn default() -> Self {
-        Self { warmth_delta:0.0, punch_delta:0.0,
-               forwardness_delta:0.0, smoothness_delta:0.0 }
+        Self { tone_delta:0.0, dynamics_delta:0.0 }
     }
 }

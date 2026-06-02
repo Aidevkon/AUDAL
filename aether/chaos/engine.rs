@@ -167,7 +167,7 @@ mod tests {
     fn test_base_delta_maxed() -> MicroDelta {
         let p = PersonaManager::load().default_persona().clone();
         let m = crate::personas::config::MacroControls {
-            warmth:1.0, punch:1.0, forwardness:1.0, smoothness:1.0
+            tone:1.0, dynamics:1.0
         };
         MacroMicroMapper::map(&p, &m)
     }

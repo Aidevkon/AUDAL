@@ -36,10 +36,8 @@ impl IntegrationFirewall {
 
         // Step 2: Validate macro controls [0.0, 1.0]
         for (field, val) in [
-            ("warmth",      macros.warmth),
-            ("punch",       macros.punch),
-            ("forwardness", macros.forwardness),
-            ("smoothness",  macros.smoothness),
+            ("tone",      macros.tone),
+            ("dynamics",       macros.dynamics),
         ] {
             if !(0.0_f32..=1.0_f32).contains(&val) {
                 return Err(FirewallError::MacroOutOfRange {
@@ -249,8 +247,7 @@ mod tests {
     #[test]
     fn firewall_constitutional_bounds_respected() {
         let persona = default_persona();
-        let macros  = MacroControls { warmth:1.0, punch:1.0,
-                                       forwardness:1.0, smoothness:1.0 };
+        let macros  = MacroControls { tone:1.0, dynamics:1.0 };
         let mut log = ProofLog::new();
         let cfg = IntegrationFirewall::build(
             &persona, &macros,
@@ -283,8 +280,7 @@ mod tests {
     #[test]
     fn firewall_invalid_macro_fatal() {
         let persona = default_persona();
-        let macros  = MacroControls { warmth:2.0, punch:0.5,
-                                       forwardness:0.5, smoothness:0.5 };
+        let macros  = MacroControls { tone:2.0, dynamics:0.5 };
         let mut log = ProofLog::new();
         let result  = IntegrationFirewall::build(
             &persona, &macros,

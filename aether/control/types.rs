@@ -22,28 +22,22 @@ impl BlackBoxControl {
         match self.mode {
             BlackBoxMode::Clean =>
                 ("hybrid_hifi", MacroControls {
-                    warmth:0.3, punch:0.5,
-                    forwardness:0.5, smoothness:0.7 }),
+                    tone:0.3, dynamics:0.5 }),
             BlackBoxMode::Warm =>
                 ("warm_analog", MacroControls {
-                    warmth:0.8, punch:0.4,
-                    forwardness:0.4, smoothness:0.6 }),
+                    tone:0.8, dynamics:0.4 }),
             BlackBoxMode::Punch =>
                 ("clean_punch", MacroControls {
-                    warmth:0.3, punch:0.9,
-                    forwardness:0.7, smoothness:0.3 }),
+                    tone:0.3, dynamics:0.9 }),
             BlackBoxMode::Air =>
                 ("hybrid_hifi", MacroControls {
-                    warmth:0.4, punch:0.4,
-                    forwardness:0.8, smoothness:0.6 }),
+                    tone:0.4, dynamics:0.4 }),
             BlackBoxMode::Film =>
                 ("cinematic_wide", MacroControls {
-                    warmth:0.7, punch:0.5,
-                    forwardness:0.4, smoothness:0.7 }),
+                    tone:0.7, dynamics:0.5 }),
             BlackBoxMode::Broadcast =>
                 ("hybrid_hifi", MacroControls {
-                    warmth:0.5, punch:0.5,
-                    forwardness:0.5, smoothness:0.6 }),
+                    tone:0.5, dynamics:0.5 }),
         }
     }
 }
@@ -66,10 +60,7 @@ impl OrbPosition {
     /// x → smoothness_delta (right = wider/smoother, UI concept)
     /// y → forwardness_delta (up = more forward/dry)
     pub fn to_macro_delta(&self) -> MacroDelta {
-        MacroDelta {
-            forwardness_delta: -self.y * 0.3,
-            smoothness_delta:   self.x * 0.2,
-        }
+        MacroDelta {}
     }
 }
 
@@ -77,10 +68,7 @@ impl OrbPosition {
 /// Applied by adding to current values then clamping to
 /// persona's handle bounds before passing to S-004.
 #[derive(Debug, Clone, PartialEq)]
-pub struct MacroDelta {
-    pub forwardness_delta: f32,  // [-0.3, +0.3]
-    pub smoothness_delta:  f32,  // [-0.2, +0.2]
-}
+pub struct MacroDelta {}
 
 impl MacroDelta {
     /// Apply delta to MacroControls.
@@ -88,14 +76,8 @@ impl MacroDelta {
     pub fn apply(&self, macros: &MacroControls,
                   persona: &PersonaConfig) -> MacroControls {
         MacroControls {
-            warmth:      macros.warmth,
-            punch:       macros.punch,
-            forwardness: (macros.forwardness + self.forwardness_delta)
-                .clamp(persona.macros.forwardness.min,
-                       persona.macros.forwardness.max),
-            smoothness:  (macros.smoothness + self.smoothness_delta)
-                .clamp(persona.macros.smoothness.min,
-                       persona.macros.smoothness.max),
+            tone:      macros.tone,
+            dynamics:       macros.dynamics,
         }
     }
 }
@@ -145,7 +127,7 @@ mod tests {
         let (id2, m2) = BlackBoxControl{mode:BlackBoxMode::Warm}
             .to_intent();
         assert_eq!(id1, id2);
-        assert_eq!(m1.warmth, m2.warmth);
+        assert_eq!(m1.tone, m2.tone);
     }
 
     #[test]
@@ -157,15 +139,13 @@ mod tests {
             let (id, macros) = BlackBoxControl{mode}.to_intent();
             assert!(mgr.get(id).is_some(),
                 "unknown persona: {}", id);
-            assert!((0.0..=1.0).contains(&macros.warmth));
+            assert!((0.0..=1.0).contains(&macros.tone));
         }
     }
 
     #[test]
     fn orb_center_zero_delta() {
         let d = OrbPosition::center().to_macro_delta();
-        assert_eq!(d.forwardness_delta, 0.0);
-        assert_eq!(d.smoothness_delta,  0.0);
     }
 
     #[test]
@@ -173,13 +153,8 @@ mod tests {
         let mgr     = PersonaManager::load();
         let persona = mgr.get("clean_punch").unwrap();
         let macros  = MacroControls::default();
-        let delta   = MacroDelta {
-            forwardness_delta: 99.0,
-            smoothness_delta:  99.0,
-        };
+        let delta   = MacroDelta {};
         let result = delta.apply(&macros, persona);
-        assert!(result.forwardness <= persona.macros.forwardness.max);
-        assert!(result.smoothness  <= persona.macros.smoothness.max);
     }
 
     #[test]

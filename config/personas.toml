@@ -8,29 +8,17 @@ display_name    = "Warm Analog"
 description     = "Tape-like warmth with harmonic bloom and low-mid body"
 chaos_intensity = 0.6
 
-[personas.macros.warmth]
+[personas.macros.tone]
 default = 0.7
 min     = 0.0
 max     = 1.0
 curve   = "Log"
 
-[personas.macros.punch]
+[personas.macros.dynamics]
 default = 0.4
 min     = 0.0
 max     = 1.0
 curve   = "Linear"
-
-[personas.macros.forwardness]
-default = 0.4
-min     = 0.0
-max     = 1.0
-curve   = "Linear"
-
-[personas.macros.smoothness]
-default = 0.6
-min     = 0.0
-max     = 1.0
-curve   = "Exp"
 
 [personas.dsp_base]
 low_shelf_gain_db   = 1.5
@@ -66,29 +54,17 @@ display_name    = "Clean Punch"
 description     = "Transient emphasis with tight dynamics and minimal colour"
 chaos_intensity = 0.4
 
-[personas.macros.warmth]
+[personas.macros.tone]
 default = 0.3
 min     = 0.0
 max     = 1.0
 curve   = "Linear"
 
-[personas.macros.punch]
+[personas.macros.dynamics]
 default = 0.8
 min     = 0.0
 max     = 1.0
 curve   = "Log"
-
-[personas.macros.forwardness]
-default = 0.6
-min     = 0.0
-max     = 1.0
-curve   = "Linear"
-
-[personas.macros.smoothness]
-default = 0.3
-min     = 0.0
-max     = 1.0
-curve   = "Linear"
 
 [personas.dsp_base]
 low_shelf_gain_db   = 0.0
@@ -124,26 +100,14 @@ display_name    = "Hybrid HiFi"
 description     = "Wide stereo image with air shimmer and clean transients"
 chaos_intensity = 0.5
 
-[personas.macros.warmth]
+[personas.macros.tone]
 default = 0.4
 min     = 0.0
 max     = 1.0
 curve   = "Linear"
 
-[personas.macros.punch]
+[personas.macros.dynamics]
 default = 0.5
-min     = 0.0
-max     = 1.0
-curve   = "Linear"
-
-[personas.macros.forwardness]
-default = 0.6
-min     = 0.0
-max     = 1.0
-curve   = "Log"
-
-[personas.macros.smoothness]
-default = 0.6
 min     = 0.0
 max     = 1.0
 curve   = "Linear"
@@ -182,29 +146,17 @@ display_name    = "Cinematic Wide"
 description     = "Deep spatial imaging with dramatic dynamics for film and scoring"
 chaos_intensity = 0.7
 
-[personas.macros.warmth]
+[personas.macros.tone]
 default = 0.6
 min     = 0.0
 max     = 1.0
 curve   = "Log"
 
-[personas.macros.punch]
+[personas.macros.dynamics]
 default = 0.5
 min     = 0.0
 max     = 1.0
 curve   = "Linear"
-
-[personas.macros.forwardness]
-default = 0.4
-min     = 0.0
-max     = 1.0
-curve   = "Linear"
-
-[personas.macros.smoothness]
-default = 0.7
-min     = 0.0
-max     = 1.0
-curve   = "Exp"
 
 [personas.dsp_base]
 low_shelf_gain_db   = 2.0
