@@ -222,7 +222,10 @@ mod tests {
             aether_persona: None,
             aether_config: None,
             zone_flags: Some(ZoneFlagsJson::default()),
-            verification: Some(VerificationResultJson::default()),
+            verification: Some(VerificationResultJson {
+                passed: true,
+                ..VerificationResultJson::default()
+            }),
             jini: None,
             dsp_chain: None,
         }
