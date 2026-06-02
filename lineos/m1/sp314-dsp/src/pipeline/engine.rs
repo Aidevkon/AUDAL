@@ -24,6 +24,13 @@ pub struct EngineConfig {
 
 /// The core deterministic mastering engine.
 /// Manages the full signal chain: Restoration -> EQ -> Harmonics -> Compressor -> Limiter.
+#[deprecated(
+    since = "3.0.0",
+    note = "Use DspAdapter::master() via m0-daemon. \
+            This monolith is Phase 6 legacy — \
+            contains hardcoded +6dB gain violation. \
+            See lineos/m0/m0-daemon/src/dsp/mod.rs"
+)]
 pub struct Sp314MasteringEngine {
     pub eq:      MaskingAwareEQ,
     pub comp:    CompressorV3,

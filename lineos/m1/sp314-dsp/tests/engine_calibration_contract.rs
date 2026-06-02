@@ -137,13 +137,15 @@ fn test_autotuner_converges_for_all_presets() {
     for preset in active_presets.iter() {
         let config = preset.engine_config(48000);
         
-        let result = autotune(&sine, &sine, config, *preset, 48000);
+        // In Phase 8, autotune is just pure math. We know input is -18.0 LUFS.
+        let target_lufs = match preset {
+            MasteringTarget::PodcastVoice => -16.0,
+            _ => -14.0,
+        };
+        let result = autotune(-18.0, target_lufs);
         
-        assert!(result.converged,
-            "Autotuner did not converge for {:?}", preset);
-            
-        assert!(result.clipping_ratio <= AUTOTUNE_MAX_CLIP_RATIO,
-            "Autotuner exceeded clipping limit for {:?}", preset);
+        // Ensure it calculated a reasonable gain
+        assert!(result.pre_gain_db > 0.0);
     }
 }
 
@@ -154,10 +156,10 @@ fn test_full_pipeline_is_deterministic() {
     
     // Run 1
     let config1 = target.engine_config(48000);
-    let tune1 = autotune(&sine, &sine, config1.clone(), target, 48000);
+    let tune1 = autotune(-18.0, -14.0);
     
     let mut config_final_1 = config1.clone();
-    config_final_1.target_makeup_db = tune1.makeup_db;
+    config_final_1.target_makeup_db = tune1.pre_gain_db;
     let mut engine1 = Sp314MasteringEngine::new(config_final_1, 48000).unwrap();
     let mut left1 = sine.clone();
     let mut right1 = sine.clone();
@@ -165,10 +167,10 @@ fn test_full_pipeline_is_deterministic() {
     
     // Run 2
     let config2 = target.engine_config(48000);
-    let tune2 = autotune(&sine, &sine, config2.clone(), target, 48000);
+    let tune2 = autotune(-18.0, -14.0);
     
     let mut config_final_2 = config2.clone();
-    config_final_2.target_makeup_db = tune2.makeup_db;
+    config_final_2.target_makeup_db = tune2.pre_gain_db;
     let mut engine2 = Sp314MasteringEngine::new(config_final_2, 48000).unwrap();
     let mut left2 = sine.clone();
     let mut right2 = sine.clone();
@@ -197,14 +199,14 @@ fn test_podcast_voice_ebu_r128_compliance() {
     // Autotune to converge makeup gain for PodcastVoice target (-16 LUFS)
     let preset = MasteringTarget::PodcastVoice;
     let config = preset.engine_config(sample_rate);
-    let tune   = autotune(&sine, &sine, config.clone(), preset, sample_rate);
-
-    assert!(tune.converged,
-        "Autotuner must converge for PodcastVoice");
+    
+    use sp314_dsp::analysis::PreAnalyzer;
+    let pre_analysis = PreAnalyzer::run(&sine, &sine, sample_rate);
+    let tune   = autotune(pre_analysis.integrated_lufs, -16.0);
 
     // Build engine with converged makeup and process
     let mut final_config = config;
-    final_config.target_makeup_db = tune.makeup_db;
+    final_config.target_makeup_db = tune.pre_gain_db;
     let mut engine = Sp314MasteringEngine::new(final_config, sample_rate).unwrap();
 
     let mut left  = sine.clone();

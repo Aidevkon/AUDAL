@@ -1,92 +1,37 @@
 use sp314_dsp::pipeline::autotune::*;
-use sp314_dsp::pipeline::presets::MasteringTarget;
 
 #[test]
 fn autotuner_transparent_returns_zero_immediately() {
-    let target = MasteringTarget::Transparent;
-    let config = target.engine_config(48000);
-    
-    let left = vec![0.0; 48000];
-    let right = vec![0.0; 48000];
-    
-    let result = autotune(&left, &right, config, target, 48000);
-    assert_eq!(result.makeup_db, 0.0);
-    assert_eq!(result.iterations, 0);
+    let result = autotune(-14.0, -14.0);
+    assert_eq!(result.pre_gain_db, 0.0);
+    assert_eq!(result.estimated_input_lufs, -14.0);
 }
 
 #[test]
-fn autotuner_converges_to_target_lufs() {
-    let target = MasteringTarget::SpotifyV3;
-    let config = target.engine_config(48000);
-    
-    // Generate 1kHz sine at -18.0 dBFS RMS
-    let target_rms_db = -18.0_f32;
-    let target_rms_linear = 10.0_f32.powf(target_rms_db / 10.0).sqrt(); // Actually 10^(dB/20)
-    let target_peak = target_rms_linear * std::f32::consts::SQRT_2;
-
-    let len = 96000;
-    let mut left = vec![0.0; len];
-    let mut right = vec![0.0; len];
-    for i in 0..len {
-        let t = i as f32 / 48000.0;
-        let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * target_peak;
-        left[i] = s;
-        right[i] = s;
-    }
-
-    let result = autotune(&left, &right, config, target, 48000);
-    
-    // Target is -14.0 LUFS
-    assert!((result.achieved_lufs - (-14.0)).abs() < 0.1);
-    assert!(result.converged);
-    assert!(result.iterations <= 10);
+fn autotuner_calculates_gain_correctly() {
+    // Target is -14.0 LUFS, measured is -18.0 LUFS -> needs +4dB
+    let result = autotune(-18.0, -14.0);
+    assert_eq!(result.pre_gain_db, 4.0);
 }
 
 #[test]
-fn autotuner_respects_clipping_limit() {
-    let target = MasteringTarget::AggressiveEDM;
-    let config = target.engine_config(48000);
+fn autotuner_respects_clamping_limit() {
+    // Target is -14.0 LUFS, measured is 20.0 LUFS -> needs -34dB, clamps to -20dB
+    let result = autotune(20.0, -14.0);
+    assert_eq!(result.pre_gain_db, -20.0);
     
-    // Very hot signal: square wave at -0.5 dBFS peak
-    let len = 96000;
-    let mut left = vec![0.0; len];
-    let mut right = vec![0.0; len];
-    let peak = 10.0_f32.powf(-0.5 / 20.0);
-    for i in 0..len {
-        let t = i as f32 / 48000.0;
-        let s = if (2.0 * std::f32::consts::PI * 100.0 * t).sin() >= 0.0 { peak } else { -peak };
-        left[i] = s;
-        right[i] = s;
-    }
-
-    let result = autotune(&left, &right, config, target, 48000);
-    
-    // Should hit clipping ratio limit and back off
-    assert!(result.clipping_ratio <= AUTOTUNE_MAX_CLIP_RATIO);
-    // Might not converge due to clipping, but that's safe
+    // Target is -14.0 LUFS, measured is -40.0 LUFS -> needs +26dB, clamps to +20dB
+    let result = autotune(-40.0, -14.0);
+    assert_eq!(result.pre_gain_db, 20.0);
 }
 
 #[test]
 fn autotuner_is_fully_deterministic() {
-    let target = MasteringTarget::SpotifyV3;
-    let config = target.engine_config(48000);
+    let result1 = autotune(-15.0, -14.0);
+    let result2 = autotune(-15.0, -14.0);
     
-    let len = 96000;
-    let mut left = vec![0.0; len];
-    let mut right = vec![0.0; len];
-    for i in 0..len {
-        left[i] = (i as f32).sin() * 0.5;
-        right[i] = ((i + 1) as f32).cos() * 0.5;
-    }
-
-    let result1 = autotune(&left, &right, config.clone(), target, 48000);
-    let result2 = autotune(&left, &right, config.clone(), target, 48000);
-    
-    assert_eq!(result1.makeup_db, result2.makeup_db);
-    assert_eq!(result1.iterations, result2.iterations);
-    assert_eq!(result1.achieved_lufs, result2.achieved_lufs);
-    assert_eq!(result1.clipping_ratio, result2.clipping_ratio);
-    assert_eq!(result1.converged, result2.converged);
+    assert_eq!(result1.pre_gain_db, result2.pre_gain_db);
+    assert_eq!(result1.estimated_input_lufs, result2.estimated_input_lufs);
 }
 
 #[test]
