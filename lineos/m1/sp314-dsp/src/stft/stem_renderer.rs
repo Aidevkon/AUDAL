@@ -92,13 +92,43 @@ impl FourStemRenderer {
         
         let centroids = nmf.centroids(N_BINS);
 
-        // Sort by centroid: lowest=Bass, highest=Ambience, middle=Harmonics
-        let mut sorted: Vec<usize> = (0..N_COMPONENTS).collect();
-        sorted.sort_by(|&a, &b|
-            centroids[a].total_cmp(&centroids[b]));
-        let bass_comp      = sorted[0];
-        let harmonics_comp = sorted[1];
-        let ambience_comp  = sorted[2];
+        // Step 7: Semantic assignment
+        // Ambience = highest spectral flatness (diffuse spectrum)
+        // Bass = lowest centroid among remaining
+        // Harmonics = the other one
+
+        // Compute spectral flatness per NMF component
+        let mut flatness = [0.0f32; N_COMPONENTS];
+        for c in 0..N_COMPONENTS {
+            let mut log_sum = 0.0f32;
+            let mut arith   = 0.0f32;
+            let eps = 1e-10f32;
+            for b in 0..N_BINS {
+                let w_val = nmf.w[b * N_COMPONENTS + c];
+                log_sum += libm::logf(w_val + eps);
+                arith   += w_val;
+            }
+            let geom = libm::expf(log_sum / N_BINS as f32);
+            let mean = arith / N_BINS as f32;
+            flatness[c] = if mean > eps { (geom / mean).clamp(0.0, 1.0) } else { 0.0 };
+        }
+
+        // Ambience = flattest component
+        let ambience_comp = (0..N_COMPONENTS)
+            .max_by(|&a, &b| flatness[a].total_cmp(&flatness[b]))
+            .unwrap_or(2);
+
+        // Bass and Harmonics from remaining two — by centroid
+        let remaining: Vec<usize> = (0..N_COMPONENTS)
+            .filter(|&c| c != ambience_comp)
+            .collect();
+
+        let bass_comp = *remaining.iter()
+            .min_by(|&&a, &&b| centroids[a].total_cmp(&centroids[b]))
+            .unwrap();
+        let harmonics_comp = *remaining.iter()
+            .find(|&&c| c != bass_comp)
+            .unwrap();
 
         // Step 8: Build NMF Wiener masks
         let mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
