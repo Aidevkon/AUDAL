@@ -35,10 +35,38 @@ impl FourStemRenderer {
             };
         }
 
-        // Step 1: STFT
-        let (frames, n_frames) = self.engine.forward(signal);
+        // --- NEW V2 PIPELINE ---
 
-        // Step 2: Magnitude spectrogram
+        // Step 1: Find representative window (spectral flux)
+        use crate::stft::nmf::find_most_diverse_window;
+        let (start, end) = find_most_diverse_window(signal, 48000, 10.0);
+        let sample = &signal[start..end];
+
+        // Step 2: STFT + Magnitude on sample only
+        let (sample_frames, sample_n_frames) = self.engine.forward(sample);
+        let mut sample_magnitudes = vec![vec![0.0_f32; N_BINS]; sample_n_frames];
+        for t in 0..sample_n_frames {
+            for b in 0..N_BINS {
+                let re = sample_frames[t][b].re;
+                let im = sample_frames[t][b].im;
+                sample_magnitudes[t][b] = libm::sqrtf(re * re + im * im);
+            }
+        }
+
+        // Step 3: HPSS on sample
+        let (sample_mask_h, _) = self.processor.process(&sample_magnitudes);
+        let sample_harmonic_mag: Vec<Vec<f32>> = (0..sample_n_frames)
+            .map(|t| (0..N_BINS)
+                .map(|b| sample_magnitudes[t][b] * sample_mask_h[t][b])
+                .collect())
+            .collect();
+
+        // Step 4: NMF fit on sample → learn W
+        let mut nmf = NmfEngine::default();
+        let w = nmf.fit(&sample_harmonic_mag);
+
+        // Step 5: STFT + Magnitude on full track
+        let (frames, n_frames) = self.engine.forward(signal);
         let mut magnitudes = vec![vec![0.0_f32; N_BINS]; n_frames];
         for t in 0..n_frames {
             for b in 0..N_BINS {
@@ -48,19 +76,20 @@ impl FourStemRenderer {
             }
         }
 
-        // Step 3: HPSS — separate harmonic and percussive
+        // Step 6: HPSS on full track
         let (mask_h, mask_p) = self.processor.process(&magnitudes);
-
-        // Step 4: Apply harmonic mask to get harmonic spectrogram
         let harmonic_mag: Vec<Vec<f32>> = (0..n_frames)
             .map(|t| (0..N_BINS)
                 .map(|b| magnitudes[t][b] * mask_h[t][b])
                 .collect())
             .collect();
 
-        // Step 5: NMF on harmonic spectrogram → Bass, Vocals, Other
-        let mut nmf = NmfEngine::default();
-        nmf.fit(&harmonic_mag);
+        // Step 7: NMF transform on full track (fast — no iteration)
+        let h = nmf.transform(&w, &harmonic_mag);
+        
+        // Inject full-track H into NmfEngine so existing component_mask works
+        nmf.h = h;
+        
         let centroids = nmf.centroids(N_BINS);
 
         // Sort by centroid: lowest=Bass, highest=Ambience, middle=Harmonics
@@ -71,12 +100,12 @@ impl FourStemRenderer {
         let harmonics_comp = sorted[1];
         let ambience_comp  = sorted[2];
 
-        // Step 6: Build NMF Wiener masks
+        // Step 8: Build NMF Wiener masks
         let mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
         let mask_harmonics = nmf.component_mask(harmonics_comp, N_BINS, n_frames);
         let mask_ambience  = nmf.component_mask(ambience_comp,  N_BINS, n_frames);
 
-        // Step 7: Combine HPSS + NMF masks and apply in Cartesian domain
+        // Step 9: Combine HPSS + NMF masks and apply in Cartesian domain
         let mut frames_bass      = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
         let mut frames_harmonics = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
         let mut frames_drums     = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
@@ -101,7 +130,7 @@ impl FourStemRenderer {
             }
         }
 
-        // Step 8: iSTFT for all 4 stems
+        // Step 10: iSTFT for all 4 stems
         FourStems {
             bass:      self.engine.inverse(&frames_bass,      n),
             harmonics: self.engine.inverse(&frames_harmonics, n),
