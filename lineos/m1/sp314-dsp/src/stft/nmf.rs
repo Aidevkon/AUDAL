@@ -179,3 +179,99 @@ impl NmfEngine {
         mask
     }
 }
+
+/// Find the most spectrally diverse window in the signal.
+/// Uses spectral flux to identify the region with maximum
+/// sonic variation — best training data for NMF stem learning.
+/// 
+/// Returns (start_sample, end_sample).
+/// Same input → same output always. INV-AB-1 preserved.
+/// Determinism: max_by returns FIRST maximum on tie — no randomness.
+pub fn find_most_diverse_window(
+    signal:      &[f32],
+    sample_rate: u32,
+    window_sec:  f32,
+) -> (usize, usize) {
+    use crate::stft::spectral_flux::SpectralFluxDetector;
+    use crate::stft::HOP_SIZE;
+
+    // Edge case: track shorter than window
+    let window_samples = (window_sec * sample_rate as f32) as usize;
+    if signal.len() <= window_samples {
+        return (0, signal.len());
+    }
+
+    // Compute spectral flux
+    let mut detector = SpectralFluxDetector::new();
+    let (flux, _) = detector.detect(signal);
+
+    // Edge case: flat signal (silence)
+    if flux.iter().all(|&f| f < 1e-6) {
+        return find_highest_energy_chunk_window(signal, sample_rate, window_sec);
+    }
+
+    // Find window with maximum cumulative flux
+    let window_frames = (window_sec * sample_rate as f32 / HOP_SIZE as f32) as usize;
+    
+    let best_start_frame = flux
+        .windows(window_frames.max(1))
+        .enumerate()
+        .max_by(|(_, a), (_, b)| {
+            let sum_a: f32 = a.iter().sum();
+            let sum_b: f32 = b.iter().sum();
+            sum_a.partial_cmp(&sum_b).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+
+    let start = best_start_frame * HOP_SIZE;
+    let end = (start + window_samples).min(signal.len());
+    (start, end)
+}
+
+/// Fallback: energy-based selection (for flat/silent signals).
+fn find_highest_energy_chunk_window(
+    signal:      &[f32],
+    sample_rate: u32,
+    window_sec:  f32,
+) -> (usize, usize) {
+    let window_samples = (window_sec * sample_rate as f32) as usize;
+    if signal.len() <= window_samples {
+        return (0, signal.len());
+    }
+    let start = crate::pipeline::autotune::find_highest_energy_chunk(
+        signal, signal, // mono — pass same slice
+    );
+    let end = (start + window_samples).min(signal.len());
+    (start, end)
+}
+
+#[cfg(test)]
+mod diverse_window_tests {
+    use super::*;
+
+    #[test]
+    fn same_input_same_output() {
+        let signal: Vec<f32> = (0..96000).map(|i| (i as f32 * 0.01).sin()).collect();
+        let r1 = find_most_diverse_window(&signal, 48000, 10.0);
+        let r2 = find_most_diverse_window(&signal, 48000, 10.0);
+        assert_eq!(r1, r2, "INV-AB-1: must be deterministic");
+    }
+
+    #[test]
+    fn short_track_returns_full() {
+        let signal = vec![0.1f32; 48000]; // 1 second
+        let (start, end) = find_most_diverse_window(&signal, 48000, 10.0);
+        assert_eq!(start, 0);
+        assert_eq!(end, signal.len());
+    }
+
+    #[test]
+    fn result_within_bounds() {
+        let signal: Vec<f32> = (0..480000).map(|i| (i as f32 * 0.001).sin()).collect();
+        let (start, end) = find_most_diverse_window(&signal, 48000, 10.0);
+        assert!(start < end);
+        assert!(end <= signal.len());
+        assert!(end - start <= 480001);
+    }
+}
