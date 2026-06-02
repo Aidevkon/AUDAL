@@ -348,9 +348,18 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         target_makeup_db: 0.0,  // input gain applied above
     };
 
-    // A1: Extract features
+    // A1: Full stem separation (NMF v2 — representative sample approach)
+    use sp314_dsp::stft::stem_renderer::FourStemRenderer;
     use sp314_dsp::analysis::StemFeatureAnalyzer;
-    let features = StemFeatureAnalyzer::analyze_stereo(&chunk.left, &chunk.right, chunk.sample_rate);
+
+    let mono: Vec<f32> = chunk.left.iter()
+        .zip(chunk.right.iter())
+        .map(|(l, r)| (l + r) * 0.5)
+        .collect();
+
+    let mut renderer = FourStemRenderer::new();
+    let stems = renderer.render(&mono);
+    let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
     // Runs once per session on raw stereo PCM, before Aether.
