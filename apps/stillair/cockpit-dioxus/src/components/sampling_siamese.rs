@@ -16,6 +16,7 @@ pub struct SamplingSiameseProps {
     pub dyn_angle: Signal<f32>,
     pub space_angle: Signal<f32>,
     pub loud_angle: Signal<f32>,
+    pub jini_persona: Signal<crate::types::JiniPersonaState>,
 }
 
 #[component]
@@ -44,6 +45,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                     dyn_angle: props.dyn_angle,
                     space_angle: props.space_angle,
                     loud_angle: props.loud_angle,
+                    jini_persona: props.jini_persona,
                 }
                 crate::components::hud_overlay::MfdHud {
                     findings: props.wizard_findings.read().clone(),

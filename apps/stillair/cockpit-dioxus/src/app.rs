@@ -87,6 +87,7 @@ pub fn App() -> Element {
                     dyn_angle,
                     space_angle,
                     loud_angle,
+                    jini_persona,
                 }
             }
 

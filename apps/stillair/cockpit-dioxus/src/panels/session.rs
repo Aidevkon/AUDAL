@@ -52,6 +52,7 @@ pub fn SessionPanel(
     dyn_angle: Signal<f32>,
     space_angle: Signal<f32>,
     loud_angle: Signal<f32>,
+    jini_persona: Signal<crate::types::JiniPersonaState>,
 ) -> Element {
 
     let mut flavour = use_signal(|| "clean".to_string());
@@ -116,7 +117,7 @@ pub fn SessionPanel(
                                 SelectedPreset { preset_id: preset_id.clone() }
                                 MasterButton { 
                                     mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour,
-                                    tone_angle, dyn_angle, space_angle, loud_angle
+                                    tone_angle, dyn_angle, space_angle, loud_angle, jini_persona
                                 }
                             }
                         },
@@ -256,6 +257,7 @@ fn MasterButton(
     dyn_angle: Signal<f32>,
     space_angle: Signal<f32>,
     loud_angle: Signal<f32>,
+    jini_persona: Signal<crate::types::JiniPersonaState>,
 ) -> Element {
     let on_master = move |_| {
         #[cfg(debug_assertions)]
@@ -310,9 +312,16 @@ fn MasterButton(
             // Single IPC call: all session data in one shot (P9-008)
             #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] calling get_session_state..."));
+            
+            let persona_str = match *jini_persona.read() {
+                crate::types::JiniPersonaState::Beginner     => "beginner",
+                crate::types::JiniPersonaState::Intermediate => "intermediate",
+                crate::types::JiniPersonaState::Pro          => "pro",
+            };
+
             let state = match invoke::<crate::types::SessionStateJson, _>(
                 "get_session_state",
-                json!({ "blobId": blob_id }),
+                json!({ "blobId": blob_id, "persona": persona_str }),
             ).await {
                 Ok(s)   => s,
                 Err(e)  => {

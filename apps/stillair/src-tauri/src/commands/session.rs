@@ -153,7 +153,10 @@ pub struct DspChainStateJson {
 ///   - rule-engine failure → Err (invariant violation, should not happen)
 ///   - narrative failure → narrative = None (non-fatal, not surfaced as error)
 #[tauri::command]
-pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, String> {
+pub async fn get_session_state(
+    blob_id: String,
+    persona: Option<String>,
+) -> Result<SessionStateJson, String> {
     eprintln!("[get_session_state] START blob_id={blob_id}");
 
     // Step 1: Fetch GoldenBlobJson from M0
@@ -201,11 +204,19 @@ pub async fn get_session_state(blob_id: String) -> Result<SessionStateJson, Stri
         ebu_r128:  blob.loudness.ebu_r128_compliant,
     };
 
+    use lineos_types::JiniPersonaId;
+    let persona_id = match persona.as_deref() {
+        Some("beginner") => JiniPersonaId::Beginner,
+        Some("pro")      => JiniPersonaId::Pro,
+        _                => JiniPersonaId::Intermediate,
+    };
+
     // Step 5 (J-P8): Build JINI suggestion from quality + zone flags
     let jini = build_jini_suggestion(
         &blob.quality,
         &ZoneFlagsJson::default(),
         blob.loudness.integrated_lufs,
+        persona_id,
     );
 
     let dsp_chain = blob.aether_config.as_ref().and_then(|cfg_str| {
@@ -255,6 +266,7 @@ fn build_jini_suggestion(
     quality: &QualityMetricsJson,
     zones:   &ZoneFlagsJson,
     lufs:    f32,
+    persona_id: lineos_types::JiniPersonaId,
 ) -> JiniSuggestionJson {
     use lineos_types::*;
 
@@ -276,7 +288,7 @@ fn build_jini_suggestion(
 
     // Priority: Quality → Loudness → Spectral → Dynamics → Stereo
     // Mirrors sp314-dsp/src/jini/mod.rs rule_based_suggestion() logic
-    let _persona = JiniPersonaId::Intermediate;
+    let _persona = persona_id;
 
     let (narrative, action, confidence) = if behaviour.quality == QualityBehaviour::Clipping {
         (
