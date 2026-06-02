@@ -88,7 +88,37 @@ output = {
     "H_first_row_first8": H[0, :8].tolist()
 }
 
+from sklearn.decomposition import NMF
+
+# NMF v2: fit on sample, transform on full track
+# For fixture purposes: use first half as "sample", full as "track"
+sample = V[:, :n_frames//2]  # first half = representative sample
+nmf_v2 = NMF(n_components=N_COMPONENTS, max_iter=30, init='random', random_state=42)
+nmf_v2.fit(sample.T)  # fit on sample
+W_sample = nmf_v2.components_.T              # basis profiles (n_bins, n_components)
+H_full = nmf_v2.transform(V.T).T             # activations (n_components, n_frames)
+
+# SDR per component
+def sdr_db(reference, estimated):
+    signal_power = np.sum(reference ** 2)
+    noise_power = np.sum((reference - estimated) ** 2)
+    if noise_power < 1e-10:
+        return 100.0
+    return 10.0 * np.log10(signal_power / noise_power)
+
+# Reconstruct v2 stems
+V_v2 = W_sample @ H_full
+sdr_values = [sdr_db(V[k,:], V_v2[k,:]) for k in range(min(N_COMPONENTS, n_bins))]
+
+output["nmf_v2"] = {
+    "sdr_components": sdr_values,
+    "min_sdr_db": float(min(sdr_values)),
+    "gate_6db": all(s > 6.0 for s in sdr_values)
+}
+
 os.makedirs("tests/fixtures", exist_ok=True)
 with open("tests/fixtures/nmf_reference.json", "w") as f:
     json.dump(output, f, indent=2)
 print("Written: tests/fixtures/nmf_reference.json")
+print(f"NMF v2 min SDR: {min(sdr_values):.1f} dB")
+print(f"Gate 6dB: {output['nmf_v2']['gate_6db']}")

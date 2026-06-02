@@ -83,3 +83,53 @@ fn four_stem_drums_captures_transient() {
         "Drums {:.4} should exceed bass {:.4} at impulse",
         drums_energy, bass_energy);
 }
+
+#[test]
+fn four_stem_sdr_above_gate() {
+    use sp314_dsp::stft::stem_renderer::FourStemRenderer;
+    use sp314_dsp::analysis::sdr::sdr_db;
+
+    let fft_size = 2048_usize;
+    let fs       = 48000_f32;
+    let n        = fft_size * 16;
+
+    // Synthetic signal with clear bass + harmonic content
+    let signal: Vec<f32> = (0..n).map(|i| {
+        let t = i as f32 / fs;
+        // Bass: 80Hz
+        0.4 * libm::sinf(2.0 * core::f32::consts::PI * 80.0 * t)
+        // Harmonic: 440Hz
+        + 0.3 * libm::sinf(2.0 * core::f32::consts::PI * 440.0 * t)
+        // Transient every 512 samples
+        + if i % 512 == 0 { 0.5 } else { 0.0 }
+    }).collect();
+
+    let mut renderer = FourStemRenderer::new();
+    let stems = renderer.render(&signal);
+
+    // Perfect reconstruction check (sum of stems = original)
+    let margin = fft_size;
+    let reconstructed: Vec<f32> = (0..n).map(|i| {
+        stems.bass[i] + stems.harmonics[i] + stems.drums[i] + stems.ambience[i]
+    }).collect();
+
+    let recon_sdr = sdr_db(&signal[margin..n-margin], &reconstructed[margin..n-margin]);
+    println!("Reconstruction SDR: {:.1} dB", recon_sdr);
+
+    // Gate: reconstruction SDR must be > 20dB (high quality)
+    assert!(recon_sdr > 20.0,
+        "Reconstruction SDR {:.1}dB below 20dB gate", recon_sdr);
+
+    // Gate: no stem should be silent (all have some energy)
+    let bass_energy: f32     = stems.bass.iter().map(|x| x*x).sum();
+    let harmonic_energy: f32 = stems.harmonics.iter().map(|x| x*x).sum();
+    let drums_energy: f32    = stems.drums.iter().map(|x| x*x).sum();
+
+    assert!(bass_energy > 0.0,     "Bass stem is silent");
+    assert!(harmonic_energy > 0.0, "Harmonics stem is silent");
+    assert!(drums_energy > 0.0,    "Drums stem is silent");
+
+    println!("Bass energy:     {:.4}", bass_energy);
+    println!("Harmonic energy: {:.4}", harmonic_energy);
+    println!("Drums energy:    {:.4}", drums_energy);
+}
