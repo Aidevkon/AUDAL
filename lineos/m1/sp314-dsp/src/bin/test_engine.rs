@@ -8,6 +8,14 @@ use sp314_dsp::{
     pipeline::engine::{Sp314MasteringEngine, EngineConfig},
 };
 
+fn assert_signal_integrity(signal: &[f32], node: &'static str) {
+    let has_nan = signal.iter().any(|s| s.is_nan() || s.is_infinite());
+    let rms: f32 = signal.iter().map(|s| s*s).sum::<f32>() / signal.len() as f32;
+    let is_silent = rms < 1e-15 && signal.len() > 1000;
+    assert!(!has_nan, "Signal integrity violation at '{}': NaN/Inf detected", node);
+    assert!(!is_silent, "Signal integrity violation at '{}': audio silenced RMS={:.2e}", node, rms);
+}
+
 fn main() {
     let input_path  = "/home/aidevcon/Music/test.wav";
     let output_path = "/home/aidevcon/Music/test_mastered.wav";
@@ -95,9 +103,25 @@ fn main() {
     let mut engine = Sp314MasteringEngine::new(engine_config, spec.sample_rate)
         .expect("Engine init failed");
 
+    // --- Autotune ---
+    println!("\n=== Autotune ===");
+    use sp314_dsp::analysis::PreAnalyzer;
+    let pre_analysis = PreAnalyzer::run(&left, &right, spec.sample_rate);
+    let autotune_result = sp314_dsp::pipeline::autotune::autotune(
+        pre_analysis.integrated_lufs,
+        -14.0,
+    );
+    let gain_linear = 10.0_f32.powf(autotune_result.pre_gain_db / 20.0_f32);
+    for s in left.iter_mut()  { *s *= gain_linear; }
+    for s in right.iter_mut() { *s *= gain_linear; }
+    assert_signal_integrity(&left, "autotune_l");
+    assert_signal_integrity(&right, "autotune_r");
+
     // --- Process ---
     println!("\n=== Processing ===");
     let telemetry = engine.process_offline(&mut left, &mut right);
+    assert_signal_integrity(&left, "process_offline_l");
+    assert_signal_integrity(&right, "process_offline_r");
 
     println!("  Pre-pass peak:  {:.1} dBFS", telemetry.peak_db);
     println!("  Pre-pass RMS:   {:.1} dBFS", telemetry.rms_db);
@@ -142,6 +166,9 @@ fn main() {
     // Use asymmetric scaling + clamp to prevent out-of-range panic.
     let max_pos = 8388607.0_f32;
     let max_neg = 8388608.0_f32;
+
+    assert_signal_integrity(&left, "export_l");
+    assert_signal_integrity(&right, "export_r");
 
     for i in 0..left.len() {
         let l_smp = if left[i]  >= 0.0 { left[i]  * max_pos } else { left[i]  * max_neg };
