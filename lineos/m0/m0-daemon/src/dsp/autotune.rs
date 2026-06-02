@@ -6,7 +6,7 @@ pub const AUTOTUNE_MAX_ITERATIONS: usize = 8;
 pub const AUTOTUNE_TOLERANCE_DB:   f32   = 0.2;
 pub const AUTOTUNE_MIN_GAIN_DB:    f32   = -18.0;
 pub const AUTOTUNE_MAX_GAIN_DB:    f32   =  18.0;
-pub const FULL_FILE_THRESHOLD:     usize = 48_000 * 30; // 30sec
+
 
 #[derive(Debug, Clone, Copy)]
 pub struct AutotuneResult {
@@ -26,11 +26,8 @@ pub fn autotune_dsp(
     let target_lufs = intent.target.target_lufs;
     let sample_rate = audio.sample_rate;
 
-    // Use full file if ≤30sec, else highest energy 2sec chunk
-    let (ref_l, ref_r) = if audio.left.len() <= FULL_FILE_THRESHOLD {
-        (audio.left.clone(), audio.right.clone())
-    } else {
-        // Find highest energy 2-second window
+    // Find highest energy 2-second window
+    let (ref_l, ref_r) = {
         let chunk = 96_000_usize.min(audio.left.len());
         let hop   = 48_000_usize;
         let mut best_start = 0usize;

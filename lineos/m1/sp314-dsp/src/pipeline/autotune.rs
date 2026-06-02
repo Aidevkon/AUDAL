@@ -88,11 +88,8 @@ pub fn autotune(
         Some(t) => t,
     };
 
-    const FULL_FILE_THRESHOLD: usize = 48_000 * 30;
-
-    let (chunk_l, chunk_r) = if left.len() <= FULL_FILE_THRESHOLD {
-        (left, right)
-    } else {
+    // Always use representative chunk — never process full file for autotune
+    let (chunk_l, chunk_r) = {
         let start = find_highest_energy_chunk(left, right);
         let end = (start + AUTOTUNE_CHUNK_SAMPLES).min(left.len());
         (&left[start..end], &right[start..end])
