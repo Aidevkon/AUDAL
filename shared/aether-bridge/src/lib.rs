@@ -23,6 +23,7 @@ pub struct AetherRequest {
     pub persona_id:  Option<String>,
     pub tone:        Option<f32>,
     pub dynamics:    Option<f32>,
+    pub ambience:    Option<AmbienceIntent>,
     pub chaos_seed:  Option<u64>,
     pub project_id:  Option<String>,
     pub track_id:    Option<String>,
@@ -35,12 +36,21 @@ impl Default for AetherRequest {
             persona_id:  None,
             tone:        None,
             dynamics:    None,
+            ambience:    None,
             chaos_seed:  None,
             project_id:  None,
             track_id:    None,
             preset_name: None,
         }
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AmbienceIntent {
+    pub space: Option<f32>,
+    pub width: Option<f32>,
+    pub tone: Option<f32>,
+    pub loudness: Option<f32>,
 }
 
 #[derive(Debug)]
@@ -106,12 +116,40 @@ pub fn build_dsp_config(
                         &persona, features, pre_analysis);
 
     let mut proof_log = ProofLog::new();
-    let dsp_config    = IntegrationFirewall::build(
+    let mut dsp_config    = IntegrationFirewall::build(
         &persona, &macros, &modulated,
         &zones, &chaos_delta, seed, &mut proof_log,
     ).map_err(|e| AetherBridgeError::FirewallError(
         format!("{:?}", e)
     ))?;
+
+    if let Some(amb) = &req.ambience {
+        let amb_macros = aether::mapping::types::AmbienceMacroControls {
+            space: amb.space.unwrap_or(0.5),
+            width: amb.width.unwrap_or(0.5),
+            tone: amb.tone.unwrap_or(0.5),
+            loudness: amb.loudness.unwrap_or(0.5),
+        };
+        let delta = aether::mapping::ambience::AmbienceMicroMapper::map(&amb_macros);
+        dsp_config.ambience = Some(integration::config::DspAmbienceConfig {
+            reverb_time_delta_s: delta.reverb_time_delta_s,
+            pre_delay_delta_ms: delta.pre_delay_delta_ms,
+            diffusion_delta: delta.diffusion_delta,
+            high_shelf_gain_db: delta.high_shelf_gain_db,
+            high_shelf_freq_delta: delta.high_shelf_freq_delta,
+            low_shelf_cut_db: delta.low_shelf_cut_db,
+            reverb_send_level: delta.reverb_send_level,
+            decorrelation: delta.decorrelation,
+            side_gain_db: delta.side_gain_db,
+            phase_variance: delta.phase_variance,
+            mono_comp_shelf_db: delta.mono_comp_shelf_db,
+            hf_damping_db: delta.hf_damping_db,
+            low_mid_cut_db: delta.low_mid_cut_db,
+            tail_density_delta: delta.tail_density_delta,
+            output_gain_db: delta.output_gain_db,
+            hf_tail_cut_db: delta.hf_tail_cut_db,
+        });
+    }
 
     Ok((dsp_config, proof_log, persona))
 }

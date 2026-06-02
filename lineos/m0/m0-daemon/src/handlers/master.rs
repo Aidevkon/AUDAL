@@ -381,6 +381,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         persona_id:  Some(mapped_persona.to_string()),
         tone:      req.intent_tone.or(req.tone),
         dynamics:       req.intent_dynamics.or(req.dynamics),
+        ambience:    None,
         chaos_seed:  req.chaos_seed,
         project_id:  req.project_id.clone(),
         track_id:    req.track_id.clone(),

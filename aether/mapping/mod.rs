@@ -4,6 +4,7 @@
 pub mod types;
 pub mod curves;
 pub mod mapper;
+pub mod ambience;
 
 pub use types::{MicroDelta, EqDelta, DynamicsDelta, SaturationDelta,
                 StereoDelta, EQ_GAIN_DELTA_MIN_DB, EQ_GAIN_DELTA_MAX_DB,

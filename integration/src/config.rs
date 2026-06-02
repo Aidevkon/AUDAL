@@ -29,6 +29,7 @@ pub struct DspConfig {
     pub dynamics:   DspDynamicsConfig,
     pub sat:        DspSatConfig,
     pub stereo:     DspStereoConfig,
+    pub ambience:   Option<DspAmbienceConfig>,
     pub persona_id: String,
     pub chaos_seed: u64,
 }
@@ -68,4 +69,24 @@ pub struct DspSatConfig {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DspStereoConfig {
     pub width: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DspAmbienceConfig {
+    pub reverb_time_delta_s: f32,
+    pub pre_delay_delta_ms: f32,
+    pub diffusion_delta: f32,
+    pub high_shelf_gain_db: f32,
+    pub high_shelf_freq_delta: f32,
+    pub low_shelf_cut_db: f32,
+    pub reverb_send_level: f32,
+    pub decorrelation: f32,
+    pub side_gain_db: f32,
+    pub phase_variance: f32,
+    pub mono_comp_shelf_db: f32,
+    pub hf_damping_db: f32,
+    pub low_mid_cut_db: f32,
+    pub tail_density_delta: f32,
+    pub output_gain_db: f32,
+    pub hf_tail_cut_db: f32,
 }

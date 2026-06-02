@@ -88,3 +88,56 @@ impl MicroDelta {
 impl Default for MicroDelta {
     fn default() -> Self { Self::zero() }
 }
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AmbienceMacroControls {
+    pub space: f32,
+    pub width: f32,
+    pub tone: f32,
+    pub loudness: f32,
+}
+
+impl Default for AmbienceMacroControls {
+    fn default() -> Self {
+        Self { space: 0.5, width: 0.5, tone: 0.5, loudness: 0.5 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AmbienceMicroDelta {
+    pub reverb_time_delta_s: f32, pub pre_delay_delta_ms: f32,
+    pub diffusion_delta: f32, pub high_shelf_gain_db: f32,
+    pub high_shelf_freq_delta: f32, pub low_shelf_cut_db: f32,
+    pub reverb_send_level: f32, pub decorrelation: f32,
+    pub side_gain_db: f32, pub phase_variance: f32,
+    pub mono_comp_shelf_db: f32, pub hf_damping_db: f32,
+    pub low_mid_cut_db: f32, pub tail_density_delta: f32,
+    pub output_gain_db: f32, pub hf_tail_cut_db: f32,
+}
+
+impl AmbienceMicroDelta {
+    pub fn zero() -> Self {
+        Self {
+            reverb_time_delta_s: 0.0,
+            pre_delay_delta_ms: 0.0,
+            diffusion_delta: 0.0,
+            high_shelf_gain_db: 0.0,
+            high_shelf_freq_delta: 0.0,
+            low_shelf_cut_db: 0.0,
+            reverb_send_level: 0.0,
+            decorrelation: 0.0,
+            side_gain_db: 0.0,
+            phase_variance: 0.0,
+            mono_comp_shelf_db: 0.0,
+            hf_damping_db: 0.0,
+            low_mid_cut_db: 0.0,
+            tail_density_delta: 0.0,
+            output_gain_db: 0.0,
+            hf_tail_cut_db: 0.0,
+        }
+    }
+}
+
+impl Default for AmbienceMicroDelta {
+    fn default() -> Self { Self::zero() }
+}

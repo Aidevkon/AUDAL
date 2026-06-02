@@ -144,6 +144,7 @@ impl IntegrationFirewall {
 
         Ok(DspConfig {
             eq, dynamics, sat, stereo,
+            ambience: None,
             persona_id: persona.id.clone(),
             chaos_seed,
         })

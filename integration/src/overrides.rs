@@ -87,6 +87,7 @@ impl DspOverrides {
                                      CFW_STEREO_WIDTH_MAX))
                     .unwrap_or(config.stereo.width),
             },
+            ambience: config.ambience.clone(),
             persona_id: config.persona_id.clone(),
             chaos_seed: config.chaos_seed,
         }
