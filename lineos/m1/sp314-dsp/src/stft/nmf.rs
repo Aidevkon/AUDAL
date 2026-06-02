@@ -1,5 +1,5 @@
 pub const N_COMPONENTS: usize = 3;
-pub const N_ITER:       usize = 100;
+pub const N_ITER:       usize = 30;
 const EPS:      f32 = 1e-10_f32;
 const LAMBDA_H: f32 = 0.1;
 const CONV_CHECK_INTERVAL: usize = 10;

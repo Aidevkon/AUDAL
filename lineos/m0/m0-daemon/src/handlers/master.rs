@@ -403,12 +403,20 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     // Clone target before spawn_blocking consumes intent (fix E0382)
     let intent_target_for_verify = intent.target.clone();
 
-    // Run sp314-dsp in blocking thread (no_std/alloc/sync)
-    let (result, audio, dsp_config) = tokio::task::spawn_blocking(move || {
-        let res = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
-        (res, audio, dsp_config)
-    }).await
-      .map_err(|e| format!("DSP task join error: {e}"))?;
+    // Run sp314-dsp in blocking thread (no_std/alloc/sync) with a 60s timeout
+    let timeout_result = tokio::time::timeout(
+        tokio::time::Duration::from_secs(60),
+        tokio::task::spawn_blocking(move || {
+            let res = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
+            (res, audio, dsp_config)
+        })
+    ).await;
+
+    let (result, audio, dsp_config) = match timeout_result {
+        Err(_) => return Err("DSP timeout after 60s".to_string()),
+        Ok(Err(e)) => return Err(format!("DSP task join error: {e}")),
+        Ok(Ok(r)) => r,
+    };
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
 
     let mut audio = audio;
