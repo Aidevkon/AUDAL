@@ -22,9 +22,9 @@ use crate::ipc::m0_client::{GoldenBlobJson, M0Client};
 pub async fn export_pdf_report(
     blob_id: String,
     app:     tauri::AppHandle,
+    client:  tauri::State<'_, M0Client>,
 ) -> Result<String, String> {
     // Fetch the Golden Blob metrics from M0 (no PCM — only the JSON metadata)
-    let client = M0Client::new();
     let blob   = client.get_blob(&blob_id).await
         .map_err(|e| format!("IO_ERR:0x02:{e}"))?;
 
@@ -59,8 +59,8 @@ pub async fn export_pdf_report(
 #[tauri::command]
 pub async fn preview_pdf_report(
     blob_id: String,
+    client: tauri::State<'_, M0Client>,
 ) -> Result<String, String> {
-    let client = M0Client::new();
     let blob   = client.get_blob(&blob_id).await
         .map_err(|e| format!("IO_ERR:0x02:{e}"))?;
 

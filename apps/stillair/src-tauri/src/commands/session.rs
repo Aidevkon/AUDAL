@@ -156,11 +156,11 @@ pub struct DspChainStateJson {
 pub async fn get_session_state(
     blob_id: String,
     persona: Option<String>,
+    client:  tauri::State<'_, M0Client>,
 ) -> Result<SessionStateJson, String> {
     eprintln!("[get_session_state] START blob_id={blob_id}");
 
     // Step 1: Fetch GoldenBlobJson from M0
-    let client = M0Client::new();
     let blob: GoldenBlobJson = client
         .get_blob(&blob_id)
         .await

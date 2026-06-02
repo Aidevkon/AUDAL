@@ -152,9 +152,9 @@ pub async fn trigger_mastering(
     intent_punch: f32,
     intent_space: f32,
     intent_loudness: f32,
+    client: tauri::State<'_, M0Client>,
 ) -> Result<String, String> {
     eprintln!("[trigger_mastering] START path={audio_path} preset={preset_id}");
-    let client = M0Client::new();
 
     // Guard: verify M0 is healthy (ASC 0x05 guard).
     client.health().await
@@ -184,8 +184,10 @@ pub async fn trigger_mastering(
 /// Fetch Golden Blob as JSON — called on FM2 → FM3 to start Data Cascade.
 /// No binary data crosses the IPC boundary.
 #[command]
-pub async fn get_golden_blob(blob_id: String) -> Result<GoldenBlobJson, String> {
-    let client = M0Client::new();
+pub async fn get_golden_blob(
+    blob_id: String,
+    client: tauri::State<'_, M0Client>,
+) -> Result<GoldenBlobJson, String> {
     client.get_blob(&blob_id).await.map_err(|e| e.to_string())
 }
 

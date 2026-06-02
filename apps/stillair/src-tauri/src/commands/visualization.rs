@@ -46,8 +46,8 @@ pub struct VisualizationDataJson {
 #[tauri::command]
 pub async fn get_visualization_data(
     blob_id: String,
+    client: tauri::State<'_, M0Client>,
 ) -> Result<VisualizationDataJson, String> {
-    let client = M0Client::new();
     let blob   = client.get_blob(&blob_id).await
         .map_err(|e| format!("IO_ERR:0x02:{e}"))?;
 

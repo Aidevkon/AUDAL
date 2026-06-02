@@ -33,12 +33,12 @@ pub struct M0Client {
     client: Client,
 }
 
+unsafe impl Send for M0Client {}
+unsafe impl Sync for M0Client {}
+
 impl M0Client {
     pub fn new() -> Self {
         let client = ClientBuilder::new()
-            // Default timeout for non-mastering requests.
-            // trigger_mastering overrides this per-request.
-            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .build()
             .unwrap_or_else(|_| Client::new());
         Self { client }
@@ -49,6 +49,7 @@ impl M0Client {
     pub async fn health(&self) -> Result<M0HealthResponse, M0Error> {
         let resp = self.client
             .get(format!("{M0_HEALTH_BASE}/health"))
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -85,6 +86,7 @@ impl M0Client {
     pub async fn get_blob(&self, id: &str) -> Result<GoldenBlobJson, M0Error> {
         let resp = self.client
             .get(format!("{M0_BASE}/blob/{id}"))
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -109,6 +111,7 @@ impl M0Client {
                 format:      format.to_string(),
                 output_path: path.to_string(),
             })
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -131,6 +134,7 @@ impl M0Client {
                 action:      action.to_string(),
                 position_ms,
             })
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -161,6 +165,7 @@ impl M0Client {
     ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
         let resp = self.client
             .get(format!("{M0_PLAYBACK_BASE}/playback/state"))
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
@@ -176,6 +181,7 @@ impl M0Client {
     ) -> Result<Option<crate::commands::playback::LiveTelemetryJson>, M0Error> {
         let resp = self.client
             .get(format!("{M0_PLAYBACK_BASE}/playback/telemetry"))
+            .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
             .send().await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 

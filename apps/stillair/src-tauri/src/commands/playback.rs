@@ -34,8 +34,8 @@ pub struct LiveTelemetryJson {
 pub async fn playback_control(
     action:      String,
     position_ms: Option<u64>,
+    client:      tauri::State<'_, M0Client>,
 ) -> Result<Option<PlaybackStateJson>, String> {
-    let client = M0Client::new();
     client.playback_control(&action, position_ms)
         .await
         .map_err(|e| format!("IO_ERR:0x02:Playback failed: {e}"))
@@ -43,8 +43,9 @@ pub async fn playback_control(
 
 /// Get current playback position and state (non-blocking).
 #[tauri::command]
-pub async fn get_playback_state() -> Result<Option<PlaybackStateJson>, String> {
-    let client = M0Client::new();
+pub async fn get_playback_state(
+    client: tauri::State<'_, M0Client>,
+) -> Result<Option<PlaybackStateJson>, String> {
     client.get_playback_state()
         .await
         .map_err(|e| format!("IO_ERR:0x02:Get playback state failed: {e}"))
@@ -54,8 +55,9 @@ pub async fn get_playback_state() -> Result<Option<PlaybackStateJson>, String> {
 /// Returns momentary LUFS from the active blob's stored metrics.
 /// Uses playback position to select the correct telemetry window.
 #[tauri::command]
-pub async fn get_live_telemetry() -> Result<Option<LiveTelemetryJson>, String> {
-    let client = M0Client::new();
+pub async fn get_live_telemetry(
+    client: tauri::State<'_, M0Client>,
+) -> Result<Option<LiveTelemetryJson>, String> {
     client.get_live_telemetry()
         .await
         .map_err(|e| format!("IO_ERR:0x02:Live telemetry failed: {e}"))

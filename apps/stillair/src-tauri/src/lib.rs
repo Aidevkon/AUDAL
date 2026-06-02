@@ -12,12 +12,18 @@
 // Prevent a console window from popping up on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use tauri::Manager;
+
 pub mod commands;
 pub mod ipc;
 pub mod coach_narrative;   // Phase 8: Aether Coach — LLM narrative layer
 
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            app.manage(ipc::m0_client::M0Client::new());
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![

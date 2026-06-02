@@ -50,6 +50,7 @@ pub async fn export_audio(
     blob_id: String,
     format:  String,    // "wav" | "flac" | "opus"
     app:     tauri::AppHandle,
+    client:  tauri::State<'_, M0Client>,
 ) -> Result<ExportResult, String> {
     eprintln!("[export_audio] called: blob_id={blob_id}, format={format}");
 
@@ -91,7 +92,6 @@ pub async fn export_audio(
     eprintln!("[export_audio] dialog path: {output_path}");
 
     // Call M0 /export — audio bytes written to disk by M0, path returned
-    let client = M0Client::new();
     eprintln!("[export_audio] calling M0 export: blob_id={blob_id}, format={format}, path={output_path}");
     let resp = client.export(&blob_id, &format, &output_path)
         .await
