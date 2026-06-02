@@ -7,6 +7,7 @@ pub mod dynamics;
 pub mod stereo;
 pub mod analyzer;
 pub mod pre_analysis;
+pub mod sdr;
 
 pub use features::{StemFeatures, StemMetrics, MixMetrics};
 pub use analyzer::StemFeatureAnalyzer;

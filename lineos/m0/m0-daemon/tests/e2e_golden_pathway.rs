@@ -11,6 +11,11 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     let req = MasterRequest {
         audio_path: wav_path.to_string(),
         preset_id: "spotify".to_string(),
+        flavour_id: None,
+        intent_warmth: None,
+        intent_punch: None,
+        intent_space: None,
+        intent_loudness: None,
         persona_id: Some("warm_analog".to_string()),
         warmth: None,
         punch: None,

@@ -55,7 +55,7 @@ pub fn SessionPanel(
     jini_persona: Signal<crate::types::JiniPersonaState>,
 ) -> Element {
 
-    let mut flavour = use_signal(|| "clean".to_string());
+    let flavour = use_signal(|| "clean".to_string());
 
     rsx! {
         ModuleFrame {

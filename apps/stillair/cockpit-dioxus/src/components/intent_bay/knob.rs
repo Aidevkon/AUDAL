@@ -13,7 +13,7 @@ pub struct IntentKnobProps {
 }
 
 #[component]
-pub fn IntentKnob(mut props: IntentKnobProps) -> Element {
+pub fn IntentKnob(props: IntentKnobProps) -> Element {
     let hl_class = if props.highlighted { "highlighted" } else { "" };
     let socket_class = if props.highlighted {
         "intent-knob-socket socket-active"
