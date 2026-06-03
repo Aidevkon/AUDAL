@@ -8,6 +8,10 @@ use aether::personas::config::{PersonaConfig, MacroControls};
 use aether::mapping::mapper::MacroMicroMapper;
 use aether::chaos::engine::ChaosEngine;
 use aether::semantic::resolver::SemanticZoneResolver;
+use aether::markov::voice_v1::MarkovStateClassifier;
+use aether::markov::predictive::PredictiveController;
+use aether::markov::chaos::ChaosLayer;
+use aether::markov::firewall::IntegrationFirewall as MarkovFirewall;
 use integration::firewall::IntegrationFirewall;
 use integration::config::DspConfig;
 use integration::proof_log::ProofLog;
@@ -150,6 +154,20 @@ pub fn build_dsp_config(
             hf_tail_cut_db: delta.hf_tail_cut_db,
         });
     }
+
+    // Aether Black enrichment — INV-AB-9: if no voice features, skip (Mark III behavior)
+    let voice_metrics = &features.voice;
+    let current = MarkovStateClassifier::classify_voice(voice_metrics);
+    let predicted = MarkovStateClassifier::predict_next(current);
+    let delta = PredictiveController::compute_voice_delta(current, predicted);
+    let chaos = ChaosLayer { bypass: false, seed: dsp_config.chaos_seed };
+    let modulated = chaos.modulate(delta, dsp_config.chaos_seed);
+    let md = MarkovFirewall::clamp_voice_delta(modulated);
+
+    // Apply delta to baseline (enrichment, not replacement)
+    dsp_config.dynamics.comp_threshold_db += md.comp_threshold_db;
+    dsp_config.dynamics.comp_attack_ms    += md.comp_attack_ms;
+    dsp_config.dynamics.comp_release_ms   += md.comp_release_ms;
 
     Ok((dsp_config, proof_log, persona))
 }
