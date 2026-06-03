@@ -13,6 +13,7 @@ pub const ENERGY_RATIO_EPSILON:   f32   = 1e-4;
 pub struct StemFeatures {
     pub bass:      StemMetrics,
     pub harmonics: StemMetrics,
+    pub voice:     StemMetrics,
     pub drums:     StemMetrics,
     pub ambience:  StemMetrics,
     pub mix:       MixMetrics,
@@ -61,7 +62,7 @@ pub struct MixMetrics {
     pub stereo_correlation:    f32,
     pub stereo_width:          f32,
     pub dynamic_range_db:      f32,
-    pub stem_energy_ratios:    [f32; 4],  // [bass, harmonics, drums, ambience]
+    pub stem_energy_ratios:    [f32; 5],  // [bass, harmonics, voice, drums, ambience]
     /// Energy-weighted average of stem centroids (S-008 requirement)
     pub spectral_centroid_hz:  f32,
 }
@@ -75,7 +76,7 @@ impl Default for MixMetrics {
             stereo_correlation: 1.0,
             stereo_width:       0.0,
             dynamic_range_db:   0.0,
-            stem_energy_ratios: [0.25; 4],
+            stem_energy_ratios: [0.2; 5],
             spectral_centroid_hz: 1000.0,
         }
     }

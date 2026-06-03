@@ -14,6 +14,7 @@ use crate::nodes::width::WidthNode;
 use crate::nodes::noisegate::NoiseGateNode;
 use crate::nodes::deesser::DeEsserNode;
 use crate::nodes::dehum::DeHumNode;
+use crate::nodes::autolevel::AutoLevelNode;
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -110,6 +111,7 @@ impl DspGraph {
                 "NoiseGate" => Box::new(NoiseGateNode::new(sample_rate)),
                 "DeEsser"   => Box::new(DeEsserNode::new(sample_rate)),
                 "DeHum"     => Box::new(DeHumNode::new(sample_rate)),
+                "AutoLevel" => Box::new(AutoLevelNode::new(sample_rate)),
                 _ => return Err(GraphError::UnknownNodeType(t_node.node_type.clone())),
             };
             

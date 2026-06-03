@@ -19,6 +19,7 @@ impl StemFeatureAnalyzer {
     pub fn analyze(stems: &FiveStems, sample_rate: u32) -> StemFeatures {
         let bass      = Self::analyze_stem(&stems.bass,      sample_rate);
         let harmonics = Self::analyze_stem(&stems.harmonics, sample_rate);
+        let voice     = Self::analyze_stem(&stems.voice,     sample_rate);
         let drums     = Self::analyze_stem(&stems.drums,     sample_rate);
         let ambience  = Self::analyze_stem(&stems.ambience,  sample_rate);
 
@@ -49,8 +50,8 @@ impl StemFeatureAnalyzer {
 
         // Mix centroid: energy-weighted average of stem centroids (S-008)
         // Mix centroid: energy-weighted average of stem centroids (S-008)
-        let ratios = [bass_ratio, harmonics_ratio, drums_ratio, ambience_ratio]; // voice not in StemFeatures yet
-        let centroids = [bass.spectral_centroid_hz, harmonics.spectral_centroid_hz,
+        let ratios = [bass_ratio, harmonics_ratio, voice_ratio, drums_ratio, ambience_ratio];
+        let centroids = [bass.spectral_centroid_hz, harmonics.spectral_centroid_hz, voice.spectral_centroid_hz,
                          drums.spectral_centroid_hz, ambience.spectral_centroid_hz];
         let total_w: f32 = ratios.iter().sum();
         let mix_centroid = if total_w > 1e-10 {
@@ -67,11 +68,11 @@ impl StemFeatureAnalyzer {
             stereo_width:       stereo_width(&mix_stereo),
             dynamic_range_db:   dynamic_range_db(&mix_l, sample_rate),
             stem_energy_ratios: [bass_ratio, harmonics_ratio,
-                                  drums_ratio, ambience_ratio],
+                                  voice_ratio, drums_ratio, ambience_ratio],
             spectral_centroid_hz: mix_centroid,
         };
 
-        StemFeatures { bass, harmonics, drums, ambience, mix }
+        StemFeatures { bass, harmonics, voice, drums, ambience, mix }
     }
 
     fn analyze_stem(stereo: &[f32], sample_rate: u32) -> StemMetrics {
@@ -149,6 +150,7 @@ impl StemFeatureAnalyzer {
             return StemFeatures {
                 bass:      StemMetrics::default(),
                 harmonics: StemMetrics::default(),
+                voice:     StemMetrics::default(),
                 drums:     StemMetrics::default(),
                 ambience:  StemMetrics::default(),
                 mix:       MixMetrics::default(),
@@ -180,7 +182,7 @@ impl StemFeatureAnalyzer {
 
         // Energy ratios: all equal (no stem separation)
         // TODO v2.0: use real NMF stem energies
-        let equal_ratio = 0.25_f32;
+        let equal_ratio = 0.2_f32;
 
         let mix = MixMetrics {
             integrated_lufs:     lufs,
@@ -189,13 +191,14 @@ impl StemFeatureAnalyzer {
             stereo_correlation:  corr,
             stereo_width:        width,
             dynamic_range_db:    dyn_range,
-            stem_energy_ratios:  [equal_ratio; 4],
+            stem_energy_ratios:  [equal_ratio; 5],
             spectral_centroid_hz: centroid,
         };
 
         StemFeatures {
             bass:      StemMetrics::default(),
             harmonics: StemMetrics::default(),
+            voice:     StemMetrics::default(),
             drums:     StemMetrics::default(),
             ambience:  StemMetrics::default(),
             mix,

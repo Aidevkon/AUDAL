@@ -137,13 +137,15 @@ impl Flavor {
                     {"node_id": "Input",    "node_type": "Input",     "parameters": {}},
                     {"node_id": "gate",     "node_type": "NoiseGate", "parameters": {"threshold_db": -40.0, "attack_ms": 1.0, "hold_ms": 50.0, "release_ms": 150.0}},
                     {"node_id": "dehum",    "node_type": "DeHum",     "parameters": {"enabled": true, "fundamental_hz": 50.0}},
+                    {"node_id": "rider",    "node_type": "AutoLevel", "parameters": {"target_rms_db": -18.0, "lookahead_ms": 500.0, "max_gain_db": 6.0, "min_gain_db": -6.0, "smoothing_ms": 50.0}},
                     {"node_id": "deesser",  "node_type": "DeEsser",   "parameters": {"threshold_db": -24.0, "frequency_hz": 6000.0, "ratio": 4.0}},
                     {"node_id": "Output",   "node_type": "Output",    "parameters": {}}
                 ],
                 "edges": [
                     {"source": "Input",   "target": "gate",    "modulation_type": "audio"},
                     {"source": "gate",    "target": "dehum",   "modulation_type": "audio"},
-                    {"source": "dehum",   "target": "deesser", "modulation_type": "audio"},
+                    {"source": "dehum",   "target": "rider",   "modulation_type": "audio"},
+                    {"source": "rider",   "target": "deesser", "modulation_type": "audio"},
                     {"source": "deesser", "target": "Output",  "modulation_type": "audio"}
                 ]
             })
