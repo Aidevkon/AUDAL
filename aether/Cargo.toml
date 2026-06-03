@@ -15,3 +15,8 @@ libm  = "0.2"
 
 [dev-dependencies]
 serde_json = "1.0"
+lineos-corpus = { path = "../lineos/m1/lineos-corpus" }
+
+[[test]]
+name = "corpus_contract"
+path = "tests/corpus_contract.rs"

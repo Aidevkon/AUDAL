@@ -23,6 +23,7 @@ name = "aether"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "lineos-corpus",
  "lineos-types",
  "serde",
  "serde_json",
