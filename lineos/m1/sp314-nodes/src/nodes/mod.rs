@@ -6,3 +6,4 @@ pub mod rms;
 pub mod ms;
 pub mod compressor;
 pub mod limiter;
+pub mod reverb;
