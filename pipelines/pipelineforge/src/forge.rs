@@ -30,6 +30,7 @@ impl Pipelineforge {
                 crate::flavor::Flavor::LufsNormalization => "LufsNormalization",
                 crate::flavor::Flavor::DcRemoval => "DcRemoval",
                 crate::flavor::Flavor::HumRemoval => "HumRemoval",
+                crate::flavor::Flavor::POXVoice => "POXVoice",
             })
             .collect()
     }

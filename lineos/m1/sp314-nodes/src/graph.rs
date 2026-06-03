@@ -11,6 +11,9 @@ use crate::nodes::compressor::CompressorNode;
 use crate::nodes::limiter::LimiterNode;
 use crate::nodes::reverb::ReverbNode;
 use crate::nodes::width::WidthNode;
+use crate::nodes::noisegate::NoiseGateNode;
+use crate::nodes::deesser::DeEsserNode;
+use crate::nodes::dehum::DeHumNode;
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -104,6 +107,9 @@ impl DspGraph {
                 },
                 "Reverb" => Box::new(ReverbNode::new(sample_rate)),
                 "Width"  => Box::new(WidthNode::new(sample_rate)),
+                "NoiseGate" => Box::new(NoiseGateNode::new(sample_rate)),
+                "DeEsser"   => Box::new(DeEsserNode::new(sample_rate)),
+                "DeHum"     => Box::new(DeHumNode::new(sample_rate)),
                 _ => return Err(GraphError::UnknownNodeType(t_node.node_type.clone())),
             };
             
