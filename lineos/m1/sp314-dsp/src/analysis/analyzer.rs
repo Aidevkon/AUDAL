@@ -222,7 +222,7 @@ mod tests {
             &signal, &signal, 48000);
         assert!(result.mix.spectral_centroid_hz > 0.0);
         assert!(result.mix.stereo_correlation > 0.99); // L==R
-        assert_eq!(result.mix.stem_energy_ratios, [0.25; 4]);
+        assert_eq!(result.mix.stem_energy_ratios, [0.2; 5]);
     }
 
     #[test]

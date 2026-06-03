@@ -45,3 +45,4 @@ pub mod analysis;
 pub use analysis::{StemFeatures, StemMetrics, MixMetrics, StemFeatureAnalyzer, PreAnalyzer};
 
 pub mod jini;
+pub mod cut_heal;
