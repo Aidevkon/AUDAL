@@ -8,3 +8,4 @@ pub mod compressor;
 pub mod limiter;
 pub mod reverb;
 pub mod width;
+pub mod noisegate;
