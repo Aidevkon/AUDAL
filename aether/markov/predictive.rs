@@ -1,5 +1,6 @@
 use super::voice_v1::VoiceState;
 
+#[derive(Clone)]
 pub struct MarkovDelta {
     pub comp_threshold_db: f32,  // [-3.0, +3.0]
     pub comp_attack_ms:    f32,  // [-10.0, +10.0]
