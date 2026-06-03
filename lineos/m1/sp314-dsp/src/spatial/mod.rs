@@ -1,3 +1,5 @@
+pub mod channel_assign;
+
 pub struct SpatialPreAnalysis {
     pub mid_energy:          f32,   // RMS of M channel
     pub side_energy:         f32,   // RMS of S channel
