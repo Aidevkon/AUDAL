@@ -1,6 +1,7 @@
 pub mod channel_assign;
 pub mod five_dot_one;
 pub mod renderer;
+pub mod user_profile;
 
 pub struct SpatialPreAnalysis {
     pub mid_energy:          f32,   // RMS of M channel
