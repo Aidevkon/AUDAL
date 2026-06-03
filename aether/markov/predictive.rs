@@ -1,4 +1,8 @@
 use super::voice_v1::VoiceState;
+use crate::markov::drums_v1::DrumsState;
+use crate::markov::bass_v1::BassState;
+use crate::markov::harmonics_v1::HarmonicsState;
+use crate::markov::ambience_v1::AmbienceState;
 use crate::simulation::SimulationDelta;
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -11,6 +15,25 @@ pub struct PredictiveDelta {
 
 impl PredictiveDelta {
     pub fn zero() -> Self { Self::default() }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InstrumentDelta {
+    pub comp_attack_ms: f32,
+    pub eq_gain_db: f32,
+    pub level_db: f32,
+}
+
+impl InstrumentDelta {
+    pub fn zero() -> Self { Self::default() }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InstrumentDeltas {
+    pub drums: InstrumentDelta,
+    pub bass: InstrumentDelta,
+    pub harmonics: InstrumentDelta,
+    pub ambience: InstrumentDelta,
 }
 
 #[derive(Clone)]
@@ -103,6 +126,46 @@ impl PredictiveController {
         delta.density_bias += (markov.transient_risk * 0.05) - (sim.crest_risk * 0.05);
         delta.density_bias = delta.density_bias.clamp(-0.3, 0.3); // Bounded
 
+        delta
+    }
+
+    pub fn compute_drums_delta(predicted: DrumsState) -> InstrumentDelta {
+        let mut delta = InstrumentDelta::zero();
+        match predicted {
+            DrumsState::Transient => { delta.comp_attack_ms = 5.0; delta.eq_gain_db = 1.0; },
+            DrumsState::Decay => { delta.comp_attack_ms = -5.0; },
+            _ => {}
+        }
+        delta
+    }
+
+    pub fn compute_bass_delta(predicted: BassState) -> InstrumentDelta {
+        let mut delta = InstrumentDelta::zero();
+        match predicted {
+            BassState::Punchy => { delta.comp_attack_ms = 10.0; delta.eq_gain_db = 1.5; },
+            BassState::Rumble => { delta.eq_gain_db = -1.0; },
+            _ => {}
+        }
+        delta
+    }
+
+    pub fn compute_harmonics_delta(predicted: HarmonicsState) -> InstrumentDelta {
+        let mut delta = InstrumentDelta::zero();
+        match predicted {
+            HarmonicsState::Bright => { delta.eq_gain_db = 2.0; },
+            HarmonicsState::Warm => { delta.eq_gain_db = -1.0; },
+            _ => {}
+        }
+        delta
+    }
+
+    pub fn compute_ambience_delta(predicted: AmbienceState) -> InstrumentDelta {
+        let mut delta = InstrumentDelta::zero();
+        match predicted {
+            AmbienceState::Wash => { delta.eq_gain_db = -2.0; },
+            AmbienceState::Lush => { delta.eq_gain_db = 1.0; },
+            _ => {}
+        }
         delta
     }
 }

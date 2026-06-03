@@ -147,6 +147,7 @@ impl IntegrationFirewall {
             ambience: None,
             persona_id: persona.id.clone(),
             chaos_seed,
+            instrument_deltas: Default::default(),
         })
     }
 

@@ -2,6 +2,7 @@
 // Authority: spec/locked/S-009_integration_firewall.md v1.0
 
 // Constitutional DSP bounds — cannot be exceeded regardless of Aether output
+use aether::markov::predictive::InstrumentDeltas;
 pub const CFW_EQ_GAIN_MIN_DB:        f32 = -18.0;
 pub const CFW_EQ_GAIN_MAX_DB:        f32 =  12.0;
 pub const CFW_EQ_FREQ_MIN_HZ:        f32 =  20.0;
@@ -32,6 +33,8 @@ pub struct DspConfig {
     pub ambience:   Option<DspAmbienceConfig>,
     pub persona_id: String,
     pub chaos_seed: u64,
+    #[serde(default)]
+    pub instrument_deltas: InstrumentDeltas,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

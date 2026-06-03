@@ -34,6 +34,7 @@ impl DspOverrides {
     /// None    → keep Aether value unchanged.
     pub fn apply(&self, config: &DspConfig) -> DspConfig {
         DspConfig {
+            instrument_deltas: config.instrument_deltas.clone(),
             eq: DspEqConfig {
                 low_shelf_gain_db:  self.low_shelf_gain_db
                     .map(|v| v.clamp(CFW_EQ_GAIN_MIN_DB,

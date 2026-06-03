@@ -12,6 +12,12 @@ use aether::markov::voice_v1::MarkovStateClassifier;
 use aether::markov::predictive::PredictiveController;
 use aether::markov::chaos::ChaosLayer;
 use aether::markov::firewall::IntegrationFirewall as MarkovFirewall;
+use aether::markov::firewall::{DRUMS_BOUNDS, BASS_BOUNDS, HARMONICS_AMBIENCE_BOUNDS};
+use aether::markov::drums_v1::DrumsMarkovStateClassifier;
+use aether::markov::bass_v1::BassMarkovStateClassifier;
+use aether::markov::harmonics_v1::HarmonicsMarkovStateClassifier;
+use aether::markov::ambience_v1::AmbienceMarkovStateClassifier;
+use aether::markov::predictive::InstrumentDeltas;
 use integration::firewall::IntegrationFirewall;
 use integration::config::DspConfig;
 use integration::proof_log::ProofLog;
@@ -177,6 +183,26 @@ pub fn build_dsp_config(
     dsp_config.dynamics.comp_threshold_db += md.comp_threshold_db;
     dsp_config.dynamics.comp_attack_ms    += md.comp_attack_ms;
     dsp_config.dynamics.comp_release_ms   += md.comp_release_ms;
+
+    let drums_predicted    = DrumsMarkovStateClassifier::predict_next(
+        DrumsMarkovStateClassifier::classify_drums(&features.drums));
+    let bass_predicted     = BassMarkovStateClassifier::predict_next(
+        BassMarkovStateClassifier::classify_bass(&features.bass));
+    let harm_predicted     = HarmonicsMarkovStateClassifier::predict_next(
+        HarmonicsMarkovStateClassifier::classify_harmonics(&features.harmonics));
+    let amb_predicted      = AmbienceMarkovStateClassifier::predict_next(
+        AmbienceMarkovStateClassifier::classify_ambience(&features.ambience));
+
+    dsp_config.instrument_deltas = InstrumentDeltas {
+        drums:     MarkovFirewall::clamp_instrument_delta(
+                       PredictiveController::compute_drums_delta(drums_predicted), &DRUMS_BOUNDS),
+        bass:      MarkovFirewall::clamp_instrument_delta(
+                       PredictiveController::compute_bass_delta(bass_predicted), &BASS_BOUNDS),
+        harmonics: MarkovFirewall::clamp_instrument_delta(
+                       PredictiveController::compute_harmonics_delta(harm_predicted), &HARMONICS_AMBIENCE_BOUNDS),
+        ambience:  MarkovFirewall::clamp_instrument_delta(
+                       PredictiveController::compute_ambience_delta(amb_predicted), &HARMONICS_AMBIENCE_BOUNDS),
+    };
 
     Ok((dsp_config, proof_log, persona))
 }
