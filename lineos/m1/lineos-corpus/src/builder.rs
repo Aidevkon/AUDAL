@@ -99,8 +99,8 @@ fn build_frame_event(
         attributes: EnrichedAttributes {
             rms_db: metrics.rms_db,
             crest_factor_db: metrics.crest_factor_db,
-            density: 0.0,
-            spectral_centroid: 0.0,
+            transient_density: metrics.transient_density,
+            spectral_centroid: metrics.spectral_centroid_hz,
             lufs_integrated: pre_analysis.integrated_lufs,
             spectral_flatness: 0.0,
         },

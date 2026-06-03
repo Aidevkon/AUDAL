@@ -17,11 +17,18 @@ pub struct StemFeatureAnalyzer;
 
 impl StemFeatureAnalyzer {
     pub fn analyze(stems: &FiveStems, sample_rate: u32) -> StemFeatures {
-        let bass      = Self::analyze_stem(&stems.bass,      sample_rate);
-        let harmonics = Self::analyze_stem(&stems.harmonics, sample_rate);
-        let voice     = Self::analyze_stem(&stems.voice,     sample_rate);
-        let drums     = Self::analyze_stem(&stems.drums,     sample_rate);
-        let ambience  = Self::analyze_stem(&stems.ambience,  sample_rate);
+        let mut bass      = Self::analyze_stem(&stems.bass,      sample_rate);
+        let mut harmonics = Self::analyze_stem(&stems.harmonics, sample_rate);
+        let mut voice     = Self::analyze_stem(&stems.voice,     sample_rate);
+        let mut drums     = Self::analyze_stem(&stems.drums,     sample_rate);
+        let mut ambience  = Self::analyze_stem(&stems.ambience,  sample_rate);
+
+        // Use real NMF transient density — not crest approximation
+        voice.transient_density     = stems.voice_transient_density;
+        drums.transient_density     = stems.drums_transient_density;
+        bass.transient_density      = stems.bass_transient_density;
+        harmonics.transient_density = stems.harmonics_transient_density;
+        ambience.transient_density  = stems.ambience_transient_density;
 
         // Mix energy for ratios
         let mix_energy = Self::stereo_energy(&stems.bass)
@@ -82,20 +89,24 @@ impl StemFeatureAnalyzer {
         let l: Vec<f32> = stereo.iter().step_by(2).copied().collect();
         let r: Vec<f32> = stereo.iter().skip(1).step_by(2).copied().collect();
 
+        // Loudness: on stereo pair
+        let lufs    = measure_integrated_lufs(&l, &r);
+        let rms     = (rms_db(&l) + rms_db(&r)) * 0.5;
+
         // Spectral: per-channel, averaged (S-002 Option A)
-        let centroid = (spectral_centroid_hz(&l, sample_rate)
-                      + spectral_centroid_hz(&r, sample_rate)) * 0.5;
+        let centroid = if rms > -80.0 {
+            (spectral_centroid_hz(&l, sample_rate) + spectral_centroid_hz(&r, sample_rate)) * 0.5
+        } else {
+            0.0
+        };
         let flatness = (spectral_flatness(&l)
                       + spectral_flatness(&r)) * 0.5;
         let spec_crest = (spectral_crest_factor_db(&l)
                         + spectral_crest_factor_db(&r)) * 0.5;
 
-        // Loudness: on stereo pair
-        let lufs    = measure_integrated_lufs(&l, &r);
-        let rms     = (rms_db(&l) + rms_db(&r)) * 0.5;
-
         // Dynamics
-        let crest   = (crest_factor_db(&l) + crest_factor_db(&r)) * 0.5;
+        let raw_crest = (crest_factor_db(&l) + crest_factor_db(&r)) * 0.5;
+        let crest = if raw_crest.is_nan() { 0.0 } else { raw_crest.clamp(0.0, 30.0) };
         let dyn_rng = dynamic_range_db(&l, sample_rate);
 
         // Stereo
@@ -115,6 +126,7 @@ impl StemFeatureAnalyzer {
             crest_factor_db:       crest,
             dynamic_range_db:      dyn_rng,
             energy_ratio:          0.0,  // set by caller
+            transient_density:     0.0,  // set by caller
         }
     }
 

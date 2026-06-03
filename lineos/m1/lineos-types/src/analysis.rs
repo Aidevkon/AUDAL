@@ -33,6 +33,7 @@ pub struct StemMetrics {
     pub crest_factor_db:       f32,
     pub dynamic_range_db:      f32,
     pub energy_ratio:          f32,
+    pub transient_density:     f32,
 }
 
 impl Default for StemMetrics {
@@ -50,6 +51,7 @@ impl Default for StemMetrics {
             crest_factor_db:       10.0,
             dynamic_range_db:      0.0,
             energy_ratio:          0.0,
+            transient_density:     0.0,
         }
     }
 }

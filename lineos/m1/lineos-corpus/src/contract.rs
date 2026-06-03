@@ -32,7 +32,7 @@ pub struct TimelineEvent {
 pub struct EnrichedAttributes {
     pub rms_db:            f32,
     pub crest_factor_db:   f32,
-    pub density:           f32,
+    pub transient_density: f32,
     pub spectral_centroid: f32,
     pub lufs_integrated:   f32,
     pub spectral_flatness: f32,

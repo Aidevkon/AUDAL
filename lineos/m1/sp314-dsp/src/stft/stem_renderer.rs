@@ -15,6 +15,12 @@ pub struct FiveStems {
     pub voice:     Vec<f32>,
     pub harmonics: Vec<f32>,
     pub ambience:  Vec<f32>,
+    // Transient density per stem — computed during NMF (not approximated)
+    pub voice_transient_density:     f32,
+    pub drums_transient_density:     f32,
+    pub bass_transient_density:      f32,
+    pub harmonics_transient_density: f32,
+    pub ambience_transient_density:  f32,
 }
 
 /// Compute transient density of an NMF component's H row.
@@ -51,6 +57,11 @@ impl FiveStemRenderer {
                 voice:     Vec::new(),
                 harmonics: Vec::new(),
                 ambience:  Vec::new(),
+                voice_transient_density:     0.0,
+                drums_transient_density:     0.0,
+                bass_transient_density:      0.0,
+                harmonics_transient_density: 0.0,
+                ambience_transient_density:  0.0,
             };
         }
 
@@ -238,12 +249,34 @@ impl FiveStemRenderer {
         }
 
         // Step 10: iSTFT for all 5 stems
+        
+        // Compute transient density for all stems
+        let voice_td     = component_transient_density(&h_rows[voice_comp], n_frames);
+        let harmonics_td = component_transient_density(&h_rows[harmonics_comp], n_frames);
+        let bass_td      = component_transient_density(&h_rows[bass_comp], n_frames);
+        let ambience_td  = component_transient_density(&h_rows[ambience_comp], n_frames);
+        
+        let mut h_drums = vec![0.0f32; n_frames];
+        for t in 0..n_frames {
+            let mut sum = 0.0;
+            for b in 0..N_BINS {
+                sum += mask_p[t][b];
+            }
+            h_drums[t] = sum;
+        }
+        let drums_td = component_transient_density(&h_drums, n_frames);
+
         FiveStems {
             bass:      self.engine.inverse(&frames_bass,      n),
             voice:     self.engine.inverse(&frames_voice,     n),
             harmonics: self.engine.inverse(&frames_harmonics, n),
             drums:     self.engine.inverse(&frames_drums,     n),
             ambience:  self.engine.inverse(&frames_ambience,  n),
+            voice_transient_density:     voice_td,
+            drums_transient_density:     drums_td,
+            bass_transient_density:      bass_td,
+            harmonics_transient_density: harmonics_td,
+            ambience_transient_density:  ambience_td,
         }
     }
 }
