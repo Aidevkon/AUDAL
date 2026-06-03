@@ -20,8 +20,8 @@ impl PredictiveDelta {
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InstrumentDelta {
     pub comp_attack_ms: f32,
-    pub eq_gain_db: f32,
-    pub level_db: f32,
+    pub eq_presence_db: f32,
+    pub comp_threshold_db: f32,
 }
 
 impl InstrumentDelta {
@@ -132,7 +132,7 @@ impl PredictiveController {
     pub fn compute_drums_delta(predicted: DrumsState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            DrumsState::Transient => { delta.comp_attack_ms = 5.0; delta.eq_gain_db = 1.0; },
+            DrumsState::Transient => { delta.comp_attack_ms = 5.0; delta.eq_presence_db = 1.0; },
             DrumsState::Decay => { delta.comp_attack_ms = -5.0; },
             _ => {}
         }
@@ -142,8 +142,8 @@ impl PredictiveController {
     pub fn compute_bass_delta(predicted: BassState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            BassState::Punchy => { delta.comp_attack_ms = 10.0; delta.eq_gain_db = 1.5; },
-            BassState::Rumble => { delta.eq_gain_db = -1.0; },
+            BassState::Punchy => { delta.comp_attack_ms = 10.0; delta.eq_presence_db = 1.5; },
+            BassState::Rumble => { delta.eq_presence_db = -1.0; },
             _ => {}
         }
         delta
@@ -152,8 +152,8 @@ impl PredictiveController {
     pub fn compute_harmonics_delta(predicted: HarmonicsState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            HarmonicsState::Bright => { delta.eq_gain_db = 2.0; },
-            HarmonicsState::Warm => { delta.eq_gain_db = -1.0; },
+            HarmonicsState::Bright => { delta.eq_presence_db = 2.0; },
+            HarmonicsState::Warm => { delta.eq_presence_db = -1.0; },
             _ => {}
         }
         delta
@@ -162,8 +162,8 @@ impl PredictiveController {
     pub fn compute_ambience_delta(predicted: AmbienceState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            AmbienceState::Wash => { delta.eq_gain_db = -2.0; },
-            AmbienceState::Lush => { delta.eq_gain_db = 1.0; },
+            AmbienceState::Wash => { delta.eq_presence_db = -2.0; },
+            AmbienceState::Lush => { delta.eq_presence_db = 1.0; },
             _ => {}
         }
         delta

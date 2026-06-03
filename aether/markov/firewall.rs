@@ -30,8 +30,8 @@ impl IntegrationFirewall {
     pub fn clamp_instrument_delta(delta: InstrumentDelta, bounds: &InstrumentBounds) -> InstrumentDelta {
         InstrumentDelta {
             comp_attack_ms: delta.comp_attack_ms.clamp(-bounds.attack_max_ms, bounds.attack_max_ms),
-            eq_gain_db: delta.eq_gain_db.clamp(-bounds.eq_max_db, bounds.eq_max_db),
-            level_db: delta.level_db.clamp(-bounds.level_max_db, bounds.level_max_db),
+            eq_presence_db: delta.eq_presence_db.clamp(-bounds.eq_max_db, bounds.eq_max_db),
+            comp_threshold_db: delta.comp_threshold_db.clamp(-bounds.level_max_db, bounds.level_max_db),
         }
     }
 }
