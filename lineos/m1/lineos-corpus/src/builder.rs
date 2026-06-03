@@ -8,7 +8,7 @@ fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
         "voice" => {
             if rms_db < -50.0 { "silence" }
             else if rms_db < -35.0 && td < 0.08 { "breath" }
-            else if td > 0.20 { "consonant" }
+            else if td > 0.15 { "consonant" }
             else if rms_db > -30.0 { "vowel" }
             else { "tail" }
         }

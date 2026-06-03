@@ -57,6 +57,7 @@ xaak         = { path = "../../m1/xaak" }
 # See: lineos/plan/phase-13/LAME-LGPL-NOTICE.md
 # System dependency: libmp3lame.so (apt: libmp3lame-dev or libmp3lame0)
 lame-sys = { path = "../../m1/lame-sys" }
+aether = { version = "0.1.0", path = "../../../aether" }
 
 
 

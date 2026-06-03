@@ -7,6 +7,12 @@ pub struct SpatialFirewall {
     pub max_center_bleed: f32,  // 0.3
 }
 
+impl Default for SpatialFirewall {
+    fn default() -> Self {
+        Self { max_rear_energy: 0.4, max_lfe_db: -6.0, max_center_bleed: 0.3 }
+    }
+}
+
 impl SpatialFirewall {
     pub fn apply(&self, stage: &mut FiveDotOneStage) {
         // Clamp rear energy ≤ 40% of front (INV-SP-7)

@@ -342,9 +342,33 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         mix_left[i]  = mono_mix + stems.drums[i];
         mix_right[i] = mono_mix + stems.drums[i];
     }
+    let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
+
+    use sp314_dsp::spatial::SpatialPreAnalysis;
+    use sp314_dsp::spatial::channel_assign::StemChannelAssignments;
+    use sp314_dsp::spatial::five_dot_one::{FiveDotOneStage, SpatialFirewall};
+    use sp314_dsp::spatial::renderer::StereoRenderer;
+    use sp314_dsp::spatial::user_profile::UserSpatialProfile;
+    use aether::markov::voice_v1::MarkovStateClassifier;
+
+    let spatial_pre = SpatialPreAnalysis::analyze(&mix_left, &mix_right, chunk.sample_rate);
+    let assignments  = StemChannelAssignments::compute(&features, &spatial_pre);
+    let firewall     = SpatialFirewall::default();
+    let mut stage    = FiveDotOneStage::render(&stems, &assignments, &firewall);
+    firewall.apply(&mut stage);
+    let profile      = UserSpatialProfile::default_podcast();
+    let state_str    = MarkovStateClassifier::classify_voice(&features.voice).to_str();
+    let modulated    = profile.apply_markov_prediction(state_str);
+    let _ = modulated;
+    let (sp_l, sp_r) = StereoRenderer::render(&stage);
+    let sp_len = mix_left.len().min(sp_l.len());
+    for i in 0..sp_len {
+        mix_left[i]  = sp_l[i];
+        mix_right[i] = sp_r[i];
+    }
+
     chunk.left = mix_left;
     chunk.right = mix_right;
-    let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
     // Runs once per session on raw stereo PCM, before Aether.

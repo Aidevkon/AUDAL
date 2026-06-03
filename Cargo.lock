@@ -3109,6 +3109,7 @@ dependencies = [
 name = "m0d"
 version = "0.1.0"
 dependencies = [
+ "aether",
  "aether-bridge",
  "anyhow",
  "axum",
