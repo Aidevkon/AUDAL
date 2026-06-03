@@ -428,6 +428,29 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     )
         .map_err(|e| format!("AetherBridge error: {}", e))?;
 
+    let blob_id = uuid::Uuid::new_v4().to_string();
+
+    // V2.0: Corpus generation — silent background telemetry
+    // 900-JSON: behavioral stats only, zero audio content
+    use lineos_corpus::builder::build_timeline;
+
+    let track_duration_ms = (chunk.left.len() as f32 
+        / chunk.sample_rate as f32 * 1000.0) as u32;
+
+    let corpus_envelope = build_timeline(
+        &features,
+        &pre_analysis,
+        &blob_id,
+        track_duration_ms,
+        req.flavour_id.as_deref().unwrap_or("unknown"),
+    );
+
+    // Write *.corpus.json alongside mastered file — silent
+    let corpus_path = format!("session_{}.corpus.json", &blob_id[..8]);
+    if let Ok(json) = serde_json::to_string_pretty(&corpus_envelope) {
+        let _ = std::fs::write(&corpus_path, json);
+    }
+
     let mut audio = chunk;
 
     // Clone target before spawn_blocking consumes intent (fix E0382)
@@ -532,7 +555,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
 
     Ok((StoredBlob {
-        id:               Uuid::new_v4().to_string(),
+        id:               blob_id.clone(),
         version:          "1.0".into(),
         blob_type:        "audio".into(),
         created_at:       Utc::now().to_rfc3339(),
