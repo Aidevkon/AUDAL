@@ -439,9 +439,14 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let corpus_envelope = build_timeline(
         &features,
+        &stems.voice,
+        &stems.drums,
+        &stems.bass,
+        &stems.harmonics,
+        &stems.ambience,
         &pre_analysis,
         &blob_id,
-        track_duration_ms,
+        chunk.sample_rate,
         req.flavour_id.as_deref().unwrap_or("unknown"),
     );
 
