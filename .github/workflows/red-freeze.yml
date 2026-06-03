@@ -1,0 +1,42 @@
+name: Red Freeze
+on:
+  push:
+    branches: [canonical]
+  pull_request:
+    branches: [canonical]
+
+jobs:
+  verify-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fixture hash locks
+        run: |
+          chmod +x scripts/verify_golden_locks.sh
+          ./scripts/verify_golden_locks.sh
+
+  test:
+    needs: verify-fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: cargo test workspace
+        run: cargo test --workspace --release
+      - name: Grand Oracle Lock
+        run: cargo test -p aether --test grand_oracle_lock
+      - name: Red Freeze gate
+        if: failure()
+        run: |
+          echo "RED FREEZE ACTIVATED"
+          echo "canonical is RED — only revert/* branches accepted"
+          exit 1

@@ -142,7 +142,17 @@ output["ambience_validation"] = {
 os.makedirs("tests/fixtures", exist_ok=True)
 with open("tests/fixtures/nmf_reference.json", "w") as f:
     json.dump(output, f, indent=2)
+
+import hashlib
+fixture_path = "tests/fixtures/nmf_reference.json"
+lock_path = "tests/fixtures/nmf_reference.lock"
+with open(fixture_path, "rb") as f:
+    h = hashlib.sha256(f.read()).hexdigest()
+with open(lock_path, "w") as f:
+    f.write(h)
+
 print("Written: tests/fixtures/nmf_reference.json")
+print("Written: tests/fixtures/nmf_reference.lock")
 print(f"NMF v2 min SDR: {min(sdr_values):.1f} dB")
 print(f"Gate 6dB: {output['nmf_v2']['gate_6db']}")
 print(f"Flatness per component: {[f'{f:.4f}' for f in flatness_per_component]}")
