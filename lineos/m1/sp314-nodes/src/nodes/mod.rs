@@ -7,3 +7,4 @@ pub mod ms;
 pub mod compressor;
 pub mod limiter;
 pub mod reverb;
+pub mod width;
