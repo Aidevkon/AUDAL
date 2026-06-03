@@ -301,7 +301,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     let chunk_original = chunk.clone();
 
     // A1: Full stem separation (NMF v2 — representative sample approach)
-    use sp314_dsp::stft::stem_renderer::FourStemRenderer;
+    use sp314_dsp::stft::stem_renderer::FiveStemRenderer;
     use sp314_dsp::analysis::StemFeatureAnalyzer;
 
     let mono: Vec<f32> = chunk.left.iter()
@@ -309,7 +309,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
 
-    let mut renderer = FourStemRenderer::new();
+    let mut renderer = FiveStemRenderer::new();
     let stems = renderer.render(&mono);
     let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
 
