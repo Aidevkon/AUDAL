@@ -1,4 +1,17 @@
 use super::voice_v1::VoiceState;
+use crate::simulation::SimulationDelta;
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PredictiveDelta {
+    pub pre_gain_db: f32,
+    pub transient_pre_trigger: f32,
+    pub density_bias: f32,
+    pub ducking_hint: f32,
+}
+
+impl PredictiveDelta {
+    pub fn zero() -> Self { Self::default() }
+}
 
 #[derive(Clone)]
 pub struct MarkovDelta {
@@ -57,6 +70,39 @@ impl PredictiveController {
                 delta.high_shelf_db = -0.5;
             }
         }
+        delta
+    }
+
+    /// SIM-P2: Evaluates the 6 Predictive Rules in priority order (Architecture §5).
+    /// INV-AB-1: Deterministic evaluation.
+    pub fn evaluate(markov: &MarkovDelta, sim: &SimulationDelta) -> PredictiveDelta {
+        let mut delta = PredictiveDelta::zero();
+
+        // Priority 1: Peak Protection
+        if sim.predicted_peak > -1.0 {
+            delta.pre_gain_db = -1.0 - sim.predicted_peak;
+        }
+
+        // Priority 2: Transient Protection
+        delta.transient_pre_trigger = markov.transient_risk.clamp(0.0, 1.0);
+
+        // Priority 3: Collapse Prevention
+        if markov.gap_risk > 0.5 {
+            delta.density_bias -= 0.1;
+        }
+
+        // Priority 4: GR Smoother
+        if sim.predicted_gr > 6.0 {
+            delta.density_bias -= 0.1;
+        }
+
+        // Priority 5: Gap Healing
+        delta.ducking_hint = markov.gap_risk.clamp(0.0, 1.0);
+
+        // Priority 6: Density Shaping
+        delta.density_bias += (markov.transient_risk * 0.05) - (sim.crest_risk * 0.05);
+        delta.density_bias = delta.density_bias.clamp(-0.3, 0.3); // Bounded
+
         delta
     }
 }

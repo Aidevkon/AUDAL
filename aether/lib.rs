@@ -6,6 +6,7 @@ pub mod personas;
 pub mod tuning;
 pub mod control;
 pub mod markov;
+pub mod simulation;
 
 pub use control::{BlackBoxMode, BlackBoxControl, OrbPosition,
                   MacroDelta, MediumControl, orb_resistance};

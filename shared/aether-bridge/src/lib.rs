@@ -159,9 +159,18 @@ pub fn build_dsp_config(
     let voice_metrics = &features.voice;
     let current = MarkovStateClassifier::classify_voice(voice_metrics);
     let predicted = MarkovStateClassifier::predict_next(current);
-    let delta = PredictiveController::compute_voice_delta(current, predicted);
+    let raw_delta = PredictiveController::compute_voice_delta(current, predicted);
+    
+    // SIM-P2: Wire Simulation into PredictiveController
+    if let Some(pre) = pre_analysis {
+        let sim_delta = aether::simulation::SimulationLayer::run(pre, -14.0);
+        let _predictive_delta = PredictiveController::evaluate(&raw_delta, &sim_delta);
+        // Note: Map density_bias, ducking_hint, pre_gain_db to DSP fields if they exist.
+        // For v1.4, they are computed but currently unused since DspConfig lacks them.
+    }
+
     let chaos = ChaosLayer { bypass: false, seed: dsp_config.chaos_seed };
-    let modulated = chaos.modulate(delta, dsp_config.chaos_seed);
+    let modulated = chaos.modulate(raw_delta, dsp_config.chaos_seed);
     let md = MarkovFirewall::clamp_voice_delta(modulated);
 
     // Apply delta to baseline (enrichment, not replacement)
