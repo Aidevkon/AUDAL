@@ -9,6 +9,18 @@ pub enum VoiceState {
     Tail      = 4,
 }
 
+impl VoiceState {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            VoiceState::Silence   => "silence",
+            VoiceState::Breath    => "breath",
+            VoiceState::Consonant => "consonant",
+            VoiceState::Vowel     => "vowel",
+            VoiceState::Tail      => "tail",
+        }
+    }
+}
+
 /// M2: VoiceV1 hand-tuned transition matrix (INV-AB-2: compile-time const)
 pub const TRANSITION_MATRIX_VOICE_V1: [[f32; 5]; 5] = [
     [0.70, 0.15, 0.05, 0.05, 0.05],

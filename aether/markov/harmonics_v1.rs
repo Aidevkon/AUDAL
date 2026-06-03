@@ -9,6 +9,18 @@ pub enum HarmonicsState {
     Warm   = 4,
 }
 
+impl HarmonicsState {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            HarmonicsState::Silent => "silent",
+            HarmonicsState::Sparse => "sparse",
+            HarmonicsState::Dense  => "dense",
+            HarmonicsState::Bright => "bright",
+            HarmonicsState::Warm   => "warm",
+        }
+    }
+}
+
 pub const TRANSITION_MATRIX_HARMONICS_V1: [[f32; 5]; 5] = [
     [0.70, 0.20, 0.05, 0.05, 0.00],
     [0.10, 0.60, 0.10, 0.10, 0.10],

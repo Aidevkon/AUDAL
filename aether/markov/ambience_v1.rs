@@ -9,6 +9,18 @@ pub enum AmbienceState {
     Wash    = 4,
 }
 
+impl AmbienceState {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            AmbienceState::Dry     => "dry",
+            AmbienceState::Subtle  => "subtle",
+            AmbienceState::Present => "present",
+            AmbienceState::Lush    => "lush",
+            AmbienceState::Wash    => "wash",
+        }
+    }
+}
+
 pub const TRANSITION_MATRIX_AMBIENCE_V1: [[f32; 5]; 5] = [
     [0.60, 0.30, 0.10, 0.00, 0.00],
     [0.10, 0.60, 0.20, 0.05, 0.05],

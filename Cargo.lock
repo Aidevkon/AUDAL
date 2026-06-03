@@ -2986,6 +2986,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lineos-corpus"
+version = "0.1.0"
+dependencies = [
+ "aether",
+ "lineos-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lineos-insights"
 version = "0.1.0"
 dependencies = [

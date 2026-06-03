@@ -9,6 +9,7 @@ members = [
     "lineos/m1/insights",
     "lineos/m1/rule-engine",
     "lineos/m1/xaak",
+    "lineos/m1/lineos-corpus",
     "lineos/m1/lame-sys",           # Phase 13A: LAME dynamic FFI (LGPL compliant)
     "apps/stillair/src-tauri",
     "apps/stillair/cockpit-dioxus",   # Phase 11: Dioxus 0.6 Cockpit

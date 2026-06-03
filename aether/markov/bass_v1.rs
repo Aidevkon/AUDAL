@@ -9,6 +9,18 @@ pub enum BassState {
     Rumble    = 4,
 }
 
+impl BassState {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            BassState::Silent    => "silent",
+            BassState::Sustained => "sustained",
+            BassState::Walking   => "walking",
+            BassState::Punchy    => "punchy",
+            BassState::Rumble    => "rumble",
+        }
+    }
+}
+
 pub const TRANSITION_MATRIX_BASS_V1: [[f32; 5]; 5] = [
     [0.80, 0.10, 0.05, 0.05, 0.00],
     [0.10, 0.70, 0.10, 0.05, 0.05],

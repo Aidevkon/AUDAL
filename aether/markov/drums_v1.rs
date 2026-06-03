@@ -9,6 +9,19 @@ pub enum DrumsState {
     Sustain   = 4,
 }
 
+impl DrumsState {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            DrumsState::Quiet     => "quiet",
+            DrumsState::BuildUp   => "buildup",
+            DrumsState::Transient => "transient",
+            DrumsState::Decay     => "decay",
+            DrumsState::Sustain   => "sustain",
+        }
+    }
+}
+
+
 pub const TRANSITION_MATRIX_DRUMS_V1: [[f32; 5]; 5] = [
     [0.70, 0.15, 0.10, 0.05, 0.00],
     [0.10, 0.40, 0.40, 0.10, 0.00],
