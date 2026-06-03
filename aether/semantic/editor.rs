@@ -202,6 +202,7 @@ mod tests {
         StemFeatures {
             bass:      StemMetrics::default(),
             harmonics: StemMetrics::default(),
+            voice:     StemMetrics::default(),
             drums:     StemMetrics::default(),
             ambience:  StemMetrics::default(),
             mix:       MixMetrics::default(),
