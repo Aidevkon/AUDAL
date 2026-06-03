@@ -311,6 +311,39 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let mut renderer = FiveStemRenderer::new();
     let stems = renderer.render(&mono);
+
+    // POX Voice processing — clean voice before reconstruction
+    let clean_voice = if req.flavour_id.as_deref() == Some("broadcast") {
+        let voice_topology = pipelineforge::flavor::Flavor::POXVoice.build(chunk.sample_rate);
+        let mut voice_graph = sp314_nodes::graph::DspGraph::from_topology(&voice_topology, 512, chunk.sample_rate)
+            .map_err(|e| format!("POX graph error: {:?}", e))?;
+        let mut v_left  = stems.voice.clone();
+        let mut v_right = stems.voice.clone();
+        let n = v_left.len();
+        let mut frame = 0;
+        while frame < n {
+            let end = (frame + 512).min(n);
+            voice_graph.process_block(&mut v_left[frame..end], &mut v_right[frame..end]);
+            frame += end - frame;
+        }
+        v_left.iter().zip(v_right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect::<Vec<f32>>()
+    } else {
+        stems.voice.clone()
+    };
+
+    // Reconstruct mix with clean voice
+    let n = clean_voice.len();
+    let mut mix_left  = vec![0.0f32; n];
+    let mut mix_right = vec![0.0f32; n];
+    for i in 0..n {
+        let mono_mix = clean_voice[i] + stems.bass[i] + stems.harmonics[i] + stems.ambience[i];
+        mix_left[i]  = mono_mix + stems.drums[i];
+        mix_right[i] = mono_mix + stems.drums[i];
+    }
+    chunk.left = mix_left;
+    chunk.right = mix_right;
     let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
