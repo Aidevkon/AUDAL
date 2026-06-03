@@ -9,6 +9,8 @@ use crate::nodes::rms::RmsDetectorNode;
 use crate::nodes::ms::{MsMatrixNode, InverseMsMatrixNode};
 use crate::nodes::compressor::CompressorNode;
 use crate::nodes::limiter::LimiterNode;
+use crate::nodes::reverb::ReverbNode;
+use crate::nodes::width::WidthNode;
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -100,6 +102,8 @@ impl DspGraph {
                     if let Some(c) = t_node.parameters.get("ceiling_db").and_then(|v| v.as_f64()) { l.set_parameter("ceiling_db", c as f32); }
                     Box::new(l)
                 },
+                "Reverb" => Box::new(ReverbNode::new(sample_rate)),
+                "Width"  => Box::new(WidthNode::new(sample_rate)),
                 _ => return Err(GraphError::UnknownNodeType(t_node.node_type.clone())),
             };
             

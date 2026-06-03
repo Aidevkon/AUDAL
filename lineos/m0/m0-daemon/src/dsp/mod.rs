@@ -106,6 +106,16 @@ impl DspAdapter {
 
     /// Apply deterministic Aether overrides to the DSP graph topology.
     fn apply_topology_overrides(topology: &mut DspTopology, config: &integration::config::DspConfig) {
+        let mut topology_set_param = |nodes: &mut Vec<sp314_nodes::topology::TopologyNode>, node_id: &str, param: &str, val: f32| {
+            for node in nodes.iter_mut() {
+                if node.node_id == node_id {
+                    if let Some(obj) = node.parameters.as_object_mut() {
+                        obj.insert(param.into(), serde_json::json!(val));
+                    }
+                }
+            }
+        };
+
         for node in &mut topology.nodes {
             if node.node_type == "Compressor" {
                 if let Some(obj) = node.parameters.as_object_mut() {
@@ -114,6 +124,17 @@ impl DspAdapter {
                 }
             }
             // TODO v2: Map eq, sat, stereo to exact node IDs.
+        }
+
+        if let Some(amb) = &config.ambience {
+            topology_set_param(&mut topology.nodes, "ambience_reverb", "rt60", amb.reverb_time_delta_s);
+            topology_set_param(&mut topology.nodes, "ambience_reverb", "hf_damping", amb.hf_damping_db.abs() / 3.0);
+            topology_set_param(&mut topology.nodes, "ambience_reverb", "mix", if amb.output_gain_db > 0.0 { 0.8 } else { 0.0 });
+            topology_set_param(&mut topology.nodes, "ambience_width", "decorrelation", amb.decorrelation);
+            topology_set_param(&mut topology.nodes, "ambience_width", "side_gain_db", amb.side_gain_db);
+        } else {
+            topology_set_param(&mut topology.nodes, "ambience_reverb", "mix", 0.0);
+            topology_set_param(&mut topology.nodes, "ambience_width", "decorrelation", 0.0);
         }
     }
 
