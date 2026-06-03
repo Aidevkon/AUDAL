@@ -9,3 +9,5 @@ pub mod limiter;
 pub mod reverb;
 pub mod width;
 pub mod noisegate;
+pub mod deesser;
+pub mod dehum;
