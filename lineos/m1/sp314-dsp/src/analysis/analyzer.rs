@@ -2,7 +2,7 @@
 // S-002 §5 Processing Pipeline
 // All spectral features computed per-channel, averaged (Option A per DeepSeek audit)
 
-use crate::stft::stem_renderer::FourStems;
+use crate::stft::stem_renderer::FiveStems;
 use crate::metering::measure_integrated_lufs;
 use super::features::{
     StemFeatures, StemMetrics, MixMetrics,
@@ -16,9 +16,7 @@ use super::stereo::{stereo_correlation, stereo_width};
 pub struct StemFeatureAnalyzer;
 
 impl StemFeatureAnalyzer {
-    /// Analyze 4 stereo interleaved stems from S-001 (FourStems).
-    /// Returns StemFeatures with all metrics computed.
-    pub fn analyze(stems: &FourStems, sample_rate: u32) -> StemFeatures {
+    pub fn analyze(stems: &FiveStems, sample_rate: u32) -> StemFeatures {
         let bass      = Self::analyze_stem(&stems.bass,      sample_rate);
         let harmonics = Self::analyze_stem(&stems.harmonics, sample_rate);
         let drums     = Self::analyze_stem(&stems.drums,     sample_rate);
@@ -27,28 +25,31 @@ impl StemFeatureAnalyzer {
         // Mix energy for ratios
         let mix_energy = Self::stereo_energy(&stems.bass)
                        + Self::stereo_energy(&stems.harmonics)
+                       + Self::stereo_energy(&stems.voice)
                        + Self::stereo_energy(&stems.drums)
                        + Self::stereo_energy(&stems.ambience);
 
         let bass_ratio      = Self::energy_ratio(&stems.bass,      mix_energy);
         let harmonics_ratio = Self::energy_ratio(&stems.harmonics, mix_energy);
+        let voice_ratio     = Self::energy_ratio(&stems.voice,     mix_energy);
         let drums_ratio     = Self::energy_ratio(&stems.drums,     mix_energy);
         let ambience_ratio  = Self::energy_ratio(&stems.ambience,  mix_energy);
 
         // Sum check assertion (constitutional)
         debug_assert!(
-            bass_ratio + harmonics_ratio + drums_ratio + ambience_ratio
+            bass_ratio + harmonics_ratio + voice_ratio + drums_ratio + ambience_ratio
                 <= 1.0 + ENERGY_RATIO_EPSILON
         );
 
         // Mix: combine all stems
-        let mix_stereo = Self::combine_stereo(
-            &stems.bass, &stems.harmonics, &stems.drums, &stems.ambience);
+        let mix_stereo = Self::combine_stereo_five(
+            &stems.bass, &stems.harmonics, &stems.voice, &stems.drums, &stems.ambience);
         let mix_l: Vec<f32> = mix_stereo.iter().step_by(2).copied().collect();
         let mix_r: Vec<f32> = mix_stereo.iter().skip(1).step_by(2).copied().collect();
 
         // Mix centroid: energy-weighted average of stem centroids (S-008)
-        let ratios = [bass_ratio, harmonics_ratio, drums_ratio, ambience_ratio];
+        // Mix centroid: energy-weighted average of stem centroids (S-008)
+        let ratios = [bass_ratio, harmonics_ratio, drums_ratio, ambience_ratio]; // voice not in StemFeatures yet
         let centroids = [bass.spectral_centroid_hz, harmonics.spectral_centroid_hz,
                          drums.spectral_centroid_hz, ambience.spectral_centroid_hz];
         let total_w: f32 = ratios.iter().sum();
@@ -125,9 +126,9 @@ impl StemFeatureAnalyzer {
         (Self::stereo_energy(stem) / mix_energy).clamp(0.0, 1.0)
     }
 
-    fn combine_stereo(a: &[f32], b: &[f32], c: &[f32], d: &[f32]) -> Vec<f32> {
-        let n = a.len().min(b.len()).min(c.len()).min(d.len());
-        (0..n).map(|i| a[i] + b[i] + c[i] + d[i]).collect()
+    fn combine_stereo_five(a: &[f32], b: &[f32], c: &[f32], d: &[f32], e: &[f32]) -> Vec<f32> {
+        let n = a.len().min(b.len()).min(c.len()).min(d.len()).min(e.len());
+        (0..n).map(|i| a[i] + b[i] + c[i] + d[i] + e[i]).collect()
     }
 
     /// Analyze a stereo PCM signal — mix metrics only.

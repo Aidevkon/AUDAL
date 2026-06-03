@@ -1,4 +1,4 @@
-pub const N_COMPONENTS: usize = 3;
+pub const N_COMPONENTS: usize = 4;
 pub const N_ITER:       usize = 30;
 const EPS:      f32 = 1e-10_f32;
 const LAMBDA_H: f32 = 0.1;

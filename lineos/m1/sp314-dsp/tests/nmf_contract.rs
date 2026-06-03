@@ -37,8 +37,8 @@ fn test_nmf_semantic_isolation() {
     for f in 0..n_frames {
         for b in 0..n_bins {
             let mut approx = 0.0_f32;
-            for c in 0..3 {
-                approx += engine.w[b * 3 + c]
+            for c in 0..sp314_dsp::stft::nmf::N_COMPONENTS {
+                approx += engine.w[b * sp314_dsp::stft::nmf::N_COMPONENTS + c]
                         * engine.h[c * n_frames + f];
             }
             let diff = frames[f][b] - approx;
@@ -52,29 +52,31 @@ fn test_nmf_semantic_isolation() {
 
     // Spectral centroids
     let centroids = engine.centroids(n_bins);
-    for c in 0..3 {
+    for c in 0..sp314_dsp::stft::nmf::N_COMPONENTS {
         println!("Component {} centroid: {:.2}", c, centroids[c]);
     }
 
     // Sort by centroid — deterministic float sort
-    let mut sorted: Vec<usize> = (0..3).collect();
+    let mut sorted: Vec<usize> = (0..sp314_dsp::stft::nmf::N_COMPONENTS).collect();
     sorted.sort_by(|&a, &b|
         centroids[a].total_cmp(&centroids[b]));
 
     println!("Bass  component: {} (centroid {:.2})",
              sorted[0], centroids[sorted[0]]);
-    println!("Mid   component: {} (centroid {:.2})",
+    println!("Mid 1 component: {} (centroid {:.2})",
              sorted[1], centroids[sorted[1]]);
-    println!("Other component: {} (centroid {:.2})",
+    println!("Mid 2 component: {} (centroid {:.2})",
              sorted[2], centroids[sorted[2]]);
+    println!("Other component: {} (centroid {:.2})",
+             sorted[3], centroids[sorted[3]]);
 
     // Bass must be in low frequency range
     assert!(centroids[sorted[0]] < 10.0_f32,
         "Bass centroid too high: {:.2}", centroids[sorted[0]]);
 
     // Other/broadband must be in higher range
-    assert!(centroids[sorted[2]] > 12.0_f32,
-        "Other centroid too low: {:.2}", centroids[sorted[2]]);
+    assert!(centroids[sorted[3]] > 12.0_f32,
+        "Other centroid too low: {:.2}", centroids[sorted[3]]);
 }
 
 #[test]
@@ -90,7 +92,7 @@ fn test_nmf_masks_sum_to_unity() {
     let mut max_err = 0.0_f32;
     for f in 0..n_frames {
         for b in 0..n_bins {
-            let sum: f32 = (0..3)
+            let sum: f32 = (0..sp314_dsp::stft::nmf::N_COMPONENTS)
                 .map(|c| engine.component_mask(
                     c, n_bins, n_frames)[f][b])
                 .sum();
