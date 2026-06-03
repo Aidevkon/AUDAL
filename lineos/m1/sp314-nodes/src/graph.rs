@@ -234,8 +234,9 @@ impl DspGraph {
             self.nodes.get_mut(node_id).unwrap().process_stereo(buf_l, buf_r);
 
             if node_type == "Output" {
-                left.copy_from_slice(buf_l);
-                right.copy_from_slice(buf_r);
+                let len = left.len();
+                left.copy_from_slice(&buf_l[..len]);
+                right.copy_from_slice(&buf_r[..len]);
             }
         }
     }
