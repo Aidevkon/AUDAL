@@ -1,15 +1,36 @@
 use dioxus::prelude::*;
 
+#[derive(Props, Clone, PartialEq)]
+pub struct JourneyViewProps {
+    pub stage: Signal<String>,
+    pub elapsed_ms: Signal<u64>,
+}
+
 #[component]
-pub fn JourneyView() -> Element {
+pub fn JourneyView(props: JourneyViewProps) -> Element {
+    let stages = ["INITIALIZING", "ANALYZING", "STEMS", "MARKOV", "DSP", "SPATIAL", "CERTIFIED"];
+    let current_stage = props.stage.read().clone();
+    let current_stage_str = current_stage.as_str();
+    let current_idx = stages.iter().position(|&s| s == current_stage_str).unwrap_or(0);
+    let elapsed_str = format!("{} ms", *props.elapsed_ms.read());
+
     rsx! {
         div { class: "journey-view-overlay",
-            style: "width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent;",
-            div { style: "font-family: 'Share Tech Mono', monospace; font-size: 24px; color: var(--accent-cyan); letter-spacing: 0.1em; margin-bottom: 12px;",
+            div { class: "journey-title",
                 "THE SIGNAL JOURNEY"
             }
-            div { style: "font-family: 'Barlow Condensed', sans-serif; font-size: 16px; color: var(--text-muted); letter-spacing: 0.05em;",
-                "Pre-Analysis → Stems → Markov → DSP → Spatial → Certified"
+            div { class: "journey-stages",
+                for (i, s) in stages.into_iter().enumerate() {
+                    div {
+                        key: "{s}",
+                        class: format!("journey-stage {}", if i < current_idx { "done" } else if i == current_idx { "active" } else { "" }),
+                        div { class: "journey-stage-dot" }
+                        "{s}"
+                    }
+                }
+            }
+            div { class: "journey-elapsed",
+                "{elapsed_str}"
             }
         }
     }

@@ -642,6 +642,55 @@ body {
   border-right: none;
 }
 
+/* JOURNEY VIEW */
+.journey-view-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 10, 16, 0.97);
+  border-radius: 16px;
+  gap: 24px;
+}
+.journey-title {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--accent-cyan);
+  letter-spacing: 0.15em;
+}
+.journey-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.journey-stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity 0.3s;
+}
+.journey-stage.done  { opacity: 0.6; color: var(--accent-cyan); }
+.journey-stage.active { opacity: 1.0; color: #00ff88; }
+.journey-stage-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.journey-stage.active .journey-stage-dot {
+  box-shadow: 0 0 6px #00ff88;
+}
+.journey-elapsed {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .psa-col {
   flex: 35;
 }

@@ -18,6 +18,8 @@ pub struct SamplingSiameseProps {
     pub loud_angle: Signal<f32>,
     pub jini_persona: Signal<crate::types::JiniPersonaState>,
     pub is_journey_active: Signal<bool>,
+    pub journey_stage: Signal<String>,
+    pub journey_elapsed_ms: Signal<u64>,
 }
 
 #[component]
@@ -33,7 +35,10 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
             class: "sampling-siamese chassis-bezel chassis-substrate chassis-seam",
             
             if *props.is_journey_active.read() {
-                crate::components::journey_view::JourneyView {}
+                crate::components::journey_view::JourneyView {
+                    stage: props.journey_stage,
+                    elapsed_ms: props.journey_elapsed_ms,
+                }
             } else {
                 // SESSION - LEFT (PSA)
                 div { 

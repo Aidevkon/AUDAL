@@ -17,6 +17,8 @@
 //! Amendment A-003 §5: no PCM — PlaybackStateJson only.
 
 use dioxus::prelude::*;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use gloo_timers::future::TimeoutFuture;
 use crate::state::cockpit_mode::CockpitMode;
@@ -54,9 +56,57 @@ pub fn App() -> Element {
     // ── JINI signals (J-P5) ──────────────────────────────────────────────────
     let jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
     let jini_persona:    Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
-    let is_journey_active: Signal<bool> = use_signal(|| false);
+    let mut is_journey_active: Signal<bool> = use_signal(|| false);
+    let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
+    let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
+
+    // ── Tauri Event Listener for mastering://progress ────────────────────────
+    use_effect(move || {
+        spawn_local(async move {
+            let window = web_sys::window().expect("no window");
+            let window_val: JsValue = window.into();
+            
+            // Try to get window.__TAURI__.event.listen
+            if let Ok(tauri) = js_sys::Reflect::get(&window_val, &JsValue::from_str("__TAURI__")) {
+                if !tauri.is_undefined() {
+                    if let Ok(event_api) = js_sys::Reflect::get(&tauri, &JsValue::from_str("event")) {
+                        if let Ok(listen_val) = js_sys::Reflect::get(&event_api, &JsValue::from_str("listen")) {
+                            if let Ok(listen_fn) = listen_val.dyn_into::<js_sys::Function>() {
+                                
+                                let cb = wasm_bindgen::closure::Closure::wrap(Box::new(move |ev: JsValue| {
+                                    if let Ok(payload) = js_sys::Reflect::get(&ev, &JsValue::from_str("payload")) {
+                                        if let Ok(stage_val) = js_sys::Reflect::get(&payload, &JsValue::from_str("stage")) {
+                                            if let Some(s) = stage_val.as_string() {
+                                                journey_stage.set(s.clone());
+                                                // INV-JV-2: always returns to standard layout after CERTIFIED
+                                                if s == "CERTIFIED" || s == "ERROR" {
+                                                    spawn_local(async move {
+                                                        gloo_timers::future::TimeoutFuture::new(1000).await;
+                                                        is_journey_active.set(false);
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        if let Ok(elapsed_val) = js_sys::Reflect::get(&payload, &JsValue::from_str("elapsed_ms")) {
+                                            if let Some(ms) = elapsed_val.as_f64() {
+                                                journey_elapsed_ms.set(ms as u64);
+                                            }
+                                        }
+                                    }
+                                }) as Box<dyn FnMut(JsValue)>);
+                                
+                                let _ = listen_fn.call2(&event_api, &JsValue::from_str("mastering://progress"), cb.as_ref().unchecked_ref());
+                                cb.forget();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
 
     rsx! {
+
 
         div { id: "app-shell", class: "app-shell",
 
@@ -90,6 +140,8 @@ pub fn App() -> Element {
                     loud_angle,
                     jini_persona,
                     is_journey_active,
+                    journey_stage,
+                    journey_elapsed_ms,
                 }
             }
 
