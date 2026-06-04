@@ -16,9 +16,29 @@ pub struct SpatialPreAnalysis {
 
 use crate::transforms::pca::pca_spatial;
 
+/// Sample signal for PCA — every STRIDE samples.
+/// Preserves statistical properties while reducing computation.
+/// 1024 samples sufficient for covariance estimation.
+const PCA_MAX_SAMPLES: usize = 1024;
+
+fn sample_for_pca<'a>(signal: &'a [f32]) -> std::borrow::Cow<'a, [f32]> {
+    if signal.len() <= PCA_MAX_SAMPLES {
+        return std::borrow::Cow::Borrowed(signal);
+    }
+    let stride = signal.len() / PCA_MAX_SAMPLES;
+    let sampled: Vec<f32> = signal.iter()
+        .step_by(stride)
+        .take(PCA_MAX_SAMPLES)
+        .copied()
+        .collect();
+    std::borrow::Cow::Owned(sampled)
+}
+
 impl SpatialPreAnalysis {
     pub fn analyze(left: &[f32], right: &[f32], sample_rate: u32) -> Self {
-        let pca = pca_spatial(left, right);
+        let left_s  = sample_for_pca(left);
+        let right_s = sample_for_pca(right);
+        let pca = pca_spatial(&left_s, &right_s);
         
         // Adaptive M/S via PCA (replaces fixed Hadamard)
         let mid_energy  = pca.cov_ll + pca.cov_lr;
