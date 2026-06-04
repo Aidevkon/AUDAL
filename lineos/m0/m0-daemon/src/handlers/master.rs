@@ -488,7 +488,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     // Run sp314-dsp in blocking thread (no_std/alloc/sync) with a 60s timeout
     let timeout_result = tokio::time::timeout(
-        tokio::time::Duration::from_secs(60),
+        tokio::time::Duration::from_secs(300),
         tokio::task::spawn_blocking(move || {
             let res = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
             (res, audio, dsp_config)

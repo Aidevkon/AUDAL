@@ -20,12 +20,15 @@ pub struct StemChannelAssignments {
 impl StemChannelAssignments {
     /// Deterministic assignment from StemFeatures + SpatialPreAnalysis
     /// INV-SP-8: Voice always has center_weight > 0
-    pub fn compute(features: &StemFeatures, _spatial: &SpatialPreAnalysis) -> Self {
-        // Voice rule: center
-        let voice_center: f32 = if features.voice.rms_db > -30.0 && features.voice.crest_factor_db < 10.0 {
-            0.8
+    pub fn compute(features: &StemFeatures, spatial: &SpatialPreAnalysis) -> Self {
+        // Voice center weight: stronger when signal is correlated
+        // (correlated = mono-like = voice dominant = more center)
+        let voice_center = if spatial.ms_ratio < 0.3 {
+            // High correlation → strong center
+            (0.8_f32 + (0.3 - spatial.ms_ratio) * 0.5).min(1.0_f32)
         } else {
-            0.5
+            // Wide signal → less center
+            (0.8_f32 - (spatial.ms_ratio - 0.3) * 0.3).max(0.3_f32)
         };
         
         let voice = ChannelAssignment {
@@ -65,10 +68,15 @@ impl StemChannelAssignments {
         };
 
         // Ambience rule: rear
+        // Ambience rear weight: stronger when signal is wide
+        let ambience_rear = (0.3_f32 + spatial.ms_ratio * 0.5).min(0.8_f32);
+
+        // Depth score drives rear channels
+        let rear_factor = spatial.depth_score;
         let ambience = ChannelAssignment {
             center_weight: 0.0,
             front_lr_weight: 0.2,
-            rear_lr_weight: 0.8,
+            rear_lr_weight: (ambience_rear + rear_factor * 0.2).min(1.0_f32),
             lfe_weight: 0.0,
             side_weight: 0.6,
         };

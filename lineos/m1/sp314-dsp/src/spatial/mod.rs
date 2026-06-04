@@ -14,68 +14,57 @@ pub struct SpatialPreAnalysis {
     pub air_energy:          f32,   // energy ratio above 8kHz
 }
 
+use crate::transforms::pca::pca_spatial;
+
 impl SpatialPreAnalysis {
     pub fn analyze(left: &[f32], right: &[f32], sample_rate: u32) -> Self {
-        let isq2 = std::f32::consts::FRAC_1_SQRT_2;
+        let pca = pca_spatial(left, right);
         
-        let mut mid_sum_sq = 0.0;
-        let mut side_sum_sq = 0.0;
-        let mut total_sum_sq = 0.0;
+        // Adaptive M/S via PCA (replaces fixed Hadamard)
+        let mid_energy  = pca.cov_ll + pca.cov_lr;
+        let side_energy = pca.cov_ll - pca.cov_lr;
+        let total       = (mid_energy.abs() + side_energy.abs()).max(1e-10);
+        let ms_ratio    = side_energy.abs() / total;
         
-        // Simple 1-pole filter states
+        // Transient directionality from PCA angle
+        let transient_direction = libm::sinf(pca.ms_angle_rad);
+        
+        // Depth score: correlated = front, uncorrelated = deep
+        let depth_score = 1.0 - pca.pc1_ratio;
+        
+        // Band energy (keep existing logic)
         let mut lp_80_l = 0.0;
         let mut lp_80_r = 0.0;
-        let alpha_80 = (-2.0 * std::f32::consts::PI * 80.0 / sample_rate as f32).exp();
+        let alpha_80 = libm::expf(-2.0 * std::f32::consts::PI * 80.0 / sample_rate as f32);
         
         let mut sub_sum_sq = 0.0;
-
+        let mut total_sum_sq = 0.0;
         let len = left.len().min(right.len());
-        if len == 0 {
-            return Self {
-                mid_energy: 0.0,
-                side_energy: 0.0,
-                ms_ratio: 0.0,
-                transient_direction: 0.0,
-                depth_score: 0.0,
-                sub_energy: 0.0,
-                presence_energy: 0.0,
-                air_energy: 0.0,
-            };
-        }
-
-        for i in 0..len {
-            let l = left[i];
-            let r = right[i];
-            
-            let mid = (l + r) * isq2;
-            let side = (l - r) * isq2;
-            
-            mid_sum_sq += mid * mid;
-            side_sum_sq += side * side;
-            total_sum_sq += l * l + r * r;
-            
-            // Sub filter
-            lp_80_l = l * (1.0 - alpha_80) + lp_80_l * alpha_80;
-            lp_80_r = r * (1.0 - alpha_80) + lp_80_r * alpha_80;
-            sub_sum_sq += lp_80_l * lp_80_l + lp_80_r * lp_80_r;
-        }
-
-        let mid_energy = (mid_sum_sq / len as f32).sqrt();
-        let side_energy = (side_sum_sq / len as f32).sqrt();
-        let total_energy = (total_sum_sq / len as f32).max(1e-12);
         
-        let ms_ratio = side_energy / (mid_energy + side_energy).max(1e-12);
-        let sub_energy = (sub_sum_sq / len as f32) / total_energy;
-
+        if len > 0 {
+            for i in 0..len {
+                let l = left[i];
+                let r = right[i];
+                total_sum_sq += l * l + r * r;
+                
+                lp_80_l = l * (1.0 - alpha_80) + lp_80_l * alpha_80;
+                lp_80_r = r * (1.0 - alpha_80) + lp_80_r * alpha_80;
+                sub_sum_sq += lp_80_l * lp_80_l + lp_80_r * lp_80_r;
+            }
+        }
+        
+        let total_energy = if len > 0 { (total_sum_sq / len as f32).max(1e-12) } else { 1e-12 };
+        let sub_energy = if len > 0 { (sub_sum_sq / len as f32) / total_energy } else { 0.0 };
+        
         Self {
-            mid_energy,
-            side_energy,
-            ms_ratio,
-            transient_direction: 0.0,
-            depth_score: 0.0,
+            mid_energy:          pca.cov_ll,
+            side_energy:         pca.cov_rr,
+            ms_ratio:            ms_ratio.clamp(0.0, 1.0),
+            transient_direction: transient_direction.clamp(-1.0, 1.0),
+            depth_score:         depth_score.clamp(0.0, 1.0),
             sub_energy,
-            presence_energy: 0.0,
-            air_energy: 0.0,
+            presence_energy:     0.0,
+            air_energy:          0.0,
         }
     }
 }
