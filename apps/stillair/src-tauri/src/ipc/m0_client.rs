@@ -211,6 +211,7 @@ pub struct PlaybackControlRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MasterRequest {
     pub audio_path: String,
     pub preset_id:  String,
@@ -302,6 +303,18 @@ pub struct GoldenBlobJson {
     pub aether_persona:   Option<String>,
     #[serde(default)]
     pub aether_config:    Option<String>,
+    #[serde(default)]
+    pub stem_fingerprints: Option<StemFingerprints>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StemFingerprints {
+    pub voice:     String,
+    pub drums:     String,
+    pub bass:      String,
+    pub harmonics: String,
+    pub ambience:  String,
+    pub pipeline:  String,
 }
 
 fn default_schema_v1_gc() -> u32 { 1 }
@@ -445,6 +458,7 @@ mod tests {
             aether_cert:      None,
             aether_persona:   None,
             aether_config:    None,
+            stem_fingerprints: None,
         };
 
         // Spec §Determinism: JSON round-trip must be lossless

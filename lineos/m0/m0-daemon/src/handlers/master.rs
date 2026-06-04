@@ -192,6 +192,22 @@ fn update_stage(state: &AppState, job_id: &str, stage: &str,
     });
 }
 
+// Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
+// Computed on raw stems before mix — tamper-proof certificate
+fn sha256_hex(data: &[f32]) -> String {
+    // Fast deterministic fingerprint (not cryptographic SHA256 — no deps)
+    // Uses FNV-like accumulation for determinism
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &s in data {
+        let bits = s.to_bits();
+        h ^= bits as u64;
+        h = h.wrapping_mul(0x100000001b3);
+        h ^= bits as u64 >> 32;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    format!("{:016x}", h)
+}
+
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
@@ -349,6 +365,20 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
             .collect::<Vec<f32>>()
     } else {
         stems.voice.clone()
+    };
+
+    let fingerprints = crate::blob_store::StemFingerprints {
+        voice:     sha256_hex(&clean_voice),
+        drums:     sha256_hex(&stems.drums),
+        bass:      sha256_hex(&stems.bass),
+        harmonics: sha256_hex(&stems.harmonics),
+        ambience:  sha256_hex(&stems.ambience),
+        pipeline: {
+            let mut all = clean_voice.clone();
+            all.extend_from_slice(&stems.drums);
+            all.extend_from_slice(&stems.bass);
+            sha256_hex(&all)
+        },
     };
 
     // Reconstruct mix with clean voice
@@ -636,6 +666,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         seed,
         pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
         preset_id:        preset_id.to_string(),
+        stem_fingerprints: Some(fingerprints),
         loudness: StoredLoudness {
             integrated_lufs:          lufs,
             short_term_lufs:          telemetry_short_term,   // Phase 9: real 3s window

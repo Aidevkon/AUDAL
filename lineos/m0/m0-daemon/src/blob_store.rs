@@ -51,6 +51,9 @@ pub struct StoredBlob {
     #[serde(default)]
     pub aether_config:  Option<String>,
 
+    #[serde(default)]
+    pub stem_fingerprints: Option<StemFingerprints>,
+
     // Audio payload — not serialized to JSON (never sent to frontend).
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
     // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
@@ -103,6 +106,16 @@ pub struct StoredProvenance {
     pub created_by:           String,
     pub aether_enriched:      bool,
     pub aether_devices:       Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StemFingerprints {
+    pub voice:     String,
+    pub drums:     String,
+    pub bass:      String,
+    pub harmonics: String,
+    pub ambience:  String,
+    pub pipeline:  String,
 }
 
 /// Thread-safe in-memory blob store.
@@ -187,6 +200,7 @@ mod tests {
             aether_cert:    None,
             aether_persona: None,
             aether_config:  None,
+            stem_fingerprints: None,
             audio_bytes:  vec![],   // empty for tests
             sample_rate:  48000,
             channels:     2,
