@@ -6,6 +6,14 @@ const CONV_CHECK_INTERVAL: usize = 10;
 const CONV_TOL: f32 = 1e-4;
 pub const TRANSFORM_ITERS: usize = 5;
 
+use rayon::prelude::*;
+use std::cell::RefCell;
+
+thread_local! {
+    static NMF_SCRATCH: RefCell<(Vec<f32>, Vec<f32>)> =
+        RefCell::new((Vec::new(), Vec::new()));
+}
+
 /// Deterministic xorshift32 PRNG (seed=42)
 fn xorshift32(state: &mut u32) -> f32 {
     *state ^= *state << 13;
@@ -20,6 +28,28 @@ pub struct NmfEngine {
     pub w: Vec<f32>,
     /// H: activation matrix [n_components × n_frames] row-major
     pub h: Vec<f32>,
+}
+
+fn downsample_frames(frames: &[Vec<f32>]) -> Vec<Vec<f32>> {
+    frames.iter().step_by(2).cloned().collect()
+}
+
+fn upsample_masks_linear(masks: &[f32], n_components: usize,
+                          original_frames: usize) -> Vec<f32> {
+    let downsampled = (original_frames + 1) / 2;
+    let mut out = vec![0.0f32; n_components * original_frames];
+    for c in 0..n_components {
+        for f in 0..original_frames {
+            let exact = f as f32 / 2.0;
+            let idx0  = exact.floor() as usize;
+            let idx1  = (idx0 + 1).min(downsampled - 1);
+            let frac  = exact - idx0 as f32;
+            let v0    = masks[c * downsampled + idx0];
+            let v1    = masks[c * downsampled + idx1];
+            out[c * original_frames + f] = v0 + frac * (v1 - v0);
+        }
+    }
+    out
 }
 
 impl NmfEngine {
@@ -51,38 +81,50 @@ impl NmfEngine {
         let mut prev_error = f32::MAX;
         for iter in 0..N_ITER {
             // Step 1: V_approx = W * H
-            for b in 0..n_bins {
-                for f in 0..n_frames {
-                    let mut sum = 0.0_f32;
-                    for c in 0..k {
-                        sum += w[b * k + c] * h[c * n_frames + f];
+            v_approx.fill(0.0f32);
+            for c in 0..k {
+                for b in 0..n_bins {
+                    let w_bc = w[b * k + c];
+                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
+                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    for f in 0..n_frames {
+                        v_slice[f] += w_bc * h_slice[f];
                     }
-                    v_approx[b * n_frames + f] = sum;
                 }
             }
 
             // Step 2: Update H: H *= (W^T * V) / (W^T * V_approx + EPS)
-            for c in 0..k {
-                for f in 0..n_frames {
-                    let mut num = 0.0_f32;
-                    let mut den = 0.0_f32;
+            h.par_chunks_mut(n_frames).enumerate().for_each(|(c, h_row)| {
+                NMF_SCRATCH.with(|cell| {
+                    let mut scratch = cell.borrow_mut();
+                    let (ref mut num, ref mut den) = *scratch;
+                    num.clear(); num.resize(n_frames, 0.0f32);
+                    den.clear(); den.resize(n_frames, 0.0f32);
+
                     for b in 0..n_bins {
                         let w_bc = w[b * k + c];
-                        num += w_bc * frames[f][b];
-                        den += w_bc * v_approx[b * n_frames + f];
+                        let v_slice = &v_approx[b * n_frames..(b+1)*n_frames];
+                        for f in 0..n_frames {
+                            num[f] += w_bc * frames[f][b];
+                            den[f] += w_bc * v_slice[f];
+                        }
                     }
-                    h[c * n_frames + f] *= num / (den + LAMBDA_H + EPS);
-                }
-            }
+                    for f in 0..n_frames {
+                        h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
+                    }
+                });
+            });
 
             // Step 3: Recompute V_approx with updated H
-            for b in 0..n_bins {
-                for f in 0..n_frames {
-                    let mut sum = 0.0_f32;
-                    for c in 0..k {
-                        sum += w[b * k + c] * h[c * n_frames + f];
+            v_approx.fill(0.0f32);
+            for c in 0..k {
+                for b in 0..n_bins {
+                    let w_bc = w[b * k + c];
+                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
+                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    for f in 0..n_frames {
+                        v_slice[f] += w_bc * h_slice[f];
                     }
-                    v_approx[b * n_frames + f] = sum;
                 }
             }
 
@@ -140,8 +182,11 @@ impl NmfEngine {
 
     /// Learn stem profiles from representative sample.
     pub fn fit(&mut self, frames: &[Vec<f32>]) -> Vec<f32> {
-        let (w, _) = self.fit_transform(frames);
-        w
+        let ds_frames = downsample_frames(frames);
+        let (w_new, h_down) = self.fit_transform(&ds_frames);
+        self.w = w_new.clone();
+        self.h = upsample_masks_linear(&h_down, self.n_components, frames.len());
+        w_new
     }
 
     /// Apply learned profiles to full track.
@@ -158,29 +203,39 @@ impl NmfEngine {
 
         for _ in 0..TRANSFORM_ITERS {
             // Step 1: V_approx = W * H
-            for b in 0..n_bins {
-                for f in 0..n_frames {
-                    let mut sum = 0.0_f32;
-                    for c in 0..k {
-                        sum += w[b * k + c] * h[c * n_frames + f];
+            v_approx.fill(0.0f32);
+            for c in 0..k {
+                for b in 0..n_bins {
+                    let w_bc = w[b * k + c];
+                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
+                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    for f in 0..n_frames {
+                        v_slice[f] += w_bc * h_slice[f];
                     }
-                    v_approx[b * n_frames + f] = sum;
                 }
             }
 
             // Step 2: Update H: H *= (W^T * V) / (W^T * V_approx + EPS)
-            for c in 0..k {
-                for f in 0..n_frames {
-                    let mut num = 0.0_f32;
-                    let mut den = 0.0_f32;
+            h.par_chunks_mut(n_frames).enumerate().for_each(|(c, h_row)| {
+                NMF_SCRATCH.with(|cell| {
+                    let mut scratch = cell.borrow_mut();
+                    let (ref mut num, ref mut den) = *scratch;
+                    num.clear(); num.resize(n_frames, 0.0f32);
+                    den.clear(); den.resize(n_frames, 0.0f32);
+
                     for b in 0..n_bins {
                         let w_bc = w[b * k + c];
-                        num += w_bc * frames[f][b];
-                        den += w_bc * v_approx[b * n_frames + f];
+                        let v_slice = &v_approx[b * n_frames..(b+1)*n_frames];
+                        for f in 0..n_frames {
+                            num[f] += w_bc * frames[f][b];
+                            den[f] += w_bc * v_slice[f];
+                        }
                     }
-                    h[c * n_frames + f] *= num / (den + LAMBDA_H + EPS);
-                }
-            }
+                    for f in 0..n_frames {
+                        h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
+                    }
+                });
+            });
         }
         h
     }
