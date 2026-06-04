@@ -1,0 +1,16 @@
+{
+  "sine_440hz": {
+    "mse": 3.6100493390001445e-15,
+    "pass": true,
+    "signal_length": 48000,
+    "reconstructed_length": 48128
+  },
+  "white_noise": {
+    "mse": 8.452637071857229e-17,
+    "pass": true,
+    "signal_length": 48000,
+    "reconstructed_length": 48128
+  },
+  "fft_size": 2048,
+  "hop_size": 512
+}

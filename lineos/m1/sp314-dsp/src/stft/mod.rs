@@ -48,6 +48,12 @@ impl StftEngine {
     pub fn forward(&mut self, signal: &[f32])
         -> (Vec<Vec<Complex<f32>>>, usize)
     {
+        let pad = FFT_SIZE / 2;
+        let mut padded = vec![0.0f32; pad];
+        padded.extend_from_slice(signal);
+        padded.extend(vec![0.0f32; pad]);
+        let signal = &padded;
+
         let n = signal.len();
         let mut frames = Vec::new();
         let mut buf = vec![Complex::new(0.0_f32, 0.0_f32);
@@ -77,8 +83,10 @@ impl StftEngine {
                    frames: &[Vec<Complex<f32>>],
                    output_len: usize) -> Vec<f32>
     {
-        let mut output     = vec![0.0_f32; output_len];
-        let mut window_sum = vec![0.0_f32; output_len];
+        let pad = FFT_SIZE / 2;
+        let internal_len = output_len + 2 * pad;
+        let mut output     = vec![0.0_f32; internal_len];
+        let mut window_sum = vec![0.0_f32; internal_len];
         let mut buf = vec![Complex::new(0.0_f32, 0.0_f32);
                            FFT_SIZE];
 
@@ -91,7 +99,7 @@ impl StftEngine {
                 .process_with_scratch(&mut buf, &mut self.scratch);
 
             let start = k * HOP_SIZE;
-            let end   = (start + FFT_SIZE).min(output_len);
+            let end   = (start + FFT_SIZE).min(internal_len);
             let len   = end - start;
 
             for i in 0..len {
@@ -102,12 +110,12 @@ impl StftEngine {
             }
         }
 
-        for i in 0..output_len {
+        for i in 0..internal_len {
             if window_sum[i] > 1e-8_f32 {
                 output[i] /= window_sum[i];
             }
         }
-        output
+        output[pad..pad + output_len].to_vec()
     }
 }
 

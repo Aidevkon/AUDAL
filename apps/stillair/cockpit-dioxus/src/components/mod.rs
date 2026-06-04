@@ -12,4 +12,5 @@ pub mod ab_toggle;
 pub mod timecode;
 pub mod oled_tile;
 pub mod pdf_preview;
+pub mod journey_view;
 pub use pdf_preview::PdfPreviewModal;

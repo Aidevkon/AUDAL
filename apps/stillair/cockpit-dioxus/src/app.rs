@@ -54,6 +54,7 @@ pub fn App() -> Element {
     // ── JINI signals (J-P5) ──────────────────────────────────────────────────
     let jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
     let jini_persona:    Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
+    let is_journey_active: Signal<bool> = use_signal(|| false);
 
     rsx! {
 
@@ -88,6 +89,7 @@ pub fn App() -> Element {
                     space_angle,
                     loud_angle,
                     jini_persona,
+                    is_journey_active,
                 }
             }
 

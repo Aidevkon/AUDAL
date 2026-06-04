@@ -21,6 +21,7 @@ use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvena
 use xaak::PcmTransfer;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MasterRequest {
     pub audio_path: String,
     pub preset_id:  String,

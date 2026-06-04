@@ -51,7 +51,7 @@ pub fn ActiveProcessingChain(props: ActiveProcessingChainProps) -> Element {
                     div { class: "dsp-chain-cell oled-screen",
                         div { class: "dsp-chain-panel",
                             CompDisplay { state: props.compressor.clone() }
-                            div { class: "dsp-chain-divider" }
+
                             LimDisplay { state: props.limiter.clone() }
                         }
                     }
