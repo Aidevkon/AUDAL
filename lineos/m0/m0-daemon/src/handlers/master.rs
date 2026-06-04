@@ -50,8 +50,12 @@ pub struct MasterResponse {
 pub async fn trigger_mastering(
     State(state): State<AppState>,
     Json(req):    Json<MasterRequest>,
-) -> Json<MasterResponse> {
-    let start = Instant::now();
+) -> Json<serde_json::Value> {
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let start  = std::time::Instant::now();
+
+    // Register job immediately
+    update_stage(&state, &job_id, "INITIALIZING", &start, None);
 
     state.audit.write(
         AuditEntry::new("m0d.mastering_started", AuditLevel::Audit,
@@ -64,115 +68,128 @@ pub async fn trigger_mastering(
             AuditEntry::new("m0d.mastering_rejected", AuditLevel::Audit,
                 &format!("preset not allowed: {}", req.preset_id))
         ).ok();
-        return Json(MasterResponse {
-            blob_id: String::new(),
-            status:  "error",
-            message: Some(format!("preset not allowed: {}", req.preset_id)),
-            aether_error: None,
-            persona_id: None,
-            converged: None,
+        
+        state.progress.insert(job_id.clone(), crate::app_state::MasteringProgress {
+            job_id:     job_id.clone(),
+            stage:      "ERROR".into(),
+            elapsed_ms: start.elapsed().as_millis() as u64,
+            blob_id:    None,
+            error:      Some(format!("preset not allowed: {}", req.preset_id)),
         });
+
+        return Json(serde_json::json!({ "job_id": job_id }));
     }
 
-    match run_dsp_internal(&req, start).await {
-        Ok((blob, chunk_original, target_lufs)) => {
-            let blob_id  = blob.id.clone();
+    // Spawn DSP in background — HTTP returns immediately
+    let state_bg  = state.clone();
+    let job_id_bg = job_id.clone();
+    tokio::spawn(async move {
+        let start_bg = std::time::Instant::now();
 
-            // Phase 12A (A-003 §2): Transfer PCM ownership to xaak before storing blob.
-            // blob.audio_bytes = raw f32-LE PCM from sp314-dsp output.
-            // After this, xaak is the SOLE PCM owner.
-            let pcm_samples: Vec<f32> = blob.audio_bytes
-                .chunks_exact(4)
-                .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-                .collect();
+        update_stage(&state_bg, &job_id_bg, "ANALYZING", &start_bg, None);
 
-            let xaak_blob_id = Uuid::parse_str(&blob_id)
-                .unwrap_or_else(|_| Uuid::new_v4());
+        match run_dsp_internal(&req, start_bg).await {
+            Ok((blob, chunk_original, target_lufs)) => {
+                let blob_id = blob.id.clone();
 
-            let transfer = PcmTransfer {
-                samples:     pcm_samples,
-                sample_rate: blob.sample_rate,
-                channels:    blob.channels,
-                blob_id:     xaak_blob_id,
-            };
+                update_stage(&state_bg, &job_id_bg, "STEMS",   &start_bg, None);
+                update_stage(&state_bg, &job_id_bg, "MARKOV",  &start_bg, None);
+                update_stage(&state_bg, &job_id_bg, "DSP",     &start_bg, None);
+                update_stage(&state_bg, &job_id_bg, "SPATIAL", &start_bg, None);
 
-            // PlaybackHandle.load() is non-blocking — sends over mpsc channel.
-            state.playback.load(transfer);
+                // PCM transfer to xaak (existing logic)
+                let pcm_samples: Vec<f32> = blob.audio_bytes
+                    .chunks_exact(4)
+                    .map(|b| f32::from_le_bytes([b[0],b[1],b[2],b[3]]))
+                    .collect();
+                let xaak_blob_id = uuid::Uuid::parse_str(&blob_id)
+                    .unwrap_or_else(|_| uuid::Uuid::new_v4());
+                state_bg.playback.load(PcmTransfer {
+                    samples:     pcm_samples,
+                    sample_rate: blob.sample_rate,
+                    channels:    blob.channels,
+                    blob_id:     xaak_blob_id,
+                });
 
-            // Load original PCM for A/B comparison (B side)
-            // Gain match: normalize to same LUFS as mastered
-            let original_samples: Vec<f32> = {
-                let orig_l = chunk_original.left.clone();
-                let orig_r = chunk_original.right.clone();
-                orig_l.iter()
-                    .zip(orig_r.iter())
-                    .flat_map(|(l, r)| [*l, *r])
-                    .collect()
-            };
+                // Load original PCM for A/B comparison (B side)
+                let original_samples: Vec<f32> = {
+                    let orig_l = chunk_original.left.clone();
+                    let orig_r = chunk_original.right.clone();
+                    orig_l.iter()
+                        .zip(orig_r.iter())
+                        .flat_map(|(l, r)| [*l, *r])
+                        .collect()
+                };
 
-            // Apply gain match (normalize B to A's LUFS)
-            use sp314_dsp::metering::measure_integrated_lufs;
-            let orig_l_ref: Vec<f32> = original_samples
-                .iter().step_by(2).copied().collect();
-            let orig_r_ref: Vec<f32> = original_samples
-                .iter().skip(1).step_by(2).copied().collect();
-            let orig_lufs = measure_integrated_lufs(
-                &orig_l_ref, &orig_r_ref);
-            let master_lufs = target_lufs.unwrap_or(-14.0);
+                use sp314_dsp::metering::measure_integrated_lufs;
+                let orig_l_ref: Vec<f32> = original_samples
+                    .iter().step_by(2).copied().collect();
+                let orig_r_ref: Vec<f32> = original_samples
+                    .iter().skip(1).step_by(2).copied().collect();
+                let orig_lufs = measure_integrated_lufs(
+                    &orig_l_ref, &orig_r_ref);
+                let master_lufs = target_lufs.unwrap_or(-14.0);
 
-            let gain_match_db = master_lufs - orig_lufs;
-            let gain_match_linear = 10.0_f32
-                .powf(gain_match_db.clamp(-18.0, 18.0) / 20.0_f32);
+                let gain_match_db = master_lufs - orig_lufs;
+                let gain_match_linear = 10.0_f32
+                    .powf(gain_match_db.clamp(-18.0, 18.0) / 20.0_f32);
 
-            let matched_samples: Vec<f32> = original_samples
-                .iter()
-                .map(|s| s * gain_match_linear)
-                .collect();
+                let matched_samples: Vec<f32> = original_samples
+                    .iter()
+                    .map(|s| s * gain_match_linear)
+                    .collect();
 
-            let original_transfer = PcmTransfer {
-                samples:     matched_samples,
-                sample_rate: chunk_original.sample_rate,
-                channels:    2,
-                blob_id:     xaak_blob_id,
-            };
-            state.playback.load_original(original_transfer);
+                let original_transfer = PcmTransfer {
+                    samples:     matched_samples,
+                    sample_rate: chunk_original.sample_rate,
+                    channels:    2,
+                    blob_id:     xaak_blob_id,
+                };
+                state_bg.playback.load_original(original_transfer);
 
-            tracing::info!(
-                blob_id = %blob_id,
-                "m0d: PCM transferred to xaak (A-003 §2)"
-            );
+                tracing::info!(
+                    blob_id = %blob_id,
+                    "m0d: PCM transferred to xaak (A-003 §2)"
+                );
 
-            let persona_id = blob.aether_persona.clone();
+                state_bg.blob_store.insert(blob);
+                state_bg.audit.write(
+                    AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,
+                        &format!("blob={blob_id} elapsed={}ms", start_bg.elapsed().as_millis()))
+                ).ok();
 
-            state.blob_store.insert(blob);
-            state.audit.write(
-                AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,
-                    &format!("blob={blob_id} elapsed={}ms", start.elapsed().as_millis()))
-            ).ok();
-            Json(MasterResponse { 
-                blob_id, 
-                status: "ok", 
-                message: None,
-                aether_error: None,
-                persona_id,
-                converged: Some(true)
-            })
+                update_stage(&state_bg, &job_id_bg, "CERTIFIED",
+                    &start_bg, Some(blob_id));
+            }
+            Err(e) => {
+                state_bg.audit.write(
+                    AuditEntry::new("m0d.mastering_failed", AuditLevel::Audit, &e)
+                ).ok();
+                
+                state_bg.progress.insert(job_id_bg.clone(), crate::app_state::MasteringProgress {
+                    job_id:     job_id_bg,
+                    stage:      "ERROR".into(),
+                    elapsed_ms: start_bg.elapsed().as_millis() as u64,
+                    blob_id:    None,
+                    error:      Some(e.to_string()),
+                });
+            }
         }
-        Err(e) => {
-            state.audit.write(
-                AuditEntry::new("m0d.mastering_failed", AuditLevel::Audit, &e)
-            ).ok();
-            let aether_error = if e.contains("AetherBridge") { Some(e.clone()) } else { None };
-            Json(MasterResponse {
-                blob_id: String::new(),
-                status:  "error",
-                message: Some(e),
-                aether_error,
-                persona_id: None,
-                converged: None,
-            })
-        }
-    }
+    });
+
+    // Return job_id IMMEDIATELY — do not wait for DSP
+    Json(serde_json::json!({ "job_id": job_id }))
+}
+
+fn update_stage(state: &AppState, job_id: &str, stage: &str,
+                start: &std::time::Instant, blob_id: Option<String>) {
+    state.progress.insert(job_id.to_string(), crate::app_state::MasteringProgress {
+        job_id:     job_id.to_string(),
+        stage:      stage.to_string(),
+        elapsed_ms: start.elapsed().as_millis() as u64,
+        blob_id,
+        error:      None,
+    });
 }
 
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.

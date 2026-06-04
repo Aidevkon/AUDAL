@@ -11,6 +11,16 @@ use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
 use std::sync::Arc;
 use xaak::engine::PlaybackHandle;
+use dashmap::DashMap;
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MasteringProgress {
+    pub job_id:     String,
+    pub stage:      String,
+    pub elapsed_ms: u64,
+    pub blob_id:    Option<String>,
+    pub error:      Option<String>,
+}
 
 /// Shared application state for the mastering API router (port 7400).
 #[derive(Clone)]
@@ -19,6 +29,7 @@ pub struct AppState {
     pub blob_store: BlobStore,
     /// Send-safe handle to the xaak playback worker thread (A-003 §1).
     pub playback:   PlaybackHandle,
+    pub progress:   Arc<DashMap<String, MasteringProgress>>,
 }
 
 impl AppState {
@@ -27,6 +38,7 @@ impl AppState {
             audit,
             blob_store: BlobStore::new(),
             playback:   PlaybackHandle::spawn(),
+            progress:   Arc::new(DashMap::new()),
         }
     }
 }
