@@ -76,8 +76,9 @@ fn stft_output_dimensions() {
 
     let (frames, n_frames) = engine.forward(&signal);
 
-    // Expected frames: (n - FFT_SIZE) / HOP_SIZE + 1
-    let expected_frames = (n - FFT_SIZE) / HOP_SIZE + 1;
+    // Expected frames: with FFT_SIZE/2 padding on both sides, length is n + FFT_SIZE
+    let padded_n = n + FFT_SIZE;
+    let expected_frames = (padded_n - FFT_SIZE) / HOP_SIZE + 1;
     println!("n_frames: {}, expected: {}", n_frames, expected_frames);
 
     assert_eq!(n_frames, expected_frames,

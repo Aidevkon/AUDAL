@@ -343,6 +343,32 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         mix_left[i]  = mono_mix + stems.drums[i];
         mix_right[i] = mono_mix + stems.drums[i];
     }
+
+    // Level 1: Energy-preserving reconstruction
+    // Source: current track RMS (not corpus — per-session accurate)
+    // INV-AB-1: deterministic — same input → same gain always
+    let original_rms = libm::sqrtf(
+        chunk.left.iter().zip(chunk.right.iter())
+            .map(|(l, r)| l * l + r * r)
+            .sum::<f32>() / (chunk.left.len() * 2) as f32
+    );
+    let mix_rms = libm::sqrtf(
+        mix_left.iter().zip(mix_right.iter())
+            .map(|(l, r)| l * l + r * r)
+            .sum::<f32>() / (mix_left.len() * 2) as f32
+    );
+    let gain = if mix_rms > 1e-10 {
+        (original_rms / mix_rms).clamp(0.5, 2.0)
+    } else {
+        1.0
+    };
+    for i in 0..mix_left.len() {
+        mix_left[i]  *= gain;
+        mix_right[i] *= gain;
+    }
+    // Log for corpus Level 2 (future per-user learning)
+    // gain_compensation_db = 20 * log10(gain)
+
     let features = StemFeatureAnalyzer::analyze(&stems, chunk.sample_rate);
 
     use sp314_dsp::spatial::SpatialPreAnalysis;

@@ -7,6 +7,7 @@ edition = "2021"
 # inherits_from = ["creator-os-invariants", "lineos-constitution"]
 
 [dependencies]
+libm = "0.2"
 tokio        = { version = "1", features = ["full"] }
 axum         = "0.7"
 serde        = { version = "1", features = ["derive"] }
