@@ -40,6 +40,36 @@ pub fn component_transient_density(h: &[f32], n_frames: usize) -> f32 {
     spikes as f32 / n_frames as f32
 }
 
+/// Refine NMF masks before iSTFT reconstruction.
+/// INV-AB-1: deterministic — fixed threshold, no randomness
+/// FIR (not IIR) — prev_row buffer prevents smearing
+fn refine_mask(masks: &mut Vec<Vec<f32>>) {
+    let n_frames = masks.len();
+    if n_frames < 3 { return; }
+    let n_bins = masks[0].len();
+
+    // Step 1: Spectral gating — kill bleeding below 5%
+    const GATE_THRESHOLD: f32 = 0.05;
+    for frame in masks.iter_mut() {
+        for bin in frame.iter_mut() {
+            if *bin < GATE_THRESHOLD {
+                *bin = 0.0;
+            }
+        }
+    }
+
+    // Step 2: Temporal smoothing — 3-frame pure FIR moving average
+    // prev_row holds unmutated values to prevent IIR smearing
+    let mut prev_row = masks[0].clone();
+    for f in 1..n_frames - 1 {
+        for b in 0..n_bins {
+            let curr_val = masks[f][b];
+            masks[f][b] = (prev_row[b] + curr_val + masks[f+1][b]) / 3.0;
+            prev_row[b] = curr_val; // save UNMUTATED for next iteration
+        }
+    }
+}
+
 impl FiveStemRenderer {
     pub fn new() -> Self {
         Self {
@@ -215,10 +245,15 @@ impl FiveStemRenderer {
         }
 
         // Step 8: Build NMF Wiener masks
-        let mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
-        let mask_voice     = nmf.component_mask(voice_comp,     N_BINS, n_frames);
-        let mask_harmonics = nmf.component_mask(harmonics_comp, N_BINS, n_frames);
-        let mask_ambience  = nmf.component_mask(ambience_comp,  N_BINS, n_frames);
+        let mut mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
+        let mut mask_voice     = nmf.component_mask(voice_comp,     N_BINS, n_frames);
+        let mut mask_harmonics = nmf.component_mask(harmonics_comp, N_BINS, n_frames);
+        let mut mask_ambience  = nmf.component_mask(ambience_comp,  N_BINS, n_frames);
+
+        refine_mask(&mut mask_bass);
+        refine_mask(&mut mask_voice);
+        refine_mask(&mut mask_harmonics);
+        refine_mask(&mut mask_ambience);
 
         // Step 9: Combine HPSS + NMF masks and apply in Cartesian domain
         let mut frames_bass      = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
