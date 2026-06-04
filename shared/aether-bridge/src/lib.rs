@@ -245,6 +245,7 @@ mod tests {
             harmonics: StemMetrics::default(),
             drums:     StemMetrics::default(),
             ambience:  StemMetrics::default(),
+            voice:     StemMetrics::default(),
             mix:       MixMetrics::default(),
         }
     }

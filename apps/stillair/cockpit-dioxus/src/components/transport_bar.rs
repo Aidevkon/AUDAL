@@ -13,7 +13,7 @@ use crate::components::{
     transport_button::{TransportActuator, LedColor, SkipActuator},
     ab_toggle::{AbToggle, AbToggleState},
     timecode::TimecodeDisplay,
-    oled_tile::{OledTile, OledTileState},
+    oled_tile::{},
 };
 
 // ── Types (moved from app.rs) ─────────────────────────────────────────────────
@@ -141,8 +141,49 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                 div { class: "transport-panel oled-glass-surface",
                     // Left: Annunciator Zone
                     div { class: "transport-left dsp-annunciators-oled",
-                        div { class: "fm0-zone",
-                            OledTile { state: OledTileState::Lock }
+                        // Session State Annunciator
+                        div { class: "fm0-zone session-annunciator-oled",
+                            {
+                                let session = session_state.read();
+                                let mode_val = mode.read();
+                                
+                                // Extract filename if available
+                                let filename = match &*mode_val {
+                                    crate::state::cockpit_mode::CockpitMode::FileLoaded { name, .. } => Some(name.clone()),
+                                    crate::state::cockpit_mode::CockpitMode::PresetSelected { name, .. } => Some(name.clone()),
+                                    crate::state::cockpit_mode::CockpitMode::Mastering { path, .. } => std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()),
+                                    _ => None,
+                                };
+                                
+                                match session.as_ref() {
+                                    Some(s) => {
+                                        let lufs = s.loudness.integrated_lufs;
+                                        let blob_short = if s.blob_id.len() >= 8 { &s.blob_id[..8] } else { &s.blob_id };
+                                        let disp_name = filename.unwrap_or_else(|| "SESSION ACTIVE".to_string());
+                                        rsx! {
+                                            div { class: "session-ann-row",
+                                                span { class: "session-ann-dot certified" }
+                                                span { class: "session-ann-id", "{blob_short}" }
+                                            }
+                                            div { class: "session-ann-row",
+                                                span { class: "session-ann-lufs",
+                                                    { format!("{:.1} LUFS", lufs) }
+                                                }
+                                                span { class: "session-ann-idle", style: "margin-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60px;", "{disp_name}" }
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        let disp_name = filename.unwrap_or_else(|| "NO FILE".to_string());
+                                        rsx! {
+                                            div { class: "session-ann-row",
+                                                span { class: "session-ann-dot idle" }
+                                                span { class: "session-ann-idle", "{disp_name}" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                         div { class: "dsp-chassis-oled",
                             div { class: "dsp-slots-wrapper-oled",

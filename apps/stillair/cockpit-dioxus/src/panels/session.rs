@@ -286,10 +286,8 @@ fn MasterButton(
                     "audioPath":      p,
                     "presetId":       pr,
                     "flavourId":      flavour.read().clone(),
-                    "intentWarmth":   ((*tone_angle.read()  / 135.0) + 1.0) / 2.0,
-                    "intentPunch":    ((*dyn_angle.read()   / 135.0) + 1.0) / 2.0,
-                    "intentSpace":    ((*space_angle.read() / 135.0) + 1.0) / 2.0,
-                    "intentLoudness": ((*loud_angle.read()  / 135.0) + 1.0) / 2.0,
+                    "intentTone":     ((*tone_angle.read()  / 135.0) + 1.0) / 2.0,
+                    "intentDynamics": ((*dyn_angle.read()   / 135.0) + 1.0) / 2.0,
                 }),
             ).await {
                 Ok(id)  => id,

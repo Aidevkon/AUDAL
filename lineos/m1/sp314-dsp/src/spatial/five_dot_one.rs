@@ -131,6 +131,11 @@ mod tests {
             bass: vec![0.0; 100],
             harmonics: vec![0.0; 100],
             ambience: vec![0.0; 100],
+            voice_transient_density: 0.0,
+            drums_transient_density: 0.0,
+            bass_transient_density: 0.0,
+            harmonics_transient_density: 0.0,
+            ambience_transient_density: 0.0,
         }
     }
 
