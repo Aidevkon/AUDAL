@@ -96,6 +96,15 @@ impl M0Client {
         resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
+    pub async fn get_progress(&self, job_id: &str) -> Result<MasteringProgress, String> {
+        let url = format!("{M0_BASE}/progress/{job_id}");
+        let resp = self.client.get(&url)
+            .timeout(std::time::Duration::from_secs(5))
+            .send().await.map_err(|e| e.to_string())?
+            .json::<MasteringProgress>().await.map_err(|e| e.to_string())?;
+        Ok(resp)
+    }
+
     /// POST /export — write Golden Blob audio to disk as FLAC or WAV.
     /// FM6 flow: export_clicked → POST /export → FM5 (success) | FM-ERR (fail).
     pub async fn export(
@@ -210,10 +219,23 @@ pub struct MasterRequest {
     pub intent_dynamics: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
+pub struct MasteringProgress {
+    pub job_id:     String,
+    pub stage:      String,
+    pub elapsed_ms: u64,
+    pub blob_id:    Option<String>,
+    pub error:      Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct MasterResponse {
-    pub blob_id: String,
-    pub status:  String,             // "ok" | "error"
+    pub job_id:  Option<String>,
+    #[serde(default)]
+    pub blob_id: Option<String>,
+    #[serde(default)]
+    pub status:  Option<String>,
+    #[serde(default)]
     pub message: Option<String>,
 }
 

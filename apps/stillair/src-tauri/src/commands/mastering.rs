@@ -6,7 +6,7 @@
 //! FORBIDDEN: Audio processing in this module.
 //! FORBIDDEN: serde_json::Value in return types.
 
-use tauri::{command, AppHandle, Runtime};
+use tauri::{command, AppHandle, Runtime, Emitter};
 use crate::ipc::m0_client::{GoldenBlobJson, M0Client, MasterRequest};
 
 // ── Accepted audio extensions ─────────────────────────────────────────────────
@@ -143,38 +143,60 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
 
 /// Real mastering: Cockpit → Tauri → M0 → sp314-dsp.
 /// Returns blob_id on success; ASC-mapped error string on failure.
-#[command]
+#[tauri::command]
 pub async fn trigger_mastering(
-    audio_path: String,
-    preset_id:  String,
-    flavour_id: String,
-    intent_tone: f32,
+    audio_path:      String,
+    preset_id:       String,
+    flavour_id:      String,
+    intent_tone:     f32,
     intent_dynamics: f32,
     client: tauri::State<'_, M0Client>,
+    app:    tauri::AppHandle,
 ) -> Result<String, String> {
-    eprintln!("[trigger_mastering] START path={audio_path} preset={preset_id}");
-
-    // Guard: verify M0 is healthy (ASC 0x05 guard).
     client.health().await
         .map_err(|e| format!("M0 unreachable: {e}"))?;
-    eprintln!("[trigger_mastering] health OK — sending to M0...");
 
-    let resp = client
-        .trigger_mastering(MasterRequest { 
-            audio_path, preset_id, flavour_id, 
-            intent_tone, intent_dynamics 
-        })
-        .await
-        .map_err(|e| e.to_string())?;
+    let resp = client.trigger_mastering(MasterRequest {
+        audio_path, preset_id, flavour_id,
+        intent_tone, intent_dynamics,
+    }).await.map_err(|e| e.to_string())?;
 
-    eprintln!("[trigger_mastering] M0 returned status={} blob_id={}", resp.status, resp.blob_id);
+    // Fallback: if old daemon returns blob_id directly
+    let job_id = match resp.job_id {
+        Some(id) => id,
+        None => return resp.blob_id
+            .ok_or("No job_id or blob_id from daemon".into()),
+    };
 
-    if resp.status != "ok" {
-        return Err(resp.message.unwrap_or_else(|| "mastering failed".into()));
+    let _ = app.emit("mastering://progress",
+        serde_json::json!({"stage": "ANALYZING", "job_id": &job_id}));
+
+    loop {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        let progress = client.get_progress(&job_id).await
+            .map_err(|e| e.to_string())?;
+
+        let _ = app.emit("mastering://progress",
+            serde_json::json!({
+                "stage":      progress.stage,
+                "job_id":     progress.job_id,
+                "elapsed_ms": progress.elapsed_ms,
+                "blob_id":    progress.blob_id,
+            }));
+
+        match progress.stage.as_str() {
+            "CERTIFIED" => {
+                return progress.blob_id
+                    .ok_or("CERTIFIED but no blob_id".into());
+            }
+            "ERROR" => {
+                return Err(progress.error
+                    .unwrap_or("Mastering failed".into()));
+            }
+            _ => continue,
+        }
     }
-
-    eprintln!("[trigger_mastering] DONE blob_id={}", resp.blob_id);
-    Ok(resp.blob_id)
 }
 
 // ── get_golden_blob ───────────────────────────────────────────────────────────
