@@ -36,11 +36,6 @@ default = []
 cli = ["cpal", "hound", "flacenc", "ringbuf", "sha2", "hex"]
 
 [[bin]]
-name = "test_engine"
-path = "src/bin/test_engine.rs"
-required-features = ["cli"]
-
-[[bin]]
 name = "sp314_master"
 path = "src/bin/sp314_master.rs"
 required-features = ["cli"]
