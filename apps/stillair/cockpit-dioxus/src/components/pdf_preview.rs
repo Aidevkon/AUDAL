@@ -12,6 +12,13 @@ pub struct PdfPreviewProps {
     pub on_close: EventHandler<()>,
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct StageRecord {
+    pub stage:       String,
+    pub duration_ms: u64,
+    pub stage_hash:  String,
+}
+
 #[derive(Clone, Debug)]
 struct CertData {
     filename:   String,
@@ -32,6 +39,7 @@ struct CertData {
     preset_id:        String,
     persona_hash:     String,
     corpus_hash:      String,
+    timeline:         Vec<StageRecord>,
 }
 
 #[component]
@@ -68,11 +76,12 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                         harmonics:  fp.and_then(|f| f["harmonics"].as_str()).map(short).unwrap_or_default(),
                         ambience:   fp.and_then(|f| f["ambience"].as_str()).map(short).unwrap_or_default(),
                         pipeline:   fp.and_then(|f| f["pipeline"].as_str()).map(short).unwrap_or_default(),
-                        full_file_sha256: blob["input_hash"].as_str().unwrap_or("d7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8").to_string(),
-                        cert_sha256:      "eyJhbGciOiJFZERTQSJ9.eyJjZXJ0X2lkIjoiNTUwZTg0MDA...".to_string(),
+                        full_file_sha256: blob["pcm_blake3"].as_str().unwrap_or("d7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8").to_string(),
+                        cert_sha256:      blob["cert_signature"].as_str().unwrap_or("eyJhbGciOiJFZERTQSJ9...").to_string(),
                         preset_id:        blob["preset_id"].as_str().unwrap_or("dsp_abc123_def456").to_string(),
                         persona_hash:     blob["aether_persona"].as_str().unwrap_or("persona_d3f8a9c2").to_string(),
                         corpus_hash:      "corpus_e7b2f4a1".to_string(),
+                        timeline:         serde_json::from_value(blob["processing_timeline"].clone()).unwrap_or_default(),
                     };
                     cert.set(Some(data));
                     loading.set(false);
@@ -152,29 +161,17 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                         div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;margin-bottom:1.5rem;",
                             div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:10px;", "PROCESSING TIMELINE" }
                             div { style: "display:flex;flex-direction:column;gap:6px;",
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "├── Ingest:" }
-                                    span { "12ms · a3f8...c2e1" }
-                                }
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "├── Pre-Clean:" }
-                                    span { "45ms · b7c2...e9a3" }
-                                }
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "├── Stem Engine:" }
-                                    span { "234ms · c9e1...f8b4" }
-                                }
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "├── Spatial:" }
-                                    span { "67ms · d4a2...c7e9" }
-                                }
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "├── Mastering:" }
-                                    span { "189ms · e3f8...b2d1" }
-                                }
-                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
-                                    span { "└── Render:" }
-                                    span { "23ms · f1c4...d9e2" }
+                                for (i, record) in c.timeline.iter().enumerate() {
+                                    div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                        span {
+                                            if i == c.timeline.len() - 1 {
+                                                "└── {record.stage}:"
+                                            } else {
+                                                "├── {record.stage}:"
+                                            }
+                                        }
+                                        span { "{record.duration_ms}ms · {short_hash(&record.stage_hash)}" }
+                                    }
                                 }
                             }
                         }
@@ -351,4 +348,8 @@ fn chrono_now() -> String {
     {
         "2026-06-05".to_string()
     }
+}
+
+fn short_hash(s: &str) -> String {
+    s.chars().take(8).collect()
 }
