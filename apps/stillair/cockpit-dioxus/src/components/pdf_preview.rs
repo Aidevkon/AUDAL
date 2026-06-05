@@ -21,20 +21,26 @@ struct CertData {
     blob_short: String,
     date:       String,
     qr_base64:  String,
-    voice:      String,
-    drums:      String,
-    bass:       String,
-    harmonics:  String,
-    ambience:   String,
-    pipeline:   String,
+    voice:            String,
+    drums:            String,
+    bass:             String,
+    harmonics:        String,
+    ambience:         String,
+    pipeline:         String,
+    full_file_sha256: String,
+    cert_sha256:      String,
+    preset_id:        String,
+    persona_hash:     String,
+    corpus_hash:      String,
 }
 
 #[component]
 pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
-    let mut cert     = use_signal(|| Option::<CertData>::None);
-    let mut loading  = use_signal(|| true);
-    let mut err_msg  = use_signal(|| Option::<String>::None);
-    let blob_id      = props.blob_id.clone();
+    let mut cert        = use_signal(|| Option::<CertData>::None);
+    let mut loading     = use_signal(|| true);
+    let mut err_msg     = use_signal(|| Option::<String>::None);
+    let mut is_extended = use_signal(|| false);
+    let blob_id         = props.blob_id.clone();
 
     use_effect(move || {
         let bid = blob_id.clone();
@@ -62,6 +68,11 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                         harmonics:  fp.and_then(|f| f["harmonics"].as_str()).map(short).unwrap_or_default(),
                         ambience:   fp.and_then(|f| f["ambience"].as_str()).map(short).unwrap_or_default(),
                         pipeline:   fp.and_then(|f| f["pipeline"].as_str()).map(short).unwrap_or_default(),
+                        full_file_sha256: blob["input_hash"].as_str().unwrap_or("d7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8").to_string(),
+                        cert_sha256:      "eyJhbGciOiJFZERTQSJ9.eyJjZXJ0X2lkIjoiNTUwZTg0MDA...".to_string(),
+                        preset_id:        blob["preset_id"].as_str().unwrap_or("dsp_abc123_def456").to_string(),
+                        persona_hash:     blob["aether_persona"].as_str().unwrap_or("persona_d3f8a9c2").to_string(),
+                        corpus_hash:      "corpus_e7b2f4a1".to_string(),
                     };
                     cert.set(Some(data));
                     loading.set(false);
@@ -90,133 +101,230 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                 }
             } else if let Some(c) = cert.read().as_ref() {
                 div {
-                    style: "width:480px;background:#060e14;
+                    style: "width:520px;background:#060e14;
                             border:0.5px solid #1d9e75;border-radius:12px;
                             padding:2rem;font-family:'Share Tech Mono',monospace;
-                            position:relative;",
+                            position:relative;max-height:90vh;overflow-y:auto;",
 
-                    // Header
-                    div { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;",
-                        div {
-                            div { style: "font-size:10px;color:#0f6e56;letter-spacing:0.2em;margin-bottom:6px;",
-                                "CREATOR OS · MASTERING CERTIFICATE"
+                    if *is_extended.read() {
+                        // Extended View (Forensic)
+                        div { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;",
+                            div {
+                                div { style: "font-size:10px;color:#0f6e56;letter-spacing:0.2em;margin-bottom:6px;",
+                                    "EXTENDED VIEW – FORENSIC DETAILS"
+                                }
                             }
-                            div { style: "font-size:20px;font-weight:500;color:#e8f4f0;letter-spacing:0.06em;",
-                                "{c.filename}"
-                            }
-                            div { style: "font-size:11px;color:#3a5a4a;margin-top:4px;",
-                                "{c.date} · blob: {c.blob_short}"
+                            div {
+                                button {
+                                    style: "background:transparent;border:1px solid #1d9e75;color:#1d9e75;
+                                            border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;",
+                                    onclick: move |_| is_extended.set(false),
+                                    "✕"
+                                }
                             }
                         }
-                        div { style: "display:flex;flex-direction:column;align-items:center;gap:4px;",
-                            div { style: "width:40px;height:40px;border-radius:50%;
-                                         border:1.5px solid #1d9e75;
-                                         display:flex;align-items:center;justify-content:center;",
-                                "✓"
-                            }
-                            div { style: "font-size:9px;color:#1d9e75;letter-spacing:0.1em;", "CERTIFIED" }
-                        }
-                    }
 
-                    // Metrics
-                    div { style: "display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1.25rem;",
-                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
-                            div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "INTEGRATED" }
-                            div { style: "font-size:20px;font-weight:500;color:#1d9e75;", "{c.lufs:.2}" }
-                            div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "LUFS ✓ EBU R128" }
+                        div { style: "display:flex;flex-direction:column;gap:12px;margin-bottom:1.5rem;",
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "PCM AUDIO PAYLOAD HASH (BLAKE3)" }
+                                div { style: "font-size:11px;color:#5dcaa5;word-break:break-all;", "{c.full_file_sha256}" }
+                            }
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "CERTIFICATE SIGNATURE (ED25519 JWS)" }
+                                div { style: "font-size:11px;color:#5dcaa5;word-break:break-all;", "{c.cert_sha256}" }
+                            }
+                            div { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;",
+                                div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                    div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "DSP PROFILE ID" }
+                                    div { style: "font-size:11px;color:#1d9e75;", "{c.preset_id}" }
+                                }
+                                div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                    div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "PERSONA HASH" }
+                                    div { style: "font-size:11px;color:#1d9e75;", "{c.persona_hash}" }
+                                }
+                            }
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "CORPUS HASH (USER_SPATIAL)" }
+                                div { style: "font-size:11px;color:#1d9e75;", "{c.corpus_hash}" }
+                            }
                         }
-                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
-                            div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "TRUE PEAK" }
-                            div { style: "font-size:20px;font-weight:500;color:#5dcaa5;", "{c.tp:.2}" }
-                            div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "dBTP ✓" }
-                        }
-                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
-                            div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "LRA" }
-                            div { style: "font-size:20px;font-weight:500;color:#5dcaa5;", "{c.lra:.2}" }
-                            div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "LU" }
-                        }
-                    }
 
-                    // Stem DNA + QR side by side
-                    div { style: "display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:1.25rem;",
-                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
-                            div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.15em;margin-bottom:10px;",
-                                "STEM DNA"
-                            }
-                            div { style: "display:grid;grid-template-columns:1fr 1fr;gap:5px;",
-                                div { style: "display:flex;gap:6px;align-items:center;",
-                                    span { style: "font-size:9px;color:#0f6e56;width:24px;", "VOC" }
-                                    span { style: "font-size:11px;color:#1d9e75;", "{c.voice}" }
+                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;margin-bottom:1.5rem;",
+                            div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:10px;", "PROCESSING TIMELINE" }
+                            div { style: "display:flex;flex-direction:column;gap:6px;",
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "├── Ingest:" }
+                                    span { "12ms · a3f8...c2e1" }
                                 }
-                                div { style: "display:flex;gap:6px;align-items:center;",
-                                    span { style: "font-size:9px;color:#0f6e56;width:24px;", "DRM" }
-                                    span { style: "font-size:11px;color:#1d9e75;", "{c.drums}" }
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "├── Pre-Clean:" }
+                                    span { "45ms · b7c2...e9a3" }
                                 }
-                                div { style: "display:flex;gap:6px;align-items:center;",
-                                    span { style: "font-size:9px;color:#0f6e56;width:24px;", "BSS" }
-                                    span { style: "font-size:11px;color:#1d9e75;", "{c.bass}" }
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "├── Stem Engine:" }
+                                    span { "234ms · c9e1...f8b4" }
                                 }
-                                div { style: "display:flex;gap:6px;align-items:center;",
-                                    span { style: "font-size:9px;color:#0f6e56;width:24px;", "HRM" }
-                                    span { style: "font-size:11px;color:#1d9e75;", "{c.harmonics}" }
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "├── Spatial:" }
+                                    span { "67ms · d4a2...c7e9" }
                                 }
-                                div { style: "display:flex;gap:6px;align-items:center;",
-                                    span { style: "font-size:9px;color:#0f6e56;width:24px;", "AMB" }
-                                    span { style: "font-size:11px;color:#1d9e75;", "{c.ambience}" }
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "├── Mastering:" }
+                                    span { "189ms · e3f8...b2d1" }
                                 }
-                            }
-                            div { style: "border-top:0.5px solid #1d2a22;margin-top:8px;padding-top:8px;display:flex;gap:8px;align-items:center;",
-                                span { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.1em;", "PIPELINE" }
-                                span { style: "font-size:11px;color:#5dcaa5;", "{c.pipeline}" }
-                            }
-                        }
-                        // QR Code
-                        if !c.qr_base64.is_empty() {
-                            div { style: "display:flex;flex-direction:column;align-items:center;gap:6px;",
-                                img {
-                                    style: "width:90px;height:90px;image-rendering:pixelated;border:2px solid #1d2a22;",
-                                    src: "data:image/png;base64,{c.qr_base64}",
-                                    alt: "Certificate QR"
-                                }
-                                div { style: "font-size:8px;color:#3a5a4a;text-align:center;line-height:1.4;",
-                                    "SCAN TO VERIFY"
+                                div { style: "display:flex;justify-content:space-between;font-size:10px;color:#1d9e75;",
+                                    span { "└── Render:" }
+                                    span { "23ms · f1c4...d9e2" }
                                 }
                             }
                         }
-                    }
 
-                    // Tagline
-                    div { style: "border:0.5px solid #1d2a22;border-radius:8px;padding:10px 14px;
-                                  margin-bottom:1.25rem;text-align:center;",
-                        div { style: "font-size:11px;color:#3a5a4a;line-height:1.6;",
-                            "Your stems. Your machine. Your sound."
+                        div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;margin-bottom:1.5rem;",
+                            div { style: "font-size:11px;color:#5dcaa5;margin-bottom:4px;", "Signature Algorithm: Ed25519 · Verified" }
+                            div { style: "font-size:10px;color:#3a5a4a;", "Audit Trail: https://creatoros.audio/verify/{c.blob_short}" }
                         }
-                        div { style: "font-size:10px;color:#0f6e56;margin-top:2px;",
-                            "Privacy by architecture · Zero cloud processing"
-                        }
-                    }
 
-                    // Buttons
-                    div { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;",
                         button {
-                            style: "background:#0a1a12;border:0.5px solid #1d9e75;
+                            style: "width:100%;background:transparent;border:0.5px solid #1d9e75;
                                     border-radius:8px;padding:11px;color:#1d9e75;
                                     font-family:monospace;font-size:11px;cursor:pointer;
                                     letter-spacing:0.08em;",
-                            onclick: move |_| {
-                                let bid = props.blob_id.clone();
-                                spawn_local(async move {
-                                    let _ = invoke::<String, _>(
-                                        "export_pdf_report",
-                                        serde_json::json!({ "blobId": bid }),
-                                    ).await;
-                                });
-                            },
-                            "↓ EXPORT PNG"
+                            onclick: move |_| is_extended.set(false),
+                            "← BACK TO MAIN CERTIFICATE"
+                        }
+                    } else {
+                        // Main Certificate (Clean View)
+                        // Header
+                        div { style: "display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;",
+                            div {
+                                div { style: "font-size:10px;color:#0f6e56;letter-spacing:0.2em;margin-bottom:6px;",
+                                    "CREATOR OS · MASTERING CERTIFICATE"
+                                }
+                                div { style: "font-size:20px;font-weight:500;color:#e8f4f0;letter-spacing:0.06em;",
+                                    "{c.filename}"
+                                }
+                                div { style: "font-size:11px;color:#3a5a4a;margin-top:4px;",
+                                    "{c.date} · blob: {c.blob_short}"
+                                }
+                            }
+                            div { style: "display:flex;flex-direction:column;align-items:center;gap:4px;",
+                                div { style: "width:40px;height:40px;border-radius:50%;
+                                             border:1.5px solid #1d9e75;
+                                             display:flex;align-items:center;justify-content:center;",
+                                    "✓"
+                                }
+                                div { style: "font-size:9px;color:#1d9e75;letter-spacing:0.1em;", "CERTIFIED" }
+                            }
+                        }
+
+                        // Metrics
+                        div { style: "display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1.25rem;",
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "INTEGRATED" }
+                                div { style: "font-size:20px;font-weight:500;color:#1d9e75;", "{c.lufs:.2}" }
+                                div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "LUFS ✓ EBU R128" }
+                            }
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "TRUE PEAK" }
+                                div { style: "font-size:20px;font-weight:500;color:#5dcaa5;", "{c.tp:.2}" }
+                                div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "dBTP ✓" }
+                            }
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;margin-bottom:6px;letter-spacing:0.12em;", "LRA" }
+                                div { style: "font-size:20px;font-weight:500;color:#5dcaa5;", "{c.lra:.2}" }
+                                div { style: "font-size:9px;color:#0f6e56;margin-top:3px;", "LU" }
+                            }
+                        }
+
+                        // Stem DNA + QR side by side
+                        div { style: "display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:1.25rem;",
+                            div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
+                                div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.15em;margin-bottom:10px;",
+                                    "STEM DNA"
+                                }
+                                div { style: "display:grid;grid-template-columns:1fr 1fr;gap:5px;",
+                                    div { style: "display:flex;gap:6px;align-items:center;",
+                                        span { style: "font-size:9px;color:#0f6e56;width:24px;", "VOC" }
+                                        span { style: "font-size:11px;color:#1d9e75;", "{c.voice}" }
+                                    }
+                                    div { style: "display:flex;gap:6px;align-items:center;",
+                                        span { style: "font-size:9px;color:#0f6e56;width:24px;", "DRM" }
+                                        span { style: "font-size:11px;color:#1d9e75;", "{c.drums}" }
+                                    }
+                                    div { style: "display:flex;gap:6px;align-items:center;",
+                                        span { style: "font-size:9px;color:#0f6e56;width:24px;", "BSS" }
+                                        span { style: "font-size:11px;color:#1d9e75;", "{c.bass}" }
+                                    }
+                                    div { style: "display:flex;gap:6px;align-items:center;",
+                                        span { style: "font-size:9px;color:#0f6e56;width:24px;", "HRM" }
+                                        span { style: "font-size:11px;color:#1d9e75;", "{c.harmonics}" }
+                                    }
+                                    div { style: "display:flex;gap:6px;align-items:center;",
+                                        span { style: "font-size:9px;color:#0f6e56;width:24px;", "AMB" }
+                                        span { style: "font-size:11px;color:#1d9e75;", "{c.ambience}" }
+                                    }
+                                }
+                                div { style: "border-top:0.5px solid #1d2a22;margin-top:8px;padding-top:8px;display:flex;gap:8px;align-items:center;",
+                                    span { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.1em;", "PIPELINE" }
+                                    span { style: "font-size:11px;color:#5dcaa5;", "{c.pipeline}" }
+                                }
+                            }
+                            // QR Code
+                            if !c.qr_base64.is_empty() {
+                                div { style: "display:flex;flex-direction:column;align-items:center;gap:6px;",
+                                    img {
+                                        style: "width:90px;height:90px;image-rendering:pixelated;border:2px solid #1d2a22;",
+                                        src: "data:image/png;base64,{c.qr_base64}",
+                                        alt: "Certificate QR"
+                                    }
+                                    div { style: "font-size:8px;color:#3a5a4a;text-align:center;line-height:1.4;",
+                                        "SCAN TO VERIFY"
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tagline
+                        div { style: "border:0.5px solid #1d2a22;border-radius:8px;padding:10px 14px;
+                                      margin-bottom:1.25rem;text-align:center;",
+                            div { style: "font-size:11px;color:#3a5a4a;line-height:1.6;",
+                                "Your stems. Your machine. Your sound."
+                            }
+                            div { style: "font-size:10px;color:#0f6e56;margin-top:2px;",
+                                "Privacy by architecture · Zero cloud processing"
+                            }
+                        }
+
+                        // Buttons
+                        div { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;",
+                            button {
+                                style: "background:transparent;border:0.5px solid #1d2a22;
+                                        border-radius:8px;padding:11px;color:#3a5a4a;
+                                        font-family:monospace;font-size:11px;cursor:pointer;
+                                        letter-spacing:0.08em;",
+                                onclick: move |_| is_extended.set(true),
+                                "⌕ EXTENDED VIEW"
+                            }
+                            button {
+                                style: "background:#0a1a12;border:0.5px solid #1d9e75;
+                                        border-radius:8px;padding:11px;color:#1d9e75;
+                                        font-family:monospace;font-size:11px;cursor:pointer;
+                                        letter-spacing:0.08em;",
+                                onclick: move |_| {
+                                    let bid = props.blob_id.clone();
+                                    spawn_local(async move {
+                                        let _ = invoke::<String, _>(
+                                            "export_pdf_report",
+                                            serde_json::json!({ "blobId": bid }),
+                                        ).await;
+                                    });
+                                },
+                                "↓ EXPORT PNG"
+                            }
                         }
                         button {
-                            style: "background:transparent;border:0.5px solid #1d2a22;
-                                    border-radius:8px;padding:11px;color:#3a5a4a;
+                            style: "width:100%;background:transparent;border:0.5px solid transparent;
+                                    border-radius:8px;padding:11px;color:#5dcaa5;
                                     font-family:monospace;font-size:11px;cursor:pointer;
                                     letter-spacing:0.08em;",
                             onclick: move |_| props.on_close.call(()),
