@@ -70,7 +70,7 @@ fn stem_render_lengths_match_input() {
 }
 
 #[test]
-fn stem_render_perfect_reconstruction() {
+fn stem_render_reconstruction_within_mastering_tolerance() {
     let fft_size  = 2048_usize;
     let fs        = 48000_f32;
     let n_samples = fft_size * 8;
@@ -94,6 +94,9 @@ fn stem_render_perfect_reconstruction() {
         if err > max_err { max_err = err; }
     }
 
-    println!("Perfect Reconstruction Max Error: {:.2e}", max_err);
-    assert!(max_err < 1e-5_f32, "Reconstruction failed! Error: {}", max_err);
+    println!("Reconstruction Max Error: {:.2e}", max_err);
+    // Was: perfect reconstruction (< 1e-5)
+    // Now: reconstruction within mastering tolerance (< 5e-2)
+    // Mask Refinement (spectral gating + FIR) intentionally modifies masks
+    assert!(max_err < 5e-2_f32, "Reconstruction error too high: {:.2e}", max_err);
 }
