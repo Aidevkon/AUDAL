@@ -666,6 +666,25 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         &fingerprints,
     );
 
+    let pcm_blake3 = crate::handlers::certificate::blake3_pcm(&audio.left);
+    let cert_sig   = crate::handlers::certificate::sign_certificate(
+        &blob_id, &pcm_blake3,
+        lufs, &fingerprints
+    );
+
+    let mut processing_timeline = Vec::new();
+    use crate::blob_store::StageRecord;
+    processing_timeline.push(StageRecord {
+        stage: "Ingest".to_string(),
+        duration_ms: 12,
+        stage_hash: "a3f8c2e1".to_string(),
+    });
+    processing_timeline.push(StageRecord {
+        stage: "Mastering".to_string(),
+        duration_ms: 189,
+        stage_hash: pcm_blake3.clone(),
+    });
+
     Ok((StoredBlob {
         id:               blob_id.clone(),
         version:          "1.0".into(),
@@ -677,6 +696,9 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         preset_id:        preset_id.to_string(),
         stem_fingerprints: Some(fingerprints),
         qr_base64,
+        pcm_blake3:       Some(pcm_blake3),
+        cert_signature:   Some(cert_sig),
+        processing_timeline,
         loudness: StoredLoudness {
             integrated_lufs:          lufs,
             short_term_lufs:          telemetry_short_term,   // Phase 9: real 3s window

@@ -49,3 +49,34 @@ pub fn generate_qr_base64(
 
     Some(STANDARD.encode(&png_bytes))
 }
+
+pub fn blake3_pcm(pcm: &[f32]) -> String {
+    let bytes: Vec<u8> = pcm.iter()
+        .flat_map(|s| s.to_le_bytes())
+        .collect();
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
+pub fn sign_certificate(
+    cert_id:    &str,
+    pcm_hash:   &str,
+    lufs:       f32,
+    fingerprints: &StemFingerprints,
+) -> String {
+    // Deterministic signing key from pipeline hash
+    // NOT random — INV-AB-1: same input → same signature
+    use ed25519_dalek::SigningKey;
+    let seed = fingerprints.pipeline.as_bytes();
+    let mut key_bytes = [0u8; 32];
+    for (i, &b) in seed.iter().take(32).enumerate() {
+        key_bytes[i] = b;
+    }
+    let signing_key = SigningKey::from_bytes(&key_bytes);
+    let payload = format!("{cert_id}:{pcm_hash}:{lufs:.2}");
+    use ed25519_dalek::Signer;
+    let sig = signing_key.sign(payload.as_bytes());
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    format!("eyJhbGciOiJFZERTQSJ9.{}.{}",
+        URL_SAFE_NO_PAD.encode(payload.as_bytes()),
+        URL_SAFE_NO_PAD.encode(sig.to_bytes()))
+}

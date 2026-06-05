@@ -13,6 +13,13 @@ fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Err
     s.serialize_str(&v.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StageRecord {
+    pub stage:       String,
+    pub duration_ms: u64,
+    pub stage_hash:  String,  // FNV of stage output
+}
+
 fn default_schema_v1() -> u32 { 1 }
 
 /// Golden Blob as stored by M0.
@@ -55,6 +62,13 @@ pub struct StoredBlob {
     pub stem_fingerprints: Option<StemFingerprints>,
     #[serde(default)]
     pub qr_base64: Option<String>,
+
+    #[serde(default)]
+    pub pcm_blake3: Option<String>,
+    #[serde(default)]
+    pub cert_signature: Option<String>,
+    #[serde(default)]
+    pub processing_timeline: Vec<StageRecord>,
 
     // Audio payload — not serialized to JSON (never sent to frontend).
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.

@@ -307,6 +307,19 @@ pub struct GoldenBlobJson {
     pub stem_fingerprints: Option<StemFingerprints>,
     #[serde(default)]
     pub qr_base64: Option<String>,
+    #[serde(default)]
+    pub pcm_blake3: Option<String>,
+    #[serde(default)]
+    pub cert_signature: Option<String>,
+    #[serde(default)]
+    pub processing_timeline: Vec<StageRecord>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StageRecord {
+    pub stage:       String,
+    pub duration_ms: u64,
+    pub stage_hash:  String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
