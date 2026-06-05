@@ -60,9 +60,9 @@ xaak         = { path = "../../m1/xaak" }
 # System dependency: libmp3lame.so (apt: libmp3lame-dev or libmp3lame0)
 lame-sys = { path = "../../m1/lame-sys" }
 aether = { version = "0.1.0", path = "../../../aether" }
-
-
-
+qrcode = "0.14"
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile   = "3"

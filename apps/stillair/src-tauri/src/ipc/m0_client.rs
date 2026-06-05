@@ -305,6 +305,8 @@ pub struct GoldenBlobJson {
     pub aether_config:    Option<String>,
     #[serde(default)]
     pub stem_fingerprints: Option<StemFingerprints>,
+    #[serde(default)]
+    pub qr_base64: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -459,6 +461,7 @@ mod tests {
             aether_persona:   None,
             aether_config:    None,
             stem_fingerprints: None,
+            qr_base64:        None,
         };
 
         // Spec §Determinism: JSON round-trip must be lossless

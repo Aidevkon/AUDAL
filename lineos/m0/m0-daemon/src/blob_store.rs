@@ -53,6 +53,8 @@ pub struct StoredBlob {
 
     #[serde(default)]
     pub stem_fingerprints: Option<StemFingerprints>,
+    #[serde(default)]
+    pub qr_base64: Option<String>,
 
     // Audio payload — not serialized to JSON (never sent to frontend).
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
@@ -201,6 +203,7 @@ mod tests {
             aether_persona: None,
             aether_config:  None,
             stem_fingerprints: None,
+            qr_base64:      None,
             audio_bytes:  vec![],   // empty for tests
             sample_rate:  48000,
             channels:     2,

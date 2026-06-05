@@ -657,6 +657,15 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     let cert_json = serde_json::to_string(&cert).unwrap_or_default();
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
 
+    let qr_base64 = crate::handlers::certificate::generate_qr_base64(
+        &blob_id,
+        req.audio_path.split('/').last().unwrap_or("unknown"),
+        lufs,
+        tp,
+        telemetry_lra,
+        &fingerprints,
+    );
+
     Ok((StoredBlob {
         id:               blob_id.clone(),
         version:          "1.0".into(),
@@ -667,6 +676,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
         preset_id:        preset_id.to_string(),
         stem_fingerprints: Some(fingerprints),
+        qr_base64,
         loudness: StoredLoudness {
             integrated_lufs:          lufs,
             short_term_lufs:          telemetry_short_term,   // Phase 9: real 3s window
