@@ -475,6 +475,9 @@ mod tests {
             aether_config:    None,
             stem_fingerprints: None,
             qr_base64:        None,
+            pcm_blake3:       None,
+            cert_signature:   None,
+            processing_timeline: vec![],
         };
 
         // Spec §Determinism: JSON round-trip must be lossless

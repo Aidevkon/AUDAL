@@ -65,6 +65,11 @@ mod tests {
             aether_cert: None,
             aether_persona: None,
             aether_config: None,
+            stem_fingerprints: None,
+            qr_base64: None,
+            pcm_blake3: None,
+            cert_signature: None,
+            processing_timeline: vec![],
             audio_bytes:  vec![],  // empty for tests
             sample_rate:  48000,
             channels:     2,

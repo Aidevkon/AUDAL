@@ -152,6 +152,9 @@ pub async fn trigger_mastering(
                     "m0d: PCM transferred to xaak (A-003 §2)"
                 );
 
+                let pdf_path = format!("session_{}_certificate.pdf", &blob_id[..8]);
+                crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path);
+
                 state_bg.blob_store.insert(blob);
                 state_bg.audit.write(
                     AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,

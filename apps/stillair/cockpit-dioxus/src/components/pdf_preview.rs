@@ -136,11 +136,55 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                         div { style: "display:flex;flex-direction:column;gap:12px;margin-bottom:1.5rem;",
                             div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
                                 div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "PCM AUDIO PAYLOAD HASH (BLAKE3)" }
-                                div { style: "font-size:11px;color:#5dcaa5;word-break:break-all;", "{c.full_file_sha256}" }
+                                div { style: "display:flex;justify-content:space-between;align-items:flex-start;gap:8px;",
+                                    div { style: "flex:1;word-break:break-all;font-size:11px;color:#5dcaa5;",
+                                        "{c.full_file_sha256}"
+                                    }
+                                    button {
+                                        style: "flex-shrink:0;background:transparent;border:0.5px solid #1d2a22;
+                                                border-radius:4px;padding:4px 8px;color:#3a5a4a;
+                                                font-family:monospace;font-size:10px;cursor:pointer;
+                                                white-space:nowrap;",
+                                        onclick: move |_| {
+                                            #[cfg(target_arch = "wasm32")]
+                                            {
+                                                if let Some(window) = web_sys::window() {
+                                                    let _ = window.navigator().clipboard().map(|cb| {
+                                                        let text = c.full_file_sha256.clone();
+                                                        let _ = cb.write_text(&text);
+                                                    });
+                                                }
+                                            }
+                                        },
+                                        "COPY"
+                                    }
+                                }
                             }
                             div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
                                 div { style: "font-size:9px;color:#3a5a4a;letter-spacing:0.12em;margin-bottom:4px;", "CERTIFICATE SIGNATURE (ED25519 JWS)" }
-                                div { style: "font-size:11px;color:#5dcaa5;word-break:break-all;", "{c.cert_sha256}" }
+                                div { style: "display:flex;justify-content:space-between;align-items:flex-start;gap:8px;",
+                                    div { style: "flex:1;word-break:break-all;font-size:11px;color:#5dcaa5;",
+                                        "{c.cert_sha256}"
+                                    }
+                                    button {
+                                        style: "flex-shrink:0;background:transparent;border:0.5px solid #1d2a22;
+                                                border-radius:4px;padding:4px 8px;color:#3a5a4a;
+                                                font-family:monospace;font-size:10px;cursor:pointer;
+                                                white-space:nowrap;",
+                                        onclick: move |_| {
+                                            #[cfg(target_arch = "wasm32")]
+                                            {
+                                                if let Some(window) = web_sys::window() {
+                                                    let _ = window.navigator().clipboard().map(|cb| {
+                                                        let text = c.cert_sha256.clone();
+                                                        let _ = cb.write_text(&text);
+                                                    });
+                                                }
+                                            }
+                                        },
+                                        "COPY"
+                                    }
+                                }
                             }
                             div { style: "display:grid;grid-template-columns:1fr 1fr;gap:8px;",
                                 div { style: "background:#0a1a12;border:0.5px solid #1d2a22;border-radius:8px;padding:12px;",
@@ -326,6 +370,11 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                                     letter-spacing:0.08em;",
                             onclick: move |_| props.on_close.call(()),
                             "▶ CONTINUE"
+                        }
+                        div { style: "text-align:center;margin-top:8px;",
+                            span { style: "font-size:10px;color:#3a5a4a;font-family:monospace;",
+                                "Certificate archived: session_{c.blob_short}_certificate.pdf"
+                            }
                         }
                     }
                 }

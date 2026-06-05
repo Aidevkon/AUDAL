@@ -3182,6 +3182,7 @@ dependencies = [
  "lineos-types",
  "openclaw",
  "pipelineforge",
+ "printpdf",
  "qrcode",
  "rand",
  "reqwest 0.12.28",

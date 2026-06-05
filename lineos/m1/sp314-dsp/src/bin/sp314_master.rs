@@ -87,10 +87,10 @@ fn main() {
     let base_config = target.engine_config(decoded.sample_rate);
     
     // Autotune (from test_engine.rs)
-    let autotune_result = autotune(&decoded.left, &decoded.right, base_config.clone(), target, decoded.sample_rate);
+    let autotune_result = autotune(input_lufs, target.target_lufs().unwrap_or(input_lufs));
     
     let mut tuned_config = base_config;
-    tuned_config.target_makeup_db = autotune_result.makeup_db;
+    tuned_config.target_makeup_db = autotune_result.pre_gain_db;
 
     let mut engine = Sp314MasteringEngine::new(tuned_config, decoded.sample_rate).unwrap();
 
