@@ -231,6 +231,7 @@ fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 
 #[inline(always)]
 async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+    let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
     use lineos_types::{
@@ -281,6 +282,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         pcm.channels,
         &pcm.samples[..5.min(pcm.samples.len())],
     );
+    profiler.mark_stage("Ingest", &pcm.samples);
 
     // ── Silence guard (after real decode) ────────────────────────────────────
     let rms = compute_rms(&pcm.samples);
@@ -345,6 +347,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let mut renderer = FiveStemRenderer::new();
     let stems = renderer.render(&mono);
+    profiler.mark_stage("Stem Engine", &stems.voice);
 
     // POX Voice processing — clean voice before reconstruction
     let clean_voice = if req.flavour_id.as_deref() == Some("broadcast") {
@@ -366,6 +369,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     } else {
         stems.voice.clone()
     };
+    profiler.mark_stage("Pre-Clean", &clean_voice);
 
     let fingerprints = crate::blob_store::StemFingerprints {
         voice:     sha256_hex(&clean_voice),
@@ -443,6 +447,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     chunk.left = mix_left;
     chunk.right = mix_right;
+    profiler.mark_stage("Spatial", &chunk.left);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
     // Runs once per session on raw stereo PCM, before Aether.
@@ -574,6 +579,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         Ok(Ok(r)) => r,
     };
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
+    profiler.mark_stage("Mastering", &audio.left);
 
     let mut audio = audio;
     use sp314_dsp::verification::{PostFlightVerifier, VerificationConfig};
@@ -582,6 +588,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     if let Some(warn) = &verify_result.warning {
         tracing::warn!("[S-013] ⚠️  {}", warn);
     }
+    profiler.mark_stage("Render", &audio.left);
 
     // Build interleaved post-master samples for telemetry
     let post_master_samples: Vec<f32> = audio.left.iter()
@@ -672,18 +679,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         lufs, &fingerprints
     );
 
-    let mut processing_timeline = Vec::new();
-    use crate::blob_store::StageRecord;
-    processing_timeline.push(StageRecord {
-        stage: "Ingest".to_string(),
-        duration_ms: 12,
-        stage_hash: "a3f8c2e1".to_string(),
-    });
-    processing_timeline.push(StageRecord {
-        stage: "Mastering".to_string(),
-        duration_ms: 189,
-        stage_hash: pcm_blake3.clone(),
-    });
+    let processing_timeline = profiler.finalize();
 
     Ok((StoredBlob {
         id:               blob_id.clone(),
