@@ -228,6 +228,45 @@ pub struct AudioMeta {
     pub channels:    u8,
 }
 
+// ── export_certificate_png ──────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn export_certificate_png(
+    blob_id: String,
+    client:  tauri::State<'_, M0Client>,
+    app:     tauri::AppHandle,
+) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    // Get blob data
+    let blob = client.get_blob(&blob_id).await
+        .map_err(|e| e.to_string())?;
+
+    // Ask user where to save
+    let path = tokio::task::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("PNG Image", &["png"])
+            .set_file_name("certificate.png")
+            .blocking_save_file()
+    }).await.map_err(|e| e.to_string())?;
+
+    let Some(save_path) = path else {
+        return Ok("cancelled".to_string());
+    };
+
+    let path_str = match save_path {
+        tauri_plugin_dialog::FilePath::Path(p) => p.to_string_lossy().to_string(),
+        tauri_plugin_dialog::FilePath::Url(u)  => u.to_string(),
+    };
+
+    // Generate PNG via m0-daemon
+    client.export_certificate_png(&blob_id, &path_str).await
+        .map_err(|e| e.to_string())?;
+
+    Ok(path_str)
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

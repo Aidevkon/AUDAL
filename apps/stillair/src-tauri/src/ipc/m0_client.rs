@@ -130,6 +130,16 @@ impl M0Client {
         resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
+    pub async fn export_certificate_png(
+        &self, blob_id: &str, output_path: &str
+    ) -> Result<(), String> {
+        let url = format!("{M0_BASE}/cert/{blob_id}/png");
+        self.client.post(&url)
+            .json(&serde_json::json!({"output_path": output_path}))
+            .send().await.map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     /// POST /playback/control — play | pause | stop | seek
     /// Phase 12A (A-003 §8): cpal playback via xaak kernel.
     pub async fn playback_control(

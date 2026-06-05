@@ -355,7 +355,7 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                                     let bid = props.blob_id.clone();
                                     spawn_local(async move {
                                         let _ = invoke::<String, _>(
-                                            "export_pdf_report",
+                                            "export_certificate_png",
                                             serde_json::json!({ "blobId": bid }),
                                         ).await;
                                     });

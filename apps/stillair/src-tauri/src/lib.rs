@@ -31,6 +31,7 @@ pub fn run() {
             commands::mastering::trigger_mastering,
             commands::mastering::load_audio_file,
             commands::mastering::get_golden_blob,
+            commands::mastering::export_certificate_png,
             commands::insights::evaluate_findings,
             commands::export::export_audio,
             commands::coach::get_coach_narrative,    // Phase 8: Aether Coach

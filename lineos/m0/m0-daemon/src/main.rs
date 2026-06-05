@@ -160,5 +160,6 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/playback/control",   post(handlers::playback::playback_control))
         .route("/playback/state",     get(handlers::playback::get_playback_state))
         .route("/playback/telemetry", get(handlers::playback::get_live_telemetry))
+        .route("/cert/:blob_id/png",  post(handlers::png_gen::export_cert_png))
         .with_state(state)
 }
