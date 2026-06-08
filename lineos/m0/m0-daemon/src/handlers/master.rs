@@ -56,13 +56,16 @@ pub async fn trigger_mastering(
 
     let session_id = uuid::Uuid::new_v4().to_string();
 
-    // Build MasteringParams — pure translation from HTTP request
     let params = MasteringParams {
         audio_path:  req.audio_path.clone(),
         preset_id:   req.preset_id.clone(),
-        target_lufs: -14.0_f32,  // Conductor resolves from SchemaAgent
+        target_lufs: -14.0_f32,
         max_tp_db:   -1.0_f32,
         session_id:  session_id.clone(),
+        project_id:  req.project_id.clone(),
+        track_id:    req.track_id.clone(),
+        flavour_id:  req.flavour_id.clone(),
+        chaos_seed:  req.chaos_seed,
     };
 
     // Register progress immediately
@@ -765,6 +768,177 @@ fn rms_to_lufs(rms: f32) -> f32 {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+/// Batch request — array of tracks to master sequentially.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchMasterRequest {
+    pub tracks:    Vec<MasterRequest>,
+    pub preset_id: Option<String>,  // override per-track preset if set
+}
+
+/// POST /master/batch — submit an album for sequential mastering.
+/// Returns batch_id immediately. Progress via GET /progress/:batch_id
+pub async fn trigger_batch_mastering(
+    State(state): State<AppState>,
+    Json(req):    Json<BatchMasterRequest>,
+) -> Json<serde_json::Value> {
+    use tokio::sync::oneshot;
+    use crate::agents::operator::{Intent, MasteringParams, BatchTrackOutput};
+
+    if req.tracks.is_empty() {
+        return Json(serde_json::json!({
+            "error": "tracks array is empty"
+        }));
+    }
+
+    let batch_id  = uuid::Uuid::new_v4().to_string();
+    let total     = req.tracks.len();
+
+    // Register all tracks as QUEUED immediately
+    for (i, track) in req.tracks.iter().enumerate() {
+        let track_key = format!("{}:{}", batch_id, i);
+        state.progress.insert(track_key, crate::app_state::MasteringProgress {
+            job_id:     format!("{}:{}", batch_id, i),
+            stage:      "QUEUED".into(),
+            elapsed_ms: 0,
+            blob_id:    None,
+            error:      None,
+        });
+    }
+
+    // Register batch summary entry
+    state.progress.insert(batch_id.clone(), crate::app_state::MasteringProgress {
+        job_id:     batch_id.clone(),
+        stage:      "BATCH_STARTED".into(),
+        elapsed_ms: 0,
+        blob_id:    None,
+        error:      None,
+    });
+
+    state.audit.write(
+        crate::audit::AuditEntry::new(
+            "m0d.batch_mastering_dispatched",
+            crate::audit::AuditLevel::Audit,
+            &format!("batch={} tracks={}", batch_id, total),
+        )
+    ).ok();
+
+    // Build Vec<MasteringParams> from tracks
+    let preset_override = req.preset_id.clone();
+    let items: Vec<MasteringParams> = req.tracks
+        .into_iter()
+        .enumerate()
+        .map(|(i, track)| MasteringParams {
+            audio_path:  track.audio_path,
+            preset_id:   preset_override
+                             .clone()
+                             .unwrap_or(track.preset_id),
+            target_lufs: -14.0_f32,
+            max_tp_db:   -1.0_f32,
+            session_id:  format!("{}:{}", batch_id, i),
+            project_id:  track.project_id,
+            track_id:    track.track_id,
+            flavour_id:  track.flavour_id,
+            chaos_seed:  track.chaos_seed,
+        })
+        .collect();
+
+    // Dispatch to Conductor — non-blocking
+    let (tx, rx) = oneshot::channel();
+    let intent = Intent::ExecuteBatchMastering {
+        batch_id:  batch_id.clone(),
+        items,
+        response: tx,
+    };
+
+    let state_bg   = state.clone();
+    let batch_bg   = batch_id.clone();
+
+    tokio::spawn(async move {
+        if state_bg.operator.dispatch(intent).await.is_err() {
+            state_bg.progress.insert(batch_bg.clone(),
+                crate::app_state::MasteringProgress {
+                    job_id:     batch_bg,
+                    stage:      "ERROR".into(),
+                    elapsed_ms: 0,
+                    blob_id:    None,
+                    error:      Some("Conductor channel closed".into()),
+                }
+            );
+            return;
+        }
+
+        match rx.await {
+            Ok(Ok(outputs)) => {
+                let ok_count = outputs.iter()
+                    .filter(|o| o.status == "ok")
+                    .count();
+
+                // Update individual track progress
+                for output in &outputs {
+                    state_bg.progress.insert(
+                        output.session_id.clone(),
+                        crate::app_state::MasteringProgress {
+                            job_id:     output.session_id.clone(),
+                            stage:      if output.status == "ok" {
+                                "CERTIFIED".into()
+                            } else {
+                                "ERROR".into()
+                            },
+                            elapsed_ms: 0,
+                            blob_id:    if output.blob_id.is_empty() {
+                                None
+                            } else {
+                                Some(output.blob_id.clone())
+                            },
+                            error:      output.error.clone(),
+                        }
+                    );
+                }
+
+                // Update batch summary
+                state_bg.progress.insert(batch_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     batch_bg,
+                        stage:      format!("BATCH_COMPLETE {}/{}", ok_count, outputs.len()),
+                        elapsed_ms: 0,
+                        blob_id:    None,
+                        error:      None,
+                    }
+                );
+            }
+            Ok(Err(e)) => {
+                state_bg.progress.insert(batch_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     batch_bg,
+                        stage:      "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id:    None,
+                        error:      Some(format!("{:?}", e)),
+                    }
+                );
+            }
+            Err(_) => {
+                state_bg.progress.insert(batch_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     batch_bg,
+                        stage:      "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id:    None,
+                        error:      Some("Conductor dropped batch response".into()),
+                    }
+                );
+            }
+        }
+    });
+
+    Json(serde_json::json!({
+        "batch_id": batch_id,
+        "tracks":   total,
+        "status":   "queued"
+    }))
+}
 
 #[cfg(test)]
 mod tests {

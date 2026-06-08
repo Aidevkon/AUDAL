@@ -31,6 +31,10 @@ async fn test_agent_pipeline_executes_mastering() {
         target_lufs: -14.0,
         max_tp_db:   -1.0,
         session_id:  "e2e_test_001".into(),
+        project_id:  None,
+        track_id:    None,
+        flavour_id:  None,
+        chaos_seed:  None,
     };
 
     // Dispatch Intent::ExecuteMastering
@@ -89,6 +93,10 @@ async fn test_conductor_rejects_concurrent_mastering() {
         target_lufs: -14.0,
         max_tp_db:   -1.0,
         session_id:  "concurrent_001".into(),
+        project_id:  None,
+        track_id:    None,
+        flavour_id:  None,
+        chaos_seed:  None,
     };
 
     let params2 = m0d::agents::operator::MasteringParams {
@@ -97,6 +105,10 @@ async fn test_conductor_rejects_concurrent_mastering() {
         target_lufs: -14.0,
         max_tp_db:   -1.0,
         session_id:  "concurrent_002".into(),
+        project_id:  None,
+        track_id:    None,
+        flavour_id:  None,
+        chaos_seed:  None,
     };
 
     operator.dispatch(m0d::agents::operator::Intent::ExecuteMastering {

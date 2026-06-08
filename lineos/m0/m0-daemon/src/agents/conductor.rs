@@ -101,6 +101,96 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 });
             }
 
+            Intent::ExecuteBatchMastering { batch_id, items, response } => {
+                // R2 decision: busy check
+                if busy.swap(true, Ordering::SeqCst) {
+                    let _ = response.send(Err(ConductorError::Busy));
+                    continue;
+                }
+
+                let executor_tx = executor_tx.clone();
+                let busy_clone  = busy.clone();
+
+                tokio::spawn(async move {
+                    let total = items.len();
+                    let mut outputs: Vec<super::operator::BatchTrackOutput> =
+                        Vec::with_capacity(total);
+
+                    for (index, params) in items.into_iter().enumerate() {
+                        tracing::info!(
+                            batch_id = %batch_id,
+                            "Conductor: batch track {}/{} — {}",
+                            index + 1, total, params.audio_path
+                        );
+
+                        // Build ExecutionPlan for this track
+                        let plan = ExecutionPlan {
+                            audio_path:  params.audio_path.clone(),
+                            preset_id:   params.preset_id.clone(),
+                            target_lufs: params.target_lufs,
+                            max_tp_db:   params.max_tp_db,
+                            session_id:  params.session_id.clone(),
+                        };
+
+                        // Dispatch to Executor (R3) — sequential, await each
+                        let (tx, rx) = oneshot::channel();
+                        if executor_tx.send(Intent::RunDsp {
+                            plan,
+                            response: tx,
+                        }).await.is_err() {
+                            outputs.push(super::operator::BatchTrackOutput {
+                                track_index: index,
+                                session_id:  params.session_id,
+                                blob_id:     String::new(),
+                                status:      "error",
+                                error:       Some("Executor channel closed".into()),
+                            });
+                            continue;
+                        }
+
+                        match rx.await {
+                            Ok(Ok(dsp_output)) => {
+                                outputs.push(super::operator::BatchTrackOutput {
+                                    track_index: index,
+                                    session_id:  params.session_id,
+                                    blob_id:     dsp_output.blob_id,
+                                    status:      "ok",
+                                    error:       None,
+                                });
+                            }
+                            Ok(Err(e)) => {
+                                outputs.push(super::operator::BatchTrackOutput {
+                                    track_index: index,
+                                    session_id:  params.session_id,
+                                    blob_id:     String::new(),
+                                    status:      "error",
+                                    error:       Some(format!("{:?}", e)),
+                                });
+                            }
+                            Err(_) => {
+                                outputs.push(super::operator::BatchTrackOutput {
+                                    track_index: index,
+                                    session_id:  params.session_id,
+                                    blob_id:     String::new(),
+                                    status:      "error",
+                                    error:       Some("Executor dropped oneshot".into()),
+                                });
+                            }
+                        }
+                    }
+
+                    tracing::info!(
+                        batch_id = %batch_id,
+                        "Conductor: batch complete — {}/{} ok",
+                        outputs.iter().filter(|o| o.status == "ok").count(),
+                        total
+                    );
+
+                    let _ = response.send(Ok(outputs));
+                    busy_clone.store(false, Ordering::SeqCst);
+                });
+            }
+
             _ => {}
         }
     }

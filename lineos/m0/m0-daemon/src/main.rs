@@ -154,6 +154,7 @@ fn mastering_router(state: AppState) -> axum::Router {
 
     axum::Router::new()
         .route("/master",             post(handlers::master::trigger_mastering))
+        .route("/master/batch",       post(handlers::master::trigger_batch_mastering))
         .route("/blob/:id",           get(handlers::blob::get_blob))
         .route("/export",             post(handlers::export::export_audio))
         .route("/progress/:job_id",   get(handlers::progress::get_progress))
