@@ -20,6 +20,8 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
         chaos_seed: Some(42),
         project_id: Some("proj_1".to_string()),
         track_id: Some("track_1".to_string()),
+        mix_levels: None,
+        preview_id: None,
     };
 
     let start = Instant::now();
