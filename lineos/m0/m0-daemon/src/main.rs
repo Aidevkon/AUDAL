@@ -8,7 +8,7 @@
 //! Existing:      GET /health (port 7401)
 
 mod app_state;
-mod audit;
+pub mod audit;
 mod blob_store;
 mod cdn;
 pub mod handlers;
@@ -18,6 +18,7 @@ mod policy;
 mod registry;
 pub mod dsp;
 pub mod jini;
+pub mod agents;
 
 use anyhow::Result;
 use app_state::AppState;
