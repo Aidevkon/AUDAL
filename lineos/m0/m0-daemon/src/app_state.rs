@@ -10,6 +10,7 @@
 use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
 use crate::agents::operator::Operator;
+use crate::handlers::preview::PreviewStore;
 use std::sync::Arc;
 use xaak::engine::PlaybackHandle;
 use dashmap::DashMap;
@@ -26,14 +27,15 @@ pub struct MasteringProgress {
 /// Shared application state for the mastering API router (port 7400).
 #[derive(Clone)]
 pub struct AppState {
-    pub audit:      Arc<AuditLog>,
-    pub blob_store: BlobStore,
+    pub audit:         Arc<AuditLog>,
+    pub blob_store:    BlobStore,
     /// Send-safe handle to the xaak playback worker thread (A-003 §1).
-    pub playback:   PlaybackHandle,
-    pub progress:   Arc<DashMap<String, MasteringProgress>>,
+    pub playback:      PlaybackHandle,
+    pub progress:      Arc<DashMap<String, MasteringProgress>>,
     /// Constitutional Agent Architecture v3.1 — Intent dispatcher.
-    /// Wire all cross-agent communication through here.
-    pub operator:   Operator,
+    pub operator:      Operator,
+    /// Phase 8a: preview stem store for 5.1 Spatial Mixer widget.
+    pub preview_store: PreviewStore,
 }
 
 impl AppState {
@@ -41,10 +43,11 @@ impl AppState {
         let operator = crate::agents::operator::spawn_agents(audit.clone());
         Self {
             audit,
-            blob_store: BlobStore::new(),
-            playback:   PlaybackHandle::spawn(),
-            progress:   Arc::new(DashMap::new()),
+            blob_store:    BlobStore::new(),
+            playback:      PlaybackHandle::spawn(),
+            progress:      Arc::new(DashMap::new()),
             operator,
+            preview_store: PreviewStore::new(),
         }
     }
 }
