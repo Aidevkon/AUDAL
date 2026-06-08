@@ -18,6 +18,7 @@ mod policy;
 mod registry;
 pub mod dsp;
 pub mod jini;
+pub mod agents;
 
 use anyhow::Result;
 use app_state::AppState;
