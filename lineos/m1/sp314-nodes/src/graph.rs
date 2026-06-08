@@ -118,6 +118,29 @@ impl DspGraph {
                         )
                     )
                 },
+                "Harmonic" => {
+                    let drive       = t_node.parameters
+                        .get("drive")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(2.0) as f32;
+                    let mix         = t_node.parameters
+                        .get("mix")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.3) as f32;
+                    let even_amount = t_node.parameters
+                        .get("even_amount")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.6) as f32;
+                    let odd_amount  = t_node.parameters
+                        .get("odd_amount")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.2) as f32;
+                    Box::new(
+                        crate::nodes::harmonic::HarmonicNode::new(
+                            drive, mix, even_amount, odd_amount,
+                        )
+                    )
+                },
                 "Limiter" => {
                     let mut l = LimiterNode::new(sample_rate as f32);
                     if let Some(c) = t_node.parameters.get("ceiling_db").and_then(|v| v.as_f64()) { l.set_parameter("ceiling_db", c as f32); }

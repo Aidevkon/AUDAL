@@ -13,3 +13,4 @@ pub mod deesser;
 pub mod dehum;
 pub mod autolevel;
 pub mod multiband;
+pub mod harmonic;
