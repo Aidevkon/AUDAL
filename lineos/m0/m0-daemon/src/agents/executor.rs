@@ -21,13 +21,13 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 // No decisions — only extraction from plan.
                 let audio_path  = plan.audio_path.clone();
                 let preset_id   = plan.preset_id.clone();
-                let target_lufs = plan.target_lufs;
-                let max_tp_db   = plan.max_tp_db;
+                let _target_lufs = plan.target_lufs;
+                let _max_tp_db   = plan.max_tp_db;
 
                 // Build MasterRequest from ExecutionPlan — pure extraction
                 let req = crate::handlers::master::MasterRequest {
-                    audio_path:      audio_path,
-                    preset_id:       preset_id,
+                    audio_path,
+                    preset_id,
                     flavour_id:      None,
                     intent_tone:     None,
                     intent_dynamics: None,
@@ -75,6 +75,32 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                         let _ = response.send(Ok(output));
                     }
                 }
+            }
+
+            Intent::RunAnalysis { audio_path, session_id, response } => {
+                // R3: decode + PreAnalyzer only. No DSP. No decisions.
+                let result = tokio::task::spawn_blocking(move || {
+                    let pcm = crate::handlers::decode::decode_audio(&audio_path)
+                        .map_err(|e| super::operator::ExecutorError::DspFailed(
+                            format!("Decode error: {e}")
+                        ))?;
+                    let left:  Vec<f32> = pcm.samples.iter()
+                        .step_by(2).copied().collect();
+                    let right: Vec<f32> = pcm.samples.iter()
+                        .skip(1).step_by(2).copied().collect();
+                    use sp314_dsp::analysis::PreAnalyzer;
+                    let analysis = PreAnalyzer::run(&left, &right, pcm.sample_rate);
+                    Ok(super::operator::AnalysisResult {
+                        session_id,
+                        integrated_lufs: analysis.integrated_lufs,
+                        true_peak_dbtp:  analysis.true_peak_dbtp,
+                    })
+                }).await
+                    .map_err(|e| super::operator::ExecutorError::DspFailed(
+                        format!("spawn_blocking join: {e}")
+                    ))
+                    .and_then(|r| r);
+                let _ = response.send(result);
             }
 
             _ => {}
