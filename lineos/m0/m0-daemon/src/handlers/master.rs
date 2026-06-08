@@ -193,13 +193,16 @@ pub async fn trigger_mastering(
 
 fn update_stage(state: &AppState, job_id: &str, stage: &str,
                 start: &std::time::Instant, blob_id: Option<String>) {
-    state.progress.insert(job_id.to_string(), crate::app_state::MasteringProgress {
+    let progress = crate::app_state::MasteringProgress {
         job_id:     job_id.to_string(),
         stage:      stage.to_string(),
         elapsed_ms: start.elapsed().as_millis() as u64,
         blob_id,
         error:      None,
-    });
+    };
+    state.progress.insert(job_id.to_string(), progress.clone());
+    // Fire SSE broadcast — zero cost if no subscribers
+    let _ = state.progress_tx.send(progress);
 }
 
 // Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
@@ -351,7 +354,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     // Mix accumulator: ~300MB (down from ~8.3GB total)
     // Phase 8: replace accumulator with MP3 streaming encoder
     use sp314_dsp::stft::two_pass::TwoPassEngine;
-    use sp314_dsp::spatial::five_dot_one::{FiveDotOneStage, SpatialFirewall};
+    use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
     use sp314_dsp::spatial::renderer::StereoRenderer;
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
     use sha2::{Sha256, Digest};
@@ -369,7 +372,6 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     // Build minimal StemFeatures for downstream APIs
     // Full StemFeatureAnalyzer requires FiveStems — not available in streaming mode.
     // Use default values — aether_bridge uses tone/dynamics from req, not stems.
-    use sp314_dsp::analysis::StemFeatureAnalyzer;
     use lineos_types::{StemFeatures, StemMetrics, MixMetrics};
     // Minimal StemFeatures for downstream APIs in streaming mode.
     // StemFeatureAnalyzer requires FiveStems — not available in streaming.

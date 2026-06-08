@@ -11,6 +11,7 @@ use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
 use crate::agents::operator::Operator;
 use crate::handlers::preview::PreviewStore;
+use tokio::sync::broadcast;
 use std::sync::Arc;
 use xaak::engine::PlaybackHandle;
 use dashmap::DashMap;
@@ -36,11 +37,15 @@ pub struct AppState {
     pub operator:      Operator,
     /// Phase 8a: preview stem store for 5.1 Spatial Mixer widget.
     pub preview_store: PreviewStore,
+    /// Phase 8c: broadcast channel for SSE progress stream.
+    /// Workers send MasteringProgress events — SSE streams receive them.
+    pub progress_tx:   broadcast::Sender<MasteringProgress>,
 }
 
 impl AppState {
     pub fn new(audit: Arc<AuditLog>) -> Self {
         let operator = crate::agents::operator::spawn_agents(audit.clone());
+        let (progress_tx, _) = broadcast::channel(128);
         Self {
             audit,
             blob_store:    BlobStore::new(),
@@ -48,6 +53,7 @@ impl AppState {
             progress:      Arc::new(DashMap::new()),
             operator,
             preview_store: PreviewStore::new(),
+            progress_tx,
         }
     }
 }
