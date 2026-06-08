@@ -36,55 +36,81 @@ fn sample_for_pca<'a>(signal: &'a [f32]) -> std::borrow::Cow<'a, [f32]> {
 
 impl SpatialPreAnalysis {
     pub fn analyze(left: &[f32], right: &[f32], sample_rate: u32) -> Self {
+        let n = left.len().min(right.len());
+        if n == 0 {
+            return Self {
+                mid_energy: 0.0, side_energy: 0.0, ms_ratio: 0.0,
+                transient_direction: 0.0, depth_score: 0.5,
+                sub_energy: 0.0, presence_energy: 0.0, air_energy: 0.0,
+            };
+        }
+
+        // ── Direct M/S energy measurement ────────────────────────────────────
+        // mid  = (L+R)/2 — correlated content (voice, bass, center)
+        // side = (L-R)/2 — uncorrelated content (width, ambience, stereo field)
+        // This is mathematically exact — no eigendecomposition needed for RMS.
+        let mut mid_sq  = 0.0_f32;
+        let mut side_sq = 0.0_f32;
+
+        for i in 0..n {
+            let m = (left[i] + right[i]) * 0.5_f32;
+            let s = (left[i] - right[i]) * 0.5_f32;
+            mid_sq  += m * m;
+            side_sq += s * s;
+        }
+
+        let mid_rms  = libm::sqrtf(mid_sq  / n as f32);
+        let side_rms = libm::sqrtf(side_sq / n as f32);
+        let total    = (mid_rms + side_rms).max(1e-10_f32);
+
+        // ms_ratio: 0.0 = fully mono, 1.0 = fully wide
+        let ms_ratio = (side_rms / total).clamp(0.0_f32, 1.0_f32);
+
+        // ── PCA for depth_score and transient_direction ───────────────────────
+        // PCA eigendecomposition gives us:
+        //   depth_score: how "deep" the stereo field is (correlated = front)
+        //   transient_direction: L/R asymmetry of transients
+        // These require the covariance matrix — PCA is the right tool here.
         let left_s  = sample_for_pca(left);
         let right_s = sample_for_pca(right);
         let pca = pca_spatial(&left_s, &right_s);
-        
-        // Adaptive M/S via PCA (replaces fixed Hadamard)
-        let mid_energy  = pca.cov_ll + pca.cov_lr;
-        let side_energy = pca.cov_ll - pca.cov_lr;
-        let total       = (mid_energy.abs() + side_energy.abs()).max(1e-10);
-        let ms_ratio    = side_energy.abs() / total;
-        
-        // Transient directionality from PCA angle
-        let transient_direction = libm::sinf(pca.ms_angle_rad);
-        
-        // Depth score: correlated = front, uncorrelated = deep
-        let depth_score = 1.0 - pca.pc1_ratio;
-        
-        // Band energy (keep existing logic)
-        let mut lp_80_l = 0.0;
-        let mut lp_80_r = 0.0;
-        let alpha_80 = libm::expf(-2.0 * std::f32::consts::PI * 80.0 / sample_rate as f32);
-        
-        let mut sub_sum_sq = 0.0;
-        let mut total_sum_sq = 0.0;
-        let len = left.len().min(right.len());
-        
-        if len > 0 {
-            for i in 0..len {
-                let l = left[i];
-                let r = right[i];
-                total_sum_sq += l * l + r * r;
-                
-                lp_80_l = l * (1.0 - alpha_80) + lp_80_l * alpha_80;
-                lp_80_r = r * (1.0 - alpha_80) + lp_80_r * alpha_80;
-                sub_sum_sq += lp_80_l * lp_80_l + lp_80_r * lp_80_r;
-            }
+
+        let depth_score         = (1.0_f32 - pca.pc1_ratio).clamp(0.0_f32, 1.0_f32);
+        let transient_direction = libm::sinf(pca.ms_angle_rad).clamp(-1.0_f32, 1.0_f32);
+
+        // ── Sub energy (below 80 Hz) ──────────────────────────────────────────
+        // IIR low-pass at 80 Hz — same as existing implementation.
+        // alpha = exp(-2π·fc/fs) per LineOS Constitution §09.1 (libm only)
+        let alpha_80 = libm::expf(
+            -2.0_f32 * core::f32::consts::PI * 80.0_f32 / sample_rate as f32
+        );
+
+        let mut lp_80_l    = 0.0_f32;
+        let mut lp_80_r    = 0.0_f32;
+        let mut sub_sq     = 0.0_f32;
+        let mut total_sq   = 0.0_f32;
+
+        for i in 0..n {
+            let l = left[i];
+            let r = right[i];
+            total_sq += l * l + r * r;
+            lp_80_l   = l * (1.0_f32 - alpha_80) + lp_80_l * alpha_80;
+            lp_80_r   = r * (1.0_f32 - alpha_80) + lp_80_r * alpha_80;
+            sub_sq   += lp_80_l * lp_80_l + lp_80_r * lp_80_r;
         }
-        
-        let total_energy = if len > 0 { (total_sum_sq / len as f32).max(1e-12) } else { 1e-12 };
-        let sub_energy = if len > 0 { (sub_sum_sq / len as f32) / total_energy } else { 0.0 };
-        
+
+        let total_energy = (total_sq / n as f32).max(1e-12_f32);
+        let sub_energy   = (sub_sq   / n as f32) / total_energy;
+
         Self {
-            mid_energy:          pca.cov_ll,
-            side_energy:         pca.cov_rr,
-            ms_ratio:            ms_ratio.clamp(0.0, 1.0),
-            transient_direction: transient_direction.clamp(-1.0, 1.0),
-            depth_score:         depth_score.clamp(0.0, 1.0),
-            sub_energy,
-            presence_energy:     0.0,
-            air_energy:          0.0,
+            mid_energy:          mid_rms,
+            side_energy:         side_rms,
+            ms_ratio,
+            transient_direction,
+            depth_score,
+            sub_energy:          sub_energy.clamp(0.0_f32, 1.0_f32),
+            presence_energy:     0.0_f32,  // future scope
+            air_energy:          0.0_f32,  // future scope
         }
     }
 }
