@@ -56,22 +56,9 @@ const POLYPHASE_UP: [[f64; TAPS]; 4] = [
         -1.7425427174407935e-06
     ],
     [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
         0.9999971356592491,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     ]
 ];
 
@@ -163,23 +150,19 @@ pub struct OversampledSoftClipper {
     write_down:   usize,
 
     enabled: bool,
+    ceiling_linear: f32,
 }
 
 #[inline]
-fn soft_clip(x: f32) -> f32 {
-    // Clamp to polynomial maximum (ceiling at x=±1.5)
-    let xc = if x > 1.5_f32 { 1.5_f32 }
-             else if x < -1.5_f32 { -1.5_f32 }
-             else { x };
-    // Unity Gain Soft Clipper: f(x) = x - (4/27)*x^3
-    // f'(0) = 1.0  — transparent at low volumes
-    // f(1.5) = 1.0 — exact brickwall ceiling (analytically proven)
-    // Pure f32 arithmetic — zero libm calls
-    xc - (4.0_f32 / 27.0_f32) * (xc * xc * xc)
+fn soft_clip(x: f32, ceiling: f32) -> f32 {
+    let c = ceiling.max(1e-6_f32);
+    let limit = 1.5_f32 * c;
+    let xc = x.clamp(-limit, limit);
+    xc - (4.0_f32 / (27.0_f32 * c * c)) * (xc * xc * xc)
 }
 
 impl OversampledSoftClipper {
-    pub fn new(enabled: bool) -> Self {
+    pub fn new_with_ceiling(enabled: bool, ceiling_linear: f32) -> Self {
         Self {
             delay_up_l:   [0.0_f32; TAPS],
             delay_up_r:   [0.0_f32; TAPS],
@@ -188,7 +171,12 @@ impl OversampledSoftClipper {
             delay_down_r: [[0.0_f32; TAPS]; 4],
             write_down:   0,
             enabled,
+            ceiling_linear,
         }
+    }
+
+    pub fn new(enabled: bool) -> Self {
+        Self::new_with_ceiling(enabled, 1.0_f32)
     }
 
     pub fn reset(&mut self) {
@@ -221,8 +209,8 @@ impl OversampledSoftClipper {
                 acc_l += POLYPHASE_UP[p][tap] * self.delay_up_l[idx] as f64;
                 acc_r += POLYPHASE_UP[p][tap] * self.delay_up_r[idx] as f64;
             }
-            clipped_l[p] = soft_clip(acc_l as f32);
-            clipped_r[p] = soft_clip(acc_r as f32);
+            clipped_l[p] = soft_clip(acc_l as f32, self.ceiling_linear);
+            clipped_r[p] = soft_clip(acc_r as f32, self.ceiling_linear);
         }
 
         // Step B — Downsample (all 4 phases, then sum):

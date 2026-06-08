@@ -12,6 +12,7 @@ use sp314_nodes::topology::DspTopology;
 use lineos_types::{
     StereoBuffer, LufsReport, MasteringIntent,
 };
+use sp314_dsp::limiter::{BrickwallLimiter, LimiterConfig};
 
 pub struct DspAdapter;
 
@@ -84,14 +85,53 @@ impl DspAdapter {
             let correction_db = correction_db
                 .max(-18.0_f32)
                 .min(18.0_f32);
-            let correction_linear = 10.0_f32
-                .powf(correction_db / 20.0_f32);
+            let correction_linear = libm::powf(
+                10.0_f32,
+                correction_db / 20.0_f32,
+            );
             for s in audio.left.iter_mut() {
                 *s *= correction_linear;
             }
             for s in audio.right.iter_mut() {
                 *s *= correction_linear;
             }
+
+            // Second limiter pass: catch ISPs introduced by LUFS correction.
+            // Uses fast release (15ms) to transparently suppress Gibbs overshoots
+            // without pumping. ceiling from intent — never hardcoded.
+            // Authority: INV-AB-1, ITU-R BS.1770-4.
+            let ceiling_linear = libm::powf(
+                10.0_f32,
+                intent.target.max_true_peak_db / 20.0_f32,
+            );
+            let isp_limiter_config = LimiterConfig {
+                release_ms:         15.0_f32,
+                ceiling_db:         intent.target.max_true_peak_db,
+                true_peak_enabled:  true,
+                midside_eq_enabled: false,
+            };
+            let _ = ceiling_linear; // used via config
+            let mut isp_limiter = BrickwallLimiter::new(
+                isp_limiter_config,
+                audio.sample_rate,
+            );
+
+            // Process main buffer
+            isp_limiter.process_block(
+                &mut audio.left,
+                &mut audio.right,
+            );
+
+            // Latency compensation: flush lookahead delay line
+            let lookahead = isp_limiter.lookahead_samples();
+            let mut flush_l = vec![0.0_f32; lookahead];
+            let mut flush_r = vec![0.0_f32; lookahead];
+            isp_limiter.process_block(&mut flush_l, &mut flush_r);
+            audio.left.extend_from_slice(&flush_l);
+            audio.right.extend_from_slice(&flush_r);
+            audio.left.drain(..lookahead);
+            audio.right.drain(..lookahead);
+            audio.num_frames = audio.left.len();
         }
 
         // 5. Measure output LUFS
@@ -166,7 +206,7 @@ impl DspAdapter {
             .map(|s| s * s)
             .sum::<f32>() / (left.len() + right.len()) as f32;
         if sum_sq < 1e-10 { return -144.0; }
-        10.0 * sum_sq.log10() - 0.691
+        10.0_f32 * libm::log10f(sum_sq) - 0.691_f32
     }
 
     /// Measure output LUFS — uses sp314-dsp metering.
@@ -184,11 +224,20 @@ impl DspAdapter {
     }
 
     fn true_peak(left: &[f32], right: &[f32]) -> f32 {
-        let peak = left.iter().chain(right.iter())
-            .map(|s| s.abs())
-            .fold(0.0_f32, f32::max);
-        if peak < 1e-10 { return -144.0; }
-        20.0 * peak.log10()
+        use sp314_dsp::limiter::TruePeakDetector;
+        let mut detector = TruePeakDetector::new();
+        let mut max_tp = 0.0_f32;
+        for (&l, &r) in left.iter().zip(right.iter()) {
+            let tp = detector.process(l, r);
+            if tp > max_tp { max_tp = tp; }
+        }
+        // Flush the 18-sample delay line
+        for _ in 0..18 {
+            let tp = detector.process(0.0_f32, 0.0_f32);
+            if tp > max_tp { max_tp = tp; }
+        }
+        if max_tp < 1e-10 { return -144.0_f32; }
+        20.0_f32 * libm::log10f(max_tp)
     }
 }
 
