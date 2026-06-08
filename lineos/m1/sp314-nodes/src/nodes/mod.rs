@@ -12,3 +12,4 @@ pub mod noisegate;
 pub mod deesser;
 pub mod dehum;
 pub mod autolevel;
+pub mod multiband;

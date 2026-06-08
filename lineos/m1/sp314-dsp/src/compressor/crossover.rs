@@ -66,3 +66,29 @@ impl CrossoverLR4 {
         self.hp_state = [[0.0; 2]; 2];
     }
 }
+
+pub struct CrossoverLR4x3 {
+    low_split:  CrossoverLR4,
+    high_split: CrossoverLR4,
+}
+
+impl CrossoverLR4x3 {
+    pub fn new(f_low: f32, f_high: f32, sample_rate: u32) -> Self {
+        Self {
+            low_split:  CrossoverLR4::new(f_low,  sample_rate),
+            high_split: CrossoverLR4::new(f_high, sample_rate),
+        }
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32) -> (f32, f32, f32) {
+        let (low, mid_high) = self.low_split.process(x);
+        let (mid, high)     = self.high_split.process(mid_high);
+        (low, mid, high)
+    }
+
+    pub fn reset(&mut self) {
+        self.low_split.reset();
+        self.high_split.reset();
+    }
+}

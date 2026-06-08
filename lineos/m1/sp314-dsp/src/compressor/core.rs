@@ -71,3 +71,100 @@ impl CompressorBand {
         self.env_high.reset();
     }
 }
+
+use super::crossover::CrossoverLR4x3;
+
+#[derive(Clone)]
+pub struct MultibandCompressor3Config {
+    pub f_low:       f32,
+    pub f_high:      f32,
+    pub low_config:  CompressorBandConfig,
+    pub mid_config:  CompressorBandConfig,
+    pub high_config: CompressorBandConfig,
+}
+
+pub struct MultibandCompressor3 {
+    crossover:    CrossoverLR4x3,
+    env_low:      EnvelopeFollower,
+    env_mid:      EnvelopeFollower,
+    env_high:     EnvelopeFollower,
+    cfg_low:      CompressorBandConfig,
+    cfg_mid:      CompressorBandConfig,
+    cfg_high:     CompressorBandConfig,
+    makeup_low:   f32,
+    makeup_mid:   f32,
+    makeup_high:  f32,
+}
+
+impl MultibandCompressor3 {
+    pub fn new(config: MultibandCompressor3Config, sample_rate: u32) -> Self {
+        let makeup = |db: f32| libm::powf(10.0_f32, db / 20.0_f32);
+        Self {
+            crossover:   CrossoverLR4x3::new(config.f_low, config.f_high, sample_rate),
+            env_low:     EnvelopeFollower::new(
+                             config.low_config.attack_ms,
+                             config.low_config.release_ms,
+                             sample_rate),
+            env_mid:     EnvelopeFollower::new(
+                             config.mid_config.attack_ms,
+                             config.mid_config.release_ms,
+                             sample_rate),
+            env_high:    EnvelopeFollower::new(
+                             config.high_config.attack_ms,
+                             config.high_config.release_ms,
+                             sample_rate),
+            makeup_low:  makeup(config.low_config.makeup_db),
+            makeup_mid:  makeup(config.mid_config.makeup_db),
+            makeup_high: makeup(config.high_config.makeup_db),
+            cfg_low:     config.low_config,
+            cfg_mid:     config.mid_config,
+            cfg_high:    config.high_config,
+        }
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32) -> f32 {
+        let (low, mid, high) = self.crossover.process(x);
+
+        let env_low_db  = self.env_low.process(low);
+        let env_mid_db  = self.env_mid.process(mid);
+        let env_high_db = self.env_high.process(high);
+
+        let gr_low  = libm::powf(10.0_f32,
+            compute_gain_reduction(env_low_db,
+                self.cfg_low.threshold_db,
+                self.cfg_low.ratio,
+                self.cfg_low.knee_db) / 20.0_f32);
+
+        let gr_mid  = libm::powf(10.0_f32,
+            compute_gain_reduction(env_mid_db,
+                self.cfg_mid.threshold_db,
+                self.cfg_mid.ratio,
+                self.cfg_mid.knee_db) / 20.0_f32);
+
+        let gr_high = libm::powf(10.0_f32,
+            compute_gain_reduction(env_high_db,
+                self.cfg_high.threshold_db,
+                self.cfg_high.ratio,
+                self.cfg_high.knee_db) / 20.0_f32);
+
+        let out = low  * gr_low  * self.makeup_low
+                + mid  * gr_mid  * self.makeup_mid
+                + high * gr_high * self.makeup_high;
+
+        // Internal headroom clamp — matches CompressorBand convention
+        libm::fmaxf(-2.0_f32, libm::fminf(2.0_f32, out))
+    }
+
+    pub fn process_stereo(&mut self, left: &mut f32, right: &mut f32) {
+        *left  = self.process(*left);
+        *right = self.process(*right);
+    }
+
+    pub fn reset(&mut self) {
+        self.crossover.reset();
+        self.env_low.reset();
+        self.env_mid.reset();
+        self.env_high.reset();
+    }
+}

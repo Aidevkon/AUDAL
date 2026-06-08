@@ -101,6 +101,23 @@ impl DspGraph {
                     if let Some(m) = t_node.parameters.get("makeup_db").and_then(|v| v.as_f64()) { c.set_parameter("makeup_db", m as f32); }
                     Box::new(c)
                 },
+                "MultibandCompressor" => {
+                    let f_low  = t_node.parameters
+                        .get("f_low")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(200.0) as f32;
+                    let f_high = t_node.parameters
+                        .get("f_high")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(3000.0) as f32;
+                    Box::new(
+                        crate::nodes::multiband::MultibandCompressorNode::new(
+                            sample_rate as f32,
+                            f_low,
+                            f_high,
+                        )
+                    )
+                },
                 "Limiter" => {
                     let mut l = LimiterNode::new(sample_rate as f32);
                     if let Some(c) = t_node.parameters.get("ceiling_db").and_then(|v| v.as_f64()) { l.set_parameter("ceiling_db", c as f32); }
