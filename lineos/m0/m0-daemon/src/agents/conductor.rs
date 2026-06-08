@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use super::operator::{
     Intent, ConductorError, ExecutorError,
-    ExecutionPlan, MasteringOutput, DspOutput,
+    ExecutionPlan, MasteringOutput,
 };
 
 pub async fn run(mut rx: mpsc::Receiver<Intent>) {
@@ -116,7 +116,84 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     let mut outputs: Vec<super::operator::BatchTrackOutput> =
                         Vec::with_capacity(total);
 
+                    // ── Album Cohesion Pre-Pass ──────────────────────────
+                    // Step 1: analyze all tracks to get integrated LUFS
+                    // Step 2: find Anchor Track (loudest)
+                    // Step 3: compute per-track target offsets
+                    // This preserves macro-dynamics between tracks.
+                    // INV-AB-1: deterministic — same inputs → same targets
+                    let global_target = items.first()
+                        .map(|p| p.target_lufs)
+                        .unwrap_or(-14.0_f32);
+
+                    let mut track_lufs: Vec<f32> = Vec::with_capacity(total);
+
+                    for params in &items {
+                        let (tx, rx) = oneshot::channel();
+                        if executor_tx.send(Intent::RunAnalysis {
+                            audio_path: params.audio_path.clone(),
+                            session_id: params.session_id.clone(),
+                            response:   tx,
+                        }).await.is_err() {
+                            track_lufs.push(global_target);
+                            continue;
+                        }
+                        match rx.await {
+                            Ok(Ok(analysis)) => {
+                                tracing::info!(
+                                    batch_id = %batch_id,
+                                    "Cohesion pre-pass: {} → {:.1} LUFS",
+                                    params.audio_path,
+                                    analysis.integrated_lufs
+                                );
+                                track_lufs.push(analysis.integrated_lufs);
+                            }
+                            _ => {
+                                tracing::warn!(
+                                    batch_id = %batch_id,
+                                    "Cohesion pre-pass failed for {} — using global target",
+                                    params.audio_path
+                                );
+                                track_lufs.push(global_target);
+                            }
+                        }
+                    }
+
+                    // Anchor = loudest track (highest LUFS = least negative)
+                    let anchor_lufs = track_lufs.iter()
+                        .copied()
+                        .filter(|l| l.is_finite() && *l > -70.0)
+                        .fold(f32::NEG_INFINITY, f32::max);
+
+                    let anchor_lufs = if anchor_lufs.is_finite() {
+                        anchor_lufs
+                    } else {
+                        global_target
+                    };
+
+                    // per_track_target = global_target - (anchor_lufs - track_lufs)
+                    // Anchor → exactly global_target
+                    // Quieter tracks → lower target (preserves relative dynamics)
+                    let per_track_targets: Vec<f32> = track_lufs.iter()
+                        .map(|&lufs| {
+                            let offset = anchor_lufs - lufs;
+                            (global_target - offset).clamp(-40.0, 0.0)
+                        })
+                        .collect();
+
+                    tracing::info!(
+                        batch_id = %batch_id,
+                        "Cohesion: anchor={:.1} LUFS, targets={:?}",
+                        anchor_lufs,
+                        per_track_targets
+                    );
+                    // ── End Album Cohesion Pre-Pass ──────────────────────
+
                     for (index, params) in items.into_iter().enumerate() {
+                        let cohesion_target = per_track_targets
+                            .get(index)
+                            .copied()
+                            .unwrap_or(global_target);
                         tracing::info!(
                             batch_id = %batch_id,
                             "Conductor: batch track {}/{} — {}",
@@ -127,7 +204,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                         let plan = ExecutionPlan {
                             audio_path:  params.audio_path.clone(),
                             preset_id:   params.preset_id.clone(),
-                            target_lufs: params.target_lufs,
+                            target_lufs: cohesion_target,
                             max_tp_db:   params.max_tp_db,
                             session_id:  params.session_id.clone(),
                         };

@@ -30,6 +30,12 @@ pub enum Intent {
         plan:     ExecutionPlan,
         response: oneshot::Sender<Result<DspOutput, ExecutorError>>,
     },
+    // R3 — analysis only (decode + PreAnalyzer, no DSP)
+    RunAnalysis {
+        audio_path: String,
+        session_id: String,
+        response:   oneshot::Sender<Result<AnalysisResult, ExecutorError>>,
+    },
     // R2 — Conductor batch workflow
     ExecuteBatchMastering {
         batch_id: String,
@@ -95,6 +101,15 @@ pub struct DspOutput {
     pub blob_id:   String,
     pub lufs:      f32,
     pub true_peak: f32,
+}
+
+/// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
+/// No DSP — pure measurement. Used for album cohesion.
+#[derive(Debug, Clone)]
+pub struct AnalysisResult {
+    pub session_id:      String,
+    pub integrated_lufs: f32,
+    pub true_peak_dbtp:  f32,
 }
 
 /// Output from Conductor (R2) → HTTP handler
@@ -181,6 +196,14 @@ impl Operator {
             Intent::RunDsp { .. } => {
                 self.audit.write(AuditEntry::new(
                     "operator.dispatch", AuditLevel::Audit, "→ Executor",
+                )).ok();
+                self.executor_tx.send(intent).await
+                    .map_err(|e| format!("Executor closed: {e}"))
+            }
+            Intent::RunAnalysis { .. } => {
+                self.audit.write(AuditEntry::new(
+                    "operator.dispatch", AuditLevel::Audit,
+                    "→ Executor (analysis only)",
                 )).ok();
                 self.executor_tx.send(intent).await
                     .map_err(|e| format!("Executor closed: {e}"))

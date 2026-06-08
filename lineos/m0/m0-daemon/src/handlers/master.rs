@@ -12,13 +12,10 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use uuid::Uuid;
 
 use crate::app_state::AppState;
-use crate::audit::{AuditEntry, AuditLevel};
 use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvenance};
 // Phase 12A (A-003 §1): PCM ownership transfer to xaak after mastering
-use xaak::PcmTransfer;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,7 +205,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         MasteringIntent,
         AudioChunk, LoudnessTarget,
     };
-    use uuid::Uuid;
+    
     use crate::handlers::decode;
     // Phase 9: EBU R128 windowed telemetry — LRA, momentary, short-term LUFS
     use lineos_telemetry::lra::LraCalculator;
@@ -228,7 +225,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     // Determinism seed from SHA-256 of the file path (stable identity)
     let path_hash    = compute_sha256_bytes(audio_path.as_bytes());
-    let input_hash_hex = hex::encode(&path_hash);
+    let input_hash_hex = hex::encode(path_hash);
     let seed           = derive_seed(&path_hash);
 
     // ── Phase 7: Real decode ──────────────────────────────────────────────────
@@ -507,7 +504,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
     // 900-JSON: behavioral stats only, zero audio content
     use lineos_corpus::builder::build_timeline;
 
-    let track_duration_ms = (chunk.left.len() as f32 
+    let _track_duration_ms = (chunk.left.len() as f32 
         / chunk.sample_rate as f32 * 1000.0) as u32;
 
     let corpus_envelope = build_timeline(
@@ -636,7 +633,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
 
     let qr_base64 = crate::handlers::certificate::generate_qr_base64(
         &blob_id,
-        req.audio_path.split('/').last().unwrap_or("unknown"),
+        req.audio_path.split('/').next_back().unwrap_or("unknown"),
         lufs,
         tp,
         telemetry_lra,
@@ -706,7 +703,7 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         aether_persona: Some(persona_config.id),
         aether_config:  Some(config_json),
         // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
-        audio_bytes:  audio_bytes,
+        audio_bytes,
         sample_rate:  audio_sample_rate,
         channels:     audio_channels,
     }, chunk_original, target_lufs))
@@ -772,9 +769,18 @@ fn rms_to_lufs(rms: f32) -> f32 {
 /// Batch request — array of tracks to master sequentially.
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Batch/Album mastering request.
+/// album_flavour: if set, overrides per-track flavour for all tracks.
+///   Expresses the engineer's sonic vision for the whole album.
+///   None = each track keeps its own flavour identity.
+/// album_preset_id: if set, overrides per-track preset_id (LUFS target).
+///   None = each track keeps its own preset.
 pub struct BatchMasterRequest {
-    pub tracks:    Vec<MasterRequest>,
-    pub preset_id: Option<String>,  // override per-track preset if set
+    pub tracks:          Vec<MasterRequest>,
+    pub preset_id:       Option<String>,    // album-level LUFS preset override
+    pub album_flavour:   Option<String>,    // album-level sonic identity
+                                            // "warm" | "clean" | "punch" |
+                                            // "air" | "film" | "broadcast"
 }
 
 /// POST /master/batch — submit an album for sequential mastering.
@@ -784,7 +790,7 @@ pub async fn trigger_batch_mastering(
     Json(req):    Json<BatchMasterRequest>,
 ) -> Json<serde_json::Value> {
     use tokio::sync::oneshot;
-    use crate::agents::operator::{Intent, MasteringParams, BatchTrackOutput};
+    use crate::agents::operator::{Intent, MasteringParams};
 
     if req.tracks.is_empty() {
         return Json(serde_json::json!({
@@ -796,7 +802,7 @@ pub async fn trigger_batch_mastering(
     let total     = req.tracks.len();
 
     // Register all tracks as QUEUED immediately
-    for (i, track) in req.tracks.iter().enumerate() {
+    for (i, _track) in req.tracks.iter().enumerate() {
         let track_key = format!("{}:{}", batch_id, i);
         state.progress.insert(track_key, crate::app_state::MasteringProgress {
             job_id:     format!("{}:{}", batch_id, i),
@@ -826,6 +832,7 @@ pub async fn trigger_batch_mastering(
 
     // Build Vec<MasteringParams> from tracks
     let preset_override = req.preset_id.clone();
+    let album_flavour = req.album_flavour.clone();
     let items: Vec<MasteringParams> = req.tracks
         .into_iter()
         .enumerate()
@@ -839,7 +846,9 @@ pub async fn trigger_batch_mastering(
             session_id:  format!("{}:{}", batch_id, i),
             project_id:  track.project_id,
             track_id:    track.track_id,
-            flavour_id:  track.flavour_id,
+            // Album flavour overrides per-track flavour if set
+            // Engineer's sonic vision for the whole album
+            flavour_id:  album_flavour.clone().or(track.flavour_id),
             chaos_seed:  track.chaos_seed,
         })
         .collect();
