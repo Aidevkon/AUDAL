@@ -51,137 +51,101 @@ pub async fn trigger_mastering(
     State(state): State<AppState>,
     Json(req):    Json<MasterRequest>,
 ) -> Json<serde_json::Value> {
-    let job_id = uuid::Uuid::new_v4().to_string();
-    let start  = std::time::Instant::now();
+    use tokio::sync::oneshot;
+    use crate::agents::operator::{Intent, MasteringParams};
 
-    // Register job immediately
-    update_stage(&state, &job_id, "INITIALIZING", &start, None);
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    // Build MasteringParams — pure translation from HTTP request
+    let params = MasteringParams {
+        audio_path:  req.audio_path.clone(),
+        preset_id:   req.preset_id.clone(),
+        target_lufs: -14.0_f32,  // Conductor resolves from SchemaAgent
+        max_tp_db:   -1.0_f32,
+        session_id:  session_id.clone(),
+    };
+
+    // Register progress immediately
+    state.progress.insert(session_id.clone(),
+        crate::app_state::MasteringProgress {
+            job_id:     session_id.clone(),
+            stage:      "DISPATCHED".into(),
+            elapsed_ms: 0,
+            blob_id:    None,
+            error:      None,
+        }
+    );
 
     state.audit.write(
-        AuditEntry::new("m0d.mastering_started", AuditLevel::Audit,
-            &format!("path={} preset={}", req.audio_path, req.preset_id))
+        crate::audit::AuditEntry::new(
+            "m0d.mastering_dispatched",
+            crate::audit::AuditLevel::Audit,
+            &format!("session={} path={} preset={}",
+                session_id, req.audio_path, req.preset_id),
+        )
     ).ok();
 
-    const ALLOWED: &[&str] = &["spotify", "youtube", "apple_music", "apple_podcast", "tidal", "broadcast", "raw", "amazon"];
-    if !ALLOWED.contains(&req.preset_id.as_str()) {
-        state.audit.write(
-            AuditEntry::new("m0d.mastering_rejected", AuditLevel::Audit,
-                &format!("preset not allowed: {}", req.preset_id))
-        ).ok();
-        
-        state.progress.insert(job_id.clone(), crate::app_state::MasteringProgress {
-            job_id:     job_id.clone(),
-            stage:      "ERROR".into(),
-            elapsed_ms: start.elapsed().as_millis() as u64,
-            blob_id:    None,
-            error:      Some(format!("preset not allowed: {}", req.preset_id)),
-        });
+    // Dispatch to Conductor (R2) — non-blocking
+    // HTTP handler does not wait for DSP completion
+    let (tx, rx) = oneshot::channel();
+    let intent = Intent::ExecuteMastering { params, response: tx };
 
-        return Json(serde_json::json!({ "job_id": job_id }));
-    }
+    let state_bg     = state.clone();
+    let session_bg   = session_id.clone();
 
-    // Spawn DSP in background — HTTP returns immediately
-    let state_bg  = state.clone();
-    let job_id_bg = job_id.clone();
     tokio::spawn(async move {
-        let start_bg = std::time::Instant::now();
-
-        update_stage(&state_bg, &job_id_bg, "ANALYZING", &start_bg, None);
-
-        match run_dsp_internal(&req, start_bg).await {
-            Ok((blob, chunk_original, target_lufs)) => {
-                let blob_id = blob.id.clone();
-
-                update_stage(&state_bg, &job_id_bg, "STEMS",   &start_bg, None);
-                update_stage(&state_bg, &job_id_bg, "MARKOV",  &start_bg, None);
-                update_stage(&state_bg, &job_id_bg, "DSP",     &start_bg, None);
-                update_stage(&state_bg, &job_id_bg, "SPATIAL", &start_bg, None);
-
-                // PCM transfer to xaak (existing logic)
-                let pcm_samples: Vec<f32> = blob.audio_bytes
-                    .chunks_exact(4)
-                    .map(|b| f32::from_le_bytes([b[0],b[1],b[2],b[3]]))
-                    .collect();
-                let xaak_blob_id = uuid::Uuid::parse_str(&blob_id)
-                    .unwrap_or_else(|_| uuid::Uuid::new_v4());
-                state_bg.playback.load(PcmTransfer {
-                    samples:     pcm_samples,
-                    sample_rate: blob.sample_rate,
-                    channels:    blob.channels,
-                    blob_id:     xaak_blob_id,
-                });
-
-                // Load original PCM for A/B comparison (B side)
-                let original_samples: Vec<f32> = {
-                    let orig_l = chunk_original.left.clone();
-                    let orig_r = chunk_original.right.clone();
-                    orig_l.iter()
-                        .zip(orig_r.iter())
-                        .flat_map(|(l, r)| [*l, *r])
-                        .collect()
-                };
-
-                use sp314_dsp::metering::measure_integrated_lufs;
-                let orig_l_ref: Vec<f32> = original_samples
-                    .iter().step_by(2).copied().collect();
-                let orig_r_ref: Vec<f32> = original_samples
-                    .iter().skip(1).step_by(2).copied().collect();
-                let orig_lufs = measure_integrated_lufs(
-                    &orig_l_ref, &orig_r_ref);
-                let master_lufs = target_lufs.unwrap_or(-14.0);
-
-                let gain_match_db = master_lufs - orig_lufs;
-                let gain_match_linear = 10.0_f32
-                    .powf(gain_match_db.clamp(-18.0, 18.0) / 20.0_f32);
-
-                let matched_samples: Vec<f32> = original_samples
-                    .iter()
-                    .map(|s| s * gain_match_linear)
-                    .collect();
-
-                let original_transfer = PcmTransfer {
-                    samples:     matched_samples,
-                    sample_rate: chunk_original.sample_rate,
-                    channels:    2,
-                    blob_id:     xaak_blob_id,
-                };
-                state_bg.playback.load_original(original_transfer);
-
-                tracing::info!(
-                    blob_id = %blob_id,
-                    "m0d: PCM transferred to xaak (A-003 §2)"
-                );
-
-                let pdf_path = format!("session_{}_certificate.pdf", &blob_id[..8]);
-                crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path);
-
-                state_bg.blob_store.insert(blob);
-                state_bg.audit.write(
-                    AuditEntry::new("m0d.mastering_complete", AuditLevel::Audit,
-                        &format!("blob={blob_id} elapsed={}ms", start_bg.elapsed().as_millis()))
-                ).ok();
-
-                update_stage(&state_bg, &job_id_bg, "CERTIFIED",
-                    &start_bg, Some(blob_id));
-            }
-            Err(e) => {
-                state_bg.audit.write(
-                    AuditEntry::new("m0d.mastering_failed", AuditLevel::Audit, &e)
-                ).ok();
-                
-                state_bg.progress.insert(job_id_bg.clone(), crate::app_state::MasteringProgress {
-                    job_id:     job_id_bg,
+        if state_bg.operator.dispatch(intent).await.is_err() {
+            state_bg.progress.insert(session_bg.clone(),
+                crate::app_state::MasteringProgress {
+                    job_id:     session_bg,
                     stage:      "ERROR".into(),
-                    elapsed_ms: start_bg.elapsed().as_millis() as u64,
+                    elapsed_ms: 0,
                     blob_id:    None,
-                    error:      Some(e.to_string()),
-                });
+                    error:      Some("Conductor channel closed".into()),
+                }
+            );
+            return;
+        }
+
+        match rx.await {
+            Ok(Ok(output)) => {
+                state_bg.progress.insert(session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     session_bg,
+                        stage:      "CERTIFIED".into(),
+                        elapsed_ms: 0,
+                        blob_id:    Some(output.blob_id),
+                        error:      None,
+                    }
+                );
+            }
+            Ok(Err(e)) => {
+                state_bg.progress.insert(session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     session_bg,
+                        stage:      "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id:    None,
+                        error:      Some(format!("{:?}", e)),
+                    }
+                );
+            }
+            Err(_) => {
+                state_bg.progress.insert(session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id:     session_bg,
+                        stage:      "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id:    None,
+                        error:      Some("Conductor dropped response".into()),
+                    }
+                );
             }
         }
     });
 
-    // Return job_id IMMEDIATELY — do not wait for DSP
-    Json(serde_json::json!({ "job_id": job_id }))
+    // Return job_id IMMEDIATELY — HTTP does not wait for DSP
+    Json(serde_json::json!({ "job_id": session_id }))
 }
 
 fn update_stage(state: &AppState, job_id: &str, stage: &str,
