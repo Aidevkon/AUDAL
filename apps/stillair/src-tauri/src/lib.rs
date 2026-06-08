@@ -27,7 +27,7 @@ pub fn run() {
         })
         .setup(|app| {
             let latest = std::sync::Arc::new(
-                std::sync::Mutex::new(None::<lineos_types::RealtimeFrame>)
+                std::sync::Mutex::new(None::<crate::telemetry_listener::RealtimeFrame>)
             );
             app.manage(latest.clone());
             telemetry_listener::spawn_udp_listener(latest);

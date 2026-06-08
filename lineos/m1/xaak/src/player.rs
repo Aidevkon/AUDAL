@@ -6,7 +6,7 @@
 //! and drives the audio output callback via the ALSA backend on Linux.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::traits::Consumer;
+use ringbuf::{HeapRb, traits::{Split, Producer, Consumer, Observer}};
 use std::sync::{Arc, Mutex};
 
 /// cpal-backed audio output driver.
@@ -59,13 +59,19 @@ impl CpalPlayer {
         let sr  = sample_rate as u64;
         let ch  = channels as u64;
 
-        // TB-P3: UDP telemetry sender (fire and forget)
-        // Binds once — reused across all callback invocations.
-        // send_to is non-blocking on localhost (kernel memory copy).
-        let udp_tx = std::net::UdpSocket::bind("127.0.0.1:0").ok();
-        if let Some(ref s) = udp_tx {
-            s.set_nonblocking(true).ok();
-        }
+        // TB-P6: ring buffer for telemetry worker
+        // Audio callback only pushes raw samples — no math, no syscalls
+        let telem_rb = ringbuf::HeapRb::<f32>::new(1024 * 16);
+        let (mut telem_prod, telem_cons) = telem_rb.split();
+        let mut telem_prod = telem_prod;  // explicit binding
+
+        // Spawn telemetry worker — FFT + UDP off audio thread
+        crate::telemetry_worker::spawn(
+            telem_cons,
+            sample_rate,
+            channels,
+            position_ms.clone(),
+        );
 
         let stream = device.build_output_stream(
             &config,
@@ -76,27 +82,12 @@ impl CpalPlayer {
                 // Advance playback position
                 let frames   = filled as u64 / ch.max(1);
                 let delta_ms = frames.saturating_mul(1000) / sr.max(1);
-                let position_ms_now = if let Ok(mut p) = pos.lock() {
+                if let Ok(mut p) = pos.lock() {
                     *p = p.saturating_add(delta_ms);
-                    *p
-                } else { 0 };
-
-                // TB-P3: fire-and-forget UDP telemetry
-                // INV-TB-1: never blocks — set_nonblocking(true)
-                // INV-TB-2: bincode zero-alloc encoding
-                if let Some(ref sock) = udp_tx {
-                    let frame = lineos_types::RealtimeFrame {
-                        spectrum:    [-120.0f32; 64], // TB-P6: real FFT
-                        gonio_path:  decimate_gonio(data, ch as usize),
-                        position_ms: position_ms_now,
-                    };
-                    if let Ok(bytes) = bincode::encode_to_vec(
-                        &frame,
-                        bincode::config::standard(),
-                    ) {
-                        let _ = sock.send_to(&bytes, "127.0.0.1:9000");
-                    }
                 }
+                // TB-P6: push raw samples to telemetry ring buffer
+                // Lock-free push — never blocks audio thread
+                let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod, data);
             },
             |err| tracing::error!("cpal stream error: {err}"),
             None,
@@ -141,7 +132,7 @@ impl Default for CpalPlayer {
 /// Decimate audio block to 32 (L, R) pairs for Lissajous goniometer.
 /// Takes every N-th sample pair from interleaved stereo or mono data.
 /// INV-TB-7: always returns exactly 32 pairs.
-fn decimate_gonio(data: &[f32], channels: usize) -> [(f32, f32); 32] {
+pub fn decimate_gonio(data: &[f32], channels: usize) -> [(f32, f32); 32] {
     let mut pairs = [(0.0f32, 0.0f32); 32];
     let ch = channels.max(1);
     let frames = data.len() / ch;

@@ -3498,7 +3498,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "serde",
- "serde_arrays",
  "serde_json",
 ]
 
@@ -6098,6 +6097,7 @@ dependencies = [
  "printpdf",
  "reqwest 0.12.28",
  "serde",
+ "serde_arrays",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -8557,7 +8557,9 @@ dependencies = [
  "bincode",
  "cpal",
  "lineos-types",
+ "realfft",
  "ringbuf 0.4.8",
+ "rustfft",
  "serde",
  "serde_json",
  "tracing",

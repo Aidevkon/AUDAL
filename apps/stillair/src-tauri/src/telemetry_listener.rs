@@ -1,24 +1,26 @@
-//! UDP listener for real-time telemetry from xaak (m0-daemon).
+//! UDP listener + local RealtimeFrame for src-tauri.
 //! Authority: telemetry-bridge-spec-v1_3.md TB-P4
 //!
-//! Listens on 127.0.0.1:9000.
-//! Decodes RealtimeFrame (bincode, 520 bytes).
-//! Always overwrites latest frame — consumer gets freshest data.
-//!
-//! INV-TB-3: always overwrites latest frame
-//! INV-TB-4: listener thread never blocks audio thread
+//! Local RealtimeFrame duplicates xaak struct — same binary layout.
+//! Uses bincode::Decode + serde::Serialize for Tauri IPC.
+//! Fully decoupled from lineos-types.
 
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
-use lineos_types::RealtimeFrame;
 
-/// Shared state holding the latest RealtimeFrame from xaak.
-/// None if xaak has not sent any frame yet.
+/// Local copy of RealtimeFrame — same binary layout as xaak's.
+/// bincode::Decode for UDP receive.
+/// serde::Serialize for Tauri IPC to Dioxus.
+#[derive(Debug, Clone, Copy, serde::Serialize, bincode::Decode)]
+pub struct RealtimeFrame {
+    #[serde(with = "serde_arrays")]
+    pub spectrum:    [f32; 64],
+    pub gonio_path:  [(f32, f32); 32],
+    pub position_ms: u64,
+}
+
 pub type LatestFrame = Arc<Mutex<Option<RealtimeFrame>>>;
 
-/// Spawn background UDP listener thread on 127.0.0.1:9000.
-/// Non-blocking — runs independently of Tauri event loop.
-/// Overwrites latest frame on every received UDP packet.
 pub fn spawn_udp_listener(latest: LatestFrame) {
     std::thread::spawn(move || {
         let socket = match UdpSocket::bind("127.0.0.1:9000") {
@@ -28,32 +30,22 @@ pub fn spawn_udp_listener(latest: LatestFrame) {
                 return;
             }
         };
-
-        // Blocking recv — thread sleeps until packet arrives
         socket.set_nonblocking(false).ok();
 
-        let mut buf = [0u8; 1024]; // larger than max frame (520 bytes)
+        let mut buf = [0u8; 1024];
 
         loop {
             match socket.recv_from(&mut buf) {
                 Err(e) => {
                     tracing::warn!("TB-P4: UDP recv error: {e}");
-                    continue;
                 }
-                Ok((len, _addr)) => {
-                    // Decode RealtimeFrame from bincode bytes
-                    match bincode::decode_from_slice::<RealtimeFrame, _>(
+                Ok((len, _)) => {
+                    if let Ok((frame, _)) = bincode::decode_from_slice::<RealtimeFrame, _>(
                         &buf[..len],
                         bincode::config::standard(),
                     ) {
-                        Err(e) => {
-                            tracing::warn!("TB-P4: bincode decode error: {e}");
-                        }
-                        Ok((frame, _)) => {
-                            // Overwrite latest — INV-TB-3
-                            if let Ok(mut lock) = latest.lock() {
-                                *lock = Some(frame);
-                            }
+                        if let Ok(mut lock) = latest.lock() {
+                            *lock = Some(frame);
                         }
                     }
                 }

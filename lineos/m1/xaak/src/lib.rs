@@ -13,6 +13,8 @@
 
 pub mod engine;
 pub mod player;
+pub mod spectrum;
+pub mod telemetry_worker;
 
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
