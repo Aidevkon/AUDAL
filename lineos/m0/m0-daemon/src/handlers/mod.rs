@@ -8,3 +8,4 @@ pub mod certificate;
 pub mod timeline;
 pub mod pdf_gen;
 pub mod png_gen;
+pub mod preview;
