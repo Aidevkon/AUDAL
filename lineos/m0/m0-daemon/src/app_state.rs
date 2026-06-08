@@ -11,6 +11,7 @@ use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
 use crate::agents::operator::Operator;
 use crate::handlers::preview::PreviewStore;
+use crate::realtime_bridge::RealtimeBridge;
 use tokio::sync::broadcast;
 use std::sync::Arc;
 use xaak::engine::PlaybackHandle;
@@ -40,6 +41,8 @@ pub struct AppState {
     /// Phase 8c: broadcast channel for SSE progress stream.
     /// Workers send MasteringProgress events — SSE streams receive them.
     pub progress_tx:   broadcast::Sender<MasteringProgress>,
+    /// Phase 9 TB-P2: lock-free ring buffer for xaak → UI telemetry.
+    pub realtime:      RealtimeBridge,
 }
 
 impl AppState {
@@ -54,6 +57,7 @@ impl AppState {
             operator,
             preview_store: PreviewStore::new(),
             progress_tx,
+            realtime:      RealtimeBridge::new(),
         }
     }
 }

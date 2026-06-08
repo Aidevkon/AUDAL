@@ -70,6 +70,7 @@ ab_glyph = "0.2.32"
 rusttype = "0.9.3"
 async-stream = "0.3"
 futures-util = "0.3"
+ringbuf = "0.3"
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile   = "3"

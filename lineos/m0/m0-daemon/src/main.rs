@@ -12,6 +12,7 @@ pub mod audit;
 mod blob_store;
 mod cdn;
 pub mod handlers;
+mod realtime_bridge;
 mod health;
 mod marketplace;
 mod policy;

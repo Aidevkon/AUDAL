@@ -23,6 +23,8 @@ pub mod analysis;
 pub mod pre_analysis;
 pub mod jini;
 pub mod onboarding;
+pub mod telemetry;
+pub use telemetry::RealtimeFrame;
 
 // Convenience re-exports for migration
 pub use analysis::{StemFeatures, StemMetrics, MixMetrics};
