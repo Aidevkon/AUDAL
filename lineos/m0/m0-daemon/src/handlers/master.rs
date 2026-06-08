@@ -31,6 +31,49 @@ pub struct MasterRequest {
     pub chaos_seed:  Option<u64>,
     pub project_id:  Option<String>,
     pub track_id:    Option<String>,
+    /// Phase 8b: per-stem mix levels from 5.1 Spatial Mixer widget.
+    /// None = default (all 1.0 — backward compatible).
+    pub mix_levels:  Option<MixLevels>,
+    /// Phase 8a: preview session reference (future ScoutResult cache).
+    pub preview_id:  Option<String>,
+}
+
+/// Per-stem mix levels from 5.1 Spatial Mixer widget.
+/// Applied before spatial rendering — INV-MX-1.
+/// Default: all 1.0 (backward compatible, no change in behavior).
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MixLevels {
+    pub voice:     f32,
+    pub drums:     f32,
+    pub bass:      f32,
+    pub harmonics: f32,
+    pub ambience:  f32,
+}
+
+impl Default for MixLevels {
+    fn default() -> Self {
+        Self {
+            voice:     1.0,
+            drums:     1.0,
+            bass:      1.0,
+            harmonics: 1.0,
+            ambience:  1.0,
+        }
+    }
+}
+
+impl MixLevels {
+    /// Clamp all levels to [0.0, 1.0] — constitutional safety.
+    pub fn clamped(&self) -> Self {
+        Self {
+            voice:     self.voice.clamp(0.0, 1.0),
+            drums:     self.drums.clamp(0.0, 1.0),
+            bass:      self.bass.clamp(0.0, 1.0),
+            harmonics: self.harmonics.clamp(0.0, 1.0),
+            ambience:  self.ambience.clamp(0.0, 1.0),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -378,29 +421,42 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         None
     };
 
+    // Resolve mix levels — default 1.0 if not provided (backward compatible)
+    // INV-MX-1: applied before spatial rendering
+    let mix = req.mix_levels.as_ref()
+        .map(|m| m.clamped())
+        .unwrap_or_default();
+
     // Pass 2 — process_chunks: ~2MB/chunk constant RAM
     two_pass.process_chunks(&mono, &scout, |stems_chunk| {
         let chunk_len = stems_chunk.voice.len();
 
-        // Streaming hashes — no allocation
+        // Apply mix levels — INV-MX-1: before spatial rendering
+        let mv: Vec<f32> = stems_chunk.voice.iter()
+            .map(|s| s * mix.voice).collect();
+        let md: Vec<f32> = stems_chunk.drums.iter()
+            .map(|s| s * mix.drums).collect();
+        let mb: Vec<f32> = stems_chunk.bass.iter()
+            .map(|s| s * mix.bass).collect();
+        let mh: Vec<f32> = stems_chunk.harmonics.iter()
+            .map(|s| s * mix.harmonics).collect();
+        let ma: Vec<f32> = stems_chunk.ambience.iter()
+            .map(|s| s * mix.ambience).collect();
+
+        // Streaming hashes on mixed stems
         h_voice.update(unsafe { std::slice::from_raw_parts(
-            stems_chunk.voice.as_ptr() as *const u8,
-            stems_chunk.voice.len() * 4) });
+            mv.as_ptr() as *const u8, mv.len() * 4) });
         h_drums.update(unsafe { std::slice::from_raw_parts(
-            stems_chunk.drums.as_ptr() as *const u8,
-            stems_chunk.drums.len() * 4) });
+            md.as_ptr() as *const u8, md.len() * 4) });
         h_bass.update(unsafe { std::slice::from_raw_parts(
-            stems_chunk.bass.as_ptr() as *const u8,
-            stems_chunk.bass.len() * 4) });
+            mb.as_ptr() as *const u8, mb.len() * 4) });
         h_harmonics.update(unsafe { std::slice::from_raw_parts(
-            stems_chunk.harmonics.as_ptr() as *const u8,
-            stems_chunk.harmonics.len() * 4) });
+            mh.as_ptr() as *const u8, mh.len() * 4) });
         h_ambience.update(unsafe { std::slice::from_raw_parts(
-            stems_chunk.ambience.as_ptr() as *const u8,
-            stems_chunk.ambience.len() * 4) });
+            ma.as_ptr() as *const u8, ma.len() * 4) });
 
         // POX voice processing per chunk
-        let mut clean_voice = stems_chunk.voice.clone();
+        let mut clean_voice = mv.clone();
         if let Some(ref mut vg) = voice_graph_opt {
             let mut v_right = clean_voice.clone();
             let mut frame = 0;
@@ -419,12 +475,13 @@ async fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(Stored
         }
 
         // Spatial render_chunk with locked assignments from scout
+        // INV-MX-2: SpatialFirewall scales applied after mix levels
         let stage = FiveDotOneStage::render_chunk(
             &clean_voice,
-            &stems_chunk.drums,
-            &stems_chunk.bass,
-            &stems_chunk.harmonics,
-            &stems_chunk.ambience,
+            &md,
+            &mb,
+            &mh,
+            &ma,
             &scout.assignments,
         );
         let mut stage = stage;

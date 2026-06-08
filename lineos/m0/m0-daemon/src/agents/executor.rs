@@ -37,6 +37,8 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     chaos_seed:      None,
                     project_id:      None,
                     track_id:        None,
+                    mix_levels:      None,
+                    preview_id:      None,
                 };
 
                 let start = std::time::Instant::now();
