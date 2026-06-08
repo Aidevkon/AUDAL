@@ -102,6 +102,81 @@ impl FiveDotOneStage {
         firewall.apply(&mut stage);
         stage
     }
+
+    /// Chunk version of render() — same math, smaller allocation.
+    /// Uses pre-locked StemChannelAssignments from ScoutResult.
+    /// INV-SP-1: deterministic — same chunk → same output.
+    pub fn render_chunk(
+        voice:       &[f32],
+        drums:       &[f32],
+        bass:        &[f32],
+        harmonics:   &[f32],
+        ambience:    &[f32],
+        assignments: &StemChannelAssignments,
+    ) -> Self {
+        let len = voice.len()
+            .min(drums.len())
+            .min(bass.len())
+            .min(harmonics.len())
+            .min(ambience.len());
+
+        let mut l   = vec![0.0_f32; len];
+        let mut r   = vec![0.0_f32; len];
+        let mut c   = vec![0.0_f32; len];
+        let mut ls  = vec![0.0_f32; len];
+        let mut rs  = vec![0.0_f32; len];
+        let mut lfe = vec![0.0_f32; len];
+
+        for i in 0..len {
+            let v = voice[i];
+            let d = drums[i];
+            let b = bass[i];
+            let h = harmonics[i];
+            let a = ambience[i];
+
+            c[i]   = v * assignments.voice.center_weight
+                   + d * assignments.drums.center_weight
+                   + b * assignments.bass.center_weight
+                   + h * assignments.harmonics.center_weight
+                   + a * assignments.ambience.center_weight;
+
+            l[i]   = v * assignments.voice.front_lr_weight
+                   + d * assignments.drums.front_lr_weight
+                   + b * assignments.bass.front_lr_weight
+                   + h * assignments.harmonics.front_lr_weight
+                   + a * assignments.ambience.front_lr_weight;
+
+            r[i]   = l[i]; // symmetric front
+
+            ls[i]  = v * assignments.voice.rear_lr_weight
+                   + d * assignments.drums.rear_lr_weight
+                   + b * assignments.bass.rear_lr_weight
+                   + h * assignments.harmonics.rear_lr_weight
+                   + a * assignments.ambience.rear_lr_weight;
+
+            rs[i]  = ls[i]; // symmetric rear
+
+            lfe[i] = v * assignments.voice.lfe_weight
+                   + d * assignments.drums.lfe_weight
+                   + b * assignments.bass.lfe_weight
+                   + h * assignments.harmonics.lfe_weight
+                   + a * assignments.ambience.lfe_weight;
+        }
+
+        Self { l, r, c, ls, rs, lfe }
+    }
+
+    /// Apply pre-computed firewall scales to a chunk.
+    /// Scales computed once in Pass 1 from proxy stems.
+    /// INV-SP-7: rear ≤ 40% of front (enforced by scale).
+    /// INV-SP-6: LFE ≤ -6dB (enforced by scale).
+    pub fn apply_scales(&mut self, rear_scale: f32, lfe_scale: f32) {
+        for i in 0..self.ls.len() {
+            self.ls[i]  *= rear_scale;
+            self.rs[i]  *= rear_scale;
+            self.lfe[i] *= lfe_scale;
+        }
+    }
 }
 
 #[cfg(test)]

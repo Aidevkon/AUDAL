@@ -1,6 +1,7 @@
 use lineos_types::analysis::StemFeatures;
 use crate::spatial::SpatialPreAnalysis;
 
+#[derive(Debug, Clone)]
 pub struct ChannelAssignment {
     pub center_weight:    f32,  // Voice → C [0.0, 1.0]
     pub front_lr_weight:  f32,  // Drums/Harmonics → L+R
@@ -9,6 +10,7 @@ pub struct ChannelAssignment {
     pub side_weight:      f32,  // stereo width contribution
 }
 
+#[derive(Debug, Clone)]
 pub struct StemChannelAssignments {
     pub voice:     ChannelAssignment,
     pub drums:     ChannelAssignment,

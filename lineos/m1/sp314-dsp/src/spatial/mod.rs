@@ -3,6 +3,7 @@ pub mod five_dot_one;
 pub mod renderer;
 pub mod user_profile;
 
+#[derive(Debug, Clone)]
 pub struct SpatialPreAnalysis {
     pub mid_energy:          f32,   // RMS of M channel
     pub side_energy:         f32,   // RMS of S channel
