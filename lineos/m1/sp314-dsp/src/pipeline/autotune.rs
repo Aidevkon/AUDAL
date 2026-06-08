@@ -1,6 +1,4 @@
-use crate::pipeline::engine::{Sp314MasteringEngine, EngineConfig};
-use crate::pipeline::telemetry::analyze_offline_pre_pass;
-use crate::pipeline::presets::MasteringTarget;
+#![allow(deprecated)]
 
 pub const AUTOTUNE_MIN_GAIN_DB:    f32 = -12.0;
 pub const AUTOTUNE_MAX_GAIN_DB:    f32 =  12.0;

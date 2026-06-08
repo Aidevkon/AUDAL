@@ -235,7 +235,7 @@ pub async fn get_session_state(
 
     eprintln!("[get_session_state] DONE — returning SessionStateJson");
     Ok(SessionStateJson {
-        blob_id:  blob_id,
+        blob_id,
         loudness: blob.loudness,
         quality:  blob.quality,
         compliance,

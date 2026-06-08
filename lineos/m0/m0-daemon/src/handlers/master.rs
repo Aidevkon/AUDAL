@@ -151,16 +151,34 @@ pub async fn trigger_mastering(
         }
 
         match rx.await {
-            Ok(Ok(output)) => {
+            Ok(Ok(mut output)) => {
+                let blob_id_str = output.blob_id.clone();
                 state_bg.progress.insert(session_bg.clone(),
                     crate::app_state::MasteringProgress {
                         job_id:     session_bg,
                         stage:      "CERTIFIED".into(),
                         elapsed_ms: 0,
-                        blob_id:    Some(output.blob_id),
+                        blob_id:    Some(blob_id_str.clone()),
                         error:      None,
                     }
                 );
+
+                if let Some(chunk) = output.pcm_data.take() {
+                    let mut interleaved = Vec::with_capacity(chunk.left.len() * 2);
+                    for (l, r) in chunk.left.iter().zip(chunk.right.iter()) {
+                        interleaved.push(*l);
+                        interleaved.push(*r);
+                    }
+                    if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
+                        let transfer = xaak::PcmTransfer {
+                            samples: interleaved,
+                            sample_rate: chunk.sample_rate,
+                            channels: 2,
+                            blob_id: b_id,
+                        };
+                        state_bg.playback.load(transfer);
+                    }
+                }
             }
             Ok(Err(e)) => {
                 state_bg.progress.insert(session_bg.clone(),

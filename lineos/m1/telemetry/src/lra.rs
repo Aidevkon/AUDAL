@@ -31,7 +31,7 @@ impl LraCalculator {
     pub fn feed_samples(&mut self, samples: &[f32], channels: u16) {
         if samples.is_empty() || channels == 0 { return; }
         let window_size = self.sample_rate as usize * 3 * channels as usize;
-        let hop_size    = self.sample_rate as usize * 1 * channels as usize;
+        let hop_size    = (self.sample_rate as usize) * channels as usize;
 
         if window_size == 0 { return; }
 

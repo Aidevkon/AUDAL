@@ -72,7 +72,7 @@ pub async fn export_audio(
                 .file()
                 .set_file_name(&name)
                 .set_directory(&dir)
-                .add_filter(&ext.to_uppercase(), &[&ext])
+                .add_filter(ext.to_uppercase(), &[&ext])
                 .blocking_save_file()
         }
     }).await

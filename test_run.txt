@@ -1,0 +1,1257 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/runtime/openclaw/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+warning: /home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon/Cargo.toml: file `/home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon/src/main.rs` found to be present in multiple build targets:
+  * `lib` target `m0d`
+  * `bin` target `m0d`
+warning: unused variable: `persona`
+  --> aether/control/types.rs:77:19
+   |
+77 |                   persona: &PersonaConfig) -> MacroControls {
+   |                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_persona`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `aether` (lib) generated 1 warning (run `cargo fix --lib -p aether` to apply 1 suggestion)
+warning: unused imports: `EngineConfig` and `Sp314MasteringEngine`
+ --> lineos/m1/sp314-dsp/src/pipeline/autotune.rs:1:31
+  |
+1 | use crate::pipeline::engine::{Sp314MasteringEngine, EngineConfig};
+  |                               ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::pipeline::telemetry::analyze_offline_pre_pass`
+ --> lineos/m1/sp314-dsp/src/pipeline/autotune.rs:2:5
+  |
+2 | use crate::pipeline::telemetry::analyze_offline_pre_pass;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::pipeline::presets::MasteringTarget`
+ --> lineos/m1/sp314-dsp/src/pipeline/autotune.rs:3:5
+  |
+3 | use crate::pipeline::presets::MasteringTarget;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around assigned value
+   --> lineos/m1/sp314-dsp/src/cut_heal/mod.rs:132:35
+    |
+132 |             audio[cut_end + i] *= (1.0 - t);
+    |                                   ^       ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+132 -             audio[cut_end + i] *= (1.0 - t);
+132 +             audio[cut_end + i] *= 1.0 - t ;
+    |
+
+warning: use of deprecated struct `pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:54:6
+   |
+54 | impl Sp314MasteringEngine {
+   |      ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+ --> lineos/m1/sp314-dsp/src/pipeline/autotune.rs:1:31
+  |
+1 | use crate::pipeline::engine::{Sp314MasteringEngine, EngineConfig};
+  |                               ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::eq`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:70:13
+   |
+70 | / ...   eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
+71 | | ...                .map_err(|_| "EQ config error")?,
+   | |___________________________________________________^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::comp`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:72:13
+   |
+72 |             comp:    CompressorV3::new(comp_config, sample_rate),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::aligner`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:73:13
+   |
+73 |             aligner: PhaseAligner::new(crossover_hz, sample_rate),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::harmonic`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:74:13
+   |
+74 |             harmonic: HarmonicEngine::new(harmonic_config),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:75:13
+   |
+75 | ...   limiter: BrickwallLimiter::new(config.limiter_config, sample_rate),
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::clipper`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:76:13
+   |
+76 |             clipper: OversampledSoftClipper::new(config.clipper_enabled),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::restoration`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:77:13
+   |
+77 | ...   restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone(), pad_db),
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::config`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:78:13
+   |
+78 |             config,
+   |             ^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::config`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:94:51
+   |
+94 | ...   calculate_adaptive_budget(&telemetry, self.config.target_makeup_db);
+   |                                             ^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::harmonic`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:98:9
+   |
+98 |         self.harmonic.set_drive_compensation(
+   |         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::restoration`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:103:9
+    |
+103 |         self.restoration.process(left, right);
+    |         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::eq`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:105:9
+    |
+105 |         self.eq.process_block(left, right);
+    |         ^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::config`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:112:12
+    |
+112 |         if self.config.clipper_enabled {
+    |            ^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::clipper`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:114:30
+    |
+114 |                 let (l, r) = self.clipper.process(
+    |                              ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:122:9
+    |
+122 |         self.limiter.process_block(left, right);
+    |         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:125:25
+    |
+125 |         let lookahead = self.limiter.lookahead_samples();
+    |                         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:128:9
+    |
+128 |         self.limiter.process_block(&mut flush_l, &mut flush_r);
+    |         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::config`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:141:19
+    |
+141 |         let mix = self.config.parallel_mix;
+    |                   ^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::aligner`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:148:13
+    |
+148 |             self.aligner.process_stereo(&mut dry_l, &mut dry_r);
+    |             ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::harmonic`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:152:39
+    |
+152 | ...   let (mid_out, side_out) = self.harmonic.process_frame(mid, side);
+    |                                 ^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::comp`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:156:13
+    |
+156 |             self.comp.process_stereo(&mut wet_l, &mut wet_r);
+    |             ^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::config`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:176:50
+    |
+176 | ...   let headroom = HeadroomManager::new(0.0, self.config.target_makeu...
+    |                                                ^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::harmonic`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:179:9
+    |
+179 |         self.harmonic.set_drive_compensation(1.0_f32);
+    |         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::restoration`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:183:9
+    |
+183 |         self.restoration.process(left, right);
+    |         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::eq`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:185:9
+    |
+185 |         self.eq.process_block(left, right);
+    |         ^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:191:9
+    |
+191 |         self.limiter.process_block(left, right);
+    |         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::eq`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:197:9
+    |
+197 |         self.eq.reset();
+    |         ^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::harmonic`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:198:9
+    |
+198 |         self.harmonic.reset();
+    |         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::comp`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:199:9
+    |
+199 |         self.comp.reset();
+    |         ^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::aligner`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:200:9
+    |
+200 |         self.aligner.reset();
+    |         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::limiter`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:201:9
+    |
+201 |         self.limiter.reset();
+    |         ^^^^^^^^^^^^
+
+warning: use of deprecated field `pipeline::engine::Sp314MasteringEngine::restoration`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/src/pipeline/engine.rs:202:9
+    |
+202 |         self.restoration.reset();
+    |         ^^^^^^^^^^^^^^^^
+
+warning: value assigned to `voice_comp` is never read
+   --> lineos/m1/sp314-dsp/src/stft/stem_renderer.rs:195:30
+    |
+195 |         let mut voice_comp = remaining_voice[0];
+    |                              ^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `harmonics_comp` is never read
+   --> lineos/m1/sp314-dsp/src/stft/stem_renderer.rs:196:34
+    |
+196 |         let mut harmonics_comp = remaining_voice[1];
+    |                                  ^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: `sp314-dsp` (lib) generated 40 warnings (run `cargo fix --lib -p sp314-dsp` to apply 4 suggestions)
+warning: variable does not need to be mutable
+  --> lineos/m1/sp314-nodes/src/nodes/width.rs:57:17
+   |
+57 |             let mut mid = (l + r) * isq2;
+   |                 ----^^^
+   |                 |
+   |                 help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `sample_rate` is never read
+  --> lineos/m1/sp314-nodes/src/nodes/reverb.rs:53:5
+   |
+52 | pub struct ReverbNode {
+   |            ---------- field in this struct
+53 |     sample_rate: u32,
+   |     ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sp314-nodes` (lib) generated 2 warnings (run `cargo fix --lib -p sp314-nodes` to apply 1 suggestion)
+warning: unused import: `uuid::Uuid`
+  --> lineos/m0/m0-daemon/src/handlers/master.rs:15:5
+   |
+15 | use uuid::Uuid;
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `uuid::Uuid`
+   --> lineos/m0/m0-daemon/src/handlers/master.rs:244:9
+    |
+244 |     use uuid::Uuid;
+    |         ^^^^^^^^^^
+
+warning: unused variable: `track_duration_ms`
+   --> lineos/m0/m0-daemon/src/handlers/master.rs:543:9
+    |
+543 |     let track_duration_ms = (chunk.left.len() as f32 
+    |         ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_track_duration_ms`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> lineos/m0/m0-daemon/src/dsp/mod.rs:149:13
+    |
+149 | ...   let mut topology_set_param = |nodes: &mut Vec<sp314_nodes::topolo...
+    |           ----^^^^^^^^^^^^^^^^^^
+    |           |
+    |           help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `m0d` (lib) generated 4 warnings (run `cargo fix --lib -p m0d` to apply 4 suggestions)
+warning: unused import: `oled_tile::{}`
+  --> apps/stillair/cockpit-dioxus/src/components/transport_bar.rs:16:5
+   |
+16 |     oled_tile::{},
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `blob`
+   --> apps/stillair/src-tauri/src/commands/mastering.rs:242:9
+    |
+242 |     let blob = client.get_blob(&blob_id).await
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_blob`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `stillair-cockpit` (lib) generated 1 warning (run `cargo fix --lib -p stillair-cockpit` to apply 1 suggestion)
+warning: `stillair` (lib) generated 1 warning (run `cargo fix --lib -p stillair` to apply 1 suggestion)
+warning: `stillair-cockpit` (lib test) generated 1 warning (1 duplicate)
+warning: `stillair` (lib test) generated 1 warning (1 duplicate)
+warning: `m0d` (lib test) generated 4 warnings (4 duplicates)
+warning: `m0d` (bin "m0d" test) generated 4 warnings (4 duplicates)
+warning: variable does not need to be mutable
+  --> lineos/m0/m0-daemon/src/bin/test_engine.rs:32:10
+   |
+32 |     let (mut left, mut right): (Vec<f32>, Vec<f32>) = if spec.channels =...
+   |          ----^^^^
+   |          |
+   |          help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> lineos/m0/m0-daemon/src/bin/test_engine.rs:32:20
+   |
+32 |     let (mut left, mut right): (Vec<f32>, Vec<f32>) = if spec.channels =...
+   |                    ----^^^^^
+   |                    |
+   |                    help: remove this `mut`
+
+warning: `m0d` (bin "test_engine" test) generated 2 warnings (run `cargo fix --bin "test_engine" -p m0d --tests` to apply 2 suggestions)
+warning: `m0d` (bin "m0d") generated 4 warnings (4 duplicates)
+warning: `m0d` (bin "test_engine") generated 2 warnings (2 duplicates)
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+ --> lineos/m1/sp314-dsp/tests/engine_contract.rs:4:35
+  |
+4 | use sp314_dsp::pipeline::engine::{Sp314MasteringEngine, EngineConfig, cal...
+  |                                   ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:104:22
+    |
+104 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:128:22
+    |
+128 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:153:23
+    |
+153 |     let mut engine1 = Sp314MasteringEngine::new(config.clone(), 48000)....
+    |                       ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:159:23
+    |
+159 |     let mut engine2 = Sp314MasteringEngine::new(config.clone(), 48000)....
+    |                       ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:173:22
+    |
+173 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:193:22
+    |
+193 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:235:22
+    |
+235 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_contract.rs:294:22
+    |
+294 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: `sp314-dsp` (test "engine_contract") generated 9 warnings
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+ --> lineos/m1/sp314-dsp/tests/pipeline_integration.rs:1:34
+  |
+1 | use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
+  |                                  ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+ --> lineos/m1/sp314-dsp/tests/pipeline_integration.rs:9:22
+  |
+9 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+  |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/tests/pipeline_integration.rs:30:22
+   |
+30 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/tests/pipeline_integration.rs:60:22
+   |
+60 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/tests/pipeline_integration.rs:91:22
+   |
+91 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> lineos/m1/sp314-dsp/src/cut_heal/mod.rs:212:13
+    |
+212 |         let mut audio1 = vec![0.0; 48000];
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> lineos/m1/sp314-dsp/src/cut_heal/mod.rs:213:13
+    |
+213 |         let mut audio2 = vec![0.0; 48000];
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: `sp314-dsp` (test "pipeline_integration") generated 5 warnings
+warning: `sp314-dsp` (lib test) generated 42 warnings (40 duplicates) (run `cargo fix --lib -p sp314-dsp --tests` to apply 2 suggestions)
+warning: unused import: `AUTOTUNE_MAX_CLIP_RATIO`
+ --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:4:15
+  |
+4 |     autotune, AUTOTUNE_MAX_CLIP_RATIO,
+  |               ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+ --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:1:34
+  |
+1 | use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
+  |                                  ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:37:22
+   |
+37 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+  --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:64:22
+   |
+64 |     let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:106:26
+    |
+106 | ...   let mut engine = Sp314MasteringEngine::new(config, 48000).unwrap();
+    |                        ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:163:23
+    |
+163 |     let mut engine1 = Sp314MasteringEngine::new(config_final_1, 48000)....
+    |                       ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:174:23
+    |
+174 |     let mut engine2 = Sp314MasteringEngine::new(config_final_2, 48000)....
+    |                       ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `sp314_dsp::pipeline::engine::Sp314MasteringEngine`: Use DspAdapter::master() via m0-daemon. This monolith is Phase 6 legacy — contains hardcoded +6dB gain violation. See lineos/m0/m0-daemon/src/dsp/mod.rs
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:210:22
+    |
+210 |     let mut engine = Sp314MasteringEngine::new(final_config, sample_rat...
+    |                      ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `sine`
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:125:9
+    |
+125 |     let sine = sine_1khz(target_peak, 96000, 48000);
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_sine`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `config`
+   --> lineos/m1/sp314-dsp/tests/engine_calibration_contract.rs:138:13
+    |
+138 |         let config = preset.engine_config(48000);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_config`
+
+warning: unused variable: `voice_energy`
+   --> lineos/m1/sp314-dsp/tests/four_stem_contract.rs:132:9
+    |
+132 |     let voice_energy: f32    = stems.voice.iter().map(|x| x*x).sum();
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_voice_energy`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sp314-dsp` (test "engine_calibration_contract") generated 10 warnings (run `cargo fix --test "engine_calibration_contract" -p sp314-dsp` to apply 3 suggestions)
+warning: `sp314-dsp` (test "four_stem_contract") generated 1 warning (run `cargo fix --test "four_stem_contract" -p sp314-dsp` to apply 1 suggestion)
+warning: unused import: `lineos_corpus::contract::*`
+ --> aether/tests/corpus_contract.rs:1:5
+  |
+1 | use lineos_corpus::contract::*;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sp314-nodes` (lib test) generated 2 warnings (2 duplicates)
+warning: `aether` (test "corpus_contract") generated 1 warning (run `cargo fix --test "corpus_contract" -p aether` to apply 1 suggestion)
+warning: unused variable: `d`
+   --> aether/control/types.rs:148:13
+    |
+148 |         let d = OrbPosition::center().to_macro_delta();
+    |             ^ help: if this is intentional, prefix it with an underscore: `_d`
+
+warning: unused variable: `result`
+   --> aether/control/types.rs:157:13
+    |
+157 |         let result = delta.apply(&macros, persona);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: `aether` (lib test) generated 3 warnings (1 duplicate) (run `cargo fix --lib -p aether --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.27s
+     Running unittests src/lib.rs (target/debug/deps/adapter_runtime-ddfaa20d736f4734)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests lib.rs (target/debug/deps/aether-768146b14461c3b9)
+
+running 116 tests
+test chaos::engine::tests::chaos_compound_seed_persona_differentiates ... ok
+test chaos::engine::tests::chaos_bounds_at_full_intensity ... ok
+test chaos::engine::tests::chaos_compound_seed_reproducible ... ok
+test chaos::engine::tests::chaos_same_seed_same_sequence ... ok
+test chaos::engine::tests::chaos_serializable ... ok
+test chaos::engine::tests::modulate_symmetric_at_midpoint ... ok
+test chaos::engine::tests::chaos_zero_profile_zero_delta ... ok
+test chaos::seed::tests::seed_different_persona_different_seed ... ok
+test chaos::engine::tests::logistic_map_unit_interval ... ok
+test chaos::seed::tests::seed_same_inputs_same_output ... ok
+test chaos::engine::tests::chaos_zero_intensity_zero_delta ... ok
+test control::types::tests::blackbox_mode_deterministic ... ok
+test control::types::tests::medium_control_default_gain_match_on ... ok
+test control::types::tests::orb_center_zero_delta ... ok
+test control::types::tests::orb_resistance_center_zero ... ok
+test intent::parser::tests::from_handle_warmth_positive ... ok
+test intent::parser::tests::from_handle_punch_negative ... ok
+test control::types::tests::orb_resistance_wall_max ... ok
+test intent::parser::tests::intent_strength_clamped ... ok
+test intent::parser::tests::intent_serializable ... ok
+test chaos::engine::tests::chaos_apply_air_shimmer_gain_only ... ok
+test intent::parser::tests::parse_noop_on_unknown ... ok
+test intent::parser::tests::parse_strength_strong ... ok
+test intent::parser::tests::parse_persona_selection ... ok
+test intent::parser::tests::parse_punch_increase ... ok
+test intent::parser::tests::parse_strength_subtle ... ok
+test intent::parser::tests::parse_warmth_increase ... ok
+test mapping::ambience::tests::test_ambience_mapper_zeros ... ok
+test mapping::curves::tests::curve_exp_less_than_linear ... ok
+test mapping::curves::tests::curve_linear_identity ... ok
+test mapping::curves::tests::curve_log_greater_than_linear ... ok
+test chaos::engine::tests::chaos_apply_bounds_respected ... ok
+test mapping::ambience::tests::test_ambience_mapper_max ... ok
+test mapping::ambience::tests::test_ambience_mapper_mid ... ok
+test mapping::curves::tests::curve_boundaries ... ok
+test control::types::tests::blackbox_all_modes_valid_persona ... ok
+test control::types::tests::orb_delta_apply_clamped ... ok
+test chaos::engine::tests::chaos_apply_zero_delta_passthrough ... ok
+test mapping::mapper::tests::mapping_serializable ... ok
+test markov::ambience_v1::tests::classify_dry ... ok
+test markov::ambience_v1::tests::predict_next_from_dry_is_dry ... ok
+test mapping::mapper::tests::mapping_dynamics_tightens_compressor ... ok
+test markov::ambience_v1::tests::transition_matrix_rows_sum_to_one ... ok
+test markov::bass_v1::tests::classify_silent ... ok
+test markov::bass_v1::tests::predict_next_from_punchy_is_punchy ... ok
+test markov::bass_v1::tests::transition_matrix_rows_sum_to_one ... ok
+test mapping::mapper::tests::mapping_deterministic ... ok
+test markov::chaos::tests::chaos_max_deviation_30_percent ... ok
+test markov::chaos::tests::chaos_bypass_returns_unchanged ... ok
+test markov::chaos::tests::chaos_deterministic_same_seed ... ok
+test markov::contract_tests::contract_tests::chaos_bypass_zero_cpu ... ok
+test markov::contract_tests::contract_tests::full_pipeline_deterministic ... ok
+test markov::drums_v1::tests::classify_quiet ... ok
+test markov::contract_tests::contract_tests::firewall_never_exceeds_bounds ... ok
+test markov::contract_tests::contract_tests::mark_iii_fallback_zero_delta ... ok
+test markov::drums_v1::tests::predict_next_from_transient_is_decay ... ok
+test markov::drums_v1::tests::transition_matrix_rows_sum_to_one ... ok
+test markov::firewall::tests::firewall_clamps_under_bounds ... ok
+test markov::firewall::tests::firewall_passes_valid_delta ... ok
+test markov::firewall::tests::firewall_clamps_over_bounds ... ok
+test markov::harmonics_v1::tests::classify_silent ... ok
+test markov::harmonics_v1::tests::predict_next_from_sparse_is_sparse ... ok
+test markov::harmonics_v1::tests::transition_matrix_rows_sum_to_one ... ok
+test markov::predictive::tests::all_deltas_within_bounds ... ok
+test markov::predictive::tests::consonant_delta_fast_attack ... ok
+test markov::predictive::tests::deterministic ... ok
+test markov::predictive::tests::vowel_delta_presence_boost ... ok
+test markov::voice_v1::tests::classify_breath ... ok
+test markov::voice_v1::tests::classify_consonant ... ok
+test markov::voice_v1::tests::classify_silence ... ok
+test markov::voice_v1::tests::classify_tail ... ok
+test markov::voice_v1::tests::classify_vowel ... ok
+test markov::voice_v1::tests::predict_next_from_consonant_is_vowel ... ok
+test markov::voice_v1::tests::transition_matrix_rows_sum_to_one ... ok
+test markov::predictive::tests::silence_delta_is_zero ... ok
+test mapping::mapper::tests::mapping_stereo_width_always_zero ... ok
+test mapping::mapper::tests::mapping_tone_increases_low_shelf ... ok
+test mapping::mapper::tests::mapping_zero_macros_near_zero_delta ... ok
+test mapping::mapper::tests::mapping_bounds_respected ... ok
+test mapping::mapper::tests::tone_above_zero_produces_nonzero_sat_mix ... ok
+test personas::manager::tests::personas_default_is_warm_analog ... ok
+test personas::manager::tests::personas_chaos_profiles_bounded ... ok
+test personas::manager::tests::personas_get_all_four ... ok
+test personas::manager::tests::personas_override_clamped ... ok
+test personas::manager::tests::personas_load_four ... ok
+test personas::manager::tests::personas_serializable ... ok
+test semantic::editor::tests::zone_colors_defined_for_all_builtin ... ok
+test semantic::editor::tests::editor_build_deterministic ... ok
+test semantic::resolver::tests::zones_gain_bounds_respected ... ok
+test semantic::editor::tests::editor_collision_reflects_s007 ... ok
+test semantic::resolver::tests::zones_inactive_excluded ... ok
+test semantic::resolver::tests::zones_no_collision_passthrough ... ok
+test semantic::resolver::tests::zones_output_sorted_by_center_hz ... ok
+test semantic::resolver::tests::zones_three_overlapping_one_band ... ok
+test semantic::resolver::tests::zones_serializable ... ok
+test semantic::editor::tests::editor_gain_clamped ... ok
+test semantic::editor::tests::editor_reset_restores_defaults ... ok
+test semantic::resolver::tests::zones_two_overlapping_one_band ... ok
+test semantic::resolver::tests::zones_three_weighted_average ... ok
+test simulation::tests::all_outputs_within_bounds ... ok
+test simulation::tests::crest_risk_zero_when_low ... ok
+test simulation::tests::isp_risk_high_when_peak_exceeds ... ok
+test semantic::editor::tests::editor_viewonly_edit_rejected ... ok
+test simulation::tests::predicted_gr_hot_signal ... ok
+test simulation::tests::simulation_deterministic ... ok
+test tuning::engine::tests::ate_deviation_deterministic ... ok
+test tuning::engine::tests::ate_identical_converged ... ok
+test semantic::editor::tests::editor_unknown_zone_error ... ok
+test semantic::editor::tests::editor_state_serializable ... ok
+test tuning::engine::tests::ate_identical_zero_deviation ... ok
+test tuning::engine::tests::ate_override_bounded ... ok
+test tuning::engine::tests::ate_result_serializable ... ok
+test tuning::engine::tests::ate_tune_deterministic ... ok
+test tuning::engine::tests::ate_tone_positive_when_output_dark ... ok
+test tuning::engine::tests::ate_tune_identical_converged ... ok
+test semantic::resolver::tests::zones_resolve_deterministic ... ok
+
+test result: ok. 116 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/corpus_contract.rs (target/debug/deps/corpus_contract-2be2de58947ab56c)
+
+running 7 tests
+test corpus_confidence_within_bounds ... ok
+test corpus_events_have_session_id_guard ... ok
+test corpus_has_all_five_stems ... ok
+test corpus_protocol_version_is_900 ... ok
+test corpus_session_id_matches_blob_id ... ok
+test corpus_no_audio_content ... ok
+test corpus_deterministic ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/grand_oracle_lock.rs (target/debug/deps/grand_oracle_lock-aa2d8697dc876f09)
+
+running 1 test
+test test_grand_oracle_lock ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/aether_bridge-f3c156c70c205755)
+
+running 8 tests
+test tests::bridge_unknown_persona_error ... ok
+test tests::bridge_build_dsp_config_default_persona ... ok
+test tests::bridge_certificate_generation ... ok
+test tests::bridge_no_pre_analysis_no_corrective_zones ... ok
+test tests::bridge_certificate_different_output_different_hash ... ok
+test tests::bridge_deterministic ... ok
+test tests::bridge_pre_analysis_zone_flags_wire_through ... ok
+test tests::bridge_build_dsp_config_all_personas ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/integration-02e3de7c6ddd76e2)
+
+running 12 tests
+test firewall::tests::firewall_build_deterministic ... ok
+test firewall::tests::firewall_constitutional_bounds_respected ... ok
+test firewall::tests::firewall_zone_bands_passed_through ... ok
+test firewall::tests::firewall_config_serializable ... ok
+test firewall::tests::firewall_invalid_macro_fatal ... ok
+test firewall::tests::firewall_clamp_logged_not_fatal ... ok
+test firewall::tests::firewall_combination_order_correct ... ok
+test firewall::tests::firewall_persona_id_and_seed_in_config ... ok
+test overrides::tests::overrides_none_passthrough ... ok
+test overrides::tests::overrides_persona_id_preserved ... ok
+test overrides::tests::overrides_preserves_zone_bands ... ok
+test overrides::tests::overrides_some_applied_and_clamped ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/lame_sys-6ca9787ec70e0a04)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_corpus-6184368fd1752268)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_insights-fcacd52449a60c9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_metadata-113826e823762165)
+
+running 9 tests
+test bmr128::tests::test_bmr128_fails_lufs_out_of_tolerance ... ok
+test bmr128::tests::test_bmr128_fails_true_peak_exceeded ... ok
+test bmr128::tests::test_bmr128_raw_preset_no_lufs_check ... ok
+test bmr128::tests::test_bmr128_passes_within_tolerance ... ok
+test bmr128::tests::test_bmr128_serializes_to_json ... ok
+test ebu_report::tests::test_ebu_report_round_trips ... ok
+test project_manifest::tests::test_manifest_generates ... ok
+test ebu_report::tests::test_ebu_report_json_contains_schema ... ok
+test project_manifest::tests::test_manifest_json ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_rule_engine-8089a698eba762bb)
+
+running 49 tests
+test evaluator::tests::test_all_issues_collected ... ok
+test evaluator::tests::test_clean_track_no_issues ... ok
+test evaluator::tests::test_lufs_compliance_issue_has_correct_id ... ok
+test evaluator::tests::test_lufs_too_loud_recommendation ... ok
+test evaluator::tests::test_lufs_too_quiet_recommendation ... ok
+test evaluator::tests::test_raw_preset_no_lufs_issue ... ok
+test evaluator::tests::test_true_peak_exceeded_recommendation ... ok
+test rules::dynamics::tests::test_dynamic_range_at_minimum_no_trigger ... ok
+test rules::dynamics::tests::test_dynamic_range_low_severity ... ok
+test rules::dynamics::tests::test_dynamic_range_low_triggers ... ok
+test rules::dynamics::tests::test_lra_at_max_no_trigger ... ok
+test rules::dynamics::tests::test_lra_tags_streaming ... ok
+test rules::dynamics::tests::test_lra_too_high_triggers ... ok
+test rules::loudness::tests::test_apple_music_preset_at_target_no_trigger ... ok
+test rules::loudness::tests::test_apple_music_preset_triggers_with_correct_tag ... ok
+test rules::loudness::tests::test_at_target_no_trigger ... ok
+test rules::loudness::tests::test_at_tolerance_boundary_no_trigger ... ok
+test rules::loudness::tests::test_below_target_is_low ... ok
+test rules::loudness::tests::test_delta_1_1_is_medium ... ok
+test rules::loudness::tests::test_delta_2_0_is_medium ... ok
+test rules::loudness::tests::test_delta_2_1_is_high ... ok
+test rules::loudness::tests::test_just_inside_upper_tolerance_no_trigger ... ok
+test rules::loudness::tests::test_just_outside_tolerance_is_low ... ok
+test rules::loudness::tests::test_large_delta_negative_is_high ... ok
+test rules::loudness::tests::test_params_are_correct ... ok
+test rules::loudness::tests::test_raw_preset_no_trigger ... ok
+test rules::loudness::tests::test_tag_reflects_preset_name ... ok
+test rules::peak::tests::test_true_peak_at_ceiling_no_trigger ... ok
+test rules::peak::tests::test_true_peak_below_ceiling_no_trigger ... ok
+test rules::peak::tests::test_true_peak_exceeded_triggers ... ok
+test rules::peak::tests::test_true_peak_params_correct ... ok
+test rules::peak::tests::test_true_peak_tags_critical ... ok
+test rules::registry::tests::test_lufs_compliance_is_first ... ok
+test rules::registry::tests::test_no_old_loudness_rule_ids ... ok
+test rules::registry::tests::test_rules_count ... ok
+test rules::registry::tests::test_rules_ids_unique ... ok
+test rules::stereo::tests::test_dc_offset_negative_magnitude ... ok
+test rules::stereo::tests::test_dc_offset_ok ... ok
+test rules::stereo::tests::test_dc_offset_triggers ... ok
+test rules::stereo::tests::test_stereo_corr_at_min_no_trigger ... ok
+test rules::stereo::tests::test_stereo_corr_at_warning_medium_not_high ... ok
+test rules::stereo::tests::test_stereo_corr_high_severity_below_warning ... ok
+test rules::stereo::tests::test_stereo_corr_medium_severity_below_min ... ok
+test rules::stereo::tests::test_stereo_corr_ok_no_trigger ... ok
+test types::coach_findings::tests::test_coach_findings_json_round_trip ... ok
+test types::coach_findings::tests::test_empty_findings_no_issues ... ok
+test types::coach_findings::tests::test_has_blocking_detects_high ... ok
+test types::coach_findings::tests::test_severity_ordered ... ok
+test types::coach_findings::tests::test_severity_serializes_lowercase ... ok
+
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/determinism.rs (target/debug/deps/determinism-effb2e4cf7660371)
+
+running 15 tests
+test test_apple_music_preset_lufs_compliance_tag ... ok
+test test_clean_track_no_issues ... ok
+test test_determinism_100_runs ... ok
+test test_determinism_broadcast_preset_100_runs ... ok
+test test_lufs_compliance_high_severity_above_2lu ... ok
+test test_determinism_clean_track_100_runs ... ok
+test test_lufs_exactly_at_tolerance_boundary ... ok
+test test_lufs_too_loud_triggers_compliance_and_reduce_recommendation ... ok
+test test_findings_serialize_to_json ... ok
+test test_raw_preset_no_lufs_compliance ... ok
+test test_lufs_too_quiet_triggers_compliance_and_increase_recommendation ... ok
+test test_true_peak_priority_over_lufs ... ok
+test test_determinism_all_rules_triggered_100_runs ... ok
+test test_weak_stereo_high_severity ... ok
+test test_true_peak_exceeded_is_high_severity ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_telemetry-9e0ae6cb069f6d20)
+
+running 11 tests
+test lra::tests::test_lra_empty_returns_zero ... ok
+test lra::tests::test_ms_to_lufs_silence ... ok
+test report::tests::test_measure_produces_valid_output ... ok
+test report::tests::test_measure_uses_blob_values ... ok
+test windows::tests::test_momentary_too_short ... ok
+test windows::tests::test_short_term_too_short ... ok
+test windows::tests::test_momentary_silence ... ok
+test lra::tests::test_lra_too_few_windows ... ok
+test windows::tests::test_short_term_loud_signal ... ok
+test lra::tests::test_lra_silence_is_zero ... ok
+test lra::tests::test_lra_nonnegative ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (target/debug/deps/lineos_types-e13476188c299613)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/types_contract.rs (target/debug/deps/types_contract-ed848194d61dde45)
+
+running 5 tests
+test loudness_target_spotify_correct ... ok
+test golden_blob_serializes_roundtrip ... ok
+test mastering_intent_spotify ... ok
+test v29_aliases_work ... ok
+test stereo_buffer_duration_correct ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/m0d-ca96331177961419)
+
+running 71 tests
+test audit::tests::audit_fail_on_nonexistent_path ... ok
+test blob_store::tests::test_blob_store_get_missing_returns_none ... ok
+test blob_store::tests::test_blob_store_insert_get ... ok
+test audit::tests::audit_write_creates_ndjson_line ... ok
+test blob_store::tests::test_stored_blob_serializes_to_json ... ok
+test audit::tests::audit_test_writable_succeeds ... ok
+test handlers::blob::tests::test_blob_store_returns_none_for_unknown_id ... ok
+test handlers::blob::tests::test_stored_blob_json_no_audio_bytes ... ok
+test audit::tests::audit_all_7_event_types_serialize ... ok
+test handlers::decode::tests::test_decode_error_display ... ok
+test handlers::decode::tests::test_decode_nonexistent_file ... ok
+test handlers::decode::tests::test_downmix_mono_via_downmix ... ok
+test cdn::tests::cdn_serves_correct_asset ... ok
+test handlers::decode::tests::test_decode_invalid_format ... ok
+test cdn::tests::cdn_verify_all_passes_with_correct_hashes ... ok
+test cdn::tests::cdn_hash_mismatch_prevents_serve ... ok
+test handlers::decode::tests::test_downmix_quad_to_stereo ... ok
+test handlers::decode::tests::test_mono_to_stereo ... ok
+test handlers::decode::tests::test_mono_to_stereo_empty ... ok
+test handlers::decode::tests::test_target_constants ... ok
+test handlers::export::tests::test_export_format_extension ... ok
+test handlers::export::tests::test_export_format_from_str ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_48000 ... ok
+test cdn::tests::cdn_verify_all_detects_tamper ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_zero ... ok
+test handlers::export::tests::test_pcm_bytes_empty ... ok
+test handlers::export::tests::test_pcm_bytes_roundtrip ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_in_range ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_mp3_bitstream ... ok
+test handlers::master::tests::test_compute_rms_silence ... ok
+test handlers::master::tests::test_gain_overflow_guard ... ok
+test handlers::master::tests::test_derive_seed_non_zero ... ok
+test handlers::master::tests::test_platform_ok_tp_exceeded ... ok
+test handlers::master::tests::test_compute_rms_half_amp ... ok
+test handlers::master::tests::test_platform_ok_at_target ... ok
+test handlers::master::tests::test_platform_ok_too_loud ... ok
+test handlers::master::tests::test_silence_guard_threshold ... ok
+test handlers::master::tests::test_sha256_bytes_deterministic ... ok
+test handlers::master::tests::test_target_lufs_clamped ... ok
+test jini::schema_agent::tests::confidence_out_of_range_fails ... ok
+test health::tests::health_gate_all_criteria_required ... ok
+test health::tests::health_criteria_default_c6_c7_true ... ok
+test health::tests::health_gate_passes_when_all_set ... ok
+test health::tests::health_gate_fails_if_any_criterion_missing ... ok
+test jini::schema_agent::tests::delta_at_boundary_passes ... ok
+test jini::schema_agent::tests::delta_out_of_range_fails ... ok
+test jini::schema_agent::tests::empty_narrative_fails ... ok
+test jini::schema_agent::tests::invalid_suggestion_returns_fallback ... ok
+test jini::schema_agent::tests::narrative_over_500_fails ... ok
+test jini::schema_agent::tests::negative_delta_at_boundary_passes ... ok
+test jini::schema_agent::tests::valid_suggestion_passes ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_unsigned_engine ... ok
+test marketplace::revocation::tests::revocation_detects_revoked_key ... ok
+test marketplace::revocation::tests::revocation_empty_list_passes_all ... ok
+test marketplace::revocation::tests::revocation_passes_valid_key ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_revoked_key ... ok
+test policy::tests::policy_allows_declared_destination ... ok
+test policy::tests::policy_blocks_undeclared_destination ... ok
+test policy::tests::policy_deny_by_default_with_no_allow_rules ... ok
+test policy::tests::policy_loaded_from_actual_config ... ok
+test registry::tests::registry_load_fails_on_missing_file ... ok
+test registry::tests::registry_correct_hash_passes ... ok
+test registry::tests::registry_hash_mismatch_is_fatal ... ok
+test handlers::decode::tests::test_resample_passthrough_48k ... ok
+test registry::tests::registry_pending_stub_skips_verification ... ok
+test registry::tests::registry_unregistered_asset_is_fatal ... ok
+test registry::tests::registry_revoked_keys_accessible ... ok
+test marketplace::gatekeeper::tests::gatekeeper_accepts_valid_engine ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_undeclared_permission ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_wrong_digest ... ok
+test handlers::decode::tests::test_decode_real_mp3_file ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.89s
+
+     Running unittests src/main.rs (target/debug/deps/m0d-8be6fcb373f9edf8)
+
+running 71 tests
+test audit::tests::audit_fail_on_nonexistent_path ... ok
+test blob_store::tests::test_blob_store_insert_get ... ok
+test blob_store::tests::test_blob_store_get_missing_returns_none ... ok
+test blob_store::tests::test_stored_blob_serializes_to_json ... ok
+test audit::tests::audit_test_writable_succeeds ... ok
+test handlers::blob::tests::test_blob_store_returns_none_for_unknown_id ... ok
+test audit::tests::audit_write_creates_ndjson_line ... ok
+test handlers::blob::tests::test_stored_blob_json_no_audio_bytes ... ok
+test handlers::decode::tests::test_decode_error_display ... ok
+test handlers::decode::tests::test_decode_invalid_format ... ok
+test handlers::decode::tests::test_decode_nonexistent_file ... ok
+test audit::tests::audit_all_7_event_types_serialize ... ok
+test handlers::decode::tests::test_downmix_quad_to_stereo ... ok
+test handlers::decode::tests::test_downmix_mono_via_downmix ... ok
+test handlers::decode::tests::test_mono_to_stereo_empty ... ok
+test handlers::decode::tests::test_mono_to_stereo ... ok
+test cdn::tests::cdn_hash_mismatch_prevents_serve ... ok
+test handlers::export::tests::test_export_format_from_str ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_48000 ... ok
+test cdn::tests::cdn_verify_all_passes_with_correct_hashes ... ok
+test cdn::tests::cdn_verify_all_detects_tamper ... ok
+test handlers::decode::tests::test_target_constants ... ok
+test handlers::export::tests::test_export_format_extension ... ok
+test cdn::tests::cdn_serves_correct_asset ... ok
+test handlers::export::tests::test_f64_to_80bit_extended_zero ... ok
+test handlers::export::tests::test_pcm_bytes_empty ... ok
+test handlers::export::tests::test_pcm_bytes_roundtrip ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_in_range ... ok
+test handlers::master::tests::test_bytes_to_f32_clamps_mp3_bitstream ... ok
+test handlers::master::tests::test_compute_rms_silence ... ok
+test handlers::master::tests::test_derive_seed_non_zero ... ok
+test handlers::master::tests::test_platform_ok_at_target ... ok
+test handlers::master::tests::test_platform_ok_too_loud ... ok
+test handlers::master::tests::test_compute_rms_half_amp ... ok
+test handlers::master::tests::test_platform_ok_tp_exceeded ... ok
+test handlers::master::tests::test_sha256_bytes_deterministic ... ok
+test handlers::master::tests::test_silence_guard_threshold ... ok
+test handlers::master::tests::test_gain_overflow_guard ... ok
+test health::tests::health_criteria_default_c6_c7_true ... ok
+test health::tests::health_gate_all_criteria_required ... ok
+test health::tests::health_gate_fails_if_any_criterion_missing ... ok
+test handlers::master::tests::test_target_lufs_clamped ... ok
+test jini::schema_agent::tests::delta_at_boundary_passes ... ok
+test jini::schema_agent::tests::confidence_out_of_range_fails ... ok
+test health::tests::health_gate_passes_when_all_set ... ok
+test jini::schema_agent::tests::delta_out_of_range_fails ... ok
+test jini::schema_agent::tests::empty_narrative_fails ... ok
+test jini::schema_agent::tests::invalid_suggestion_returns_fallback ... ok
+test jini::schema_agent::tests::narrative_over_500_fails ... ok
+test jini::schema_agent::tests::negative_delta_at_boundary_passes ... ok
+test jini::schema_agent::tests::valid_suggestion_passes ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_revoked_key ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_unsigned_engine ... ok
+test marketplace::revocation::tests::revocation_detects_revoked_key ... ok
+test marketplace::revocation::tests::revocation_passes_valid_key ... ok
+test marketplace::revocation::tests::revocation_empty_list_passes_all ... ok
+test handlers::decode::tests::test_resample_passthrough_48k ... ok
+test policy::tests::policy_blocks_undeclared_destination ... ok
+test policy::tests::policy_deny_by_default_with_no_allow_rules ... ok
+test policy::tests::policy_allows_declared_destination ... ok
+test policy::tests::policy_loaded_from_actual_config ... ok
+test registry::tests::registry_correct_hash_passes ... ok
+test registry::tests::registry_load_fails_on_missing_file ... ok
+test registry::tests::registry_hash_mismatch_is_fatal ... ok
+test registry::tests::registry_pending_stub_skips_verification ... ok
+test registry::tests::registry_unregistered_asset_is_fatal ... ok
+test registry::tests::registry_revoked_keys_accessible ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_undeclared_permission ... ok
+test marketplace::gatekeeper::tests::gatekeeper_accepts_valid_engine ... ok
+test marketplace::gatekeeper::tests::gatekeeper_rejects_wrong_digest ... ok
+test handlers::decode::tests::test_decode_real_mp3_file ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.97s
+
+     Running unittests src/bin/test_engine.rs (target/debug/deps/test_engine-06531242e0dbd658)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/e2e_golden_pathway.rs (target/debug/deps/e2e_golden_pathway-b3eaf3f03b19cc45)
+
+running 1 test
+test test_e2e_golden_pathway_aether_pipeline ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.09s
+
+     Running unittests src/lib.rs (target/debug/deps/openclaw-16016df8e7202ef5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/openclaw_contract.rs (target/debug/deps/openclaw_contract-96f8cb244b1b5417)
+
+running 18 tests
+test biquad_glide_produces_no_nan ... ok
+test glider_is_linear ... ok
+test engine_initializes_from_topology_json ... ok
+test glider_reaches_target_after_glide_duration ... ok
+test scheduler_advances_and_detects_boundary ... ok
+test engine_processes_silence_without_panic ... ok
+test global_glide_ms_applies_to_all_nodes ... ok
+test engine_processes_sine_wave ... ok
+test set_node_parameter_does_not_panic ... ok
+test engine_reset_produces_identical_output ... ok
+test crossfader_produces_valid_output ... ok
+test stem_buffer_read_block_pads_silence ... ok
+test process_stems_sums_four_channels ... ok
+test set_stem_node_parameter_updates_correct_stem ... ok
+test stem_buffer_decodes_flac_bytes ... ok
+test stem_engine_processes_without_panic ... ok
+test stem_seek_advances_correctly ... ok
+test engine_switches_section_glitch_free ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running unittests src/lib.rs (target/debug/deps/pipelineforge-340912463e32b898)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipelineforge_contract.rs (target/debug/deps/pipelineforge_contract-f09fc444f6d3e19d)
+
+running 6 tests
+test lufs_normalization_always_last ... ok
+test hum_removal_always_first ... ok
+test muddy_mix_selects_lowmid_clarity ... ok
+test empty_conditions_produces_lufs_only ... ok
+test muddy_and_pump_produces_valid_dag ... ok
+test forged_topology_loads_into_dsp_graph ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (target/debug/deps/proof-73f288ebddbd653b)
+
+running 7 tests
+test proof::tests::proof_log_clamp_count ... ok
+test proof::tests::proof_hash_length_and_hex ... ok
+test proof::tests::proof_verify_wrong_output_fails ... ok
+test proof::tests::proof_certificate_serializable ... ok
+test proof::tests::proof_different_output_different_hash ... ok
+test proof::tests::proof_verify_correct_ok ... ok
+test proof::tests::proof_generate_deterministic ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/sp314_dsp-87761be48fbc5822)
+
+running 67 tests
+test analysis::sdr::tests::perfect_reconstruction_returns_high_sdr ... ok
+test analysis::analyzer::tests::analyze_stereo_empty_returns_default ... ok
+test analysis::sdr::tests::sdr_above_6db_gate ... ok
+test analysis::sdr::tests::zero_signal_returns_low_sdr ... ok
+test jini::tests::clipping_takes_priority_over_spectral ... ok
+test jini::tests::harsh_suggests_warm_flavour ... ok
+test cut_heal::tests::cut_heal_deterministic ... ok
+test jini::tests::neutral_behaviour_suggests_nothing ... ok
+test jini::tests::overcompressed_suggests_dynamics_reduction ... ok
+test cut_heal::tests::crossfade_no_click_at_boundary ... ok
+test jini::tests::persona_changes_narrative_not_action ... ok
+test spatial::channel_assign::tests::all_weights_in_bounds ... ok
+test spatial::channel_assign::tests::assignment_deterministic ... ok
+test spatial::channel_assign::tests::ambience_goes_to_rear ... ok
+test spatial::channel_assign::tests::bass_has_lfe_weight ... ok
+test spatial::channel_assign::tests::voice_always_has_center_weight ... ok
+test spatial::channel_assign::tests::drums_go_to_front ... ok
+test jini::tests::muddy_suggests_clean_flavour ... ok
+test spatial::five_dot_one::tests::lfe_within_bounds ... ok
+test spatial::five_dot_one::tests::ambience_energy_in_rear_channels ... ok
+test spatial::five_dot_one::tests::rear_energy_within_bounds ... ok
+test spatial::five_dot_one::tests::render_deterministic ... ok
+test spatial::five_dot_one::tests::voice_energy_in_center_channel ... ok
+test spatial::renderer::tests::center_energy_in_both_channels ... ok
+test spatial::renderer::tests::five_dot_one_renderer_has_six_channels ... ok
+test spatial::renderer::tests::lfe_blended_at_minus_10db ... ok
+test spatial::renderer::tests::stereo_output_is_mono_compatible ... ok
+test spatial::renderer::tests::stereo_renderer_deterministic ... ok
+test spatial::tests::analysis_deterministic ... ok
+test cut_heal::tests::silence_cut_ignores_short_gaps ... ok
+test cut_heal::tests::silence_cut_detects_long_silence ... ok
+test spatial::user_profile::tests::all_fields_in_bounds_after_modulation ... ok
+test spatial::user_profile::tests::default_music_has_wide_tendencies ... ok
+test spatial::tests::wide_signal_has_high_ms_ratio ... ok
+test spatial::tests::mono_signal_has_zero_side_energy ... ok
+test spatial::user_profile::tests::default_podcast_has_strong_center ... ok
+test spatial::user_profile::tests::markov_silence_reduces_activity ... ok
+test spatial::user_profile::tests::profile_deterministic ... ok
+test spatial::user_profile::tests::markov_consonant_increases_width ... ok
+test spatial::user_profile::tests::markov_tail_increases_rear_decay ... ok
+test cut_heal::tests::breath_cut_detects_breath_region ... ok
+test stft::nmf::diverse_window_tests::short_track_returns_full ... ok
+test transforms::hadamard::tests::hadamard_deterministic ... ok
+test transforms::hadamard::tests::hadamard_normalized_is_identity ... ok
+test transforms::hadamard::tests::hadamard_orthogonality ... ok
+test transforms::hadamard::tests::hadamard_requires_power_of_two ... ok
+test transforms::hadamard::tests::ms_matrix_is_hadamard_2x2 ... ok
+test spatial::tests::sub_energy_detected_below_80hz ... ok
+test stft::nmf::diverse_window_tests::same_input_same_output ... ok
+test transforms::pca::tests::eigenvectors_are_orthogonal ... ok
+test transforms::pca::tests::pca_deterministic ... ok
+test transforms::pca::tests::pca_does_not_modify_input ... ok
+test verification::tests::verify_config_from_spotify ... ok
+test transforms::pca::tests::uncorrelated_stereo_has_low_pc1_ratio ... ok
+test verification::tests::verify_empty_no_panic ... ok
+test transforms::pca::tests::correlated_stereo_has_high_correlation ... ok
+test analysis::analyzer::tests::analyze_stereo_mix_metrics_reasonable ... ok
+test analysis::analyzer::tests::analyze_stereo_stems_are_default ... ok
+test stft::nmf::diverse_window_tests::result_within_bounds ... ok
+test stft::nmf::transform_tests::transform_is_deterministic ... ok
+test verification::tests::verify_max_trim_respected ... ok
+test verification::tests::verify_tp_clamp_prevents_clipping ... ok
+test verification::tests::verify_trim_applied_when_too_loud ... ok
+test verification::tests::verify_deterministic ... ok
+test verification::tests::verify_one_pass_only ... ok
+test verification::tests::verify_pass_when_already_on_target ... ok
+test stft::nmf::transform_tests::fit_then_transform_matches_fit_transform ... ok
+
+test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running unittests src/bin/scratch_bq.rs (target/debug/deps/scratch_bq-37bd1bec6e4203c2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/autotune_contract.rs (target/debug/deps/autotune_contract-1b7d9e297b4b550f)
+
+running 5 tests
+test autotuner_calculates_gain_correctly ... ok
+test autotuner_respects_clamping_limit ... ok
+test autotuner_is_fully_deterministic ... ok
+test autotuner_transparent_returns_zero_immediately ... ok
+test autotuner_chunk_finds_loudest_section ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/biquad_contract.rs (target/debug/deps/biquad_contract-f92969c274406407)
+
+running 5 tests
+test test_bell ... ok
+test test_highpass ... ok
+test test_highshelf ... ok
+test test_lowshelf ... ok
+test test_lowpass ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/clipper_contract.rs (target/debug/deps/clipper_contract-03a74ee4e5ecea34)
+
+running 3 tests
+test soft_clipper_bypass_is_transparent ... ok
+test soft_clipper_limits_massive_peaks ... ok
+test soft_clipper_transparent_on_low_signals ... FAILED
+
+failures:
+
+---- soft_clipper_transparent_on_low_signals stdout ----
+Transparent max output: 0.149421
+
+thread 'soft_clipper_transparent_on_low_signals' (98921) panicked at lineos/m1/sp314-dsp/tests/clipper_contract.rs:24:5:
+Clipper altered low signal amplitude! Max out: 0.149421
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    soft_clipper_transparent_on_low_signals
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p sp314-dsp --test clipper_contract`

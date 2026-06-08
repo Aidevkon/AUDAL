@@ -126,10 +126,10 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
         _              => "AUDIO",
     };
 
-    let name = path.split('/').last().unwrap_or("unknown").to_string();
+    let name = path.split('/').next_back().unwrap_or("unknown").to_string();
 
     Ok(AudioMeta {
-        path:        path,
+        path,
         name,
         format:      format.to_string(),
         sample_rate: 48_000,
@@ -239,7 +239,7 @@ pub async fn export_certificate_png(
     use tauri_plugin_dialog::DialogExt;
 
     // Get blob data
-    let blob = client.get_blob(&blob_id).await
+    let _blob = client.get_blob(&blob_id).await
         .map_err(|e| e.to_string())?;
 
     // Ask user where to save

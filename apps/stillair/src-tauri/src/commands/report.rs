@@ -107,11 +107,11 @@ fn generate_bmr128_pdf(blob: &GoldenBlobJson, path: &str) -> Result<(), String> 
     layer.use_text("Still Air — Creator OS",     10.0, Mm(20.0), Mm(269.0), &font);
 
     layer.use_text(
-        &format!("Blob ID : {}", blob.id),
+        format!("Blob ID : {}", blob.id),
         8.0, Mm(20.0), Mm(263.0), &font,
     );
     layer.use_text(
-        &format!("Preset  : {}", blob.preset_id),
+        format!("Preset  : {}", blob.preset_id),
         8.0, Mm(20.0), Mm(258.0), &font,
     );
 

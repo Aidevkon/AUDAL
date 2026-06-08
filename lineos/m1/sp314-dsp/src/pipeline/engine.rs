@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::masking_eq::{MaskingAwareEQ, MaskingEQConfig};
 use crate::compressor::stereo::{CompressorV3, CompressorV3Config};
 use crate::pipeline::phase::PhaseAligner;

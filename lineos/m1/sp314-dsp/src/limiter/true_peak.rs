@@ -42,6 +42,12 @@ pub struct TruePeakDetector {
     write_pos: usize,
 }
 
+impl Default for TruePeakDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TruePeakDetector {
     pub fn new() -> Self {
         Self {

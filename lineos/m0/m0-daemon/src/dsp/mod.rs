@@ -146,7 +146,7 @@ impl DspAdapter {
 
     /// Apply deterministic Aether overrides to the DSP graph topology.
     fn apply_topology_overrides(topology: &mut DspTopology, config: &integration::config::DspConfig) {
-        let mut topology_set_param = |nodes: &mut Vec<sp314_nodes::topology::TopologyNode>, node_id: &str, param: &str, val: f32| {
+        let topology_set_param = |nodes: &mut Vec<sp314_nodes::topology::TopologyNode>, node_id: &str, param: &str, val: f32| {
             for node in nodes.iter_mut() {
                 if node.node_id == node_id {
                     if let Some(obj) = node.parameters.as_object_mut() {

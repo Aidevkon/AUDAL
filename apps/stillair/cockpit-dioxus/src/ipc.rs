@@ -168,7 +168,7 @@ fn map_command_to_http(command: &str, args: &serde_json::Value) -> Result<(&'sta
         "get_visualization_data" => {
             // Visualization is computed in Tauri backend, not in M0.
             // In browser mode, return a minimal stub so the UI doesn't crash.
-            return Err("[IPC/browser] get_visualization_data not available in browser mode".into());
+            Err("[IPC/browser] get_visualization_data not available in browser mode".into())
         }
 
         // ── Playback ─────────────────────────────────────────────────────
@@ -202,16 +202,16 @@ fn map_command_to_http(command: &str, args: &serde_json::Value) -> Result<(&'sta
         "open_audio_file" | "load_audio_file" => {
             // Native file dialog is unavailable in browser.
             // Return None (= dialog cancelled) so the UI stays in current mode.
-            return Err("[IPC/browser] File dialog not available — use Tauri dev for file picking".into());
+            Err("[IPC/browser] File dialog not available — use Tauri dev for file picking".into())
         }
 
         // ── Coach / Report / other ───────────────────────────────────────
         "get_coach_narrative" | "evaluate_findings" | "export_pdf_report" | "preview_pdf_report" => {
-            return Err(format!("[IPC/browser] {command} not available in browser mode"));
+            Err(format!("[IPC/browser] {command} not available in browser mode"))
         }
 
         _ => {
-            return Err(format!("[IPC/browser] Unknown command: {command}"));
+            Err(format!("[IPC/browser] Unknown command: {command}"))
         }
     }
 }

@@ -36,6 +36,12 @@ pub struct M0Client {
 unsafe impl Send for M0Client {}
 unsafe impl Sync for M0Client {}
 
+impl Default for M0Client {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl M0Client {
     pub fn new() -> Self {
         let client = ClientBuilder::new()

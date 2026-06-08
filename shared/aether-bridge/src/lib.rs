@@ -29,6 +29,7 @@ use lineos_types::pre_analysis::PreAnalysisData;
 /// Aether tuning parameters from the caller.
 /// Decoupled from MasterRequest (m0 network DTO).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub struct AetherRequest {
     pub persona_id:  Option<String>,
     pub tone:        Option<f32>,
@@ -40,20 +41,6 @@ pub struct AetherRequest {
     pub preset_name: Option<String>,
 }
 
-impl Default for AetherRequest {
-    fn default() -> Self {
-        Self {
-            persona_id:  None,
-            tone:        None,
-            dynamics:    None,
-            ambience:    None,
-            chaos_seed:  None,
-            project_id:  None,
-            track_id:    None,
-            preset_name: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AmbienceIntent {

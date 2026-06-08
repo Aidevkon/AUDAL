@@ -29,7 +29,7 @@ fn main() {
         }
     };
 
-    let (mut left, mut right): (Vec<f32>, Vec<f32>) = if spec.channels == 2 {
+    let (left, right): (Vec<f32>, Vec<f32>) = if spec.channels == 2 {
         let l: Vec<f32> = samples_raw.iter().step_by(2).cloned().collect();
         let r: Vec<f32> = samples_raw.iter().skip(1).step_by(2).cloned().collect();
         (l, r)

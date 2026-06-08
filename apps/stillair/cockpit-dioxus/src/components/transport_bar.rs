@@ -13,7 +13,6 @@ use crate::components::{
     transport_button::{TransportActuator, LedColor, SkipActuator},
     ab_toggle::{AbToggle, AbToggleState},
     timecode::TimecodeDisplay,
-    oled_tile::{},
 };
 
 // ── Types (moved from app.rs) ─────────────────────────────────────────────────
@@ -86,12 +85,12 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     // ── P12B-004: Position polling — 500ms when in CoachReady ────────────────
     // Scoped here: only TransportBar re-renders on poll (fixes F4-INT-01).
     {
-        let playback_state = playback_state.clone();
-        let mode_poll      = mode.clone();
+        let playback_state = playback_state;
+        let mode_poll      = mode;
 
         use_effect(move || {
-            let playback_state = playback_state.clone();
-            let mode_poll      = mode_poll.clone();
+            let playback_state = playback_state;
+            let mode_poll      = mode_poll;
 
             spawn_local(async move {
                 loop {
@@ -102,12 +101,9 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                         continue;
                     }
 
-                    match crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
+                    if let Ok(Some(state)) = crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
                         "get_playback_state"
-                    ).await {
-                        Ok(Some(state)) => { playback_state.clone().set(Some(state)); }
-                        _               => {}
-                    }
+                    ).await { playback_state.clone().set(Some(state)); }
                 }
             });
         });
@@ -209,7 +205,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     label: "{lbl_skip_back}",
                                                     on_click: move |_| {
                                                         let new_ms = position_ms.saturating_sub(5_000);
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback("seek", Some(new_ms), ps).await;
                                                         });
@@ -235,7 +231,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                         let rect = el.get_bounding_client_rect();
                                                         let frac = ((client_x - rect.left()) / rect.width()).clamp(0.0, 1.0);
                                                         let seek_ms = (frac * duration_ms as f64) as u64;
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback("seek", Some(seek_ms), ps).await;
                                                         });
@@ -319,7 +315,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     label: "{lbl_skip_fwd}",
                                                     on_click: move |_| {
                                                         let new_ms = position_ms.saturating_add(5_000).min(duration_ms);
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback("seek", Some(new_ms), ps).await;
                                                         });
@@ -354,7 +350,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     active: current_state() == TransportState::Stopped,
                                                     on_click: move |_| {
                                                         current_state.set(TransportState::Stopped);
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback("stop", None, ps).await;
                                                         });
@@ -373,7 +369,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                     active: current_state() == TransportState::Playing,
                                                     on_click: move |_| {
                                                         current_state.set(TransportState::Playing);
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback("play", None, ps).await;
                                                         });
@@ -397,7 +393,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                             - *ab_press_time.read();
                                                         if press_duration >= 300 {
                                                             // long press — return to A
-                                                            let ps = playback_state.clone();
+                                                            let ps = playback_state;
                                                             spawn_local(async move {
                                                                 invoke_playback("ab_a", None, ps).await;
                                                             });
@@ -414,7 +410,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                                             AbToggleState::A | AbToggleState::Toggled => "ab_a",
                                                             AbToggleState::B => "ab_b",
                                                         };
-                                                        let ps = playback_state.clone();
+                                                        let ps = playback_state;
                                                         spawn_local(async move {
                                                             invoke_playback(action, None, ps).await;
                                                         });
@@ -455,7 +451,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                 match current {
                                     AbortState::IdleClosed => {
                                         abort_state.set(AbortState::Armed);
-                                        let mut state_clone = abort_state.clone();
+                                        let mut state_clone = abort_state;
                                         spawn_local(async move {
                                             gloo_timers::future::TimeoutFuture::new(3_000).await;
                                             if *state_clone.read() == AbortState::Armed {

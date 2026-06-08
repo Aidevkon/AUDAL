@@ -46,7 +46,7 @@ pub fn dynamic_range_db(signal: &[f32], sample_rate: u32) -> f32 {
     let mut block_rms: Vec<f32> = signal
         .chunks(block_size)
         .filter(|c| c.len() == block_size)
-        .map(|c| rms_db(c))
+        .map(rms_db)
         .filter(|&r| r > -144.0)
         .collect();
 

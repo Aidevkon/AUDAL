@@ -199,7 +199,7 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     let samples = pcm_bytes_to_f32(&blob.audio_bytes);
 
     let spec = hound::WavSpec {
-        channels:        blob.channels as u16,
+        channels:        blob.channels,
         sample_rate:     blob.sample_rate,
         bits_per_sample: 32,
         sample_format:   hound::SampleFormat::Float,
@@ -242,7 +242,7 @@ fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     }
 
     let pcm = pcm_bytes_to_f32(&blob.audio_bytes);
-    let channels    = blob.channels.max(1) as u16;
+    let channels    = blob.channels.max(1);
     let sample_rate = blob.sample_rate;
     let num_frames  = (pcm.len() / channels as usize) as u32;
     let bit_depth: u16 = 32;

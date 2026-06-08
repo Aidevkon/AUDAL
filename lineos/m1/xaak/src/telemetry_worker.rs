@@ -1,80 +1,74 @@
-//! Telemetry background worker — FFT + UDP off audio thread.
-//! Authority: telemetry-bridge-spec-v1_3.md
-//!
-//! Receives raw audio samples from audio callback via lock-free ringbuf.
-//! When 1024 samples accumulated: compute spectrum + send UDP.
-//!
-//! INV-TB-1: audio thread never blocked
-//! INV-TB-2: bincode zero-alloc encoding
-//! INV-TB-4: worker thread never waits for audio thread
-
-use ringbuf::traits::{Consumer, Observer};
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
-use lineos_types::RealtimeFrame;
+use std::time::Duration;
+use ringbuf::traits::*;
 
-const FRAME_SIZE: usize = 1024;
-
-/// Spawn telemetry worker thread.
-/// Consumes raw samples from ring buffer, computes spectrum, sends UDP.
-pub fn spawn(
-    mut consumer:   impl Consumer<Item = f32> + Observer + Send + 'static,
-    sample_rate:    u32,
-    channels:       u16,
-    position_ms:    Arc<Mutex<u64>>,
-) {
+pub fn spawn<C>(
+    mut consumer: C,
+    sample_rate: u32,
+    channels: usize,
+    pos_mutex: Arc<Mutex<u64>>,
+) where
+    C: Consumer<Item = f32> + Observer + Send + 'static,
+{
     std::thread::spawn(move || {
-        let socket = match UdpSocket::bind("127.0.0.1:0") {
-            Ok(s)  => s,
+        eprintln!("[WORKER] Thread spawned. CH: {}, SR: {}", channels, sample_rate);
+
+        let udp_tx = match UdpSocket::bind("127.0.0.1:0") {
+            Ok(s) => {
+                s.set_nonblocking(true).unwrap_or_default();
+                eprintln!("[WORKER] UDP bound to {:?}", s.local_addr());
+                Some(s)
+            }
             Err(e) => {
-                tracing::error!("telemetry_worker: UDP bind failed: {e}");
-                return;
+                eprintln!("[WORKER] Failed to bind UDP: {}", e);
+                None
             }
         };
-        socket.set_nonblocking(false).ok();
 
         let mut analyzer = crate::spectrum::SpectrumAnalyzer::new();
-        let mut buf = vec![0.0f32; FRAME_SIZE * channels as usize];
-        let ch = channels as usize;
+        let ch = channels.max(1);
+        let chunk_size = 1024 * ch;
+        let mut buffer = Vec::with_capacity(chunk_size);
+        let mut iter_count = 0;
 
         loop {
-            // Wait until we have a full frame worth of samples
             let available = consumer.occupied_len();
-            if available < FRAME_SIZE * ch {
-                // Not enough data yet — yield briefly
-                std::thread::sleep(std::time::Duration::from_millis(1));
-                continue;
-            }
+            if available >= chunk_size {
+                buffer.clear();
+                for _ in 0..chunk_size {
+                    if let Some(s) = consumer.try_pop() {
+                        buffer.push(s);
+                    }
+                }
+                
+                iter_count += 1;
+                if iter_count % 50 == 0 {
+                    eprintln!("[WORKER] Processed 50 chunks ({} frames)", chunk_size);
+                }
 
-            // Pop exactly one frame
-            let popped = consumer.pop_slice(&mut buf[..FRAME_SIZE * ch]);
-            if popped < FRAME_SIZE * ch { continue; }
+                let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
+                
+                let frame = lineos_types::RealtimeFrame {
+                    spectrum:    analyzer.compute(&buffer, ch),
+                    gonio_path:  crate::player::decimate_gonio(&buffer, ch),
+                    position_ms,
+                };
 
-            // Compute spectrum (FFT on channel 0)
-            let spectrum = analyzer.compute(&buf[..FRAME_SIZE * ch], ch);
-
-            // Decimate goniometer (32 pairs)
-            let gonio_path = crate::player::decimate_gonio(
-                &buf[..FRAME_SIZE * ch], ch
-            );
-
-            // Current playback position
-            let position_ms = position_ms.lock()
-                .map(|p| *p)
-                .unwrap_or(0);
-
-            let frame = RealtimeFrame {
-                spectrum,
-                gonio_path,
-                position_ms,
-            };
-
-            // Encode + send (syscall here — safe, off audio thread)
-            if let Ok(bytes) = bincode::encode_to_vec(
-                &frame,
-                bincode::config::standard(),
-            ) {
-                let _ = socket.send_to(&bytes, "127.0.0.1:9000");
+                if let Some(ref sock) = udp_tx {
+                    match bincode::encode_to_vec(&frame, bincode::config::standard()) {
+                        Ok(bytes) => {
+                            if let Err(e) = sock.send_to(&bytes, "127.0.0.1:9000") {
+                                if e.kind() != std::io::ErrorKind::WouldBlock {
+                                    eprintln!("[WORKER] send_to error: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => eprintln!("[WORKER] Bincode error: {}", e),
+                    }
+                }
+            } else {
+                std::thread::sleep(Duration::from_millis(2));
             }
         }
     });

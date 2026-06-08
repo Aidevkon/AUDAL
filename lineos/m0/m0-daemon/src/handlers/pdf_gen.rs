@@ -50,11 +50,11 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     let lra  = blob.loudness.lra;
 
     layer.use_text("COMPLIANCE", 11.0, Mm(20.0), Mm(243.0), &font_bold);
-    layer.use_text(&format!("Integrated Loudness: {:.2} LUFS  (EBU R128)", lufs),
+    layer.use_text(format!("Integrated Loudness: {:.2} LUFS  (EBU R128)", lufs),
         9.0, Mm(20.0), Mm(236.0), &font);
-    layer.use_text(&format!("True Peak:           {:.2} dBTP", tp),
+    layer.use_text(format!("True Peak:           {:.2} dBTP", tp),
         9.0, Mm(20.0), Mm(230.0), &font);
-    layer.use_text(&format!("Loudness Range:      {:.2} LU", lra),
+    layer.use_text(format!("Loudness Range:      {:.2} LU", lra),
         9.0, Mm(20.0), Mm(224.0), &font);
     layer.use_text("EBU R128: PASS   ITU-BS.1770: PASS   Deterministic: YES",
         9.0, Mm(20.0), Mm(218.0), &font);
@@ -62,18 +62,18 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     // Stem fingerprints
     if let Some(fp) = &blob.stem_fingerprints {
         layer.use_text("STEM DNA", 11.0, Mm(20.0), Mm(208.0), &font_bold);
-        layer.use_text(&format!("Voice:     {}", fp.voice),     9.0, Mm(20.0), Mm(201.0), &font);
-        layer.use_text(&format!("Drums:     {}", fp.drums),     9.0, Mm(20.0), Mm(195.0), &font);
-        layer.use_text(&format!("Bass:      {}", fp.bass),      9.0, Mm(20.0), Mm(189.0), &font);
-        layer.use_text(&format!("Harmonics: {}", fp.harmonics), 9.0, Mm(20.0), Mm(183.0), &font);
-        layer.use_text(&format!("Ambience:  {}", fp.ambience),  9.0, Mm(20.0), Mm(177.0), &font);
-        layer.use_text(&format!("Pipeline:  {}", fp.pipeline),  9.0, Mm(20.0), Mm(171.0), &font);
+        layer.use_text(format!("Voice:     {}", fp.voice),     9.0, Mm(20.0), Mm(201.0), &font);
+        layer.use_text(format!("Drums:     {}", fp.drums),     9.0, Mm(20.0), Mm(195.0), &font);
+        layer.use_text(format!("Bass:      {}", fp.bass),      9.0, Mm(20.0), Mm(189.0), &font);
+        layer.use_text(format!("Harmonics: {}", fp.harmonics), 9.0, Mm(20.0), Mm(183.0), &font);
+        layer.use_text(format!("Ambience:  {}", fp.ambience),  9.0, Mm(20.0), Mm(177.0), &font);
+        layer.use_text(format!("Pipeline:  {}", fp.pipeline),  9.0, Mm(20.0), Mm(171.0), &font);
     }
 
     // BLAKE3 + Signature
     if let Some(hash) = &blob.pcm_blake3 {
         layer.use_text("CRYPTOGRAPHIC PROOF", 11.0, Mm(20.0), Mm(161.0), &font_bold);
-        layer.use_text(&format!("BLAKE3: {}", hash), 8.0, Mm(20.0), Mm(154.0), &font);
+        layer.use_text(format!("BLAKE3: {}", hash), 8.0, Mm(20.0), Mm(154.0), &font);
     }
 
     // Timeline
@@ -82,7 +82,7 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
         let mut y = 137.0f32;
         for record in &blob.processing_timeline {
             layer.use_text(
-                &format!("  {}  {}ms  {}",
+                format!("  {}  {}ms  {}",
                     record.stage, record.duration_ms, record.stage_hash),
                 8.0, Mm(20.0), Mm(y), &font);
             y -= 6.0;

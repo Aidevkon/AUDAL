@@ -188,7 +188,7 @@ pub async fn get_preview_stem(
 /// Runs in spawn_blocking.
 fn generate_preview_stems(
     audio_path: &str,
-    flavour_id: &Option<String>,
+    _flavour_id: &Option<String>,
 ) -> Result<(HashMap<String, Vec<u8>>, ScoutMeta, f32, u32), String> {
     use crate::handlers::decode;
     use sp314_dsp::stft::two_pass::TwoPassEngine;

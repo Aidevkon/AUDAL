@@ -16,6 +16,12 @@ pub struct BiquadCoeffs {
     pub a2: f64,
 }
 
+impl Default for BiquadCoeffs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BiquadCoeffs {
     pub fn new() -> Self {
         Self { b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }
@@ -26,6 +32,12 @@ impl BiquadCoeffs {
 pub struct BiquadState {
     pub s1: f64,
     pub s2: f64,
+}
+
+impl Default for BiquadState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BiquadState {

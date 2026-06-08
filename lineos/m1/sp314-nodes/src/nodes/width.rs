@@ -54,7 +54,7 @@ impl DspNode for WidthNode {
             let r = right[i];
             
             // 1. M/S Matrix
-            let mut mid = (l + r) * isq2;
+            let mid = (l + r) * isq2;
             let mut side = (l - r) * isq2;
             
             // 2. Side Gain

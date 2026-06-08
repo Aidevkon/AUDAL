@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 use rustfft::{FftPlanner, num_complex::Complex};

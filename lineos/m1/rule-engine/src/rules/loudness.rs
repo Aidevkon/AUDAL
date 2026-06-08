@@ -25,10 +25,7 @@ use crate::thresholds::Thresholds;
 /// Tag: `platform:<preset_name>` — set by Cockpit's preset selection.
 pub fn lufs_compliance(r: &AnalysisReport, t: &Thresholds) -> Option<Issue> {
     // Raw preset — no LUFS target, nothing to evaluate
-    let target = match t.target_lufs {
-        Some(v) => v,
-        None    => return None,
-    };
+    let target = t.target_lufs?;
 
     let delta = r.quality.lufs_integrated - target;
 

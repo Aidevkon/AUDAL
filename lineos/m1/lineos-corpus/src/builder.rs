@@ -121,12 +121,12 @@ pub fn build_timeline(
 
     let stem_timelines: Vec<StemTimeline> = stem_pairs.iter().map(|(name, signal, td)| {
         let base_attrs = EnrichedAttributes {
-            rms_db:            features_for(name, &features).rms_db,
-            crest_factor_db:   features_for(name, &features).crest_factor_db,
+            rms_db:            features_for(name, features).rms_db,
+            crest_factor_db:   features_for(name, features).crest_factor_db,
             transient_density: *td,
-            spectral_centroid: features_for(name, &features).spectral_centroid_hz,
+            spectral_centroid: features_for(name, features).spectral_centroid_hz,
             lufs_integrated:   pre_analysis.integrated_lufs,
-            spectral_flatness: features_for(name, &features).spectral_flatness,
+            spectral_flatness: features_for(name, features).spectral_flatness,
         };
         let base_risk = RiskFlags {
             artifact_risk:  0.0,

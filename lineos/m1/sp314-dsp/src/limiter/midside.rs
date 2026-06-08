@@ -15,6 +15,12 @@ pub struct MidSideProcessor {
     y2: f64,
 }
 
+impl Default for MidSideProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MidSideProcessor {
     pub fn new() -> Self {
         Self { x1: 0.0, x2: 0.0, y1: 0.0, y2: 0.0 }

@@ -140,6 +140,12 @@ pub struct CooldownTracker {
     pub cooldown_ms: f64,
 }
 
+impl Default for CooldownTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CooldownTracker {
     pub fn new() -> Self {
         Self {

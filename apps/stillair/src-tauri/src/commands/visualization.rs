@@ -104,7 +104,7 @@ fn compute_lissajous_path(rx: f32, ry: f32, a: f32, b: f32, phase: f32, n_points
 
     for i in 0..=n_points {
         // t ∈ [0, 2π] — full period
-        let t = i as f32 * 2.0 * 3.141592653589793 / n_points as f32;
+        let t = i as f32 * 2.0 * 3.141_592_7 / n_points as f32;
         let x = cx + rx * libm::sinf(a * t + phase);
         let y = cy + ry * libm::sinf(b * t);
         points.push((x, y));

@@ -8,6 +8,12 @@ pub struct TimelineProfiler {
     last_mark: Instant,
 }
 
+impl Default for TimelineProfiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimelineProfiler {
     pub fn new() -> Self {
         Self {

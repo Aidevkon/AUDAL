@@ -40,6 +40,7 @@ pub const RESONANT_PEAK_SIGMA:           f32 =   3.0;
 /// against spectral profile, crest factor, LRA, and phase correlation.
 /// No ML, no randomness. (INV-PA-7)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ZoneActivationFlags {
     pub zone_cymbal_harsh:    bool,
     pub zone_sub_rumble:      bool,
@@ -48,17 +49,6 @@ pub struct ZoneActivationFlags {
     pub zone_harsh_resonance: bool,
 }
 
-impl Default for ZoneActivationFlags {
-    fn default() -> Self {
-        Self {
-            zone_cymbal_harsh:    false,
-            zone_sub_rumble:      false,
-            zone_boxiness:        false,
-            zone_phase_issue:     false,
-            zone_harsh_resonance: false,
-        }
-    }
-}
 
 // ── PreAnalysisData ──────────────────────────────────────────────────────────
 

@@ -129,7 +129,7 @@ impl CrossfadeHeal {
             // Fade out before cut_start
             audio[cut_start - fade_len + i] *= t;
             // Fade in after cut_end
-            audio[cut_end + i] *= (1.0 - t);
+            audio[cut_end + i] *= 1.0 - t ;
         }
         
         for i in cut_start..cut_end {

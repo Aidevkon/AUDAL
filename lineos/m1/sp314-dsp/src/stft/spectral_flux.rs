@@ -7,6 +7,12 @@ pub struct SpectralFluxDetector {
     engine:       StftEngine,
 }
 
+impl Default for SpectralFluxDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpectralFluxDetector {
     pub fn new() -> Self {
         Self {

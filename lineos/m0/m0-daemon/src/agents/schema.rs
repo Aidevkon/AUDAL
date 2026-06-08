@@ -44,7 +44,7 @@ impl ProjectState {
                             "dsp.target_lufs must be f64".into()
                         )
                     )?;
-                    if v < -40.0 || v > 0.0 {
+                    if !(-40.0..=0.0).contains(&v) {
                         return Err(SchemaError::ValidationFailed(
                             format!("dsp.target_lufs {v} out of range [-40, 0]")
                         ));
@@ -56,7 +56,7 @@ impl ProjectState {
                             "dsp.max_tp_db must be f64".into()
                         )
                     )?;
-                    if v < -6.0 || v > 0.0 {
+                    if !(-6.0..=0.0).contains(&v) {
                         return Err(SchemaError::ValidationFailed(
                             format!("dsp.max_tp_db {v} out of range [-6, 0]")
                         ));

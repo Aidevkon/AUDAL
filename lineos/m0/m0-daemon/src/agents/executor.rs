@@ -71,6 +71,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                             blob_id:   blob.id.clone(),
                             lufs:      blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
+                            pcm_data:  Some(_chunk_original),
                         };
                         // Store blob — Executor is responsible for persistence
                         // This is execution, not decision-making

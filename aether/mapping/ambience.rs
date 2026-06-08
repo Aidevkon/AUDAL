@@ -27,12 +27,12 @@ impl AmbienceMicroMapper {
 
         // 4.3 TONE
         let hf_damping_db = -1.5 * tone;
-        let low_mid_cut_db = -1.0 * tone;
+        let low_mid_cut_db = -tone;
 
         // 4.4 LOUDNESS
         let tail_density_delta = 0.2 * loudness;
         let output_gain_db = 1.0 * loudness;
-        let hf_tail_cut_db = -1.0 * loudness;
+        let hf_tail_cut_db = -loudness;
 
         AmbienceMicroDelta {
             reverb_time_delta_s,

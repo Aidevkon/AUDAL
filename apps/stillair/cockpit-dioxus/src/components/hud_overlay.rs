@@ -57,7 +57,7 @@ pub fn MfdHud(props: MfdHudProps) -> Element {
                             cursor: pointer;",
                     onclick: {
                         let id = finding.id;
-                        let dismiss = props.on_dismiss.clone();
+                        let dismiss = props.on_dismiss;
                         move |_| dismiss.call(id)
                     },
                     span { "⚠ {finding.id}" }

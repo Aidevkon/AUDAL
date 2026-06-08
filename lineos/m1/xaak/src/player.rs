@@ -69,7 +69,7 @@ impl CpalPlayer {
         crate::telemetry_worker::spawn(
             telem_cons,
             sample_rate,
-            channels,
+            channels as usize,
             position_ms.clone(),
         );
 

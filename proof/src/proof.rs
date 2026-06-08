@@ -42,11 +42,11 @@ impl ExecutionProof {
             input_pcm_hash:        Self::hash_pcm(input_pcm),
             persona_hash:          Self::hash_json(persona),
             intent_hash:           proof_log.intent.as_ref()
-                                       .map(|i| Self::hash_json(i))
+                                       .map(Self::hash_json)
                                        .unwrap_or_else(|| "none".into()),
             chaos_seed_hash,
             zone_resolutions_hash: proof_log.zone_adj.as_ref()
-                                       .map(|z| Self::hash_json(z))
+                                       .map(Self::hash_json)
                                        .unwrap_or_else(|| "none".into()),
             final_dsp_config_hash: Self::hash_json(dsp_config),
             output_pcm_hash:       Self::hash_pcm(output_pcm),

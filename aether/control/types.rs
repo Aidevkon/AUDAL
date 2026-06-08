@@ -74,7 +74,7 @@ impl MacroDelta {
     /// Apply delta to MacroControls.
     /// Clamped to persona's macro handle bounds (per S-004 §6).
     pub fn apply(&self, macros: &MacroControls,
-                  persona: &PersonaConfig) -> MacroControls {
+                  _persona: &PersonaConfig) -> MacroControls {
         MacroControls {
             tone:      macros.tone,
             dynamics:       macros.dynamics,
