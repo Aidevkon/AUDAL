@@ -30,6 +30,12 @@ pub enum Intent {
         plan:     ExecutionPlan,
         response: oneshot::Sender<Result<DspOutput, ExecutorError>>,
     },
+    // R2 — Conductor batch workflow
+    ExecuteBatchMastering {
+        batch_id: String,
+        items:    Vec<MasteringParams>,
+        response: oneshot::Sender<Result<Vec<BatchTrackOutput>, ConductorError>>,
+    },
     // R2 — WizardAgent
     AnalyzeTelemetry {
         metrics:  AudioMetrics,
@@ -60,11 +66,15 @@ pub enum ExecutorError {
 /// Parameters from HTTP handler → Conductor (R2)
 #[derive(Debug, Clone)]
 pub struct MasteringParams {
-    pub audio_path:  String,
-    pub preset_id:   String,
-    pub target_lufs: f32,
-    pub max_tp_db:   f32,
-    pub session_id:  String,
+    pub audio_path:   String,
+    pub preset_id:    String,
+    pub target_lufs:  f32,
+    pub max_tp_db:    f32,
+    pub session_id:   String,
+    pub project_id:   Option<String>,
+    pub track_id:     Option<String>,
+    pub flavour_id:   Option<String>,
+    pub chaos_seed:   Option<u64>,
 }
 
 /// Plan from Conductor (R2) → Executor (R3)
@@ -93,6 +103,16 @@ pub struct MasteringOutput {
     pub job_id:  String,
     pub blob_id: String,
     pub status:  &'static str,
+}
+
+/// Output for a single track in a batch job
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BatchTrackOutput {
+    pub track_index: usize,
+    pub session_id:  String,
+    pub blob_id:     String,
+    pub status:      &'static str,  // "ok" | "error"
+    pub error:       Option<String>,
 }
 
 /// One finding from WizardAgent (R2)
@@ -141,6 +161,14 @@ impl Operator {
                 )).ok();
                 self.schema_tx.send(intent).await
                     .map_err(|e| format!("SchemaAgent closed: {e}"))
+            }
+            Intent::ExecuteBatchMastering { batch_id, .. } => {
+                self.audit.write(AuditEntry::new(
+                    "operator.dispatch", AuditLevel::Audit,
+                    &format!("→ Conductor batch={batch_id}"),
+                )).ok();
+                self.conductor_tx.send(intent).await
+                    .map_err(|e| format!("Conductor closed: {e}"))
             }
             Intent::ExecuteMastering { params, .. } => {
                 self.audit.write(AuditEntry::new(
