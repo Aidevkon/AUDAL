@@ -112,8 +112,52 @@ impl TwoPassEngine {
         let proxy_frames = ctx.forward_chunk(&proxy);
 
         // NMF fit — INV-ST-1: ONLY fit() call
-        let w = self.nmf.fit(&proxy_frames);
-        self.nmf.w = w.clone();
+        // W learned at proxy sample rate (~12kHz, SCOUT_DOWNSAMPLE=4)
+        let w_proxy = self.nmf.fit(&proxy_frames);
+
+        // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
+        // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
+        // No floating-point interpolation needed — direct index lookup.
+        //
+        // Bin mapping:
+        //   b_full × 23.4 Hz = b_proxy × 5.86 Hz  (same physical frequency)
+        //   b_proxy = b_full * SCOUT_DOWNSAMPLE
+        //
+        // Bins above proxy Nyquist (~6kHz): filled with EPS.
+        // NMF will treat them as "no template" — leaves them untouched.
+        // INV-AB-1: deterministic — integer mapping, no rounding.
+        // ── W-matrix energy averaging: proxy (12kHz) → full (48kHz) ─
+        // proxy bin spacing: 48000 / (4 × 2048) = 5.86 Hz/bin
+        // full  bin spacing: 48000 / 2048       = 23.44 Hz/bin
+        // SCOUT_DOWNSAMPLE=4: average 4 proxy bins → 1 full bin
+        // Preserves micro-harmonic energy — no information lost below ~6kHz
+        // Bins above proxy Nyquist (~6kHz): filled with EPS (no template)
+        // INV-AB-1: deterministic — integer arithmetic only
+        let k = N_COMPONENTS;
+        let mut w_full = vec![1e-10_f32; N_BINS * k];
+        for c in 0..k {
+            for b_full in 0..N_BINS {
+                let proxy_start = b_full * SCOUT_DOWNSAMPLE;
+                if proxy_start < N_BINS {
+                    let mut sum   = 0.0_f32;
+                    let mut count = 0usize;
+                    for offset in 0..SCOUT_DOWNSAMPLE {
+                        let b_proxy = proxy_start + offset;
+                        if b_proxy < N_BINS {
+                            sum   += w_proxy[b_proxy * k + c];
+                            count += 1;
+                        }
+                    }
+                    if count > 0 {
+                        w_full[b_full * k + c] =
+                            (sum / count as f32).max(1e-10_f32);
+                    }
+                }
+                // proxy_start >= N_BINS → above ~6kHz → remains EPS
+            }
+        }
+        let w = w_full.clone();
+        self.nmf.w = w_full;
 
         // ── Semantic assignment from W ───────────────────────────────
         let n_bins = N_BINS;
@@ -123,7 +167,7 @@ impl TwoPassEngine {
             let mut arith   = 0.0f32;
             let eps = 1e-10f32;
             for b in 0..n_bins {
-                let w_val = w[b * N_COMPONENTS + c];
+                let w_val = w_proxy[b * N_COMPONENTS + c];
                 log_sum += libm::logf(w_val + eps);
                 arith   += w_val;
             }
@@ -131,7 +175,12 @@ impl TwoPassEngine {
             let mean = arith / n_bins as f32;
             flatness[c] = if mean > eps { (geom / mean).clamp(0.0, 1.0) } else { 0.0 };
         }
+        // Use proxy W for centroids — relative frequency ordering preserved
+        // (proxy bins have correct relative ordering even at 12kHz)
+        let w_saved = self.nmf.w.clone();
+        self.nmf.w = w_proxy.clone();
         let centroids = self.nmf.centroids(n_bins);
+        self.nmf.w = w_saved;
 
         let ambience_idx = (0..N_COMPONENTS)
             .max_by(|&a, &b| flatness[a].partial_cmp(&flatness[b]).unwrap())
@@ -444,6 +493,48 @@ mod tests {
         (0..n).map(|i| {
             libm::sinf(2.0 * core::f32::consts::PI * freq * i as f32 / 48000.0)
         }).collect()
+    }
+
+    #[test]
+    fn w_bin_mapping_produces_full_size_w() {
+        let signal = sine(440.0, 48000);
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+        assert_eq!(scout.w.len(), N_BINS * N_COMPONENTS,
+            "W must be N_BINS × N_COMPONENTS after bin mapping");
+        assert!(scout.w.iter().all(|&v| v >= 1e-10_f32),
+            "All W values must be >= EPS");
+    }
+
+    #[test]
+    fn w_bin_mapping_is_deterministic() {
+        // INV-AB-1: same signal → same mapped W
+        let signal = sine(440.0, 48000);
+        let mut e1 = TwoPassEngine::new();
+        let mut e2 = TwoPassEngine::new();
+        let s1 = e1.scout(&signal, 48000);
+        let s2 = e2.scout(&signal, 48000);
+        for (a, b) in s1.w.iter().zip(s2.w.iter()) {
+            assert!((a - b).abs() < 1e-10,
+                "INV-AB-1: W must be bit-identical for same input");
+        }
+    }
+
+    #[test]
+    fn w_bins_above_6khz_are_eps() {
+        // Bins above proxy Nyquist must be EPS (no template)
+        let signal = sine(440.0, 48000);
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+        // Proxy Nyquist = 48000 / (2 * SCOUT_DOWNSAMPLE) = 6000 Hz
+        // Bin at 6kHz = 6000 * N_BINS * 2 / 48000 = ~256
+        for b in N_BINS.div_ceil(SCOUT_DOWNSAMPLE)..N_BINS {
+            for c in 0..N_COMPONENTS {
+                let v = scout.w[b * N_COMPONENTS + c];
+                assert!(v <= 1e-10_f32 + 1e-12_f32,
+                    "Bin {b} component {c} should be EPS, got {v}");
+            }
+        }
     }
 
     #[test]
