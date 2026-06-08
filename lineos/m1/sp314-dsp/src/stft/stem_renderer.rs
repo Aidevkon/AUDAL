@@ -43,7 +43,7 @@ pub fn component_transient_density(h: &[f32], n_frames: usize) -> f32 {
 /// Refine NMF masks before iSTFT reconstruction.
 /// INV-AB-1: deterministic — fixed threshold, no randomness
 /// FIR (not IIR) — prev_row buffer prevents smearing
-fn refine_mask(masks: &mut Vec<Vec<f32>>) {
+pub fn refine_mask(masks: &mut Vec<Vec<f32>>) {
     let n_frames = masks.len();
     if n_frames < 3 { return; }
     let n_bins = masks[0].len();
@@ -67,6 +67,29 @@ fn refine_mask(masks: &mut Vec<Vec<f32>>) {
             masks[f][b] = (prev_row[b] + curr_val + masks[f+1][b]) / 3.0;
             prev_row[b] = curr_val; // save UNMUTATED for next iteration
         }
+    }
+}
+
+impl FiveStems {
+    pub fn empty() -> Self {
+        Self {
+            drums:     Vec::new(),
+            bass:      Vec::new(),
+            voice:     Vec::new(),
+            harmonics: Vec::new(),
+            ambience:  Vec::new(),
+            voice_transient_density:     0.0,
+            drums_transient_density:     0.0,
+            bass_transient_density:      0.0,
+            harmonics_transient_density: 0.0,
+            ambience_transient_density:  0.0,
+        }
+    }
+}
+
+impl Default for FiveStemRenderer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -192,8 +215,8 @@ impl FiveStemRenderer {
             .collect();
 
         // Voice vs Harmonics semantic assignment
-        let mut voice_comp = remaining_voice[0];
-        let mut harmonics_comp = remaining_voice[1];
+        let mut voice_comp;
+        let mut harmonics_comp;
         
         // Extract H rows for transient density
         let mut h_rows = vec![vec![0.0f32; n_frames]; N_COMPONENTS];
@@ -319,6 +342,12 @@ impl FiveStemRenderer {
 // Keep StemRenderer for backward compatibility
 pub struct StemRenderer {
     inner: FiveStemRenderer,
+}
+
+impl Default for StemRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StemRenderer {

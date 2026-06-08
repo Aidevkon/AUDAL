@@ -11,7 +11,7 @@ use std::cell::RefCell;
 
 thread_local! {
     static NMF_SCRATCH: RefCell<(Vec<f32>, Vec<f32>)> =
-        RefCell::new((Vec::new(), Vec::new()));
+        const { RefCell::new((Vec::new(), Vec::new())) };
 }
 
 /// Deterministic xorshift32 PRNG (seed=42)
@@ -36,7 +36,7 @@ fn downsample_frames(frames: &[Vec<f32>]) -> Vec<Vec<f32>> {
 
 fn upsample_masks_linear(masks: &[f32], n_components: usize,
                           original_frames: usize) -> Vec<f32> {
-    let downsampled = (original_frames + 1) / 2;
+    let downsampled = original_frames.div_ceil(2);
     let mut out = vec![0.0f32; n_components * original_frames];
     for c in 0..n_components {
         for f in 0..original_frames {
@@ -277,6 +277,38 @@ impl NmfEngine {
                            * self.h[c * n_frames + f];
                 }
                 mask[f][b] = target / (total + EPS);
+            }
+        }
+        mask
+    }
+
+    /// Per-chunk component mask — uses h_chunk instead of full self.h.
+    /// h_chunk: [n_components × n_chunk_frames] row-major
+    /// Returns mask [n_chunk_frames][n_bins]
+    pub fn component_mask_chunk(
+        &self,
+        component:    usize,
+        h_chunk:      &[f32],
+        n_chunk_frames: usize,
+        n_bins:       usize,
+    ) -> Vec<Vec<f32>> {
+        let k = self.n_components;
+        let mut mask = vec![vec![0.0_f32; n_bins]; n_chunk_frames];
+        for f in 0..n_chunk_frames {
+            for b in 0..n_bins {
+                let w_bc = self.w[b * k + component];
+                let h_cf = if component * n_chunk_frames + f < h_chunk.len() {
+                    h_chunk[component * n_chunk_frames + f]
+                } else { 0.0 };
+                let target = w_bc * h_cf;
+                let mut total = 0.0_f32;
+                for c in 0..k {
+                    let h_val = if c * n_chunk_frames + f < h_chunk.len() {
+                        h_chunk[c * n_chunk_frames + f]
+                    } else { 0.0 };
+                    total += self.w[b * k + c] * h_val;
+                }
+                mask[f][b] = target / (total + 1e-10_f32);
             }
         }
         mask

@@ -248,6 +248,8 @@ pub use stem_renderer::StemRenderer;
 
 pub mod nmf;
 pub use nmf::NmfEngine;
+pub mod two_pass;
+pub use two_pass::TwoPassEngine;
 
 #[cfg(test)]
 mod streaming_tests {
