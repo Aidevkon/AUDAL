@@ -15,10 +15,12 @@
 /// INV-TB-6: Must remain Copy. No Vec, no String, no heap.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 pub struct RealtimeFrame {
     /// 64-band log-spaced spectrum magnitude in dBFS.
     /// Band 0 ≈ 20Hz, Band 63 ≈ 20kHz.
     /// -120.0 = silence (no negative infinity in Copy types).
+    #[cfg_attr(feature = "serde", serde(with = "serde_arrays"))]
     pub spectrum:    [f32; 64],
 
     /// 32 decimated (Left, Right) sample pairs for Lissajous goniometer.

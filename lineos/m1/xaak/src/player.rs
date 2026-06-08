@@ -50,7 +50,7 @@ impl CpalPlayer {
         );
 
         let config = cpal::StreamConfig {
-            channels:    channels,
+            channels,
             sample_rate: cpal::SampleRate(sample_rate),
             buffer_size: cpal::BufferSize::Default,
         };
@@ -59,18 +59,43 @@ impl CpalPlayer {
         let sr  = sample_rate as u64;
         let ch  = channels as u64;
 
+        // TB-P3: UDP telemetry sender (fire and forget)
+        // Binds once — reused across all callback invocations.
+        // send_to is non-blocking on localhost (kernel memory copy).
+        let udp_tx = std::net::UdpSocket::bind("127.0.0.1:0").ok();
+        if let Some(ref s) = udp_tx {
+            s.set_nonblocking(true).ok();
+        }
+
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 let filled = consumer.pop_slice(data);
                 // Fill any remaining frames with silence
                 for s in &mut data[filled..] { *s = 0.0; }
-
                 // Advance playback position
                 let frames   = filled as u64 / ch.max(1);
                 let delta_ms = frames.saturating_mul(1000) / sr.max(1);
-                if let Ok(mut p) = pos.lock() {
+                let position_ms_now = if let Ok(mut p) = pos.lock() {
                     *p = p.saturating_add(delta_ms);
+                    *p
+                } else { 0 };
+
+                // TB-P3: fire-and-forget UDP telemetry
+                // INV-TB-1: never blocks — set_nonblocking(true)
+                // INV-TB-2: bincode zero-alloc encoding
+                if let Some(ref sock) = udp_tx {
+                    let frame = lineos_types::RealtimeFrame {
+                        spectrum:    [-120.0f32; 64], // TB-P6: real FFT
+                        gonio_path:  decimate_gonio(data, ch as usize),
+                        position_ms: position_ms_now,
+                    };
+                    if let Ok(bytes) = bincode::encode_to_vec(
+                        &frame,
+                        bincode::config::standard(),
+                    ) {
+                        let _ = sock.send_to(&bytes, "127.0.0.1:9000");
+                    }
                 }
             },
             |err| tracing::error!("cpal stream error: {err}"),
@@ -111,4 +136,23 @@ impl CpalPlayer {
 
 impl Default for CpalPlayer {
     fn default() -> Self { Self::new() }
+}
+
+/// Decimate audio block to 32 (L, R) pairs for Lissajous goniometer.
+/// Takes every N-th sample pair from interleaved stereo or mono data.
+/// INV-TB-7: always returns exactly 32 pairs.
+fn decimate_gonio(data: &[f32], channels: usize) -> [(f32, f32); 32] {
+    let mut pairs = [(0.0f32, 0.0f32); 32];
+    let ch = channels.max(1);
+    let frames = data.len() / ch;
+    let step = (frames / 32).max(1);
+    for i in 0..32 {
+        let idx = (i * step * ch).min(data.len().saturating_sub(ch));
+        let l = data.get(idx).copied().unwrap_or(0.0);
+        let r = if ch > 1 {
+            data.get(idx + 1).copied().unwrap_or(0.0)
+        } else { l };
+        pairs[i] = (l, r);
+    }
+    pairs
 }

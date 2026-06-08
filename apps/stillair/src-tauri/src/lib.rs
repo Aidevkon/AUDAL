@@ -12,6 +12,7 @@
 // Prevent a console window from popping up on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod telemetry_listener;
 use tauri::Manager;
 
 pub mod commands;
@@ -22,6 +23,14 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             app.manage(ipc::m0_client::M0Client::new());
+            Ok(())
+        })
+        .setup(|app| {
+            let latest = std::sync::Arc::new(
+                std::sync::Mutex::new(None::<lineos_types::RealtimeFrame>)
+            );
+            app.manage(latest.clone());
+            telemetry_listener::spawn_udp_listener(latest);
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -45,6 +54,7 @@ pub fn run() {
             commands::report::preview_pdf_report,
             // Phase 14: precomputed SVG paths (UI Agent Context v2.1 §2)
             commands::visualization::get_visualization_data,
+            commands::telemetry::get_live_telemetry_realtime,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Still Air");
