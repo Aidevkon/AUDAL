@@ -16,8 +16,7 @@ fn sliding_median(input: &[f32], window: usize) -> Vec<f32> {
         for k in 0..window {
             let idx = if k < half {
                 // Left side — clamp to 0
-                if i + k < half { 0 }
-                else { i + k - half }
+                (i + k).saturating_sub(half)
             } else {
                 let j = i + k - half;
                 j.min(n - 1)  // Right side — clamp to n-1
@@ -41,6 +40,12 @@ fn sliding_median(input: &[f32], window: usize) -> Vec<f32> {
 }
 
 pub struct HpssProcessor;
+
+impl Default for HpssProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl HpssProcessor {
     pub fn new() -> Self { Self }
@@ -93,6 +98,59 @@ impl HpssProcessor {
                 mask_p[t][b] = p / d;
             }
         }
+
+        (mask_h, mask_p)
+    }
+}
+
+/// Streaming HPSS context — maintains frame history across chunks.
+/// Holds last L_HARM frames for correct harmonic median at boundaries.
+/// INV-ST: stateful — never drop between chunks.
+pub struct HpssStreamContext {
+    /// Ring buffer of last L_HARM magnitude frames from previous chunk.
+    frame_history: std::collections::VecDeque<Vec<f32>>,
+}
+
+impl HpssStreamContext {
+    pub fn new() -> Self {
+        Self {
+            frame_history: std::collections::VecDeque::with_capacity(L_HARM),
+        }
+    }
+
+    /// Process a chunk of magnitude frames with history context.
+    /// Prepends L_HARM history frames for correct boundary handling.
+    /// Returns masks only for the NEW frames (not the history prefix).
+    pub fn process_chunk(
+        &mut self,
+        chunk_frames: &[Vec<f32>],
+    ) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
+        if chunk_frames.is_empty() {
+            return (Vec::new(), Vec::new());
+        }
+
+        // Build context window: history + new chunk
+        let mut context: Vec<Vec<f32>> = self.frame_history
+            .iter()
+            .cloned()
+            .collect();
+        let history_len = context.len();
+        context.extend_from_slice(chunk_frames);
+
+        // Run full HPSS on context + chunk
+        let processor = HpssProcessor::new();
+        let (mask_h_full, mask_p_full) = processor.process(&context);
+
+        // Update history: keep last L_HARM frames from chunk
+        let new_history_start = context.len().saturating_sub(L_HARM);
+        self.frame_history.clear();
+        for frame in &context[new_history_start..] {
+            self.frame_history.push_back(frame.clone());
+        }
+
+        // Return only masks for the NEW chunk frames (skip history prefix)
+        let mask_h = mask_h_full[history_len..].to_vec();
+        let mask_p = mask_p_full[history_len..].to_vec();
 
         (mask_h, mask_p)
     }
