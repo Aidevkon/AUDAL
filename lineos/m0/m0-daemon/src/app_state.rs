@@ -9,6 +9,7 @@
 
 use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
+use crate::agents::operator::Operator;
 use std::sync::Arc;
 use xaak::engine::PlaybackHandle;
 use dashmap::DashMap;
@@ -30,15 +31,20 @@ pub struct AppState {
     /// Send-safe handle to the xaak playback worker thread (A-003 §1).
     pub playback:   PlaybackHandle,
     pub progress:   Arc<DashMap<String, MasteringProgress>>,
+    /// Constitutional Agent Architecture v3.1 — Intent dispatcher.
+    /// Wire all cross-agent communication through here.
+    pub operator:   Operator,
 }
 
 impl AppState {
     pub fn new(audit: Arc<AuditLog>) -> Self {
+        let operator = crate::agents::operator::spawn_agents(audit.clone());
         Self {
             audit,
             blob_store: BlobStore::new(),
             playback:   PlaybackHandle::spawn(),
             progress:   Arc::new(DashMap::new()),
+            operator,
         }
     }
 }
