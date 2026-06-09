@@ -143,6 +143,7 @@ pub const RMS_DELTA_BINS:         [f32; 4] = [-10.0, -2.0,   2.0,  10.0];
 pub const TRANSIENT_DENSITY_BINS: [f32; 3] = [0.05,  0.15,  0.30];
 pub const SPECTRAL_CENTROID_BINS: [f32; 3] = [500.0, 2000.0, 6000.0];
 pub const SPECTRAL_FLATNESS_BINS: [f32; 2] = [0.1,   0.5];
+pub const MFCC_BIN_COUNT: usize = 3; // low/mid/high per coefficient
 
 /// Find bin index. Bin 0 = below first boundary.
 /// Uses strict < so boundary values fall into upper bin.
@@ -158,6 +159,9 @@ pub struct EmissionHistogram {
     pub transient_density: [usize; 4],
     pub spectral_centroid: [usize; 4],
     pub spectral_flatness: [usize; 3],
+    /// MFCC bins: 13 coefficients × 3 bins each = 39 counters.
+    /// Bin boundaries: negative (-inf,0), zero [-0.5,0.5], positive (0.5,inf)
+    pub mfcc_bins:         [[usize; 3]; 13],
     pub total:             usize,
 }
 
@@ -170,6 +174,7 @@ impl EmissionHistogram {
             transient_density: [0; 4],
             spectral_centroid: [0; 4],
             spectral_flatness: [0; 3],
+            mfcc_bins:         [[0usize; 3]; 13],
             total:             0,
         }
     }
@@ -185,6 +190,13 @@ impl EmissionHistogram {
             &SPECTRAL_CENTROID_BINS)] += 1;
         self.spectral_flatness[bin_index(features.spectral_flatness,
             &SPECTRAL_FLATNESS_BINS)] += 1;
+        for k in 0..13 {
+            let v = features.mfcc[k];
+            let bin = if v < -0.5 { 0 }
+                      else if v <= 0.5 { 1 }
+                      else { 2 };
+            self.mfcc_bins[k][bin] += 1;
+        }
         self.total += 1;
     }
 
@@ -192,16 +204,24 @@ impl EmissionHistogram {
     /// Returns 0.0 if no observations yet.
     pub fn likelihood(&self, features: &crate::features::StateFeatures) -> f32 {
         if self.total == 0 { return 0.0; }
-        bin_prob(&self.rms_db,
-            bin_index(features.rms_db, &RMS_DB_BINS))
-        * bin_prob(&self.rms_delta,
-            bin_index(features.rms_delta, &RMS_DELTA_BINS))
-        * bin_prob(&self.transient_density,
-            bin_index(features.transient_density, &TRANSIENT_DENSITY_BINS))
-        * bin_prob(&self.spectral_centroid,
-            bin_index(features.spectral_centroid, &SPECTRAL_CENTROID_BINS))
-        * bin_prob(&self.spectral_flatness,
-            bin_index(features.spectral_flatness, &SPECTRAL_FLATNESS_BINS))
+        let p_rms = bin_prob(&self.rms_db,
+            bin_index(features.rms_db, &RMS_DB_BINS));
+        let p_delta = bin_prob(&self.rms_delta,
+            bin_index(features.rms_delta, &RMS_DELTA_BINS));
+        let p_td = bin_prob(&self.transient_density,
+            bin_index(features.transient_density, &TRANSIENT_DENSITY_BINS));
+        let p_sc = bin_prob(&self.spectral_centroid,
+            bin_index(features.spectral_centroid, &SPECTRAL_CENTROID_BINS));
+        let p_sf = bin_prob(&self.spectral_flatness,
+            bin_index(features.spectral_flatness, &SPECTRAL_FLATNESS_BINS));
+        let p_mfcc: f32 = (0..13).map(|k| {
+            let v = features.mfcc[k];
+            let bin = if v < -0.5 { 0 } else if v <= 0.5 { 1 } else { 2 };
+            let total = self.mfcc_bins[k].iter().sum::<usize>() + 3;
+            let count = self.mfcc_bins[k][bin] + 1;
+            count as f32 / total as f32
+        }).product::<f32>();
+        p_rms * p_delta * p_td * p_sc * p_sf * p_mfcc
     }
 
     pub fn merge(&mut self, other: &EmissionHistogram) {
@@ -210,6 +230,9 @@ impl EmissionHistogram {
         for i in 0..4 { self.transient_density[i] += other.transient_density[i]; }
         for i in 0..4 { self.spectral_centroid[i] += other.spectral_centroid[i]; }
         for i in 0..3 { self.spectral_flatness[i] += other.spectral_flatness[i]; }
+        for k in 0..13 {
+            for b in 0..3 { self.mfcc_bins[k][b] += other.mfcc_bins[k][b]; }
+        }
         self.total += other.total;
     }
 }
