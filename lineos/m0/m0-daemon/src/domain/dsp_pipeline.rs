@@ -471,6 +471,43 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         let _ = std::fs::write(&corpus_path, json);
     }
 
+    // CB-P8: Update per-preset UserMarkovModel (incremental, silent)
+    // INV-CB-1: never modifies DSP behavior — background learning only
+    // INV-CB-8: only updates the preset_id for this session
+    {
+        use lineos_corpus::store::{UserMarkovModel, aggregate_preset};
+
+        let preset_id  = req.flavour_id.as_deref().unwrap_or("default");
+        let model_path = format!("user_model_{}.json",
+            req.project_id.as_deref().unwrap_or("default"));
+
+        // Load existing model or create new one
+        let mut user_model = std::fs::read_to_string(&model_path)
+            .ok()
+            .and_then(|json| UserMarkovModel::from_json(&json).ok())
+            .unwrap_or_else(|| UserMarkovModel::new(
+                req.project_id.as_deref().unwrap_or("default")
+            ));
+
+        user_model.update(preset_id, &corpus_envelope);
+
+        // Save updated model — silent failure (never blocks mastering)
+        if let Ok(json) = user_model.to_json() {
+            let _ = std::fs::write(&model_path, json);
+        }
+
+        // Every 10 sessions: recompute global preset snapshot
+        if user_model.version % 10 == 0 {
+            if let Some(global) = aggregate_preset(preset_id, &[&user_model]) {
+                let global_path = format!("global_{}_v{}.json",
+                    preset_id, user_model.version / 10);
+                if let Ok(json) = serde_json::to_string(&global) {
+                    let _ = std::fs::write(&global_path, json);
+                }
+            }
+        }
+    }
+
     // Run sp314-dsp directly (we are already in a blocking thread)
     let dsp_start_time = std::time::Instant::now();
     let result = crate::dsp::DspAdapter::master(&intent, left_slice, right_slice, chunk.sample_rate, Some(&dsp_config));
