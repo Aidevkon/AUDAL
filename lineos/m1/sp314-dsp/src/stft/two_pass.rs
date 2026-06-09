@@ -261,16 +261,16 @@ impl TwoPassEngine {
             .unwrap_or(0);
         let remaining: Vec<usize> = (0..N_COMPONENTS)
             .filter(|&i| i != ambience_idx).collect();
-        let bass_idx = remaining.iter()
-            .min_by(|&&a, &&b| centroids[a].partial_cmp(&centroids[b]).unwrap())
-            .copied().unwrap_or(1);
-        let voice_harmonics: Vec<usize> = remaining.iter()
-            .filter(|&&i| i != bass_idx).copied().collect();
-        let (voice_idx, harmonics_idx) = match voice_harmonics.len() {
-            0 => (0, 0),
-            1 => (voice_harmonics[0], voice_harmonics[0]),
-            _ => (voice_harmonics[0], voice_harmonics[1]),
-        };
+
+        // Sort the remaining 4 components by spectral centroid (lowest to highest)
+        let mut sorted_by_centroid = remaining.clone();
+        sorted_by_centroid.sort_by(|&a, &b| centroids[a].partial_cmp(&centroids[b]).unwrap());
+
+        // Semantic mapping based on frequency ordering
+        let bass_idx = sorted_by_centroid[0];      // Lowest centroid
+        let drums_idx = sorted_by_centroid[1];     // 2nd lowest centroid
+        let harmonics_idx = sorted_by_centroid[2]; // Mid/High frequencies
+        let voice_idx = sorted_by_centroid[3];     // Highest centroid
 
         // ── Proxy stems for spatial + feature analysis ───────────────
         let proxy_h = self.nmf.transform(&w, &proxy_frames);
@@ -278,7 +278,7 @@ impl TwoPassEngine {
 
         let proxy_n = proxy_frames.len();
         let proxy_voice = self.proxy_stem(voice_idx,     proxy_n, n_bins, &proxy);
-        let proxy_drums = self.proxy_stem(bass_idx,      proxy_n, n_bins, &proxy);
+        let proxy_drums = self.proxy_stem(drums_idx,     proxy_n, n_bins, &proxy);
         let proxy_bass  = self.proxy_stem(bass_idx,      proxy_n, n_bins, &proxy);
         let proxy_harm  = self.proxy_stem(harmonics_idx, proxy_n, n_bins, &proxy);
         let proxy_amb   = self.proxy_stem(ambience_idx,  proxy_n, n_bins, &proxy);
