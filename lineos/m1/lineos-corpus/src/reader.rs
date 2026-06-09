@@ -2,7 +2,7 @@
 //! Authority: corpus-learning-spec-v1_2.md CB-P2
 
 use std::path::Path;
-use crate::contract::{CorpusEnvelope, TimelineEvent};
+use crate::contract::CorpusEnvelope;
 use crate::features::StateFeatures;
 
 /// Read all session_*.corpus.json files from a directory.
@@ -71,13 +71,24 @@ pub fn extract_features_sequence(
 
     for event in &events {
         let rms_db = event.attributes.rms_db;
-        let f = StateFeatures::new(
-            rms_db,
-            prev_rms_db,
-            event.attributes.transient_density,
-            event.attributes.spectral_centroid,
-            event.attributes.spectral_flatness,
-        );
+        let f = if event.mfcc.iter().any(|&x| x != 0.0) {
+            StateFeatures::with_mfcc(
+                rms_db,
+                prev_rms_db,
+                event.attributes.transient_density,
+                event.attributes.spectral_centroid,
+                event.attributes.spectral_flatness,
+                event.mfcc,
+            )
+        } else {
+            StateFeatures::new(
+                rms_db,
+                prev_rms_db,
+                event.attributes.transient_density,
+                event.attributes.spectral_centroid,
+                event.attributes.spectral_flatness,
+            )
+        };
         features.push(f);
         prev_rms_db = rms_db;
     }
@@ -118,6 +129,7 @@ mod tests {
                 stem:         "voice".to_string(),
                 profile_hint: "music_v1".to_string(),
             },
+            mfcc: [0.0; 13],
         }
     }
 

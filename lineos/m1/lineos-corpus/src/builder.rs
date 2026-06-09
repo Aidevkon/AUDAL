@@ -38,13 +38,14 @@ fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
 }
 
 fn build_windowed_stem(
-    signal:     &[f32],
-    stem_type:  &str,
-    session_id: &str,
-    base_td:    f32,
-    base_attrs: &EnrichedAttributes,
-    base_risk:  &RiskFlags,
-    sample_rate: u32,
+    signal:        &[f32],
+    stem_type:     &str,
+    session_id:    &str,
+    base_td:       f32,
+    base_attrs:    &EnrichedAttributes,
+    base_risk:     &RiskFlags,
+    sample_rate:   u32,
+    mfcc_analyzer: &mut crate::mfcc::MfccAnalyzer,
 ) -> Vec<TimelineEvent> {
     let window_samples = (sample_rate as f32 * 0.1) as usize; // 100ms
     let window_samples = window_samples.max(1);
@@ -65,6 +66,9 @@ fn build_windowed_stem(
 
         let state = classify_for_stem(stem_type, rms_db, base_td);
 
+        let window_audio = &signal[start..end];
+        let window_mfcc = mfcc_analyzer.compute(window_audio);
+
         events.push(TimelineEvent {
             state:       state.to_string(),
             start_ms:    (w as u32) * 100,
@@ -82,6 +86,7 @@ fn build_windowed_stem(
                 stem:         stem_type.to_string(),
                 profile_hint: "auto".to_string(),
             },
+            mfcc: window_mfcc,
         });
     }
     events
@@ -119,6 +124,8 @@ pub fn build_timeline(
         ("ambience",  ambience_audio,  features.ambience.transient_density),
     ];
 
+    let mut mfcc_analyzer = crate::mfcc::MfccAnalyzer::new();
+
     let stem_timelines: Vec<StemTimeline> = stem_pairs.iter().map(|(name, signal, td)| {
         let base_attrs = EnrichedAttributes {
             rms_db:            features_for(name, features).rms_db,
@@ -136,7 +143,7 @@ pub fn build_timeline(
         };
         StemTimeline {
             stem_type: name.to_string(),
-            events: build_windowed_stem(signal, name, session_id, *td, &base_attrs, &base_risk, sample_rate),
+            events: build_windowed_stem(signal, name, session_id, *td, &base_attrs, &base_risk, sample_rate, &mut mfcc_analyzer),
         }
     }).collect();
 

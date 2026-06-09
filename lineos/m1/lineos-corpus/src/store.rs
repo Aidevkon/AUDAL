@@ -181,6 +181,7 @@ mod tests {
                     stem: "voice".to_string(),
                     profile_hint: preset_hint.to_string(),
                 },
+                mfcc: [0.0; 13],
             },
             TimelineEvent {
                 state: "vowel".to_string(),
@@ -198,6 +199,7 @@ mod tests {
                     stem: "voice".to_string(),
                     profile_hint: preset_hint.to_string(),
                 },
+                mfcc: [0.0; 13],
             },
         ];
         CorpusEnvelope {

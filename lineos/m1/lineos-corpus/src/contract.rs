@@ -26,6 +26,10 @@ pub struct TimelineEvent {
     pub attributes:  EnrichedAttributes,
     pub risk:        RiskFlags,
     pub domain:      DomainHint,
+    /// 13 MFCC coefficients — timbral fingerprint for this window.
+    /// [0.0; 13] for backward compatibility when not computed.
+    #[serde(default)]
+    pub mfcc:        [f32; 13],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

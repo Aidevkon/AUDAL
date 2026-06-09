@@ -4,19 +4,7 @@ use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvena
 use crate::handlers::master::MasterRequest;
 // Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
 // Computed on raw stems before mix — tamper-proof certificate
-fn sha256_hex(data: &[f32]) -> String {
-    // Fast deterministic fingerprint (not cryptographic SHA256 — no deps)
-    // Uses FNV-like accumulation for determinism
-    let mut h: u64 = 0xcbf29ce484222325;
-    for &s in data {
-        let bits = s.to_bits();
-        h ^= bits as u64;
-        h = h.wrapping_mul(0x100000001b3);
-        h ^= bits as u64 >> 32;
-        h = h.wrapping_mul(0x100000001b3);
-    }
-    format!("{:016x}", h)
-}
+
 
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
@@ -132,8 +120,8 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     // Build AudioChunk — always 48000 Hz stereo after decode.
     // Clone samples first so telemetry can read full-track PCM after DSP completes.
     let _pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
-    let pcm_channels_for_telemetry = pcm.channels;          // Phase 9
-    let pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
+    let _pcm_channels_for_telemetry = pcm.channels;          // Phase 9
+    let _pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
     // Create StereoBuffer (AudioChunk)
     let mut chunk = AudioChunk {
         left: pcm.samples.iter().step_by(2).copied().collect(),
@@ -141,7 +129,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         sample_rate: pcm.sample_rate,
         num_frames: pcm.samples.len() / 2,
     };
-    let chunk_original = chunk.clone();
+    let _chunk_original = chunk.clone();
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     // NMF phase RAM: ~7MB (was ~8GB for 2h file)
@@ -521,7 +509,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let lufs = result.lufs.integrated_lufs;
     tracing::info!("Post-DSP integrated LUFS: {:.4}", lufs);
     let tp    = result.lufs.true_peak_dbfs;
-    let lra   = result.lufs.loudness_range_lu;
+    let _lra   = result.lufs.loudness_range_lu;
     let dr    = 10.0; // dynamic range proxy for v3
     let sc    = 1.0;  // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
