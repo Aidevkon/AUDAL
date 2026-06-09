@@ -32,6 +32,7 @@ pub struct PcmTransfer {
     pub sample_rate: u32,
     pub channels:    u16,
     pub blob_id:     Uuid,
+    pub num_frames:  usize,
 }
 
 // ── XaakKernel ────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ pub struct XaakKernel {
     sample_rate: u32,
     channels:    u16,
     duration_ms: u64,
+    num_frames:  usize,
     /// Authoritative PCM backing store — supports seek via slice offset.
     pcm:         memmap2::Mmap,
     /// Kept alive to hold the ring buffer while consumer exists.
@@ -59,8 +61,8 @@ impl XaakKernel {
     pub fn load(transfer: PcmTransfer) -> Self {
         let file = std::fs::File::open(&transfer.pcm_path).expect("Failed to open PCM file");
         let mmap = unsafe { memmap2::Mmap::map(&file).expect("Failed to map PCM file") };
-        // Each f32 is 4 bytes. Number of samples = size / 4
-        let num_samples = mmap.len() / 4;
+        // We use the actual valid frames, not the mapped file size
+        let num_samples = transfer.num_frames * transfer.channels as usize;
 
         let duration_ms = if transfer.sample_rate > 0 && transfer.channels > 0 {
             (num_samples as u64 * 1000)
@@ -85,6 +87,7 @@ impl XaakKernel {
             sample_rate: transfer.sample_rate,
             channels:    transfer.channels,
             duration_ms,
+            num_frames:  transfer.num_frames,
             pcm:         mmap,
             _producer:   None,
         }
@@ -95,17 +98,19 @@ impl XaakKernel {
     /// The ring buffer is sized to hold all PCM from the seek position.
     /// Returns a Box<dyn Consumer> so the concrete ringbuf type is erased.
     pub fn stream_from(&mut self, position_ms: u64) -> impl Consumer<Item = f32> {
+        // frame_offset = number of frames (NOT samples) to skip
         let frame_offset = if self.sample_rate > 0 {
             (position_ms * self.sample_rate as u64 / 1000) as usize
-                * self.channels as usize
         } else { 0 };
 
-        let num_samples = self.pcm.len() / 4;
-        let slice = if frame_offset < num_samples {
-            // Unsafe cast from mapped bytes to f32 slice for playback
-            let pcm_bytes = &self.pcm[(frame_offset * 4)..];
+        let slice = if frame_offset < self.num_frames {
+            let frames_to_play = self.num_frames - frame_offset;
+            // byte offset = frame_offset * channels * 4 bytes per f32
+            let byte_offset = frame_offset * self.channels as usize * 4;
+            let pcm_bytes = &self.pcm[byte_offset..];
             unsafe {
-                std::slice::from_raw_parts(pcm_bytes.as_ptr() as *const f32, pcm_bytes.len() / 4)
+                let full_slice = std::slice::from_raw_parts(pcm_bytes.as_ptr() as *const f32, pcm_bytes.len() / 4);
+                &full_slice[..(frames_to_play * self.channels as usize)]
             }
         } else { &[] };
 
@@ -131,7 +136,8 @@ impl XaakKernel {
     pub fn sample_rate(&self) -> u32    { self.sample_rate }
     pub fn channels(&self)    -> u16    { self.channels }
     pub fn duration_ms(&self) -> u64    { self.duration_ms }
-    pub fn pcm_len(&self)     -> usize  { self.pcm.len() }
+    /// Returns number of f32 samples in the PCM buffer.
+    pub fn pcm_len(&self) -> usize { self.pcm.len() / 4 }
     /// Release PCM and emit A-003 §2 audit event: m0d.xaak_buffer_released.
     pub fn release(self) {
         tracing::info!(
@@ -174,6 +180,7 @@ mod tests {
             sample_rate: 48000,
             channels:    2,
             blob_id:     uuid::Uuid::new_v4(),
+            num_frames:  samples / 2,
         }
     }
 

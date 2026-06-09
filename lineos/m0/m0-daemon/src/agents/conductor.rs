@@ -88,10 +88,11 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                         Ok(Ok(dsp_output)) => {
                             // R2: assemble MasteringOutput from DspOutput
                             let output = MasteringOutput {
-                                job_id:   params.session_id,
-                                blob_id:  dsp_output.blob_id,
-                                status:   "ok",
-                                pcm_data: dsp_output.pcm_data,
+                                job_id:     params.session_id,
+                                blob_id:    dsp_output.blob_id,
+                                status:     "ok",
+                                pcm_data:   dsp_output.pcm_data,
+                                num_frames: dsp_output.num_frames,
                             };
                             let _ = response.send(Ok(output));
                         }

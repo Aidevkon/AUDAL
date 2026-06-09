@@ -66,10 +66,11 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     }
                     Ok(Ok((blob, _chunk_original, _target_lufs))) => {
                         let output = DspOutput {
-                            blob_id:   blob.id.clone(),
-                            lufs:      blob.loudness.integrated_lufs,
-                            true_peak: blob.loudness.true_peak_dbtp,
-                            pcm_data:  Some(_chunk_original),
+                            blob_id:    blob.id.clone(),
+                            lufs:       blob.loudness.integrated_lufs,
+                            true_peak:  blob.loudness.true_peak_dbtp,
+                            pcm_data:   Some(_chunk_original),
+                            num_frames: blob.num_frames,
                         };
                         // Store blob — Executor is responsible for persistence
                         // This is execution, not decision-making

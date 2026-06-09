@@ -292,6 +292,7 @@ mod tests {
             sample_rate: 48000,
             channels:    2,
             blob_id:     uuid::Uuid::new_v4(),
+            num_frames:  samples / 2,
         }
     }
 

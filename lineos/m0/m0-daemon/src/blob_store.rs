@@ -79,6 +79,8 @@ pub struct StoredBlob {
     pub sample_rate:  u32,       // always 48000 after Phase 7 decode
     #[serde(skip)]
     pub channels:     u16,       // stereo = 2
+    #[serde(skip)]
+    pub num_frames:   usize,     // actual audio length without tail
 }
 
 /// BS.1770-4 canonical values + platform compliance flags.
@@ -224,6 +226,7 @@ mod tests {
             audio_path:   std::path::PathBuf::from("/tmp/stub.pcm"),
             sample_rate:  48000,
             channels:     2,
+            num_frames:   48000,
         }
     }
 

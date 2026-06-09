@@ -177,6 +177,7 @@ pub async fn trigger_mastering(
                             sample_rate: 48000,
                             channels: 2,
                             blob_id: b_id,
+                            num_frames: output.num_frames,
                         };
                         state_bg.playback.load(transfer);
                     }

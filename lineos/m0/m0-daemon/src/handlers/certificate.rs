@@ -12,19 +12,19 @@ pub fn generate_qr_base64(
     fingerprints: &StemFingerprints,
 ) -> Option<String> {
     let payload = serde_json::json!({
-        "cert": &cert_id[..8],
+        "cert": &cert_id[..cert_id.len().min(8)],
         "file": filename,
         "lufs": (lufs * 100.0).round() / 100.0,
         "tp":   (tp   * 100.0).round() / 100.0,
         "lra":  (lra  * 100.0).round() / 100.0,
         "stems": {
-            "v": &fingerprints.voice[..8],
-            "d": &fingerprints.drums[..8],
-            "b": &fingerprints.bass[..8],
-            "h": &fingerprints.harmonics[..8],
-            "a": &fingerprints.ambience[..8],
+            "v": &fingerprints.voice[..fingerprints.voice.len().min(8)],
+            "d": &fingerprints.drums[..fingerprints.drums.len().min(8)],
+            "b": &fingerprints.bass[..fingerprints.bass.len().min(8)],
+            "h": &fingerprints.harmonics[..fingerprints.harmonics.len().min(8)],
+            "a": &fingerprints.ambience[..fingerprints.ambience.len().min(8)],
         },
-        "pipe": &fingerprints.pipeline[..8],
+        "pipe": &fingerprints.pipeline[..fingerprints.pipeline.len().min(8)],
         "date": chrono::Utc::now().format("%Y-%m-%d").to_string(),
         "by":   "CreatorOS poc-v3.0",
     }).to_string();

@@ -73,6 +73,7 @@ mod tests {
             audio_path:   std::path::PathBuf::from("/tmp/stub.pcm"),
             sample_rate:  48000,
             channels:     2,
+            num_frames:   48000,
         }
     }
 

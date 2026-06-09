@@ -181,6 +181,9 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
 
     // Phase 2: Zero Allocation Disk Streaming via memmap2
     let n_total = mono.len();
+    const STFT_FLUSH_TAIL: usize = 1024;
+    let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
+
     let blob_id = req.track_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
     let file = std::fs::OpenOptions::new()
@@ -191,8 +194,8 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         .open(&file_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
 
-    // Size: n_total * 2 channels * 4 bytes/float
-    let file_size = (n_total * 2 * 4) as u64;
+    // Size: n_total_with_tail * 2 channels * 4 bytes/float
+    let file_size = (n_total_with_tail * 2 * 4) as u64;
     file.set_len(file_size).map_err(|e| format!("Failed to set file len: {e}"))?;
 
     let mut mmap = unsafe {
@@ -201,12 +204,12 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
 
     // The first half of mmap is LEFT, second half is RIGHT
     // We cast the raw bytes to f32 slices safely using std::slice::from_raw_parts_mut
-    let (left_bytes, right_bytes) = mmap.split_at_mut(n_total * 4);
+    let (left_bytes, right_bytes) = mmap.split_at_mut(n_total_with_tail * 4);
     let left_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(left_bytes.as_mut_ptr() as *mut f32, n_total)
+        std::slice::from_raw_parts_mut(left_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
     };
     let right_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total)
+        std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
     };
 
     // Streaming SHA-256 hashers — no full stem Vec needed
@@ -463,7 +466,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     );
 
     // Write *.corpus.json alongside mastered file — silent
-    let corpus_path = format!("session_{}.corpus.json", &blob_id[..8]);
+    let corpus_path = format!("session_{}.corpus.json", &blob_id[..blob_id.len().min(8)]);
     if let Ok(json) = serde_json::to_string_pretty(&corpus_envelope) {
         let _ = std::fs::write(&corpus_path, json);
     }
@@ -609,6 +612,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
         sample_rate:  post_master_sr,
         channels:     post_master_channels,
+        num_frames:   n_total,
         audio_path:   file_path.clone(),
     },
     file_path,

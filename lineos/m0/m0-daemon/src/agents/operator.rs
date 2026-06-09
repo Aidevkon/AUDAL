@@ -98,10 +98,11 @@ pub struct ExecutionPlan {
 /// Output from Executor (R3) → Conductor (R2)
 #[derive(Debug, Clone)]
 pub struct DspOutput {
-    pub blob_id:   String,
-    pub lufs:      f32,
-    pub true_peak: f32,
-    pub pcm_data:  Option<std::path::PathBuf>,
+    pub blob_id:    String,
+    pub lufs:       f32,
+    pub true_peak:  f32,
+    pub pcm_data:   Option<std::path::PathBuf>,
+    pub num_frames: usize,
 }
 
 /// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
@@ -116,10 +117,11 @@ pub struct AnalysisResult {
 /// Output from Conductor (R2) → HTTP handler
 #[derive(Debug, Clone)]
 pub struct MasteringOutput {
-    pub job_id:   String,
-    pub blob_id:  String,
-    pub status:   &'static str,
-    pub pcm_data: Option<std::path::PathBuf>,
+    pub job_id:     String,
+    pub blob_id:    String,
+    pub status:     &'static str,
+    pub pcm_data:   Option<std::path::PathBuf>,
+    pub num_frames: usize,
 }
 
 /// Output for a single track in a batch job
