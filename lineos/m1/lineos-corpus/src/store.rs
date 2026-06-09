@@ -104,6 +104,57 @@ impl UserMarkovModel {
     }
 }
 
+pub fn aggregate_preset(
+    preset_id:   &str,
+    user_models: &[&UserMarkovModel],
+) -> Option<PresetMarkovModel> {
+    let contributors: Vec<(&UserMarkovModel, &PresetMarkovModel)> = user_models
+        .iter()
+        .filter_map(|u| u.preset(preset_id).map(|p| (*u, p)))
+        .collect();
+
+    if contributors.is_empty() { return None; }
+
+    let mut global = PresetMarkovModel::new(preset_id);
+
+    for (_user, preset) in &contributors {
+        for (stem_type, stem_model) in &preset.stems {
+            let global_stem = global.stems
+                .entry(stem_type.clone())
+                .or_insert_with(|| StemMarkovModel::new(stem_type));
+
+            global_stem.transitions.merge(&stem_model.transitions);
+
+            for (state, hist) in &stem_model.emissions {
+                global_stem.emissions
+                    .entry(state.clone())
+                    .or_insert_with(|| crate::model::EmissionHistogram::new(state))
+                    .merge(hist);
+            }
+
+            global_stem.n_sessions += stem_model.n_sessions;
+        }
+    }
+
+    Some(global)
+}
+
+pub fn aggregate_all_presets(
+    user_models: &[&UserMarkovModel],
+) -> HashMap<String, PresetMarkovModel> {
+    let preset_ids: std::collections::BTreeSet<String> = user_models
+        .iter()
+        .flat_map(|u| u.presets.keys().cloned())
+        .collect();
+
+    preset_ids.into_iter()
+        .filter_map(|id| {
+            aggregate_preset(&id, user_models)
+                .map(|m| (id, m))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +267,49 @@ mod tests {
             .and_then(|p| p.stem("voice"))
             .map(|s| s.n_sessions).unwrap_or(0);
         assert_eq!(sessions, 2);
+    }
+
+    #[test]
+    fn aggregate_preset_merges_users() {
+        let mut user1 = UserMarkovModel::new("user1");
+        let mut user2 = UserMarkovModel::new("user2");
+        user1.update("techno", &make_session("techno"));
+        user2.update("techno", &make_session("techno"));
+        let global = aggregate_preset("techno", &[&user1, &user2]);
+        assert!(global.is_some());
+        let sessions = global.unwrap().stem("voice")
+            .map(|s| s.n_sessions).unwrap_or(0);
+        assert_eq!(sessions, 2);
+    }
+
+    #[test]
+    fn aggregate_preset_missing_returns_none() {
+        let user1 = UserMarkovModel::new("user1");
+        assert!(aggregate_preset("jazz", &[&user1]).is_none());
+    }
+
+    #[test]
+    fn aggregate_no_cross_contamination() {
+        let mut user1 = UserMarkovModel::new("user1");
+        user1.update("techno",  &make_session("techno"));
+        user1.update("podcast", &make_session("podcast"));
+        let global_techno  = aggregate_preset("techno",  &[&user1]);
+        let global_podcast = aggregate_preset("podcast", &[&user1]);
+        assert!(global_techno.is_some());
+        assert!(global_podcast.is_some());
+        // Use stem() getter — consistent API
+        assert!(global_techno.unwrap().stem("voice").is_some());
+        assert!(global_podcast.unwrap().stem("voice").is_some());
+    }
+
+    #[test]
+    fn aggregate_all_presets_returns_all() {
+        let mut user1 = UserMarkovModel::new("user1");
+        user1.update("techno",  &make_session("techno"));
+        user1.update("podcast", &make_session("podcast"));
+        let all = aggregate_all_presets(&[&user1]);
+        assert!(all.contains_key("techno"));
+        assert!(all.contains_key("podcast"));
+        assert_eq!(all.len(), 2);
     }
 }
