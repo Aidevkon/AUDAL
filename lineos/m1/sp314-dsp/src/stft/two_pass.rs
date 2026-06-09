@@ -92,7 +92,7 @@ pub struct TwoPassEngine {
     bass_ducking_gain: f32,
 }
 
-fn detect_collision(drums_chunk: &[f32], bass_chunk: &[f32]) -> bool {
+pub(crate) fn detect_collision(drums_chunk: &[f32], bass_chunk: &[f32]) -> bool {
     if drums_chunk.is_empty() || bass_chunk.is_empty() { return false; }
     let drums_sum_sq: f32 = drums_chunk.iter().map(|s| s * s).sum();
     let drums_mean_sq = drums_sum_sq / drums_chunk.len() as f32;
@@ -531,6 +531,38 @@ fn transient_density(h: &[f32]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_collision_matrix_rms_detection() {
+        // Alternating signal: high variance = transient-like
+        // diff between adjacent samples is always 1.0 → high drums_td
+        let loud_chunk: Vec<f32> = (0..512)
+            .map(|i| if i % 2 == 0 { 0.5f32 } else { -0.5f32 })
+            .collect();
+        // Amplitude 0.0001 → RMS ≈ -80 dBFS (below threshold)
+        let quiet_chunk = vec![0.0001f32; 512];
+
+        // Scenario 1: Both loud → collision expected
+        assert!(
+            super::detect_collision(&loud_chunk, &loud_chunk),
+            "Should detect collision when both drums and bass have high RMS"
+        );
+        // Scenario 2: Loud drums, quiet bass → no collision
+        assert!(
+            !super::detect_collision(&loud_chunk, &quiet_chunk),
+            "Should NOT detect collision when bass is quiet"
+        );
+        // Scenario 3: Quiet drums, loud bass → no collision
+        assert!(
+            !super::detect_collision(&quiet_chunk, &loud_chunk),
+            "Should NOT detect collision when drums transient is low"
+        );
+        // Scenario 4: Empty chunks → safe, no panic
+        assert!(
+            !super::detect_collision(&[], &loud_chunk),
+            "Should safely return false on empty chunks"
+        );
+    }
 
     fn sine(freq: f32, n: usize) -> Vec<f32> {
         (0..n).map(|i| {
