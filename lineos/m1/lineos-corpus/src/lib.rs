@@ -15,3 +15,6 @@ pub use inference::{predict_state, StatePrediction, StemMarkovModel};
 
 pub mod store;
 pub use store::{UserMarkovModel, PresetMarkovModel, aggregate_preset, aggregate_all_presets};
+
+pub mod mfcc;
+pub use mfcc::{MfccAnalyzer, MelFilterbank};
