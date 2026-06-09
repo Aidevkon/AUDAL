@@ -9,9 +9,9 @@
 //! INV-ST-6: EBU R128 output identical to full-load processing
 //! INV-AB-1: deterministic — same input → same output
 
-use crate::stft::{StftStreamContext, N_BINS, FFT_SIZE, HOP_SIZE};
+use crate::stft::{StftStreamContext, N_BINS};
 use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
-use crate::stft::hpss::{HpssProcessor, HpssStreamContext};
+use crate::stft::hpss::HpssStreamContext;
 use crate::stft::stem_renderer::FiveStems;
 use crate::spatial::channel_assign::StemChannelAssignments;
 use crate::spatial::SpatialPreAnalysis;
@@ -21,6 +21,11 @@ pub const CHUNK_FRAMES: usize = 65536;
 
 /// Downsample ratio for Pass 1 Scout proxy (~11kHz mono)
 const SCOUT_DOWNSAMPLE: usize = 4;
+
+const COLLISION_DRUMS_TRANSIENT_THRESHOLD: f32 = 0.25;
+const COLLISION_BASS_RMS_THRESHOLD_DB:     f32 = -40.0;
+const COLLISION_DUCKING_GAIN:              f32 = 0.707;
+const COLLISION_SMOOTHING_ALPHA:           f32 = 0.005;
 
 /// A single chunk of 5 stems — chunk-sized slices only.
 /// Never holds full-file data. Passed to process_chunks callback.
@@ -80,14 +85,38 @@ pub struct RenderMetadata {
     pub drums_transient_density: f32,
 }
 
-/// Two-pass streaming engine.
 pub struct TwoPassEngine {
     nmf: NmfEngine,
+    /// Psychoacoustic Collision Matrix — smoothed ducking gain state.
+    /// Initialized to 1.0 (no ducking). Persists across chunks.
+    bass_ducking_gain: f32,
+}
+
+fn detect_collision(drums_chunk: &[f32], bass_chunk: &[f32]) -> bool {
+    if drums_chunk.is_empty() || bass_chunk.is_empty() { return false; }
+    let drums_sum_sq: f32 = drums_chunk.iter().map(|s| s * s).sum();
+    let drums_mean_sq = drums_sum_sq / drums_chunk.len() as f32;
+    let drums_diff_sq: f32 = drums_chunk.windows(2)
+        .map(|w| (w[1] - w[0]).powi(2))
+        .sum();
+    let drums_td = if drums_mean_sq > 1e-10 {
+        drums_diff_sq / (drums_mean_sq * drums_chunk.len() as f32)
+    } else { 0.0 };
+    let bass_sum_sq: f32 = bass_chunk.iter().map(|s| s * s).sum();
+    let bass_mean_sq = bass_sum_sq / bass_chunk.len() as f32;
+    let bass_rms_db = if bass_mean_sq > 1e-15 {
+        10.0 * libm::log10f(bass_mean_sq)
+    } else { -144.0 };
+    drums_td    > COLLISION_DRUMS_TRANSIENT_THRESHOLD &&
+    bass_rms_db > COLLISION_BASS_RMS_THRESHOLD_DB
 }
 
 impl TwoPassEngine {
     pub fn new() -> Self {
-        Self { nmf: NmfEngine::default() }
+        Self { 
+            nmf: NmfEngine::default(),
+            bass_ducking_gain: 1.0,
+        }
     }
 
     // ── Pass 1 — Scout ───────────────────────────────────────────────
@@ -365,6 +394,20 @@ impl TwoPassEngine {
                 .map(|f| f.iter().sum::<f32>() / N_BINS as f32)
                 .sum::<f32>() / n_frames.max(1) as f32;
             chunk_count += 1;
+
+            // Psychoacoustic Collision Matrix — smoothed micro-ducking.
+            // One-pole gain smoothing prevents zipper noise at chunk boundaries.
+            let bass_chunk = {
+                let collision = detect_collision(&drums_chunk, &bass_chunk);
+                let target_gain = if collision { COLLISION_DUCKING_GAIN } else { 1.0_f32 };
+                let mut processed = bass_chunk;
+                let alpha = COLLISION_SMOOTHING_ALPHA;
+                processed.iter_mut().for_each(|s| {
+                    self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
+                    *s *= self.bass_ducking_gain;
+                });
+                processed
+            };
 
             let stems_chunk = FiveStemsChunk {
                 voice:     voice_chunk,
