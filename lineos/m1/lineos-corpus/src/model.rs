@@ -7,8 +7,7 @@ use std::collections::HashMap;
 /// P[i][j] = P(next_state=j | current_state=i)
 /// States indexed alphabetically for determinism.
 /// Training: count consecutive pairs, normalize rows.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TransitionMatrix {
     /// State labels — sorted alphabetically for determinism.
     pub states:        Vec<String>,
@@ -151,8 +150,7 @@ fn bin_index(value: f32, boundaries: &[f32]) -> usize {
     boundaries.iter().position(|&b| value < b).unwrap_or(boundaries.len())
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmissionHistogram {
     pub state:             String,
     pub rms_db:            [usize; 5],

@@ -26,8 +26,7 @@ pub struct StatePrediction {
 }
 
 /// Complete model for one stem type within one preset.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StemMarkovModel {
     pub stem_type:   String,
     pub transitions: TransitionMatrix,

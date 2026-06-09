@@ -12,3 +12,6 @@ pub use model::{TransitionMatrix, EmissionHistogram};
 
 pub mod inference;
 pub use inference::{predict_state, StatePrediction, StemMarkovModel};
+
+pub mod store;
+pub use store::{UserMarkovModel, PresetMarkovModel};

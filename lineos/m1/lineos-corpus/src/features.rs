@@ -5,8 +5,7 @@
 //! Zero new mathematical dependencies.
 //! no_std compatible — pure f32 arithmetic only.
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateFeatures {
     /// RMS energy in dBFS. Range: [-144, 0].
     pub rms_db: f32,
