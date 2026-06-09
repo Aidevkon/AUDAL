@@ -45,12 +45,10 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
 
                 // spawn_blocking: DSP is CPU-intensive, must not block async runtime
                 let result = tokio::task::spawn_blocking(move || {
-                    tokio::runtime::Handle::current().block_on(async {
-                        crate::handlers::master::run_dsp(
-                            &req,
-                            start,
-                        ).await
-                    })
+                    crate::domain::dsp_pipeline::run_dsp(
+                        &req,
+                        start,
+                    )
                 }).await;
 
                 match result {

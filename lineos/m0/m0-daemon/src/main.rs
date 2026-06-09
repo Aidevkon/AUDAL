@@ -20,6 +20,7 @@ mod registry;
 pub mod dsp;
 pub mod jini;
 pub mod agents;
+pub mod domain;
 
 use anyhow::Result;
 use app_state::AppState;

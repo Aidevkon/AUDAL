@@ -1,4 +1,5 @@
-use m0d::handlers::master::{run_dsp, MasterRequest};
+use m0d::domain::dsp_pipeline::run_dsp;
+use m0d::handlers::master::MasterRequest;
 use std::time::Instant;
 
 #[tokio::test]
@@ -27,7 +28,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     let start = Instant::now();
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(60),
-        run_dsp(&req, start)
+        async { run_dsp(&req, start) }
     ).await;
 
     // Must not timeout
