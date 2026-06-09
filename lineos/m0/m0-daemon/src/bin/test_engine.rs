@@ -72,7 +72,7 @@ fn main() {
 
     // --- Process ---
     println!("\n=== Processing ===");
-    let _result = DspAdapter::master(&intent, &mut audio, None).expect("Mastering failed");
+    let _result = DspAdapter::master(&intent, &mut audio.left, &mut audio.right, audio.sample_rate, None).expect("Mastering failed");
     assert_signal_integrity(&audio.left, "process_offline_l");
     assert_signal_integrity(&audio.right, "process_offline_r");
 

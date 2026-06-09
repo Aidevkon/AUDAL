@@ -284,11 +284,14 @@ mod tests {
     use uuid::Uuid;
 
     fn make_transfer(samples: usize) -> PcmTransfer {
+        let path = std::path::PathBuf::from(format!("/tmp/xaak-test-{}.pcm", uuid::Uuid::new_v4()));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len((samples * 4) as u64).unwrap();
         PcmTransfer {
-            samples:     vec![0.0f32; samples],
-            sample_rate: 48_000,
+            pcm_path:    path,
+            sample_rate: 48000,
             channels:    2,
-            blob_id:     Uuid::new_v4(),
+            blob_id:     uuid::Uuid::new_v4(),
         }
     }
 

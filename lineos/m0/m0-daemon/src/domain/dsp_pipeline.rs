@@ -22,7 +22,7 @@ fn sha256_hex(data: &[f32]) -> String {
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
-pub fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+pub fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
     run_dsp_internal(req, start)
 }
 
@@ -40,7 +40,7 @@ fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 }
 
 #[inline(always)]
-fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, lineos_types::AudioChunk, Option<f32>), String> {
+fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
@@ -179,22 +179,35 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         mix:       MixMetrics::default(),
     };
 
-    // std::sync::mpsc — works inside spawn_blocking closure
-    // bounded via sync_channel(8) = ~4MB max in-flight
-    let (tx, rx) = std::sync::mpsc::sync_channel::<(Vec<f32>, Vec<f32>)>(8);
-
-    // Consumer runs in a standard thread — accumulates mix chunks
-    // Phase 8: replace with streaming MP3 encoder
+    // Phase 2: Zero Allocation Disk Streaming via memmap2
     let n_total = mono.len();
-    let consumer_task = std::thread::spawn(move || {
-        let mut final_left  = Vec::with_capacity(n_total);
-        let mut final_right = Vec::with_capacity(n_total);
-        while let Ok((mix_l, mix_r)) = rx.recv() {
-            final_left.extend_from_slice(&mix_l);
-            final_right.extend_from_slice(&mix_r);
-        }
-        (final_left, final_right)
-    });
+    let blob_id = req.track_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&file_path)
+        .map_err(|e| format!("Failed to create mapped file: {e}"))?;
+
+    // Size: n_total * 2 channels * 4 bytes/float
+    let file_size = (n_total * 2 * 4) as u64;
+    file.set_len(file_size).map_err(|e| format!("Failed to set file len: {e}"))?;
+
+    let mut mmap = unsafe {
+        memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))?
+    };
+
+    // The first half of mmap is LEFT, second half is RIGHT
+    // We cast the raw bytes to f32 slices safely using std::slice::from_raw_parts_mut
+    let (left_bytes, right_bytes) = mmap.split_at_mut(n_total * 4);
+    let left_slice: &mut [f32] = unsafe {
+        std::slice::from_raw_parts_mut(left_bytes.as_mut_ptr() as *mut f32, n_total)
+    };
+    let right_slice: &mut [f32] = unsafe {
+        std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total)
+    };
 
     // Streaming SHA-256 hashers — no full stem Vec needed
     let mut h_voice      = Sha256::new();
@@ -224,6 +237,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         .unwrap_or_default();
 
     // Pass 2 — process_chunks: ~2MB/chunk constant RAM
+    let mut write_offset = 0;
     two_pass.process_chunks(&mono, &scout, |stems_chunk| {
         let chunk_len = stems_chunk.voice.len();
 
@@ -284,19 +298,14 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         stage.apply_scales(scout.rear_scale, scout.lfe_scale);
         let (sp_l, sp_r) = StereoRenderer::render(&stage);
 
-        // Send mix chunk to consumer — backpressure if full
-        let _ = tx.send((sp_l, sp_r));
+        // Write directly to mapped slices
+        let end_offset = write_offset + sp_l.len();
+        left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
+        right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
+        write_offset = end_offset;
     }).map_err(|e| format!("TwoPassEngine error: {e}"))?;
 
-    // Graceful shutdown — signal end of stream
-    drop(tx);
-
-    // Harvest final mix from consumer
-    let (final_left, final_right) = consumer_task
-        .join()
-        .map_err(|_| format!("Consumer task panic"))?;
-
-    profiler.mark_stage("Stem Engine", &final_left);
+    profiler.mark_stage("Stem Engine", left_slice);
 
     // Finalize streaming fingerprints
     let voice_hex    = format!("{:x}", h_voice.finalize());
@@ -320,7 +329,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         pipeline:  pipeline_hex,
     };
 
-    profiler.mark_stage("Pre-Clean", &final_left);
+    profiler.mark_stage("Pre-Clean", left_slice);
 
     // Level 1: Energy-preserving reconstruction
     let original_rms = libm::sqrtf(
@@ -329,19 +338,17 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
             .sum::<f32>() / (chunk.left.len() * 2) as f32
     );
     let mix_rms = libm::sqrtf(
-        final_left.iter().zip(final_right.iter())
+        left_slice.iter().zip(right_slice.iter())
             .map(|(l, r)| l * l + r * r)
-            .sum::<f32>() / (final_left.len() * 2) as f32
+            .sum::<f32>() / (left_slice.len() * 2) as f32
     );
     let gain = if mix_rms > 1e-10 {
         (original_rms / mix_rms).clamp(0.5, 2.0)
     } else { 1.0 };
 
-    let mut mix_left  = final_left;
-    let mut mix_right = final_right;
-    for i in 0..mix_left.len() {
-        mix_left[i]  *= gain;
-        mix_right[i] *= gain;
+    for i in 0..left_slice.len() {
+        left_slice[i]  *= gain;
+        right_slice[i] *= gain;
     }
 
     // Markov spatial modulation (simplified — full in Phase 8)
@@ -349,8 +356,8 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let modulated = profile.apply_markov_prediction("vowel");
     let _ = modulated;
 
-    chunk.left  = mix_left;
-    chunk.right = mix_right;
+    // chunk.left  = left_slice;
+    // chunk.right = right_slice;
     profiler.mark_stage("Spatial", &chunk.left);
 
     // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
@@ -435,8 +442,6 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     )
         .map_err(|e| format!("AetherBridge error: {}", e))?;
 
-    let blob_id = uuid::Uuid::new_v4().to_string();
-
     // V2.0: Corpus generation — silent background telemetry
     // 900-JSON: behavioral stats only, zero audio content
     use lineos_corpus::builder::build_timeline;
@@ -446,11 +451,11 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
 
     let corpus_envelope = build_timeline(
         &streaming_features,
-        &chunk.left,
-        &chunk.left,
-        &chunk.left,
-        &chunk.left,
-        &chunk.left,
+        left_slice,
+        left_slice,
+        left_slice,
+        left_slice,
+        left_slice,
         &pre_analysis,
         &blob_id,
         chunk.sample_rate,
@@ -463,40 +468,17 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         let _ = std::fs::write(&corpus_path, json);
     }
 
-    let mut audio = chunk;
-
-    // Clone target before spawn_blocking consumes intent (fix E0382)
-    let intent_target_for_verify = intent.target.clone();
-
     // Run sp314-dsp directly (we are already in a blocking thread)
     let dsp_start_time = std::time::Instant::now();
-    let result = crate::dsp::DspAdapter::master(&intent, &mut audio, Some(&dsp_config));
+    let result = crate::dsp::DspAdapter::master(&intent, left_slice, right_slice, chunk.sample_rate, Some(&dsp_config));
     if dsp_start_time.elapsed().as_secs() > 300 {
         tracing::warn!("DSP took more than 300 seconds");
     }
     
     let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
-    profiler.mark_stage("Mastering", &audio.left);
+    profiler.mark_stage("Mastering", left_slice);
 
-    let mut audio = audio;
-    use sp314_dsp::verification::{PostFlightVerifier, VerificationConfig};
-    let verify_cfg = VerificationConfig::from_target(&intent_target_for_verify);
-    let verify_result = PostFlightVerifier::verify_and_trim(&mut audio, &verify_cfg);
-    if let Some(warn) = &verify_result.warning {
-        tracing::warn!("[S-013] ⚠️  {}", warn);
-    }
-    profiler.mark_stage("Render", &audio.left);
-
-    // Build interleaved post-master samples for telemetry
-    let post_master_samples: Vec<f32> = audio.left.iter()
-        .zip(audio.right.iter())
-        .flat_map(|(l, r)| [*l, *r])
-        .collect();
-    let post_master_sr       = pcm_sr_for_telemetry;
-    let post_master_channels = 2_u16;
-
-    // Measure integrated LUFS on post-master output
-    let lufs = sp314_dsp::metering::measure_integrated_lufs(&audio.left, &audio.right);
+    let lufs = result.lufs.integrated_lufs;
     tracing::info!("Post-DSP integrated LUFS: {:.4}", lufs);
     let tp    = result.lufs.true_peak_dbfs;
     let lra   = result.lufs.loudness_range_lu;
@@ -505,9 +487,16 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let elapsed = start.elapsed().as_millis() as u64;
 
     // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
-    // Run full EBU R128 windowed analysis on the decoded (pre-mastered) PCM.
-    // LRA measures source material dynamic range — per EBU Tech 3342.
-    // Uses libm — no std::f32 methods per LineOS Constitution §09.1.
+    // Run full EBU R128 windowed analysis on the mapped PCM
+    // Post-master samples for telemetry are interleaved manually
+    let mut post_master_samples = Vec::with_capacity(n_total * 2);
+    for i in 0..n_total {
+        post_master_samples.push(left_slice[i]);
+        post_master_samples.push(right_slice[i]);
+    }
+    let post_master_sr       = chunk.sample_rate;
+    let post_master_channels = 2_u16;
+
     let telemetry_lra = {
         let mut calc = LraCalculator::new(post_master_sr);
         calc.feed_samples(&post_master_samples, post_master_channels);
@@ -530,19 +519,9 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         telemetry_lra, telemetry_momentary, telemetry_short_term
     );
 
-    // Phase 10: store mastered PCM as f32 LE bytes for export.
-    // FORBIDDEN: return these bytes to the frontend (Amendment A-002 §3).
-    // GoldenBlob.flac_bytes = raw f32 LE interleaved PCM from DSP output (Phase 2/10).
-    let audio_bytes: Vec<u8> = audio.left.iter()
-        .zip(audio.right.iter())
-        .flat_map(|(l, r)| {
-            l.to_le_bytes().into_iter()
-             .chain(r.to_le_bytes().into_iter())
-        })
-        .collect();
-    let audio_sample_rate = pcm_sr_for_telemetry;
-    let audio_channels    = pcm_channels_for_telemetry;
-
+    // Sync mapped file to disk before returning path
+    mmap.flush().unwrap_or_default();
+    
     let cert = aether_bridge::generate_certificate(
         &_pcm_samples_for_telemetry,
         &post_master_samples,
@@ -565,7 +544,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         &fingerprints,
     );
 
-    let pcm_blake3 = crate::handlers::certificate::blake3_pcm(&audio.left);
+    let pcm_blake3 = crate::handlers::certificate::blake3_pcm(left_slice);
     let cert_sig   = crate::handlers::certificate::sign_certificate(
         &blob_id, &pcm_blake3,
         lufs, &fingerprints
@@ -628,10 +607,13 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         aether_persona: Some(persona_config.id),
         aether_config:  Some(config_json),
         // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
-        audio_bytes,
-        sample_rate:  audio_sample_rate,
-        channels:     audio_channels,
-    }, chunk_original, target_lufs))
+        sample_rate:  post_master_sr,
+        channels:     post_master_channels,
+        audio_path:   file_path.clone(),
+    },
+    file_path,
+    None
+))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

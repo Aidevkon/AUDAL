@@ -74,7 +74,7 @@ pub struct StoredBlob {
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
     // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
     #[serde(skip)]
-    pub audio_bytes:  Vec<u8>,   // f32 LE PCM, always 48000 Hz
+    pub audio_path:  std::path::PathBuf,
     #[serde(skip)]
     pub sample_rate:  u32,       // always 48000 after Phase 7 decode
     #[serde(skip)]
@@ -221,7 +221,7 @@ mod tests {
             pcm_blake3:     None,
             cert_signature: None,
             processing_timeline: vec![],
-            audio_bytes:  vec![],   // empty for tests
+            audio_path:   std::path::PathBuf::from("/tmp/stub.pcm"),
             sample_rate:  48000,
             channels:     2,
         }

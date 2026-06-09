@@ -183,20 +183,24 @@ fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(
 /// audio_bytes = raw f32 LE PCM bytes from GoldenBlob (Phase 2/10 note).
 /// Phase 11: replace with real FLAC encoder when sp314-dsp adds FLAC output.
 fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    if blob.audio_bytes.is_empty() {
-        return Err("No audio bytes in blob — mastering may have used legacy path".into());
+    let audio_bytes = std::fs::read(&blob.audio_path)
+        .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
+    if audio_bytes.is_empty() {
+        return Err("No audio bytes in file — mastering may have failed".into());
     }
-    std::fs::write(path, &blob.audio_bytes)
+    std::fs::write(path, &audio_bytes)
         .map_err(|e| format!("FLAC write failed: {e}"))
 }
 
 /// WAV: decode f32 LE PCM bytes → write 32-bit float WAV via hound.
 fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    if blob.audio_bytes.is_empty() {
-        return Err("No audio bytes in blob — cannot write WAV".into());
+    let audio_bytes = std::fs::read(&blob.audio_path)
+        .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
+    if audio_bytes.is_empty() {
+        return Err("No audio bytes in file — cannot write WAV".into());
     }
 
-    let samples = pcm_bytes_to_f32(&blob.audio_bytes);
+    let samples = pcm_bytes_to_f32(&audio_bytes);
 
     let spec = hound::WavSpec {
         channels:        blob.channels,
@@ -237,11 +241,13 @@ fn export_opus(_blob: &StoredBlob, _path: &Path) -> Result<(), String> {
 ///
 /// No DSP re-run — reads f32 LE PCM from Golden Blob, converts to BE in-place.
 fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    if blob.audio_bytes.is_empty() {
-        return Err("No audio bytes in blob — cannot write AIFF".into());
+    let audio_bytes = std::fs::read(&blob.audio_path)
+        .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
+    if audio_bytes.is_empty() {
+        return Err("No audio bytes in file — cannot write AIFF".into());
     }
 
-    let pcm = pcm_bytes_to_f32(&blob.audio_bytes);
+    let pcm = pcm_bytes_to_f32(&audio_bytes);
     let channels    = blob.channels.max(1);
     let sample_rate = blob.sample_rate;
     let num_frames  = (pcm.len() / channels as usize) as u32;
@@ -336,11 +342,13 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         lame_encode_flush_nogap, lame_close,
     };
 
-    if blob.audio_bytes.is_empty() {
-        return Err("No audio bytes in blob — cannot write MP3".into());
+    let audio_bytes = std::fs::read(&blob.audio_path)
+        .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
+    if audio_bytes.is_empty() {
+        return Err("No audio bytes in file — cannot write MP3".into());
     }
 
-    let pcm = pcm_bytes_to_f32(&blob.audio_bytes);
+    let pcm = pcm_bytes_to_f32(&audio_bytes);
     // Samples per channel (LAME interleaved API takes frames, not total samples)
     let num_samples_per_channel = (pcm.len() / blob.channels.max(1) as usize) as i32;
 

@@ -170,16 +170,11 @@ pub async fn trigger_mastering(
                     }
                 );
 
-                if let Some(chunk) = output.pcm_data.take() {
-                    let mut interleaved = Vec::with_capacity(chunk.left.len() * 2);
-                    for (l, r) in chunk.left.iter().zip(chunk.right.iter()) {
-                        interleaved.push(*l);
-                        interleaved.push(*r);
-                    }
+                if let Some(path) = output.pcm_data.take() {
                     if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
                         let transfer = xaak::PcmTransfer {
-                            samples: interleaved,
-                            sample_rate: chunk.sample_rate,
+                            pcm_path: path,
+                            sample_rate: 48000,
                             channels: 2,
                             blob_id: b_id,
                         };

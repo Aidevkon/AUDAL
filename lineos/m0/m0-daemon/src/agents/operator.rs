@@ -101,7 +101,7 @@ pub struct DspOutput {
     pub blob_id:   String,
     pub lufs:      f32,
     pub true_peak: f32,
-    pub pcm_data:  Option<lineos_types::AudioChunk>,
+    pub pcm_data:  Option<std::path::PathBuf>,
 }
 
 /// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
@@ -119,7 +119,7 @@ pub struct MasteringOutput {
     pub job_id:   String,
     pub blob_id:  String,
     pub status:   &'static str,
-    pub pcm_data: Option<lineos_types::AudioChunk>,
+    pub pcm_data: Option<std::path::PathBuf>,
 }
 
 /// Output for a single track in a batch job

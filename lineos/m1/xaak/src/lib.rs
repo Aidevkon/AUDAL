@@ -28,7 +28,7 @@ pub const TARGET_CHANNELS:    u16 = 2;
 /// After this is passed to XaakKernel::load(), the caller must not
 /// access the samples — ownership is moved unconditionally (A-003 §2).
 pub struct PcmTransfer {
-    pub samples:     Vec<f32>,
+    pub pcm_path:    std::path::PathBuf,
     pub sample_rate: u32,
     pub channels:    u16,
     pub blob_id:     Uuid,
@@ -46,7 +46,7 @@ pub struct XaakKernel {
     channels:    u16,
     duration_ms: u64,
     /// Authoritative PCM backing store — supports seek via slice offset.
-    pcm:         Vec<f32>,
+    pcm:         memmap2::Mmap,
     /// Kept alive to hold the ring buffer while consumer exists.
     _producer:   Option<Box<dyn std::any::Any + Send>>,
 }
@@ -57,8 +57,13 @@ impl XaakKernel {
     /// Emits A-003 §2 audit event: m0d.xaak_buffer_allocated.
     /// After this returns, the caller's samples field is consumed.
     pub fn load(transfer: PcmTransfer) -> Self {
+        let file = std::fs::File::open(&transfer.pcm_path).expect("Failed to open PCM file");
+        let mmap = unsafe { memmap2::Mmap::map(&file).expect("Failed to map PCM file") };
+        // Each f32 is 4 bytes. Number of samples = size / 4
+        let num_samples = mmap.len() / 4;
+
         let duration_ms = if transfer.sample_rate > 0 && transfer.channels > 0 {
-            (transfer.samples.len() as u64 * 1000)
+            (num_samples as u64 * 1000)
                 / (transfer.sample_rate as u64 * transfer.channels as u64)
         } else {
             0
@@ -68,7 +73,7 @@ impl XaakKernel {
         tracing::info!(
             event       = "m0d.xaak_buffer_allocated",
             blob_id     = %transfer.blob_id,
-            size_bytes  = transfer.samples.len() * 4,
+            size_bytes  = num_samples * 4,
             sample_rate = transfer.sample_rate,
             channels    = transfer.channels,
             duration_ms = duration_ms,
@@ -80,7 +85,7 @@ impl XaakKernel {
             sample_rate: transfer.sample_rate,
             channels:    transfer.channels,
             duration_ms,
-            pcm:         transfer.samples,
+            pcm:         mmap,
             _producer:   None,
         }
     }
@@ -95,8 +100,13 @@ impl XaakKernel {
                 * self.channels as usize
         } else { 0 };
 
-        let slice = if frame_offset < self.pcm.len() {
-            &self.pcm[frame_offset..]
+        let num_samples = self.pcm.len() / 4;
+        let slice = if frame_offset < num_samples {
+            // Unsafe cast from mapped bytes to f32 slice for playback
+            let pcm_bytes = &self.pcm[(frame_offset * 4)..];
+            unsafe {
+                std::slice::from_raw_parts(pcm_bytes.as_ptr() as *const f32, pcm_bytes.len() / 4)
+            }
         } else { &[] };
 
         let capacity = slice.len().max(4096);
@@ -156,11 +166,14 @@ mod tests {
     use super::*;
 
     fn make_transfer(samples: usize) -> PcmTransfer {
+        let path = std::path::PathBuf::from(format!("/tmp/xaak-test-{}.pcm", uuid::Uuid::new_v4()));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len((samples * 4) as u64).unwrap();
         PcmTransfer {
-            samples:     vec![0.0f32; samples],
-            sample_rate: TARGET_SAMPLE_RATE,
-            channels:    TARGET_CHANNELS,
-            blob_id:     Uuid::new_v4(),
+            pcm_path:    path,
+            sample_rate: 48000,
+            channels:    2,
+            blob_id:     uuid::Uuid::new_v4(),
         }
     }
 

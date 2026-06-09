@@ -21,12 +21,14 @@ impl DspAdapter {
     /// Replaces MasteringPipeline::master().
     pub fn master(
         intent: &MasteringIntent,
-        audio: &mut StereoBuffer,
+        left: &mut [f32],
+        right: &mut [f32],
+        sample_rate: u32,
         aether_config: Option<&integration::config::DspConfig>,
     ) -> Result<MasteringResult, DspError> {
 
         // 1. Build EngineerConditions from intent
-        let conditions = Self::intent_to_conditions(intent, audio);
+        let conditions = Self::intent_to_conditions(intent, left, right, sample_rate);
 
         // 2. Forge the DSP topology
         let topology_json = Pipelineforge::forge(&conditions)
@@ -44,11 +46,11 @@ impl DspAdapter {
         let mut graph = DspGraph::from_topology(
             &topology,
             block_size,
-            audio.sample_rate,
+            sample_rate,
         ).map_err(|e| DspError::GraphError(format!("{:?}", e)))?;
 
         // 4. Process offline in blocks
-        let num_frames = audio.num_frames;
+        let num_frames = left.len();
         let mut frame = 0;
         while frame < num_frames {
             let end = (frame + block_size).min(num_frames);
@@ -56,17 +58,17 @@ impl DspAdapter {
             if block_len < block_size {
                 let mut pad_l = vec![0.0_f32; block_size];
                 let mut pad_r = vec![0.0_f32; block_size];
-                pad_l[..block_len].copy_from_slice(&audio.left[frame..end]);
-                pad_r[..block_len].copy_from_slice(&audio.right[frame..end]);
+                pad_l[..block_len].copy_from_slice(&left[frame..end]);
+                pad_r[..block_len].copy_from_slice(&right[frame..end]);
                 
                 graph.process_block(&mut pad_l, &mut pad_r);
                 
-                audio.left[frame..end].copy_from_slice(&pad_l[..block_len]);
-                audio.right[frame..end].copy_from_slice(&pad_r[..block_len]);
+                left[frame..end].copy_from_slice(&pad_l[..block_len]);
+                right[frame..end].copy_from_slice(&pad_r[..block_len]);
             } else {
                 graph.process_block(
-                    &mut audio.left[frame..end],
-                    &mut audio.right[frame..end],
+                    &mut left[frame..end],
+                    &mut right[frame..end],
                 );
             }
             frame += block_len;
@@ -76,7 +78,7 @@ impl DspAdapter {
         // Measure actual output LUFS and correct to target
         use sp314_dsp::metering::measure_integrated_lufs;
         let output_lufs = measure_integrated_lufs(
-            &audio.left, &audio.right);
+            left, right);
         let target_lufs = intent.target.target_lufs;
 
         if output_lufs > -69.0 {
@@ -89,10 +91,10 @@ impl DspAdapter {
                 10.0_f32,
                 correction_db / 20.0_f32,
             );
-            for s in audio.left.iter_mut() {
+            for s in left.iter_mut() {
                 *s *= correction_linear;
             }
-            for s in audio.right.iter_mut() {
+            for s in right.iter_mut() {
                 *s *= correction_linear;
             }
 
@@ -113,30 +115,40 @@ impl DspAdapter {
             let _ = ceiling_linear; // used via config
             let mut isp_limiter = BrickwallLimiter::new(
                 isp_limiter_config,
-                audio.sample_rate,
+                sample_rate,
             );
 
             // Process main buffer
             isp_limiter.process_block(
-                &mut audio.left,
-                &mut audio.right,
+                left,
+                right,
             );
 
-            // Latency compensation: flush lookahead delay line
+            // Latency compensation for ISPs:
+            // Since we are working with fixed slices (mmap), we CANNOT reallocate or extend the slice.
+            // But BrickwallLimiter introduces a tiny lookahead delay.
+            // For now, we will just shift the samples backward by `lookahead` to compensate,
+            // and zero-pad the end (or leave as is).
             let lookahead = isp_limiter.lookahead_samples();
-            let mut flush_l = vec![0.0_f32; lookahead];
-            let mut flush_r = vec![0.0_f32; lookahead];
-            isp_limiter.process_block(&mut flush_l, &mut flush_r);
-            audio.left.extend_from_slice(&flush_l);
-            audio.right.extend_from_slice(&flush_r);
-            audio.left.drain(..lookahead);
-            audio.right.drain(..lookahead);
-            audio.num_frames = audio.left.len();
+            if lookahead > 0 && lookahead < left.len() {
+                // Shift backward
+                left.copy_within(lookahead.., 0);
+                right.copy_within(lookahead.., 0);
+                
+                // Flush the delay line into the end of the buffer
+                let mut flush_l = vec![0.0_f32; lookahead];
+                let mut flush_r = vec![0.0_f32; lookahead];
+                isp_limiter.process_block(&mut flush_l, &mut flush_r);
+                
+                let tail_start = left.len() - lookahead;
+                left[tail_start..].copy_from_slice(&flush_l);
+                right[tail_start..].copy_from_slice(&flush_r);
+            }
         }
 
         // 5. Measure output LUFS
         // Use sp314-dsp metering if available, or compute simple RMS
-        let output_lufs = Self::measure_lufs(&audio.left, &audio.right, audio.sample_rate);
+        let output_lufs = Self::measure_lufs(left, right, sample_rate);
 
         Ok(MasteringResult {
             lufs: output_lufs,
@@ -181,12 +193,14 @@ impl DspAdapter {
     /// Translate MasteringIntent → EngineerConditions for Pipelineforge.
     fn intent_to_conditions(
         intent: &MasteringIntent,
-        audio: &StereoBuffer,
+        left: &[f32],
+        right: &[f32],
+        sample_rate: u32,
     ) -> ConditionSet {
         let mut conditions = vec![];
 
         // Basic loudness conditions
-        let approx_lufs = Self::estimate_lufs(&audio.left, &audio.right);
+        let approx_lufs = Self::estimate_lufs(left, right);
         if approx_lufs > intent.target.target_lufs + 2.0 {
             conditions.push(EngineerCondition::LufsTooLoud);
         } else if approx_lufs < intent.target.target_lufs - 6.0 {
@@ -195,7 +209,7 @@ impl DspAdapter {
 
         ConditionSet {
             conditions,
-            sample_rate: audio.sample_rate,
+            sample_rate,
             target_lufs: intent.target.target_lufs,
         }
     }

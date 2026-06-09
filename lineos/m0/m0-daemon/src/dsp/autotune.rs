@@ -71,7 +71,7 @@ pub fn autotune_dsp(
         // Run EXACT production pipeline
         let mut test_intent = intent.clone();
         test_intent.target_makeup_db = 0.0;
-        let _ = DspAdapter::master(&test_intent, &mut test_audio, None);
+        let _ = DspAdapter::master(&test_intent, &mut test_audio.left, &mut test_audio.right, test_audio.sample_rate, None);
 
         // Measure output LUFS
         let output_lufs = measure_integrated_lufs(
