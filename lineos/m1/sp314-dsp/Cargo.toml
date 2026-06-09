@@ -50,3 +50,7 @@ required-features = ["cli"]
 name = "sp314_stems"
 path = "src/bin/sp314_stems.rs"
 required-features = ["cli"]
+
+[[test]]
+name = "stress"
+path = "tests/stress/mod.rs"
