@@ -27,6 +27,48 @@ const COLLISION_BASS_RMS_THRESHOLD_DB:     f32 = -40.0;
 const COLLISION_DUCKING_GAIN:              f32 = 0.707;
 const COLLISION_SMOOTHING_ALPHA:           f32 = 0.005;
 
+/// Per-stem MFCC fingerprints computed during scout().
+/// Captures the timbral identity of each stem BEFORE render.
+/// Used by AutoTuningController to set adaptive ducking_gain.
+/// INV-AB-1: computed deterministically from scout proxy stems.
+#[derive(Debug, Clone)]
+pub struct StemMfccs {
+    pub voice:     [f32; 13],
+    pub drums:     [f32; 13],
+    pub bass:      [f32; 13],
+    pub harmonics: [f32; 13],
+    pub ambience:  [f32; 13],
+}
+
+impl StemMfccs {
+    /// Zero MFCCs — used before computation or as fallback.
+    pub fn zero() -> Self {
+        Self {
+            voice:     [0.0f32; 13],
+            drums:     [0.0f32; 13],
+            bass:      [0.0f32; 13],
+            harmonics: [0.0f32; 13],
+            ambience:  [0.0f32; 13],
+        }
+    }
+
+    /// L2 distance between two MFCC vectors.
+    /// Used to measure timbral similarity/difference.
+    pub fn distance(a: &[f32; 13], b: &[f32; 13]) -> f32 {
+        a.iter().zip(b.iter())
+            .map(|(x, y)| (x - y).powi(2))
+            .sum::<f32>()
+            .sqrt()
+    }
+
+    /// Bass vs Drums timbral distance.
+    /// High distance = different timbre = low collision risk.
+    /// Low distance = similar timbre = high collision risk.
+    pub fn bass_drums_distance(&self) -> f32 {
+        Self::distance(&self.bass, &self.drums)
+    }
+}
+
 /// A single chunk of 5 stems — chunk-sized slices only.
 /// Never holds full-file data. Passed to process_chunks callback.
 pub struct FiveStemsChunk {
@@ -60,6 +102,9 @@ pub struct ScoutResult {
     pub global_rms_gain: f32,
     /// Spatial pre-analysis from proxy
     pub spatial_pre:   SpatialPreAnalysis,
+    /// Per-stem MFCC fingerprints from scout proxy analysis.
+    /// StemMfccs::zero() until M-P2 populates them.
+    pub stem_mfccs:    StemMfccs,
 }
 
 /// Streaming error
@@ -294,6 +339,7 @@ impl TwoPassEngine {
             lfe_scale,
             global_rms_gain,
             spatial_pre,
+            stem_mfccs: StemMfccs::zero(), // populated in M-P2
         }
     }
 
