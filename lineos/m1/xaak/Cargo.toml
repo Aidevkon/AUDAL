@@ -17,6 +17,7 @@ lineos-types = { version = "0.1.0", path = "../lineos-types", features = ["binco
 realfft = "3"
 rustfft = "6"
 memmap2 = "0.9.10"
+arc-swap = "1"
 
 [dev-dependencies]
 serde_json = "1"

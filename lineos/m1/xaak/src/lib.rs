@@ -15,6 +15,8 @@ pub mod engine;
 pub mod player;
 pub mod spectrum;
 pub mod telemetry_worker;
+pub mod repo;
+pub use repo::{AudioRepo, DspState, MixCommit};
 
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
