@@ -40,11 +40,7 @@ pub fn mono_to_stereo(mono: &[f32]) -> (Vec<f32>, Vec<f32>) {
     (mono.to_vec(), mono.to_vec())
 }
 
-/// Create anti-phase stereo (L = signal, R = -signal).
-pub fn mono_to_antiphase_stereo(mono: &[f32]) -> (Vec<f32>, Vec<f32>) {
-    let r: Vec<f32> = mono.iter().map(|&s| -s).collect();
-    (mono.to_vec(), r)
-}
+
 
 /// Assert no NaN or Inf in PCM.
 pub fn assert_no_nan_inf(pcm: &[f32], context: &str) {
@@ -60,4 +56,46 @@ pub fn assert_bounded(pcm: &[f32], context: &str) {
         assert!(x >= -1.0 && x <= 1.0,
             "{}: sample[{}] = {} (out of [-1,1])", context, i, x);
     }
+}
+
+/// Simulate a kick drum: impulse + exponential decay + harmonics.
+/// Models the broadband character of a real kick (sub thump + click).
+pub fn kick_drum(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // Sub thump: 60Hz with fast exponential decay
+        let sub   = libm::sinf(2.0 * core::f32::consts::PI * 60.0 * t)
+                    * libm::expf(-t * 30.0) * 0.8;
+        // Body: 120Hz harmonic
+        let body  = libm::sinf(2.0 * core::f32::consts::PI * 120.0 * t)
+                    * libm::expf(-t * 50.0) * 0.4;
+        // Click: 2kHz transient attack
+        let click = libm::sinf(2.0 * core::f32::consts::PI * 2000.0 * t)
+                    * libm::expf(-t * 200.0) * 0.3;
+        (sub + body + click).clamp(-1.0, 1.0)
+    }).collect()
+}
+
+/// Simulate a bass line: fundamental + rich harmonics.
+/// Models a real bass guitar or 808 sustained note.
+pub fn bass_line(freq_hz: f32, duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // Fundamental
+        let f1 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * t) * 0.6;
+        // 2nd harmonic
+        let f2 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * 2.0 * t) * 0.3;
+        // 3rd harmonic
+        let f3 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * 3.0 * t) * 0.15;
+        (f1 + f2 + f3).clamp(-1.0, 1.0)
+    }).collect()
+}
+
+/// Simulate hi-hat: bandpass white noise (high frequency).
+pub fn hi_hat(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f32> {
+    // White noise — hi-hats are broadband but high frequency
+    // The NMF will separate this into high-centroid component
+    white_noise(-6.0, duration_s, sample_rate, seed)
 }

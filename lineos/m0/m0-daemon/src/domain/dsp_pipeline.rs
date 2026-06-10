@@ -146,9 +146,17 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
 
-    // Pass 1 — Scout: ~5MB, locks W + spatial params
-    let mut two_pass  = TwoPassEngine::new();
-    let scout = two_pass.scout(&mono, chunk.sample_rate);
+    // M-P7: True Scout Window (One Shot One Kill)
+    // Seek to 30% of the track to avoid intro silence.
+    // Feed exactly 2 seconds of the chorus to train the NMF perfectly.
+    let scout_window_len = (2.0 * chunk.sample_rate as f32) as usize;
+    let scout_start      = (mono.len() as f32 * 0.30) as usize;
+    let scout_end        = (scout_start + scout_window_len).min(mono.len());
+    let scout_slice      = &mono[scout_start..scout_end];
+
+    // Pass 1 — Scout: trains on the 2-second chorus window!
+    let mut two_pass = TwoPassEngine::new();
+    let scout        = two_pass.scout(scout_slice, chunk.sample_rate);
 
     // M-P5: Maestro AutoTuning — between Pass 1 and Pass 2.
     // Reads stem MFCCs from scout + UserMarkovModel history.

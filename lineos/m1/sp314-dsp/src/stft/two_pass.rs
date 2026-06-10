@@ -288,15 +288,17 @@ impl TwoPassEngine {
         // Only first 4096 samples (~85ms) — keeps scout() latency minimal.
         // 4096 samples is sufficient for timbral fingerprint.
         // INV-AB-1: deterministic — same proxy → same MFCCs.
+        // M-P2: Compute per-stem MFCC fingerprints.
+        // Proxy stems are now exactly the 2-second chorus window passed into scout().
+        // INV-AB-1: deterministic — same slice → same MFCCs.
         let stem_mfccs = {
-            let mut mfcc  = MfccAnalyzer::new();
-            let limit     = 4096_usize;
+            let mut mfcc = MfccAnalyzer::new();
             StemMfccs {
-                voice:     mfcc.compute(&proxy_voice[..proxy_voice.len().min(limit)]),
-                drums:     mfcc.compute(&proxy_drums[..proxy_drums.len().min(limit)]),
-                bass:      mfcc.compute(&proxy_bass[..proxy_bass.len().min(limit)]),
-                harmonics: mfcc.compute(&proxy_harm[..proxy_harm.len().min(limit)]),
-                ambience:  mfcc.compute(&proxy_amb[..proxy_amb.len().min(limit)]),
+                voice:     mfcc.compute(&proxy_voice),
+                drums:     mfcc.compute(&proxy_drums),
+                bass:      mfcc.compute(&proxy_bass),
+                harmonics: mfcc.compute(&proxy_harm),
+                ambience:  mfcc.compute(&proxy_amb),
             }
         };
 
