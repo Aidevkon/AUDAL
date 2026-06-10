@@ -111,3 +111,55 @@ pub async fn post_revert(State(app): State<AppState>) -> Json<MixResponse> {
         Err(e) => Json(MixResponse { ok: false, message: e }),
     }
 }
+
+#[derive(Serialize)]
+pub struct FlavourInfo {
+    pub name:   String,
+    pub label:  String,
+}
+
+#[derive(Serialize)]
+pub struct FlavoursResponse {
+    pub active:   String,
+    pub flavours: Vec<FlavourInfo>,
+}
+
+pub async fn get_flavours(State(app): State<AppState>) -> Json<FlavoursResponse> {
+    let repo   = app.audio_repo.read().unwrap();
+    let active = repo.active_branch.clone();
+    let flavours = xaak::flavours::ALL.iter()
+        .map(|(name, _)| FlavourInfo {
+            name:  name.to_string(),
+            label: xaak::flavours::label(name).to_string(),
+        })
+        .collect();
+    Json(FlavoursResponse { active, flavours })
+}
+
+#[derive(Deserialize)]
+pub struct FlavourRequest {
+    pub name: String,
+}
+
+pub async fn post_flavour(
+    State(app): State<AppState>,
+    Json(req):  Json<FlavourRequest>,
+) -> Json<MixResponse> {
+    // Validate flavour name
+    if xaak::flavours::from_name(&req.name).is_none() {
+        return Json(MixResponse {
+            ok:      false,
+            message: format!("Unknown flavour: {}", req.name),
+        });
+    }
+    let result = app.audio_repo.write().unwrap()
+        .checkout(&req.name);
+    match result {
+        Ok(_) => {
+            let state = app.audio_repo.read().unwrap().head_state();
+            app.head_state_ptr.store(state);
+            Json(MixResponse { ok: true, message: req.name })
+        }
+        Err(e) => Json(MixResponse { ok: false, message: e }),
+    }
+}
