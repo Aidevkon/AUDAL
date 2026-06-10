@@ -3,7 +3,7 @@
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 use sp314_dsp::pipeline::autotune::{
-    autotune, AUTOTUNE_MAX_CLIP_RATIO,
+    autotune,
     measure_clipping_ratio_post_process
 };
 use sp314_dsp::pipeline::telemetry::analyze_offline_pre_pass;
@@ -124,7 +124,7 @@ fn test_autotuner_converges_for_all_presets() {
     // 1kHz sine wave at -18.0 dBFS RMS, 96_000 samples
     let target_rms_linear = 10.0_f32.powf(-18.0 / 20.0);
     let target_peak = target_rms_linear * std::f32::consts::SQRT_2;
-    let sine = sine_1khz(target_peak, 96000, 48000);
+    let _sine = sine_1khz(target_peak, 96000, 48000);
 
     let active_presets = [
         MasteringTarget::SpotifyV3,
@@ -137,7 +137,7 @@ fn test_autotuner_converges_for_all_presets() {
     ];
 
     for preset in active_presets.iter() {
-        let config = preset.engine_config(48000);
+        let _config = preset.engine_config(48000);
         
         // In Phase 8, autotune is just pure math. We know input is -18.0 LUFS.
         let target_lufs = match preset {

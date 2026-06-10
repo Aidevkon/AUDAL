@@ -212,19 +212,7 @@ pub async fn trigger_mastering(
     Json(serde_json::json!({ "job_id": session_id }))
 }
 
-fn update_stage(state: &AppState, job_id: &str, stage: &str,
-                start: &std::time::Instant, blob_id: Option<String>) {
-    let progress = crate::app_state::MasteringProgress {
-        job_id:     job_id.to_string(),
-        stage:      stage.to_string(),
-        elapsed_ms: start.elapsed().as_millis() as u64,
-        blob_id,
-        error:      None,
-    };
-    state.progress.insert(job_id.to_string(), progress.clone());
-    // Fire SSE broadcast — zero cost if no subscribers
-    let _ = state.progress_tx.send(progress);
-}
+
 
 /// POST /master/batch — submit an album for sequential mastering.
 /// Returns batch_id immediately. Progress via GET /progress/:batch_id

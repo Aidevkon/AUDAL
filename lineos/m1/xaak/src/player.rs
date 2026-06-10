@@ -6,7 +6,7 @@
 //! and drives the audio output callback via the ALSA backend on Linux.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{HeapRb, traits::{Split, Producer, Consumer, Observer}};
+use ringbuf::traits::{Split, Consumer};
 use std::sync::{Arc, Mutex};
 
 /// cpal-backed audio output driver.
@@ -62,7 +62,7 @@ impl CpalPlayer {
         // TB-P6: ring buffer for telemetry worker
         // Audio callback only pushes raw samples — no math, no syscalls
         let telem_rb = ringbuf::HeapRb::<f32>::new(1024 * 16);
-        let (mut telem_prod, telem_cons) = telem_rb.split();
+        let (telem_prod, telem_cons) = telem_rb.split();
         let mut telem_prod = telem_prod;  // explicit binding
 
         // Spawn telemetry worker — FFT + UDP off audio thread

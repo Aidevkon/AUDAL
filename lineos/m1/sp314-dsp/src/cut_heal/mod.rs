@@ -209,8 +209,8 @@ mod tests {
     #[test]
     fn cut_heal_deterministic() {
         let sr = 48000;
-        let mut audio1 = vec![0.0; 48000];
-        let mut audio2 = vec![0.0; 48000];
+        let audio1 = vec![0.0; 48000];
+        let audio2 = vec![0.0; 48000];
         let cuts1 = SilenceCut::detect(&audio1, sr);
         let cuts2 = SilenceCut::detect(&audio2, sr);
         assert_eq!(cuts1, cuts2);

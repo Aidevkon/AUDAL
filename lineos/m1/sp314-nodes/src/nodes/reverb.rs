@@ -50,7 +50,7 @@ impl Allpass {
 }
 
 pub struct ReverbNode {
-    sample_rate: u32,
+
     rt60: f32,
     hf_damping: f32,
     diffusion: f32,
@@ -81,7 +81,7 @@ impl ReverbNode {
         allpass_r.push(Allpass::new(11));
 
         Self { 
-            sample_rate, rt60: 0.5, hf_damping: 0.5, diffusion: 0.5, mix: 0.5,
+            rt60: 0.5, hf_damping: 0.5, diffusion: 0.5, mix: 0.5,
             lbcf_l, lbcf_r, allpass_l, allpass_r
         }
     }

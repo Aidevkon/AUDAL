@@ -545,6 +545,47 @@ impl NmfEngine {
             process_event(event_start, n_frames, &mut self.h);
         }
     }
+
+    /// Maestro Engine: Smart Ducking (Sidechain Compression)
+    /// Automatically ducks the `target_c` (e.g., Bass) when `trigger_c` (e.g., Kick) has a transient hit.
+    pub fn apply_smart_ducking(&mut self, trigger_c: usize, target_c: usize) {
+        let n_frames = self.h.len() / self.n_components;
+        if n_frames < 2 { return; }
+
+        let mut duck_multiplier = 1.0_f32;
+        let ducking_depth = 0.3_f32; // Drops target to 30% volume
+        let release_factor = 0.15_f32; 
+        
+        // NEW: Hold timer to keep the bass ducked through the entire kick transient
+        let mut hold_counter = 0;
+        let hold_frames = 3; // Hold for ~60ms before releasing
+
+        let mut trigger_sum = 0.0;
+        for f in 0..n_frames {
+            trigger_sum += self.h[trigger_c * n_frames + f];
+        }
+        let trigger_mean = trigger_sum / n_frames as f32;
+        let trigger_threshold = trigger_mean * 1.5; 
+
+        for f in 0..n_frames {
+            let trigger_energy = self.h[trigger_c * n_frames + f];
+            
+            // 1. Detect Transient (Trigger)
+            if trigger_energy > trigger_threshold && trigger_energy > 50.0 {
+                duck_multiplier = ducking_depth;
+                hold_counter = hold_frames; // Reset the hold timer
+            } else if hold_counter > 0 {
+                // 2. Hold Phase (keep it slammed)
+                duck_multiplier = ducking_depth;
+                hold_counter -= 1;
+            } else {
+                // 3. Release Phase (recover volume smoothly)
+                duck_multiplier += (1.0 - duck_multiplier) * release_factor;
+            }
+
+            self.h[target_c * n_frames + f] *= duck_multiplier;
+        }
+    }
 }
 
 /// Find the most spectrally diverse window in the signal.

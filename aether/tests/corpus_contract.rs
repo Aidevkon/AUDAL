@@ -1,4 +1,3 @@
-use lineos_corpus::contract::*;
 use lineos_corpus::builder::build_timeline;
 use lineos_types::analysis::{StemFeatures, StemMetrics};
 use lineos_types::pre_analysis::PreAnalysisData;

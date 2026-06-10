@@ -129,7 +129,7 @@ fn four_stem_sdr_above_gate() {
     // Gate: no stem should be silent (all have some energy)
     let bass_energy: f32     = stems.bass.iter().map(|x| x*x).sum();
     let harmonic_energy: f32 = stems.harmonics.iter().map(|x| x*x).sum();
-    let voice_energy: f32    = stems.voice.iter().map(|x| x*x).sum();
+    let _voice_energy: f32    = stems.voice.iter().map(|x| x*x).sum();
     let drums_energy: f32    = stems.drums.iter().map(|x| x*x).sum();
 
     assert!(bass_energy > 0.0,     "Bass stem is silent");

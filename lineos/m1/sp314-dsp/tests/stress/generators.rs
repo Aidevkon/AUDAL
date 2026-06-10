@@ -154,3 +154,44 @@ pub fn hihat_and_sibilance_clash(duration_s: f32, sample_rate: u32) -> Vec<f32> 
         (noise * hat_env + noise * sib_env * 0.8).clamp(-1.0, 1.0)
     }).collect()
 }
+
+/// Generate a mix where a Static Synth and a Vibrating Vocal share the exact same base frequency (440Hz).
+/// synth: Perfectly static 440Hz sine wave (0.1s to 0.4s).
+/// vocal: 440Hz sine wave with 15Hz vibrato at 6Hz rate (0.6s to 0.9s).
+pub fn vocal_and_synth_clash(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    let mut phase_static = 0.0_f32;
+    let mut phase_vib = 0.0_f32;
+    
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        
+        // Synth: Static 440Hz
+        let synth_env = if t > 0.1 && t < 0.4 { 1.0 } else { 0.0 };
+        phase_static += 2.0 * core::f32::consts::PI * 440.0 / sample_rate as f32;
+        let synth = libm::sinf(phase_static) * synth_env;
+        
+        // Vocal: 440Hz base + 15Hz Depth Vibrato at 6Hz Rate
+        let vib_env = if t > 0.6 && t < 0.9 { 1.0 } else { 0.0 };
+        let current_freq = 440.0 + 15.0 * libm::sinf(2.0 * core::f32::consts::PI * 6.0 * t);
+        phase_vib += 2.0 * core::f32::consts::PI * current_freq / sample_rate as f32;
+        let vocal = libm::sinf(phase_vib) * vib_env;
+        
+        (synth + vocal).clamp(-1.0, 1.0)
+    }).collect()
+}
+
+/// Generate a clean mix: 50Hz Kick transient and 150Hz Sustained Bass.
+pub fn clean_kick_and_bass(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    let mut phase_bass = 0.0_f32;
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // Kick: 50Hz transient at t=0.1s
+        let kick = if t >= 0.1 { libm::sinf(2.0 * core::f32::consts::PI * 50.0 * (t - 0.1)) * libm::expf(-(t - 0.1) * 40.0) } else { 0.0 };
+        // Bass: Sustained 150Hz
+        phase_bass += 2.0 * core::f32::consts::PI * 150.0 / sample_rate as f32;
+        let bass = libm::sinf(phase_bass) * 0.5;
+        (kick + bass).clamp(-1.0, 1.0)
+    }).collect()
+}

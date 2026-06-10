@@ -30,7 +30,7 @@ fn s1_1_full_scale_sine() {
     let mono = sine(1000.0, 0.0, 10.0, 48000);
     let (mut left, mut right) = mono_to_stereo(&mono);
     let mut engine = make_engine(48000);
-    let telemetry = engine.process_offline(&mut left, &mut right);
+    let _telemetry = engine.process_offline(&mut left, &mut right);
     assert_no_nan_inf(&left,  "S1.1 left");
     assert_no_nan_inf(&right, "S1.1 right");
     let output_peak = peak_dbfs(&left, &right);
@@ -46,7 +46,7 @@ fn s1_2_clipped_sine() {
     let mono = sine(1000.0, 12.0, 10.0, 48000);
     let (mut left, mut right) = mono_to_stereo(&mono);
     let mut engine = make_engine(48000);
-    let telemetry = engine.process_offline(&mut left, &mut right);
+    let _telemetry = engine.process_offline(&mut left, &mut right);
     assert_no_nan_inf(&left,  "S1.2 left");
     assert_no_nan_inf(&right, "S1.2 right");
     let output_peak = peak_dbfs(&left, &right);

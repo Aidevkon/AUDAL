@@ -281,7 +281,7 @@ impl PlaybackEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
+    
 
     fn make_transfer(samples: usize) -> PcmTransfer {
         let path = std::path::PathBuf::from(format!("/tmp/xaak-test-{}.pcm", uuid::Uuid::new_v4()));

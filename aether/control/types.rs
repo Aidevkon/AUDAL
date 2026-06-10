@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn orb_center_zero_delta() {
-        let d = OrbPosition::center().to_macro_delta();
+        let _d = OrbPosition::center().to_macro_delta();
     }
 
     #[test]
@@ -154,7 +154,7 @@ mod tests {
         let persona = mgr.get("clean_punch").unwrap();
         let macros  = MacroControls::default();
         let delta   = MacroDelta {};
-        let result = delta.apply(&macros, persona);
+        let _result = delta.apply(&macros, persona);
     }
 
     #[test]
