@@ -142,115 +142,32 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     // chunk.right = right_slice;
     profiler.mark_stage("Spatial", &chunk.left);
 
-    // A1.5: Pre-Analysis Engine (RFC-008, Constitution v1.3)
-    // Runs once per session on raw stereo PCM, before Aether.
-    use sp314_dsp::analysis::PreAnalyzer;
-    let pre_analysis = PreAnalyzer::run(&chunk.left, &chunk.right, chunk.sample_rate);
-    tracing::info!(
-        "pre-analysis: lufs={:.1} tp={:.1} lra={:.1} td={:.1}/s corr={:.2} \
-         profile=[{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}] \
-         zones=[sub={} box={} harsh={} phase={} res={}]",
-        pre_analysis.integrated_lufs,
-        pre_analysis.true_peak_dbtp,
-        pre_analysis.loudness_range,
-        pre_analysis.transient_density,
-        pre_analysis.global_phase_correlation,
-        pre_analysis.spectral_profile_db[0],
-        pre_analysis.spectral_profile_db[1],
-        pre_analysis.spectral_profile_db[2],
-        pre_analysis.spectral_profile_db[3],
-        pre_analysis.spectral_profile_db[4],
-        pre_analysis.spectral_profile_db[5],
-        pre_analysis.zone_flags.zone_sub_rumble,
-        pre_analysis.zone_flags.zone_boxiness,
-        pre_analysis.zone_flags.zone_cymbal_harsh,
-        pre_analysis.zone_flags.zone_phase_issue,
-        pre_analysis.zone_flags.zone_harsh_resonance,
-    );
-
-    // Before: autotune reads chunk from file (inaccurate)
-    // After:  autotune uses PreAnalysis full-track LUFS (accurate)
-    let autotune_result = sp314_dsp::pipeline::autotune::autotune(
-        pre_analysis.integrated_lufs,
-        target_lufs.unwrap_or(-14.0),
-    );
-    tracing::info!(
-        "Autotune (pure math): pre_gain_db={:.2} est_lufs={:.2}",
-        autotune_result.pre_gain_db,
-        autotune_result.estimated_input_lufs,
-    );
-
-    // Apply autotune input gain to audio
-    let gain_linear = 10.0_f32
-        .powf(autotune_result.pre_gain_db / 20.0_f32);
-    for s in chunk.left.iter_mut()  { *s *= gain_linear; }
-    for s in chunk.right.iter_mut() { *s *= gain_linear; }
-
-    // MasteringIntent — all three fields verified:
-    //   seed:         from path hash (stable; non-zero guaranteed by derive_seed)
-    //   target_lufs:  from schema preset, clamped to [-40.0, 0.0]
-    //   export_16bit: false (24-bit dither, lossless output)
-    let intent = MasteringIntent {
-        target: LoudnessTarget {
-            target_lufs:      target_lufs.unwrap_or(-14.0),
-            max_true_peak_db: -1.0,
-            max_lra_lu:       None,
-            platform:         "default".into(),
-        },
-        preset_name:      preset_id.to_string(),
-        stem_mode:        false,
-        target_makeup_db: 0.0,  // input gain applied above
-    };
-
-    // A2: Pre-DSP Aether processing
-    let mapped_persona = map_flavour_to_persona(
-        req.flavour_id.as_deref().unwrap_or("warm")
-    );
-    let aether_req = aether_bridge::AetherRequest {
-        persona_id:  Some(mapped_persona.to_string()),
-        tone:      req.intent_tone.or(req.tone),
-        dynamics:       req.intent_dynamics.or(req.dynamics),
-        ambience:    None,
-        chaos_seed:  req.chaos_seed,
-        project_id:  req.project_id.clone(),
-        track_id:    req.track_id.clone(),
-        preset_name: Some(req.preset_id.clone()),
-    };
-
-    let (dsp_config, proof_log, persona_config) = aether_bridge::build_dsp_config(
-        &aether_req,
-        &streaming_features,
-        Some(&pre_analysis),
-    )
-        .map_err(|e| format!("AetherBridge error: {}", e))?;
-
-    // V2.0: Corpus generation — silent background telemetry
-    // 900-JSON: behavioral stats only, zero audio content
-    // NODE 2: CORPUS
-    let _corpus_out = crate::domain::nodes::corpus_node::run(
-        &streaming_features,
+    // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
+    let dsp_out = crate::domain::nodes::dsp_node::run(
+        &mut chunk.left,
+        &mut chunk.right,
         left_slice,
-        &pre_analysis,
-        &blob_id,
+        right_slice,
         chunk.sample_rate,
-        req.flavour_id.as_deref().unwrap_or("unknown"),
-        req.project_id.as_deref().unwrap_or("default"),
-    );
-
-    // Run sp314-dsp directly (we are already in a blocking thread)
-    let dsp_start_time = std::time::Instant::now();
-    let result = crate::dsp::DspAdapter::master(&intent, left_slice, right_slice, chunk.sample_rate, Some(&dsp_config));
-    if dsp_start_time.elapsed().as_secs() > 300 {
-        tracing::warn!("DSP took more than 300 seconds");
-    }
-    
-    let result = result.map_err(|e| format!("DSP pipeline error: {:?}", e))?;
+        preset_id,
+        target_lufs,
+        req.flavour_id.as_deref().unwrap_or("warm"),
+        &streaming_features,
+        req.intent_tone.or(req.tone),
+        req.intent_dynamics.or(req.dynamics),
+        req.chaos_seed,
+        req.project_id.as_deref(),
+        req.track_id.as_deref(),
+        &blob_id,
+    )?;
+    let pre_analysis  = dsp_out.pre_analysis;
+    let dsp_config    = dsp_out.dsp_config;
+    let proof_log     = dsp_out.proof_log;
+    let persona_config = dsp_out.persona_config;
+    let aether_req    = dsp_out.aether_req;
+    let lufs          = dsp_out.lufs;
+    let tp            = dsp_out.true_peak;
     profiler.mark_stage("Mastering", left_slice);
-
-    let lufs = result.lufs.integrated_lufs;
-    tracing::info!("Post-DSP integrated LUFS: {:.4}", lufs);
-    let tp    = result.lufs.true_peak_dbfs;
-    let _lra   = result.lufs.loudness_range_lu;
     let dr    = 10.0; // dynamic range proxy for v3
     let sc    = 1.0;  // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
