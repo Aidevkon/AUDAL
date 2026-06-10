@@ -65,6 +65,14 @@ fn test_maestro_smart_ducking() {
     // If there is no ducking, bass_at_hit will be roughly equal to bass_sustain.
     let ducking_target = bass_sustain * 0.5;
 
+    // Absolute Bounds (Gate)
+    assert!(bass_sustain > 0.01, "Gate Failed: No baseline bass detected in test signal");
+    assert!(
+        bass_at_hit > bass_sustain * 0.05,
+        "ANTI-VACUUM FAILED! Bass dropped below 5% of sustain. Sustain: {:.2}, At Hit: {:.2}",
+        bass_sustain, bass_at_hit
+    );
+
     assert!(
         bass_at_hit < ducking_target,
         "MAESTRO DUCKING FAILED! The Bass did not duck for the Kick. Sustain: {:.2}, At Hit: {:.2}",

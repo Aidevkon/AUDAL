@@ -94,6 +94,12 @@ fn maestro_calibration_broadband_signals() {
     println!("Track B (hhat+bass): distance={:.3}, ducking={:.3}", dist_b, params_b.ducking_gain);
     println!("Distance ratio B/A: {:.2}x", dist_b / dist_a.max(0.001));
 
+    // Absolute Bounds (Gate)
+    assert!(params_a.ducking_gain <= 0.0, "Gate Failed: Ducking cannot be positive (A: {:.2})", params_a.ducking_gain);
+    assert!(params_a.ducking_gain >= -12.0, "Gate Failed: Ducking too aggressive/muting (A: {:.2})", params_a.ducking_gain);
+    assert!(params_b.ducking_gain <= 0.0, "Gate Failed: Ducking cannot be positive (B: {:.2})", params_b.ducking_gain);
+    assert!(params_b.ducking_gain >= -12.0, "Gate Failed: Ducking too aggressive/muting (B: {:.2})", params_b.ducking_gain);
+
     // Track A must have MORE ducking than Track B
     assert!(
         params_a.ducking_gain <= params_b.ducking_gain,
