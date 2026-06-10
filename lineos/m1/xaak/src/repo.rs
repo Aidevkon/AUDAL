@@ -63,6 +63,24 @@ impl AudioRepo {
         }
     }
 
+    /// Create repo with system flavour branches pre-loaded.
+    /// Called at AppState init — replaces new() in production.
+    /// INV-FLAVOUR-1: system branches never deleted.
+    pub fn new_with_flavours(initial_state: DspState) -> Self {
+        let mut repo = Self::new(initial_state);
+        for (name, state) in crate::flavours::ALL {
+            repo.create_branch(name)
+                .unwrap_or(());  // ignore if already exists
+            let current = repo.active_branch.clone();
+            repo.checkout(name).unwrap_or(());
+            repo.commit(*state, &format!("{} preset", name));
+            repo.checkout(&current).unwrap_or(());
+        }
+        // Always return to main
+        let _ = repo.checkout("main");
+        repo
+    }
+
     pub fn commit(&mut self, new_state: DspState, message: &str) -> String {
         let parent = self.branches.get(&self.active_branch).cloned();
         let hash = uuid::Uuid::new_v4().to_string();
