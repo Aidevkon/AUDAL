@@ -198,5 +198,7 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/mix/checkout", post(handlers::mix::post_checkout))
         .route("/mix/branch",   post(handlers::mix::post_branch))
         .route("/mix/revert",   post(handlers::mix::post_revert))
+        .route("/mix/flavours", get(handlers::mix::get_flavours))
+        .route("/mix/flavour",  post(handlers::mix::post_flavour))
         .with_state(state)
 }
