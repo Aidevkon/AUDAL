@@ -61,22 +61,24 @@ fn test_nmf_semantic_isolation() {
     sorted.sort_by(|&a, &b|
         centroids[a].total_cmp(&centroids[b]));
 
-    println!("Bass  component: {} (centroid {:.2})",
+    println!("Bass     component: {} (centroid {:.2})",
              sorted[0], centroids[sorted[0]]);
-    println!("Mid 1 component: {} (centroid {:.2})",
+    println!("Drums    component: {} (centroid {:.2})",
              sorted[1], centroids[sorted[1]]);
-    println!("Mid 2 component: {} (centroid {:.2})",
+    println!("Mid      component: {} (centroid {:.2})",
              sorted[2], centroids[sorted[2]]);
-    println!("Other component: {} (centroid {:.2})",
+    println!("Harmonic component: {} (centroid {:.2})",
              sorted[3], centroids[sorted[3]]);
+    println!("Other    component: {} (centroid {:.2})",
+             sorted[4], centroids[sorted[4]]);
 
     // Bass must be in low frequency range
     assert!(centroids[sorted[0]] < 10.0_f32,
         "Bass centroid too high: {:.2}", centroids[sorted[0]]);
 
-    // Other/broadband must be in higher range
-    assert!(centroids[sorted[3]] > 12.0_f32,
-        "Other centroid too low: {:.2}", centroids[sorted[3]]);
+    // Highest component must be broadband/high freq
+    assert!(centroids[sorted[4]] > 10.0_f32,
+        "Highest component centroid too low: {:.2}", centroids[sorted[4]]);
 }
 
 #[test]

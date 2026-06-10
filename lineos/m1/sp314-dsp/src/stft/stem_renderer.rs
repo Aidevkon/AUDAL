@@ -196,27 +196,23 @@ impl FiveStemRenderer {
             flatness[c] = if mean > eps { (geom / mean).clamp(0.0, 1.0) } else { 0.0 };
         }
 
-        // Ambience = flattest component
         let ambience_comp = (0..N_COMPONENTS)
             .max_by(|&a, &b| flatness[a].total_cmp(&flatness[b]))
-            .unwrap_or(2);
+            .unwrap_or(0);
 
-        // Bass and Harmonics from remaining two — by centroid
-        let remaining: Vec<usize> = (0..N_COMPONENTS)
+        // Sort remaining 4 components by centroid (lowest to highest)
+        let mut remaining: Vec<usize> = (0..N_COMPONENTS)
             .filter(|&c| c != ambience_comp)
             .collect();
+        remaining.sort_by(|&a, &b| centroids[a].total_cmp(&centroids[b]));
 
-        let bass_comp = *remaining.iter()
-            .min_by(|&&a, &&b| centroids[a].total_cmp(&centroids[b]))
-            .unwrap();
-
-        let remaining_voice: Vec<usize> = remaining.into_iter()
-            .filter(|&c| c != bass_comp)
-            .collect();
+        let bass_comp      = remaining[0]; // lowest centroid
+        let drums_comp     = remaining[1]; // 2nd lowest — kick/snare range
+        let remaining_voice: Vec<usize> = remaining[2..].to_vec(); // voice + harmonics
 
         // Voice vs Harmonics semantic assignment
-        let mut voice_comp;
-        let mut harmonics_comp;
+        let voice_comp;
+        let harmonics_comp;
         
         // Extract H rows for transient density
         let mut h_rows = vec![vec![0.0f32; n_frames]; N_COMPONENTS];
@@ -269,11 +265,13 @@ impl FiveStemRenderer {
 
         // Step 8: Build NMF Wiener masks
         let mut mask_bass      = nmf.component_mask(bass_comp,      N_BINS, n_frames);
+        let mut mask_drums     = nmf.component_mask(drums_comp,     N_BINS, n_frames);
         let mut mask_voice     = nmf.component_mask(voice_comp,     N_BINS, n_frames);
         let mut mask_harmonics = nmf.component_mask(harmonics_comp, N_BINS, n_frames);
         let mut mask_ambience  = nmf.component_mask(ambience_comp,  N_BINS, n_frames);
 
         refine_mask(&mut mask_bass);
+        refine_mask(&mut mask_drums);
         refine_mask(&mut mask_voice);
         refine_mask(&mut mask_harmonics);
         refine_mask(&mut mask_ambience);
@@ -297,11 +295,12 @@ impl FiveStemRenderer {
                 let m_v = mask_voice[t][b]    * mh;
                 let m_h = mask_harmonics[t][b] * mh;
                 let mo = mask_ambience[t][b]  * mh;
+                let md = mask_drums[t][b]     * mh + mp;
 
                 frames_bass[t][b]      = Complex::new(re * mb, im * mb);
                 frames_voice[t][b]     = Complex::new(re * m_v, im * m_v);
                 frames_harmonics[t][b] = Complex::new(re * m_h, im * m_h);
-                frames_drums[t][b]     = Complex::new(re * mp, im * mp);
+                frames_drums[t][b]     = Complex::new(re * md, im * md);
                 frames_ambience[t][b]  = Complex::new(re * mo, im * mo);
             }
         }
@@ -313,16 +312,7 @@ impl FiveStemRenderer {
         let harmonics_td = component_transient_density(&h_rows[harmonics_comp], n_frames);
         let bass_td      = component_transient_density(&h_rows[bass_comp], n_frames);
         let ambience_td  = component_transient_density(&h_rows[ambience_comp], n_frames);
-        
-        let mut h_drums = vec![0.0f32; n_frames];
-        for t in 0..n_frames {
-            let mut sum = 0.0;
-            for b in 0..N_BINS {
-                sum += mask_p[t][b];
-            }
-            h_drums[t] = sum;
-        }
-        let drums_td = component_transient_density(&h_drums, n_frames);
+        let drums_td     = component_transient_density(&h_rows[drums_comp], n_frames);
 
         FiveStems {
             bass:      self.engine.inverse(&frames_bass,      n),
