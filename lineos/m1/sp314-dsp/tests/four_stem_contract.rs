@@ -47,13 +47,12 @@ fn four_stem_reconstruction_within_mastering_tolerance() {
         if err > max_err { max_err = err; }
     }
 
-    println!("5-stem reconstruction error: {:.2e}", max_err);
+    println!("4-stem reconstruction error: {:.2e}", max_err);
     // Was: perfect reconstruction (< 1e-5)
-    // 4-stem: reconstruction within mastering tolerance (< 5e-2)
-    // 5-stem: mask refinement causes higher variance (< 1.5e-1)
-    // Mask Refinement (spectral gating + FIR + Exp Decay) intentionally modifies masks
-    // MSE 1.43e-1 is expected and correct behavior for 5 components
-    assert!(max_err < 1.5e-1_f32,
+    // Now: reconstruction within mastering tolerance (< 5e-2)
+    // Mask Refinement (spectral gating + FIR) intentionally modifies masks
+    // MSE 1.53e-2 is expected and correct behavior
+    assert!(max_err < 5e-2_f32,
         "Reconstruction error too high: {:.2e} (mask refinement active)", max_err);
 }
 
@@ -123,9 +122,9 @@ fn four_stem_sdr_above_gate() {
     let recon_sdr = sdr_db(&signal[margin..n-margin], &reconstructed[margin..n-margin]);
     println!("Reconstruction SDR: {:.1} dB", recon_sdr);
 
-    // Gate: 5-stem reconstruction SDR must be > 15dB (acceptable for 5-stem refinement)
-    assert!(recon_sdr > 15.0,
-        "Reconstruction SDR {:.1}dB below 15dB gate", recon_sdr);
+    // Gate: reconstruction SDR must be > 20dB (high quality)
+    assert!(recon_sdr > 20.0,
+        "Reconstruction SDR {:.1}dB below 20dB gate", recon_sdr);
 
     // Gate: no stem should be silent (all have some energy)
     let bass_energy: f32     = stems.bass.iter().map(|x| x*x).sum();

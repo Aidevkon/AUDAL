@@ -288,6 +288,27 @@ impl FiveStemRenderer {
         refine_mask(&mut mask_harmonics);
         refine_mask(&mut mask_ambience);
 
+        // Step 4: Re-normalize masks per frame to preserve unity sum.
+        // Required after S.4 decay binding which can inflate mask values.
+        // INV: sum of all component masks per (frame, bin) = 1.0
+        let mut all_masks = [
+            &mut mask_bass,
+            &mut mask_drums,
+            &mut mask_voice,
+            &mut mask_harmonics,
+            &mut mask_ambience,
+        ];
+        for f in 0..n_frames {
+            for b in 0..N_BINS {
+                let total: f32 = all_masks.iter().map(|m| m[f][b]).sum();
+                if total > 1e-6 {
+                    for m in all_masks.iter_mut() {
+                        m[f][b] /= total;
+                    }
+                }
+            }
+        }
+
         // Step 9: Combine HPSS + NMF masks and apply in Cartesian domain
         let mut frames_bass      = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
         let mut frames_voice     = vec![vec![Complex::new(0.0_f32, 0.0_f32); N_BINS]; n_frames];
