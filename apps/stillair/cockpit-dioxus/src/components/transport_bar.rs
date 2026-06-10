@@ -85,7 +85,6 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     // ── P12B-004: Position polling — 500ms when in CoachReady ────────────────
     // Scoped here: only TransportBar re-renders on poll (fixes F4-INT-01).
     {
-        let playback_state = playback_state;
         let mode_poll      = mode;
 
         use_effect(move || {

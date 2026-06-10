@@ -5,7 +5,7 @@
 //!   - JiniNarrative: persona-aware narrative from JINI engine
 //!   - JiniActionCard: APPLY / DISMISS for suggested macro/flavour changes
 //!   - ScoreBar + WizardFinding rows (unchanged from Coach)
-//!   TEACHER VOICE ENFORCED: no DSP values in JINI output
+//!     TEACHER VOICE ENFORCED: no DSP values in JINI output
 
 use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;

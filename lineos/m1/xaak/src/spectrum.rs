@@ -52,7 +52,7 @@ impl SpectrumAnalyzer {
         let log_range = (f_max / f_min).ln();
         let mut out   = [-120.0f32; N_BANDS];
 
-        for b in 0..N_BANDS {
+        for (b, out_val) in out.iter_mut().enumerate() {
             let f_low  = f_min * (b as f32 / N_BANDS as f32 * log_range).exp();
             let f_high = f_min * ((b + 1) as f32 / N_BANDS as f32 * log_range).exp();
             let bin_low  = ((f_low  / bin_hz) as usize).max(1);
@@ -61,7 +61,7 @@ impl SpectrumAnalyzer {
             let energy: f32 = self.output[bin_low..bin_high]
                 .iter().map(|c| c.norm_sqr()).sum::<f32>()
                 / (bin_high - bin_low) as f32;
-            out[b] = if energy > 1e-15 {
+            *out_val = if energy > 1e-15 {
                 10.0 * energy.log10() - 20.0 * (FFT_SIZE as f32).log10()
             } else { -120.0 };
         }

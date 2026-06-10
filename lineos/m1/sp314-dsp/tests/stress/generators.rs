@@ -1,4 +1,5 @@
 //! Deterministic test signal generator.
+#![allow(dead_code)]
 //! All functions use deterministic math — no rand::thread_rng().
 //! Same seed → same output on all platforms.
 

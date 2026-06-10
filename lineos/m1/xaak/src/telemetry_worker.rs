@@ -56,7 +56,7 @@ pub fn spawn<C>(
                 };
 
                 if let Some(ref sock) = udp_tx {
-                    match bincode::encode_to_vec(&frame, bincode::config::standard()) {
+                    match bincode::encode_to_vec(frame, bincode::config::standard()) {
                         Ok(bytes) => {
                             if let Err(e) = sock.send_to(&bytes, "127.0.0.1:9000") {
                                 if e.kind() != std::io::ErrorKind::WouldBlock {

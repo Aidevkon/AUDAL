@@ -107,7 +107,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                                 thd_percent: 1.8,
                                 knee_curve: {
                                     let mut k = [0.0f32; 64];
-                                    for i in 0..64 { k[i] = (i as f32 / 63.0).powf(0.72); }
+                                    for (i, val) in k.iter_mut().enumerate() { *val = (i as f32 / 63.0).powf(0.72); }
                                     k
                                 },
                                 headroom_db: 3.4,

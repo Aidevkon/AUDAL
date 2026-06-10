@@ -110,8 +110,8 @@ mod tests {
         drums[0] = 2.0;
         let d = StemMfccs::distance(&bass, &drums);
         assert!(d < 5.0, "Distance should be < 5.0, got {:.2}", d);
-        let base_gain = if d < 5.0 { 0.5 } else if d < 15.0 { 0.707 } else { 0.9 };
-        assert!((base_gain - 0.5).abs() < 0.001);
+        let base_gain = if d < 5.0 { 0.5_f32 } else if d < 15.0 { 0.707_f32 } else { 0.9_f32 };
+        assert!((base_gain - 0.5_f32).abs() < 0.001);
     }
 
     #[test]
@@ -122,8 +122,8 @@ mod tests {
         for k in 0..13 { drums[k] = 20.0 / (13.0_f32).sqrt(); }
         let d = StemMfccs::distance(&bass, &drums);
         assert!(d >= 15.0, "Distance should be >= 15.0, got {:.2}", d);
-        let base_gain = if d < 5.0 { 0.5 } else if d < 15.0 { 0.707 } else { 0.9 };
-        assert!((base_gain - 0.9).abs() < 0.001);
+        let base_gain = if d < 5.0 { 0.5_f32 } else if d < 15.0 { 0.707_f32 } else { 0.9_f32 };
+        assert!((base_gain - 0.9_f32).abs() < 0.001);
     }
 
     #[test]

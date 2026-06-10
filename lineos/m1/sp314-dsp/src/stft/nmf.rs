@@ -492,7 +492,7 @@ impl NmfEngine {
         let vocal_c = 1;
 
         // Helper closure to analyze and route a completed audio event
-        let mut process_event = |start: usize, end: usize, h: &mut [f32]| {
+        let process_event = |start: usize, end: usize, h: &mut [f32]| {
             let mut delta_sum = 0.0;
             let mut energy_sum = 0.0;
             

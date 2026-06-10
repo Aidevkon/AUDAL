@@ -2,6 +2,7 @@
 //! Authority: spec/stress-test-suite.md S1
 
 use super::generators::*;
+#[allow(deprecated)]
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 

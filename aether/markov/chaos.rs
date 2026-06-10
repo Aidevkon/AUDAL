@@ -17,7 +17,7 @@ impl ChaosLayer {
         let mut next_rand = || -> f32 {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
             let val = (seed >> 32) as u32;
-            let f = val as f32 / std::u32::MAX as f32;
+            let f = val as f32 / u32::MAX as f32;
             (f * 2.0) - 1.0 // [-1.0, 1.0]
         };
 

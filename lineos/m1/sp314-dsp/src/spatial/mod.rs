@@ -1,5 +1,6 @@
 pub mod channel_assign;
 pub mod five_dot_one;
+pub mod mid_side;
 pub mod renderer;
 pub mod user_profile;
 

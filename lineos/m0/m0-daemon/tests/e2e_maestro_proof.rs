@@ -2,8 +2,7 @@
 //! Proves: bass-heavy track gets more aggressive ducking than clean track.
 //! Authority: maestro-controller-spec-v1_0.md M-P6
 
-use sp314_dsp::stft::two_pass::{TwoPassEngine, StemMfccs};
-use lineos_corpus::mfcc::MfccAnalyzer;
+use sp314_dsp::stft::two_pass::TwoPassEngine;
 use m0d::dsp::maestro::AutoTuningController;
 
 fn sine_wave(freq_hz: f32, n: usize, sr: u32) -> Vec<f32> {

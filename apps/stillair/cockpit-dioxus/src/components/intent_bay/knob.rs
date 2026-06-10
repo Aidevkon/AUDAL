@@ -38,9 +38,7 @@ pub fn IntentKnob(props: IntentKnobProps) -> Element {
             let move_listener = EventListener::new(&win, "mousemove", move |ev: &web_sys::Event| {
                 let me = ev.unchecked_ref::<web_sys::MouseEvent>();
                 let dy = *start_y.read() - me.client_y() as f64;
-                let mut new_angle = *start_angle.read() + (dy as f32) * 1.5;
-                if new_angle < -135.0 { new_angle = -135.0; }
-                if new_angle > 135.0 { new_angle = 135.0; }
+                let new_angle = (*start_angle.read() + (dy as f32) * 1.5).clamp(-135.0, 135.0);
                 angle_sig.set(new_angle);
             });
 

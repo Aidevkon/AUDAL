@@ -137,13 +137,13 @@ pub fn decimate_gonio(data: &[f32], channels: usize) -> [(f32, f32); 32] {
     let ch = channels.max(1);
     let frames = data.len() / ch;
     let step = (frames / 32).max(1);
-    for i in 0..32 {
+    for (i, pair) in pairs.iter_mut().enumerate() {
         let idx = (i * step * ch).min(data.len().saturating_sub(ch));
         let l = data.get(idx).copied().unwrap_or(0.0);
         let r = if ch > 1 {
             data.get(idx + 1).copied().unwrap_or(0.0)
         } else { l };
-        pairs[i] = (l, r);
+        *pair = (l, r);
     }
     pairs
 }

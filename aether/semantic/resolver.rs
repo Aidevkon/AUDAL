@@ -124,8 +124,8 @@ impl SemanticZoneResolver {
 
         let mut components: BTreeMap<usize, Vec<usize>> =
             BTreeMap::new();
-        for i in 0..n {
-            if zones[i].active {
+        for (i, zone) in zones.iter().enumerate().take(n) {
+            if zone.active {
                 let root = find(&mut parent, i);
                 components.entry(root).or_default().push(i);
             }

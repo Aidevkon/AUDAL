@@ -36,22 +36,17 @@ fn test_maestro_smart_ducking() {
 
     let n_frames = frames.len();
     
-    // Identify which component is which. 
     // Kick is a transient, Bass is sustained.
-    let mut kick_c = 0;
-    let mut bass_c = 1;
     // Correct Row-Major slice summation
     let energy_c0: f32 = nmf.h[0..n_frames].iter().sum();
     let energy_c1: f32 = nmf.h[n_frames..2 * n_frames].iter().sum();
     
     // Bass has more total energy over 1s because it is sustained
-    if energy_c1 > energy_c0 { 
-        bass_c = 1; 
-        kick_c = 0; 
+    let (kick_c, bass_c) = if energy_c1 > energy_c0 { 
+        (0, 1)
     } else { 
-        bass_c = 0; 
-        kick_c = 1; 
-    }
+        (1, 0)
+    };
 
     // Apply Maestro Smart Ducking (Sidechain Bass to Kick)
     nmf.apply_smart_ducking(kick_c, bass_c);
