@@ -3586,6 +3586,7 @@ dependencies = [
  "aether",
  "aether-bridge",
  "anyhow",
+ "arc-swap",
  "async-stream",
  "axum",
  "base64 0.22.1",

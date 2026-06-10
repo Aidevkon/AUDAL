@@ -13,9 +13,11 @@ use crate::blob_store::BlobStore;
 use crate::handlers::preview::PreviewStore;
 use crate::realtime_bridge::RealtimeBridge;
 use dashmap::DashMap;
-use std::sync::Arc;
+use arc_swap::ArcSwap;
+use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use xaak::engine::PlaybackHandle;
+use xaak::repo::{AudioRepo, DspState};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MasteringProgress {
@@ -43,12 +45,21 @@ pub struct AppState {
     pub progress_tx: broadcast::Sender<MasteringProgress>,
     /// Phase 9 TB-P2: lock-free ring buffer for xaak → UI telemetry.
     pub realtime: RealtimeBridge,
+    /// Audio Git — version control for DSP state.
+    /// UI thread writes via RwLock. Audio thread reads via head_state_ptr.
+    pub audio_repo: Arc<RwLock<AudioRepo>>,
+    /// Lock-free hot pointer for audio thread.
+    pub head_state_ptr: Arc<ArcSwap<DspState>>,
 }
 
 impl AppState {
     pub fn new(audit: Arc<AuditLog>) -> Self {
         let operator = crate::agents::operator::spawn_agents(audit.clone());
         let (progress_tx, _) = broadcast::channel(128);
+        let initial_dsp_state = DspState::default();
+        let audio_repo = AudioRepo::new(initial_dsp_state.clone());
+        let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
+        let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
         Self {
             audit,
             blob_store: BlobStore::new(),
@@ -58,6 +69,8 @@ impl AppState {
             preview_store: PreviewStore::new(),
             progress_tx,
             realtime: RealtimeBridge::new(),
+            audio_repo: audio_repo_arc,
+            head_state_ptr,
         }
     }
 }
