@@ -15,7 +15,7 @@ pub fn run_dsp(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, std::
 }
 
 #[inline(always)]
-fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
+pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
     match flavour_id {
         "warm"      => "warm_analog",
         "clean"     => "clean_punch",
