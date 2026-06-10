@@ -69,244 +69,69 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
     use sha2::{Sha256, Digest};
 
-    let mono: Vec<f32> = chunk.left.iter()
-        .zip(chunk.right.iter())
-        .map(|(l, r)| (l + r) * 0.5)
-        .collect();
-
-    // M-P7: True Scout Window (One Shot One Kill)
-    // Seek to 30% of the track to avoid intro silence.
-    // Feed exactly 2 seconds of the chorus to train the NMF perfectly.
-    let scout_window_len = (2.0 * chunk.sample_rate as f32) as usize;
-    let scout_start      = (mono.len() as f32 * 0.30) as usize;
-    let scout_end        = (scout_start + scout_window_len).min(mono.len());
-    let scout_slice      = &mono[scout_start..scout_end];
-
-    // Pass 1 — Scout: trains on the 2-second chorus window!
-    let mut two_pass = TwoPassEngine::new();
-    let scout        = two_pass.scout(scout_slice, chunk.sample_rate);
-
-    // M-P5: Maestro AutoTuning — between Pass 1 and Pass 2.
-    // Reads stem MFCCs from scout + UserMarkovModel history.
-    // Computes adaptive ducking_gain for this track.
-    // INV-AB-1: deterministic — same scout + same model → same params.
-    let render_params = {
-        use crate::dsp::maestro::AutoTuningController;
-
-        // Load user model if it exists (silent failure — no model = default params)
-        let model_path = format!("user_model_{}.json",
-            req.project_id.as_deref().unwrap_or("default"));
-        let user_model = std::fs::read_to_string(&model_path)
-            .ok()
-            .and_then(|json| lineos_corpus::store::UserMarkovModel::from_json(&json).ok());
-
-        let preset_id = req.flavour_id.as_deref().unwrap_or("default");
-
-        AutoTuningController::compute_render_params(
-            &scout,
-            user_model.as_ref(),
-            preset_id,
-        )
-    };
-
-    tracing::info!(
-        event        = "m0d.maestro_params",
-        ducking_gain = render_params.ducking_gain,
-        bass_drums_distance = scout.stem_mfccs.bass_drums_distance(),
-        "Maestro: adaptive ducking_gain computed"
-    );
+    // NODE 3: SCOUT (NMF + Maestro)
+    let scout_out = crate::domain::nodes::scout_node::run(
+        &chunk.left,
+        &chunk.right,
+        chunk.sample_rate,
+        req.project_id.as_deref().unwrap_or("default"),
+        req.flavour_id.as_deref().unwrap_or("default"),
+    )?;
+    let mut two_pass     = scout_out.engine;
+    let scout            = scout_out.scout;
+    let render_params    = scout_out.render_params;
+    let mono             = scout_out.mono;
     profiler.mark_stage("Scout Pass", &mono);
 
-    // Build minimal StemFeatures for downstream APIs
-    // Full StemFeatureAnalyzer requires FiveStems — not available in streaming mode.
-    // Use default values — aether_bridge uses tone/dynamics from req, not stems.
     use lineos_types::{StemFeatures, StemMetrics, MixMetrics};
-    // Minimal StemFeatures for downstream APIs in streaming mode.
-    // StemFeatureAnalyzer requires FiveStems — not available in streaming.
-    // Aether uses tone/dynamics from req, not raw stem metrics.
     let streaming_features = StemFeatures {
-        voice:     StemMetrics::default(),
-        drums:     StemMetrics::default(),
-        bass:      StemMetrics::default(),
-        harmonics: StemMetrics::default(),
-        ambience:  StemMetrics::default(),
-        mix:       MixMetrics::default(),
+        voice: StemMetrics::default(), drums: StemMetrics::default(),
+        bass:  StemMetrics::default(), harmonics: StemMetrics::default(),
+        ambience: StemMetrics::default(), mix: MixMetrics::default(),
     };
 
-    // Phase 2: Zero Allocation Disk Streaming via memmap2
+    // NODE 4: RENDER (mmap + process_chunks + spatial)
+    // mmap stays here — render_node receives slices (no self-referential struct)
     let n_total = mono.len();
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
-
     let blob_id = req.track_id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let file_path = std::path::PathBuf::from(
+        format!("/tmp/m0d-mastering-{}.pcm", blob_id));
     let file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
+        .read(true).write(true).create(true).truncate(true)
         .open(&file_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
-
-    // Size: n_total_with_tail * 2 channels * 4 bytes/float
-    let file_size = (n_total_with_tail * 2 * 4) as u64;
-    file.set_len(file_size).map_err(|e| format!("Failed to set file len: {e}"))?;
-
+    file.set_len((n_total_with_tail * 2 * 4) as u64)
+        .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut mmap = unsafe {
-        memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))?
+        memmap2::MmapMut::map_mut(&file)
+            .map_err(|e| format!("Mmap failed: {e}"))?
     };
-
-    // The first half of mmap is LEFT, second half is RIGHT
-    // We cast the raw bytes to f32 slices safely using std::slice::from_raw_parts_mut
     let (left_bytes, right_bytes) = mmap.split_at_mut(n_total_with_tail * 4);
     let left_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(left_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
+        std::slice::from_raw_parts_mut(
+            left_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
     };
     let right_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
+        std::slice::from_raw_parts_mut(
+            right_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
     };
 
-    // Streaming SHA-256 hashers — no full stem Vec needed
-    let mut h_voice      = Sha256::new();
-    let mut h_drums      = Sha256::new();
-    let mut h_bass       = Sha256::new();
-    let mut h_harmonics  = Sha256::new();
-    let mut h_ambience   = Sha256::new();
-
-    // POX voice graph — stateful, lives outside closure
-    let is_broadcast = req.flavour_id.as_deref() == Some("broadcast");
-    let mut voice_graph_opt = if is_broadcast {
-        let topo = pipelineforge::flavor::Flavor::POXVoice
-            .build(chunk.sample_rate);
-        Some(
-            sp314_nodes::graph::DspGraph::from_topology(
-                &topo, 512, chunk.sample_rate,
-            ).map_err(|e| format!("POX graph error: {:?}", e))?
-        )
-    } else {
-        None
-    };
-
-    // Resolve mix levels — default 1.0 if not provided (backward compatible)
-    // INV-MX-1: applied before spatial rendering
-    let mix = req.mix_levels.as_ref()
-        .map(|m: &crate::handlers::master::MixLevels| m.clamped())
-        .unwrap_or_default();
-
-    // Pass 2 — process_chunks: ~2MB/chunk constant RAM
-    let mut write_offset = 0;
-    two_pass.process_chunks_with_params(&mono, &scout, render_params.ducking_gain, |stems_chunk| {
-        let chunk_len = stems_chunk.voice.len();
-
-        // Apply mix levels — INV-MX-1: before spatial rendering
-        let mv: Vec<f32> = stems_chunk.voice.iter()
-            .map(|s| s * mix.voice).collect();
-        let md: Vec<f32> = stems_chunk.drums.iter()
-            .map(|s| s * mix.drums).collect();
-        let mb: Vec<f32> = stems_chunk.bass.iter()
-            .map(|s| s * mix.bass).collect();
-        let mh: Vec<f32> = stems_chunk.harmonics.iter()
-            .map(|s| s * mix.harmonics).collect();
-        let ma: Vec<f32> = stems_chunk.ambience.iter()
-            .map(|s| s * mix.ambience).collect();
-
-        // Streaming hashes on mixed stems
-        h_voice.update(unsafe { std::slice::from_raw_parts(
-            mv.as_ptr() as *const u8, mv.len() * 4) });
-        h_drums.update(unsafe { std::slice::from_raw_parts(
-            md.as_ptr() as *const u8, md.len() * 4) });
-        h_bass.update(unsafe { std::slice::from_raw_parts(
-            mb.as_ptr() as *const u8, mb.len() * 4) });
-        h_harmonics.update(unsafe { std::slice::from_raw_parts(
-            mh.as_ptr() as *const u8, mh.len() * 4) });
-        h_ambience.update(unsafe { std::slice::from_raw_parts(
-            ma.as_ptr() as *const u8, ma.len() * 4) });
-
-        // POX voice processing per chunk
-        let mut clean_voice = mv.clone();
-        if let Some(ref mut vg) = voice_graph_opt {
-            let mut v_right = clean_voice.clone();
-            let mut frame = 0;
-            while frame < chunk_len {
-                let end = (frame + 512).min(chunk_len);
-                vg.process_block(
-                    &mut clean_voice[frame..end],
-                    &mut v_right[frame..end],
-                );
-                frame = end;
-            }
-            // Average L+R → mono clean voice
-            for i in 0..chunk_len {
-                clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
-            }
-        }
-
-        // Spatial render_chunk with locked assignments from scout
-        // INV-MX-2: SpatialFirewall scales applied after mix levels
-        let stage = FiveDotOneStage::render_chunk(
-            &clean_voice,
-            &md,
-            &mb,
-            &mh,
-            &ma,
-            &scout.assignments,
-        );
-        let mut stage = stage;
-        stage.apply_scales(scout.rear_scale, scout.lfe_scale);
-        let (sp_l, sp_r) = StereoRenderer::render(&stage);
-
-        // Write directly to mapped slices
-        let end_offset = write_offset + sp_l.len();
-        left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
-        right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
-        write_offset = end_offset;
-    }).map_err(|e| format!("TwoPassEngine error: {e}"))?;
-
+    let fingerprints = crate::domain::nodes::render_node::run(
+        &mut two_pass,
+        &mono,
+        &scout,
+        render_params.ducking_gain,
+        req.mix_levels.as_ref(),
+        req.flavour_id.as_deref(),
+        chunk.sample_rate,
+        &chunk.left,
+        &chunk.right,
+        left_slice,
+        right_slice,
+    )?;
     profiler.mark_stage("Stem Engine", left_slice);
-
-    // Finalize streaming fingerprints
-    let voice_hex    = format!("{:x}", h_voice.finalize());
-    let drums_hex    = format!("{:x}", h_drums.finalize());
-    let bass_hex     = format!("{:x}", h_bass.finalize());
-    let harm_hex     = format!("{:x}", h_harmonics.finalize());
-    let amb_hex      = format!("{:x}", h_ambience.finalize());
-    let pipeline_hex = {
-        let mut hp = Sha256::new();
-        hp.update(voice_hex.as_bytes());
-        hp.update(bass_hex.as_bytes());
-        format!("{:x}", hp.finalize())
-    };
-
-    let fingerprints = crate::blob_store::StemFingerprints {
-        voice:     voice_hex,
-        drums:     drums_hex,
-        bass:      bass_hex,
-        harmonics: harm_hex,
-        ambience:  amb_hex,
-        pipeline:  pipeline_hex,
-    };
-
-    profiler.mark_stage("Pre-Clean", left_slice);
-
-    // Level 1: Energy-preserving reconstruction
-    let original_rms = libm::sqrtf(
-        chunk.left.iter().zip(chunk.right.iter())
-            .map(|(l, r)| l * l + r * r)
-            .sum::<f32>() / (chunk.left.len() * 2) as f32
-    );
-    let mix_rms = libm::sqrtf(
-        left_slice.iter().zip(right_slice.iter())
-            .map(|(l, r)| l * l + r * r)
-            .sum::<f32>() / (left_slice.len() * 2) as f32
-    );
-    let gain = if mix_rms > 1e-10 {
-        (original_rms / mix_rms).clamp(0.5, 2.0)
-    } else { 1.0 };
-
-    for i in 0..left_slice.len() {
-        left_slice[i]  *= gain;
-        right_slice[i] *= gain;
-    }
 
     // Markov spatial modulation (simplified — full in Phase 8)
     let profile   = UserSpatialProfile::default_podcast();
