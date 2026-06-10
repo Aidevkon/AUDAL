@@ -54,11 +54,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(audit: Arc<AuditLog>) -> Self {
-        let operator = crate::agents::operator::spawn_agents(audit.clone());
         let (progress_tx, _) = broadcast::channel(128);
         let initial_dsp_state = DspState::default();
         let audio_repo = AudioRepo::new(initial_dsp_state.clone());
         let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
+        let operator = crate::agents::operator::spawn_agents(audit.clone(), head_state_ptr.clone());
         let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
         Self {
             audit,

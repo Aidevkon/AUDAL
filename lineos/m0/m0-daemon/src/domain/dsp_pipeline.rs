@@ -1,6 +1,9 @@
 use crate::blob_store::StoredBlob;
 use crate::handlers::master::MasterRequest;
 use std::time::Instant;
+use std::sync::Arc;
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 // Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
 // Computed on raw stems before mix — tamper-proof certificate
 
@@ -11,8 +14,9 @@ use std::time::Instant;
 pub fn run_dsp(
     req: &MasterRequest,
     start: Instant,
+    head_state: Arc<ArcSwap<DspState>>,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
-    run_dsp_internal(req, start)
+    run_dsp_internal(req, start, head_state)
 }
 
 #[inline(always)]
@@ -32,6 +36,7 @@ pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 fn run_dsp_internal(
     req: &MasterRequest,
     start: Instant,
+    head_state: Arc<ArcSwap<DspState>>,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
@@ -109,11 +114,14 @@ fn run_dsp_internal(
         std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
     };
 
+    let repo_state = head_state.load_full();
+    let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
+
     let fingerprints = crate::domain::nodes::render_node::run(
         &mut two_pass,
         &mono,
         &scout,
-        render_params.ducking_gain,
+        final_ducking,
         req.mix_levels.as_ref(),
         req.flavour_id.as_deref(),
         chunk.sample_rate,

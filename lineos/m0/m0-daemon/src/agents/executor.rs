@@ -9,8 +9,11 @@
 
 use super::operator::{DspOutput, ExecutorError, Intent};
 use tokio::sync::mpsc;
+use std::sync::Arc;
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 
-pub async fn run(mut rx: mpsc::Receiver<Intent>) {
+pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<DspState>>) {
     while let Some(intent) = rx.recv().await {
         match intent {
             Intent::Shutdown => break,
@@ -44,8 +47,9 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 let start = std::time::Instant::now();
 
                 // spawn_blocking: DSP is CPU-intensive, must not block async runtime
+                let head_state = head_state_ptr.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    crate::domain::dsp_pipeline::run_dsp(&req, start)
+                    crate::domain::dsp_pipeline::run_dsp(&req, start, head_state)
                 })
                 .await;
 

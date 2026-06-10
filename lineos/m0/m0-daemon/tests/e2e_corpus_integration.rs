@@ -2,6 +2,9 @@
 //! Authority: corpus-learning-spec-v1_2.md CB-P11
 
 use m0d::domain::dsp_pipeline::run_dsp;
+use std::sync::Arc;
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 use m0d::handlers::master::MasterRequest;
 use std::time::Instant;
 
@@ -42,7 +45,8 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
 
     let start = Instant::now();
     let result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
-        run_dsp(&req, start)
+        let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+        run_dsp(&req, start, dummy_head_state)
     })
     .await;
 

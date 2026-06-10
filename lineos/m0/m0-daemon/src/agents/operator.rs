@@ -6,6 +6,8 @@
 //! No agent calls another agent directly.
 
 use crate::audit::{AuditEntry, AuditLevel, AuditLog};
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
@@ -278,15 +280,15 @@ impl Operator {
 
 /// Spawn all four agent tasks. Call once from main().
 /// Returns Operator — wire into AppState.
-pub fn spawn_agents(audit: Arc<AuditLog>) -> Operator {
+pub fn spawn_agents(audit: Arc<AuditLog>, head_state_ptr: Arc<ArcSwap<DspState>>) -> Operator {
     let (schema_tx, schema_rx) = mpsc::channel::<Intent>(32);
     let (conductor_tx, conductor_rx) = mpsc::channel::<Intent>(32);
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(32);
     let (wizard_tx, wizard_rx) = mpsc::channel::<Intent>(32);
 
     tokio::spawn(crate::agents::schema::run(schema_rx));
-    tokio::spawn(crate::agents::conductor::run(conductor_rx));
-    tokio::spawn(crate::agents::executor::run(executor_rx));
+    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone()));
+    tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr));
     tokio::spawn(crate::agents::wizard::run(wizard_rx));
 
     Operator::new(schema_tx, conductor_tx, executor_tx, wizard_tx, audit)

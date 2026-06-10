@@ -8,9 +8,11 @@
 use super::operator::{ConductorError, ExecutionPlan, ExecutorError, Intent, MasteringOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 use tokio::sync::{mpsc, oneshot};
 
-pub async fn run(mut rx: mpsc::Receiver<Intent>) {
+pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<DspState>>) {
     // AtomicBool: only one mastering job at a time
     // R2 decision: is the system busy?
     let busy = Arc::new(AtomicBool::new(false));
@@ -18,7 +20,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
     // Conductor holds its own channel to Executor
     // Created once at startup — persists for the lifetime of the agent
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(4);
-    tokio::spawn(super::executor::run(executor_rx));
+    tokio::spawn(super::executor::run(executor_rx, head_state_ptr));
 
     while let Some(intent) = rx.recv().await {
         match intent {
