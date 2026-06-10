@@ -7,6 +7,8 @@
 //! Authority: Constitutional Agent Architecture Spec v3.1
 
 use std::sync::Arc;
+use arc_swap::ArcSwap;
+use xaak::repo::DspState;
 use tokio::sync::oneshot;
 
 #[tokio::test]
@@ -16,7 +18,8 @@ async fn test_agent_pipeline_executes_mastering() {
     std::fs::create_dir_all(audit_dir).ok();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
-    let operator = m0d::agents::operator::spawn_agents(audit.clone());
+    let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state);
 
     // Allow agents to start
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -72,7 +75,8 @@ async fn test_conductor_rejects_concurrent_mastering() {
     std::fs::create_dir_all(audit_dir).ok();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
-    let operator = m0d::agents::operator::spawn_agents(audit.clone());
+    let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Send two concurrent mastering requests
@@ -146,7 +150,8 @@ async fn test_schema_agent_validates_and_queries() {
     std::fs::create_dir_all(audit_dir).ok();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
-    let operator = m0d::agents::operator::spawn_agents(audit);
+    let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+    let operator = m0d::agents::operator::spawn_agents(audit, dummy_head_state);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Test 1: valid patch accepted
