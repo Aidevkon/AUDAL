@@ -148,7 +148,37 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
 
     // Pass 1 — Scout: ~5MB, locks W + spatial params
     let mut two_pass  = TwoPassEngine::new();
-    let scout         = two_pass.scout(&mono, chunk.sample_rate);
+    let scout = two_pass.scout(&mono, chunk.sample_rate);
+
+    // M-P5: Maestro AutoTuning — between Pass 1 and Pass 2.
+    // Reads stem MFCCs from scout + UserMarkovModel history.
+    // Computes adaptive ducking_gain for this track.
+    // INV-AB-1: deterministic — same scout + same model → same params.
+    let render_params = {
+        use crate::dsp::maestro::AutoTuningController;
+
+        // Load user model if it exists (silent failure — no model = default params)
+        let model_path = format!("user_model_{}.json",
+            req.project_id.as_deref().unwrap_or("default"));
+        let user_model = std::fs::read_to_string(&model_path)
+            .ok()
+            .and_then(|json| lineos_corpus::store::UserMarkovModel::from_json(&json).ok());
+
+        let preset_id = req.flavour_id.as_deref().unwrap_or("default");
+
+        AutoTuningController::compute_render_params(
+            &scout,
+            user_model.as_ref(),
+            preset_id,
+        )
+    };
+
+    tracing::info!(
+        event        = "m0d.maestro_params",
+        ducking_gain = render_params.ducking_gain,
+        bass_drums_distance = scout.stem_mfccs.bass_drums_distance(),
+        "Maestro: adaptive ducking_gain computed"
+    );
     profiler.mark_stage("Scout Pass", &mono);
 
     // Build minimal StemFeatures for downstream APIs
@@ -229,7 +259,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
 
     // Pass 2 — process_chunks: ~2MB/chunk constant RAM
     let mut write_offset = 0;
-    two_pass.process_chunks(&mono, &scout, |stems_chunk| {
+    two_pass.process_chunks_with_params(&mono, &scout, render_params.ducking_gain, |stems_chunk| {
         let chunk_len = stems_chunk.voice.len();
 
         // Apply mix levels — INV-MX-1: before spatial rendering
