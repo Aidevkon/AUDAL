@@ -43,11 +43,8 @@ pub fn run(
         .unwrap_or_default();
     let mut write_offset = 0;
 
-    // Adapter Layer: Convert Domain dB to Engine Linear Multiplier
-    let linear_ducking = 10.0_f32.powf(ducking_gain / 20.0);
-
     two_pass
-        .process_chunks_with_params(mono, scout, linear_ducking, |stems_chunk| {
+        .process_chunks_with_params(mono, scout, ducking_gain, |stems_chunk| {
             let chunk_len = stems_chunk.voice.len();
 
             let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();

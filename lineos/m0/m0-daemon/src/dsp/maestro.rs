@@ -45,8 +45,15 @@ impl AutoTuningController {
     ) -> RenderParams {
         let distance = scout.stem_mfccs.bass_drums_distance();
 
-        // Dynamic dB mapping: higher distance = greater spectral collision = more negative ducking
-        let base_ducking_db = -(distance * 4.0);
+        // MFCC distance → base ducking gain (linear, not dB)
+        // Low distance = similar timbre = high collision risk = more ducking
+        let base_gain = if distance < 5.0 {
+            0.5_f32   // -6dB aggressive
+        } else if distance < 15.0 {
+            0.707_f32 // -3dB default
+        } else {
+            0.9_f32   // -1dB subtle
+        };
 
         let modifier = if let Some(m) = model {
             Self::historical_modifier(m, preset)
@@ -54,8 +61,8 @@ impl AutoTuningController {
             1.0_f32
         };
 
-        // Clamp to absolute professional bounds [-12.0 dB, 0.0 dB]
-        let ducking_gain = (base_ducking_db * modifier).clamp(-12.0_f32, 0.0_f32);
+        // INV-MAESTRO-1: ducking_gain clamped to [0.3, 1.0]
+        let ducking_gain = (base_gain * modifier).clamp(0.3_f32, 1.0_f32);
 
         RenderParams { ducking_gain }
     }
