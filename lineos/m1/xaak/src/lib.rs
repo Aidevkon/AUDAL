@@ -12,11 +12,13 @@
 //!   - cpal sits UNDER xaak, not above it (A-003 §8)
 
 pub mod engine;
+pub mod flavours;
 pub mod player;
 pub mod repo;
 pub mod spectrum;
 pub mod telemetry_worker;
 pub use repo::{AudioRepo, DspState, MixCommit};
+pub use flavours::{from_name as flavour_from_name, ALL as FLAVOURS};
 
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
