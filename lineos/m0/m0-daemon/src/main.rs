@@ -193,5 +193,10 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/cert/:blob_id/png",
             post(handlers::png_gen::export_cert_png),
         )
+        .route("/mix/state",    get(handlers::mix::get_state))
+        .route("/mix/commit",   post(handlers::mix::post_commit))
+        .route("/mix/checkout", post(handlers::mix::post_checkout))
+        .route("/mix/branch",   post(handlers::mix::post_branch))
+        .route("/mix/revert",   post(handlers::mix::post_revert))
         .with_state(state)
 }

@@ -9,3 +9,4 @@ pub mod png_gen;
 pub mod preview;
 pub mod progress;
 pub mod timeline;
+pub mod mix;
