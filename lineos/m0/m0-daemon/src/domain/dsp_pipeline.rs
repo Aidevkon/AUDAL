@@ -692,7 +692,7 @@ fn platform_ok(lufs: f32, target: f32, tp: f32) -> bool {
 
 /// SHA-256 of input bytes — returns [u8; 32].
 /// Used for both `input_hash` audit field and determinism `seed`.
-fn compute_sha256_bytes(data: &[u8]) -> [u8; 32] {
+pub fn compute_sha256_bytes(data: &[u8]) -> [u8; 32] {
     use sha2::{Sha256, Digest};
     let mut h = Sha256::new();
     h.update(data);
@@ -700,7 +700,7 @@ fn compute_sha256_bytes(data: &[u8]) -> [u8; 32] {
 }
 
 /// Derive u64 seed from first 8 bytes of hash (big-endian).
-fn derive_seed(hash: &[u8; 32]) -> u64 {
+pub fn derive_seed(hash: &[u8; 32]) -> u64 {
     u64::from_be_bytes(hash[..8].try_into().unwrap_or([0; 8]))
 }
 
@@ -724,7 +724,7 @@ fn bytes_to_f32_samples(bytes: &[u8]) -> Vec<f32> {
 }
 
 /// Compute RMS amplitude of samples.
-fn compute_rms(samples: &[f32]) -> f32 {
+pub fn compute_rms(samples: &[f32]) -> f32 {
     if samples.is_empty() { return 0.0; }
     let sum_sq: f64 = samples.iter().map(|&s| (s as f64) * (s as f64)).sum();
     (sum_sq / samples.len() as f64).sqrt() as f32
@@ -732,7 +732,7 @@ fn compute_rms(samples: &[f32]) -> f32 {
 
 /// Rough LUFS estimate from RMS — used only for overflow guard, not stored.
 /// Full EBU R128 measurement happens inside sp314-dsp.
-fn rms_to_lufs(rms: f32) -> f32 {
+pub fn rms_to_lufs(rms: f32) -> f32 {
     if rms <= 0.0 { return f32::NEG_INFINITY; }
     // K-weighting approximation: subtract ~1 dB from RMS dBFS
     20.0 * rms.log10() - 1.0
