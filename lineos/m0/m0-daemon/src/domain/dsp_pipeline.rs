@@ -32,15 +32,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
-    use lineos_types::{
-        MasteringIntent,
-        AudioChunk, LoudnessTarget,
-    };
-    
     use crate::handlers::decode;
-    // Phase 9: EBU R128 windowed telemetry — LRA, momentary, short-term LUFS
-    use lineos_telemetry::lra::LraCalculator;
-    use lineos_telemetry::windows::{momentary_lufs, short_term_lufs};
 
     // NODE 1: DECODE
     let decoded = crate::domain::nodes::decode_node::run(
@@ -48,9 +40,9 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let target_lufs                 = decoded.target_lufs;
     let input_hash_hex              = decoded.input_hash_hex;
     let seed                        = decoded.seed;
-    let original_sr                 = decoded.original_sr;
-    let original_ch                 = decoded.original_ch;
-    let duration_ms                 = decoded.duration_ms;
+    let _original_sr                = decoded.original_sr;
+    let _original_ch                = decoded.original_ch;
+    let _duration_ms                = decoded.duration_ms;
     let _pcm_samples_for_telemetry  = decoded.pcm_samples;
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry       = decoded.pcm_sample_rate;
@@ -58,16 +50,6 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let _chunk_original             = decoded.chunk_original;
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
-
-    // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
-    // NMF phase RAM: ~7MB (was ~8GB for 2h file)
-    // Mix accumulator: ~300MB (down from ~8.3GB total)
-    // Phase 8: replace accumulator with MP3 streaming encoder
-    use sp314_dsp::stft::two_pass::TwoPassEngine;
-    use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
-    use sp314_dsp::spatial::renderer::StereoRenderer;
-    use sp314_dsp::spatial::user_profile::UserSpatialProfile;
-    use sha2::{Sha256, Digest};
 
     // NODE 3: SCOUT (NMF + Maestro)
     let scout_out = crate::domain::nodes::scout_node::run(

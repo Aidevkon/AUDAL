@@ -4,7 +4,6 @@
 use sp314_dsp::stft::two_pass::{TwoPassEngine, ScoutResult};
 use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
 use sp314_dsp::spatial::renderer::StereoRenderer;
-use sp314_dsp::spatial::user_profile::UserSpatialProfile;
 use sha2::{Digest, Sha256};
 use crate::blob_store::StemFingerprints;
 use crate::handlers::master::MixLevels;
