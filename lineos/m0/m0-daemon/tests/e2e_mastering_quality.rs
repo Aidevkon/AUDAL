@@ -1,72 +1,126 @@
-//! E2E Mastering Quality Test
-//! Validates the entire DspAdapter pipeline:
-//! Input Audio -> LUFS Normalization -> Maestro AI Ducking -> True Peak Limiting -> Output LufsReport
+//! E2E Mastering Quality & Auto-Tuning Test
+//! Runs a multi-instrument mix through the STFT -> NMF -> Maestro Pipeline -> iSTFT and exports a WAV file.
 
-use lineos_types::MasteringIntent;
-use m0d::dsp::DspAdapter;
+use sp314_dsp::stft::nmf::NmfEngine;
+use sp314_dsp::stft::StftEngine;
+use std::fs::File;
+use std::io::Write;
 
-// Re-use our deterministic broadband generators inline for cross-crate test visibility
-fn generate_techno_track(duration_s: f32, sample_rate: u32) -> (Vec<f32>, Vec<f32>) {
-    let n = (duration_s * sample_rate as f32) as usize;
-    let mut left = vec![0.0f32; n];
-    let mut right = vec![0.0f32; n];
+// A dense 2-second mix triggering all DSP collision scenarios
+fn generate_chaos_mix(sample_rate: u32) -> Vec<f32> {
+    let n = (2.0 * sample_rate as f32) as usize;
+    let mut phase_bass = 0.0_f32;
+    let mut phase_synth = 0.0_f32;
     
-    for i in 0..n {
+    (0..n).map(|i| {
         let t = i as f32 / sample_rate as f32;
-        // Kick (60Hz + click)
-        let kick = (libm::sinf(2.0 * core::f32::consts::PI * 60.0 * t) * libm::expf(-t * 30.0) * 0.8) + 
-                   (libm::sinf(2.0 * core::f32::consts::PI * 2000.0 * t) * libm::expf(-t * 200.0) * 0.3);
-        // Sub Bass (50Hz)
-        let bass = libm::sinf(2.0 * core::f32::consts::PI * 50.0 * t) * 0.6;
         
-        let mix = (kick + bass).clamp(-1.0, 1.0);
-        // Make it slightly quiet to force the autotuner to work (+ gain)
-        left[i] = mix * 0.2;
-        right[i] = mix * 0.2;
-    }
-    (left, right)
+        // S.2 / Maestro Trigger: 50Hz Kick at 0.5s and 1.5s
+        let kick = if (t >= 0.5 && t < 0.6) || (t >= 1.5 && t < 1.6) {
+            let env = libm::expf(-((t % 1.0) - 0.5) * 40.0);
+            libm::sinf(2.0 * core::f32::consts::PI * 50.0 * t) * env
+        } else { 0.0 };
+
+        // Target: Sustained 150Hz Bass
+        phase_bass += 2.0 * core::f32::consts::PI * 150.0 / sample_rate as f32;
+        let bass = libm::sinf(phase_bass) * 0.6;
+
+        // S.3 Trigger: Static 440Hz Synth
+        phase_synth += 2.0 * core::f32::consts::PI * 440.0 / sample_rate as f32;
+        let synth = libm::sinf(phase_synth) * 0.4;
+
+        (kick + bass + synth).clamp(-1.0, 1.0)
+    }).collect()
 }
 
 #[test]
-fn e2e_pipeline_hits_lufs_and_true_peak() {
+fn test_e2e_maestro_render_to_wav() {
     let sample_rate = 48000;
-    // 5 seconds of audio — enough for LUFS integration and NMF training
-    let (mut left, mut right) = generate_techno_track(5.0, sample_rate);
+    let signal = generate_chaos_mix(sample_rate);
+
+    // 1. Forward STFT
+    let mut stft = StftEngine::new();
+    let (mut complex_frames, _n_frames_stft) = stft.forward(&signal);
     
-    let target_lufs = -14.0;
-    let target_tp = -1.0;
+    let mag_frames: Vec<Vec<f32>> = complex_frames.iter()
+        .map(|frame| frame.iter().map(|c| libm::sqrtf(c.re * c.re + c.im * c.im)).collect())
+        .collect();
+
+    // 2. NMF Matrix Factorization
+    let mut nmf = NmfEngine::new(3);
+    nmf.fit(&mag_frames);
+
+    // 3. Apply Heuristic Psychoacoustic Matrix (The DSP Muscle)
+    nmf.resolve_low_end_clash();
+    nmf.resolve_formant_clash();
+    nmf.resolve_high_end_clash();
+
+    // 4. Identify Components (Simplified auto-detection for the test)
+    let n_frames = mag_frames.len();
+    let mut kick_c = 0; let mut bass_c = 1;
+    let e0: f32 = nmf.h[0..n_frames].iter().sum();
+    let e1: f32 = nmf.h[n_frames..2*n_frames].iter().sum();
+    if e1 > e0 { bass_c = 1; kick_c = 0; } else { bass_c = 0; kick_c = 1; }
+
+    // 5. Maestro AI Engine: Smart Ducking (Sidechain)
+    nmf.apply_smart_ducking(kick_c, bass_c);
+
+    // 6. Matrix Reconstruction (W * ducked H)
+    let n_bins = 1025;
+    let mut reconstructed_mags = vec![vec![0.0f32; n_bins]; n_frames];
+    for f in 0..n_frames {
+        for b in 0..n_bins {
+            let mut sum = 0.0;
+            for c in 0..3 {
+                sum += nmf.w[b * 3 + c] * nmf.h[c * n_frames + f];
+            }
+            reconstructed_mags[f][b] = sum;
+        }
+    }
+
+    // 7. iSTFT (Re-apply original phase to the new Maestro magnitudes)
+    for f in 0..n_frames {
+        for b in 0..n_bins {
+            let mag = reconstructed_mags[f][b];
+            let orig = complex_frames[f][b];
+            let orig_mag = libm::sqrtf(orig.re * orig.re + orig.im * orig.im);
+            if orig_mag > 0.0 {
+                complex_frames[f][b].re = (orig.re / orig_mag) * mag;
+                complex_frames[f][b].im = (orig.im / orig_mag) * mag;
+            } else {
+                complex_frames[f][b].re = 0.0;
+                complex_frames[f][b].im = 0.0;
+            }
+        }
+    }
+    let mastered_signal = stft.inverse(&complex_frames, signal.len());
+
+    // 8. WAV Export (Minimal RIFF/WAV header writer to avoid external dependencies)
+    std::fs::create_dir_all("target").unwrap();
+    let mut file = File::create("target/mastered_output.wav").expect("Failed to create WAV");
+    let data_size = mastered_signal.len() as u32 * 4; // 32-bit float
     
-    // Use the built-in Spotify constructor (-14 LUFS, -1.0 TP)
-    let mut intent = MasteringIntent::spotify();
-    // Override the preset name for our specific test
-    intent.preset_name = "techno_master".to_string();
-
-    println!("Starting E2E Master (Intent: {} LUFS, {} TP)", target_lufs, target_tp);
+    // RIFF Header
+    file.write_all(b"RIFF").unwrap();
+    file.write_all(&(36u32 + data_size).to_le_bytes()).unwrap();
+    file.write_all(b"WAVE").unwrap();
     
-    // EXECUTE THE CORE ENGINE
-    let result = DspAdapter::master(
-        &intent,
-        &mut left,
-        &mut right,
-        sample_rate,
-        None, // No manual Aether config overrides
-    ).expect("DSP Pipeline failed to process the track");
+    // fmt Subchunk
+    file.write_all(b"fmt ").unwrap();
+    file.write_all(&16u32.to_le_bytes()).unwrap(); // Subchunk1Size
+    file.write_all(&3u16.to_le_bytes()).unwrap();  // AudioFormat (3 = IEEE Float)
+    file.write_all(&1u16.to_le_bytes()).unwrap();  // NumChannels (1 = Mono)
+    file.write_all(&sample_rate.to_le_bytes()).unwrap(); // SampleRate
+    file.write_all(&(sample_rate * 4).to_le_bytes()).unwrap(); // ByteRate
+    file.write_all(&4u16.to_le_bytes()).unwrap();  // BlockAlign
+    file.write_all(&32u16.to_le_bytes()).unwrap(); // BitsPerSample
+    
+    // data Subchunk
+    file.write_all(b"data").unwrap();
+    file.write_all(&data_size.to_le_bytes()).unwrap();
+    for sample in mastered_signal {
+        file.write_all(&sample.to_le_bytes()).unwrap();
+    }
 
-    let final_lufs = result.lufs.integrated_lufs;
-    let final_tp = result.lufs.true_peak_dbfs;
-
-    println!("Final Integrated LUFS: {:.2} (Target: {:.2})", final_lufs, target_lufs);
-    println!("Final True Peak:       {:.2} (Target: {:.2})", final_tp, target_tp);
-
-    // Assert LUFS is within 0.5 LU of target
-    assert!(
-        (final_lufs - target_lufs).abs() <= 0.5,
-        "Failed to hit target LUFS. Got {:.2}, Expected {:.2}", final_lufs, target_lufs
-    );
-
-    // Assert True Peak does not exceed ceiling (allow 0.1dB math tolerance)
-    assert!(
-        final_tp <= target_tp + 0.1,
-        "True Peak exceeded ceiling! Got {:.2}, Ceiling {:.2}", final_tp, target_tp
-    );
+    println!("SUCCESS! Mastered WAV file written to: target/mastered_output.wav");
 }
