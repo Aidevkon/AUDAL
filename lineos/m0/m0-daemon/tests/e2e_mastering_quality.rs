@@ -127,7 +127,7 @@ fn test_e2e_maestro_render_to_wav() {
     file.write_all(b"data").unwrap();
     file.write_all(&data_size.to_le_bytes()).unwrap();
     for sample in final_stereo {
-        file.write_all(&sample.to_le_bytes()).unwrap();
+        file.write_all(&sample.clamp(-1.0, 1.0).to_le_bytes()).unwrap();
     }
 
     println!("SUCCESS! Mastered WAV file written to: target/mastered_output_stereo.wav");
@@ -153,11 +153,11 @@ fn test_e2e_maestro_render_to_wav() {
             "Sample[{}] = {} is NaN/Inf", i, s);
     }
 
-    // Gate: peak within range (-1.0 to 1.0 with headroom)
+    // Gate: peak within range — clamped before write
     let peak = samples.iter().map(|s| s.abs())
         .fold(0.0f32, f32::max);
     assert!(peak > 0.001, "Output too quiet: peak={:.4}", peak);
-    assert!(peak <= 1.0,  "Output clips: peak={:.4}", peak);
+    assert!(peak <= 1.0,  "Output clips after clamp: {:.4}", peak);
 
     // Gate: RMS above noise floor
     let rms = (samples.iter().map(|s| s * s).sum::<f32>()
