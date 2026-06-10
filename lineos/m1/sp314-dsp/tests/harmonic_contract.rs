@@ -3,21 +3,24 @@
 const PAD_LINEAR: f32 = 0.5011872336272722;
 const GLOBAL_K_HARMONIC: f32 = 1.99526166;
 const PER_DRIVE: &[(f32, f32)] = &[
-    (0.1,  1.99526184),
-    (0.5,  1.99526221),
-    (1.0,  1.99526242),
-    (2.0,  1.99526212),
-    (5.0,  1.99526364),
+    (0.1, 1.99526184),
+    (0.5, 1.99526221),
+    (1.0, 1.99526242),
+    (2.0, 1.99526212),
+    (5.0, 1.99526364),
     (10.0, 1.99526302),
 ];
 
 #[test]
 fn harmonic_k_compensation_matches_reference() {
-    assert!(GLOBAL_K_HARMONIC >= 0.5 && GLOBAL_K_HARMONIC <= 5.0, "Global K is out of bounds");
+    assert!(
+        GLOBAL_K_HARMONIC >= 0.5 && GLOBAL_K_HARMONIC <= 5.0,
+        "Global K is out of bounds"
+    );
 
     let sample_rate = 48000;
     let num_samples = sample_rate; // 1 second
-    
+
     for &(drive, k_harmonic) in PER_DRIVE.iter() {
         // Generate 1kHz sine at amplitude=1.0, 48000Hz, 1 second
         let mut x = vec![0.0_f32; num_samples];
@@ -47,8 +50,12 @@ fn harmonic_k_compensation_matches_reference() {
         let mut max_ref = 0.0_f32;
         let mut max_comp = 0.0_f32;
         for i in 0..num_samples {
-            if y_ref[i].abs() > max_ref { max_ref = y_ref[i].abs(); }
-            if y_comp[i].abs() > max_comp { max_comp = y_comp[i].abs(); }
+            if y_ref[i].abs() > max_ref {
+                max_ref = y_ref[i].abs();
+            }
+            if y_comp[i].abs() > max_comp {
+                max_comp = y_comp[i].abs();
+            }
         }
 
         let mut y_ref_norm = vec![0.0_f32; num_samples];

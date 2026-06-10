@@ -98,13 +98,15 @@ where
         .map_err(|e| format!("[IPC] Reflect::get __TAURI_INTERNALS__ failed: {e:?}"))?;
     if internals.is_undefined() || internals.is_null() {
         return Err("[IPC] window.__TAURI_INTERNALS__ is undefined. \
-                    Check tauri.conf.json withGlobalTauri:true".to_string());
+                    Check tauri.conf.json withGlobalTauri:true"
+            .to_string());
     }
 
     // 4. Get the invoke function
     let invoke_val = Reflect::get(&internals, &JsValue::from_str("invoke"))
         .map_err(|e| format!("[IPC] Reflect::get invoke failed: {e:?}"))?;
-    let invoke_fn: Function = invoke_val.dyn_into()
+    let invoke_fn: Function = invoke_val
+        .dyn_into()
         .map_err(|_| "[IPC] __TAURI_INTERNALS__.invoke is not a function".to_string())?;
 
     // 5. Call invoke(command, args) → Promise
@@ -112,29 +114,29 @@ where
         .call2(&internals, &JsValue::from_str(command), &args_js)
         .map_err(|e| format!("[IPC] invoke({command}) call failed: {e:?}"))?;
 
-    let promise: Promise = promise_val.dyn_into()
+    let promise: Promise = promise_val
+        .dyn_into()
         .map_err(|e| format!("[IPC] invoke({command}) did not return Promise: {e:?}"))?;
 
     // 6. Await the Promise via JsFuture
-    let result_js = JsFuture::from(promise)
-        .await
-        .map_err(|e| {
-            let msg = e.as_string()
-                .or_else(|| {
-                    Reflect::get(&e, &JsValue::from_str("message"))
-                        .ok()
-                        .and_then(|v| v.as_string())
-                })
-                .unwrap_or_else(|| {
-                    js_sys::JSON::stringify(&e)
-                        .ok()
-                        .and_then(|s| s.as_string())
-                        .unwrap_or_else(|| format!("{e:?}"))
-                });
-            let full = format!("[IPC] ❌ {command}: {msg}");
-            clog!("{}", full);
-            full
-        })?;
+    let result_js = JsFuture::from(promise).await.map_err(|e| {
+        let msg = e
+            .as_string()
+            .or_else(|| {
+                Reflect::get(&e, &JsValue::from_str("message"))
+                    .ok()
+                    .and_then(|v| v.as_string())
+            })
+            .unwrap_or_else(|| {
+                js_sys::JSON::stringify(&e)
+                    .ok()
+                    .and_then(|s| s.as_string())
+                    .unwrap_or_else(|| format!("{e:?}"))
+            });
+        let full = format!("[IPC] ❌ {command}: {msg}");
+        clog!("{}", full);
+        full
+    })?;
 
     // 7. Deserialize result
     let result = serde_wasm_bindgen::from_value::<R>(result_js)
@@ -148,7 +150,10 @@ where
 
 /// Map Tauri command names to M0 HTTP endpoints.
 /// Returns (method, url, body_json_option).
-fn map_command_to_http(command: &str, args: &serde_json::Value) -> Result<(&'static str, String, Option<String>), String> {
+fn map_command_to_http(
+    command: &str,
+    args: &serde_json::Value,
+) -> Result<(&'static str, String, Option<String>), String> {
     match command {
         // ── Mastering ────────────────────────────────────────────────────
         "trigger_mastering" => {
@@ -177,16 +182,16 @@ fn map_command_to_http(command: &str, args: &serde_json::Value) -> Result<(&'sta
                 "action":      args.get("action").and_then(|v| v.as_str()).unwrap_or("stop"),
                 "position_ms": args.get("positionMs").and_then(|v| v.as_u64()),
             });
-            Ok(("POST", "/m0/playback/control".into(), Some(body.to_string())))
+            Ok((
+                "POST",
+                "/m0/playback/control".into(),
+                Some(body.to_string()),
+            ))
         }
 
-        "get_playback_state" => {
-            Ok(("GET", "/m0/playback/state".into(), None))
-        }
+        "get_playback_state" => Ok(("GET", "/m0/playback/state".into(), None)),
 
-        "get_live_telemetry" => {
-            Ok(("GET", "/m0/playback/telemetry".into(), None))
-        }
+        "get_live_telemetry" => Ok(("GET", "/m0/playback/telemetry".into(), None)),
 
         // ── Export ────────────────────────────────────────────────────────
         "export_audio" => {
@@ -206,13 +211,14 @@ fn map_command_to_http(command: &str, args: &serde_json::Value) -> Result<(&'sta
         }
 
         // ── Coach / Report / other ───────────────────────────────────────
-        "get_coach_narrative" | "evaluate_findings" | "export_pdf_report" | "preview_pdf_report" => {
-            Err(format!("[IPC/browser] {command} not available in browser mode"))
-        }
+        "get_coach_narrative"
+        | "evaluate_findings"
+        | "export_pdf_report"
+        | "preview_pdf_report" => Err(format!(
+            "[IPC/browser] {command} not available in browser mode"
+        )),
 
-        _ => {
-            Err(format!("[IPC/browser] Unknown command: {command}"))
-        }
+        _ => Err(format!("[IPC/browser] Unknown command: {command}")),
     }
 }
 
@@ -224,13 +230,12 @@ where
 {
     clog!("[IPC/browser] invoke: {}", command);
 
-    let args_value = serde_json::to_value(&args)
-        .map_err(|e| format!("[IPC/browser] serialize failed: {e}"))?;
+    let args_value =
+        serde_json::to_value(&args).map_err(|e| format!("[IPC/browser] serialize failed: {e}"))?;
 
     let (method, url, body) = map_command_to_http(command, &args_value)?;
 
-    let window = web_sys::window()
-        .ok_or("[IPC/browser] no window")?;
+    let window = web_sys::window().ok_or("[IPC/browser] no window")?;
 
     // Build fetch request
     let opts = web_sys::RequestInit::new();
@@ -244,7 +249,8 @@ where
         .map_err(|e| format!("[IPC/browser] Request::new failed: {e:?}"))?;
 
     if body.is_some() {
-        request.headers()
+        request
+            .headers()
             .set("Content-Type", "application/json")
             .map_err(|e| format!("[IPC/browser] header set failed: {e:?}"))?;
     }
@@ -257,7 +263,8 @@ where
             format!("[IPC/browser] fetch failed [{command}]: {msg}")
         })?;
 
-    let resp: web_sys::Response = resp_value.dyn_into()
+    let resp: web_sys::Response = resp_value
+        .dyn_into()
         .map_err(|_| "[IPC/browser] response is not a Response object".to_string())?;
 
     if !resp.ok() {
@@ -266,15 +273,14 @@ where
     }
 
     // Parse JSON body
-    let json_promise = resp.json()
+    let json_promise = resp
+        .json()
         .map_err(|e| format!("[IPC/browser] .json() failed: {e:?}"))?;
 
-    let json_val = JsFuture::from(json_promise)
-        .await
-        .map_err(|e| {
-            let msg = e.as_string().unwrap_or_else(|| format!("{e:?}"));
-            format!("[IPC/browser] JSON parse failed [{command}]: {msg}")
-        })?;
+    let json_val = JsFuture::from(json_promise).await.map_err(|e| {
+        let msg = e.as_string().unwrap_or_else(|| format!("{e:?}"));
+        format!("[IPC/browser] JSON parse failed [{command}]: {msg}")
+    })?;
 
     // For trigger_mastering: M0 returns { blob_id, status, message }
     // But the Tauri command returns just the blob_id string.
@@ -319,10 +325,10 @@ fn adapt_response(command: &str, val: JsValue) -> Result<JsValue, String> {
             // Tauri's get_session_state does: blob → findings → narrative → compose
             // In browser mode, we return a simplified session from the blob directly.
             // The blob has loudness, quality — we compose a minimal SessionStateJson.
-            let loudness = Reflect::get(&val, &JsValue::from_str("loudness"))
-                .unwrap_or(JsValue::UNDEFINED);
-            let quality = Reflect::get(&val, &JsValue::from_str("quality"))
-                .unwrap_or(JsValue::UNDEFINED);
+            let loudness =
+                Reflect::get(&val, &JsValue::from_str("loudness")).unwrap_or(JsValue::UNDEFINED);
+            let quality =
+                Reflect::get(&val, &JsValue::from_str("quality")).unwrap_or(JsValue::UNDEFINED);
             let blob_id = Reflect::get(&val, &JsValue::from_str("id"))
                 .ok()
                 .and_then(|v| v.as_string())
@@ -356,20 +362,23 @@ fn adapt_response(command: &str, val: JsValue) -> Result<JsValue, String> {
             Reflect::set(&session, &"loudness".into(), &loudness).ok();
             Reflect::set(&session, &"quality".into(), &quality).ok();
 
-            let compliance_js = js_sys::JSON::parse(&compliance.to_string())
-                .unwrap_or(JsValue::UNDEFINED);
+            let compliance_js =
+                js_sys::JSON::parse(&compliance.to_string()).unwrap_or(JsValue::UNDEFINED);
             Reflect::set(&session, &"compliance".into(), &compliance_js).ok();
 
-            let findings_js = js_sys::JSON::parse(&findings.to_string())
-                .unwrap_or(JsValue::UNDEFINED);
+            let findings_js =
+                js_sys::JSON::parse(&findings.to_string()).unwrap_or(JsValue::UNDEFINED);
             Reflect::set(&session, &"findings".into(), &findings_js).ok();
 
             Reflect::set(&session, &"narrative".into(), &JsValue::NULL).ok();
 
             // Pass through Aether fields
-            let cert = Reflect::get(&val, &JsValue::from_str("aether_cert")).unwrap_or(JsValue::NULL);
-            let persona = Reflect::get(&val, &JsValue::from_str("aether_persona")).unwrap_or(JsValue::NULL);
-            let config = Reflect::get(&val, &JsValue::from_str("aether_config")).unwrap_or(JsValue::NULL);
+            let cert =
+                Reflect::get(&val, &JsValue::from_str("aether_cert")).unwrap_or(JsValue::NULL);
+            let persona =
+                Reflect::get(&val, &JsValue::from_str("aether_persona")).unwrap_or(JsValue::NULL);
+            let config =
+                Reflect::get(&val, &JsValue::from_str("aether_config")).unwrap_or(JsValue::NULL);
             Reflect::set(&session, &"aether_cert".into(), &cert).ok();
             Reflect::set(&session, &"aether_persona".into(), &persona).ok();
             Reflect::set(&session, &"aether_config".into(), &config).ok();
@@ -380,15 +389,12 @@ fn adapt_response(command: &str, val: JsValue) -> Result<JsValue, String> {
         "playback_control" => {
             // Tauri returns Option<PlaybackStateJson>
             // M0 returns { status, state, message }
-            let state = Reflect::get(&val, &JsValue::from_str("state"))
-                .unwrap_or(JsValue::NULL);
+            let state = Reflect::get(&val, &JsValue::from_str("state")).unwrap_or(JsValue::NULL);
             Ok(state)
         }
 
         // For these commands, the M0 response matches what Tauri returns
-        "get_playback_state" | "get_live_telemetry" | "get_golden_blob" | "export_audio" => {
-            Ok(val)
-        }
+        "get_playback_state" | "get_live_telemetry" | "get_golden_blob" | "export_audio" => Ok(val),
 
         _ => Ok(val),
     }

@@ -26,12 +26,13 @@ fn two_pass_engine_peak_heap_under_50mb() {
             let t = i as f32 / sample_rate as f32;
             // Simulate realistic audio: mix of voice + drums freq
             libm::sinf(2.0 * core::f32::consts::PI * 440.0 * t) * 0.5
-            + libm::sinf(2.0 * core::f32::consts::PI * 80.0 * t) * 0.3
-            + libm::sinf(2.0 * core::f32::consts::PI * 2000.0 * t) * 0.2
+                + libm::sinf(2.0 * core::f32::consts::PI * 80.0 * t) * 0.3
+                + libm::sinf(2.0 * core::f32::consts::PI * 2000.0 * t) * 0.2
         })
         .collect();
 
-    println!("Snippet: {} samples ({:.1}s at {}Hz)",
+    println!(
+        "Snippet: {} samples ({:.1}s at {}Hz)",
         snippet.len(),
         snippet.len() as f32 / sample_rate as f32,
         sample_rate
@@ -46,8 +47,10 @@ fn two_pass_engine_peak_heap_under_50mb() {
     let scout = engine.scout(&snippet, sample_rate);
 
     let stats_scout = dhat::HeapStats::get();
-    println!("After Scout (30s snippet) — peak heap: {:.1} MB",
-        stats_scout.max_bytes as f64 / 1_000_000.0);
+    println!(
+        "After Scout (30s snippet) — peak heap: {:.1} MB",
+        stats_scout.max_bytes as f64 / 1_000_000.0
+    );
 
     // Drop snippet — no longer needed
     drop(snippet);
@@ -58,10 +61,12 @@ fn two_pass_engine_peak_heap_under_50mb() {
     let total_duration_s = 240; // 4 minutes
     let chunk_size = 65536usize;
     let total_samples = total_duration_s * sample_rate as usize;
-    let total_chunks  = (total_samples + chunk_size - 1) / chunk_size;
+    let total_chunks = (total_samples + chunk_size - 1) / chunk_size;
 
-    println!("Simulating {}s file ({} chunks of {} samples)",
-        total_duration_s, total_chunks, chunk_size);
+    println!(
+        "Simulating {}s file ({} chunks of {} samples)",
+        total_duration_s, total_chunks, chunk_size
+    );
 
     let mut chunk_count = 0usize;
     let mut offset = 0usize;
@@ -81,19 +86,23 @@ fn two_pass_engine_peak_heap_under_50mb() {
 
         // Process chunk — stems computed and dropped immediately
         let chunk_mono = chunk; // already mono
-        engine.process_chunks(&chunk_mono, &scout, |stems| {
-            chunk_count += 1;
-            let _ = stems.voice.len();
-        }).expect("process_chunks failed");
+        engine
+            .process_chunks(&chunk_mono, &scout, |stems| {
+                chunk_count += 1;
+                let _ = stems.voice.len();
+            })
+            .expect("process_chunks failed");
 
         offset = end;
     }
 
     let stats_final = dhat::HeapStats::get();
-    println!("After Render ({} chunks, {}s) — peak heap: {:.1} MB",
+    println!(
+        "After Render ({} chunks, {}s) — peak heap: {:.1} MB",
         chunk_count,
         total_duration_s,
-        stats_final.max_bytes as f64 / 1_000_000.0);
+        stats_final.max_bytes as f64 / 1_000_000.0
+    );
 
     // INV-ST-3: peak RAM ≤ 50MB
     // With Disk-Seek Architecture: snippet (5MB) + STFT (10MB) + chunks (2MB) = ~17MB
@@ -106,8 +115,10 @@ fn two_pass_engine_peak_heap_under_50mb() {
         stats_final.max_bytes as f64 / 1_000_000.0
     );
 
-    println!("✅ INV-ST-3: peak heap {:.1}MB < 50MB — PASS",
-        stats_final.max_bytes as f64 / 1_000_000.0);
+    println!(
+        "✅ INV-ST-3: peak heap {:.1}MB < 50MB — PASS",
+        stats_final.max_bytes as f64 / 1_000_000.0
+    );
     println!("   Proves: NMF streaming layer is memory-safe");
     println!("   Phase 8: add WavChunkReader.seek() for real-file streaming");
 }

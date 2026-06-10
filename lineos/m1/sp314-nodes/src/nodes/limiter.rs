@@ -39,9 +39,9 @@ impl DspNode for LimiterNode {
                 true_peak_enabled: true,
             };
             // Note: Re-creating the limiter flushes the lookahead delay line.
-            // This is acceptable only when re-configuring before processing, 
+            // This is acceptable only when re-configuring before processing,
             // but not ideal during live parameter automation.
-            // However, BrickwallLimiter in sp314-dsp doesn't expose a method 
+            // However, BrickwallLimiter in sp314-dsp doesn't expose a method
             // to update ceiling_db dynamically without losing state.
             // We'll keep the state reset here as it's the only safe way given the API.
             self.limiter = BrickwallLimiter::new(config, self.sample_rate as u32);

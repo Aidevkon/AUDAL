@@ -17,7 +17,7 @@ const POLYPHASE_UP: [[f64; TAPS]; 4] = [
         0.008216810773212088,
         -0.0021377457248467195,
         0.0003592009444519958,
-        -2.1705869358414087e-05
+        -2.1705869358414087e-05,
     ],
     [
         -8.866036690746866e-06,
@@ -35,7 +35,7 @@ const POLYPHASE_UP: [[f64; TAPS]; 4] = [
         0.008550367479972976,
         -0.0020363676157635156,
         0.0002916564199290543,
-        -8.866036690748265e-06
+        -8.866036690748265e-06,
     ],
     [
         -2.1705869358414087e-05,
@@ -53,13 +53,26 @@ const POLYPHASE_UP: [[f64; TAPS]; 4] = [
         0.004367911852255977,
         -0.000941059720917635,
         0.00011046553246435567,
-        -1.7425427174407935e-06
+        -1.7425427174407935e-06,
     ],
     [
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
         0.9999971356592491,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-    ]
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ],
 ];
 
 const POLYPHASE_DOWN: [[f64; TAPS]; 4] = [
@@ -79,7 +92,7 @@ const POLYPHASE_DOWN: [[f64; TAPS]; 4] = [
         0.002054202693303022,
         -0.0005344364312116799,
         8.980023611299895e-05,
-        -5.426467339603522e-06
+        -5.426467339603522e-06,
     ],
     [
         -2.2165091726867164e-06,
@@ -97,7 +110,7 @@ const POLYPHASE_DOWN: [[f64; TAPS]; 4] = [
         0.002137591869993244,
         -0.0005090919039408789,
         7.291410498226358e-05,
-        -2.2165091726870662e-06
+        -2.2165091726870662e-06,
     ],
     [
         -5.426467339603522e-06,
@@ -115,7 +128,7 @@ const POLYPHASE_DOWN: [[f64; TAPS]; 4] = [
         0.0010919779630639943,
         -0.00023526493022940875,
         2.7616383116088917e-05,
-        -4.356356793601984e-07
+        -4.356356793601984e-07,
     ],
     [
         0.0,
@@ -133,21 +146,21 @@ const POLYPHASE_DOWN: [[f64; TAPS]; 4] = [
         0.0,
         0.0,
         0.0,
-        0.0
-    ]
+        0.0,
+    ],
 ];
 
 pub struct OversampledSoftClipper {
     // Upsampler delay lines (low rate: 1 sample per step)
     delay_up_l: [f32; TAPS],
     delay_up_r: [f32; TAPS],
-    write_up:   usize,
+    write_up: usize,
 
     // Downsampler delay lines (4 phases per channel)
     // Each phase has its own history buffer
     delay_down_l: [[f32; TAPS]; 4],
     delay_down_r: [[f32; TAPS]; 4],
-    write_down:   usize,
+    write_down: usize,
 
     enabled: bool,
     ceiling_linear: f32,
@@ -164,12 +177,12 @@ fn soft_clip(x: f32, ceiling: f32) -> f32 {
 impl OversampledSoftClipper {
     pub fn new_with_ceiling(enabled: bool, ceiling_linear: f32) -> Self {
         Self {
-            delay_up_l:   [0.0_f32; TAPS],
-            delay_up_r:   [0.0_f32; TAPS],
-            write_up:     0,
+            delay_up_l: [0.0_f32; TAPS],
+            delay_up_r: [0.0_f32; TAPS],
+            write_up: 0,
             delay_down_l: [[0.0_f32; TAPS]; 4],
             delay_down_r: [[0.0_f32; TAPS]; 4],
-            write_down:   0,
+            write_down: 0,
             enabled,
             ceiling_linear,
         }
@@ -180,12 +193,12 @@ impl OversampledSoftClipper {
     }
 
     pub fn reset(&mut self) {
-        self.delay_up_l   = [0.0_f32; TAPS];
-        self.delay_up_r   = [0.0_f32; TAPS];
-        self.write_up     = 0;
+        self.delay_up_l = [0.0_f32; TAPS];
+        self.delay_up_r = [0.0_f32; TAPS];
+        self.write_up = 0;
         self.delay_down_l = [[0.0_f32; TAPS]; 4];
         self.delay_down_r = [[0.0_f32; TAPS]; 4];
-        self.write_down   = 0;
+        self.write_down = 0;
     }
 
     pub fn process(&mut self, left: f32, right: f32) -> (f32, f32) {

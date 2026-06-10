@@ -1,5 +1,5 @@
-use std::time::Instant;
 use crate::blob_store::StageRecord;
+use std::time::Instant;
 
 /// Profiler for the deterministic forensic timeline.
 /// Captures exact durations and BLAKE3 hashes at stage boundaries.

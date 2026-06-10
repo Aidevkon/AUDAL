@@ -2,9 +2,7 @@
 // Orchestrates K-Weighting + Block Gating → Integrated LUFS.
 
 use crate::metering::filter::KWeightingFilter;
-use crate::metering::gating::{
-    integrated_lufs, BLOCK_SAMPLES, HOP_SAMPLES
-};
+use crate::metering::gating::{integrated_lufs, BLOCK_SAMPLES, HOP_SAMPLES};
 
 /// Compute Integrated LUFS for a stereo offline buffer.
 /// ITU-R BS.1770-4 compliant: K-weighting + absolute + relative gating.
@@ -30,7 +28,7 @@ pub fn measure_integrated_lufs(left: &[f32], right: &[f32]) -> f32 {
     let mut block_mean_squares = Vec::new();
     let mut hop_sums = [0.0_f32; 4];
     let mut hop_idx = 0;
-    
+
     let mut current_sum = 0.0_f32;
     let mut sample_count = 0;
 

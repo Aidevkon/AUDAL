@@ -1,9 +1,9 @@
 #![cfg(feature = "cli")]
 // tests/io_contract.rs
 
+use hound;
 use sp314_dsp::io::{WavReader, WavWriter};
 use std::fs;
-use hound;
 
 #[test]
 fn wav_roundtrip_preserves_samples() {
@@ -11,7 +11,7 @@ fn wav_roundtrip_preserves_samples() {
     let len = 1000;
     let mut left = vec![0.0; len];
     let mut right = vec![0.0; len];
-    
+
     for i in 0..len {
         let t = i as f32 / 48000.0;
         let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * 0.5;
@@ -22,27 +22,27 @@ fn wav_roundtrip_preserves_samples() {
     WavWriter::write(path, &left, &right, 48000).unwrap();
 
     let decoded = WavReader::read(path).unwrap();
-    
+
     assert_eq!(decoded.left.len(), len);
     for i in 0..len {
         assert!((decoded.left[i] - left[i]).abs() < 1e-6);
         assert!((decoded.right[i] - right[i]).abs() < 1e-6);
     }
-    
+
     let _ = fs::remove_file(path);
 }
 
 #[test]
 fn wav_reader_handles_mono() {
     let path = "tests/fixtures/test_mono.wav";
-    
+
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 48000,
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,
     };
-    
+
     let mut writer = hound::WavWriter::create(path, spec).unwrap();
     for _i in 0..100 {
         writer.write_sample(0.5f32).unwrap();
@@ -50,7 +50,7 @@ fn wav_reader_handles_mono() {
     writer.finalize().unwrap();
 
     let decoded = WavReader::read(path).unwrap();
-    
+
     assert_eq!(decoded.num_channels, 1);
     assert_eq!(decoded.left, decoded.right);
     assert_eq!(decoded.left.len(), 100);
@@ -62,20 +62,20 @@ fn wav_reader_handles_mono() {
 #[test]
 fn wav_reader_handles_16bit_pcm() {
     let path = "tests/fixtures/test_16bit.wav";
-    
+
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 48000,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
-    
+
     let mut writer = hound::WavWriter::create(path, spec).unwrap();
     writer.write_sample(16384i16).unwrap();
     writer.finalize().unwrap();
 
     let decoded = WavReader::read(path).unwrap();
-    
+
     assert!((decoded.left[0] - 0.5).abs() < 1e-4);
 
     let _ = fs::remove_file(path);
@@ -96,7 +96,10 @@ fn mastered_path(input: &str, ext: &str) -> String {
 #[test]
 fn wav_output_path_logic() {
     assert_eq!(mastered_path("song.wav", "wav"), "song_mastered.wav");
-    assert_eq!(mastered_path("path/to/song.wav", "wav"), "path/to/song_mastered.wav");
+    assert_eq!(
+        mastered_path("path/to/song.wav", "wav"),
+        "path/to/song_mastered.wav"
+    );
 }
 
 #[test]
@@ -108,23 +111,29 @@ fn flac_output_path_logic() {
 
 #[test]
 fn full_pipeline_wav_to_wav() {
+    use sp314_dsp::metering::measure_integrated_lufs;
+    use sp314_dsp::pipeline::autotune::autotune;
     use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
     use sp314_dsp::pipeline::presets::MasteringTarget;
-    use sp314_dsp::pipeline::autotune::autotune;
-    use sp314_dsp::metering::measure_integrated_lufs;
 
     let input_path = "tests/fixtures/sine_1khz_3s.wav";
     let output_path = mastered_path(input_path, "wav");
-    
+
     let mut decoded = WavReader::read(input_path).unwrap();
     let input_len = decoded.left.len();
-    
+
     let input_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
 
     let target = MasteringTarget::SpotifyV3;
     let base_config = target.engine_config(decoded.sample_rate);
-    
-    let autotune_result = autotune(&decoded.left, &decoded.right, base_config.clone(), target, decoded.sample_rate);
+
+    let autotune_result = autotune(
+        &decoded.left,
+        &decoded.right,
+        base_config.clone(),
+        target,
+        decoded.sample_rate,
+    );
     let mut tuned_config = base_config;
     tuned_config.target_makeup_db = autotune_result.makeup_db;
 
@@ -132,35 +141,44 @@ fn full_pipeline_wav_to_wav() {
     engine.process_offline(&mut decoded.left, &mut decoded.right);
 
     let output_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
-    
-    let out_peak = decoded.left.iter().chain(decoded.right.iter())
+
+    let out_peak = decoded
+        .left
+        .iter()
+        .chain(decoded.right.iter())
         .map(|s| s.abs())
         .fold(0.0_f32, f32::max);
 
-    WavWriter::write(&output_path, &decoded.left, &decoded.right, decoded.sample_rate).unwrap();
+    WavWriter::write(
+        &output_path,
+        &decoded.left,
+        &decoded.right,
+        decoded.sample_rate,
+    )
+    .unwrap();
 
     assert!(std::path::Path::new(&output_path).exists());
     let metadata = fs::metadata(&output_path).unwrap();
     assert!(metadata.len() > 0);
 
     assert_eq!(decoded.left.len(), input_len);
-    
+
     assert!(out_peak <= sp314_dsp::limiter::DEFAULT_CEILING_LINEAR);
-    
+
     let target_lufs = target.target_lufs().unwrap();
     assert!((output_lufs - target_lufs).abs() < (input_lufs - target_lufs).abs());
 }
 
 #[test]
 fn flac_roundtrip_preserves_samples() {
-    use sp314_dsp::io::FlacWriter;
     use claxon::FlacReader;
+    use sp314_dsp::io::FlacWriter;
 
     let path = "tests/fixtures/test_roundtrip.flac";
     let len = 1000;
     let mut left = vec![0.0; len];
     let mut right = vec![0.0; len];
-    
+
     for i in 0..len {
         let t = i as f32 / 48000.0;
         let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * 0.5;
@@ -180,14 +198,24 @@ fn flac_roundtrip_preserves_samples() {
     for i in 0..len {
         let l_i32 = samples.next().unwrap().unwrap();
         let r_i32 = samples.next().unwrap().unwrap();
-        
+
         let l_f32 = l_i32 as f32 / 8388607.0_f32;
         let r_f32 = r_i32 as f32 / 8388607.0_f32;
 
         let tol = 1.0 / 8388608.0 * 2.0;
-        assert!((l_f32 - left[i]).abs() < tol, "Left channel mismatch: {} vs {}", l_f32, left[i]);
-        assert!((r_f32 - right[i]).abs() < tol, "Right channel mismatch: {} vs {}", r_f32, right[i]);
+        assert!(
+            (l_f32 - left[i]).abs() < tol,
+            "Left channel mismatch: {} vs {}",
+            l_f32,
+            left[i]
+        );
+        assert!(
+            (r_f32 - right[i]).abs() < tol,
+            "Right channel mismatch: {} vs {}",
+            r_f32,
+            right[i]
+        );
     }
-    
+
     let _ = fs::remove_file(path);
 }

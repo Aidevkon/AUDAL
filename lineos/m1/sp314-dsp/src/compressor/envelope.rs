@@ -25,15 +25,15 @@ impl EnvelopeFollower {
         // Smoothing in dB domain sounds robotic (constant dB/sec rate).
         // Smoothing in linear domain sounds natural (exponential dB/sec rate).
         let x_abs = libm::fabsf(x);
-        
+
         if x_abs > self.envelope {
             self.envelope += (x_abs - self.envelope) * self.attack_coeff;
         } else {
             self.envelope += (x_abs - self.envelope) * self.release_coeff;
         }
 
-        if libm::fabsf(self.envelope) < 1e-15 { 
-            self.envelope = 0.0; 
+        if libm::fabsf(self.envelope) < 1e-15 {
+            self.envelope = 0.0;
         }
 
         20.0 * libm::log10f(self.envelope + 1e-10)

@@ -8,8 +8,8 @@
 //! Pure function: same input → same output. No side effects. No state.
 //! Authority: Coach-Core README v1.1 §5.2
 
-use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 use crate::thresholds::Thresholds;
+use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 
 /// R001: Integrated LUFS compliance against the selected preset target.
 ///
@@ -77,10 +77,14 @@ mod tests {
     fn report(lufs: f32) -> AnalysisReport {
         AnalysisReport::from_metrics(
             QualityMetrics {
-                lufs_integrated: lufs, lufs_short_term: lufs + 1.0,
-                lufs_momentary: lufs + 2.0, true_peak: -1.5,
-                loudness_range: 8.0, stereo_correlation: 0.95,
-                dynamic_range: 10.0, dc_offset: 0.0,
+                lufs_integrated: lufs,
+                lufs_short_term: lufs + 1.0,
+                lufs_momentary: lufs + 2.0,
+                true_peak: -1.5,
+                loudness_range: 8.0,
+                stereo_correlation: 0.95,
+                dynamic_range: 10.0,
+                dc_offset: 0.0,
             },
             ComplianceFlags::all_pass(),
         )
@@ -91,8 +95,10 @@ mod tests {
     #[test]
     fn test_raw_preset_no_trigger() {
         let t = thresholds_for("raw", None);
-        assert!(lufs_compliance(&report(-14.0), &t).is_none(),
-            "raw preset (None target) must never trigger");
+        assert!(
+            lufs_compliance(&report(-14.0), &t).is_none(),
+            "raw preset (None target) must never trigger"
+        );
     }
 
     // ── Within tolerance — no trigger ─────────────────────────────────────────
@@ -100,16 +106,20 @@ mod tests {
     #[test]
     fn test_at_target_no_trigger() {
         let t = thresholds_for("spotify", Some(-14.0));
-        assert!(lufs_compliance(&report(-14.0), &t).is_none(),
-            "At target: delta=0.0, within tolerance");
+        assert!(
+            lufs_compliance(&report(-14.0), &t).is_none(),
+            "At target: delta=0.0, within tolerance"
+        );
     }
 
     #[test]
     fn test_at_tolerance_boundary_no_trigger() {
         // delta = -14.5 - (-14.0) = -0.5, abs = 0.5 = lufs_tolerance → no trigger (<=)
         let t = thresholds_for("spotify", Some(-14.0));
-        assert!(lufs_compliance(&report(-14.5), &t).is_none(),
-            "At exactly ±0.5 boundary: must not trigger");
+        assert!(
+            lufs_compliance(&report(-14.5), &t).is_none(),
+            "At exactly ±0.5 boundary: must not trigger"
+        );
     }
 
     #[test]
@@ -153,8 +163,11 @@ mod tests {
         // -12.0 → delta = 2.0, abs = 2.0 — NOT > 2.0 → Medium (boundary)
         let t = thresholds_for("spotify", Some(-14.0));
         let issue = lufs_compliance(&report(-12.0), &t).unwrap();
-        assert_eq!(issue.severity, Severity::Medium,
-            "delta=2.0 exactly: should be Medium (threshold is > 2.0)");
+        assert_eq!(
+            issue.severity,
+            Severity::Medium,
+            "delta=2.0 exactly: should be Medium (threshold is > 2.0)"
+        );
     }
 
     // ── High severity (> 2.0) ────────────────────────────────────────────────
@@ -189,8 +202,11 @@ mod tests {
         let t = thresholds_for("apple_music", Some(-16.0));
         let issue = lufs_compliance(&report(-14.0), &t).unwrap();
         assert_eq!(issue.severity, Severity::Medium);
-        assert!(issue.tags.iter().any(|tag| tag == "platform:apple_music"),
-            "Tag must reflect preset: {:?}", issue.tags);
+        assert!(
+            issue.tags.iter().any(|tag| tag == "platform:apple_music"),
+            "Tag must reflect preset: {:?}",
+            issue.tags
+        );
     }
 
     // ── Params correctness ────────────────────────────────────────────────────
@@ -200,15 +216,18 @@ mod tests {
         let t = thresholds_for("spotify", Some(-14.0));
         let issue = lufs_compliance(&report(-12.0), &t).unwrap();
         assert!((issue.params.current - (-12.0)).abs() < 0.001);
-        assert!((issue.params.target  - (-14.0)).abs() < 0.001);
-        assert!((issue.params.delta   -   2.0 ).abs() < 0.001);
+        assert!((issue.params.target - (-14.0)).abs() < 0.001);
+        assert!((issue.params.delta - 2.0).abs() < 0.001);
     }
 
     #[test]
     fn test_tag_reflects_preset_name() {
         let t = thresholds_for("broadcast", Some(-23.0));
         let issue = lufs_compliance(&report(-20.0), &t).unwrap();
-        assert!(issue.tags.iter().any(|tag| tag == "platform:broadcast"),
-            "Tag must be platform:broadcast, got: {:?}", issue.tags);
+        assert!(
+            issue.tags.iter().any(|tag| tag == "platform:broadcast"),
+            "Tag must be platform:broadcast, got: {:?}",
+            issue.tags
+        );
     }
 }

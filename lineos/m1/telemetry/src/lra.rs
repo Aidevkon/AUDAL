@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 pub struct LraCalculator {
     /// Short-term loudness values (3s windows) that passed the absolute gate.
     short_term_values: Vec<f32>,
-    sample_rate:       u32,
+    sample_rate: u32,
 }
 
 impl LraCalculator {
@@ -29,18 +29,23 @@ impl LraCalculator {
     /// Window: 3s = sample_rate × 3 × channels samples.
     /// Hop: 1s = sample_rate × 1 × channels samples.
     pub fn feed_samples(&mut self, samples: &[f32], channels: u16) {
-        if samples.is_empty() || channels == 0 { return; }
+        if samples.is_empty() || channels == 0 {
+            return;
+        }
         let window_size = self.sample_rate as usize * 3 * channels as usize;
-        let hop_size    = (self.sample_rate as usize) * channels as usize;
+        let hop_size = (self.sample_rate as usize) * channels as usize;
 
-        if window_size == 0 { return; }
+        if window_size == 0 {
+            return;
+        }
 
         let mut pos = 0;
         while pos + window_size <= samples.len() {
             let window = &samples[pos..pos + window_size];
-            let ms     = mean_square(window);
-            let lufs   = ms_to_lufs(ms);
-            if lufs > -70.0 {  // absolute gate per EBU R128 §3.4
+            let ms = mean_square(window);
+            let lufs = ms_to_lufs(ms);
+            if lufs > -70.0 {
+                // absolute gate per EBU R128 §3.4
                 self.short_term_values.push(lufs);
             }
             pos += hop_size;
@@ -59,14 +64,10 @@ impl LraCalculator {
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
 
         // Relative gate: -20 LU below ungated mean of gated short-term values
-        let ungated_mean = sorted.iter().map(|&v| v as f64).sum::<f64>()
-            / sorted.len() as f64;
+        let ungated_mean = sorted.iter().map(|&v| v as f64).sum::<f64>() / sorted.len() as f64;
         let gate = ungated_mean as f32 - 20.0;
 
-        let gated: Vec<f32> = sorted.iter()
-            .copied()
-            .filter(|&v| v > gate)
-            .collect();
+        let gated: Vec<f32> = sorted.iter().copied().filter(|&v| v > gate).collect();
 
         if gated.len() < 2 {
             return 0.0;
@@ -82,7 +83,9 @@ impl LraCalculator {
 /// Mean square of a sample slice.
 #[inline]
 fn mean_square(samples: &[f32]) -> f32 {
-    if samples.is_empty() { return 0.0; }
+    if samples.is_empty() {
+        return 0.0;
+    }
     let sum: f32 = samples.iter().map(|&s| s * s).sum();
     sum / samples.len() as f32
 }

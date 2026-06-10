@@ -4,9 +4,9 @@ use lineos_types::analysis::StemMetrics;
 pub enum HarmonicsState {
     Silent = 0,
     Sparse = 1,
-    Dense  = 2,
+    Dense = 2,
     Bright = 3,
-    Warm   = 4,
+    Warm = 4,
 }
 
 impl HarmonicsState {
@@ -14,9 +14,9 @@ impl HarmonicsState {
         match self {
             HarmonicsState::Silent => "silent",
             HarmonicsState::Sparse => "sparse",
-            HarmonicsState::Dense  => "dense",
+            HarmonicsState::Dense => "dense",
             HarmonicsState::Bright => "bright",
-            HarmonicsState::Warm   => "warm",
+            HarmonicsState::Warm => "warm",
         }
     }
 }
@@ -50,7 +50,8 @@ impl HarmonicsMarkovStateClassifier {
 
     pub fn predict_next(state: HarmonicsState) -> HarmonicsState {
         let row = TRANSITION_MATRIX_HARMONICS_V1[state as usize];
-        let next_idx = row.iter()
+        let next_idx = row
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -70,17 +71,27 @@ mod tests {
     use super::*;
 
     fn mock(rms: f32, crest: f32) -> StemMetrics {
-        StemMetrics { rms_db: rms, crest_factor_db: crest, ..StemMetrics::default() }
+        StemMetrics {
+            rms_db: rms,
+            crest_factor_db: crest,
+            ..StemMetrics::default()
+        }
     }
 
     #[test]
     fn classify_silent() {
-        assert_eq!(HarmonicsMarkovStateClassifier::classify_harmonics(&mock(-65.0, 5.0)), HarmonicsState::Silent);
+        assert_eq!(
+            HarmonicsMarkovStateClassifier::classify_harmonics(&mock(-65.0, 5.0)),
+            HarmonicsState::Silent
+        );
     }
 
     #[test]
     fn predict_next_from_sparse_is_sparse() {
-        assert_eq!(HarmonicsMarkovStateClassifier::predict_next(HarmonicsState::Sparse), HarmonicsState::Sparse);
+        assert_eq!(
+            HarmonicsMarkovStateClassifier::predict_next(HarmonicsState::Sparse),
+            HarmonicsState::Sparse
+        );
     }
 
     #[test]

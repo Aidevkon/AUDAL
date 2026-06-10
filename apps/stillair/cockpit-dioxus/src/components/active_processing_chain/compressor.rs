@@ -1,9 +1,14 @@
-use dioxus::prelude::*;
-use super::types::CompressorState;
 use super::eq::eq_stroke_path;
+use super::types::CompressorState;
+use dioxus::prelude::*;
 
 pub fn comp_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
-    if points.is_empty() { return format!("M0,{} L{},{} L{},{} L0,{} Z", height, width, 0.0, width, height, height); }
+    if points.is_empty() {
+        return format!(
+            "M0,{} L{},{} L{},{} L0,{} Z",
+            height, width, 0.0, width, height, height
+        );
+    }
     let mut path = eq_stroke_path(points, width, height);
     path.push_str(&format!(" L{},{} L0,{} Z", width, height, height));
     path

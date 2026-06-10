@@ -4,68 +4,81 @@
 // Priority-weighted average across entire component.
 // BTreeMap — no HashSet (deterministic order guaranteed).
 
-use std::collections::BTreeMap;
+use super::zone::*;
+use crate::personas::config::PersonaConfig;
 use lineos_types::analysis::StemFeatures;
 use lineos_types::pre_analysis::PreAnalysisData;
-use crate::personas::config::PersonaConfig;
-use super::zone::*;
+use std::collections::BTreeMap;
 
 pub struct SemanticZoneResolver;
 
 impl SemanticZoneResolver {
     /// Build default zone set from persona priorities and stem features.
-    pub fn build_zones(persona:      &PersonaConfig,
-                       features:     &StemFeatures,
-                       pre_analysis: Option<&PreAnalysisData>,
+    pub fn build_zones(
+        persona: &PersonaConfig,
+        features: &StemFeatures,
+        pre_analysis: Option<&PreAnalysisData>,
     ) -> Vec<SemanticZone> {
         let mut zones = vec![];
 
         zones.push(SemanticZone {
-            id: "dialogue".into(), center_hz: 3000.0, bandwidth_hz: 3000.0,
-            gain_db: zone_gain_from_priority(
-                persona.zone_priorities.dialogue, 0.0, 2.0),
-            q: 0.7, priority: persona.zone_priorities.dialogue,
+            id: "dialogue".into(),
+            center_hz: 3000.0,
+            bandwidth_hz: 3000.0,
+            gain_db: zone_gain_from_priority(persona.zone_priorities.dialogue, 0.0, 2.0),
+            q: 0.7,
+            priority: persona.zone_priorities.dialogue,
             active: true,
         });
         zones.push(SemanticZone {
-            id: "bass".into(), center_hz: 120.0, bandwidth_hz: 190.0,
-            gain_db: zone_gain_from_priority(
-                persona.zone_priorities.bass, 0.0, 2.5),
-            q: 0.5, priority: persona.zone_priorities.bass,
+            id: "bass".into(),
+            center_hz: 120.0,
+            bandwidth_hz: 190.0,
+            gain_db: zone_gain_from_priority(persona.zone_priorities.bass, 0.0, 2.5),
+            q: 0.5,
+            priority: persona.zone_priorities.bass,
             active: true,
         });
         zones.push(SemanticZone {
-            id: "air".into(), center_hz: 14000.0, bandwidth_hz: 10000.0,
-            gain_db: zone_gain_from_priority(
-                persona.zone_priorities.air, 0.0, 2.0),
-            q: 0.4, priority: persona.zone_priorities.air,
+            id: "air".into(),
+            center_hz: 14000.0,
+            bandwidth_hz: 10000.0,
+            gain_db: zone_gain_from_priority(persona.zone_priorities.air, 0.0, 2.0),
+            q: 0.4,
+            priority: persona.zone_priorities.air,
             active: true,
         });
 
         // Zone flags — from PreAnalysis if available, fallback to stem features
         let cymbal_harsh = pre_analysis
             .map(|pa| pa.zone_flags.zone_cymbal_harsh)
-            .unwrap_or(features.harmonics.spectral_crest_factor
-                > CYMBAL_HARSH_CREST_THRESHOLD);
+            .unwrap_or(features.harmonics.spectral_crest_factor > CYMBAL_HARSH_CREST_THRESHOLD);
 
         let sub_rumble = pre_analysis
             .map(|pa| pa.zone_flags.zone_sub_rumble)
-            .unwrap_or(features.mix.stem_energy_ratios[0]
-                > SUB_RUMBLE_ENERGY_THRESHOLD);
+            .unwrap_or(features.mix.stem_energy_ratios[0] > SUB_RUMBLE_ENERGY_THRESHOLD);
 
         if cymbal_harsh {
             zones.push(SemanticZone {
-                id: "cymbal_harsh".into(), center_hz: 9000.0,
-                bandwidth_hz: 5000.0, gain_db: -1.5,
-                q: 0.8, priority: 4, active: true,
+                id: "cymbal_harsh".into(),
+                center_hz: 9000.0,
+                bandwidth_hz: 5000.0,
+                gain_db: -1.5,
+                q: 0.8,
+                priority: 4,
+                active: true,
             });
         }
 
         if sub_rumble {
             zones.push(SemanticZone {
-                id: "sub_rumble".into(), center_hz: 40.0,
-                bandwidth_hz: 40.0, gain_db: -1.0,
-                q: 1.0, priority: 5, active: true,
+                id: "sub_rumble".into(),
+                center_hz: 40.0,
+                bandwidth_hz: 40.0,
+                gain_db: -1.0,
+                q: 1.0,
+                priority: 5,
+                active: true,
             });
         }
 
@@ -80,7 +93,8 @@ impl SemanticZoneResolver {
             return ZoneAdjustments::empty();
         }
         let components = Self::find_components(zones);
-        let mut bands: Vec<ZoneAdjustment> = components.iter()
+        let mut bands: Vec<ZoneAdjustment> = components
+            .iter()
             .map(|indices| Self::resolve_component(zones, indices))
             .collect();
         bands.sort_by(|a, b| a.center_hz.total_cmp(&b.center_hz));
@@ -88,9 +102,10 @@ impl SemanticZoneResolver {
     }
 
     /// Full pipeline: build zones + resolve.
-    pub fn auto_carve(persona:      &PersonaConfig,
-                      features:     &StemFeatures,
-                      pre_analysis: Option<&PreAnalysisData>,
+    pub fn auto_carve(
+        persona: &PersonaConfig,
+        features: &StemFeatures,
+        pre_analysis: Option<&PreAnalysisData>,
     ) -> ZoneAdjustments {
         Self::resolve(&Self::build_zones(persona, features, pre_analysis))
     }
@@ -110,20 +125,20 @@ impl SemanticZoneResolver {
         fn union(parent: &mut Vec<usize>, i: usize, j: usize) {
             let ri = find(parent, i);
             let rj = find(parent, j);
-            if ri != rj { parent[rj] = ri; }
+            if ri != rj {
+                parent[rj] = ri;
+            }
         }
 
         for i in 0..n {
-            for j in (i+1)..n {
-                if zones[i].active && zones[j].active
-                   && zones[i].overlaps(&zones[j]) {
+            for j in (i + 1)..n {
+                if zones[i].active && zones[j].active && zones[i].overlaps(&zones[j]) {
                     union(&mut parent, i, j);
                 }
             }
         }
 
-        let mut components: BTreeMap<usize, Vec<usize>> =
-            BTreeMap::new();
+        let mut components: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
         for (i, zone) in zones.iter().enumerate().take(n) {
             if zone.active {
                 let root = find(&mut parent, i);
@@ -133,52 +148,58 @@ impl SemanticZoneResolver {
 
         let mut result: Vec<Vec<usize>> = components
             .into_values()
-            .map(|mut v| { v.sort_unstable(); v })
+            .map(|mut v| {
+                v.sort_unstable();
+                v
+            })
             .collect();
         result.sort_by_key(|c| c[0]);
         result
     }
 
     /// Priority-weighted average across all zones in component.
-    fn resolve_component(zones: &[SemanticZone],
-                         indices: &[usize]) -> ZoneAdjustment {
+    fn resolve_component(zones: &[SemanticZone], indices: &[usize]) -> ZoneAdjustment {
         debug_assert!(!indices.is_empty());
 
         if indices.len() == 1 {
             let z = &zones[indices[0]];
             return ZoneAdjustment {
                 center_hz: z.center_hz,
-                gain_db:   z.gain_db
-                    .clamp(ZONE_GAIN_MIN_DB, ZONE_GAIN_MAX_DB),
-                q:         z.q,
+                gain_db: z.gain_db.clamp(ZONE_GAIN_MIN_DB, ZONE_GAIN_MAX_DB),
+                q: z.q,
             };
         }
 
-        let total_w: f32 = indices.iter()
-            .map(|&i| zones[i].priority as f32)
-            .sum();
+        let total_w: f32 = indices.iter().map(|&i| zones[i].priority as f32).sum();
 
-        let center_hz = indices.iter()
+        let center_hz = indices
+            .iter()
             .map(|&i| zones[i].priority as f32 * zones[i].center_hz)
-            .sum::<f32>() / total_w;
+            .sum::<f32>()
+            / total_w;
 
-        let gain_db = (indices.iter()
+        let gain_db = (indices
+            .iter()
             .map(|&i| zones[i].priority as f32 * zones[i].gain_db)
-            .sum::<f32>() / total_w)
+            .sum::<f32>()
+            / total_w)
             .clamp(ZONE_GAIN_MIN_DB, ZONE_GAIN_MAX_DB);
 
-        let q = indices.iter()
+        let q = indices
+            .iter()
             .map(|&i| zones[i].q)
             .fold(0.0_f32, f32::max)
             .clamp(ZONE_Q_MIN, ZONE_Q_MAX);
 
-        ZoneAdjustment { center_hz, gain_db, q }
+        ZoneAdjustment {
+            center_hz,
+            gain_db,
+            q,
+        }
     }
 }
 
-fn zone_gain_from_priority(priority: u8,
-                            min_gain: f32,
-                            max_gain: f32) -> f32 {
+fn zone_gain_from_priority(priority: u8, min_gain: f32, max_gain: f32) -> f32 {
     let t = (priority as f32 - 1.0) / 9.0;
     min_gain + t * (max_gain - min_gain)
 }
@@ -189,22 +210,33 @@ mod tests {
     use crate::personas::manager::PersonaManager;
 
     fn test_stem_features() -> StemFeatures {
-        use lineos_types::analysis::{StemMetrics, MixMetrics};
+        use lineos_types::analysis::{MixMetrics, StemMetrics};
         StemFeatures {
-            bass:      StemMetrics::default(),
+            bass: StemMetrics::default(),
             harmonics: StemMetrics::default(),
-            voice:     StemMetrics::default(),
-            drums:     StemMetrics::default(),
-            ambience:  StemMetrics::default(),
-            mix:       MixMetrics::default(),
+            voice: StemMetrics::default(),
+            drums: StemMetrics::default(),
+            ambience: StemMetrics::default(),
+            mix: MixMetrics::default(),
         }
     }
 
-    fn make_zone(id: &str, center_hz: f32, bandwidth_hz: f32,
-                 gain_db: f32, q: f32, priority: u8) -> SemanticZone {
+    fn make_zone(
+        id: &str,
+        center_hz: f32,
+        bandwidth_hz: f32,
+        gain_db: f32,
+        q: f32,
+        priority: u8,
+    ) -> SemanticZone {
         SemanticZone {
-            id: id.into(), center_hz, bandwidth_hz,
-            gain_db, q, priority, active: true,
+            id: id.into(),
+            center_hz,
+            bandwidth_hz,
+            gain_db,
+            q,
+            priority,
+            active: true,
         }
     }
 
@@ -221,8 +253,8 @@ mod tests {
     #[test]
     fn zones_no_collision_passthrough() {
         let zones = vec![
-            make_zone("bass",  120.0,   100.0, 1.5, 0.5, 7),
-            make_zone("air",   14000.0, 8000.0, 1.0, 0.4, 8),
+            make_zone("bass", 120.0, 100.0, 1.5, 0.5, 7),
+            make_zone("air", 14000.0, 8000.0, 1.0, 0.4, 8),
         ];
         assert_eq!(SemanticZoneResolver::resolve(&zones).bands.len(), 2);
     }
@@ -230,8 +262,8 @@ mod tests {
     #[test]
     fn zones_two_overlapping_one_band() {
         let zones = vec![
-            make_zone("dialogue", 3000.0, 3000.0,  2.0, 0.7, 6),
-            make_zone("traffic",  3000.0, 2000.0, -3.0, 0.8, 3),
+            make_zone("dialogue", 3000.0, 3000.0, 2.0, 0.7, 6),
+            make_zone("traffic", 3000.0, 2000.0, -3.0, 0.8, 3),
         ];
         assert_eq!(SemanticZoneResolver::resolve(&zones).bands.len(), 1);
     }
@@ -239,33 +271,40 @@ mod tests {
     #[test]
     fn zones_three_overlapping_one_band() {
         let zones = vec![
-            make_zone("a", 3000.0, 3000.0,  2.0, 0.7, 6),
+            make_zone("a", 3000.0, 3000.0, 2.0, 0.7, 6),
             make_zone("b", 3000.0, 2000.0, -3.0, 0.8, 5),
-            make_zone("c", 2500.0, 2000.0,  1.0, 0.6, 4),
+            make_zone("c", 2500.0, 2000.0, 1.0, 0.6, 4),
         ];
         let r = SemanticZoneResolver::resolve(&zones);
-        assert_eq!(r.bands.len(), 1,
-            "Three overlapping zones must resolve to ONE band");
+        assert_eq!(
+            r.bands.len(),
+            1,
+            "Three overlapping zones must resolve to ONE band"
+        );
     }
 
     #[test]
     fn zones_three_weighted_average() {
         let zones = vec![
-            make_zone("a", 3000.0, 3000.0,  2.0, 0.7, 6),
+            make_zone("a", 3000.0, 3000.0, 2.0, 0.7, 6),
             make_zone("b", 3000.0, 2000.0, -3.0, 0.8, 5),
-            make_zone("c", 2500.0, 2000.0,  1.0, 0.6, 4),
+            make_zone("c", 2500.0, 2000.0, 1.0, 0.6, 4),
         ];
-        let expected = (6.0*2.0 + 5.0*(-3.0) + 4.0*1.0) / 15.0;
+        let expected = (6.0 * 2.0 + 5.0 * (-3.0) + 4.0 * 1.0) / 15.0;
         let r = SemanticZoneResolver::resolve(&zones);
-        assert!((r.bands[0].gain_db - expected).abs() < 1e-4,
-            "gain: {} vs expected {}", r.bands[0].gain_db, expected);
+        assert!(
+            (r.bands[0].gain_db - expected).abs() < 1e-4,
+            "gain: {} vs expected {}",
+            r.bands[0].gain_db,
+            expected
+        );
     }
 
     #[test]
     fn zones_output_sorted_by_center_hz() {
         let zones = vec![
-            make_zone("air",  14000.0, 8000.0, 1.0, 0.4, 8),
-            make_zone("bass",   120.0,  100.0, 1.5, 0.5, 7),
+            make_zone("air", 14000.0, 8000.0, 1.0, 0.4, 8),
+            make_zone("bass", 120.0, 100.0, 1.5, 0.5, 7),
         ];
         let r = SemanticZoneResolver::resolve(&zones);
         assert!(r.bands[0].center_hz < r.bands[1].center_hz);
@@ -283,7 +322,7 @@ mod tests {
     fn zones_inactive_excluded() {
         let mut zones = vec![
             make_zone("a", 3000.0, 2000.0, 2.0, 0.7, 6),
-            make_zone("b",  120.0,  100.0, 1.5, 0.5, 7),
+            make_zone("b", 120.0, 100.0, 1.5, 0.5, 7),
         ];
         zones[0].active = false;
         let r = SemanticZoneResolver::resolve(&zones);
@@ -295,11 +334,13 @@ mod tests {
     fn zones_serializable() {
         let adj = ZoneAdjustments {
             bands: vec![ZoneAdjustment {
-                center_hz:3000.0, gain_db:1.5, q:0.7
-            }]
+                center_hz: 3000.0,
+                gain_db: 1.5,
+                q: 0.7,
+            }],
         };
-        let adj2: ZoneAdjustments = serde_json::from_str(
-            &serde_json::to_string(&adj).unwrap()).unwrap();
+        let adj2: ZoneAdjustments =
+            serde_json::from_str(&serde_json::to_string(&adj).unwrap()).unwrap();
         assert_eq!(adj, adj2);
     }
 }

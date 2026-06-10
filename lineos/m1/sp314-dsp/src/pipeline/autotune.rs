@@ -1,11 +1,11 @@
 #![allow(deprecated)]
 
-pub const AUTOTUNE_MIN_GAIN_DB:    f32 = -12.0;
-pub const AUTOTUNE_MAX_GAIN_DB:    f32 =  12.0;
+pub const AUTOTUNE_MIN_GAIN_DB: f32 = -12.0;
+pub const AUTOTUNE_MAX_GAIN_DB: f32 = 12.0;
 pub const AUTOTUNE_MAX_ITERATIONS: usize = 10;
-pub const AUTOTUNE_TOLERANCE_DB:   f32 =  0.1;
-pub const AUTOTUNE_MAX_CLIP_RATIO: f32 =  0.01;  // 1% clip tolerance
-pub const AUTOTUNE_CHUNK_SAMPLES:  usize = 96_000; // 2 seconds @ 48kHz
+pub const AUTOTUNE_TOLERANCE_DB: f32 = 0.1;
+pub const AUTOTUNE_MAX_CLIP_RATIO: f32 = 0.01; // 1% clip tolerance
+pub const AUTOTUNE_CHUNK_SAMPLES: usize = 96_000; // 2 seconds @ 48kHz
 
 #[derive(Debug, Clone, Copy)]
 pub struct AutotuneResult {
@@ -18,7 +18,7 @@ pub struct AutotuneResult {
 /// Zero allocation — operates on slices.
 pub fn find_highest_energy_chunk(left: &[f32], right: &[f32]) -> usize {
     let chunk = AUTOTUNE_CHUNK_SAMPLES.min(left.len());
-    let hop   = 48_000_usize; // 1-second hop
+    let hop = 48_000_usize; // 1-second hop
     let mut best_start = 0usize;
     let mut best_energy = 0.0_f32;
 
@@ -30,11 +30,11 @@ pub fn find_highest_energy_chunk(left: &[f32], right: &[f32]) -> usize {
         }
         if energy > best_energy {
             best_energy = energy;
-            best_start  = start;
+            best_start = start;
         }
         start += hop;
     }
-    
+
     // If the loop didn't run (e.g. left.len() < chunk)
     // best_start remains 0, which is correct for short buffers.
     best_start
@@ -53,8 +53,12 @@ pub fn measure_clipping_ratio_post_process(left: &[f32], right: &[f32]) -> f32 {
     }
     let mut over = 0usize;
     for i in 0..left.len() {
-        if libm::fabsf(left[i])  >= 0.9999_f32 { over += 1; }
-        if libm::fabsf(right[i]) >= 0.9999_f32 { over += 1; }
+        if libm::fabsf(left[i]) >= 0.9999_f32 {
+            over += 1;
+        }
+        if libm::fabsf(right[i]) >= 0.9999_f32 {
+            over += 1;
+        }
     }
     over as f32 / total
 }
@@ -63,16 +67,13 @@ pub fn measure_clipping_ratio_post_process(left: &[f32], right: &[f32]) -> f32 {
 /// Pure function — no IO, no file reading, no chunk estimation.
 /// Uses PreAnalysis integrated_lufs (full track, EBU R128 gated).
 /// Same input → same output always. INV-AB-1 preserved.
-pub fn autotune(
-    measured_lufs: f32,
-    target_lufs:   f32,
-) -> AutotuneResult {
+pub fn autotune(measured_lufs: f32, target_lufs: f32) -> AutotuneResult {
     let pre_gain_db = if measured_lufs.is_finite() && target_lufs.is_finite() {
         (target_lufs - measured_lufs).clamp(-20.0, 20.0)
     } else {
-        0.0  // safe fallback
+        0.0 // safe fallback
     };
-    
+
     AutotuneResult {
         pre_gain_db,
         estimated_input_lufs: measured_lufs,

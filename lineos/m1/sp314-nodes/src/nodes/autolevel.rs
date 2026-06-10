@@ -1,5 +1,5 @@
 use crate::node::DspNode;
-use libm::{expf, powf, log10f};
+use libm::{expf, log10f, powf};
 
 pub struct AutoLevelNode {
     sample_rate: u32,
@@ -14,7 +14,7 @@ pub struct AutoLevelNode {
     window_idx: usize,
     sum_squares: f32,
     samples_seen: usize,
-    
+
     current_gain_lin: f32,
 }
 
@@ -36,7 +36,14 @@ impl AutoLevelNode {
         }
     }
 
-    pub fn set_params(&mut self, target: f32, lookahead: f32, max_gain: f32, min_gain: f32, smoothing: f32) {
+    pub fn set_params(
+        &mut self,
+        target: f32,
+        lookahead: f32,
+        max_gain: f32,
+        min_gain: f32,
+        smoothing: f32,
+    ) {
         self.set_parameter("target_rms_db", target);
         self.set_parameter("lookahead_ms", lookahead);
         self.set_parameter("max_gain_db", max_gain);
@@ -60,44 +67,55 @@ impl DspNode for AutoLevelNode {
         for i in 0..left.len() {
             let l = left[i];
             let r = right[i];
-            
+
             // Mono mix for RMS calculation
             let mono = (l + r) * 0.5;
             let sq = mono * mono;
-            
+
             // Sliding window RMS
             let old_sq = self.window_buffer[self.window_idx];
             self.sum_squares = self.sum_squares + sq - old_sq;
-            if self.sum_squares < 0.0 { self.sum_squares = 0.0; }
+            if self.sum_squares < 0.0 {
+                self.sum_squares = 0.0;
+            }
             self.window_buffer[self.window_idx] = sq;
-            
+
             self.window_idx += 1;
             if self.window_idx >= self.window_buffer.len() {
                 self.window_idx = 0;
             }
-            
+
             if self.samples_seen < self.window_buffer.len() {
                 self.samples_seen += 1;
             }
-            
+
             let divisor = self.samples_seen as f32;
-            let mean_sq = if divisor > 0.0 { self.sum_squares / divisor } else { 0.0 };
+            let mean_sq = if divisor > 0.0 {
+                self.sum_squares / divisor
+            } else {
+                0.0
+            };
             let rms_lin = libm::sqrtf(mean_sq);
-            
+
             let rms_db = if rms_lin > 1e-6 {
                 20.0 * log10f(rms_lin)
             } else {
                 -120.0
             };
-            
+
             let mut target_gain_db = self.target_rms_db - rms_db;
-            if target_gain_db > self.max_gain_db { target_gain_db = self.max_gain_db; }
-            if target_gain_db < self.min_gain_db { target_gain_db = self.min_gain_db; }
-            
+            if target_gain_db > self.max_gain_db {
+                target_gain_db = self.max_gain_db;
+            }
+            if target_gain_db < self.min_gain_db {
+                target_gain_db = self.min_gain_db;
+            }
+
             let target_gain_lin = powf(10.0, target_gain_db / 20.0);
-            
-            self.current_gain_lin = self.current_gain_lin * smoothing_coef + target_gain_lin * (1.0 - smoothing_coef);
-            
+
+            self.current_gain_lin =
+                self.current_gain_lin * smoothing_coef + target_gain_lin * (1.0 - smoothing_coef);
+
             left[i] = l * self.current_gain_lin;
             right[i] = r * self.current_gain_lin;
         }
@@ -156,7 +174,11 @@ mod tests {
         node.process_stereo(&mut l, &mut r);
         // Gain should be ~1.0 — signal unchanged
         let ratio = l[511] / l_orig[511];
-        assert!((ratio - 1.0).abs() < 0.1, "Expected unity gain, got {}", ratio);
+        assert!(
+            (ratio - 1.0).abs() < 0.1,
+            "Expected unity gain, got {}",
+            ratio
+        );
     }
 
     #[test]
@@ -169,7 +191,10 @@ mod tests {
         node.process_stereo(&mut l, &mut r);
         // Output should be louder than input
         assert!(l[4799] > 0.001, "Signal not boosted");
-        assert!(l[4799] < 0.001 * 10.0_f32.powf(12.0 / 20.0) + 0.0001, "Gain exceeded maximum");
+        assert!(
+            l[4799] < 0.001 * 10.0_f32.powf(12.0 / 20.0) + 0.0001,
+            "Gain exceeded maximum"
+        );
     }
 
     #[test]
@@ -193,8 +218,13 @@ mod tests {
         node.process_stereo(&mut l, &mut r);
         // Check no abrupt jumps between adjacent samples
         for i in 1..4800 {
-            let delta = (l[i] - l[i-1]).abs();
-            assert!(delta < 0.01, "Abrupt gain change at sample {}: {}", i, delta);
+            let delta = (l[i] - l[i - 1]).abs();
+            assert!(
+                delta < 0.01,
+                "Abrupt gain change at sample {}: {}",
+                i,
+                delta
+            );
         }
     }
 

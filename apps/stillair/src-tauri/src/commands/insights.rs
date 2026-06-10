@@ -8,27 +8,27 @@
 //! FORBIDDEN: Re-measuring audio (all values come from the blob).
 //! FORBIDDEN: serde_json::Value in return types.
 
-use tauri::command;
 use crate::ipc::m0_client::GoldenBlobJson;
 use serde::{Deserialize, Serialize};
+use tauri::command;
 
 /// Coach findings returned to Cockpit — matches lineos-rule-engine CoachFindings.
 /// All fields typed — no serde_json::Value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoachFindingsJson {
-    pub issues:         Vec<IssueJson>,
+    pub issues: Vec<IssueJson>,
     pub recommendation: String,
 }
 
 /// A single finding — mirrors lineos-rule-engine Issue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueJson {
-    pub id:       String,
-    pub severity: String,        // "info" | "low" | "medium" | "high"
-    pub current:  f32,
-    pub target:   f32,
-    pub delta:    f32,
-    pub tags:     Vec<String>,
+    pub id: String,
+    pub severity: String, // "info" | "low" | "medium" | "high"
+    pub current: f32,
+    pub target: f32,
+    pub delta: f32,
+    pub tags: Vec<String>,
 }
 
 /// Evaluate CoachFindings from a Golden Blob via the local rule-engine.
@@ -47,7 +47,6 @@ pub async fn evaluate_findings(_blob: GoldenBlobJson) -> Result<CoachFindingsJso
 mod tests {
     // use super::*;
     // use crate::ipc::m0_client::{LoudnessMetricsJson, QualityMetricsJson, ProvenanceJson};
-
 
     /* TODO: 3b — restore tests
     #[tokio::test]

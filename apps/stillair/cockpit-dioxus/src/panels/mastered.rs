@@ -13,11 +13,11 @@
 //! Phase 15: Real before/after waveforms from PCM cache (A-003 §11).
 
 use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 use serde_json::json;
+use wasm_bindgen_futures::spawn_local;
 
-use crate::types::{SessionStateJson, VisualizationDataJson};
 use crate::ipc::invoke;
+use crate::types::{SessionStateJson, VisualizationDataJson};
 
 /// View mode — UI-only signal, no IPC. (§5.3)
 #[derive(Debug, Clone, PartialEq)]
@@ -35,17 +35,23 @@ pub enum ViewMode {
 #[component]
 pub fn MasteredView(
     session_state: Signal<Option<SessionStateJson>>,
-    viz_data:      Signal<Option<VisualizationDataJson>>,
-    on_close:      EventHandler<()>,
+    viz_data: Signal<Option<VisualizationDataJson>>,
+    on_close: EventHandler<()>,
 ) -> Element {
     // ViewMode — UI signal only, no IPC (§5.3)
     let mut view_mode: Signal<ViewMode> = use_signal(|| ViewMode::Split);
 
     let session = session_state.read();
-    let viz     = viz_data.read();
+    let viz = viz_data.read();
 
-    let before_path = viz.as_ref().map(|v| v.waveform_before_svg.clone()).unwrap_or_default();
-    let after_path  = viz.as_ref().map(|v| v.waveform_after_svg.clone()).unwrap_or_default();
+    let before_path = viz
+        .as_ref()
+        .map(|v| v.waveform_before_svg.clone())
+        .unwrap_or_default();
+    let after_path = viz
+        .as_ref()
+        .map(|v| v.waveform_after_svg.clone())
+        .unwrap_or_default();
 
     rsx! {
         div {
@@ -275,12 +281,12 @@ fn QualityGatePanel(session: SessionStateJson) -> Element {
 #[component]
 fn CompliancePanel(session: SessionStateJson) -> Element {
     let platforms = [
-        ("SPOTIFY",    session.compliance.spotify),
-        ("YOUTUBE",    session.compliance.youtube),
-        ("APPLE",      session.compliance.apple),
-        ("TIDAL",      session.compliance.tidal),
-        ("BROADCAST",  session.compliance.broadcast),
-        ("EBU R128",   session.compliance.ebu_r128),
+        ("SPOTIFY", session.compliance.spotify),
+        ("YOUTUBE", session.compliance.youtube),
+        ("APPLE", session.compliance.apple),
+        ("TIDAL", session.compliance.tidal),
+        ("BROADCAST", session.compliance.broadcast),
+        ("EBU R128", session.compliance.ebu_r128),
     ];
 
     rsx! {

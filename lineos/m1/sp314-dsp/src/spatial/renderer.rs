@@ -9,7 +9,7 @@ impl StereoRenderer {
         let len = stage.l.len();
         let mut l_out = vec![0.0; len];
         let mut r_out = vec![0.0; len];
-        
+
         let c_gain = 0.707_f32;
         let s_gain = 0.707_f32;
         // lfe_blend = LFE * 0.316 (-10dB)
@@ -61,7 +61,7 @@ mod tests {
             stage.lfe[i] = 0.2;
         }
         let (l_out, r_out) = StereoRenderer::render(&stage);
-        
+
         assert_eq!(l_out, r_out);
     }
 
@@ -80,9 +80,13 @@ mod tests {
         let mut stage = mock_stage();
         stage.lfe = vec![1.0; 100];
         let (l_out, _) = StereoRenderer::render(&stage);
-        
+
         let val = l_out[0];
-        assert!((val - 0.31622776).abs() < 1e-5, "Expected ~0.316, got {}", val);
+        assert!(
+            (val - 0.31622776).abs() < 1e-5,
+            "Expected ~0.316, got {}",
+            val
+        );
     }
 
     #[test]
@@ -91,7 +95,7 @@ mod tests {
         stage1.c = vec![0.5; 100];
         let mut stage2 = mock_stage();
         stage2.c = vec![0.5; 100];
-        
+
         let r1 = StereoRenderer::render(&stage1);
         let r2 = StereoRenderer::render(&stage2);
         assert_eq!(r1, r2);

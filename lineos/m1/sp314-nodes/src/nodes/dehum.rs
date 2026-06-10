@@ -30,7 +30,12 @@ impl DeHumNode {
             let freq = self.fundamental_hz * i as f32;
             if freq < self.sample_rate as f32 / 2.0 {
                 // Q = 20.0 from cleaner.rs
-                self.notches.push(Biquad::new(FilterType::Notch, freq, 20.0, self.sample_rate as f32));
+                self.notches.push(Biquad::new(
+                    FilterType::Notch,
+                    freq,
+                    20.0,
+                    self.sample_rate as f32,
+                ));
             }
         }
     }
@@ -45,7 +50,7 @@ impl DspNode for DeHumNode {
         for i in 0..left.len() {
             let mut l = left[i];
             let mut r = right[i];
-            
+
             for notch in &mut self.notches {
                 let (nl, nr) = notch.process_stereo(l, r);
                 l = nl;
@@ -99,13 +104,13 @@ mod tests {
     fn bypasses_when_disabled() {
         let mut node = DeHumNode::new(48000);
         node.set_parameter("enabled", 0.0);
-        
+
         // Use 50Hz signal
         let mut left = vec![0.5; 480];
         let mut right = vec![0.5; 480];
         // If bypassed, stays 0.5 (or whatever it is)
         node.process_stereo(&mut left, &mut right);
-        
+
         assert_eq!(left[0], 0.5);
     }
 
@@ -115,7 +120,7 @@ mod tests {
         node.set_parameter("enabled", 1.0);
         node.set_parameter("fundamental_hz", 50.0);
         node.set_parameter("harmonics", 1.0);
-        
+
         // Generate 50Hz sine
         let mut left = vec![0.0; 4800];
         let mut right = vec![0.0; 4800];
@@ -124,9 +129,9 @@ mod tests {
             left[i] = val;
             right[i] = val;
         }
-        
+
         node.process_stereo(&mut left, &mut right);
-        
+
         // 50Hz should be heavily attenuated
         // Check energy near end of buffer
         let end_energy = left[4000..4800].iter().map(|v| v.abs()).sum::<f32>() / 800.0;

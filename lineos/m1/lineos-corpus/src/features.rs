@@ -8,9 +8,9 @@
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct StateFeatures {
     /// RMS energy in dBFS. Range: [-144, 0].
-    pub rms_db:            f32,
+    pub rms_db: f32,
     /// Change in RMS from previous window.
-    pub rms_delta:         f32,
+    pub rms_delta: f32,
     /// Temporal transient density. Range: [0, 1].
     pub transient_density: f32,
     /// Spectral centroid in Hz. Range: [20, 20000].
@@ -26,8 +26,8 @@ pub struct StateFeatures {
 impl StateFeatures {
     /// Create StateFeatures without MFCCs (corpus reader path).
     pub fn new(
-        rms_db:            f32,
-        prev_rms_db:       f32,
+        rms_db: f32,
+        prev_rms_db: f32,
         transient_density: f32,
         spectral_centroid: f32,
         spectral_flatness: f32,
@@ -44,12 +44,12 @@ impl StateFeatures {
 
     /// Create StateFeatures with MFCCs (full analysis path).
     pub fn with_mfcc(
-        rms_db:            f32,
-        prev_rms_db:       f32,
+        rms_db: f32,
+        prev_rms_db: f32,
         transient_density: f32,
         spectral_centroid: f32,
         spectral_flatness: f32,
-        mfcc:              [f32; 13],
+        mfcc: [f32; 13],
     ) -> Self {
         Self {
             rms_db,
@@ -62,22 +62,27 @@ impl StateFeatures {
     }
 
     pub fn activity_hint(&self) -> &'static str {
-        if self.rms_db < -60.0        { "silence" }
-        else if self.rms_delta > 6.0  { "attack"  }
-        else if self.rms_delta < -3.0 { "decay"   }
-        else                          { "sustain" }
+        if self.rms_db < -60.0 {
+            "silence"
+        } else if self.rms_delta > 6.0 {
+            "attack"
+        } else if self.rms_delta < -3.0 {
+            "decay"
+        } else {
+            "sustain"
+        }
     }
 }
 
 impl Default for StateFeatures {
     fn default() -> Self {
         Self {
-            rms_db:            -144.0,
-            rms_delta:         0.0,
+            rms_db: -144.0,
+            rms_delta: 0.0,
             transient_density: 0.0,
             spectral_centroid: 1000.0,
             spectral_flatness: 0.5,
-            mfcc:              [0.0f32; 13],
+            mfcc: [0.0f32; 13],
         }
     }
 }

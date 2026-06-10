@@ -1,6 +1,6 @@
 use crate::conditions::ConditionSet;
-use crate::router::Router;
 use crate::merger::Merger;
+use crate::router::Router;
 
 pub struct Pipelineforge;
 

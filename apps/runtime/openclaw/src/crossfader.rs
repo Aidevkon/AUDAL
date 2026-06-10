@@ -31,7 +31,7 @@ impl Crossfader {
 
     pub fn begin(&mut self, current_graph: DspGraph, mut new_graph: DspGraph, fade_samples: usize) {
         new_graph.reset();
-        
+
         self.graph_a = Some(current_graph);
         self.graph_b = Some(new_graph);
         self.fade_samples_total = fade_samples;
@@ -69,7 +69,8 @@ impl Crossfader {
         let fade_this_block = std::cmp::min(self.block_size, self.fade_samples_remaining);
 
         for i in 0..fade_this_block {
-            let progress = 1.0 - ((self.fade_samples_remaining - i) as f32 / self.fade_samples_total as f32);
+            let progress =
+                1.0 - ((self.fade_samples_remaining - i) as f32 / self.fade_samples_total as f32);
             let gain_a = 1.0 - progress;
             let gain_b = progress;
             left[i] = self.buf_a_left[i] * gain_a + self.buf_b_left[i] * gain_b;
@@ -88,7 +89,7 @@ impl Crossfader {
         }
 
         self.fade_samples_remaining -= self.block_size;
-        
+
         if self.fade_samples_remaining == 0 {
             self.active = false;
             true
@@ -105,7 +106,7 @@ impl Crossfader {
         self.graph_a = None; // Drop old graph
         self.graph_b.take()
     }
-    
+
     pub fn clear(&mut self) {
         self.active = false;
         self.graph_a = None;

@@ -19,10 +19,16 @@ fn muddy_mix_selects_lowmid_clarity() {
 
     let flavors = Pipelineforge::selected_flavors(&conditions);
     assert!(flavors.contains(&"LowMidClarity"));
-    
+
     let eq_idx = flavors.iter().position(|&f| f == "LowMidClarity").unwrap();
-    let comp_idx = flavors.iter().position(|&f| f == "AntiPumpStabilization").unwrap();
-    assert!(eq_idx < comp_idx, "EQ flavor must appear before Compression flavor");
+    let comp_idx = flavors
+        .iter()
+        .position(|&f| f == "AntiPumpStabilization")
+        .unwrap();
+    assert!(
+        eq_idx < comp_idx,
+        "EQ flavor must appear before Compression flavor"
+    );
 }
 
 #[test]
@@ -38,14 +44,21 @@ fn muddy_and_pump_produces_valid_dag() {
     let topology = DspTopology::from_json(&json_str).expect("Valid JSON topology");
 
     let graph = DspGraph::from_topology(&topology, 512, 48000);
-    assert!(graph.is_ok(), "Graph should compile without cycles or missing edges");
+    assert!(
+        graph.is_ok(),
+        "Graph should compile without cycles or missing edges"
+    );
 }
 
 #[test]
 fn lufs_normalization_always_last() {
     let mut conditions = default_conditions();
-    conditions.conditions.push(EngineerCondition::TranslationRisk);
-    conditions.conditions.push(EngineerCondition::DcOffsetDetected);
+    conditions
+        .conditions
+        .push(EngineerCondition::TranslationRisk);
+    conditions
+        .conditions
+        .push(EngineerCondition::DcOffsetDetected);
 
     let flavors = Pipelineforge::selected_flavors(&conditions);
     assert_eq!(*flavors.last().unwrap(), "LufsNormalization");
@@ -54,7 +67,9 @@ fn lufs_normalization_always_last() {
 #[test]
 fn hum_removal_always_first() {
     let mut conditions = default_conditions();
-    conditions.conditions.push(EngineerCondition::MainsHumDetected);
+    conditions
+        .conditions
+        .push(EngineerCondition::MainsHumDetected);
     conditions.conditions.push(EngineerCondition::MuddyMix);
 
     let flavors = Pipelineforge::selected_flavors(&conditions);
@@ -79,7 +94,9 @@ fn empty_conditions_produces_lufs_only() {
 #[test]
 fn forged_topology_loads_into_dsp_graph() {
     let mut conditions = default_conditions();
-    conditions.conditions.push(EngineerCondition::DcOffsetDetected);
+    conditions
+        .conditions
+        .push(EngineerCondition::DcOffsetDetected);
     conditions.conditions.push(EngineerCondition::HarshTopEnd);
     conditions.conditions.push(EngineerCondition::PumpDrift);
     conditions.conditions.push(EngineerCondition::LufsTooQuiet);
@@ -87,8 +104,9 @@ fn forged_topology_loads_into_dsp_graph() {
     let json_str = Pipelineforge::forge(&conditions).unwrap();
     let topology = DspTopology::from_json(&json_str).unwrap();
 
-    let mut graph = DspGraph::from_topology(&topology, 512, 48000).expect("Topology should load into DspGraph");
-    
+    let mut graph =
+        DspGraph::from_topology(&topology, 512, 48000).expect("Topology should load into DspGraph");
+
     let mut left = vec![0.0; 512];
     let mut right = vec![0.0; 512];
     graph.process_block(&mut left, &mut right);

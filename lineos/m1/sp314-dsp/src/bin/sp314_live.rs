@@ -11,11 +11,11 @@
 //
 // Press Ctrl+C to stop.
 
+use ringbuf::HeapRb;
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 use sp314_dsp::realtime::audio_io::{setup_streams, AudioConfig};
 use sp314_dsp::realtime::engine_thread::{spawn_engine_thread, BLOCK_SIZE};
-use ringbuf::HeapRb;
 use std::env;
 use std::sync::atomic::Ordering;
 
@@ -30,7 +30,11 @@ fn print_usage_and_exit() -> ! {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let preset_arg = if args.len() > 1 { args[1].as_str() } else { "spotify" };
+    let preset_arg = if args.len() > 1 {
+        args[1].as_str()
+    } else {
+        "spotify"
+    };
 
     let target = match preset_arg {
         "spotify" => MasteringTarget::SpotifyV3,
@@ -46,7 +50,11 @@ fn main() {
     println!("─────────────────────────────────────");
     println!("Preset:       {:?}", target);
     println!("Sample rate:  48000 Hz");
-    println!("Block size:   {} frames ({:.1}ms)", BLOCK_SIZE, BLOCK_SIZE as f32 / 48000.0 * 1000.0);
+    println!(
+        "Block size:   {} frames ({:.1}ms)",
+        BLOCK_SIZE,
+        BLOCK_SIZE as f32 / 48000.0 * 1000.0
+    );
     println!("Input:        default microphone");
     println!("Output:       default speakers");
     println!("─────────────────────────────────────");
@@ -55,12 +63,12 @@ fn main() {
     // Create ring buffers
     let rb_in = HeapRb::<f32>::new(4096 * 2);
     let (input_prod, input_cons) = rb_in.split();
-    
+
     let rb_out = HeapRb::<f32>::new(4096 * 2);
     let (output_prod, output_cons) = rb_out.split();
 
     let config = AudioConfig::default();
-    
+
     // Setup audio streams
     let streams = setup_streams(&config, input_prod, output_cons);
     let (_in_stream, _out_stream) = match streams {
@@ -81,7 +89,8 @@ fn main() {
     let ctrlc_stop = stop_signal.clone();
     ctrlc::set_handler(move || {
         ctrlc_stop.store(true, Ordering::SeqCst);
-    }).expect("Error setting Ctrl-C handler");
+    })
+    .expect("Error setting Ctrl-C handler");
 
     // Loop and print meter
     while !stop_signal.load(Ordering::SeqCst) {

@@ -1,10 +1,10 @@
 use crate::stft::{StftEngine, N_BINS};
 
-pub const FLUX_THRESHOLD:    f32 = 0.01_f32;
-pub const FLUX_MIN_DISTANCE: usize = 10;  // frames (~100ms)
+pub const FLUX_THRESHOLD: f32 = 0.01_f32;
+pub const FLUX_MIN_DISTANCE: usize = 10; // frames (~100ms)
 
 pub struct SpectralFluxDetector {
-    engine:       StftEngine,
+    engine: StftEngine,
 }
 
 impl Default for SpectralFluxDetector {
@@ -16,7 +16,7 @@ impl Default for SpectralFluxDetector {
 impl SpectralFluxDetector {
     pub fn new() -> Self {
         Self {
-            engine:          StftEngine::new(),
+            engine: StftEngine::new(),
         }
     }
 
@@ -24,9 +24,7 @@ impl SpectralFluxDetector {
     /// Returns: (flux_normalized: Vec<f32>,
     ///           beats: Vec<usize>)
     /// beats contains frame indices of detected onsets.
-    pub fn detect(&mut self, signal: &[f32])
-        -> (Vec<f32>, Vec<usize>)
-    {
+    pub fn detect(&mut self, signal: &[f32]) -> (Vec<f32>, Vec<usize>) {
         // Forward STFT
         let (frames, n_frames) = self.engine.forward(signal);
 
@@ -37,10 +35,7 @@ impl SpectralFluxDetector {
         for (t, frame) in frames.iter().enumerate() {
             let mut frame_flux = 0.0_f32;
             for b in 0..N_BINS {
-                let mag = libm::sqrtf(
-                    frame[b].re * frame[b].re
-                    + frame[b].im * frame[b].im
-                );
+                let mag = libm::sqrtf(frame[b].re * frame[b].re + frame[b].im * frame[b].im);
                 let diff = mag - prev[b];
                 if diff > 0.0_f32 {
                     frame_flux += diff;
@@ -51,9 +46,7 @@ impl SpectralFluxDetector {
         }
 
         // Normalize flux to [0, 1]
-        let flux_max = flux.iter()
-            .cloned()
-            .fold(0.0_f32, f32::max);
+        let flux_max = flux.iter().cloned().fold(0.0_f32, f32::max);
 
         let mut flux_norm = vec![0.0_f32; n_frames];
         if flux_max > 1e-8_f32 {
@@ -64,7 +57,7 @@ impl SpectralFluxDetector {
 
         // Peak picking — exact same logic as Python fixture:
         // local max > threshold with min_distance
-        let mut beats     = Vec::new();
+        let mut beats = Vec::new();
 
         // Use signed arithmetic for min_distance check
         for t in 1..n_frames.saturating_sub(1) {

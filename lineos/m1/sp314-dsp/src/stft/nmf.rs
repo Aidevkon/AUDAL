@@ -1,6 +1,6 @@
 pub const N_COMPONENTS: usize = 5;
-pub const N_ITER:       usize = 30;
-const EPS:      f32 = 1e-10_f32;
+pub const N_ITER: usize = 30;
+const EPS: f32 = 1e-10_f32;
 const LAMBDA_H: f32 = 0.1;
 const CONV_CHECK_INTERVAL: usize = 10;
 const CONV_TOL: f32 = 1e-4;
@@ -34,18 +34,17 @@ fn downsample_frames(frames: &[Vec<f32>]) -> Vec<Vec<f32>> {
     frames.iter().step_by(2).cloned().collect()
 }
 
-fn upsample_masks_linear(masks: &[f32], n_components: usize,
-                          original_frames: usize) -> Vec<f32> {
+fn upsample_masks_linear(masks: &[f32], n_components: usize, original_frames: usize) -> Vec<f32> {
     let downsampled = original_frames.div_ceil(2);
     let mut out = vec![0.0f32; n_components * original_frames];
     for c in 0..n_components {
         for f in 0..original_frames {
             let exact = f as f32 / 2.0;
-            let idx0  = exact.floor() as usize;
-            let idx1  = (idx0 + 1).min(downsampled - 1);
-            let frac  = exact - idx0 as f32;
-            let v0    = masks[c * downsampled + idx0];
-            let v1    = masks[c * downsampled + idx1];
+            let idx0 = exact.floor() as usize;
+            let idx1 = (idx0 + 1).min(downsampled - 1);
+            let frac = exact - idx0 as f32;
+            let v0 = masks[c * downsampled + idx0];
+            let v1 = masks[c * downsampled + idx1];
             out[c * original_frames + f] = v0 + frac * (v1 - v0);
         }
     }
@@ -53,9 +52,12 @@ fn upsample_masks_linear(masks: &[f32], n_components: usize,
 }
 
 impl NmfEngine {
-
     pub fn new(n_components: usize) -> Self {
-        Self { n_components, w: Vec::new(), h: Vec::new() }
+        Self {
+            n_components,
+            w: Vec::new(),
+            h: Vec::new(),
+        }
     }
 
     pub fn default() -> Self {
@@ -65,15 +67,19 @@ impl NmfEngine {
     /// Run NMF on magnitude spectrogram. Returns (W, H).
     pub fn fit_transform(&mut self, frames: &[Vec<f32>]) -> (Vec<f32>, Vec<f32>) {
         let n_frames = frames.len();
-        let n_bins   = if n_frames > 0 { frames[0].len() } else { 0 };
-        let k        = self.n_components;
+        let n_bins = if n_frames > 0 { frames[0].len() } else { 0 };
+        let k = self.n_components;
 
         // Initialize W and H with fixed seed=42
         let mut seed: u32 = 42;
         let mut w = vec![0.0_f32; n_bins * k];
         let mut h = vec![0.0_f32; k * n_frames];
-        for x in w.iter_mut() { *x = xorshift32(&mut seed) + EPS; }
-        for x in h.iter_mut() { *x = xorshift32(&mut seed) + EPS; }
+        for x in w.iter_mut() {
+            *x = xorshift32(&mut seed) + EPS;
+        }
+        for x in h.iter_mut() {
+            *x = xorshift32(&mut seed) + EPS;
+        }
 
         // Pre-allocate V_approx buffer (reused each iteration)
         let mut v_approx = vec![0.0_f32; n_bins * n_frames];
@@ -85,8 +91,8 @@ impl NmfEngine {
             for c in 0..k {
                 for b in 0..n_bins {
                     let w_bc = w[b * k + c];
-                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
-                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    let v_slice = &mut v_approx[b * n_frames..(b + 1) * n_frames];
+                    let h_slice = &h[c * n_frames..(c + 1) * n_frames];
                     for f in 0..n_frames {
                         v_slice[f] += w_bc * h_slice[f];
                     }
@@ -94,34 +100,38 @@ impl NmfEngine {
             }
 
             // Step 2: Update H: H *= (W^T * V) / (W^T * V_approx + EPS)
-            h.par_chunks_mut(n_frames).enumerate().for_each(|(c, h_row)| {
-                NMF_SCRATCH.with(|cell| {
-                    let mut scratch = cell.borrow_mut();
-                    let (ref mut num, ref mut den) = *scratch;
-                    num.clear(); num.resize(n_frames, 0.0f32);
-                    den.clear(); den.resize(n_frames, 0.0f32);
+            h.par_chunks_mut(n_frames)
+                .enumerate()
+                .for_each(|(c, h_row)| {
+                    NMF_SCRATCH.with(|cell| {
+                        let mut scratch = cell.borrow_mut();
+                        let (ref mut num, ref mut den) = *scratch;
+                        num.clear();
+                        num.resize(n_frames, 0.0f32);
+                        den.clear();
+                        den.resize(n_frames, 0.0f32);
 
-                    for b in 0..n_bins {
-                        let w_bc = w[b * k + c];
-                        let v_slice = &v_approx[b * n_frames..(b+1)*n_frames];
-                        for f in 0..n_frames {
-                            num[f] += w_bc * frames[f][b];
-                            den[f] += w_bc * v_slice[f];
+                        for b in 0..n_bins {
+                            let w_bc = w[b * k + c];
+                            let v_slice = &v_approx[b * n_frames..(b + 1) * n_frames];
+                            for f in 0..n_frames {
+                                num[f] += w_bc * frames[f][b];
+                                den[f] += w_bc * v_slice[f];
+                            }
                         }
-                    }
-                    for f in 0..n_frames {
-                        h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
-                    }
+                        for f in 0..n_frames {
+                            h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
+                        }
+                    });
                 });
-            });
 
             // Step 3: Recompute V_approx with updated H
             v_approx.fill(0.0f32);
             for c in 0..k {
                 for b in 0..n_bins {
                     let w_bc = w[b * k + c];
-                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
-                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    let v_slice = &mut v_approx[b * n_frames..(b + 1) * n_frames];
+                    let h_slice = &h[c * n_frames..(c + 1) * n_frames];
                     for f in 0..n_frames {
                         v_slice[f] += w_bc * h_slice[f];
                     }
@@ -145,10 +155,7 @@ impl NmfEngine {
             // Normalize W columns (L1), absorb scale into H rows
             // Prevents scale ambiguity accumulating over iterations (NMF upgrade 1)
             for c in 0..k {
-                let col_sum: f32 = (0..n_bins)
-                    .map(|b| w[b * k + c])
-                    .sum::<f32>()
-                    .max(EPS);
+                let col_sum: f32 = (0..n_bins).map(|b| w[b * k + c]).sum::<f32>().max(EPS);
                 for b in 0..n_bins {
                     w[b * k + c] /= col_sum;
                 }
@@ -192,12 +199,14 @@ impl NmfEngine {
     /// Apply learned profiles to full track.
     pub fn transform(&self, w: &[f32], frames: &[Vec<f32>]) -> Vec<f32> {
         let n_frames = frames.len();
-        let n_bins   = if n_frames > 0 { frames[0].len() } else { 0 };
-        let k        = self.n_components;
+        let n_bins = if n_frames > 0 { frames[0].len() } else { 0 };
+        let k = self.n_components;
 
         let mut seed: u32 = 42;
         let mut h = vec![0.0_f32; k * n_frames];
-        for x in h.iter_mut() { *x = xorshift32(&mut seed) + EPS; }
+        for x in h.iter_mut() {
+            *x = xorshift32(&mut seed) + EPS;
+        }
 
         let mut v_approx = vec![0.0_f32; n_bins * n_frames];
 
@@ -207,8 +216,8 @@ impl NmfEngine {
             for c in 0..k {
                 for b in 0..n_bins {
                     let w_bc = w[b * k + c];
-                    let v_slice = &mut v_approx[b * n_frames..(b+1)*n_frames];
-                    let h_slice = &h[c * n_frames..(c+1)*n_frames];
+                    let v_slice = &mut v_approx[b * n_frames..(b + 1) * n_frames];
+                    let h_slice = &h[c * n_frames..(c + 1) * n_frames];
                     for f in 0..n_frames {
                         v_slice[f] += w_bc * h_slice[f];
                     }
@@ -216,26 +225,30 @@ impl NmfEngine {
             }
 
             // Step 2: Update H: H *= (W^T * V) / (W^T * V_approx + EPS)
-            h.par_chunks_mut(n_frames).enumerate().for_each(|(c, h_row)| {
-                NMF_SCRATCH.with(|cell| {
-                    let mut scratch = cell.borrow_mut();
-                    let (ref mut num, ref mut den) = *scratch;
-                    num.clear(); num.resize(n_frames, 0.0f32);
-                    den.clear(); den.resize(n_frames, 0.0f32);
+            h.par_chunks_mut(n_frames)
+                .enumerate()
+                .for_each(|(c, h_row)| {
+                    NMF_SCRATCH.with(|cell| {
+                        let mut scratch = cell.borrow_mut();
+                        let (ref mut num, ref mut den) = *scratch;
+                        num.clear();
+                        num.resize(n_frames, 0.0f32);
+                        den.clear();
+                        den.resize(n_frames, 0.0f32);
 
-                    for b in 0..n_bins {
-                        let w_bc = w[b * k + c];
-                        let v_slice = &v_approx[b * n_frames..(b+1)*n_frames];
-                        for f in 0..n_frames {
-                            num[f] += w_bc * frames[f][b];
-                            den[f] += w_bc * v_slice[f];
+                        for b in 0..n_bins {
+                            let w_bc = w[b * k + c];
+                            let v_slice = &v_approx[b * n_frames..(b + 1) * n_frames];
+                            for f in 0..n_frames {
+                                num[f] += w_bc * frames[f][b];
+                                den[f] += w_bc * v_slice[f];
+                            }
                         }
-                    }
-                    for f in 0..n_frames {
-                        h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
-                    }
+                        for f in 0..n_frames {
+                            h_row[f] *= num[f] / (den[f] + LAMBDA_H + EPS);
+                        }
+                    });
                 });
-            });
         }
         h
     }
@@ -269,12 +282,10 @@ impl NmfEngine {
         let mut mask = vec![vec![0.0_f32; n_bins]; n_frames];
         for f in 0..n_frames {
             for b in 0..n_bins {
-                let target = self.w[b * k + component]
-                           * self.h[component * n_frames + f];
+                let target = self.w[b * k + component] * self.h[component * n_frames + f];
                 let mut total = 0.0_f32;
                 for c in 0..k {
-                    total += self.w[b * k + c]
-                           * self.h[c * n_frames + f];
+                    total += self.w[b * k + c] * self.h[c * n_frames + f];
                 }
                 mask[f][b] = target / (total + EPS);
             }
@@ -287,10 +298,10 @@ impl NmfEngine {
     /// Returns mask [n_chunk_frames][n_bins]
     pub fn component_mask_chunk(
         &self,
-        component:    usize,
-        h_chunk:      &[f32],
+        component: usize,
+        h_chunk: &[f32],
         n_chunk_frames: usize,
-        n_bins:       usize,
+        n_bins: usize,
     ) -> Vec<Vec<f32>> {
         let k = self.n_components;
         let mut mask = vec![vec![0.0_f32; n_bins]; n_chunk_frames];
@@ -299,13 +310,17 @@ impl NmfEngine {
                 let w_bc = self.w[b * k + component];
                 let h_cf = if component * n_chunk_frames + f < h_chunk.len() {
                     h_chunk[component * n_chunk_frames + f]
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
                 let target = w_bc * h_cf;
                 let mut total = 0.0_f32;
                 for c in 0..k {
                     let h_val = if c * n_chunk_frames + f < h_chunk.len() {
                         h_chunk[c * n_chunk_frames + f]
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     total += self.w[b * k + c] * h_val;
                 }
                 mask[f][b] = target / (total + 1e-10_f32);
@@ -315,12 +330,14 @@ impl NmfEngine {
     }
 
     /// S.2 Fix: Resolves Low-End Clashes via Envelope Correlation (Slew-Rate Limiting).
-    /// Identifies the transient (Kick) and sustained (Bass) components, and physically 
+    /// Identifies the transient (Kick) and sustained (Bass) components, and physically
     /// restricts the Bass from having sharp transients, transferring that excess energy to the Kick.
     pub fn resolve_low_end_clash(&mut self) {
         let n_frames = self.h.len() / self.n_components;
         let k = self.n_components;
-        if k < 2 || n_frames < 2 { return; }
+        if k < 2 || n_frames < 2 {
+            return;
+        }
 
         // Step A: Find Kick (max Crest Factor) and Bass (min Crest Factor)
         let mut crest_factors = vec![0.0_f32; k];
@@ -329,7 +346,9 @@ impl NmfEngine {
             let mut sum = 0.0_f32;
             for f in 0..n_frames {
                 let val = self.h[c * n_frames + f];
-                if val > peak { peak = val; }
+                if val > peak {
+                    peak = val;
+                }
                 sum += val;
             }
             let mean = sum / n_frames as f32;
@@ -342,11 +361,19 @@ impl NmfEngine {
         let mut min_cf = f32::MAX;
 
         for c in 0..k {
-            if crest_factors[c] > max_cf { max_cf = crest_factors[c]; kick_c = c; }
-            if crest_factors[c] < min_cf { min_cf = crest_factors[c]; bass_c = c; }
+            if crest_factors[c] > max_cf {
+                max_cf = crest_factors[c];
+                kick_c = c;
+            }
+            if crest_factors[c] < min_cf {
+                min_cf = crest_factors[c];
+                bass_c = c;
+            }
         }
 
-        if kick_c == bass_c { return; }
+        if kick_c == bass_c {
+            return;
+        }
 
         // Step B: Transient-Aware Energy Reallocation (With Hold Window)
         let mut prev_total = 0.0_f32;
@@ -361,11 +388,11 @@ impl NmfEngine {
             // Attack: Energy jumps significantly
             let is_attack = total_energy > prev_total * 1.5 && total_energy > 10.0;
             // Decay: Energy drops rapidly
-            let is_decay  = total_energy < prev_total * 0.8 && prev_total > 10.0;
+            let is_decay = total_energy < prev_total * 0.8 && prev_total > 10.0;
 
             if is_attack {
                 // Lock out the bass for 3 frames (~60ms) to let the kick ring out
-                transient_holdout = 3; 
+                transient_holdout = 3;
             }
 
             if transient_holdout > 0 || is_decay {
@@ -397,14 +424,17 @@ impl NmfEngine {
     pub fn resolve_high_end_clash(&mut self) {
         let n_frames = self.h.len() / self.n_components;
         let k = self.n_components;
-        if k < 2 || n_frames < 2 { return; }
+        if k < 2 || n_frames < 2 {
+            return;
+        }
 
         // Step A: Identify Hat (Transient) and Sib (Sustain) components
         // Sibilance has many active frames. Hats have very few.
         let mut active_frame_counts = vec![0; k];
         for c in 0..k {
-            let mean = self.h[c * n_frames .. (c + 1) * n_frames].iter().sum::<f32>() / n_frames as f32;
-            active_frame_counts[c] = self.h[c * n_frames .. (c + 1) * n_frames]
+            let mean =
+                self.h[c * n_frames..(c + 1) * n_frames].iter().sum::<f32>() / n_frames as f32;
+            active_frame_counts[c] = self.h[c * n_frames..(c + 1) * n_frames]
                 .iter()
                 .filter(|&&v| v > mean * 1.5)
                 .count();
@@ -416,20 +446,28 @@ impl NmfEngine {
         let mut max_active = 0;
 
         for c in 0..k {
-            if active_frame_counts[c] < min_active { min_active = active_frame_counts[c]; hat_c = c; }
-            if active_frame_counts[c] > max_active { max_active = active_frame_counts[c]; sib_c = c; }
+            if active_frame_counts[c] < min_active {
+                min_active = active_frame_counts[c];
+                hat_c = c;
+            }
+            if active_frame_counts[c] > max_active {
+                max_active = active_frame_counts[c];
+                sib_c = c;
+            }
         }
 
-        if hat_c == sib_c { return; }
+        if hat_c == sib_c {
+            return;
+        }
 
         // Step B: Morphological Routing (Event Width Measurement)
         let mut in_event = false;
         let mut event_start = 0;
-        let noise_floor = 50.0_f32; 
+        let noise_floor = 50.0_f32;
 
-        // At 48kHz with 512 hop, 1 frame = 10.6ms. 
+        // At 48kHz with 512 hop, 1 frame = 10.6ms.
         // 8 frames = ~85ms. Anything shorter is a Hat.
-        let hat_max_frames = 8; 
+        let hat_max_frames = 8;
 
         for f in 0..n_frames {
             let raw_hat = self.h[hat_c * n_frames + f];
@@ -458,7 +496,7 @@ impl NmfEngine {
                 }
             }
         }
-        
+
         // Handle edge case where an event touches the absolute end of the track
         if in_event {
             let event_length = n_frames - event_start;
@@ -481,7 +519,9 @@ impl NmfEngine {
     pub fn resolve_formant_clash(&mut self) {
         let n_frames = self.h.len() / self.n_components;
         let k = self.n_components;
-        if k < 2 || n_frames < 2 { return; }
+        if k < 2 || n_frames < 2 {
+            return;
+        }
 
         let mut in_event = false;
         let mut event_start = 0;
@@ -495,7 +535,7 @@ impl NmfEngine {
         let process_event = |start: usize, end: usize, h: &mut [f32]| {
             let mut delta_sum = 0.0;
             let mut energy_sum = 0.0;
-            
+
             // Calculate Frame-to-Frame Variation (Amplitude Modulation)
             for ef in (start + 1)..end {
                 let mut prev = 0.0;
@@ -507,16 +547,20 @@ impl NmfEngine {
                 delta_sum += (curr - prev).abs();
                 energy_sum += curr;
             }
-            
+
             // Modulation Index: High variance = Human Vibrato, Low variance = Static Synth
-            let modulation_index = if energy_sum > 0.0 { delta_sum / energy_sum } else { 0.0 };
-            let is_vocal = modulation_index > 0.05; 
+            let modulation_index = if energy_sum > 0.0 {
+                delta_sum / energy_sum
+            } else {
+                0.0
+            };
+            let is_vocal = modulation_index > 0.05;
 
             // Route retroactive event energy
             for ef in start..end {
                 let mut e_total = 0.0;
-                for c in 0..k { 
-                    e_total += h[c * n_frames + ef]; 
+                for c in 0..k {
+                    e_total += h[c * n_frames + ef];
                     h[c * n_frames + ef] = 0.0; // Clear all components
                 }
                 if is_vocal {
@@ -529,7 +573,9 @@ impl NmfEngine {
 
         for f in 0..n_frames {
             let mut total = 0.0;
-            for c in 0..k { total += self.h[c * n_frames + f]; }
+            for c in 0..k {
+                total += self.h[c * n_frames + f];
+            }
 
             if total > noise_floor && !in_event {
                 in_event = true;
@@ -539,7 +585,7 @@ impl NmfEngine {
                 process_event(event_start, f, &mut self.h);
             }
         }
-        
+
         // Edge case: track ends while an event is still playing
         if in_event {
             process_event(event_start, n_frames, &mut self.h);
@@ -550,12 +596,14 @@ impl NmfEngine {
     /// Automatically ducks the `target_c` (e.g., Bass) when `trigger_c` (e.g., Kick) has a transient hit.
     pub fn apply_smart_ducking(&mut self, trigger_c: usize, target_c: usize) {
         let n_frames = self.h.len() / self.n_components;
-        if n_frames < 2 { return; }
+        if n_frames < 2 {
+            return;
+        }
 
         let mut duck_multiplier = 1.0_f32;
         let ducking_depth = 0.3_f32; // Drops target to 30% volume
-        let release_factor = 0.15_f32; 
-        
+        let release_factor = 0.15_f32;
+
         // NEW: Hold timer to keep the bass ducked through the entire kick transient
         let mut hold_counter = 0;
         let hold_frames = 3; // Hold for ~60ms before releasing
@@ -565,11 +613,11 @@ impl NmfEngine {
             trigger_sum += self.h[trigger_c * n_frames + f];
         }
         let trigger_mean = trigger_sum / n_frames as f32;
-        let trigger_threshold = trigger_mean * 1.5; 
+        let trigger_threshold = trigger_mean * 1.5;
 
         for f in 0..n_frames {
             let trigger_energy = self.h[trigger_c * n_frames + f];
-            
+
             // 1. Detect Transient (Trigger)
             if trigger_energy > trigger_threshold && trigger_energy > 50.0 {
                 duck_multiplier = ducking_depth;
@@ -591,14 +639,14 @@ impl NmfEngine {
 /// Find the most spectrally diverse window in the signal.
 /// Uses spectral flux to identify the region with maximum
 /// sonic variation — best training data for NMF stem learning.
-/// 
+///
 /// Returns (start_sample, end_sample).
 /// Same input → same output always. INV-AB-1 preserved.
 /// Determinism: max_by returns FIRST maximum on tie — no randomness.
 pub fn find_most_diverse_window(
-    signal:      &[f32],
+    signal: &[f32],
     sample_rate: u32,
-    window_sec:  f32,
+    window_sec: f32,
 ) -> (usize, usize) {
     use crate::stft::spectral_flux::SpectralFluxDetector;
     use crate::stft::HOP_SIZE;
@@ -620,14 +668,16 @@ pub fn find_most_diverse_window(
 
     // Find window with maximum cumulative flux
     let window_frames = (window_sec * sample_rate as f32 / HOP_SIZE as f32) as usize;
-    
+
     let best_start_frame = flux
         .windows(window_frames.max(1))
         .enumerate()
         .max_by(|(_, a), (_, b)| {
             let sum_a: f32 = a.iter().sum();
             let sum_b: f32 = b.iter().sum();
-            sum_a.partial_cmp(&sum_b).unwrap_or(std::cmp::Ordering::Equal)
+            sum_a
+                .partial_cmp(&sum_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(i, _)| i)
         .unwrap_or(0);
@@ -639,9 +689,9 @@ pub fn find_most_diverse_window(
 
 /// Fallback: energy-based selection (for flat/silent signals).
 fn find_highest_energy_chunk_window(
-    signal:      &[f32],
+    signal: &[f32],
     sample_rate: u32,
-    window_sec:  f32,
+    window_sec: f32,
 ) -> (usize, usize) {
     let window_samples = (window_sec * sample_rate as f32) as usize;
     if signal.len() <= window_samples {

@@ -15,7 +15,7 @@ pub fn fwht(data: &mut [f32]) {
             for j in i..i + step {
                 let u = data[j];
                 let v = data[j + step];
-                data[j]        = u + v;
+                data[j] = u + v;
                 data[j + step] = u - v;
             }
         }
@@ -43,8 +43,12 @@ mod tests {
         fwht(&mut data);
         let n = original.len() as f32;
         for (a, b) in data.iter().zip(original.iter()) {
-            assert!((a - b * n).abs() < 1e-5,
-                "Orthogonality violated: got {}, expected {}", a, b * n);
+            assert!(
+                (a - b * n).abs() < 1e-5,
+                "Orthogonality violated: got {}, expected {}",
+                a,
+                b * n
+            );
         }
     }
 
@@ -56,8 +60,12 @@ mod tests {
         fwht_normalized(&mut data);
         fwht_normalized(&mut data);
         for (a, b) in data.iter().zip(original.iter()) {
-            assert!((a - b).abs() < 1e-5,
-                "Normalized Hadamard not identity: {} != {}", a, b);
+            assert!(
+                (a - b).abs() < 1e-5,
+                "Normalized Hadamard not identity: {} != {}",
+                a,
+                b
+            );
         }
     }
 
@@ -67,22 +75,29 @@ mod tests {
         let l = 0.8f32;
         let r = 0.3f32;
         let sqrt2 = libm::sqrtf(2.0f32);
-        let mid  = (l + r) / sqrt2;
+        let mid = (l + r) / sqrt2;
         let side = (l - r) / sqrt2;
         // Reconstruct
         let l_rec = (mid + side) / sqrt2;
         let r_rec = (mid - side) / sqrt2;
-        assert!((l - l_rec).abs() < 1e-6,
-            "M/S L reconstruction failed: {} != {}", l, l_rec);
-        assert!((r - r_rec).abs() < 1e-6,
-            "M/S R reconstruction failed: {} != {}", r, r_rec);
+        assert!(
+            (l - l_rec).abs() < 1e-6,
+            "M/S L reconstruction failed: {} != {}",
+            l,
+            l_rec
+        );
+        assert!(
+            (r - r_rec).abs() < 1e-6,
+            "M/S R reconstruction failed: {} != {}",
+            r,
+            r_rec
+        );
     }
 
     #[test]
     fn hadamard_deterministic() {
         // INV-OT-3: same input → same output
-        let signal = vec![1.0f32, -1.0, 0.5, -0.5,
-                          0.25, -0.25, 0.1, -0.1];
+        let signal = vec![1.0f32, -1.0, 0.5, -0.5, 0.25, -0.25, 0.1, -0.1];
         let mut d1 = signal.clone();
         let mut d2 = signal.clone();
         fwht(&mut d1);

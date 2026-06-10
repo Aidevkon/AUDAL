@@ -8,5 +8,9 @@ pub enum FirewallError {
     /// E_SCHEMA_FAIL — output failed JSON schema validation
     SchemaFail { source: String, detail: String },
     /// E_FIREWALL_CLAMP — value clamped (non-fatal, logged only)
-    FirewallClamp { field: String, original: f32, clamped: f32 },
+    FirewallClamp {
+        field: String,
+        original: f32,
+        clamped: f32,
+    },
 }

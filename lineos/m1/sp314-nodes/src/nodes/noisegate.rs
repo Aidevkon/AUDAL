@@ -54,7 +54,7 @@ impl DspNode for NoiseGateNode {
 
         for i in 0..left.len() {
             let abs_sig = left[i].abs().max(right[i].abs());
-            
+
             // Fast attack, slow release peak detector for envelope
             if abs_sig > self.env {
                 self.env = abs_sig;
@@ -90,7 +90,8 @@ impl DspNode for NoiseGateNode {
                     }
                 }
                 GateState::Release => {
-                    self.current_gain = self.current_gain * release_coef + 0.0001 * (1.0 - release_coef);
+                    self.current_gain =
+                        self.current_gain * release_coef + 0.0001 * (1.0 - release_coef);
                     if self.env > threshold_lin {
                         self.state = GateState::Attack;
                     } else if self.current_gain <= 0.0002 {
@@ -145,7 +146,7 @@ mod tests {
         let mut left = vec![0.5; 4800];
         let mut right = vec![0.5; 4800];
         gate.process_stereo(&mut left, &mut right);
-        
+
         // Signal is above -20dB (0.1), so gain should go to 1.0 and signal should pass
         // Check end of buffer
         assert!((left[4799] - 0.5).abs() < 1e-4);
@@ -158,7 +159,7 @@ mod tests {
         let mut left = vec![0.001; 4800]; // well below -20dB
         let mut right = vec![0.001; 4800];
         gate.process_stereo(&mut left, &mut right);
-        
+
         // Signal is quiet, should be attenuated
         assert!(left[4799] < 0.001 * 0.1);
     }
@@ -168,18 +169,18 @@ mod tests {
         let mut gate = NoiseGateNode::new(48000);
         // 50ms hold = 2400 samples
         gate.set_params(-20.0, 1.0, 50.0, 10.0);
-        
+
         // 1. Loud signal to open gate
         let mut left = vec![0.5; 480];
         let mut right = vec![0.5; 480];
         gate.process_stereo(&mut left, &mut right);
-        
+
         // 2. Sudden silence, length < hold_time (e.g. 1000 samples)
         let mut left2 = vec![0.0; 1000];
         let mut right2 = vec![0.0; 1000];
         left2[500] = 1.0; // dummy transient to check if gain is still 1.0
         gate.process_stereo(&mut left2, &mut right2);
-        
+
         // Since we are in hold phase, gain should still be 1.0
         assert!((left2[500] - 1.0).abs() < 1e-4);
     }

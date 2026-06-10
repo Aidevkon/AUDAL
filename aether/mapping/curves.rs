@@ -13,8 +13,8 @@ pub fn apply_curve(x: f32, curve: &CurveShape) -> f32 {
     let x = x.clamp(0.0_f32, 1.0_f32);
     match curve {
         CurveShape::Linear => x,
-        CurveShape::Log    => libm::sqrtf(x),
-        CurveShape::Exp    => x * x,
+        CurveShape::Log => libm::sqrtf(x),
+        CurveShape::Exp => x * x,
     }
 }
 

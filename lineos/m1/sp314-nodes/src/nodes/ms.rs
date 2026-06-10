@@ -13,9 +13,13 @@ impl DspNode for MsMatrixNode {
     }
 
     fn set_parameter(&mut self, _name: &str, _value: f32) {}
-    fn get_output(&self, _name: &str) -> Option<f32> { None }
+    fn get_output(&self, _name: &str) -> Option<f32> {
+        None
+    }
     fn reset(&mut self) {}
-    fn node_type(&self) -> &'static str { "MS_Matrix" }
+    fn node_type(&self) -> &'static str {
+        "MS_Matrix"
+    }
 }
 
 pub struct InverseMsMatrixNode;
@@ -31,7 +35,11 @@ impl DspNode for InverseMsMatrixNode {
     }
 
     fn set_parameter(&mut self, _name: &str, _value: f32) {}
-    fn get_output(&self, _name: &str) -> Option<f32> { None }
+    fn get_output(&self, _name: &str) -> Option<f32> {
+        None
+    }
     fn reset(&mut self) {}
-    fn node_type(&self) -> &'static str { "Inverse_MS_Matrix" }
+    fn node_type(&self) -> &'static str {
+        "Inverse_MS_Matrix"
+    }
 }

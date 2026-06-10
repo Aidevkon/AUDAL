@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 /// left and right are interleaved-free f32 sample vectors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StereoBuffer {
-    pub left:        Vec<f32>,
-    pub right:       Vec<f32>,
+    pub left: Vec<f32>,
+    pub right: Vec<f32>,
     pub sample_rate: u32,
-    pub num_frames:  usize,
+    pub num_frames: usize,
 }
 
 impl StereoBuffer {
     pub fn new(sample_rate: u32, num_frames: usize) -> Self {
         Self {
-            left:        vec![0.0; num_frames],
-            right:       vec![0.0; num_frames],
+            left: vec![0.0; num_frames],
+            right: vec![0.0; num_frames],
             sample_rate,
             num_frames,
         }

@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 /// Never contains raw audio. Never mutable after construction.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AnalysisReport {
-    pub quality:    QualityMetrics,
+    pub quality: QualityMetrics,
     pub compliance: ComplianceFlags,
-    pub version:    String,
+    pub version: String,
 }
 
 /// Measurement values from Golden Blob (via telemetry + sp314-dsp).
@@ -21,21 +21,21 @@ pub struct AnalysisReport {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct QualityMetrics {
     /// BS.1770-4 integrated gated loudness (LUFS)
-    pub lufs_integrated:    f32,
+    pub lufs_integrated: f32,
     /// Short-term loudness — 3s window (EBU R128 §2.3)
-    pub lufs_short_term:    f32,
+    pub lufs_short_term: f32,
     /// Momentary loudness — 400ms window (EBU R128 §2.2)
-    pub lufs_momentary:     f32,
+    pub lufs_momentary: f32,
     /// BS.1770-4 true peak (dBTP)
-    pub true_peak:          f32,
+    pub true_peak: f32,
     /// EBU R128 LRA (LU) — from lineos-telemetry
-    pub loudness_range:     f32,
+    pub loudness_range: f32,
     /// Stereo correlation [-1.0, 1.0]
     pub stereo_correlation: f32,
     /// Peak-to-RMS dynamic range (dB)
-    pub dynamic_range:      f32,
+    pub dynamic_range: f32,
     /// DC offset [-1.0, 1.0]
-    pub dc_offset:          f32,
+    pub dc_offset: f32,
 }
 
 /// Per-platform compliance booleans — from InsightsReport::preset_results.
@@ -43,10 +43,10 @@ pub struct QualityMetrics {
 /// to produce parameterised Issues with severity and delta.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ComplianceFlags {
-    pub spotify_ok:   bool,
-    pub youtube_ok:   bool,
-    pub apple_ok:     bool,
-    pub tidal_ok:     bool,
+    pub spotify_ok: bool,
+    pub youtube_ok: bool,
+    pub apple_ok: bool,
+    pub tidal_ok: bool,
     pub broadcast_ok: bool,
 }
 
@@ -65,16 +65,22 @@ impl ComplianceFlags {
     /// All presets fail — convenience helper for tests.
     pub fn all_fail() -> Self {
         Self {
-            spotify_ok: false, youtube_ok: false, apple_ok: false,
-            tidal_ok: false, broadcast_ok: false,
+            spotify_ok: false,
+            youtube_ok: false,
+            apple_ok: false,
+            tidal_ok: false,
+            broadcast_ok: false,
         }
     }
 
     /// All presets pass — convenience helper for tests.
     pub fn all_pass() -> Self {
         Self {
-            spotify_ok: true, youtube_ok: true, apple_ok: true,
-            tidal_ok: true, broadcast_ok: true,
+            spotify_ok: true,
+            youtube_ok: true,
+            apple_ok: true,
+            tidal_ok: true,
+            broadcast_ok: true,
         }
     }
 }

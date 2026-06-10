@@ -1,18 +1,17 @@
+use ringbuf::traits::*;
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use ringbuf::traits::*;
 
-pub fn spawn<C>(
-    mut consumer: C,
-    sample_rate: u32,
-    channels: usize,
-    pos_mutex: Arc<Mutex<u64>>,
-) where
+pub fn spawn<C>(mut consumer: C, sample_rate: u32, channels: usize, pos_mutex: Arc<Mutex<u64>>)
+where
     C: Consumer<Item = f32> + Observer + Send + 'static,
 {
     std::thread::spawn(move || {
-        eprintln!("[WORKER] Thread spawned. CH: {}, SR: {}", channels, sample_rate);
+        eprintln!(
+            "[WORKER] Thread spawned. CH: {}, SR: {}",
+            channels, sample_rate
+        );
 
         let udp_tx = match UdpSocket::bind("127.0.0.1:0") {
             Ok(s) => {
@@ -41,17 +40,17 @@ pub fn spawn<C>(
                         buffer.push(s);
                     }
                 }
-                
+
                 iter_count += 1;
                 if iter_count % 50 == 0 {
                     eprintln!("[WORKER] Processed 50 chunks ({} frames)", chunk_size);
                 }
 
                 let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
-                
+
                 let frame = lineos_types::RealtimeFrame {
-                    spectrum:    analyzer.compute(&buffer, ch),
-                    gonio_path:  crate::player::decimate_gonio(&buffer, ch),
+                    spectrum: analyzer.compute(&buffer, ch),
+                    gonio_path: crate::player::decimate_gonio(&buffer, ch),
                     position_ms,
                 };
 

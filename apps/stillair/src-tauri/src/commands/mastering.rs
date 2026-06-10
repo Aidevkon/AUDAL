@@ -6,8 +6,8 @@
 //! FORBIDDEN: Audio processing in this module.
 //! FORBIDDEN: serde_json::Value in return types.
 
-use tauri::{command, AppHandle, Runtime, Emitter};
 use crate::ipc::m0_client::{GoldenBlobJson, M0Client, MasterRequest};
+use tauri::{command, AppHandle, Emitter, Runtime};
 
 // ── Accepted audio extensions ─────────────────────────────────────────────────
 //
@@ -28,9 +28,7 @@ const AUDIO_EXTENSIONS: &[&str] = &["wav", "flac", "aiff", "aif", "mp3"];
 /// The Err string prefix "ASC:0x04:" is parsed by the frontend to set the
 /// correct fault code.
 #[command]
-pub async fn open_audio_file<R: Runtime>(
-    app: AppHandle<R>,
-) -> Result<Option<AudioMeta>, String> {
+pub async fn open_audio_file<R: Runtime>(app: AppHandle<R>) -> Result<Option<AudioMeta>, String> {
     use tauri_plugin_dialog::{DialogExt, FilePath};
 
     // Block the dialog call on a dedicated thread — blocking_pick_file()
@@ -49,14 +47,14 @@ pub async fn open_audio_file<R: Runtime>(
     .map_err(|e| format!("Dialog task error: {e}"))?;
 
     let file_path = match maybe_path {
-        None       => return Ok(None),    // User cancelled → stay in current mode
-        Some(fp)   => fp,
+        None => return Ok(None), // User cancelled → stay in current mode
+        Some(fp) => fp,
     };
 
     // Extract path string
     let path_str = match file_path {
-        FilePath::Path(p)   => p.to_string_lossy().to_string(),
-        FilePath::Url(u)    => u.to_string(),
+        FilePath::Path(p) => p.to_string_lossy().to_string(),
+        FilePath::Url(u) => u.to_string(),
     };
 
     // Validate extension — ASC 0x04 (ValidationFail) on mismatch
@@ -75,11 +73,11 @@ pub async fn open_audio_file<R: Runtime>(
 
     // Derive display format from extension
     let format = match ext.as_str() {
-        "wav"          => "WAV",
-        "flac"         => "FLAC",
+        "wav" => "WAV",
+        "flac" => "FLAC",
         "aiff" | "aif" => "AIFF",
-        "mp3"          => "MP3",
-        _              => "AUDIO",
+        "mp3" => "MP3",
+        _ => "AUDIO",
     };
 
     let name = std::path::Path::new(&path_str)
@@ -90,13 +88,13 @@ pub async fn open_audio_file<R: Runtime>(
 
     // Phase 6: metadata stub — Phase 7 reads real headers via hound/symphonia
     Ok(Some(AudioMeta {
-        path:        path_str,
+        path: path_str,
         name,
-        format:      format.to_string(),
+        format: format.to_string(),
         sample_rate: 48_000,
-        bit_depth:   24,
-        duration_s:  0.0,    // Phase 7: real decode
-        channels:    2,
+        bit_depth: 24,
+        duration_s: 0.0, // Phase 7: real decode
+        channels: 2,
     }))
 }
 
@@ -113,17 +111,15 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
         .unwrap_or_default();
 
     if !AUDIO_EXTENSIONS.contains(&ext.as_str()) {
-        return Err(format!(
-            "ASC:0x04:Unsupported file type '.{ext}'."
-        ));
+        return Err(format!("ASC:0x04:Unsupported file type '.{ext}'."));
     }
 
     let format = match ext.as_str() {
-        "wav"          => "WAV",
-        "flac"         => "FLAC",
+        "wav" => "WAV",
+        "flac" => "FLAC",
         "aiff" | "aif" => "AIFF",
-        "mp3"          => "MP3",
-        _              => "AUDIO",
+        "mp3" => "MP3",
+        _ => "AUDIO",
     };
 
     let name = path.split('/').next_back().unwrap_or("unknown").to_string();
@@ -131,11 +127,11 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
     Ok(AudioMeta {
         path,
         name,
-        format:      format.to_string(),
+        format: format.to_string(),
         sample_rate: 48_000,
-        bit_depth:   24,
-        duration_s:  0.0,
-        channels:    2,
+        bit_depth: 24,
+        duration_s: 0.0,
+        channels: 2,
     })
 }
 
@@ -145,54 +141,69 @@ pub async fn load_audio_file(path: String) -> Result<AudioMeta, String> {
 /// Returns blob_id on success; ASC-mapped error string on failure.
 #[tauri::command]
 pub async fn trigger_mastering(
-    audio_path:      String,
-    preset_id:       String,
-    flavour_id:      String,
-    intent_tone:     f32,
+    audio_path: String,
+    preset_id: String,
+    flavour_id: String,
+    intent_tone: f32,
     intent_dynamics: f32,
     client: tauri::State<'_, M0Client>,
-    app:    tauri::AppHandle,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
-    client.health().await
+    client
+        .health()
+        .await
         .map_err(|e| format!("M0 unreachable: {e}"))?;
 
-    let resp = client.trigger_mastering(MasterRequest {
-        audio_path, preset_id, flavour_id,
-        intent_tone, intent_dynamics,
-    }).await.map_err(|e| e.to_string())?;
+    let resp = client
+        .trigger_mastering(MasterRequest {
+            audio_path,
+            preset_id,
+            flavour_id,
+            intent_tone,
+            intent_dynamics,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
 
     // Fallback: if old daemon returns blob_id directly
     let job_id = match resp.job_id {
         Some(id) => id,
-        None => return resp.blob_id
-            .ok_or("No job_id or blob_id from daemon".into()),
+        None => {
+            return resp
+                .blob_id
+                .ok_or("No job_id or blob_id from daemon".into())
+        }
     };
 
-    let _ = app.emit("mastering://progress",
-        serde_json::json!({"stage": "ANALYZING", "job_id": &job_id}));
+    let _ = app.emit(
+        "mastering://progress",
+        serde_json::json!({"stage": "ANALYZING", "job_id": &job_id}),
+    );
 
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-        let progress = client.get_progress(&job_id).await
+        let progress = client
+            .get_progress(&job_id)
+            .await
             .map_err(|e| e.to_string())?;
 
-        let _ = app.emit("mastering://progress",
+        let _ = app.emit(
+            "mastering://progress",
             serde_json::json!({
                 "stage":      progress.stage,
                 "job_id":     progress.job_id,
                 "elapsed_ms": progress.elapsed_ms,
                 "blob_id":    progress.blob_id,
-            }));
+            }),
+        );
 
         match progress.stage.as_str() {
             "CERTIFIED" => {
-                return progress.blob_id
-                    .ok_or("CERTIFIED but no blob_id".into());
+                return progress.blob_id.ok_or("CERTIFIED but no blob_id".into());
             }
             "ERROR" => {
-                return Err(progress.error
-                    .unwrap_or("Mastering failed".into()));
+                return Err(progress.error.unwrap_or("Mastering failed".into()));
             }
             _ => continue,
         }
@@ -218,14 +229,14 @@ pub async fn get_golden_blob(
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AudioMeta {
     /// Full filesystem path — used by trigger_mastering.
-    pub path:        String,
+    pub path: String,
     /// Display filename.
-    pub name:        String,
-    pub format:      String,
+    pub name: String,
+    pub format: String,
     pub sample_rate: u32,
-    pub bit_depth:   u8,
-    pub duration_s:  f32,
-    pub channels:    u8,
+    pub bit_depth: u8,
+    pub duration_s: f32,
+    pub channels: u8,
 }
 
 // ── export_certificate_png ──────────────────────────────────────────────────────
@@ -233,14 +244,13 @@ pub struct AudioMeta {
 #[tauri::command]
 pub async fn export_certificate_png(
     blob_id: String,
-    client:  tauri::State<'_, M0Client>,
-    app:     tauri::AppHandle,
+    client: tauri::State<'_, M0Client>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
 
     // Get blob data
-    let _blob = client.get_blob(&blob_id).await
-        .map_err(|e| e.to_string())?;
+    let _blob = client.get_blob(&blob_id).await.map_err(|e| e.to_string())?;
 
     // Ask user where to save
     let path = tokio::task::spawn_blocking(move || {
@@ -249,7 +259,9 @@ pub async fn export_certificate_png(
             .add_filter("PNG Image", &["png"])
             .set_file_name("certificate.png")
             .blocking_save_file()
-    }).await.map_err(|e| e.to_string())?;
+    })
+    .await
+    .map_err(|e| e.to_string())?;
 
     let Some(save_path) = path else {
         return Ok("cancelled".to_string());
@@ -257,11 +269,13 @@ pub async fn export_certificate_png(
 
     let path_str = match save_path {
         tauri_plugin_dialog::FilePath::Path(p) => p.to_string_lossy().to_string(),
-        tauri_plugin_dialog::FilePath::Url(u)  => u.to_string(),
+        tauri_plugin_dialog::FilePath::Url(u) => u.to_string(),
     };
 
     // Generate PNG via m0-daemon
-    client.export_certificate_png(&blob_id, &path_str).await
+    client
+        .export_certificate_png(&blob_id, &path_str)
+        .await
         .map_err(|e| e.to_string())?;
 
     Ok(path_str)
@@ -292,7 +306,10 @@ mod tests {
     #[tokio::test]
     async fn test_load_audio_file_rejects_txt() {
         let err = load_audio_file("/tmp/readme.txt".into()).await.unwrap_err();
-        assert!(err.contains("ASC:0x04"), "Must return ASC 0x04 for .txt: {err}");
+        assert!(
+            err.contains("ASC:0x04"),
+            "Must return ASC 0x04 for .txt: {err}"
+        );
     }
 
     #[tokio::test]

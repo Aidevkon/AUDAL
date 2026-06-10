@@ -3,30 +3,80 @@
 // Eliminates aliasing from tanhf nonlinearity.
 // Same FIR pattern as OversampledSoftClipper (v3.5).
 
-const TAPS:     usize = 32;  // taps_per_phase from JSON
-const N_PHASES: usize = 2;   // 2x oversample
+const TAPS: usize = 32; // taps_per_phase from JSON
+const N_PHASES: usize = 2; // 2x oversample
 
 // Anti-imaging upsampler (scaled x2) from JSON antiimaging_upsampler.phases
 const POLYPHASE_UP: [[f32; TAPS]; N_PHASES] = [
     // Phase 0: from JSON antiimaging_upsampler.phases[0]
     [
-        -1.232_168_1e-6, 1.534_842_2e-5, -7.811_12e-5,
-        0.000_253_994_3, -0.000_665_432_1, 0.001_511_619_9,
-        -0.003_088_591, 0.005_810_183, -0.010_235_056,
-        0.017_118_536, -0.027_540_816, 0.043_254_07,
-        -0.067_705_415, 0.109_627_06, -0.201_119_68,
-        0.632_843_2, 0.632_843_2, -0.201_119_68,
-        0.109_627_06, -0.067_705_415, 0.043_254_07,
-        -0.027_540_816, 0.017_118_536, -0.010_235_056,
-        0.005_810_183, -0.003_088_591, 0.001_511_619_9,
-        -0.000_665_432_1, 0.000_253_994_3, -7.811_12e-5,
-        1.534_842_2e-5, -1.232_168_1e-6
+        -1.232_168_1e-6,
+        1.534_842_2e-5,
+        -7.811_12e-5,
+        0.000_253_994_3,
+        -0.000_665_432_1,
+        0.001_511_619_9,
+        -0.003_088_591,
+        0.005_810_183,
+        -0.010_235_056,
+        0.017_118_536,
+        -0.027_540_816,
+        0.043_254_07,
+        -0.067_705_415,
+        0.109_627_06,
+        -0.201_119_68,
+        0.632_843_2,
+        0.632_843_2,
+        -0.201_119_68,
+        0.109_627_06,
+        -0.067_705_415,
+        0.043_254_07,
+        -0.027_540_816,
+        0.017_118_536,
+        -0.010_235_056,
+        0.005_810_183,
+        -0.003_088_591,
+        0.001_511_619_9,
+        -0.000_665_432_1,
+        0.000_253_994_3,
+        -7.811_12e-5,
+        1.534_842_2e-5,
+        -1.232_168_1e-6,
     ],
     // Phase 1: from JSON antiimaging_upsampler.phases[1]
     [
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        1.000_000_7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.000_000_7,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
     ],
 ];
 
@@ -34,69 +84,119 @@ const POLYPHASE_UP: [[f32; TAPS]; N_PHASES] = [
 const POLYPHASE_DOWN: [[f32; TAPS]; N_PHASES] = [
     // Phase 0
     [
-        -6.160_840_4e-7, 7.674_211e-6, -3.905_56e-5,
-        0.000_126_997_15, -0.000_332_716_04, 0.000_755_809_95,
-        -0.001_544_295_5, 0.002_905_091_5, -0.005_117_528,
-        0.008_559_268, -0.013_770_408, 0.021_627_035,
-        -0.033_852_708, 0.054_813_53, -0.100_559_84,
-        0.316_421_6, 0.316_421_6, -0.100_559_84,
-        0.054_813_53, -0.033_852_708, 0.021_627_035,
-        -0.013_770_408, 0.008_559_268, -0.005_117_528,
-        0.002_905_091_5, -0.001_544_295_5, 0.000_755_809_95,
-        -0.000_332_716_04, 0.000_126_997_15, -3.905_56e-5,
-        7.674_211e-6, -6.160_840_4e-7
+        -6.160_840_4e-7,
+        7.674_211e-6,
+        -3.905_56e-5,
+        0.000_126_997_15,
+        -0.000_332_716_04,
+        0.000_755_809_95,
+        -0.001_544_295_5,
+        0.002_905_091_5,
+        -0.005_117_528,
+        0.008_559_268,
+        -0.013_770_408,
+        0.021_627_035,
+        -0.033_852_708,
+        0.054_813_53,
+        -0.100_559_84,
+        0.316_421_6,
+        0.316_421_6,
+        -0.100_559_84,
+        0.054_813_53,
+        -0.033_852_708,
+        0.021_627_035,
+        -0.013_770_408,
+        0.008_559_268,
+        -0.005_117_528,
+        0.002_905_091_5,
+        -0.001_544_295_5,
+        0.000_755_809_95,
+        -0.000_332_716_04,
+        0.000_126_997_15,
+        -3.905_56e-5,
+        7.674_211e-6,
+        -6.160_840_4e-7,
     ],
     // Phase 1
     [
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.500_000_36, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.500_000_36,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
     ],
 ];
 
 #[derive(Clone, Debug, Copy)]
 pub struct HarmonicConfig {
-    pub drive:              f32,
+    pub drive: f32,
     pub drive_compensation: f32,
-    pub even_amount:        f32,
-    pub odd_amount:         f32,
-    pub mix:                f32,
+    pub even_amount: f32,
+    pub odd_amount: f32,
+    pub mix: f32,
 }
 
 impl Default for HarmonicConfig {
     fn default() -> Self {
         Self {
-            drive:              2.0,
+            drive: 2.0,
             drive_compensation: 1.0,
-            even_amount:        0.6,
-            odd_amount:         0.2,
-            mix:                0.3,
+            even_amount: 0.6,
+            odd_amount: 0.2,
+            mix: 0.3,
         }
     }
 }
 
 pub struct HarmonicEngine {
-    config:      HarmonicConfig,
+    config: HarmonicConfig,
     // Upsampler delay lines (one per channel)
-    delay_up_m:  [f32; TAPS],
-    delay_up_s:  [f32; TAPS],
-    write_up:    usize,
+    delay_up_m: [f32; TAPS],
+    delay_up_s: [f32; TAPS],
+    write_up: usize,
     // Downsampler delay lines (2 phases per channel)
     delay_down_m: [[f32; TAPS]; N_PHASES],
     delay_down_s: [[f32; TAPS]; N_PHASES],
-    write_down:   usize,
+    write_down: usize,
 }
 
 impl HarmonicEngine {
     pub fn new(config: HarmonicConfig) -> Self {
         Self {
             config,
-            delay_up_m:   [0.0_f32; TAPS],
-            delay_up_s:   [0.0_f32; TAPS],
-            write_up:     0,
+            delay_up_m: [0.0_f32; TAPS],
+            delay_up_s: [0.0_f32; TAPS],
+            write_up: 0,
             delay_down_m: [[0.0_f32; TAPS]; N_PHASES],
             delay_down_s: [[0.0_f32; TAPS]; N_PHASES],
-            write_down:   0,
+            write_down: 0,
         }
     }
 
@@ -109,22 +209,19 @@ impl HarmonicEngine {
 
     #[inline]
     fn waveshape(&self, x: f32) -> f32 {
-        if self.config.mix == 0.0 { return x; }
-        let drive = self.config.drive
-                  * self.config.drive_compensation;
-        let y_odd  = libm::tanhf(drive * x);
+        if self.config.mix == 0.0 {
+            return x;
+        }
+        let drive = self.config.drive * self.config.drive_compensation;
+        let y_odd = libm::tanhf(drive * x);
         let y_even = x + (x * libm::fabsf(x)) * 0.5_f32;
-        let wet    = self.config.even_amount * y_even
-                   + self.config.odd_amount  * y_odd;
-        let wet_c  = libm::tanhf(wet);
-        x * (1.0_f32 - self.config.mix)
-            + wet_c * self.config.mix
+        let wet = self.config.even_amount * y_even + self.config.odd_amount * y_odd;
+        let wet_c = libm::tanhf(wet);
+        x * (1.0_f32 - self.config.mix) + wet_c * self.config.mix
     }
 
     #[inline]
-    pub fn process_frame(&mut self, mid: f32, side: f32)
-        -> (f32, f32)
-    {
+    pub fn process_frame(&mut self, mid: f32, side: f32) -> (f32, f32) {
         if self.config.mix == 0.0 {
             return (mid, side);
         }
@@ -153,10 +250,8 @@ impl HarmonicEngine {
         // Step B: Downsample → 1 output sample
         self.write_down = (self.write_down + TAPS - 1) % TAPS;
         for p in 0..N_PHASES {
-            self.delay_down_m[p][self.write_down] =
-                shaped_m[N_PHASES - 1 - p];
-            self.delay_down_s[p][self.write_down] =
-                shaped_s[N_PHASES - 1 - p];
+            self.delay_down_m[p][self.write_down] = shaped_m[N_PHASES - 1 - p];
+            self.delay_down_s[p][self.write_down] = shaped_s[N_PHASES - 1 - p];
         }
 
         let mut out_m = 0.0_f64;
@@ -174,11 +269,11 @@ impl HarmonicEngine {
     }
 
     pub fn reset(&mut self) {
-        self.delay_up_m   = [0.0_f32; TAPS];
-        self.delay_up_s   = [0.0_f32; TAPS];
-        self.write_up     = 0;
+        self.delay_up_m = [0.0_f32; TAPS];
+        self.delay_up_s = [0.0_f32; TAPS];
+        self.write_up = 0;
         self.delay_down_m = [[0.0_f32; TAPS]; N_PHASES];
         self.delay_down_s = [[0.0_f32; TAPS]; N_PHASES];
-        self.write_down   = 0;
+        self.write_down = 0;
     }
 }

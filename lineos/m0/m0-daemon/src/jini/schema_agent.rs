@@ -4,25 +4,35 @@
 //! INV-JINI-3: no suggestion shown without validation.
 //! Schema Agent is the sole writer of ProjectState (future).
 
-use lineos_types::{JiniSuggestion, JiniAction};
+use lineos_types::{JiniAction, JiniSuggestion};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationError {
     NarrativeEmpty,
-    NarrativeTooLong(usize),       // max 500
-    ConfidenceOutOfRange(f32),     // must be [0.0, 1.0]
-    DeltaOutOfRange(f32),          // must be [-0.3, +0.3] INV-JINI-7
+    NarrativeTooLong(usize),   // max 500
+    ConfidenceOutOfRange(f32), // must be [0.0, 1.0]
+    DeltaOutOfRange(f32),      // must be [-0.3, +0.3] INV-JINI-7
 }
 
 #[derive(Debug, Clone)]
 pub struct ValidationResult {
-    pub valid:  bool,
+    pub valid: bool,
     pub errors: Vec<ValidationError>,
 }
 
 impl ValidationResult {
-    pub fn ok()                         -> Self { Self { valid: true,  errors: vec![] } }
-    pub fn fail(e: ValidationError)     -> Self { Self { valid: false, errors: vec![e] } }
+    pub fn ok() -> Self {
+        Self {
+            valid: true,
+            errors: vec![],
+        }
+    }
+    pub fn fail(e: ValidationError) -> Self {
+        Self {
+            valid: false,
+            errors: vec![e],
+        }
+    }
 }
 
 pub fn validate(s: &JiniSuggestion) -> ValidationResult {
@@ -31,16 +41,14 @@ pub fn validate(s: &JiniSuggestion) -> ValidationResult {
         return ValidationResult::fail(ValidationError::NarrativeEmpty);
     }
     if s.narrative.chars().count() > 500 {
-        return ValidationResult::fail(
-            ValidationError::NarrativeTooLong(s.narrative.chars().count())
-        );
+        return ValidationResult::fail(ValidationError::NarrativeTooLong(
+            s.narrative.chars().count(),
+        ));
     }
 
     // Confidence in [0.0, 1.0]
     if s.confidence < 0.0 || s.confidence > 1.0 {
-        return ValidationResult::fail(
-            ValidationError::ConfidenceOutOfRange(s.confidence)
-        );
+        return ValidationResult::fail(ValidationError::ConfidenceOutOfRange(s.confidence));
     }
 
     // Validate action if present
@@ -49,9 +57,7 @@ pub fn validate(s: &JiniSuggestion) -> ValidationResult {
             JiniAction::SuggestMacroChange { delta, .. } => {
                 // INV-JINI-7: delta bounded [-0.3, +0.3]
                 if *delta < -0.3 || *delta > 0.3 {
-                    return ValidationResult::fail(
-                        ValidationError::DeltaOutOfRange(*delta)
-                    );
+                    return ValidationResult::fail(ValidationError::DeltaOutOfRange(*delta));
                 }
             }
             JiniAction::SuggestFlavourSwitch { .. } => {}
@@ -65,7 +71,7 @@ pub fn validate(s: &JiniSuggestion) -> ValidationResult {
 /// Validate and return suggestion if valid, fallback if not.
 pub fn validated_or_fallback(
     suggestion: JiniSuggestion,
-    fallback:   JiniSuggestion,
+    fallback: JiniSuggestion,
 ) -> JiniSuggestion {
     if validate(&suggestion).valid {
         suggestion
@@ -81,9 +87,9 @@ mod tests {
 
     fn valid_suggestion() -> JiniSuggestion {
         JiniSuggestion {
-            narrative:    "Test narrative".to_string(),
-            action:       Some(JiniAction::SuggestNothing),
-            confidence:   0.85,
+            narrative: "Test narrative".to_string(),
+            action: Some(JiniAction::SuggestNothing),
+            confidence: 0.85,
             persona_used: JiniPersonaId::Pro,
         }
     }
@@ -119,7 +125,7 @@ mod tests {
         let mut s = valid_suggestion();
         s.action = Some(JiniAction::SuggestMacroChange {
             handle: MacroHandle::Tone,
-            delta:  0.5,   // > 0.3 — invalid
+            delta: 0.5, // > 0.3 — invalid
             reason: "test".to_string(),
         });
         assert!(!validate(&s).valid);
@@ -130,7 +136,7 @@ mod tests {
         let mut s = valid_suggestion();
         s.action = Some(JiniAction::SuggestMacroChange {
             handle: MacroHandle::Tone,
-            delta:  0.3,   // exactly at boundary — valid
+            delta: 0.3, // exactly at boundary — valid
             reason: "test".to_string(),
         });
         assert!(validate(&s).valid);
@@ -141,7 +147,7 @@ mod tests {
         let mut s = valid_suggestion();
         s.action = Some(JiniAction::SuggestMacroChange {
             handle: MacroHandle::Dynamics,
-            delta:  -0.3,
+            delta: -0.3,
             reason: "test".to_string(),
         });
         assert!(validate(&s).valid);

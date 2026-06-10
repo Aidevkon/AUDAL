@@ -10,11 +10,11 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TransitionMatrix {
     /// State labels — sorted alphabetically for determinism.
-    pub states:        Vec<String>,
+    pub states: Vec<String>,
     /// Raw counts[from_idx][to_idx].
-    pub counts:        Vec<Vec<usize>>,
+    pub counts: Vec<Vec<usize>>,
     /// Normalized probabilities[from_idx][to_idx]. Row sums to 1.0.
-    pub probs:         Vec<Vec<f32>>,
+    pub probs: Vec<Vec<f32>>,
     /// Total number of transitions observed.
     pub n_transitions: usize,
 }
@@ -25,7 +25,8 @@ impl TransitionMatrix {
     /// States sorted alphabetically for cross-platform determinism.
     pub fn from_sequence(sequence: &[String]) -> Self {
         // Collect unique states, sort for determinism
-        let mut state_set: Vec<String> = sequence.iter()
+        let mut state_set: Vec<String> = sequence
+            .iter()
             .cloned()
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
@@ -37,13 +38,14 @@ impl TransitionMatrix {
             return Self {
                 states: vec![],
                 counts: vec![],
-                probs:  vec![],
+                probs: vec![],
                 n_transitions: 0,
             };
         }
 
         // Index lookup
-        let idx: HashMap<&str, usize> = state_set.iter()
+        let idx: HashMap<&str, usize> = state_set
+            .iter()
             .enumerate()
             .map(|(i, s)| (s.as_str(), i))
             .collect();
@@ -53,14 +55,19 @@ impl TransitionMatrix {
 
         for window in sequence.windows(2) {
             let from = idx[window[0].as_str()];
-            let to   = idx[window[1].as_str()];
+            let to = idx[window[1].as_str()];
             counts[from][to] += 1;
             n_transitions += 1;
         }
 
         let probs = normalize_rows(&counts);
 
-        Self { states: state_set, counts, probs, n_transitions }
+        Self {
+            states: state_set,
+            counts,
+            probs,
+            n_transitions,
+        }
     }
 
     /// Merge another matrix into self (incremental training).
@@ -68,7 +75,9 @@ impl TransitionMatrix {
     /// INV-CB-2: incremental — never full retrain.
     pub fn merge(&mut self, other: &TransitionMatrix) {
         // Collect union of states
-        let mut all_states: Vec<String> = self.states.iter()
+        let mut all_states: Vec<String> = self
+            .states
+            .iter()
             .chain(other.states.iter())
             .cloned()
             .collect::<std::collections::BTreeSet<_>>()
@@ -77,7 +86,8 @@ impl TransitionMatrix {
         all_states.sort();
 
         let n = all_states.len();
-        let idx: HashMap<&str, usize> = all_states.iter()
+        let idx: HashMap<&str, usize> = all_states
+            .iter()
             .enumerate()
             .map(|(i, s)| (s.as_str(), i))
             .collect();
@@ -102,20 +112,22 @@ impl TransitionMatrix {
             }
         }
 
-        self.states        = all_states;
-        self.counts        = new_counts;
+        self.states = all_states;
+        self.counts = new_counts;
         self.n_transitions = self.n_transitions + other.n_transitions;
-        self.probs         = normalize_rows(&self.counts);
+        self.probs = normalize_rows(&self.counts);
     }
 
     /// P(next_state | current_state).
     /// Returns uniform probability if state unseen (Laplace smoothing).
     pub fn probability(&self, from: &str, to: &str) -> f32 {
         let n = self.states.len();
-        if n == 0 { return 0.0; }
+        if n == 0 {
+            return 0.0;
+        }
 
         let from_idx = self.states.iter().position(|s| s == from);
-        let to_idx   = self.states.iter().position(|s| s == to);
+        let to_idx = self.states.iter().position(|s| s == to);
 
         match (from_idx, to_idx) {
             (Some(fi), Some(ti)) => self.probs[fi][ti],
@@ -127,74 +139,79 @@ impl TransitionMatrix {
 /// Normalize each row to sum to 1.0.
 /// Rows with all-zero counts get uniform distribution.
 fn normalize_rows(counts: &[Vec<usize>]) -> Vec<Vec<f32>> {
-    counts.iter().map(|row| {
-        let total: usize = row.iter().sum();
-        if total == 0 {
-            let n = row.len();
-            vec![if n > 0 { 1.0 / n as f32 } else { 0.0 }; n]
-        } else {
-            row.iter().map(|&c| c as f32 / total as f32).collect()
-        }
-    }).collect()
+    counts
+        .iter()
+        .map(|row| {
+            let total: usize = row.iter().sum();
+            if total == 0 {
+                let n = row.len();
+                vec![if n > 0 { 1.0 / n as f32 } else { 0.0 }; n]
+            } else {
+                row.iter().map(|&c| c as f32 / total as f32).collect()
+            }
+        })
+        .collect()
 }
 
-pub const RMS_DB_BINS:            [f32; 4] = [-80.0, -50.0, -30.0, -10.0];
-pub const RMS_DELTA_BINS:         [f32; 4] = [-10.0, -2.0,   2.0,  10.0];
-pub const TRANSIENT_DENSITY_BINS: [f32; 3] = [0.05,  0.15,  0.30];
+pub const RMS_DB_BINS: [f32; 4] = [-80.0, -50.0, -30.0, -10.0];
+pub const RMS_DELTA_BINS: [f32; 4] = [-10.0, -2.0, 2.0, 10.0];
+pub const TRANSIENT_DENSITY_BINS: [f32; 3] = [0.05, 0.15, 0.30];
 pub const SPECTRAL_CENTROID_BINS: [f32; 3] = [500.0, 2000.0, 6000.0];
-pub const SPECTRAL_FLATNESS_BINS: [f32; 2] = [0.1,   0.5];
+pub const SPECTRAL_FLATNESS_BINS: [f32; 2] = [0.1, 0.5];
 pub const MFCC_BIN_COUNT: usize = 3; // low/mid/high per coefficient
 
 /// Find bin index. Bin 0 = below first boundary.
 /// Uses strict < so boundary values fall into upper bin.
 fn bin_index(value: f32, boundaries: &[f32]) -> usize {
-    boundaries.iter().position(|&b| value < b).unwrap_or(boundaries.len())
+    boundaries
+        .iter()
+        .position(|&b| value < b)
+        .unwrap_or(boundaries.len())
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EmissionHistogram {
-    pub state:             String,
-    pub rms_db:            [usize; 5],
-    pub rms_delta:         [usize; 5],
+    pub state: String,
+    pub rms_db: [usize; 5],
+    pub rms_delta: [usize; 5],
     pub transient_density: [usize; 4],
     pub spectral_centroid: [usize; 4],
     pub spectral_flatness: [usize; 3],
     /// MFCC bins: 13 coefficients × 3 bins each = 39 counters.
     /// Bin boundaries: negative (-inf,0), zero [-0.5,0.5], positive (0.5,inf)
-    pub mfcc_bins:         [[usize; 3]; 13],
-    pub total:             usize,
+    pub mfcc_bins: [[usize; 3]; 13],
+    pub total: usize,
 }
 
 impl EmissionHistogram {
     pub fn new(state: &str) -> Self {
         Self {
-            state:             state.to_string(),
-            rms_db:            [0; 5],
-            rms_delta:         [0; 5],
+            state: state.to_string(),
+            rms_db: [0; 5],
+            rms_delta: [0; 5],
             transient_density: [0; 4],
             spectral_centroid: [0; 4],
             spectral_flatness: [0; 3],
-            mfcc_bins:         [[0usize; 3]; 13],
-            total:             0,
+            mfcc_bins: [[0usize; 3]; 13],
+            total: 0,
         }
     }
 
     pub fn observe(&mut self, features: &crate::features::StateFeatures) {
-        self.rms_db[bin_index(features.rms_db,
-            &RMS_DB_BINS)] += 1;
-        self.rms_delta[bin_index(features.rms_delta,
-            &RMS_DELTA_BINS)] += 1;
-        self.transient_density[bin_index(features.transient_density,
-            &TRANSIENT_DENSITY_BINS)] += 1;
-        self.spectral_centroid[bin_index(features.spectral_centroid,
-            &SPECTRAL_CENTROID_BINS)] += 1;
-        self.spectral_flatness[bin_index(features.spectral_flatness,
-            &SPECTRAL_FLATNESS_BINS)] += 1;
+        self.rms_db[bin_index(features.rms_db, &RMS_DB_BINS)] += 1;
+        self.rms_delta[bin_index(features.rms_delta, &RMS_DELTA_BINS)] += 1;
+        self.transient_density[bin_index(features.transient_density, &TRANSIENT_DENSITY_BINS)] += 1;
+        self.spectral_centroid[bin_index(features.spectral_centroid, &SPECTRAL_CENTROID_BINS)] += 1;
+        self.spectral_flatness[bin_index(features.spectral_flatness, &SPECTRAL_FLATNESS_BINS)] += 1;
         for k in 0..13 {
             let v = features.mfcc[k];
-            let bin = if v < -0.5 { 0 }
-                      else if v <= 0.5 { 1 }
-                      else { 2 };
+            let bin = if v < -0.5 {
+                0
+            } else if v <= 0.5 {
+                1
+            } else {
+                2
+            };
             self.mfcc_bins[k][bin] += 1;
         }
         self.total += 1;
@@ -203,35 +220,64 @@ impl EmissionHistogram {
     /// P(features | state) — product of bin probabilities (Naive Bayes).
     /// Returns 0.0 if no observations yet.
     pub fn likelihood(&self, features: &crate::features::StateFeatures) -> f32 {
-        if self.total == 0 { return 0.0; }
-        let p_rms = bin_prob(&self.rms_db,
-            bin_index(features.rms_db, &RMS_DB_BINS));
-        let p_delta = bin_prob(&self.rms_delta,
-            bin_index(features.rms_delta, &RMS_DELTA_BINS));
-        let p_td = bin_prob(&self.transient_density,
-            bin_index(features.transient_density, &TRANSIENT_DENSITY_BINS));
-        let p_sc = bin_prob(&self.spectral_centroid,
-            bin_index(features.spectral_centroid, &SPECTRAL_CENTROID_BINS));
-        let p_sf = bin_prob(&self.spectral_flatness,
-            bin_index(features.spectral_flatness, &SPECTRAL_FLATNESS_BINS));
-        let p_mfcc: f32 = (0..13).map(|k| {
-            let v = features.mfcc[k];
-            let bin = if v < -0.5 { 0 } else if v <= 0.5 { 1 } else { 2 };
-            let total = self.mfcc_bins[k].iter().sum::<usize>() + 3;
-            let count = self.mfcc_bins[k][bin] + 1;
-            count as f32 / total as f32
-        }).product::<f32>();
+        if self.total == 0 {
+            return 0.0;
+        }
+        let p_rms = bin_prob(&self.rms_db, bin_index(features.rms_db, &RMS_DB_BINS));
+        let p_delta = bin_prob(
+            &self.rms_delta,
+            bin_index(features.rms_delta, &RMS_DELTA_BINS),
+        );
+        let p_td = bin_prob(
+            &self.transient_density,
+            bin_index(features.transient_density, &TRANSIENT_DENSITY_BINS),
+        );
+        let p_sc = bin_prob(
+            &self.spectral_centroid,
+            bin_index(features.spectral_centroid, &SPECTRAL_CENTROID_BINS),
+        );
+        let p_sf = bin_prob(
+            &self.spectral_flatness,
+            bin_index(features.spectral_flatness, &SPECTRAL_FLATNESS_BINS),
+        );
+        let p_mfcc: f32 = (0..13)
+            .map(|k| {
+                let v = features.mfcc[k];
+                let bin = if v < -0.5 {
+                    0
+                } else if v <= 0.5 {
+                    1
+                } else {
+                    2
+                };
+                let total = self.mfcc_bins[k].iter().sum::<usize>() + 3;
+                let count = self.mfcc_bins[k][bin] + 1;
+                count as f32 / total as f32
+            })
+            .product::<f32>();
         p_rms * p_delta * p_td * p_sc * p_sf * p_mfcc
     }
 
     pub fn merge(&mut self, other: &EmissionHistogram) {
-        for i in 0..5 { self.rms_db[i]    += other.rms_db[i]; }
-        for i in 0..5 { self.rms_delta[i] += other.rms_delta[i]; }
-        for i in 0..4 { self.transient_density[i] += other.transient_density[i]; }
-        for i in 0..4 { self.spectral_centroid[i] += other.spectral_centroid[i]; }
-        for i in 0..3 { self.spectral_flatness[i] += other.spectral_flatness[i]; }
+        for i in 0..5 {
+            self.rms_db[i] += other.rms_db[i];
+        }
+        for i in 0..5 {
+            self.rms_delta[i] += other.rms_delta[i];
+        }
+        for i in 0..4 {
+            self.transient_density[i] += other.transient_density[i];
+        }
+        for i in 0..4 {
+            self.spectral_centroid[i] += other.spectral_centroid[i];
+        }
+        for i in 0..3 {
+            self.spectral_flatness[i] += other.spectral_flatness[i];
+        }
         for k in 0..13 {
-            for b in 0..3 { self.mfcc_bins[k][b] += other.mfcc_bins[k][b]; }
+            for b in 0..3 {
+                self.mfcc_bins[k][b] += other.mfcc_bins[k][b];
+            }
         }
         self.total += other.total;
     }
@@ -251,8 +297,11 @@ mod tests {
     #[test]
     fn from_sequence_counts_correctly() {
         let seq = vec![
-            "a".to_string(), "b".to_string(), "a".to_string(),
-            "b".to_string(), "c".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
         ];
         let m = TransitionMatrix::from_sequence(&seq);
         assert_eq!(m.n_transitions, 4);
@@ -280,8 +329,10 @@ mod tests {
     #[test]
     fn states_sorted_alphabetically() {
         let seq = vec![
-            "vowel".to_string(), "consonant".to_string(),
-            "tail".to_string(), "silence".to_string(),
+            "vowel".to_string(),
+            "consonant".to_string(),
+            "tail".to_string(),
+            "silence".to_string(),
         ];
         let m = TransitionMatrix::from_sequence(&seq);
         assert_eq!(m.states, vec!["consonant", "silence", "tail", "vowel"]);
@@ -292,7 +343,7 @@ mod tests {
         let seq1 = vec!["a".to_string(), "b".to_string()];
         let seq2 = vec!["a".to_string(), "b".to_string()];
         let mut m1 = TransitionMatrix::from_sequence(&seq1);
-        let m2     = TransitionMatrix::from_sequence(&seq2);
+        let m2 = TransitionMatrix::from_sequence(&seq2);
         m1.merge(&m2);
         assert_eq!(m1.n_transitions, 2);
         // a→b should be count=2, prob=1.0
@@ -311,15 +362,23 @@ mod tests {
     #[test]
     fn row_sums_to_one() {
         let seq = vec![
-            "silence".to_string(), "vowel".to_string(),
-            "consonant".to_string(), "tail".to_string(),
-            "silence".to_string(), "breath".to_string(),
+            "silence".to_string(),
+            "vowel".to_string(),
+            "consonant".to_string(),
+            "tail".to_string(),
+            "silence".to_string(),
+            "breath".to_string(),
         ];
         let m = TransitionMatrix::from_sequence(&seq);
         for (i, from) in m.states.iter().enumerate() {
             let row_sum: f32 = m.probs[i].iter().sum();
-            assert!((row_sum - 1.0).abs() < 0.001,
-                "Row {} ({}) sums to {}", i, from, row_sum);
+            assert!(
+                (row_sum - 1.0).abs() < 0.001,
+                "Row {} ({}) sums to {}",
+                i,
+                from,
+                row_sum
+            );
         }
     }
 
@@ -368,7 +427,7 @@ mod tests {
     #[test]
     fn bin_index_boundaries() {
         assert_eq!(bin_index(-144.0, &RMS_DB_BINS), 0); // < -80 → bin 0
-        assert_eq!(bin_index(-80.0,  &RMS_DB_BINS), 1); // not < -80 → bin 1
-        assert_eq!(bin_index(0.0,    &RMS_DB_BINS), 4); // above all → bin 4
+        assert_eq!(bin_index(-80.0, &RMS_DB_BINS), 1); // not < -80 → bin 1
+        assert_eq!(bin_index(0.0, &RMS_DB_BINS), 4); // above all → bin 4
     }
 }

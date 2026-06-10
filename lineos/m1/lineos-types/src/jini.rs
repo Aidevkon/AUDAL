@@ -107,8 +107,8 @@ pub struct BehaviourVector {
     pub loudness: LoudnessBehaviour,
     pub spectral: SpectralBehaviour,
     pub dynamics: DynamicsBehaviour,
-    pub stereo:   StereoBehaviour,
-    pub quality:  QualityBehaviour,
+    pub stereo: StereoBehaviour,
+    pub quality: QualityBehaviour,
 }
 
 impl BehaviourVector {
@@ -117,19 +117,19 @@ impl BehaviourVector {
             loudness: LoudnessBehaviour::Balanced,
             spectral: SpectralBehaviour::Neutral,
             dynamics: DynamicsBehaviour::Stable,
-            stereo:   StereoBehaviour::Wide,
-            quality:  QualityBehaviour::Clean,
+            stereo: StereoBehaviour::Wide,
+            quality: QualityBehaviour::Clean,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MacroState {
-    pub tone:     f32,
+    pub tone: f32,
     pub dynamics: f32,
-    pub space:    f32,
+    pub space: f32,
     pub loudness: f32,
-    pub width:    f32,
+    pub width: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -141,24 +141,24 @@ pub enum JiniPersonaId {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JiniContext {
-    pub spinoff:    SpinoffTarget,
+    pub spinoff: SpinoffTarget,
     pub stem_focus: Option<StemKind>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JiniInput {
-    pub behaviour:      BehaviourVector,
-    pub persona:        JiniPersonaId,
+    pub behaviour: BehaviourVector,
+    pub persona: JiniPersonaId,
     pub current_macros: MacroState,
-    pub flavour:        FlavourId,
-    pub context:        JiniContext,
+    pub flavour: FlavourId,
+    pub context: JiniContext,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct JiniSuggestion {
-    pub narrative:    String,
-    pub action:       Option<JiniAction>,
-    pub confidence:   f32,
+    pub narrative: String,
+    pub action: Option<JiniAction>,
+    pub confidence: f32,
     pub persona_used: JiniPersonaId,
 }
 
@@ -166,11 +166,11 @@ pub struct JiniSuggestion {
 pub enum JiniAction {
     SuggestMacroChange {
         handle: MacroHandle,
-        delta:  f32,          // bounded [-0.3, +0.3]
+        delta: f32, // bounded [-0.3, +0.3]
         reason: String,
     },
     SuggestFlavourSwitch {
-        to:     FlavourId,
+        to: FlavourId,
         reason: String,
     },
     SuggestNothing,
@@ -180,10 +180,10 @@ pub enum JiniAction {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct PersonaSchema {
-    pub id:               JiniPersonaId,
-    pub system_prompt:    &'static str,
-    pub temperature:      f32,
-    pub max_tokens:       u32,
+    pub id: JiniPersonaId,
+    pub system_prompt: &'static str,
+    pub temperature: f32,
+    pub max_tokens: u32,
     pub vocabulary_level: VocabLevel,
 }
 
@@ -197,37 +197,37 @@ pub enum VocabLevel {
 // ── Schema Constants (§3 Personas) ───────────────────────────────────────────
 
 pub const SCHEMA_BEGINNER: PersonaSchema = PersonaSchema {
-    id:               JiniPersonaId::Beginner,
-    system_prompt:    "You are a friendly music mentor helping someone new to audio. \
+    id: JiniPersonaId::Beginner,
+    system_prompt: "You are a friendly music mentor helping someone new to audio. \
                        Speak warmly and simply. No technical terms. Use musical analogies. \
                        Keep suggestions to one or two sentences. Always be encouraging.",
-    temperature:      0.7,
-    max_tokens:       256,
+    temperature: 0.7,
+    max_tokens: 256,
     vocabulary_level: VocabLevel::Simple,
 };
 
 pub const SCHEMA_INTERMEDIATE: PersonaSchema = PersonaSchema {
-    id:               JiniPersonaId::Intermediate,
-    system_prompt:    "You are an experienced audio engineer helping an intermediate producer. \
+    id: JiniPersonaId::Intermediate,
+    system_prompt: "You are an experienced audio engineer helping an intermediate producer. \
                        Explain what you hear and why it matters. \
                        Use DSP terms but explain them briefly. Be direct and helpful.",
-    temperature:      0.5,
-    max_tokens:       384,
+    temperature: 0.5,
+    max_tokens: 384,
     vocabulary_level: VocabLevel::Intermediate,
 };
 
 pub const SCHEMA_PRO: PersonaSchema = PersonaSchema {
-    id:               JiniPersonaId::Pro,
-    system_prompt:    "You are a mastering engineer speaking to another engineer. \
+    id: JiniPersonaId::Pro,
+    system_prompt: "You are a mastering engineer speaking to another engineer. \
                        Be precise and technical. Reference standards where relevant. \
                        No explanations unless asked. Maximum two sentences.",
-    temperature:      0.3,
-    max_tokens:       256,
+    temperature: 0.3,
+    max_tokens: 256,
     vocabulary_level: VocabLevel::Technical,
 };
 
 // ── Ollama Constants (§5.3) ──────────────────────────────────────────────────
 
-pub const OLLAMA_TIMEOUT_MS: u64  = 5_000;
-pub const OLLAMA_ENDPOINT:   &str = "http://localhost:11434/api/generate";
-pub const GEMMA_MODEL:       &str = "gemma4:latest";
+pub const OLLAMA_TIMEOUT_MS: u64 = 5_000;
+pub const OLLAMA_ENDPOINT: &str = "http://localhost:11434/api/generate";
+pub const GEMMA_MODEL: &str = "gemma4:latest";

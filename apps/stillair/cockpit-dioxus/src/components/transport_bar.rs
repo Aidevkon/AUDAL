@@ -5,15 +5,15 @@
 //!
 //! Props received from App(): mode, session_state, intent_open, intent_closing
 
-use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson};
 use crate::components::{
-    transport_button::{TransportActuator, LedColor, SkipActuator},
     ab_toggle::{AbToggle, AbToggleState},
     timecode::TimecodeDisplay,
+    transport_button::{LedColor, SkipActuator, TransportActuator},
 };
+use crate::state::cockpit_mode::CockpitMode;
+use crate::types::{PlaybackStateJson, SessionStateJson};
+use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 // ── Types (moved from app.rs) ─────────────────────────────────────────────────
 
@@ -35,22 +35,29 @@ enum AbortState {
 
 /// Scrub fill % (0.0–100.0)
 fn scrub_pct(position_ms: u64, duration_ms: u64) -> f64 {
-    if duration_ms == 0 { 0.0 }
-    else { (position_ms as f64 / duration_ms as f64 * 100.0).clamp(0.0, 100.0) }
+    if duration_ms == 0 {
+        0.0
+    } else {
+        (position_ms as f64 / duration_ms as f64 * 100.0).clamp(0.0, 100.0)
+    }
 }
 
 // ── IPC (fire-and-forget, moved from app.rs) ──────────────────────────────────
 
 async fn invoke_playback(
-    action:         &'static str,
-    position_ms:    Option<u64>,
+    action: &'static str,
+    position_ms: Option<u64>,
     playback_state: Signal<Option<PlaybackStateJson>>,
 ) {
     let args = serde_json::json!({ "action": action, "positionMs": position_ms });
     match crate::ipc::invoke::<Option<PlaybackStateJson>, _>("playback_control", args).await {
-        Ok(Some(state)) => { playback_state.clone().set(Some(state)); }
-        Ok(None)        => {}
-        Err(e)          => { web_sys::console::log_1(&format!("[transport] {action} error: {e}").into()); }
+        Ok(Some(state)) => {
+            playback_state.clone().set(Some(state));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            web_sys::console::log_1(&format!("[transport] {action} error: {e}").into());
+        }
     }
 }
 
@@ -58,38 +65,38 @@ async fn invoke_playback(
 
 #[derive(Props, Clone, PartialEq)]
 pub struct TransportBarProps {
-    pub mode:           Signal<CockpitMode>,
-    pub session_state:  Signal<Option<SessionStateJson>>,
-    pub tier:           Signal<crate::types::CockpitTier>,
-    pub intent_open:    Signal<bool>,
+    pub mode: Signal<CockpitMode>,
+    pub session_state: Signal<Option<SessionStateJson>>,
+    pub tier: Signal<crate::types::CockpitTier>,
+    pub intent_open: Signal<bool>,
     pub intent_closing: Signal<bool>,
-    pub presentation:   crate::state::cockpit_presentation::CockpitPresentation,
+    pub presentation: crate::state::cockpit_presentation::CockpitPresentation,
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 #[component]
 pub fn TransportBar(props: TransportBarProps) -> Element {
-    let mut mode          = props.mode;
+    let mut mode = props.mode;
     let mut session_state = props.session_state;
-    let tier              = props.tier;
-    let mut intent_open   = props.intent_open;
-    let presentation      = &props.presentation;
+    let tier = props.tier;
+    let mut intent_open = props.intent_open;
+    let presentation = &props.presentation;
 
     // ── Internal signals ─────────────────────────────────────────────────────
     let playback_state: Signal<Option<PlaybackStateJson>> = use_signal(|| None);
     let mut current_state = use_signal(|| TransportState::Stopped);
-    let mut abort_state   = use_signal(|| AbortState::IdleClosed);
+    let mut abort_state = use_signal(|| AbortState::IdleClosed);
     let mut ab_press_time = use_signal(|| 0u64);
 
     // ── P12B-004: Position polling — 500ms when in CoachReady ────────────────
     // Scoped here: only TransportBar re-renders on poll (fixes F4-INT-01).
     {
-        let mode_poll      = mode;
+        let mode_poll = mode;
 
         use_effect(move || {
             let playback_state = playback_state;
-            let mode_poll      = mode_poll;
+            let mode_poll = mode_poll;
 
             spawn_local(async move {
                 loop {
@@ -100,9 +107,14 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                         continue;
                     }
 
-                    if let Ok(Some(state)) = crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
-                        "get_playback_state"
-                    ).await { playback_state.clone().set(Some(state)); }
+                    if let Ok(Some(state)) =
+                        crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
+                            "get_playback_state",
+                        )
+                        .await
+                    {
+                        playback_state.clone().set(Some(state));
+                    }
                 }
             });
         });
@@ -111,20 +123,33 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
     // ── Computed (subscribed to TransportBar only after extraction) ───────────
     // NOTE: These reads are inside TransportBar — not App() — so only this
     // component re-renders on playback_state changes. Fixes F4-INT-01.
-    let position_ms = playback_state.read().as_ref().map(|s| s.position_ms).unwrap_or(0);
-    let duration_ms = playback_state.read().as_ref().map(|s| s.duration_ms).unwrap_or(0);
-    let scrub_len   = scrub_pct(position_ms, duration_ms);
+    let position_ms = playback_state
+        .read()
+        .as_ref()
+        .map(|s| s.position_ms)
+        .unwrap_or(0);
+    let duration_ms = playback_state
+        .read()
+        .as_ref()
+        .map(|s| s.duration_ms)
+        .unwrap_or(0);
+    let scrub_len = scrub_pct(position_ms, duration_ms);
 
-    let ab_state_derived = playback_state.read().as_ref().map(|s| match s.active_ab.as_str() {
-        "A" => AbToggleState::A,
-        _   => AbToggleState::B,
-    }).unwrap_or(AbToggleState::B);
+    let ab_state_derived = playback_state
+        .read()
+        .as_ref()
+        .map(|s| match s.active_ab.as_str() {
+            "A" => AbToggleState::A,
+            _ => AbToggleState::B,
+        })
+        .unwrap_or(AbToggleState::B);
 
     // Define labels outside rsx! to prevent editor syntax highlighter errors with '<' and '>'
     let lbl_skip_back = "<<".to_string();
-    let lbl_skip_fwd  = ">>".to_string();
+    let lbl_skip_fwd = ">>".to_string();
 
-    let chain = session_state.read()
+    let chain = session_state
+        .read()
         .as_ref()
         .and_then(|s| s.dsp_chain.clone())
         .unwrap_or_default();
@@ -141,7 +166,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                             {
                                 let session = session_state.read();
                                 let mode_val = mode.read();
-                                
+
                                 // Extract filename if available
                                 let filename = match &*mode_val {
                                     crate::state::cockpit_mode::CockpitMode::FileLoaded { name, .. } => Some(name.clone()),
@@ -149,7 +174,7 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                     crate::state::cockpit_mode::CockpitMode::Mastering { path, .. } => std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()),
                                     _ => None,
                                 };
-                                
+
                                 match session.as_ref() {
                                     Some(s) => {
                                         let lufs = s.loudness.integrated_lufs;

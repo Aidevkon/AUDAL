@@ -2,9 +2,9 @@
 use std::f32::consts::PI;
 use std::fs;
 
-use sp314_dsp::metering::KWeightingFilter;
-use sp314_dsp::metering::measure_integrated_lufs;
 use sp314_dsp::metering::integrated_lufs;
+use sp314_dsp::metering::measure_integrated_lufs;
+use sp314_dsp::metering::KWeightingFilter;
 use sp314_dsp::pipeline::telemetry::analyze_offline_pre_pass;
 
 fn load_lufs_reference() -> f32 {
@@ -38,14 +38,22 @@ fn kweight_filter_boosts_high_frequencies() {
         let o_100 = filter_100hz.process(sine_100hz);
         let o_10k = filter_10khz.process(sine_10khz);
 
-        if i > 40000 { // measure after settling
-            if o_100.abs() > out_100hz { out_100hz = o_100.abs(); }
-            if o_10k.abs() > out_10khz { out_10khz = o_10k.abs(); }
+        if i > 40000 {
+            // measure after settling
+            if o_100.abs() > out_100hz {
+                out_100hz = o_100.abs();
+            }
+            if o_10k.abs() > out_10khz {
+                out_10khz = o_10k.abs();
+            }
         }
     }
 
     // K-weighting has a high shelf boost, so 10kHz should be significantly louder than 100Hz
-    assert!(out_10khz > out_100hz * 1.5, "High frequencies should be boosted by K-weighting");
+    assert!(
+        out_10khz > out_100hz * 1.5,
+        "High frequencies should be boosted by K-weighting"
+    );
 }
 
 #[test]
@@ -57,14 +65,20 @@ fn kweight_filter_attenuates_sub_bass() {
         let t = i as f32 / 48000.0;
         let sine_50hz = 1.0 * (2.0 * PI * 50.0 * t).sin();
         let out = filter.process(sine_50hz);
-        
+
         if i > 40000 {
-            if out.abs() > out_50hz { out_50hz = out.abs(); }
+            if out.abs() > out_50hz {
+                out_50hz = out.abs();
+            }
         }
     }
 
     // High-pass filter attenuates below 100Hz
-    assert!(out_50hz < 0.75, "Sub-bass should be attenuated, peak was {}", out_50hz);
+    assert!(
+        out_50hz < 0.75,
+        "Sub-bass should be attenuated, peak was {}",
+        out_50hz
+    );
 }
 
 #[test]
@@ -82,7 +96,10 @@ fn lufs_absolute_gate_removes_quiet_blocks() {
     // Absolute gate is -70 LUFS. So -80 LUFS blocks should be removed.
     let blocks = vec![quiet_ms, quiet_ms, quiet_ms];
     let lufs = integrated_lufs(&blocks);
-    assert_eq!(lufs, -144.0, "Absolute gate should drop blocks below -70 LUFS");
+    assert_eq!(
+        lufs, -144.0,
+        "Absolute gate should drop blocks below -70 LUFS"
+    );
 }
 
 #[test]
@@ -90,12 +107,12 @@ fn lufs_relative_gate_removes_quiet_blocks() {
     // Loud blocks at -14 LUFS, quiet blocks at -30 LUFS
     let loud_ms = sp314_dsp::metering::lufs_to_mean_square(-14.0);
     let quiet_ms = sp314_dsp::metering::lufs_to_mean_square(-30.0);
-    
+
     let mut blocks = vec![loud_ms; 10];
     blocks.extend(vec![quiet_ms; 10]); // These should be gated out by relative gate
-    
+
     let lufs = integrated_lufs(&blocks);
-    
+
     // If quiet blocks were included, mean would be lowered.
     // If gated, mean should be exactly loud_ms (since there are 10 of them, and others dropped)
     // Wait, the ungated mean includes ALL absolute-surviving blocks.
@@ -106,40 +123,49 @@ fn lufs_relative_gate_removes_quiet_blocks() {
     // -30 LUFS is below -27 LUFS, so it is gated out!
     // Surviving blocks: the 10 loud blocks.
     // Final mean = loud_ms. Final LUFS = -14.0 LUFS.
-    assert!((lufs - -14.0).abs() < 0.1, "Relative gate failed, got {} LUFS", lufs);
+    assert!(
+        (lufs - -14.0).abs() < 0.1,
+        "Relative gate failed, got {} LUFS",
+        lufs
+    );
 }
 
 #[test]
 fn lufs_1khz_sine_matches_reference() {
     let mut left = vec![0.0_f32; 48000 * 3];
     let mut right = vec![0.0_f32; 48000 * 3];
-    
+
     for i in 0..(48000 * 3) {
         let t = i as f32 / 48000.0;
         left[i] = 0.1 * (2.0 * PI * 1000.0 * t).sin();
         right[i] = left[i];
     }
-    
+
     let lufs = measure_integrated_lufs(&left, &right);
     let expected = load_lufs_reference();
-    
-    assert!((lufs - expected).abs() <= 0.5, "Expected approx {}, got {}", expected, lufs);
+
+    assert!(
+        (lufs - expected).abs() <= 0.5,
+        "Expected approx {}, got {}",
+        expected,
+        lufs
+    );
 }
 
 #[test]
 fn lufs_integrated_is_deterministic() {
     let mut left = vec![0.0_f32; 48000 * 2];
     let mut right = vec![0.0_f32; 48000 * 2];
-    
+
     // Fill with pseudo-random deterministic data
     for i in 0..(48000 * 2) {
         left[i] = ((i % 100) as f32 / 100.0) - 0.5;
         right[i] = ((i % 120) as f32 / 120.0) - 0.5;
     }
-    
+
     let lufs1 = measure_integrated_lufs(&left, &right);
     let lufs2 = measure_integrated_lufs(&left, &right);
-    
+
     assert_eq!(lufs1, lufs2, "LUFS calculation must be deterministic");
 }
 
@@ -147,13 +173,17 @@ fn lufs_integrated_is_deterministic() {
 fn telemetry_includes_lufs() {
     let mut left = vec![0.0_f32; 48000];
     let mut right = vec![0.0_f32; 48000];
-    
+
     for i in 0..48000 {
         left[i] = 0.5 * (2.0 * PI * 1000.0 * (i as f32) / 48000.0).sin();
         right[i] = left[i];
     }
-    
+
     let telemetry = analyze_offline_pre_pass(&left, &right);
-    
-    assert!(telemetry.lufs > -100.0 && telemetry.lufs < 0.0, "LUFS should be a realistic value, got {}", telemetry.lufs);
+
+    assert!(
+        telemetry.lufs > -100.0 && telemetry.lufs < 0.0,
+        "LUFS should be a realistic value, got {}",
+        telemetry.lufs
+    );
 }

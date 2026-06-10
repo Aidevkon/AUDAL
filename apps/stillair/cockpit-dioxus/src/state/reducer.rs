@@ -3,8 +3,8 @@
 //! reduce(CockpitMode, CockpitEvent) → CockpitMode
 //! No I/O. No side effects. No Operator calls. Pure function only.
 
-use super::cockpit_mode::{AscCode, CockpitMode};
 use super::cockpit_event::CockpitEvent;
+use super::cockpit_mode::{AscCode, CockpitMode};
 use dioxus::prelude::*;
 
 /// Dispatch a CockpitEvent through the reducer into the mode Signal.
@@ -19,57 +19,71 @@ pub fn dispatch(mut mode: Signal<CockpitMode>, event: CockpitEvent) {
 pub fn reduce(mode: CockpitMode, event: CockpitEvent) -> CockpitMode {
     match (mode, event) {
         // From Idle
-        (CockpitMode::Idle, CockpitEvent::FileDropped { path, name, format }) =>
-            CockpitMode::FileLoaded { path, name, format },
-        (CockpitMode::Idle, CockpitEvent::FileDropFailed { message }) =>
-            CockpitMode::Fault { code: AscCode::FileReadError, message },
+        (CockpitMode::Idle, CockpitEvent::FileDropped { path, name, format }) => {
+            CockpitMode::FileLoaded { path, name, format }
+        }
+        (CockpitMode::Idle, CockpitEvent::FileDropFailed { message }) => CockpitMode::Fault {
+            code: AscCode::FileReadError,
+            message,
+        },
 
         // From FileLoaded
-        (CockpitMode::FileLoaded { .. }, CockpitEvent::BackToIdle) =>
-            CockpitMode::Idle,
-        (CockpitMode::FileLoaded { path, name, .. },
-         CockpitEvent::PresetSelected { preset_id }) =>
-            CockpitMode::PresetSelected { path, name, preset_id },
+        (CockpitMode::FileLoaded { .. }, CockpitEvent::BackToIdle) => CockpitMode::Idle,
+        (
+            CockpitMode::FileLoaded { path, name, .. },
+            CockpitEvent::PresetSelected { preset_id },
+        ) => CockpitMode::PresetSelected {
+            path,
+            name,
+            preset_id,
+        },
 
         // From PresetSelected
-        (CockpitMode::PresetSelected { .. }, CockpitEvent::BackToIdle) =>
-            CockpitMode::Idle,
-        (CockpitMode::PresetSelected { path, preset_id, .. },
-         CockpitEvent::MasterTriggered) =>
-            CockpitMode::Mastering { path, preset_id },
+        (CockpitMode::PresetSelected { .. }, CockpitEvent::BackToIdle) => CockpitMode::Idle,
+        (
+            CockpitMode::PresetSelected {
+                path, preset_id, ..
+            },
+            CockpitEvent::MasterTriggered,
+        ) => CockpitMode::Mastering { path, preset_id },
 
         // From Mastering
-        (CockpitMode::Mastering { .. },
-         CockpitEvent::MasteringFailed { message }) =>
-            CockpitMode::Fault { code: AscCode::MasteringError, message },
-        (CockpitMode::Mastering { .. },
-         CockpitEvent::MasteringComplete { blob_id }) =>
-            CockpitMode::CoachReady { blob_id },
+        (CockpitMode::Mastering { .. }, CockpitEvent::MasteringFailed { message }) => {
+            CockpitMode::Fault {
+                code: AscCode::MasteringError,
+                message,
+            }
+        }
+        (CockpitMode::Mastering { .. }, CockpitEvent::MasteringComplete { blob_id }) => {
+            CockpitMode::CoachReady { blob_id }
+        }
 
         // From CoachReady
-        (CockpitMode::CoachReady { blob_id },
-         CockpitEvent::ExportTriggered { format }) =>
-            CockpitMode::Exporting { blob_id, format },
+        (CockpitMode::CoachReady { blob_id }, CockpitEvent::ExportTriggered { format }) => {
+            CockpitMode::Exporting { blob_id, format }
+        }
 
         // From Exporting
-        (CockpitMode::Exporting { blob_id, .. },
-         CockpitEvent::ExportComplete) =>
-            CockpitMode::CoachReady { blob_id },
-        (CockpitMode::Exporting { .. },
-         CockpitEvent::ExportFailed { message }) =>
-            CockpitMode::Fault { code: AscCode::ExportError, message },
+        (CockpitMode::Exporting { blob_id, .. }, CockpitEvent::ExportComplete) => {
+            CockpitMode::CoachReady { blob_id }
+        }
+        (CockpitMode::Exporting { .. }, CockpitEvent::ExportFailed { message }) => {
+            CockpitMode::Fault {
+                code: AscCode::ExportError,
+                message,
+            }
+        }
 
         // From Fault
-        (CockpitMode::Fault { .. }, CockpitEvent::FaultAcknowledged) =>
-            CockpitMode::Idle,
+        (CockpitMode::Fault { .. }, CockpitEvent::FaultAcknowledged) => CockpitMode::Idle,
 
         // ── JINI transitions (J-P6) ─────────────────────────────────────────
         // Suggestion ready — mode stays CoachReady, suggestion stored via signal
-        (CockpitMode::CoachReady { blob_id },
-         CockpitEvent::JiniSuggestionReady { .. }) =>
-            CockpitMode::CoachReady { blob_id },
+        (CockpitMode::CoachReady { blob_id }, CockpitEvent::JiniSuggestionReady { .. }) => {
+            CockpitMode::CoachReady { blob_id }
+        }
         // Accept/Dismiss/Persona — side effect only, mode unchanged
-        (mode, CockpitEvent::JiniSuggestionAccepted)  => mode,
+        (mode, CockpitEvent::JiniSuggestionAccepted) => mode,
         (mode, CockpitEvent::JiniSuggestionDismissed) => mode,
         (mode, CockpitEvent::JiniPersonaChanged { .. }) => mode,
 
@@ -103,11 +117,12 @@ mod tests {
                 name: "test.wav".into(),
                 format: "WAV".into(),
             },
-            CockpitEvent::PresetSelected { preset_id: "spotify_v3".into() },
+            CockpitEvent::PresetSelected {
+                preset_id: "spotify_v3".into(),
+            },
         );
         match result {
-            CockpitMode::PresetSelected { preset_id, .. } =>
-                assert_eq!(preset_id, "spotify_v3"),
+            CockpitMode::PresetSelected { preset_id, .. } => assert_eq!(preset_id, "spotify_v3"),
             other => panic!("Expected PresetSelected, got {:?}", other),
         }
     }
@@ -119,7 +134,9 @@ mod tests {
                 path: "/tmp/test.wav".into(),
                 preset_id: "spotify_v3".into(),
             },
-            CockpitEvent::MasteringComplete { blob_id: "blob_123".into() },
+            CockpitEvent::MasteringComplete {
+                blob_id: "blob_123".into(),
+            },
         );
         assert!(matches!(result, CockpitMode::CoachReady { .. }));
     }
@@ -147,29 +164,41 @@ mod tests {
     fn full_happy_path_fsm() {
         let mut mode = CockpitMode::Idle;
 
-        mode = reduce(mode, CockpitEvent::FileDropped {
-            path: "/music/song.wav".into(),
-            name: "song.wav".into(),
-            format: "WAV".into(),
-        });
+        mode = reduce(
+            mode,
+            CockpitEvent::FileDropped {
+                path: "/music/song.wav".into(),
+                name: "song.wav".into(),
+                format: "WAV".into(),
+            },
+        );
         assert!(matches!(mode, CockpitMode::FileLoaded { .. }));
 
-        mode = reduce(mode, CockpitEvent::PresetSelected {
-            preset_id: "podcast_voice".into(),
-        });
+        mode = reduce(
+            mode,
+            CockpitEvent::PresetSelected {
+                preset_id: "podcast_voice".into(),
+            },
+        );
         assert!(matches!(mode, CockpitMode::PresetSelected { .. }));
 
         mode = reduce(mode, CockpitEvent::MasterTriggered);
         assert!(matches!(mode, CockpitMode::Mastering { .. }));
 
-        mode = reduce(mode, CockpitEvent::MasteringComplete {
-            blob_id: "golden_001".into(),
-        });
+        mode = reduce(
+            mode,
+            CockpitEvent::MasteringComplete {
+                blob_id: "golden_001".into(),
+            },
+        );
         assert!(matches!(mode, CockpitMode::CoachReady { .. }));
 
-        mode = reduce(mode, CockpitEvent::ExportTriggered {
-            format: "WAV".into(),
-        });
+        mode = reduce(
+            mode,
+            CockpitEvent::ExportTriggered {
+                format: "WAV".into(),
+            },
+        );
         assert!(matches!(mode, CockpitMode::Exporting { .. }));
 
         mode = reduce(mode, CockpitEvent::ExportComplete);

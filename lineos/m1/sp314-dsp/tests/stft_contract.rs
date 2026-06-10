@@ -3,15 +3,14 @@ fn stft_perfect_reconstruction_sine() {
     use sp314_dsp::stft::{StftEngine, FFT_SIZE};
 
     let mut engine = StftEngine::new();
-    let n = FFT_SIZE * 8;  // 8 frames
+    let n = FFT_SIZE * 8; // 8 frames
     let fs = 48000.0_f32;
 
     // 1kHz sine at 0.5 amplitude
     let signal: Vec<f32> = (0..n)
         .map(|i| {
             let t = i as f32 / fs;
-            0.5_f32 * (2.0_f32 * std::f32::consts::PI
-                       * 1000.0_f32 * t).sin()
+            0.5_f32 * (2.0_f32 * std::f32::consts::PI * 1000.0_f32 * t).sin()
         })
         .collect();
 
@@ -24,12 +23,17 @@ fn stft_perfect_reconstruction_sine() {
     let mut max_err = 0.0_f32;
     for i in margin..n - margin {
         let err = (signal[i] - reconstructed[i]).abs();
-        if err > max_err { max_err = err; }
+        if err > max_err {
+            max_err = err;
+        }
     }
 
     println!("Sine reconstruction max error: {:.2e}", max_err);
-    assert!(max_err < 1e-5_f32,
-        "Perfect reconstruction failed: {:.2e}", max_err);
+    assert!(
+        max_err < 1e-5_f32,
+        "Perfect reconstruction failed: {:.2e}",
+        max_err
+    );
 }
 
 #[test]
@@ -58,12 +62,17 @@ fn stft_perfect_reconstruction_noise() {
     let mut max_err = 0.0_f32;
     for i in margin..n - margin {
         let err = (signal[i] - reconstructed[i]).abs();
-        if err > max_err { max_err = err; }
+        if err > max_err {
+            max_err = err;
+        }
     }
 
     println!("Noise reconstruction max error: {:.2e}", max_err);
-    assert!(max_err < 1e-5_f32,
-        "Perfect reconstruction failed: {:.2e}", max_err);
+    assert!(
+        max_err < 1e-5_f32,
+        "Perfect reconstruction failed: {:.2e}",
+        max_err
+    );
 }
 
 #[test]
@@ -81,10 +90,12 @@ fn stft_output_dimensions() {
     let expected_frames = (padded_n - FFT_SIZE) / HOP_SIZE + 1;
     println!("n_frames: {}, expected: {}", n_frames, expected_frames);
 
-    assert_eq!(n_frames, expected_frames,
-        "Wrong frame count");
-    assert_eq!(frames.len(), n_frames,
-        "frames.len() mismatch");
-    assert_eq!(frames[0].len(), N_BINS,
-        "Wrong bin count: {}", frames[0].len());
+    assert_eq!(n_frames, expected_frames, "Wrong frame count");
+    assert_eq!(frames.len(), n_frames, "frames.len() mismatch");
+    assert_eq!(
+        frames[0].len(),
+        N_BINS,
+        "Wrong bin count: {}",
+        frames[0].len()
+    );
 }

@@ -3,7 +3,7 @@
 // CRITICAL: callbacks must never allocate, lock, or block.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{StreamConfig, Stream};
+use cpal::{Stream, StreamConfig};
 
 pub struct AudioConfig {
     pub sample_rate: u32,      // target: 48000
@@ -33,7 +33,8 @@ pub fn setup_streams(
     let host = cpal::default_host();
 
     let input_device = if config.input_device == "default" {
-        host.default_input_device().ok_or("No default input device found")?
+        host.default_input_device()
+            .ok_or("No default input device found")?
     } else {
         host.input_devices()?
             .find(|x| x.name().unwrap_or_default() == config.input_device)
@@ -41,7 +42,8 @@ pub fn setup_streams(
     };
 
     let output_device = if config.output_device == "default" {
-        host.default_output_device().ok_or("No default output device found")?
+        host.default_output_device()
+            .ok_or("No default output device found")?
     } else {
         host.output_devices()?
             .find(|x| x.name().unwrap_or_default() == config.output_device)

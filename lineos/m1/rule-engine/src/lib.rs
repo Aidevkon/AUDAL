@@ -19,6 +19,5 @@ pub mod types;
 pub use evaluator::evaluate;
 pub use thresholds::Thresholds;
 pub use types::{
-    AnalysisReport, CoachFindings, ComplianceFlags,
-    Issue, IssueParams, QualityMetrics, Severity,
+    AnalysisReport, CoachFindings, ComplianceFlags, Issue, IssueParams, QualityMetrics, Severity,
 };

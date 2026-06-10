@@ -163,9 +163,8 @@ impl Gatekeeper {
             GatekeeperError::SignatureInvalid("Public key must be 32 bytes".to_string())
         })?;
 
-        let verifying_key = VerifyingKey::from_bytes(&key_array).map_err(|e| {
-            GatekeeperError::SignatureInvalid(format!("Invalid ed25519 key: {e}"))
-        })?;
+        let verifying_key = VerifyingKey::from_bytes(&key_array)
+            .map_err(|e| GatekeeperError::SignatureInvalid(format!("Invalid ed25519 key: {e}")))?;
 
         // Parse developer signature
         let sig_bytes = hex::decode(&manifest.developer_signature).map_err(|e| {
@@ -228,7 +227,7 @@ impl Gatekeeper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ed25519_dalek::{SigningKey, Signer};
+    use ed25519_dalek::{Signer, SigningKey};
 
     fn make_signing_key() -> SigningKey {
         use rand::RngCore;
@@ -244,7 +243,11 @@ mod tests {
         h.finalize().to_hex().to_string()
     }
 
-    fn make_valid_manifest(signing_key: &SigningKey, artifact: &[u8], permissions: Vec<String>) -> EngineManifest {
+    fn make_valid_manifest(
+        signing_key: &SigningKey,
+        artifact: &[u8],
+        permissions: Vec<String>,
+    ) -> EngineManifest {
         let verifying_key = signing_key.verifying_key();
         let signature = signing_key.sign(artifact);
 
@@ -294,7 +297,8 @@ mod tests {
         let artifact = b"original artifact";
         let mut manifest = make_valid_manifest(&key, artifact, vec![]);
         // Tamper: give wrong digest
-        manifest.blake3_digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        manifest.blake3_digest =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
 
         let gate = Gatekeeper::new(vec![]);
         let result = gate.verify(&manifest, artifact);

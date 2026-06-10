@@ -1,8 +1,8 @@
 use serde_json::Value;
-use std::fs;
-use sp314_dsp::pipeline::phase::PhaseAligner;
-use sp314_dsp::pipeline::gain::HeadroomManager;
 use sp314_dsp::masking_eq::{MaskingAwareEQ, MaskingEQConfig};
+use sp314_dsp::pipeline::gain::HeadroomManager;
+use sp314_dsp::pipeline::phase::PhaseAligner;
+use std::fs;
 
 fn load_fixture(name: &str) -> Value {
     let path = format!("tests/fixtures/{}.json", name);
@@ -23,88 +23,96 @@ fn phase_aligner_magnitude_is_flat() {
         let w = 2.0 * std::f32::consts::PI * f / 48000.0;
         let mut peak_out = 0.0_f32;
         let in_peak = 1.0_f32;
-        
-        for i in 0..2000 { // Allow settling
+
+        for i in 0..2000 {
+            // Allow settling
             let mut l = (i as f32 * w).sin();
             let mut r = l;
             aligner.process_stereo(&mut l, &mut r);
         }
-        
+
         for i in 0..2000 {
             let mut l = ((i + 2000) as f32 * w).sin();
             let mut r = l;
             aligner.process_stereo(&mut l, &mut r);
-            if l.abs() > peak_out { peak_out = l.abs(); }
+            if l.abs() > peak_out {
+                peak_out = l.abs();
+            }
         }
-        
+
         let mag_db = 20.0 * (peak_out / in_peak).log10();
-        assert!(mag_db.abs() < 0.1, "Magnitude not flat at {}Hz: {}dB", f, mag_db);
+        assert!(
+            mag_db.abs() < 0.1,
+            "Magnitude not flat at {}Hz: {}dB",
+            f,
+            mag_db
+        );
     }
 }
 
 #[test]
 fn phase_aligner_matches_crossover_phase() {
-    // Actually, PhaseAligner IS the sum of crossover outputs. 
+    // Actually, PhaseAligner IS the sum of crossover outputs.
     // The prompt says "PhaseAligner(x) phase == CrossoverLR4(x).low + CrossoverLR4(x).high phase"
     // and to verify against `phase_aligner_reference.json`.
     let fixture = load_fixture("phase_aligner_reference");
     let phase_checks = fixture["phase_checks"].as_array().unwrap();
-    
+
     for check in phase_checks {
         let f = check["freq_hz"].as_f64().unwrap() as f32;
         let expected_phase_deg = check["expected_phase_deg"].as_f64().unwrap() as f32;
         let tol_deg = check["tolerance_deg"].as_f64().unwrap() as f32;
-        
+
         let mut aligner = PhaseAligner::new(150.0, 48000);
         let w = 2.0 * std::f32::consts::PI * f / 48000.0;
-        
+
         // Feed sine and measure phase difference
         let mut last_in = 0.0;
         let mut last_out = 0.0;
         let mut zero_cross_in = 0;
         let mut zero_cross_out = 0;
-        
+
         // Let it settle
         for i in 0..48000 {
             let mut l = (i as f32 * w).sin();
             let mut r = l;
             aligner.process_stereo(&mut l, &mut r);
         }
-        
+
         for i in 0..48000 {
             let x = ((i + 48000) as f32 * w).sin();
             let mut l = x;
             let mut r = x;
             aligner.process_stereo(&mut l, &mut r);
-            
+
             if last_in < 0.0 && x >= 0.0 {
                 zero_cross_in = i;
             }
             if last_out < 0.0 && l >= 0.0 {
                 zero_cross_out = i;
             }
-            
+
             last_in = x;
             last_out = l;
-            
+
             // Just need one good pair of zero crossings
             if zero_cross_in > 0 && zero_cross_out > 0 && i > 1000 {
                 break;
             }
         }
-        
+
         let delay_samples = zero_cross_out as f32 - zero_cross_in as f32;
         if delay_samples < 0.0 {
             // It could be that out crossed before in (phase wrap), or we missed a cycle.
             // Actually, we should be careful. A better way to measure phase is DFT at `f`.
         }
-        
+
         // DFT measurement
         let mut re_in = 0.0_f32;
         let mut im_in = 0.0_f32;
         let mut re_out = 0.0_f32;
         let mut im_out = 0.0_f32;
-        
+
         // Reset and settle again for DFT
         aligner.reset();
         for i in 0..10000 {
@@ -112,24 +120,24 @@ fn phase_aligner_matches_crossover_phase() {
             let mut r = l;
             aligner.process_stereo(&mut l, &mut r);
         }
-        
+
         for i in 0..10000 {
             let idx = i + 10000;
             let x = (idx as f32 * w).sin();
             let mut l = x;
             let mut r = x;
             aligner.process_stereo(&mut l, &mut r);
-            
+
             let cos_w = (idx as f32 * w).cos();
             let sin_w = -(idx as f32 * w).sin(); // complex exponent e^{-j w n}
-            
+
             re_in += x * cos_w;
             im_in += x * sin_w;
-            
+
             re_out += l * cos_w;
             im_out += l * sin_w;
         }
-        
+
         let phase_in = im_in.atan2(re_in);
         let phase_out = im_out.atan2(re_out);
         let phase_diff_rad = phase_out - phase_in;
@@ -137,17 +145,35 @@ fn phase_aligner_matches_crossover_phase() {
         // We can just check phase_diff % 360 vs expected % 360, but wait! The expected unwrapped phase is e.g. -360.
         // phase_out - phase_in will be in [-pi, pi].
         let mut phase_diff_deg = phase_diff_rad * 180.0 / std::f32::consts::PI;
-        while phase_diff_deg > 180.0 { phase_diff_deg -= 360.0; }
-        while phase_diff_deg <= -180.0 { phase_diff_deg += 360.0; }
-        
+        while phase_diff_deg > 180.0 {
+            phase_diff_deg -= 360.0;
+        }
+        while phase_diff_deg <= -180.0 {
+            phase_diff_deg += 360.0;
+        }
+
         let mut expected_wrapped = expected_phase_deg;
-        while expected_wrapped > 180.0 { expected_wrapped -= 360.0; }
-        while expected_wrapped <= -180.0 { expected_wrapped += 360.0; }
-        
+        while expected_wrapped > 180.0 {
+            expected_wrapped -= 360.0;
+        }
+        while expected_wrapped <= -180.0 {
+            expected_wrapped += 360.0;
+        }
+
         let mut diff = (phase_diff_deg - expected_wrapped).abs();
-        if diff > 180.0 { diff = 360.0 - diff; }
-        
-        assert!(diff < tol_deg, "Phase at {}Hz: expected {} (wrapped {}), got {} (diff {})", f, expected_phase_deg, expected_wrapped, phase_diff_deg, diff);
+        if diff > 180.0 {
+            diff = 360.0 - diff;
+        }
+
+        assert!(
+            diff < tol_deg,
+            "Phase at {}Hz: expected {} (wrapped {}), got {} (diff {})",
+            f,
+            expected_phase_deg,
+            expected_wrapped,
+            phase_diff_deg,
+            diff
+        );
     }
 }
 
@@ -263,7 +289,7 @@ fn stereo_eq_process_block_deterministic() {
         max_boost_db: 12.0,
         target_phon: 80.0,
     };
-    
+
     let mut left_in = vec![0.0; 512];
     let mut right_in = vec![0.0; 512];
     for i in 0..512 {
@@ -297,7 +323,7 @@ fn stereo_eq_reset_restores_identity() {
         max_boost_db: 12.0,
         target_phon: 80.0,
     };
-    
+
     let mut left_in = vec![0.0; 512];
     let mut right_in = vec![0.0; 512];
     for i in 0..512 {
@@ -311,7 +337,7 @@ fn stereo_eq_reset_restores_identity() {
     eq.process_block(&mut l1, &mut r1);
 
     eq.reset();
-    
+
     let mut l2 = left_in.clone();
     let mut r2 = right_in.clone();
     eq.process_block(&mut l2, &mut r2);

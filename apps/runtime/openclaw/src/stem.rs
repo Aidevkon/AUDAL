@@ -24,38 +24,48 @@ pub struct StemBuffer {
 impl StemBuffer {
     pub fn from_flac_bytes(id: &str, bytes: &[u8]) -> Result<Self, StemError> {
         // Create a MediaSourceStream from the in-memory bytes
-        let mss = MediaSourceStream::new(Box::new(std::io::Cursor::new(bytes.to_vec())), Default::default());
-        
+        let mss = MediaSourceStream::new(
+            Box::new(std::io::Cursor::new(bytes.to_vec())),
+            Default::default(),
+        );
+
         let mut hint = Hint::new();
         hint.with_extension("flac");
 
         let meta_opts: MetadataOptions = Default::default();
         let fmt_opts: FormatOptions = Default::default();
-        
+
         let probed = symphonia::default::get_probe()
             .format(&hint, mss, &fmt_opts, &meta_opts)
             .map_err(|e| StemError::DecodeError(e.to_string()))?;
-            
+
         let mut format = probed.format;
-        
+
         let track = format
             .tracks()
             .iter()
             .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
             .ok_or_else(|| StemError::UnsupportedFormat("No audio track found".into()))?;
-            
+
         let track_id = track.id;
         let sample_rate = track.codec_params.sample_rate.unwrap_or(48000);
-        let channels = track.codec_params.channels.unwrap_or(symphonia::core::audio::Channels::FRONT_LEFT | symphonia::core::audio::Channels::FRONT_RIGHT).count();
-        
+        let channels = track
+            .codec_params
+            .channels
+            .unwrap_or(
+                symphonia::core::audio::Channels::FRONT_LEFT
+                    | symphonia::core::audio::Channels::FRONT_RIGHT,
+            )
+            .count();
+
         let dec_opts: DecoderOptions = Default::default();
         let mut decoder = symphonia::default::get_codecs()
             .make(&track.codec_params, &dec_opts)
             .map_err(|e| StemError::DecodeError(e.to_string()))?;
-            
+
         let mut left = Vec::new();
         let mut right = Vec::new();
-        
+
         loop {
             let packet = match format.next_packet() {
                 Ok(p) => p,
@@ -65,22 +75,23 @@ impl StemBuffer {
                         break;
                     }
                     return Err(StemError::DecodeError(err.to_string()));
-                },
+                }
                 Err(err) => {
                     return Err(StemError::DecodeError(err.to_string()));
                 }
             };
-            
+
             if packet.track_id() != track_id {
                 continue;
             }
-            
+
             match decoder.decode(&packet) {
                 Ok(decoded) => {
-                    let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, *decoded.spec());
+                    let mut sample_buf =
+                        SampleBuffer::<f32>::new(decoded.capacity() as u64, *decoded.spec());
                     sample_buf.copy_interleaved_ref(decoded);
                     let samples = sample_buf.samples();
-                    
+
                     if channels == 1 {
                         for &sample in samples {
                             left.push(sample);
@@ -99,7 +110,7 @@ impl StemBuffer {
                 Err(e) => return Err(StemError::DecodeError(e.to_string())),
             }
         }
-        
+
         let num_frames = left.len();
         if num_frames == 0 {
             return Err(StemError::EmptyBuffer);
@@ -123,10 +134,12 @@ impl StemBuffer {
         }
 
         let frames_to_read = std::cmp::min(block_size, self.num_frames - frame_offset);
-        
-        left[..frames_to_read].copy_from_slice(&self.left[frame_offset..frame_offset + frames_to_read]);
-        right[..frames_to_read].copy_from_slice(&self.right[frame_offset..frame_offset + frames_to_read]);
-        
+
+        left[..frames_to_read]
+            .copy_from_slice(&self.left[frame_offset..frame_offset + frames_to_read]);
+        right[..frames_to_read]
+            .copy_from_slice(&self.right[frame_offset..frame_offset + frames_to_read]);
+
         if frames_to_read < block_size {
             left[frames_to_read..].fill(0.0);
             right[frames_to_read..].fill(0.0);

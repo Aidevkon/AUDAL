@@ -5,10 +5,10 @@
 //! INV-CB-8: Preset models NEVER cross-contaminate.
 //! INV-CB-2: Incremental updates — never full retrain.
 
-use std::collections::HashMap;
-use crate::inference::StemMarkovModel;
-use crate::reader::{extract_state_sequence, extract_features_sequence};
 use crate::contract::CorpusEnvelope;
+use crate::inference::StemMarkovModel;
+use crate::reader::{extract_features_sequence, extract_state_sequence};
+use std::collections::HashMap;
 
 const STEM_TYPES: &[&str] = &["voice", "drums", "bass", "harmonics", "ambience"];
 
@@ -17,23 +17,25 @@ const STEM_TYPES: &[&str] = &["voice", "drums", "bass", "harmonics", "ambience"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PresetMarkovModel {
     pub preset_id: String,
-    pub stems:     HashMap<String, StemMarkovModel>,
+    pub stems: HashMap<String, StemMarkovModel>,
 }
 
 impl PresetMarkovModel {
     pub fn new(preset_id: &str) -> Self {
         Self {
             preset_id: preset_id.to_string(),
-            stems:     HashMap::new(),
+            stems: HashMap::new(),
         }
     }
 
     /// Train on a corpus session for all stems.
     pub fn train(&mut self, session: &CorpusEnvelope) {
         for stem_type in STEM_TYPES {
-            let states   = extract_state_sequence(session, stem_type);
+            let states = extract_state_sequence(session, stem_type);
             let features = extract_features_sequence(session, stem_type);
-            if states.is_empty() { continue; }
+            if states.is_empty() {
+                continue;
+            }
             self.stems
                 .entry(stem_type.to_string())
                 .or_insert_with(|| StemMarkovModel::new(stem_type))
@@ -51,18 +53,18 @@ impl PresetMarkovModel {
 /// One PresetMarkovModel per preset_id — isolated per genre.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UserMarkovModel {
-    pub user_id:    String,
-    pub version:    u32,
-    pub presets:    HashMap<String, PresetMarkovModel>,
+    pub user_id: String,
+    pub version: u32,
+    pub presets: HashMap<String, PresetMarkovModel>,
     pub updated_at: u64,
 }
 
 impl UserMarkovModel {
     pub fn new(user_id: &str) -> Self {
         Self {
-            user_id:    user_id.to_string(),
-            version:    1,
-            presets:    HashMap::new(),
+            user_id: user_id.to_string(),
+            version: 1,
+            presets: HashMap::new(),
             updated_at: 0,
         }
     }
@@ -86,7 +88,8 @@ impl UserMarkovModel {
 
     /// Total sessions trained across all presets.
     pub fn total_sessions(&self) -> usize {
-        self.presets.values()
+        self.presets
+            .values()
             .flat_map(|p| p.stems.values())
             .map(|s| s.n_sessions)
             .max()
@@ -105,7 +108,7 @@ impl UserMarkovModel {
 }
 
 pub fn aggregate_preset(
-    preset_id:   &str,
+    preset_id: &str,
     user_models: &[&UserMarkovModel],
 ) -> Option<PresetMarkovModel> {
     let contributors: Vec<(&UserMarkovModel, &PresetMarkovModel)> = user_models
@@ -113,20 +116,24 @@ pub fn aggregate_preset(
         .filter_map(|u| u.preset(preset_id).map(|p| (*u, p)))
         .collect();
 
-    if contributors.is_empty() { return None; }
+    if contributors.is_empty() {
+        return None;
+    }
 
     let mut global = PresetMarkovModel::new(preset_id);
 
     for (_user, preset) in &contributors {
         for (stem_type, stem_model) in &preset.stems {
-            let global_stem = global.stems
+            let global_stem = global
+                .stems
                 .entry(stem_type.clone())
                 .or_insert_with(|| StemMarkovModel::new(stem_type));
 
             global_stem.transitions.merge(&stem_model.transitions);
 
             for (state, hist) in &stem_model.emissions {
-                global_stem.emissions
+                global_stem
+                    .emissions
                     .entry(state.clone())
                     .or_insert_with(|| crate::model::EmissionHistogram::new(state))
                     .merge(hist);
@@ -147,11 +154,9 @@ pub fn aggregate_all_presets(
         .flat_map(|u| u.presets.keys().cloned())
         .collect();
 
-    preset_ids.into_iter()
-        .filter_map(|id| {
-            aggregate_preset(&id, user_models)
-                .map(|m| (id, m))
-        })
+    preset_ids
+        .into_iter()
+        .filter_map(|id| aggregate_preset(&id, user_models).map(|m| (id, m)))
         .collect()
 }
 
@@ -159,24 +164,32 @@ pub fn aggregate_all_presets(
 mod tests {
     use super::*;
     use crate::contract::{
-        CorpusEnvelope, StemTimeline, TimelineEvent,
-        EnrichedAttributes, RiskFlags, DomainHint,
+        CorpusEnvelope, DomainHint, EnrichedAttributes, RiskFlags, StemTimeline, TimelineEvent,
     };
 
     fn make_session(preset_hint: &str) -> CorpusEnvelope {
         let events = vec![
             TimelineEvent {
                 state: "silence".to_string(),
-                start_ms: 0, end_ms: 100, duration_ms: 100,
+                start_ms: 0,
+                end_ms: 100,
+                duration_ms: 100,
                 confidence: 0.9,
                 session_id: "test".to_string(),
                 attributes: EnrichedAttributes {
-                    rms_db: -80.0, crest_factor_db: 6.0,
-                    transient_density: 0.0, spectral_centroid: 1000.0,
-                    lufs_integrated: -70.0, spectral_flatness: 0.5,
+                    rms_db: -80.0,
+                    crest_factor_db: 6.0,
+                    transient_density: 0.0,
+                    spectral_centroid: 1000.0,
+                    lufs_integrated: -70.0,
+                    spectral_flatness: 0.5,
                 },
-                risk: RiskFlags { artifact_risk: 0.0, sibilance_risk: 0.0,
-                    phase_issue: 0.0, sub_rumble: 0.0 },
+                risk: RiskFlags {
+                    artifact_risk: 0.0,
+                    sibilance_risk: 0.0,
+                    phase_issue: 0.0,
+                    sub_rumble: 0.0,
+                },
                 domain: DomainHint {
                     stem: "voice".to_string(),
                     profile_hint: preset_hint.to_string(),
@@ -185,16 +198,25 @@ mod tests {
             },
             TimelineEvent {
                 state: "vowel".to_string(),
-                start_ms: 100, end_ms: 200, duration_ms: 100,
+                start_ms: 100,
+                end_ms: 200,
+                duration_ms: 100,
                 confidence: 0.9,
                 session_id: "test".to_string(),
                 attributes: EnrichedAttributes {
-                    rms_db: -20.0, crest_factor_db: 6.0,
-                    transient_density: 0.1, spectral_centroid: 2000.0,
-                    lufs_integrated: -14.0, spectral_flatness: 0.2,
+                    rms_db: -20.0,
+                    crest_factor_db: 6.0,
+                    transient_density: 0.1,
+                    spectral_centroid: 2000.0,
+                    lufs_integrated: -14.0,
+                    spectral_flatness: 0.2,
                 },
-                risk: RiskFlags { artifact_risk: 0.0, sibilance_risk: 0.0,
-                    phase_issue: 0.0, sub_rumble: 0.0 },
+                risk: RiskFlags {
+                    artifact_risk: 0.0,
+                    sibilance_risk: 0.0,
+                    phase_issue: 0.0,
+                    sub_rumble: 0.0,
+                },
                 domain: DomainHint {
                     stem: "voice".to_string(),
                     profile_hint: preset_hint.to_string(),
@@ -224,17 +246,21 @@ mod tests {
     #[test]
     fn presets_isolated() {
         let mut model = UserMarkovModel::new("anestis");
-        model.update("techno",  &make_session("techno"));
+        model.update("techno", &make_session("techno"));
         model.update("podcast", &make_session("podcast"));
         assert!(model.preset("techno").is_some());
         assert!(model.preset("podcast").is_some());
         // Techno stem model must not be same as podcast
-        let techno_sessions = model.preset("techno")
+        let techno_sessions = model
+            .preset("techno")
             .and_then(|p| p.stem("voice"))
-            .map(|s| s.n_sessions).unwrap_or(0);
-        let podcast_sessions = model.preset("podcast")
+            .map(|s| s.n_sessions)
+            .unwrap_or(0);
+        let podcast_sessions = model
+            .preset("podcast")
             .and_then(|p| p.stem("voice"))
-            .map(|s| s.n_sessions).unwrap_or(0);
+            .map(|s| s.n_sessions)
+            .unwrap_or(0);
         assert_eq!(techno_sessions, 1);
         assert_eq!(podcast_sessions, 1);
     }
@@ -254,8 +280,7 @@ mod tests {
         let mut model = UserMarkovModel::new("anestis");
         model.update("techno", &make_session("techno"));
         let json = model.to_json().expect("serialize failed");
-        let restored = UserMarkovModel::from_json(&json)
-            .expect("deserialize failed");
+        let restored = UserMarkovModel::from_json(&json).expect("deserialize failed");
         assert_eq!(restored.user_id, "anestis");
         assert!(restored.preset("techno").is_some());
     }
@@ -265,9 +290,11 @@ mod tests {
         let mut model = UserMarkovModel::new("anestis");
         model.update("techno", &make_session("techno"));
         model.update("techno", &make_session("techno"));
-        let sessions = model.preset("techno")
+        let sessions = model
+            .preset("techno")
             .and_then(|p| p.stem("voice"))
-            .map(|s| s.n_sessions).unwrap_or(0);
+            .map(|s| s.n_sessions)
+            .unwrap_or(0);
         assert_eq!(sessions, 2);
     }
 
@@ -279,8 +306,11 @@ mod tests {
         user2.update("techno", &make_session("techno"));
         let global = aggregate_preset("techno", &[&user1, &user2]);
         assert!(global.is_some());
-        let sessions = global.unwrap().stem("voice")
-            .map(|s| s.n_sessions).unwrap_or(0);
+        let sessions = global
+            .unwrap()
+            .stem("voice")
+            .map(|s| s.n_sessions)
+            .unwrap_or(0);
         assert_eq!(sessions, 2);
     }
 
@@ -293,9 +323,9 @@ mod tests {
     #[test]
     fn aggregate_no_cross_contamination() {
         let mut user1 = UserMarkovModel::new("user1");
-        user1.update("techno",  &make_session("techno"));
+        user1.update("techno", &make_session("techno"));
         user1.update("podcast", &make_session("podcast"));
-        let global_techno  = aggregate_preset("techno",  &[&user1]);
+        let global_techno = aggregate_preset("techno", &[&user1]);
         let global_podcast = aggregate_preset("podcast", &[&user1]);
         assert!(global_techno.is_some());
         assert!(global_podcast.is_some());
@@ -307,7 +337,7 @@ mod tests {
     #[test]
     fn aggregate_all_presets_returns_all() {
         let mut user1 = UserMarkovModel::new("user1");
-        user1.update("techno",  &make_session("techno"));
+        user1.update("techno", &make_session("techno"));
         user1.update("podcast", &make_session("podcast"));
         let all = aggregate_all_presets(&[&user1]);
         assert!(all.contains_key("techno"));

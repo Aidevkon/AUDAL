@@ -7,15 +7,15 @@
 //!   - ScoreBar + WizardFinding rows (unchanged from Coach)
 //!     TEACHER VOICE ENFORCED: no DSP values in JINI output
 
-use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
-use wasm_bindgen_futures::spawn_local;
-use serde_json::json;
 use crate::ipc::invoke;
-use crate::state::cockpit_mode::CockpitMode;
 use crate::state::cockpit_event::CockpitEvent;
+use crate::state::cockpit_mode::CockpitMode;
 use crate::state::reducer::dispatch;
-use crate::types::{IssueJson, SessionStateJson, JiniSuggestionJson, JiniPersonaState};
+use crate::types::{IssueJson, JiniPersonaState, JiniSuggestionJson, SessionStateJson};
+use dioxus::prelude::*;
+use serde_json::json;
+use wasm_bindgen_futures::spawn_local;
 
 #[derive(PartialEq, Clone)]
 pub struct FindingData {
@@ -27,11 +27,11 @@ pub struct FindingData {
 
 #[component]
 pub fn CoachPanel(
-    mode:            Signal<CockpitMode>,
-    session_state:   Signal<Option<SessionStateJson>>,
+    mode: Signal<CockpitMode>,
+    session_state: Signal<Option<SessionStateJson>>,
     wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>,
     jini_suggestion: Signal<Option<JiniSuggestionJson>>,
-    jini_persona:    Signal<JiniPersonaState>,
+    jini_persona: Signal<JiniPersonaState>,
 ) -> Element {
     let state = session_state.read();
 
@@ -52,7 +52,7 @@ pub fn CoachPanel(
             show_screws: false,
             title: "HANGAR".to_string(),
             is_scrollable: true,
-            
+
             { match state.as_ref() {
                         Some(_s) => rsx! {
                             // ── JINI Narrative (replaces NarrativeSummary) ────
@@ -148,7 +148,7 @@ pub fn CoachPanel(
 #[component]
 fn JiniNarrative(
     suggestion: Option<JiniSuggestionJson>,
-    persona:    Signal<JiniPersonaState>,
+    persona: Signal<JiniPersonaState>,
 ) -> Element {
     let current_persona = persona.read().clone();
     rsx! {
@@ -213,10 +213,7 @@ fn JiniNarrative(
 }
 
 #[component]
-fn JiniActionCard(
-    suggestion: Option<JiniSuggestionJson>,
-    mode:       Signal<CockpitMode>,
-) -> Element {
+fn JiniActionCard(suggestion: Option<JiniSuggestionJson>, mode: Signal<CockpitMode>) -> Element {
     let Some(ref s) = suggestion else {
         return rsx! {};
     };
@@ -305,17 +302,23 @@ fn DemoFindingRow(finding: FindingData) -> Element {
 
 #[component]
 fn ScoreBar(wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>) -> Element {
-    let has_high   = wizard_findings.read().iter().any(|f| f.severity == crate::wizard::WizardSeverity::High);
-    let has_medium = wizard_findings.read().iter().any(|f| f.severity == crate::wizard::WizardSeverity::Medium);
+    let has_high = wizard_findings
+        .read()
+        .iter()
+        .any(|f| f.severity == crate::wizard::WizardSeverity::High);
+    let has_medium = wizard_findings
+        .read()
+        .iter()
+        .any(|f| f.severity == crate::wizard::WizardSeverity::Medium);
 
     let (label, color) = if !has_high && !has_medium {
-        ("ALL CLEAR",     "var(--accent-cyan)")
+        ("ALL CLEAR", "var(--accent-cyan)")
     } else if has_medium && !has_high {
-        ("MINOR ISSUES",  "var(--accent-amber)")
+        ("MINOR ISSUES", "var(--accent-amber)")
     } else {
         ("REVIEW NEEDED", "var(--severity-high)")
     };
-    
+
     let issues = wizard_findings.read().len();
 
     rsx! {

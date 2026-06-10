@@ -30,7 +30,7 @@ impl WidthNode {
             shelf_low: 0.0,
         }
     }
-    
+
     pub fn set_params(&mut self, decorrelation: f32, side_gain_db: f32, mono_comp_shelf_db: f32) {
         self.decorrelation = decorrelation;
         self.side_gain_db = side_gain_db;
@@ -52,32 +52,34 @@ impl DspNode for WidthNode {
         for i in 0..left.len() {
             let l = left[i];
             let r = right[i];
-            
+
             // 1. M/S Matrix
             let mid = (l + r) * isq2;
             let mut side = (l - r) * isq2;
-            
+
             // 2. Side Gain
             side *= sg;
-            
+
             // 3. Decorrelation
             let d_mid = self.mid_delay[self.mid_idx];
             let d_side = self.side_delay[self.side_idx];
-            
+
             self.mid_delay[self.mid_idx] = mid;
             self.side_delay[self.side_idx] = side;
             self.mid_idx = (self.mid_idx + 1) % self.mid_delay.len();
             self.side_idx = (self.side_idx + 1) % self.side_delay.len();
-            
+
             side += (d_side + d_mid) * dec;
-            
+
             // 4. Mono Comp Shelf (1st order HP on Side below ~200Hz)
             self.shelf_low = side * alpha + self.shelf_low * (1.0 - alpha);
-            if self.shelf_low.abs() < 1e-9 { self.shelf_low = 0.0; }
+            if self.shelf_low.abs() < 1e-9 {
+                self.shelf_low = 0.0;
+            }
             let shelf_high = side - self.shelf_low;
-            
+
             side = shelf_high + self.shelf_low * mcs;
-            
+
             // 5. L/R Matrix
             left[i] = (mid + side) * isq2;
             right[i] = (mid - side) * isq2;
@@ -102,9 +104,13 @@ impl DspNode for WidthNode {
     fn set_parameter_no_glide(&mut self, name: &str, value: f32) {
         self.set_parameter(name, value);
     }
-    
-    fn get_output(&self, _name: &str) -> Option<f32> { None }
-    fn node_type(&self) -> &'static str { "Width" }
+
+    fn get_output(&self, _name: &str) -> Option<f32> {
+        None
+    }
+    fn node_type(&self) -> &'static str {
+        "Width"
+    }
 }
 
 #[cfg(test)]
@@ -139,7 +145,8 @@ mod tests {
         n.set_params(0.5, 0.0, 0.0);
         let mut l = vec![0.0f32; 512];
         let mut r = vec![0.0f32; 512];
-        l[0] = 1.0; r[0] = 1.0;
+        l[0] = 1.0;
+        r[0] = 1.0;
         n.process_stereo(&mut l, &mut r);
         let mut has_diff = false;
         for i in 0..l.len() {

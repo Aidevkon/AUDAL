@@ -19,14 +19,14 @@ use std::fmt;
 // All limits enforced before calling sp314-dsp.
 
 pub const TARGET_SAMPLE_RATE: u32 = 48_000;
-pub const TARGET_CHANNELS:    u16 = 2;
-pub const MAX_DURATION_SECS:  u64 = 720;          // 12 minutes
-pub const MAX_FILE_BYTES:     u64 = 500 * 1024 * 1024; // 500 MB
+pub const TARGET_CHANNELS: u16 = 2;
+pub const MAX_DURATION_SECS: u64 = 720; // 12 minutes
+pub const MAX_FILE_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
 
 // Rubato SincFixedIn parameters — fixed for determinism.
 // Linear interpolation selected: low CPU, acceptable quality for offline mastering.
-const SINC_LEN:             usize = 256;
-const SINC_OVERSAMPLE:      usize = 256;
+const SINC_LEN: usize = 256;
+const SINC_OVERSAMPLE: usize = 256;
 const RESAMPLE_CHUNK_FRAMES: usize = 1024; // frames per rubato chunk (per channel)
 
 // ── AudioPcm ─────────────────────────────────────────────────────────────────
@@ -36,11 +36,11 @@ const RESAMPLE_CHUNK_FRAMES: usize = 1024; // frames per rubato chunk (per chann
 #[derive(Debug)]
 pub struct AudioPcm {
     /// Interleaved stereo f32 samples at 48000 Hz.
-    pub samples:     Vec<f32>,
+    pub samples: Vec<f32>,
     /// Always TARGET_SAMPLE_RATE (48000). Redundant; kept for audit clarity.
     pub sample_rate: u32,
     /// Always TARGET_CHANNELS (2). Redundant; kept for audit clarity.
-    pub channels:    u16,
+    pub channels: u16,
     /// Duration after decode + resample, in milliseconds.
     pub duration_ms: u64,
     /// Original file sample rate (before resampling). For audit log.
@@ -64,12 +64,14 @@ pub enum DecodeError {
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodeError::FileNotFound(p)     => write!(f, "File not found: {p}"),
-            DecodeError::FileTooLarge(sz)    => write!(f, "File too large ({} MB > 500MB limit)", sz / 1024 / 1024),
+            DecodeError::FileNotFound(p) => write!(f, "File not found: {p}"),
+            DecodeError::FileTooLarge(sz) => {
+                write!(f, "File too large ({} MB > 500MB limit)", sz / 1024 / 1024)
+            }
             DecodeError::DurationExceeded(s) => write!(f, "Audio too long ({s}s > 12 min limit)"),
-            DecodeError::UnsupportedFormat(e)=> write!(f, "Unsupported format: {e}"),
-            DecodeError::DecodeFailure(e)    => write!(f, "Decode failure: {e}"),
-            DecodeError::ResampleFailure(e)  => write!(f, "Resample failure: {e}"),
+            DecodeError::UnsupportedFormat(e) => write!(f, "Unsupported format: {e}"),
+            DecodeError::DecodeFailure(e) => write!(f, "Decode failure: {e}"),
+            DecodeError::ResampleFailure(e) => write!(f, "Resample failure: {e}"),
         }
     }
 }
@@ -97,25 +99,30 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     use symphonia::core::probe::Hint;
 
     // ── 1. File size check ────────────────────────────────────────────────────
-    let meta = std::fs::metadata(path)
-        .map_err(|_| DecodeError::FileNotFound(path.to_string()))?;
+    let meta = std::fs::metadata(path).map_err(|_| DecodeError::FileNotFound(path.to_string()))?;
 
     if meta.len() > MAX_FILE_BYTES {
         return Err(DecodeError::FileTooLarge(meta.len()));
     }
 
     // ── 2. symphonia probe + decode ───────────────────────────────────────────
-    let file = std::fs::File::open(path)
-        .map_err(|_| DecodeError::FileNotFound(path.to_string()))?;
+    let file =
+        std::fs::File::open(path).map_err(|_| DecodeError::FileNotFound(path.to_string()))?;
 
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(path).extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
         hint.with_extension(ext);
     }
 
-    let format_opts   = FormatOptions { enable_gapless: true, ..Default::default() };
+    let format_opts = FormatOptions {
+        enable_gapless: true,
+        ..Default::default()
+    };
     let metadata_opts = MetadataOptions::default();
 
     let probed = symphonia::default::get_probe()
@@ -131,9 +138,11 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
         .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
         .ok_or_else(|| DecodeError::UnsupportedFormat("No audio track found".into()))?;
 
-    let track_id    = track.id;
+    let track_id = track.id;
     let original_sr = track.codec_params.sample_rate.unwrap_or(44_100);
-    let original_ch = track.codec_params.channels
+    let original_ch = track
+        .codec_params
+        .channels
         .map(|c| c.count() as u16)
         .unwrap_or(2);
 
@@ -151,7 +160,10 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(ref e))
-                if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+            {
+                break
+            }
             Err(symphonia::core::errors::Error::ResetRequired) => {
                 decoder.reset();
                 continue;
@@ -159,7 +171,9 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
             Err(e) => return Err(DecodeError::DecodeFailure(e.to_string())),
         };
 
-        if packet.track_id() != track_id { continue; }
+        if packet.track_id() != track_id {
+            continue;
+        }
 
         match decoder.decode(&packet) {
             Ok(audio_buf) => {
@@ -177,7 +191,9 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     }
 
     if raw_samples.is_empty() {
-        return Err(DecodeError::DecodeFailure("No audio samples decoded".into()));
+        return Err(DecodeError::DecodeFailure(
+            "No audio samples decoded".into(),
+        ));
     }
 
     // ── 3. Duration check ─────────────────────────────────────────────────────
@@ -215,15 +231,14 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     }
 
     Ok(AudioPcm {
-        samples:     resampled,
+        samples: resampled,
         sample_rate: TARGET_SAMPLE_RATE,
-        channels:    TARGET_CHANNELS,
+        channels: TARGET_CHANNELS,
         duration_ms,
         original_sr,
         original_ch,
     })
 }
-
 
 // Sample sanitization
 
@@ -236,7 +251,11 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
 /// Applied at: downmix output, resample re-interleave, final decode_audio() pass.
 #[inline(always)]
 fn sanitize_sample(s: f32) -> f32 {
-    if s.is_nan() || s.is_infinite() { 0.0 } else { s.clamp(-1.0, 1.0) }
+    if s.is_nan() || s.is_infinite() {
+        0.0
+    } else {
+        s.clamp(-1.0, 1.0)
+    }
 }
 
 // Channel helpers
@@ -256,20 +275,35 @@ pub fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
 /// Takes average of channels 0 & 1 for L, channels 2 & 3 for R (or repeats if fewer).
 /// Clamps to [-1.0, 1.0] after mix.
 pub fn downmix_to_stereo(interleaved: &[f32], channels: usize) -> Vec<f32> {
-    if channels == 0 { return Vec::new(); }
+    if channels == 0 {
+        return Vec::new();
+    }
     let frames = interleaved.len() / channels;
     let mut out = Vec::with_capacity(frames * 2);
     for f in 0..frames {
         let base = f * channels;
         // L: mean of all odd-indexed channels (0, 2, ...)
         // R: mean of all even-indexed channels (1, 3, ...)
-        let l_ch: Vec<f32> = (0..channels).step_by(2).map(|c| interleaved[base + c]).collect();
-        let r_ch: Vec<f32> = (1..channels).step_by(2).map(|c| interleaved[base + c]).collect();
-        let l = if l_ch.is_empty() { 0.0 } else { l_ch.iter().sum::<f32>() / l_ch.len() as f32 };
-        let r = if r_ch.is_empty() { l } else { r_ch.iter().sum::<f32>() / r_ch.len() as f32 };
+        let l_ch: Vec<f32> = (0..channels)
+            .step_by(2)
+            .map(|c| interleaved[base + c])
+            .collect();
+        let r_ch: Vec<f32> = (1..channels)
+            .step_by(2)
+            .map(|c| interleaved[base + c])
+            .collect();
+        let l = if l_ch.is_empty() {
+            0.0
+        } else {
+            l_ch.iter().sum::<f32>() / l_ch.len() as f32
+        };
+        let r = if r_ch.is_empty() {
+            l
+        } else {
+            r_ch.iter().sum::<f32>() / r_ch.len() as f32
+        };
         out.push(sanitize_sample(l));
         out.push(sanitize_sample(r));
-
     }
     out
 }
@@ -278,32 +312,29 @@ pub fn downmix_to_stereo(interleaved: &[f32], channels: usize) -> Vec<f32> {
 
 /// Resample stereo interleaved PCM from `original_sr` to 48000 Hz.
 /// Uses rubato SincFixedIn with Linear interpolation.
-fn resample_stereo_to_48k(
-    interleaved: &[f32],
-    original_sr: u32,
-) -> Result<Vec<f32>, DecodeError> {
+fn resample_stereo_to_48k(interleaved: &[f32], original_sr: u32) -> Result<Vec<f32>, DecodeError> {
     use rubato::{
-        Resampler, SincFixedIn,
-        SincInterpolationParameters, SincInterpolationType, WindowFunction,
+        Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
     };
 
     let ratio = TARGET_SAMPLE_RATE as f64 / original_sr as f64;
 
     let params = SincInterpolationParameters {
-        sinc_len:            SINC_LEN,
-        f_cutoff:            0.95,
-        interpolation:       SincInterpolationType::Linear,
+        sinc_len: SINC_LEN,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
         oversampling_factor: SINC_OVERSAMPLE,
-        window:              WindowFunction::BlackmanHarris2,
+        window: WindowFunction::BlackmanHarris2,
     };
 
     let mut resampler = SincFixedIn::<f32>::new(
         ratio,
-        2.0,           // max_resample_ratio_relative
+        2.0, // max_resample_ratio_relative
         params,
         RESAMPLE_CHUNK_FRAMES,
-        2,             // 2 channels (non-interleaved in rubato)
-    ).map_err(|e| DecodeError::ResampleFailure(format!("Resampler init: {e}")))?;
+        2, // 2 channels (non-interleaved in rubato)
+    )
+    .map_err(|e| DecodeError::ResampleFailure(format!("Resampler init: {e}")))?;
 
     // De-interleave: rubato expects [Vec<f32>; channels] (non-interleaved)
     let total_frames = interleaved.len() / 2;
@@ -334,7 +365,8 @@ fn resample_stereo_to_48k(
             vec![l, r]
         };
 
-        let wave_out = resampler.process(&wave_in, None)
+        let wave_out = resampler
+            .process(&wave_in, None)
             .map_err(|e| DecodeError::ResampleFailure(format!("Resample chunk: {e}")))?;
 
         out_ch0.extend_from_slice(&wave_out[0]);
@@ -380,8 +412,11 @@ mod tests {
     #[test]
     fn test_decode_nonexistent_file() {
         let result = decode_audio("/nonexistent/file.wav");
-        assert!(matches!(result, Err(DecodeError::FileNotFound(_))),
-            "Missing file must produce FileNotFound, got: {:?}", result);
+        assert!(
+            matches!(result, Err(DecodeError::FileNotFound(_))),
+            "Missing file must produce FileNotFound, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -389,8 +424,7 @@ mod tests {
         let path = "/tmp/test_decode_not_audio_p7.txt";
         std::fs::write(path, b"not audio data at all").unwrap();
         let result = decode_audio(path);
-        assert!(result.is_err(),
-            "Non-audio file must produce an error");
+        assert!(result.is_err(), "Non-audio file must produce an error");
     }
 
     #[test]
@@ -428,12 +462,24 @@ mod tests {
 
     #[test]
     fn test_decode_error_display() {
-        assert!(DecodeError::FileTooLarge(600_000_000).to_string().contains("500MB"),
-            "FileTooLarge must mention 500MB limit");
-        assert!(DecodeError::DurationExceeded(800).to_string().contains("12 min"),
-            "DurationExceeded must mention 12 min limit");
-        assert!(DecodeError::FileNotFound("/x".into()).to_string().contains("/x"));
-        assert!(DecodeError::UnsupportedFormat("mp4".into()).to_string().contains("mp4"));
+        assert!(
+            DecodeError::FileTooLarge(600_000_000)
+                .to_string()
+                .contains("500MB"),
+            "FileTooLarge must mention 500MB limit"
+        );
+        assert!(
+            DecodeError::DurationExceeded(800)
+                .to_string()
+                .contains("12 min"),
+            "DurationExceeded must mention 12 min limit"
+        );
+        assert!(DecodeError::FileNotFound("/x".into())
+            .to_string()
+            .contains("/x"));
+        assert!(DecodeError::UnsupportedFormat("mp4".into())
+            .to_string()
+            .contains("mp4"));
     }
 
     #[test]
@@ -448,7 +494,11 @@ mod tests {
             })
             .collect();
         // No resampling needed — just verify the vector is well-formed.
-        assert_eq!(stereo_440hz.len(), 96_000, "Stereo 48k should have 2 * 48000 samples");
+        assert_eq!(
+            stereo_440hz.len(),
+            96_000,
+            "Stereo 48k should have 2 * 48000 samples"
+        );
     }
 
     #[test]
@@ -465,10 +515,14 @@ mod tests {
         assert!(pcm.duration_ms > 0, "Must have positive duration");
         // All samples must be within range (no clipping overflow)
         for (i, &s) in pcm.samples.iter().enumerate() {
-            assert!(s >= -1.001 && s <= 1.001,
-                "Sample [{i}] out of range: {s}");
+            assert!(s >= -1.001 && s <= 1.001, "Sample [{i}] out of range: {s}");
         }
-        println!("✅ gargar.mp3: {}ms, {}/{} ch/sr, {} samples",
-            pcm.duration_ms, pcm.original_ch, pcm.original_sr, pcm.samples.len());
+        println!(
+            "✅ gargar.mp3: {}ms, {}/{} ch/sr, {} samples",
+            pcm.duration_ms,
+            pcm.original_ch,
+            pcm.original_sr,
+            pcm.samples.len()
+        );
     }
 }

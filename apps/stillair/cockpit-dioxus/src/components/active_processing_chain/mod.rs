@@ -1,17 +1,17 @@
-pub mod eq;
 pub mod compressor;
+pub mod eq;
 pub mod limiter;
-pub mod sat;
 pub mod readout;
+pub mod sat;
 pub mod types;
 
-use dioxus::prelude::*;
-use eq::{EQDisplay};
-use sat::SatDisplay;
 use compressor::CompDisplay;
+use dioxus::prelude::*;
+use eq::EQDisplay;
 use limiter::LimDisplay;
-use types::{EQState, CompressorState, LimiterState};
+use sat::SatDisplay;
 pub use types::SatTelemetry;
+use types::{CompressorState, EQState, LimiterState};
 
 #[derive(Props, Clone, PartialEq)]
 pub struct ActiveProcessingChainProps {

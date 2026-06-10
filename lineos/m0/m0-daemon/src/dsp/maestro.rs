@@ -8,8 +8,8 @@
 //! INV-MAESTRO-2: pure function
 //! INV-MAESTRO-3: no model → distance-only logic
 
-use sp314_dsp::stft::two_pass::ScoutResult;
 use lineos_corpus::store::UserMarkovModel;
+use sp314_dsp::stft::two_pass::ScoutResult;
 
 /// Parameters computed by Maestro for Pass 2.
 /// Replaces hardcoded COLLISION_DUCKING_GAIN.
@@ -22,7 +22,9 @@ pub struct RenderParams {
 
 impl Default for RenderParams {
     fn default() -> Self {
-        Self { ducking_gain: 0.707 }
+        Self {
+            ducking_gain: 0.707,
+        }
     }
 }
 
@@ -37,9 +39,9 @@ impl AutoTuningController {
     ///   3. Apply historical modifier from UserMarkovModel if available
     ///   4. Clamp to [0.3, 1.0]
     pub fn compute_render_params(
-        scout:   &ScoutResult,
-        model:   Option<&UserMarkovModel>,
-        preset:  &str,
+        scout: &ScoutResult,
+        model: Option<&UserMarkovModel>,
+        preset: &str,
     ) -> RenderParams {
         let distance = scout.stem_mfccs.bass_drums_distance();
 
@@ -63,19 +65,21 @@ impl AutoTuningController {
     fn historical_modifier(model: &UserMarkovModel, preset: &str) -> f32 {
         let preset_model = match model.preset(preset) {
             Some(p) => p,
-            None    => return 1.0,
+            None => return 1.0,
         };
 
         // Check drums stem collision history via transient density
         let drums_model = match preset_model.stem("drums") {
             Some(s) => s,
-            None    => return 1.0,
+            None => return 1.0,
         };
 
         // Use n_sessions as proxy for collision experience
         // More sessions with drums model → user works with transient-heavy music
         let sessions = drums_model.n_sessions;
-        if sessions == 0 { return 1.0; }
+        if sessions == 0 {
+            return 1.0;
+        }
 
         // High transient history → apply more aggressive ducking
         // Low history → subtle ducking
@@ -97,25 +101,39 @@ mod tests {
     #[test]
     fn low_distance_gives_aggressive_ducking() {
         // distance < 5.0 → base_gain = 0.5
-        let bass  = [0.0f32; 13];
+        let bass = [0.0f32; 13];
         let mut drums = [0.0f32; 13];
         // L2 distance = 2.0 → below 5.0 threshold
         drums[0] = 2.0;
         let d = StemMfccs::distance(&bass, &drums);
         assert!(d < 5.0, "Distance should be < 5.0, got {:.2}", d);
-        let base_gain = if d < 5.0 { 0.5_f32 } else if d < 15.0 { 0.707_f32 } else { 0.9_f32 };
+        let base_gain = if d < 5.0 {
+            0.5_f32
+        } else if d < 15.0 {
+            0.707_f32
+        } else {
+            0.9_f32
+        };
         assert!((base_gain - 0.5_f32).abs() < 0.001);
     }
 
     #[test]
     fn high_distance_gives_subtle_ducking() {
-        let bass  = [0.0f32; 13];
+        let bass = [0.0f32; 13];
         let mut drums = [0.0f32; 13];
         // L2 distance ~20.0 → above 15.0 threshold
-        for k in 0..13 { drums[k] = 20.0 / (13.0_f32).sqrt(); }
+        for k in 0..13 {
+            drums[k] = 20.0 / (13.0_f32).sqrt();
+        }
         let d = StemMfccs::distance(&bass, &drums);
         assert!(d >= 15.0, "Distance should be >= 15.0, got {:.2}", d);
-        let base_gain = if d < 5.0 { 0.5_f32 } else if d < 15.0 { 0.707_f32 } else { 0.9_f32 };
+        let base_gain = if d < 5.0 {
+            0.5_f32
+        } else if d < 15.0 {
+            0.707_f32
+        } else {
+            0.9_f32
+        };
         assert!((base_gain - 0.9_f32).abs() < 0.001);
     }
 

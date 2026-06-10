@@ -7,18 +7,18 @@
 //! INV-TB-4: Audio thread never waits for UI thread
 //! INV-TB-5: Auto-disable if UI silent > 2s (AtomicU64)
 
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicU64, Ordering};
-use ringbuf::{HeapRb, HeapProducer, HeapConsumer};
 use lineos_types::RealtimeFrame;
+use ringbuf::{HeapConsumer, HeapProducer, HeapRb};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// Lock-free ring buffer bridge from xaak audio thread to UI.
 /// Producer: xaak audio callback (push, non-blocking)
 /// Consumer: Tauri command (pop, non-blocking)
 #[derive(Clone)]
 pub struct RealtimeBridge {
-    producer:     Arc<Mutex<HeapProducer<RealtimeFrame>>>,
-    consumer:     Arc<Mutex<HeapConsumer<RealtimeFrame>>>,
+    producer: Arc<Mutex<HeapProducer<RealtimeFrame>>>,
+    consumer: Arc<Mutex<HeapConsumer<RealtimeFrame>>>,
     /// Timestamp (ms since epoch) of last UI poll.
     /// Audio thread checks: if now - last_poll > 2000ms → skip FFT.
     /// Zero tasks, zero allocations — pure atomic.
@@ -30,8 +30,8 @@ impl RealtimeBridge {
         let rb = HeapRb::<RealtimeFrame>::new(4);
         let (producer, consumer) = rb.split();
         Self {
-            producer:     Arc::new(Mutex::new(producer)),
-            consumer:     Arc::new(Mutex::new(consumer)),
+            producer: Arc::new(Mutex::new(producer)),
+            consumer: Arc::new(Mutex::new(consumer)),
             last_poll_ms: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -42,7 +42,7 @@ impl RealtimeBridge {
     /// INV-TB-2: never panics, never blocks.
     pub fn push(&self, frame: RealtimeFrame) {
         let last = self.last_poll_ms.load(Ordering::Relaxed);
-        let now  = Self::now_ms();
+        let now = Self::now_ms();
         if now.saturating_sub(last) > 2000 {
             return; // UI gone — skip FFT and push
         }
@@ -69,7 +69,9 @@ impl RealtimeBridge {
 }
 
 impl Default for RealtimeBridge {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -105,7 +107,9 @@ mod tests {
 
         // Should have at most 4 frames — extras dropped
         let mut count = 0;
-        while bridge.pop().is_some() { count += 1; }
+        while bridge.pop().is_some() {
+            count += 1;
+        }
         assert!(count <= 4, "Ring buffer must not exceed capacity");
     }
 
@@ -119,8 +123,10 @@ mod tests {
         bridge.push(frame);
 
         // Nothing should be in buffer
-        assert!(bridge.pop().is_none(),
-            "Push should be bypassed when UI has not polled");
+        assert!(
+            bridge.pop().is_none(),
+            "Push should be bypassed when UI has not polled"
+        );
     }
 
     #[test]
@@ -128,7 +134,9 @@ mod tests {
         let bridge = RealtimeBridge::new();
         let before = RealtimeBridge::now_ms();
         bridge.pop();
-        let stored = bridge.last_poll_ms.load(std::sync::atomic::Ordering::Relaxed);
+        let stored = bridge
+            .last_poll_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
         assert!(stored >= before, "pop() must update last_poll_ms");
     }
 }

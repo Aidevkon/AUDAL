@@ -105,7 +105,10 @@ impl Registry {
 
         // Empty hash = pending stub — skip hash verification (Phase 1 stubs)
         if expected.is_empty() {
-            tracing::debug!("Asset '{}' has empty registered hash (pending stub) — skipping verification", asset_name);
+            tracing::debug!(
+                "Asset '{}' has empty registered hash (pending stub) — skipping verification",
+                asset_name
+            );
             return Ok(());
         }
 
@@ -119,7 +122,11 @@ impl Registry {
             );
         }
 
-        tracing::debug!("Asset '{}' verified OK (blake3={})", asset_name, &actual_hex[..16]);
+        tracing::debug!(
+            "Asset '{}' verified OK (blake3={})",
+            asset_name,
+            &actual_hex[..16]
+        );
         Ok(())
     }
 
@@ -179,12 +186,13 @@ mod tests {
         let entries: Vec<String> = assets
             .iter()
             .map(|(name, hash)| {
-                format!(
-                    r#""{name}": {{ "blake3": "{hash}", "sha256": "", "size_bytes": 0 }}"#
-                )
+                format!(r#""{name}": {{ "blake3": "{hash}", "sha256": "", "size_bytes": 0 }}"#)
             })
             .collect();
-        format!(r#"{{ "version": "0.1.0", "assets": {{ {} }} }}"#, entries.join(", "))
+        format!(
+            r#"{{ "version": "0.1.0", "assets": {{ {} }} }}"#,
+            entries.join(", ")
+        )
     }
 
     #[tokio::test]
@@ -203,7 +211,10 @@ mod tests {
         let wrong_hash = hex::decode("deadbeef").unwrap();
         let result = registry.verify_asset("test.wasm", &wrong_hash);
 
-        assert!(result.is_err(), "Hash mismatch must return Err, never silently pass");
+        assert!(
+            result.is_err(),
+            "Hash mismatch must return Err, never silently pass"
+        );
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("Hash mismatch"),
@@ -260,7 +271,10 @@ mod tests {
 
         // empty_hash.wasm is in wasm_modules with empty blake3 → should pass
         let result = registry.verify_asset("empty_hash.wasm", &[0x00, 0x01, 0x02]);
-        assert!(result.is_ok(), "Pending stub with empty hash must skip verification");
+        assert!(
+            result.is_ok(),
+            "Pending stub with empty hash must skip verification"
+        );
     }
 
     #[tokio::test]
@@ -283,7 +297,8 @@ mod tests {
 
     #[tokio::test]
     async fn registry_load_fails_on_missing_file() {
-        let result = Registry::load("/nonexistent/registry.json", "/nonexistent/checksums.json").await;
+        let result =
+            Registry::load("/nonexistent/registry.json", "/nonexistent/checksums.json").await;
         assert!(result.is_err(), "Missing file must return Err");
     }
 }

@@ -1,6 +1,6 @@
 use crate::node::DspNode;
-use sp314_dsp::restoration::biquad::{Biquad, FilterType};
 use libm::{expf, fabsf, powf};
+use sp314_dsp::restoration::biquad::{Biquad, FilterType};
 
 pub struct DeEsserNode {
     sample_rate: u32,
@@ -34,13 +34,13 @@ impl DeEsserNode {
 impl DspNode for DeEsserNode {
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let threshold_lin = powf(10.0, self.threshold_db / 20.0);
-        
+
         for i in 0..left.len() {
             let mut l = left[i];
             let mut r = right[i];
-            
+
             let (hf_l, hf_r) = self.hp_filter.process_stereo(l, r);
-            
+
             let rect_l = fabsf(hf_l);
             self.env_l = if rect_l > self.env_l {
                 self.env_l + (rect_l - self.env_l) * (1.0 - self.attack_coef)
@@ -77,7 +77,8 @@ impl DspNode for DeEsserNode {
             "threshold_db" => self.threshold_db = value,
             "frequency_hz" => {
                 self.frequency_hz = value;
-                self.hp_filter = Biquad::new(FilterType::HighPass, value, 0.707, self.sample_rate as f32);
+                self.hp_filter =
+                    Biquad::new(FilterType::HighPass, value, 0.707, self.sample_rate as f32);
             }
             "ratio" => self.ratio = value,
             _ => {}
@@ -108,11 +109,11 @@ mod tests {
         let mut node = DeEsserNode::new(48000);
         node.set_parameter("threshold_db", -40.0);
         node.set_parameter("frequency_hz", 6000.0);
-        
+
         let mut left = vec![0.5; 480]; // DC is 0Hz, well below 6000Hz
         let mut right = vec![0.5; 480];
         node.process_stereo(&mut left, &mut right);
-        
+
         assert!((left[479] - 0.5).abs() < 1e-4);
     }
 
@@ -121,7 +122,7 @@ mod tests {
         let mut node = DeEsserNode::new(48000);
         node.set_parameter("threshold_db", -40.0);
         node.set_parameter("frequency_hz", 1000.0); // lower to catch nyquist oscillation
-        
+
         let mut left = vec![0.0; 480];
         let mut right = vec![0.0; 480];
         // Nyquist frequency oscillation (24kHz)
@@ -129,9 +130,9 @@ mod tests {
             left[i] = if i % 2 == 0 { 0.5 } else { -0.5 };
             right[i] = if i % 2 == 0 { 0.5 } else { -0.5 };
         }
-        
+
         node.process_stereo(&mut left, &mut right);
-        
+
         // Should be attenuated
         assert!(left[479].abs() < 0.5);
     }

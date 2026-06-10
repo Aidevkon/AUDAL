@@ -1,4 +1,7 @@
-use lineos_types::{AudioChunk, Bmr128Schema, StereoBuffer, LoudnessTarget, GoldenBlob, BlobType, GoldenInputProfile, LufsReport, MasteringIntent};
+use lineos_types::{
+    AudioChunk, BlobType, Bmr128Schema, GoldenBlob, GoldenInputProfile, LoudnessTarget, LufsReport,
+    MasteringIntent, StereoBuffer,
+};
 
 #[test]
 fn stereo_buffer_duration_correct() {

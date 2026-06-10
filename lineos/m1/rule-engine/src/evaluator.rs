@@ -12,13 +12,17 @@ use crate::types::{AnalysisReport, CoachFindings, Issue, Severity};
 /// Evaluate all rules against the analysis report.
 /// Returns CoachFindings with all triggered issues and a deterministic recommendation.
 pub fn evaluate(report: &AnalysisReport, thresholds: &Thresholds) -> CoachFindings {
-    let issues: Vec<Issue> = RULES.iter()
+    let issues: Vec<Issue> = RULES
+        .iter()
         .filter_map(|rule| (rule.check)(report, thresholds))
         .collect();
 
     let recommendation = derive_recommendation(&issues);
 
-    CoachFindings { issues, recommendation }
+    CoachFindings {
+        issues,
+        recommendation,
+    }
 }
 
 /// Deterministic recommendation derived from the issue list.
@@ -85,10 +89,14 @@ mod tests {
     fn make_report(lufs: f32, tp: f32, dr: f32, corr: f32, dc: f32, lra: f32) -> AnalysisReport {
         AnalysisReport::from_metrics(
             QualityMetrics {
-                lufs_integrated: lufs, lufs_short_term: lufs + 1.0,
-                lufs_momentary: lufs + 2.0, true_peak: tp,
-                loudness_range: lra, stereo_correlation: corr,
-                dynamic_range: dr, dc_offset: dc,
+                lufs_integrated: lufs,
+                lufs_short_term: lufs + 1.0,
+                lufs_momentary: lufs + 2.0,
+                true_peak: tp,
+                loudness_range: lra,
+                stereo_correlation: corr,
+                dynamic_range: dr,
+                dc_offset: dc,
             },
             ComplianceFlags::all_pass(),
         )
@@ -99,8 +107,11 @@ mod tests {
         // -14.0 LUFS, within Spotify ±0.5 tolerance, all other metrics clean
         let r = make_report(-14.0, -1.5, 10.0, 0.95, 0.0, 8.0);
         let f = evaluate(&r, &make_thresholds());
-        assert!(f.issues.is_empty(),
-            "Track at target LUFS must have no issues: {:?}", f.issues);
+        assert!(
+            f.issues.is_empty(),
+            "Track at target LUFS must have no issues: {:?}",
+            f.issues
+        );
         assert!(f.recommendation.contains("ready"));
     }
 
@@ -116,8 +127,11 @@ mod tests {
         // -12.0 LUFS → delta = 2.0, above spotify target. Severity Medium (delta.abs()=2.0 not > 2.0)
         let r = make_report(-12.0, -1.5, 10.0, 0.95, 0.0, 8.0);
         let f = evaluate(&r, &make_thresholds());
-        assert!(f.recommendation.contains("Reduce gain"),
-            "Expected Reduce gain: {}", f.recommendation);
+        assert!(
+            f.recommendation.contains("Reduce gain"),
+            "Expected Reduce gain: {}",
+            f.recommendation
+        );
     }
 
     #[test]
@@ -125,8 +139,11 @@ mod tests {
         // -20.0 LUFS → delta = -6.0, below target. High severity.
         let r = make_report(-20.0, -1.5, 10.0, 0.95, 0.0, 8.0);
         let f = evaluate(&r, &make_thresholds());
-        assert!(f.recommendation.contains("Increase gain"),
-            "Expected Increase gain: {}", f.recommendation);
+        assert!(
+            f.recommendation.contains("Increase gain"),
+            "Expected Increase gain: {}",
+            f.recommendation
+        );
     }
 
     #[test]
@@ -143,21 +160,31 @@ mod tests {
     fn test_lufs_compliance_issue_has_correct_id() {
         let r = make_report(-12.0, -1.5, 10.0, 0.95, 0.0, 8.0);
         let f = evaluate(&r, &make_thresholds());
-        assert!(f.issues.iter().any(|i| i.id == "lufs_compliance"),
-            "Must use id 'lufs_compliance', not old ids: {:?}", f.issues);
+        assert!(
+            f.issues.iter().any(|i| i.id == "lufs_compliance"),
+            "Must use id 'lufs_compliance', not old ids: {:?}",
+            f.issues
+        );
     }
 
     #[test]
     fn test_raw_preset_no_lufs_issue() {
         let t = Thresholds {
-            preset_name: "raw", target_lufs: None,
-            true_peak_max: -0.1, lufs_tolerance: 0.5,
-            dynamic_range_min: 6.0, stereo_corr_min: 0.8,
-            stereo_corr_warning: 0.5, dc_offset_max: 0.01, lra_max: 14.0,
+            preset_name: "raw",
+            target_lufs: None,
+            true_peak_max: -0.1,
+            lufs_tolerance: 0.5,
+            dynamic_range_min: 6.0,
+            stereo_corr_min: 0.8,
+            stereo_corr_warning: 0.5,
+            dc_offset_max: 0.01,
+            lra_max: 14.0,
         };
         let r = make_report(-14.0, -1.5, 10.0, 0.95, 0.0, 8.0);
         let f = evaluate(&r, &t);
-        assert!(!f.issues.iter().any(|i| i.id == "lufs_compliance"),
-            "Raw preset must produce no lufs_compliance issue");
+        assert!(
+            !f.issues.iter().any(|i| i.id == "lufs_compliance"),
+            "Raw preset must produce no lufs_compliance issue"
+        );
     }
 }

@@ -2,21 +2,21 @@ use lineos_types::analysis::StemMetrics;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoiceState {
-    Silence   = 0,
-    Breath    = 1,
+    Silence = 0,
+    Breath = 1,
     Consonant = 2,
-    Vowel     = 3,
-    Tail      = 4,
+    Vowel = 3,
+    Tail = 4,
 }
 
 impl VoiceState {
     pub fn to_str(&self) -> &'static str {
         match self {
-            VoiceState::Silence   => "silence",
-            VoiceState::Breath    => "breath",
+            VoiceState::Silence => "silence",
+            VoiceState::Breath => "breath",
             VoiceState::Consonant => "consonant",
-            VoiceState::Vowel     => "vowel",
-            VoiceState::Tail      => "tail",
+            VoiceState::Vowel => "vowel",
+            VoiceState::Tail => "tail",
         }
     }
 }
@@ -54,7 +54,8 @@ impl MarkovStateClassifier {
     /// Next state prediction: argmax of transition row (INV-AB-2: no sampling).
     pub fn predict_next(state: VoiceState) -> VoiceState {
         let row = TRANSITION_MATRIX_VOICE_V1[state as usize];
-        let next_idx = row.iter()
+        let next_idx = row
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -74,33 +75,55 @@ mod tests {
     use super::*;
 
     fn mock(rms: f32, crest: f32) -> StemMetrics {
-        StemMetrics { rms_db: rms, crest_factor_db: crest, ..StemMetrics::default() }
+        StemMetrics {
+            rms_db: rms,
+            crest_factor_db: crest,
+            ..StemMetrics::default()
+        }
     }
 
     #[test]
     fn classify_silence() {
-        assert_eq!(MarkovStateClassifier::classify_voice(&mock(-65.0, 5.0)), VoiceState::Silence);
+        assert_eq!(
+            MarkovStateClassifier::classify_voice(&mock(-65.0, 5.0)),
+            VoiceState::Silence
+        );
     }
     #[test]
     fn classify_breath() {
-        assert_eq!(MarkovStateClassifier::classify_voice(&mock(-45.0, 5.0)), VoiceState::Breath);
+        assert_eq!(
+            MarkovStateClassifier::classify_voice(&mock(-45.0, 5.0)),
+            VoiceState::Breath
+        );
     }
     #[test]
     fn classify_consonant() {
-        assert_eq!(MarkovStateClassifier::classify_voice(&mock(-20.0, 15.0)), VoiceState::Consonant);
+        assert_eq!(
+            MarkovStateClassifier::classify_voice(&mock(-20.0, 15.0)),
+            VoiceState::Consonant
+        );
     }
     #[test]
     fn classify_vowel() {
-        assert_eq!(MarkovStateClassifier::classify_voice(&mock(-12.0, 6.0)), VoiceState::Vowel);
+        assert_eq!(
+            MarkovStateClassifier::classify_voice(&mock(-12.0, 6.0)),
+            VoiceState::Vowel
+        );
     }
     #[test]
     fn classify_tail() {
-        assert_eq!(MarkovStateClassifier::classify_voice(&mock(-25.0, 8.0)), VoiceState::Tail);
+        assert_eq!(
+            MarkovStateClassifier::classify_voice(&mock(-25.0, 8.0)),
+            VoiceState::Tail
+        );
     }
     #[test]
     fn predict_next_from_consonant_is_vowel() {
         // Consonant → Vowel has highest probability (0.65)
-        assert_eq!(MarkovStateClassifier::predict_next(VoiceState::Consonant), VoiceState::Vowel);
+        assert_eq!(
+            MarkovStateClassifier::predict_next(VoiceState::Consonant),
+            VoiceState::Vowel
+        );
     }
     #[test]
     fn transition_matrix_rows_sum_to_one() {

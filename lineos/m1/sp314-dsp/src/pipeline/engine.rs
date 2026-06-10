@@ -1,26 +1,26 @@
 #![allow(deprecated)]
 
-use crate::masking_eq::{MaskingAwareEQ, MaskingEQConfig};
 use crate::compressor::stereo::{CompressorV3, CompressorV3Config};
-use crate::pipeline::phase::PhaseAligner;
-use crate::pipeline::gain::HeadroomManager;
-use crate::pipeline::telemetry::{Telemetry, analyze_offline_pre_pass};
-use crate::limiter::{BrickwallLimiter, LimiterConfig};
+use crate::harmonic::{HarmonicConfig, HarmonicEngine};
 use crate::limiter::clipper::OversampledSoftClipper;
-use crate::harmonic::{HarmonicEngine, HarmonicConfig};
+use crate::limiter::{BrickwallLimiter, LimiterConfig};
+use crate::masking_eq::{MaskingAwareEQ, MaskingEQConfig};
+use crate::pipeline::gain::HeadroomManager;
+use crate::pipeline::phase::PhaseAligner;
+use crate::pipeline::telemetry::{analyze_offline_pre_pass, Telemetry};
 use crate::restoration::{RestorationChain, RestorationConfig};
 
 /// Configuration for the entire mastering engine.
 /// Includes nested configurations for all DSP stages.
 #[derive(Clone)]
 pub struct EngineConfig {
-    pub eq_config:        MaskingEQConfig,
-    pub comp_config:      CompressorV3Config,
-    pub parallel_mix:     f32,
+    pub eq_config: MaskingEQConfig,
+    pub comp_config: CompressorV3Config,
+    pub parallel_mix: f32,
     pub target_makeup_db: f32,
-    pub limiter_config:   LimiterConfig,
+    pub limiter_config: LimiterConfig,
     pub restoration_config: RestorationConfig,
-    pub harmonic_config:  Option<HarmonicConfig>,
+    pub harmonic_config: Option<HarmonicConfig>,
     pub clipper_enabled: bool,
 }
 
@@ -34,20 +34,17 @@ pub struct EngineConfig {
             See lineos/m0/m0-daemon/src/dsp/mod.rs"
 )]
 pub struct Sp314MasteringEngine {
-    pub eq:      MaskingAwareEQ,
-    pub comp:    CompressorV3,
+    pub eq: MaskingAwareEQ,
+    pub comp: CompressorV3,
     pub aligner: PhaseAligner,
     pub harmonic: HarmonicEngine,
     pub limiter: BrickwallLimiter,
     pub clipper: OversampledSoftClipper,
     pub restoration: RestorationChain,
-    pub config:  EngineConfig,
+    pub config: EngineConfig,
 }
 
-pub fn calculate_adaptive_budget(
-    _telemetry:     &Telemetry,
-    user_makeup_db: f32,
-) -> (f32, f32) {
+pub fn calculate_adaptive_budget(_telemetry: &Telemetry, user_makeup_db: f32) -> (f32, f32) {
     let pad_db = -6.0;
     let makeup_db = 6.0 + user_makeup_db;
     (pad_db, makeup_db)
@@ -56,27 +53,35 @@ pub fn calculate_adaptive_budget(
 impl Sp314MasteringEngine {
     pub fn new(config: EngineConfig, sample_rate: u32) -> Result<Self, &'static str> {
         let crossover_hz = config.comp_config.mid_config.crossover_hz;
-        
+
         let pad_db = -6.0;
         let mut comp_config = config.comp_config.clone();
         comp_config.mid_config.threshold_db += pad_db;
         comp_config.side_config.threshold_db += pad_db;
 
-        let harmonic_config = config.harmonic_config.unwrap_or_else(|| {
-            crate::harmonic::HarmonicConfig { mix: 0.0, ..Default::default() }
-        });
+        let harmonic_config =
+            config
+                .harmonic_config
+                .unwrap_or_else(|| crate::harmonic::HarmonicConfig {
+                    mix: 0.0,
+                    ..Default::default()
+                });
         // drive_compensation is set per-path (process_offline / process_block)
         // to match the actual pad applied to the signal.
 
         Ok(Self {
-            eq:      MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
-                         .map_err(|_| "EQ config error")?,
-            comp:    CompressorV3::new(comp_config, sample_rate),
+            eq: MaskingAwareEQ::new(config.eq_config.clone(), sample_rate)
+                .map_err(|_| "EQ config error")?,
+            comp: CompressorV3::new(comp_config, sample_rate),
             aligner: PhaseAligner::new(crossover_hz, sample_rate),
             harmonic: HarmonicEngine::new(harmonic_config),
             limiter: BrickwallLimiter::new(config.limiter_config, sample_rate),
             clipper: OversampledSoftClipper::new(config.clipper_enabled),
-            restoration: RestorationChain::new(sample_rate as f32, config.restoration_config.clone(), pad_db),
+            restoration: RestorationChain::new(
+                sample_rate as f32,
+                config.restoration_config.clone(),
+                pad_db,
+            ),
             config,
         })
     }
@@ -86,7 +91,7 @@ impl Sp314MasteringEngine {
     /// then processes the audio and returns telemetry data.
     pub fn process_offline(
         &mut self,
-        left:  &mut std::vec::Vec<f32>,
+        left: &mut std::vec::Vec<f32>,
         right: &mut std::vec::Vec<f32>,
     ) -> Telemetry {
         debug_assert_eq!(left.len(), right.len());
@@ -97,8 +102,8 @@ impl Sp314MasteringEngine {
         let headroom = HeadroomManager::new(pad_db, makeup_db);
 
         // Drive compensation must match actual pad applied to signal
-        self.harmonic.set_drive_compensation(
-            libm::powf(10.0_f32, pad_db.abs() / 20.0_f32));
+        self.harmonic
+            .set_drive_compensation(libm::powf(10.0_f32, pad_db.abs() / 20.0_f32));
 
         headroom.apply_input_pad(left, right);
 
@@ -113,10 +118,8 @@ impl Sp314MasteringEngine {
         // Soft clipper (oversampled, unity gain)
         if self.config.clipper_enabled {
             for i in 0..left.len() {
-                let (l, r) = self.clipper.process(
-                    left[i], right[i]
-                );
-                left[i]  = l;
+                let (l, r) = self.clipper.process(left[i], right[i]);
+                left[i] = l;
                 right[i] = r;
             }
         }
@@ -157,7 +160,7 @@ impl Sp314MasteringEngine {
 
             self.comp.process_stereo(&mut wet_l, &mut wet_r);
 
-            left[i]  = dry_l * (1.0_f32 - mix) + wet_l * mix;
+            left[i] = dry_l * (1.0_f32 - mix) + wet_l * mix;
             right[i] = dry_r * (1.0_f32 - mix) + wet_r * mix;
         }
     }
@@ -166,14 +169,10 @@ impl Sp314MasteringEngine {
     /// Block size must be consistent across calls.
     /// Called from the engine thread — not the audio callback.
     /// No allocation inside this method.
-    pub fn process_block(
-        &mut self,
-        left: &mut [f32],
-        right: &mut [f32],
-    ) {
+    pub fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
         debug_assert_eq!(left.len(), right.len());
-        
-        // In real-time, we don't have offline pre-pass telemetry. 
+
+        // In real-time, we don't have offline pre-pass telemetry.
         // We assume pad_db = 0.0 and just apply the target_makeup_db from the config.
         let headroom = HeadroomManager::new(0.0, self.config.target_makeup_db);
 
@@ -181,15 +180,15 @@ impl Sp314MasteringEngine {
         self.harmonic.set_drive_compensation(1.0_f32);
 
         headroom.apply_input_pad(left, right);
-        
+
         self.restoration.process(left, right);
 
         self.eq.process_block(left, right);
-        
+
         self.process_stereo_block_internal(left, right);
-        
+
         headroom.apply_output_makeup_no_clip(left, right);
-        
+
         self.limiter.process_block(left, right);
     }
 

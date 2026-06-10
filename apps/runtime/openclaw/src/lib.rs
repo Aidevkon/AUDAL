@@ -1,6 +1,6 @@
+pub mod crossfader;
 pub mod engine;
 pub mod scheduler;
-pub mod crossfader;
 pub mod stem;
 pub mod stem_engine;
 

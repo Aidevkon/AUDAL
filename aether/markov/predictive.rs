@@ -1,8 +1,8 @@
 use super::voice_v1::VoiceState;
-use crate::markov::drums_v1::DrumsState;
-use crate::markov::bass_v1::BassState;
-use crate::markov::harmonics_v1::HarmonicsState;
 use crate::markov::ambience_v1::AmbienceState;
+use crate::markov::bass_v1::BassState;
+use crate::markov::drums_v1::DrumsState;
+use crate::markov::harmonics_v1::HarmonicsState;
 use crate::simulation::SimulationDelta;
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -14,7 +14,9 @@ pub struct PredictiveDelta {
 }
 
 impl PredictiveDelta {
-    pub fn zero() -> Self { Self::default() }
+    pub fn zero() -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -25,7 +27,9 @@ pub struct InstrumentDelta {
 }
 
 impl InstrumentDelta {
-    pub fn zero() -> Self { Self::default() }
+    pub fn zero() -> Self {
+        Self::default()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -38,13 +42,13 @@ pub struct InstrumentDeltas {
 
 #[derive(Clone)]
 pub struct MarkovDelta {
-    pub comp_threshold_db: f32,  // [-3.0, +3.0]
-    pub comp_attack_ms:    f32,  // [-10.0, +10.0]
-    pub comp_release_ms:   f32,  // [-20.0, +20.0]
-    pub high_shelf_db:     f32,  // [-1.0, +1.0]
-    pub low_shelf_db:      f32,  // [-1.0, +1.0]
-    pub transient_risk:    f32,  // [0.0, 1.0]
-    pub gap_risk:          f32,  // [0.0, 1.0]
+    pub comp_threshold_db: f32, // [-3.0, +3.0]
+    pub comp_attack_ms: f32,    // [-10.0, +10.0]
+    pub comp_release_ms: f32,   // [-20.0, +20.0]
+    pub high_shelf_db: f32,     // [-1.0, +1.0]
+    pub low_shelf_db: f32,      // [-1.0, +1.0]
+    pub transient_risk: f32,    // [0.0, 1.0]
+    pub gap_risk: f32,          // [0.0, 1.0]
 }
 
 impl MarkovDelta {
@@ -66,10 +70,7 @@ pub struct PredictiveController;
 impl PredictiveController {
     /// Produce MarkovDelta from current + predicted VoiceState.
     /// INV-AB-1: deterministic. INV-AB-8: all values bounded.
-    pub fn compute_voice_delta(
-        _current: VoiceState,
-        predicted: VoiceState,
-    ) -> MarkovDelta {
+    pub fn compute_voice_delta(_current: VoiceState, predicted: VoiceState) -> MarkovDelta {
         let mut delta = MarkovDelta::zero();
         match predicted {
             VoiceState::Silence => {
@@ -132,8 +133,13 @@ impl PredictiveController {
     pub fn compute_drums_delta(predicted: DrumsState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            DrumsState::Transient => { delta.comp_attack_ms = 5.0; delta.eq_presence_db = 1.0; },
-            DrumsState::Decay => { delta.comp_attack_ms = -5.0; },
+            DrumsState::Transient => {
+                delta.comp_attack_ms = 5.0;
+                delta.eq_presence_db = 1.0;
+            }
+            DrumsState::Decay => {
+                delta.comp_attack_ms = -5.0;
+            }
             _ => {}
         }
         delta
@@ -142,8 +148,13 @@ impl PredictiveController {
     pub fn compute_bass_delta(predicted: BassState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            BassState::Punchy => { delta.comp_attack_ms = 10.0; delta.eq_presence_db = 1.5; },
-            BassState::Rumble => { delta.eq_presence_db = -1.0; },
+            BassState::Punchy => {
+                delta.comp_attack_ms = 10.0;
+                delta.eq_presence_db = 1.5;
+            }
+            BassState::Rumble => {
+                delta.eq_presence_db = -1.0;
+            }
             _ => {}
         }
         delta
@@ -152,8 +163,12 @@ impl PredictiveController {
     pub fn compute_harmonics_delta(predicted: HarmonicsState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            HarmonicsState::Bright => { delta.eq_presence_db = 2.0; },
-            HarmonicsState::Warm => { delta.eq_presence_db = -1.0; },
+            HarmonicsState::Bright => {
+                delta.eq_presence_db = 2.0;
+            }
+            HarmonicsState::Warm => {
+                delta.eq_presence_db = -1.0;
+            }
             _ => {}
         }
         delta
@@ -162,8 +177,12 @@ impl PredictiveController {
     pub fn compute_ambience_delta(predicted: AmbienceState) -> InstrumentDelta {
         let mut delta = InstrumentDelta::zero();
         match predicted {
-            AmbienceState::Wash => { delta.eq_presence_db = -2.0; },
-            AmbienceState::Lush => { delta.eq_presence_db = 1.0; },
+            AmbienceState::Wash => {
+                delta.eq_presence_db = -2.0;
+            }
+            AmbienceState::Lush => {
+                delta.eq_presence_db = 1.0;
+            }
             _ => {}
         }
         delta
@@ -176,19 +195,22 @@ mod tests {
 
     #[test]
     fn consonant_delta_fast_attack() {
-        let delta = PredictiveController::compute_voice_delta(VoiceState::Vowel, VoiceState::Consonant);
+        let delta =
+            PredictiveController::compute_voice_delta(VoiceState::Vowel, VoiceState::Consonant);
         assert_eq!(delta.comp_attack_ms, -8.0);
     }
 
     #[test]
     fn vowel_delta_presence_boost() {
-        let delta = PredictiveController::compute_voice_delta(VoiceState::Consonant, VoiceState::Vowel);
+        let delta =
+            PredictiveController::compute_voice_delta(VoiceState::Consonant, VoiceState::Vowel);
         assert_eq!(delta.high_shelf_db, 0.5);
     }
 
     #[test]
     fn silence_delta_is_zero() {
-        let delta = PredictiveController::compute_voice_delta(VoiceState::Tail, VoiceState::Silence);
+        let delta =
+            PredictiveController::compute_voice_delta(VoiceState::Tail, VoiceState::Silence);
         assert_eq!(delta.comp_threshold_db, 0.0);
         assert_eq!(delta.comp_attack_ms, 0.0);
         assert_eq!(delta.comp_release_ms, 0.0);

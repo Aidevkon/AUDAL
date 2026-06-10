@@ -2,10 +2,10 @@
 // ITU-R BS.1770-4 block gating algorithm.
 // Integrated LUFS = gated mean square → LUFS conversion.
 
-pub const BLOCK_SAMPLES:    usize = 19_200; // 400ms @ 48kHz
-pub const HOP_SAMPLES:      usize =  4_800; // 100ms hop (75% overlap)
-pub const ABSOLUTE_GATE_DB: f32   =   -70.0_f32; // LUFS
-pub const RELATIVE_GATE_LU: f32   =   -10.0_f32; // LU below ungated mean
+pub const BLOCK_SAMPLES: usize = 19_200; // 400ms @ 48kHz
+pub const HOP_SAMPLES: usize = 4_800; // 100ms hop (75% overlap)
+pub const ABSOLUTE_GATE_DB: f32 = -70.0_f32; // LUFS
+pub const RELATIVE_GATE_LU: f32 = -10.0_f32; // LU below ungated mean
 
 /// Convert mean square value to LUFS.
 /// Formula: LUFS = -0.691 + 10 * log10(mean_square)

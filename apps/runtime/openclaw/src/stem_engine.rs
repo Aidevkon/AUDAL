@@ -1,5 +1,5 @@
-use sp314_nodes::graph::DspGraph;
 use crate::stem::StemBuffer;
+use sp314_nodes::graph::DspGraph;
 
 pub struct StemEngine {
     pub id: String,
@@ -20,9 +20,16 @@ impl StemEngine {
         }
     }
 
-    pub fn process_block(&mut self, frame_offset: usize, out_left: &mut [f32], out_right: &mut [f32]) {
-        self.buffer.read_block(frame_offset, &mut self.left_buf, &mut self.right_buf);
-        self.graph.process_block(&mut self.left_buf, &mut self.right_buf);
+    pub fn process_block(
+        &mut self,
+        frame_offset: usize,
+        out_left: &mut [f32],
+        out_right: &mut [f32],
+    ) {
+        self.buffer
+            .read_block(frame_offset, &mut self.left_buf, &mut self.right_buf);
+        self.graph
+            .process_block(&mut self.left_buf, &mut self.right_buf);
         out_left.copy_from_slice(&self.left_buf);
         out_right.copy_from_slice(&self.right_buf);
     }

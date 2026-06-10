@@ -7,42 +7,42 @@
 //! PlaybackHandle wraps a Sender<PlaybackCmd> — Send + Sync — and the
 //! actual engine/stream lives on a dedicated worker thread.
 
+use crate::agents::operator::Operator;
 use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
-use crate::agents::operator::Operator;
 use crate::handlers::preview::PreviewStore;
 use crate::realtime_bridge::RealtimeBridge;
-use tokio::sync::broadcast;
-use std::sync::Arc;
-use xaak::engine::PlaybackHandle;
 use dashmap::DashMap;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use xaak::engine::PlaybackHandle;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MasteringProgress {
-    pub job_id:     String,
-    pub stage:      String,
+    pub job_id: String,
+    pub stage: String,
     pub elapsed_ms: u64,
-    pub blob_id:    Option<String>,
-    pub error:      Option<String>,
+    pub blob_id: Option<String>,
+    pub error: Option<String>,
 }
 
 /// Shared application state for the mastering API router (port 7400).
 #[derive(Clone)]
 pub struct AppState {
-    pub audit:         Arc<AuditLog>,
-    pub blob_store:    BlobStore,
+    pub audit: Arc<AuditLog>,
+    pub blob_store: BlobStore,
     /// Send-safe handle to the xaak playback worker thread (A-003 §1).
-    pub playback:      PlaybackHandle,
-    pub progress:      Arc<DashMap<String, MasteringProgress>>,
+    pub playback: PlaybackHandle,
+    pub progress: Arc<DashMap<String, MasteringProgress>>,
     /// Constitutional Agent Architecture v3.1 — Intent dispatcher.
-    pub operator:      Operator,
+    pub operator: Operator,
     /// Phase 8a: preview stem store for 5.1 Spatial Mixer widget.
     pub preview_store: PreviewStore,
     /// Phase 8c: broadcast channel for SSE progress stream.
     /// Workers send MasteringProgress events — SSE streams receive them.
-    pub progress_tx:   broadcast::Sender<MasteringProgress>,
+    pub progress_tx: broadcast::Sender<MasteringProgress>,
     /// Phase 9 TB-P2: lock-free ring buffer for xaak → UI telemetry.
-    pub realtime:      RealtimeBridge,
+    pub realtime: RealtimeBridge,
 }
 
 impl AppState {
@@ -51,13 +51,13 @@ impl AppState {
         let (progress_tx, _) = broadcast::channel(128);
         Self {
             audit,
-            blob_store:    BlobStore::new(),
-            playback:      PlaybackHandle::spawn(),
-            progress:      Arc::new(DashMap::new()),
+            blob_store: BlobStore::new(),
+            playback: PlaybackHandle::spawn(),
+            progress: Arc::new(DashMap::new()),
             operator,
             preview_store: PreviewStore::new(),
             progress_tx,
-            realtime:      RealtimeBridge::new(),
+            realtime: RealtimeBridge::new(),
         }
     }
 }

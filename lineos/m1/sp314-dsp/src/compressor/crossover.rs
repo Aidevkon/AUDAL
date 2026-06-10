@@ -20,13 +20,13 @@ impl CrossoverLR4 {
         let a1 = -2.0 * cos_w;
         let a2 = 1.0 - alpha;
 
-        let lp_coeffs = [lp_b0/a0, lp_b1/a0, lp_b2/a0, a1/a0, a2/a0];
+        let lp_coeffs = [lp_b0 / a0, lp_b1 / a0, lp_b2 / a0, a1 / a0, a2 / a0];
 
         let hp_b0 = (1.0 + cos_w) / 2.0;
         let hp_b1 = -(1.0 + cos_w);
         let hp_b2 = (1.0 + cos_w) / 2.0;
-        
-        let hp_coeffs = [hp_b0/a0, hp_b1/a0, hp_b2/a0, a1/a0, a2/a0];
+
+        let hp_coeffs = [hp_b0 / a0, hp_b1 / a0, hp_b2 / a0, a1 / a0, a2 / a0];
 
         Self {
             lp_coeffs,
@@ -45,8 +45,12 @@ impl CrossoverLR4 {
         state[0] = b1 * x - a1 * y + w2;
         state[1] = b2 * x - a2 * y;
 
-        if libm::fabsf(state[0]) < 1e-15 { state[0] = 0.0; }
-        if libm::fabsf(state[1]) < 1e-15 { state[1] = 0.0; }
+        if libm::fabsf(state[0]) < 1e-15 {
+            state[0] = 0.0;
+        }
+        if libm::fabsf(state[1]) < 1e-15 {
+            state[1] = 0.0;
+        }
 
         y
     }
@@ -68,14 +72,14 @@ impl CrossoverLR4 {
 }
 
 pub struct CrossoverLR4x3 {
-    low_split:  CrossoverLR4,
+    low_split: CrossoverLR4,
     high_split: CrossoverLR4,
 }
 
 impl CrossoverLR4x3 {
     pub fn new(f_low: f32, f_high: f32, sample_rate: u32) -> Self {
         Self {
-            low_split:  CrossoverLR4::new(f_low,  sample_rate),
+            low_split: CrossoverLR4::new(f_low, sample_rate),
             high_split: CrossoverLR4::new(f_high, sample_rate),
         }
     }
@@ -83,7 +87,7 @@ impl CrossoverLR4x3 {
     #[inline]
     pub fn process(&mut self, x: f32) -> (f32, f32, f32) {
         let (low, mid_high) = self.low_split.process(x);
-        let (mid, high)     = self.high_split.process(mid_high);
+        let (mid, high) = self.high_split.process(mid_high);
         (low, mid, high)
     }
 

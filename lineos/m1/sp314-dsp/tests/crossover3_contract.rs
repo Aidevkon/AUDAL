@@ -3,8 +3,7 @@ use std::fs;
 
 fn load_fixture(name: &str) -> Value {
     let path = format!("tests/fixtures/{}.json", name);
-    let content = fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Failed to read {}", path));
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read {}", path));
     serde_json::from_str(&content).expect("Failed to parse JSON")
 }
 
@@ -12,18 +11,18 @@ fn load_fixture(name: &str) -> Value {
 fn crossover3_sum_is_flat() {
     use sp314_dsp::compressor::crossover::CrossoverLR4x3;
 
-    let fixture  = load_fixture("crossover3_reference");
-    let f_low    = fixture["f_low_hz"].as_f64().unwrap() as f32;
-    let f_high   = fixture["f_high_hz"].as_f64().unwrap() as f32;
-    let fs       = fixture["sample_rate"].as_f64().unwrap() as u32;
+    let fixture = load_fixture("crossover3_reference");
+    let f_low = fixture["f_low_hz"].as_f64().unwrap() as f32;
+    let f_high = fixture["f_high_hz"].as_f64().unwrap() as f32;
+    let fs = fixture["sample_rate"].as_f64().unwrap() as u32;
     let n_settle = fixture["n_settle"].as_u64().unwrap() as usize;
-    let n_measure= fixture["n_measure"].as_u64().unwrap() as usize;
+    let n_measure = fixture["n_measure"].as_u64().unwrap() as usize;
 
     let checks = fixture["sum_checks"].as_array().unwrap();
 
     for check in checks {
         let freq_hz = check["freq_hz"].as_f64().unwrap() as f32;
-        let tol     = check["tolerance_db"].as_f64().unwrap() as f32;
+        let tol = check["tolerance_db"].as_f64().unwrap() as f32;
 
         let mut lr4x3 = CrossoverLR4x3::new(f_low, f_high, fs);
 
@@ -41,7 +40,9 @@ fn crossover3_sum_is_flat() {
             let x = ((n_settle + i) as f32 * w).sin();
             let (low, mid, high) = lr4x3.process(x);
             let sum = (low + mid + high).abs();
-            if sum > peak_sum { peak_sum = sum; }
+            if sum > peak_sum {
+                peak_sum = sum;
+            }
         }
 
         let sum_db = if peak_sum < 1e-12 {
@@ -53,7 +54,9 @@ fn crossover3_sum_is_flat() {
         assert!(
             (sum_db - 0.0_f32).abs() < tol,
             "freq={}Hz: sum={:.3}dB expected 0.0dB ±{}dB",
-            freq_hz, sum_db, tol
+            freq_hz,
+            sum_db,
+            tol
         );
     }
 }
@@ -62,12 +65,12 @@ fn crossover3_sum_is_flat() {
 fn crossover3_split_at_crossover_freqs() {
     use sp314_dsp::compressor::crossover::CrossoverLR4x3;
 
-    let fixture  = load_fixture("crossover3_reference");
-    let f_low    = fixture["f_low_hz"].as_f64().unwrap() as f32;
-    let f_high   = fixture["f_high_hz"].as_f64().unwrap() as f32;
-    let fs       = fixture["sample_rate"].as_f64().unwrap() as u32;
+    let fixture = load_fixture("crossover3_reference");
+    let f_low = fixture["f_low_hz"].as_f64().unwrap() as f32;
+    let f_high = fixture["f_high_hz"].as_f64().unwrap() as f32;
+    let fs = fixture["sample_rate"].as_f64().unwrap() as u32;
     let n_settle = fixture["n_settle"].as_u64().unwrap() as usize;
-    let n_measure= fixture["n_measure"].as_u64().unwrap() as usize;
+    let n_measure = fixture["n_measure"].as_u64().unwrap() as usize;
 
     // At f_low: low band should be -6dB
     {
@@ -80,13 +83,16 @@ fn crossover3_split_at_crossover_freqs() {
         for i in 0..n_measure {
             let x = ((n_settle + i) as f32 * w).sin();
             let (low, _mid, _high) = lr4x3.process(x);
-            if low.abs() > peak_low { peak_low = low.abs(); }
+            if low.abs() > peak_low {
+                peak_low = low.abs();
+            }
         }
         let low_db = 20.0 * peak_low.log10();
         assert!(
             (low_db - (-6.0)).abs() < 0.2,
             "At f_low={}: low band={:.3}dB expected -6.0dB ±0.2dB",
-            f_low, low_db
+            f_low,
+            low_db
         );
     }
 
@@ -101,13 +107,16 @@ fn crossover3_split_at_crossover_freqs() {
         for i in 0..n_measure {
             let x = ((n_settle + i) as f32 * w).sin();
             let (_low, _mid, high) = lr4x3.process(x);
-            if high.abs() > peak_high { peak_high = high.abs(); }
+            if high.abs() > peak_high {
+                peak_high = high.abs();
+            }
         }
         let high_db = 20.0 * peak_high.log10();
         assert!(
             (high_db - (-6.0)).abs() < 0.2,
             "At f_high={}: high band={:.3}dB expected -6.0dB ±0.2dB",
-            f_high, high_db
+            f_high,
+            high_db
         );
     }
 }
@@ -117,9 +126,9 @@ fn crossover3_no_sign_inversion() {
     use sp314_dsp::compressor::crossover::CrossoverLR4x3;
 
     let fixture = load_fixture("crossover3_reference");
-    let f_low   = fixture["f_low_hz"].as_f64().unwrap() as f32;
-    let f_high  = fixture["f_high_hz"].as_f64().unwrap() as f32;
-    let fs      = fixture["sample_rate"].as_f64().unwrap() as u32;
+    let f_low = fixture["f_low_hz"].as_f64().unwrap() as f32;
+    let f_high = fixture["f_high_hz"].as_f64().unwrap() as f32;
+    let fs = fixture["sample_rate"].as_f64().unwrap() as u32;
 
     let mut lr4x3 = CrossoverLR4x3::new(f_low, f_high, fs);
 

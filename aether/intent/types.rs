@@ -36,21 +36,25 @@ impl IntentStrength {
     pub fn new(v: f32) -> Self {
         Self(v.clamp(0.0, 1.0))
     }
-    pub fn value(&self) -> f32 { self.0 }
+    pub fn value(&self) -> f32 {
+        self.0
+    }
 }
 
 impl Default for IntentStrength {
-    fn default() -> Self { Self(0.5) }
+    fn default() -> Self {
+        Self(0.5)
+    }
 }
 
 /// Structured intent — output of IntentParser.
 /// Validated against contracts/intent.schema.json by S-009.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Intent {
-    pub goal:     IntentGoal,
+    pub goal: IntentGoal,
     pub strength: IntentStrength,
     /// Optional free-text context (from LLM path)
-    pub context:  Option<String>,
+    pub context: Option<String>,
 }
 
 impl Intent {
@@ -58,7 +62,7 @@ impl Intent {
         Self {
             goal,
             strength: IntentStrength::new(strength),
-            context:  None,
+            context: None,
         }
     }
 

@@ -5,36 +5,33 @@
 //! COMPARATOR RULE: reads Ebu128Measurement and Bmr128Schema.
 //! Never calls DPS code. Never re-measures audio.
 
-use lineos_types::{Bmr128Schema, Ebu128Measurement};
 use lineos_metadata::bmr128::Bmr128Report;
+use lineos_types::{Bmr128Schema, Ebu128Measurement};
 use serde::{Deserialize, Serialize};
 
 /// Evaluation result for a single platform preset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PresetResult {
-    pub preset:  String,
-    pub passes:  bool,
-    pub report:  Bmr128Report,
+    pub preset: String,
+    pub passes: bool,
+    pub report: Bmr128Report,
 }
 
 /// Full insights report — evaluates all presets from bmr-128.schema.json.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InsightsReport {
     /// Pass/fail for each platform preset
-    pub preset_results:       Vec<PresetResult>,
+    pub preset_results: Vec<PresetResult>,
     /// The strictest preset this session passes (lowest target_lufs that passes)
-    pub recommended_preset:   Option<String>,
+    pub recommended_preset: Option<String>,
     /// Actionable hints for the rule engine (Phase 4)
-    pub rule_engine_hints:    Vec<String>,
+    pub rule_engine_hints: Vec<String>,
 }
 
 /// Evaluate compliance across all presets from bmr-128.schema.json.
 ///
 /// All threshold values come from `schema.presets` — never hardcoded.
-pub fn evaluate_all(
-    measurement: &Ebu128Measurement,
-    _schema:      &Bmr128Schema,
-) -> InsightsReport {
+pub fn evaluate_all(measurement: &Ebu128Measurement, _schema: &Bmr128Schema) -> InsightsReport {
     let results: Vec<PresetResult> = Vec::new();
 
     // TODO: 3b — Bmr128Schema no longer has presets map.
@@ -73,22 +70,21 @@ pub fn evaluate_all(
     let hints = generate_hints(measurement, &results);
 
     InsightsReport {
-        preset_results:     results,
+        preset_results: results,
         recommended_preset: recommended,
-        rule_engine_hints:  hints,
+        rule_engine_hints: hints,
     }
 }
 
 /// Generate actionable hints for the rule engine (Phase 4 input).
-fn generate_hints(
-    m:       &Ebu128Measurement,
-    results: &[PresetResult],
-) -> Vec<String> {
+fn generate_hints(m: &Ebu128Measurement, results: &[PresetResult]) -> Vec<String> {
     let mut hints: Vec<String> = Vec::new();
     let passing = results.iter().filter(|r| r.passes).count();
 
     if passing == 0 {
-        hints.push("No platform presets pass. Consider re-mastering with a lower target LUFS.".into());
+        hints.push(
+            "No platform presets pass. Consider re-mastering with a lower target LUFS.".into(),
+        );
     }
     if m.true_peak_dbfs > -1.0 {
         hints.push(format!(

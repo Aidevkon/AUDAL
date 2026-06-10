@@ -4,12 +4,12 @@
 
 #[derive(Clone, Debug)]
 pub struct ParameterGlider {
-    current:        f32,
-    target:         f32,
-    step:           f32,    // precomputed: (target - current) / glide_samples
-    samples_left:   usize,
-    glide_samples:  usize,  // total glide duration in samples
-    sample_rate:    f32,
+    current: f32,
+    target: f32,
+    step: f32, // precomputed: (target - current) / glide_samples
+    samples_left: usize,
+    glide_samples: usize, // total glide duration in samples
+    sample_rate: f32,
 }
 
 impl ParameterGlider {
@@ -19,10 +19,10 @@ impl ParameterGlider {
     pub fn new(initial: f32, glide_ms: f32, sample_rate: f32) -> Self {
         let glide_samples = (glide_ms / 1000.0 * sample_rate) as usize;
         Self {
-            current:       initial,
-            target:        initial,
-            step:          0.0,
-            samples_left:  0,
+            current: initial,
+            target: initial,
+            step: 0.0,
+            samples_left: 0,
             glide_samples,
             sample_rate,
         }
@@ -42,9 +42,9 @@ impl ParameterGlider {
             self.samples_left = 0;
             return; // already there — no glide needed
         }
-        
+
         self.target = target;
-        
+
         if self.glide_samples == 0 {
             self.current = target;
             self.samples_left = 0;
@@ -80,14 +80,18 @@ impl ParameterGlider {
     }
 
     /// True if glide is in progress.
-    pub fn is_gliding(&self) -> bool { self.samples_left > 0 }
+    pub fn is_gliding(&self) -> bool {
+        self.samples_left > 0
+    }
 
     /// Current value (without advancing).
-    pub fn value(&self) -> f32 { self.current }
+    pub fn value(&self) -> f32 {
+        self.current
+    }
 
     pub fn reset(&mut self) {
-        self.current      = self.target;
+        self.current = self.target;
         self.samples_left = 0;
-        self.step         = 0.0;
+        self.step = 0.0;
     }
 }

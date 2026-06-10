@@ -72,7 +72,11 @@ impl PolicyEngine {
     pub fn check_outbound(&self, destination: &str) -> PolicyDecision {
         for allowed in &self.config.outbound.allowed {
             if destination.starts_with(&allowed.destination) {
-                tracing::debug!("Outbound allowed: {} (module={})", destination, allowed.module);
+                tracing::debug!(
+                    "Outbound allowed: {} (module={})",
+                    destination,
+                    allowed.module
+                );
                 return PolicyDecision::Allow;
             }
         }
@@ -141,7 +145,10 @@ requires_user_consent = true
         let result = engine.check_outbound("https://example.com/api");
         match result {
             PolicyDecision::Block(reason) => {
-                assert!(reason.contains("deny-by-default"), "Reason must mention deny-by-default: {reason}");
+                assert!(
+                    reason.contains("deny-by-default"),
+                    "Reason must mention deny-by-default: {reason}"
+                );
             }
             PolicyDecision::Allow => panic!("Undeclared destination must be blocked"),
         }
@@ -169,10 +176,7 @@ requires_user_consent = true
     #[test]
     fn policy_loaded_from_actual_config() {
         // Verify the actual policies.toml in the repo loads clean
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../config/policies.toml"
-        );
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../config/policies.toml");
         if std::path::Path::new(path).exists() {
             let engine = PolicyEngine::load(path).unwrap();
             // Actual config has all outbound commented → 0 allowed

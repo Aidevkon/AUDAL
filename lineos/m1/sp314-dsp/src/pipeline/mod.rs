@@ -1,7 +1,7 @@
-pub mod phase;
-pub mod gain;
-pub mod telemetry;
-pub mod engine;
-pub mod dither;
-pub mod presets;
 pub mod autotune;
+pub mod dither;
+pub mod engine;
+pub mod gain;
+pub mod phase;
+pub mod presets;
+pub mod telemetry;

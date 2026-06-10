@@ -20,19 +20,22 @@ impl Router {
             flavors.push(Flavor::LowMidClarity);
         }
         if conditions.has(&EngineerCondition::ThinMix)
-            || conditions.has(&EngineerCondition::HarshTopEnd) {
+            || conditions.has(&EngineerCondition::HarshTopEnd)
+        {
             flavors.push(Flavor::PresenceAndAir);
         }
 
         // Stage 3: Dynamics (after EQ)
         if conditions.has(&EngineerCondition::PumpDrift)
-            || conditions.has(&EngineerCondition::TransientLoss) {
+            || conditions.has(&EngineerCondition::TransientLoss)
+        {
             flavors.push(Flavor::AntiPumpStabilization);
         }
 
         // Stage 4: Stereo (after dynamics)
         if conditions.has(&EngineerCondition::MonoCompatibilityRisk)
-            || conditions.has(&EngineerCondition::StereoCorrelationWeak) {
+            || conditions.has(&EngineerCondition::StereoCorrelationWeak)
+        {
             flavors.push(Flavor::MonoSafeMaster);
         }
 

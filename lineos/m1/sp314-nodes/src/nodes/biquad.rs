@@ -1,6 +1,6 @@
-use crate::node::DspNode;
 use crate::glider::ParameterGlider;
-use libm::{cosf, sinf, powf, sqrtf};
+use crate::node::DspNode;
+use libm::{cosf, powf, sinf, sqrtf};
 
 const PI: f32 = core::f32::consts::PI;
 
@@ -16,10 +16,15 @@ pub struct BiquadFilterNode {
     q_glider: ParameterGlider,
     glide_ms: f32,
 
-    b0: f32, b1: f32, b2: f32,
-    a1: f32, a2: f32,
-    z1_l: f32, z2_l: f32,
-    z1_r: f32, z2_r: f32,
+    b0: f32,
+    b1: f32,
+    b2: f32,
+    a1: f32,
+    a2: f32,
+    z1_l: f32,
+    z2_l: f32,
+    z1_r: f32,
+    z2_r: f32,
 }
 
 impl BiquadFilterNode {
@@ -30,10 +35,15 @@ impl BiquadFilterNode {
             q: 0.707,
             gain_db: 0.0,
             sample_rate,
-            b0: 1.0, b1: 0.0, b2: 0.0,
-            a1: 0.0, a2: 0.0,
-            z1_l: 0.0, z2_l: 0.0,
-            z1_r: 0.0, z2_r: 0.0,
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+            z1_l: 0.0,
+            z2_l: 0.0,
+            z1_r: 0.0,
+            z2_r: 0.0,
             freq_glider: ParameterGlider::new(1000.0, 300.0, sample_rate),
             gain_glider: ParameterGlider::new(0.0, 300.0, sample_rate),
             q_glider: ParameterGlider::new(0.707, 300.0, sample_rate),
@@ -124,7 +134,7 @@ impl DspNode for BiquadFilterNode {
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
             let mut recompute_needed = false;
-            
+
             if self.freq_glider.is_gliding() {
                 self.freq_hz = self.freq_glider.next();
                 recompute_needed = true;
@@ -137,7 +147,7 @@ impl DspNode for BiquadFilterNode {
                 self.q = self.q_glider.next();
                 recompute_needed = true;
             }
-            
+
             if recompute_needed {
                 self.recompute();
             }

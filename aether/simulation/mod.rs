@@ -2,10 +2,10 @@ use lineos_types::pre_analysis::PreAnalysisData;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimulationDelta {
-    pub predicted_peak:  f32,
-    pub predicted_gr:    f32,
-    pub crest_risk:      f32,
-    pub isp_risk:        f32,
+    pub predicted_peak: f32,
+    pub predicted_gr: f32,
+    pub crest_risk: f32,
+    pub isp_risk: f32,
 }
 
 impl SimulationDelta {
@@ -24,12 +24,16 @@ pub struct SimulationLayer;
 impl SimulationLayer {
     pub fn run(pre: &PreAnalysisData, target_lufs: f32) -> SimulationDelta {
         // 4.1 predicted_peak
-        let peak_margin = if pre.global_crest_factor_db > 14.0 { 0.5 } else { 0.0 };
+        let peak_margin = if pre.global_crest_factor_db > 14.0 {
+            0.5
+        } else {
+            0.0
+        };
         let predicted_peak = (pre.true_peak_dbtp + peak_margin).clamp(-40.0, 3.0);
-        
+
         // 4.2 predicted_gr
         let predicted_gr = (pre.integrated_lufs - target_lufs).clamp(0.0, 12.0) * 0.5;
-        
+
         // 4.3 crest_risk
         let crest_db = pre.global_crest_factor_db;
         let crest_risk = if crest_db > 20.0 {
@@ -39,7 +43,7 @@ impl SimulationLayer {
         } else {
             0.0
         };
-        
+
         // 4.4 isp_risk
         let isp_risk = if pre.true_peak_dbtp > -1.0 {
             1.0
@@ -64,7 +68,7 @@ mod tests {
     use lineos_types::pre_analysis::PreAnalysisData;
 
     fn mock_pre(lufs: f32, peak: f32, crest: f32) -> PreAnalysisData {
-        PreAnalysisData { 
+        PreAnalysisData {
             integrated_lufs: lufs,
             true_peak_dbtp: peak,
             global_crest_factor_db: crest,
@@ -78,7 +82,7 @@ mod tests {
         let d1 = SimulationLayer::run(&pre, -14.0);
         let d2 = SimulationLayer::run(&pre, -14.0);
         assert_eq!(d1.predicted_gr, d2.predicted_gr);
-        assert_eq!(d1.crest_risk,   d2.crest_risk);
+        assert_eq!(d1.crest_risk, d2.crest_risk);
     }
 
     #[test]
@@ -86,7 +90,11 @@ mod tests {
         // Signal at -10 LUFS, target -14 → delta = +4 → gr = 2.0
         let pre = mock_pre(-10.0, -1.5, 10.0);
         let d = SimulationLayer::run(&pre, -14.0);
-        assert!((d.predicted_gr - 2.0).abs() < 0.01, "Expected 2.0, got {}", d.predicted_gr);
+        assert!(
+            (d.predicted_gr - 2.0).abs() < 0.01,
+            "Expected 2.0, got {}",
+            d.predicted_gr
+        );
     }
 
     #[test]

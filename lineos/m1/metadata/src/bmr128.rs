@@ -2,45 +2,45 @@
 //! All thresholds from bmr-128.schema.json via PresetThresholds — never hardcoded.
 //! Authority: LineOS Constitution v2.0 §07 · LineOS §12 "BMR-128 thresholds hardcoded — build failure"
 
-use serde::{Deserialize, Serialize};
 use lineos_types::Ebu128Measurement;
+use serde::{Deserialize, Serialize};
 
 /// Full BMR-128 compliance report for a specific platform preset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bmr128Report {
-    pub version:           String,
-    pub preset:            String,
+    pub version: String,
+    pub preset: String,
     /// Target LUFS from bmr-128.schema.json (None for raw preset)
-    pub target_lufs:       Option<f32>,
+    pub target_lufs: Option<f32>,
     /// True peak ceiling from bmr-128.schema.json
     pub true_peak_ceiling: f32,
-    pub measured:          MeasuredValues,
-    pub compliance:        ComplianceResult,
+    pub measured: MeasuredValues,
+    pub compliance: ComplianceResult,
 }
 
 /// Values measured from the Golden Blob (via Ebu128Measurement).
 /// Never derived from raw audio.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeasuredValues {
-    pub integrated_lufs:    f32,
-    pub true_peak_dbtp:     f32,
-    pub loudness_range_lu:  f32,
+    pub integrated_lufs: f32,
+    pub true_peak_dbtp: f32,
+    pub loudness_range_lu: f32,
     pub stereo_correlation: f32,
-    pub dynamic_range_db:   f32,
-    pub momentary_lufs:     f32,
-    pub short_term_lufs:    f32,
+    pub dynamic_range_db: f32,
+    pub momentary_lufs: f32,
+    pub short_term_lufs: f32,
 }
 
 /// Compliance evaluation result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceResult {
-    pub passes:         bool,
+    pub passes: bool,
     /// integrated_lufs − target_lufs (None for raw preset).
     /// Negative = too quiet; positive = too loud.
-    pub lufs_delta:     Option<f32>,
+    pub lufs_delta: Option<f32>,
     /// true_peak_ceiling − true_peak_dbtp (positive = headroom available)
-    pub peak_headroom:  f32,
-    pub violations:     Vec<String>,
+    pub peak_headroom: f32,
+    pub violations: Vec<String>,
 }
 
 impl Bmr128Report {
@@ -49,9 +49,9 @@ impl Bmr128Report {
     /// `target_lufs` and `true_peak_ceiling` MUST come from bmr-128.schema.json
     /// PresetThresholds — never hardcode these values.
     pub fn generate(
-        measurement:       &Ebu128Measurement,
-        preset:            &str,
-        target_lufs:       Option<f32>,
+        measurement: &Ebu128Measurement,
+        preset: &str,
+        target_lufs: Option<f32>,
         true_peak_ceiling: f32,
     ) -> Self {
         let mut violations: Vec<String> = Vec::new();
@@ -75,9 +75,7 @@ impl Bmr128Report {
         if peak_headroom < 0.0 {
             violations.push(format!(
                 "True peak exceeds ceiling: {:.2} dBTP (ceiling {:.1}, excess {:.2})",
-                measurement.true_peak_dbfs,
-                true_peak_ceiling,
-                -peak_headroom
+                measurement.true_peak_dbfs, true_peak_ceiling, -peak_headroom
             ));
         }
 
@@ -98,13 +96,13 @@ impl Bmr128Report {
             target_lufs,
             true_peak_ceiling,
             measured: MeasuredValues {
-                integrated_lufs:    measurement.integrated_lufs,
-                true_peak_dbtp:     measurement.true_peak_dbfs,
-                loudness_range_lu:  measurement.loudness_range_lu,
+                integrated_lufs: measurement.integrated_lufs,
+                true_peak_dbtp: measurement.true_peak_dbfs,
+                loudness_range_lu: measurement.loudness_range_lu,
                 stereo_correlation: 1.0, // TODO: 3b
-                dynamic_range_db:   10.0, // TODO: 3b
-                momentary_lufs:     -14.0, // TODO: 3b
-                short_term_lufs:    measurement.short_term_lufs.unwrap_or(-14.0),
+                dynamic_range_db: 10.0,  // TODO: 3b
+                momentary_lufs: -14.0,   // TODO: 3b
+                short_term_lufs: measurement.short_term_lufs.unwrap_or(-14.0),
             },
             compliance: ComplianceResult {
                 passes: violations.is_empty(),
@@ -128,10 +126,10 @@ mod tests {
 
     fn test_measurement() -> Ebu128Measurement {
         Ebu128Measurement {
-            integrated_lufs:    -14.1,
-            true_peak_dbfs:     -1.2,
-            loudness_range_lu:  6.5,
-            short_term_lufs:    Some(-13.5),
+            integrated_lufs: -14.1,
+            true_peak_dbfs: -1.2,
+            loudness_range_lu: 6.5,
+            short_term_lufs: Some(-13.5),
         }
     }
 
@@ -139,7 +137,10 @@ mod tests {
     fn test_bmr128_passes_within_tolerance() {
         let m = test_measurement(); // -14.1 vs target -14.0 → delta = -0.1 → passes
         let report = Bmr128Report::generate(&m, "spotify", Some(-14.0), -1.0);
-        assert!(report.compliance.passes, "Should pass within ±0.5 LU tolerance");
+        assert!(
+            report.compliance.passes,
+            "Should pass within ±0.5 LU tolerance"
+        );
         assert!(report.compliance.violations.is_empty());
     }
 

@@ -42,8 +42,8 @@ impl SectionScheduler {
         block_size: usize,
         sample_rate: u32,
     ) -> Result<Self, SchedulerError> {
-        let tab: TimeAwareBehaviourJson = serde_json::from_str(json)
-            .map_err(|e| SchedulerError::InvalidJson(e.to_string()))?;
+        let tab: TimeAwareBehaviourJson =
+            serde_json::from_str(json).map_err(|e| SchedulerError::InvalidJson(e.to_string()))?;
 
         if tab.sections.is_empty() {
             return Err(SchedulerError::NoSections);
@@ -57,7 +57,7 @@ impl SectionScheduler {
 
             let canonical_graph = DspGraph::from_topology(&sec.topology, block_size, sample_rate)
                 .map_err(|e| SchedulerError::GraphError(format!("{:?}", e)))?;
-            
+
             let ready_graph = Some(canonical_graph.clone());
 
             sections.push(ScheduledSection {
@@ -81,7 +81,7 @@ impl SectionScheduler {
 
     pub fn advance(&mut self, block_size: usize) -> Option<usize> {
         let current_section = &self.sections[self.current_index];
-        
+
         // Edge case: if we are in the last section and reach the end, do not wrap around
         // Just freeze playback_sample at end_sample and return None.
         if self.playback_sample + block_size as u64 >= current_section.end_sample {
@@ -95,7 +95,7 @@ impl SectionScheduler {
                 return None;
             }
         }
-        
+
         self.playback_sample += block_size as u64;
         None
     }

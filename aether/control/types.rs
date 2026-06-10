@@ -2,12 +2,17 @@
 // Authority: spec/locked/S-011a_multimodal_control.md v1.0
 // Pure logic — depends only on aether::personas + libm
 
-use crate::personas::config::{PersonaConfig, MacroControls};
+use crate::personas::config::{MacroControls, PersonaConfig};
 
 /// Tier 1 — Black Box mode presets
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BlackBoxMode {
-    Clean, Warm, Punch, Air, Film, Broadcast,
+    Clean,
+    Warm,
+    Punch,
+    Air,
+    Film,
+    Broadcast,
 }
 
 /// Tier 1 — Black Box control
@@ -20,24 +25,48 @@ impl BlackBoxControl {
     /// Compile-time constant mapping — deterministic.
     pub fn to_intent(&self) -> (&'static str, MacroControls) {
         match self.mode {
-            BlackBoxMode::Clean =>
-                ("hybrid_hifi", MacroControls {
-                    tone:0.3, dynamics:0.5 }),
-            BlackBoxMode::Warm =>
-                ("warm_analog", MacroControls {
-                    tone:0.8, dynamics:0.4 }),
-            BlackBoxMode::Punch =>
-                ("clean_punch", MacroControls {
-                    tone:0.3, dynamics:0.9 }),
-            BlackBoxMode::Air =>
-                ("hybrid_hifi", MacroControls {
-                    tone:0.4, dynamics:0.4 }),
-            BlackBoxMode::Film =>
-                ("cinematic_wide", MacroControls {
-                    tone:0.7, dynamics:0.5 }),
-            BlackBoxMode::Broadcast =>
-                ("hybrid_hifi", MacroControls {
-                    tone:0.5, dynamics:0.5 }),
+            BlackBoxMode::Clean => (
+                "hybrid_hifi",
+                MacroControls {
+                    tone: 0.3,
+                    dynamics: 0.5,
+                },
+            ),
+            BlackBoxMode::Warm => (
+                "warm_analog",
+                MacroControls {
+                    tone: 0.8,
+                    dynamics: 0.4,
+                },
+            ),
+            BlackBoxMode::Punch => (
+                "clean_punch",
+                MacroControls {
+                    tone: 0.3,
+                    dynamics: 0.9,
+                },
+            ),
+            BlackBoxMode::Air => (
+                "hybrid_hifi",
+                MacroControls {
+                    tone: 0.4,
+                    dynamics: 0.4,
+                },
+            ),
+            BlackBoxMode::Film => (
+                "cinematic_wide",
+                MacroControls {
+                    tone: 0.7,
+                    dynamics: 0.5,
+                },
+            ),
+            BlackBoxMode::Broadcast => (
+                "hybrid_hifi",
+                MacroControls {
+                    tone: 0.5,
+                    dynamics: 0.5,
+                },
+            ),
         }
     }
 }
@@ -52,7 +81,9 @@ pub struct OrbPosition {
 }
 
 impl OrbPosition {
-    pub fn center() -> Self { Self { x: 0.0, y: 0.0 } }
+    pub fn center() -> Self {
+        Self { x: 0.0, y: 0.0 }
+    }
 
     /// Map orb to macro deltas.
     /// NOTE: orb mapping is INDEPENDENT of persona macro curves.
@@ -73,11 +104,10 @@ pub struct MacroDelta {}
 impl MacroDelta {
     /// Apply delta to MacroControls.
     /// Clamped to persona's macro handle bounds (per S-004 §6).
-    pub fn apply(&self, macros: &MacroControls,
-                  _persona: &PersonaConfig) -> MacroControls {
+    pub fn apply(&self, macros: &MacroControls, _persona: &PersonaConfig) -> MacroControls {
         MacroControls {
-            tone:      macros.tone,
-            dynamics:       macros.dynamics,
+            tone: macros.tone,
+            dynamics: macros.dynamics,
         }
     }
 }
@@ -86,8 +116,8 @@ impl MacroDelta {
 #[derive(Debug, Clone)]
 pub struct MediumControl {
     pub persona_id: String,
-    pub macros:     MacroControls,
-    pub orb:        OrbPosition,
+    pub macros: MacroControls,
+    pub orb: OrbPosition,
     pub gain_match: bool,
 }
 
@@ -95,8 +125,8 @@ impl MediumControl {
     pub fn new(persona_id: &str) -> Self {
         Self {
             persona_id: persona_id.into(),
-            macros:     MacroControls::default(),
-            orb:        OrbPosition::center(),
+            macros: MacroControls::default(),
+            orb: OrbPosition::center(),
             gain_match: true,
         }
     }
@@ -122,10 +152,14 @@ mod tests {
 
     #[test]
     fn blackbox_mode_deterministic() {
-        let (id1, m1) = BlackBoxControl{mode:BlackBoxMode::Warm}
-            .to_intent();
-        let (id2, m2) = BlackBoxControl{mode:BlackBoxMode::Warm}
-            .to_intent();
+        let (id1, m1) = BlackBoxControl {
+            mode: BlackBoxMode::Warm,
+        }
+        .to_intent();
+        let (id2, m2) = BlackBoxControl {
+            mode: BlackBoxMode::Warm,
+        }
+        .to_intent();
         assert_eq!(id1, id2);
         assert_eq!(m1.tone, m2.tone);
     }
@@ -133,12 +167,16 @@ mod tests {
     #[test]
     fn blackbox_all_modes_valid_persona() {
         let mgr = PersonaManager::load();
-        for mode in [BlackBoxMode::Clean, BlackBoxMode::Warm,
-                     BlackBoxMode::Punch, BlackBoxMode::Air,
-                     BlackBoxMode::Film, BlackBoxMode::Broadcast] {
-            let (id, macros) = BlackBoxControl{mode}.to_intent();
-            assert!(mgr.get(id).is_some(),
-                "unknown persona: {}", id);
+        for mode in [
+            BlackBoxMode::Clean,
+            BlackBoxMode::Warm,
+            BlackBoxMode::Punch,
+            BlackBoxMode::Air,
+            BlackBoxMode::Film,
+            BlackBoxMode::Broadcast,
+        ] {
+            let (id, macros) = BlackBoxControl { mode }.to_intent();
+            assert!(mgr.get(id).is_some(), "unknown persona: {}", id);
             assert!((0.0..=1.0).contains(&macros.tone));
         }
     }
@@ -150,21 +188,21 @@ mod tests {
 
     #[test]
     fn orb_delta_apply_clamped() {
-        let mgr     = PersonaManager::load();
+        let mgr = PersonaManager::load();
         let persona = mgr.get("clean_punch").unwrap();
-        let macros  = MacroControls::default();
-        let delta   = MacroDelta {};
+        let macros = MacroControls::default();
+        let delta = MacroDelta {};
         let _result = delta.apply(&macros, persona);
     }
 
     #[test]
     fn orb_resistance_center_zero() {
-        assert_eq!(orb_resistance(&OrbPosition{x:0.0, y:0.0}), 0.0);
+        assert_eq!(orb_resistance(&OrbPosition { x: 0.0, y: 0.0 }), 0.0);
     }
 
     #[test]
     fn orb_resistance_wall_max() {
-        assert!(orb_resistance(&OrbPosition{x:1.0, y:0.0}) >= 1.0);
+        assert!(orb_resistance(&OrbPosition { x: 1.0, y: 0.0 }) >= 1.0);
     }
 
     #[test]

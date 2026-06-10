@@ -1,5 +1,5 @@
-use crate::node::DspNode;
 use crate::glider::ParameterGlider;
+use crate::node::DspNode;
 
 pub struct GainNode {
     gain_linear: f32,
@@ -9,7 +9,7 @@ pub struct GainNode {
 
 impl GainNode {
     pub fn new(gain_linear: f32, sample_rate: f32) -> Self {
-        Self { 
+        Self {
             gain_linear,
             gain_glider: ParameterGlider::new(gain_linear, 300.0, sample_rate),
             glide_ms: 300.0,
@@ -47,12 +47,16 @@ impl DspNode for GainNode {
         }
     }
 
-    fn get_output(&self, _name: &str) -> Option<f32> { None }
+    fn get_output(&self, _name: &str) -> Option<f32> {
+        None
+    }
 
     fn reset(&mut self) {
         self.gain_glider.reset();
         self.gain_linear = self.gain_glider.value();
     }
 
-    fn node_type(&self) -> &'static str { "Gain" }
+    fn node_type(&self) -> &'static str {
+        "Gain"
+    }
 }

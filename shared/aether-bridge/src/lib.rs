@@ -3,44 +3,42 @@
 // Cross-layer orchestration bridge:
 // lineos/m0/m0-daemon → shared/aether-bridge → aether/
 
-use aether::personas::manager::PersonaManager;
-use aether::personas::config::{PersonaConfig, MacroControls};
-use aether::mapping::mapper::MacroMicroMapper;
 use aether::chaos::engine::ChaosEngine;
-use aether::semantic::resolver::SemanticZoneResolver;
-use aether::markov::voice_v1::MarkovStateClassifier;
-use aether::markov::predictive::PredictiveController;
-use aether::markov::chaos::ChaosLayer;
-use aether::markov::firewall::IntegrationFirewall as MarkovFirewall;
-use aether::markov::firewall::{DRUMS_BOUNDS, BASS_BOUNDS, HARMONICS_AMBIENCE_BOUNDS};
-use aether::markov::drums_v1::DrumsMarkovStateClassifier;
-use aether::markov::bass_v1::BassMarkovStateClassifier;
-use aether::markov::harmonics_v1::HarmonicsMarkovStateClassifier;
+use aether::mapping::mapper::MacroMicroMapper;
 use aether::markov::ambience_v1::AmbienceMarkovStateClassifier;
+use aether::markov::bass_v1::BassMarkovStateClassifier;
+use aether::markov::chaos::ChaosLayer;
+use aether::markov::drums_v1::DrumsMarkovStateClassifier;
+use aether::markov::firewall::IntegrationFirewall as MarkovFirewall;
+use aether::markov::firewall::{BASS_BOUNDS, DRUMS_BOUNDS, HARMONICS_AMBIENCE_BOUNDS};
+use aether::markov::harmonics_v1::HarmonicsMarkovStateClassifier;
 use aether::markov::predictive::InstrumentDeltas;
-use integration::firewall::IntegrationFirewall;
+use aether::markov::predictive::PredictiveController;
+use aether::markov::voice_v1::MarkovStateClassifier;
+use aether::personas::config::{MacroControls, PersonaConfig};
+use aether::personas::manager::PersonaManager;
+use aether::semantic::resolver::SemanticZoneResolver;
 use integration::config::DspConfig;
+use integration::firewall::IntegrationFirewall;
 use integration::proof_log::ProofLog;
-use proof::proof::ExecutionProof;
-use proof::certificate::ExecutionCertificate;
 use lineos_types::analysis::StemFeatures;
 use lineos_types::pre_analysis::PreAnalysisData;
+use proof::certificate::ExecutionCertificate;
+use proof::proof::ExecutionProof;
 
 /// Aether tuning parameters from the caller.
 /// Decoupled from MasterRequest (m0 network DTO).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct AetherRequest {
-    pub persona_id:  Option<String>,
-    pub tone:        Option<f32>,
-    pub dynamics:    Option<f32>,
-    pub ambience:    Option<AmbienceIntent>,
-    pub chaos_seed:  Option<u64>,
-    pub project_id:  Option<String>,
-    pub track_id:    Option<String>,
+    pub persona_id: Option<String>,
+    pub tone: Option<f32>,
+    pub dynamics: Option<f32>,
+    pub ambience: Option<AmbienceIntent>,
+    pub chaos_seed: Option<u64>,
+    pub project_id: Option<String>,
+    pub track_id: Option<String>,
     pub preset_name: Option<String>,
 }
-
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AmbienceIntent {
@@ -59,10 +57,8 @@ pub enum AetherBridgeError {
 impl std::fmt::Display for AetherBridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::PersonaNotFound(id) =>
-                write!(f, "Persona not found: {}", id),
-            Self::FirewallError(e) =>
-                write!(f, "Firewall error: {}", e),
+            Self::PersonaNotFound(id) => write!(f, "Persona not found: {}", id),
+            Self::FirewallError(e) => write!(f, "Firewall error: {}", e),
         }
     }
 }
@@ -73,23 +69,23 @@ impl std::fmt::Display for AetherBridgeError {
 /// DspConfig is passed to sp314-dsp for rendering.
 /// ProofLog is passed to generate_certificate() after render.
 pub fn build_dsp_config(
-    req:          &AetherRequest,
-    features:     &StemFeatures,
+    req: &AetherRequest,
+    features: &StemFeatures,
     pre_analysis: Option<&PreAnalysisData>,
 ) -> Result<(DspConfig, ProofLog, PersonaConfig), AetherBridgeError> {
-
-    let mgr     = PersonaManager::load();
-    let persona = mgr.get(
-        req.persona_id.as_deref().unwrap_or("warm_analog")
-    ).ok_or_else(|| AetherBridgeError::PersonaNotFound(
-        req.persona_id.clone().unwrap_or("warm_analog".into())
-    ))?.clone();
+    let mgr = PersonaManager::load();
+    let persona = mgr
+        .get(req.persona_id.as_deref().unwrap_or("warm_analog"))
+        .ok_or_else(|| {
+            AetherBridgeError::PersonaNotFound(
+                req.persona_id.clone().unwrap_or("warm_analog".into()),
+            )
+        })?
+        .clone();
 
     let macros = MacroControls {
-        tone:        req.tone.unwrap_or(
-                         persona.macros.tone.default),
-        dynamics:    req.dynamics.unwrap_or(
-                         persona.macros.dynamics.default),
+        tone: req.tone.unwrap_or(persona.macros.tone.default),
+        dynamics: req.dynamics.unwrap_or(persona.macros.dynamics.default),
     };
 
     let micro = MacroMicroMapper::map(&persona, &macros);
@@ -103,22 +99,22 @@ pub fn build_dsp_config(
     });
 
     let mut chaos_engine = ChaosEngine::new(seed);
-    let chaos_delta = chaos_engine.next_delta(
-        persona.chaos_intensity,
-        &persona.chaos,
-    );
+    let chaos_delta = chaos_engine.next_delta(persona.chaos_intensity, &persona.chaos);
 
     let modulated = ChaosEngine::apply(&micro, &chaos_delta);
-    let zones     = SemanticZoneResolver::auto_carve(
-                        &persona, features, pre_analysis);
+    let zones = SemanticZoneResolver::auto_carve(&persona, features, pre_analysis);
 
     let mut proof_log = ProofLog::new();
-    let mut dsp_config    = IntegrationFirewall::build(
-        &persona, &macros, &modulated,
-        &zones, &chaos_delta, seed, &mut proof_log,
-    ).map_err(|e| AetherBridgeError::FirewallError(
-        format!("{:?}", e)
-    ))?;
+    let mut dsp_config = IntegrationFirewall::build(
+        &persona,
+        &macros,
+        &modulated,
+        &zones,
+        &chaos_delta,
+        seed,
+        &mut proof_log,
+    )
+    .map_err(|e| AetherBridgeError::FirewallError(format!("{:?}", e)))?;
 
     if let Some(amb) = &req.ambience {
         let amb_macros = aether::mapping::types::AmbienceMacroControls {
@@ -153,7 +149,7 @@ pub fn build_dsp_config(
     let current = MarkovStateClassifier::classify_voice(voice_metrics);
     let predicted = MarkovStateClassifier::predict_next(current);
     let raw_delta = PredictiveController::compute_voice_delta(current, predicted);
-    
+
     // SIM-P2: Wire Simulation into PredictiveController
     if let Some(pre) = pre_analysis {
         let sim_delta = aether::simulation::SimulationLayer::run(pre, -14.0);
@@ -162,33 +158,48 @@ pub fn build_dsp_config(
         // For v1.4, they are computed but currently unused since DspConfig lacks them.
     }
 
-    let chaos = ChaosLayer { bypass: false, seed: dsp_config.chaos_seed };
+    let chaos = ChaosLayer {
+        bypass: false,
+        seed: dsp_config.chaos_seed,
+    };
     let modulated = chaos.modulate(raw_delta, dsp_config.chaos_seed);
     let md = MarkovFirewall::clamp_voice_delta(modulated);
 
     // Apply delta to baseline (enrichment, not replacement)
     dsp_config.dynamics.comp_threshold_db += md.comp_threshold_db;
-    dsp_config.dynamics.comp_attack_ms    += md.comp_attack_ms;
-    dsp_config.dynamics.comp_release_ms   += md.comp_release_ms;
+    dsp_config.dynamics.comp_attack_ms += md.comp_attack_ms;
+    dsp_config.dynamics.comp_release_ms += md.comp_release_ms;
 
-    let drums_predicted    = DrumsMarkovStateClassifier::predict_next(
-        DrumsMarkovStateClassifier::classify_drums(&features.drums));
-    let bass_predicted     = BassMarkovStateClassifier::predict_next(
-        BassMarkovStateClassifier::classify_bass(&features.bass));
-    let harm_predicted     = HarmonicsMarkovStateClassifier::predict_next(
-        HarmonicsMarkovStateClassifier::classify_harmonics(&features.harmonics));
-    let amb_predicted      = AmbienceMarkovStateClassifier::predict_next(
-        AmbienceMarkovStateClassifier::classify_ambience(&features.ambience));
+    let drums_predicted = DrumsMarkovStateClassifier::predict_next(
+        DrumsMarkovStateClassifier::classify_drums(&features.drums),
+    );
+    let bass_predicted = BassMarkovStateClassifier::predict_next(
+        BassMarkovStateClassifier::classify_bass(&features.bass),
+    );
+    let harm_predicted = HarmonicsMarkovStateClassifier::predict_next(
+        HarmonicsMarkovStateClassifier::classify_harmonics(&features.harmonics),
+    );
+    let amb_predicted = AmbienceMarkovStateClassifier::predict_next(
+        AmbienceMarkovStateClassifier::classify_ambience(&features.ambience),
+    );
 
     dsp_config.instrument_deltas = InstrumentDeltas {
-        drums:     MarkovFirewall::clamp_instrument_delta(
-                       PredictiveController::compute_drums_delta(drums_predicted), &DRUMS_BOUNDS),
-        bass:      MarkovFirewall::clamp_instrument_delta(
-                       PredictiveController::compute_bass_delta(bass_predicted), &BASS_BOUNDS),
+        drums: MarkovFirewall::clamp_instrument_delta(
+            PredictiveController::compute_drums_delta(drums_predicted),
+            &DRUMS_BOUNDS,
+        ),
+        bass: MarkovFirewall::clamp_instrument_delta(
+            PredictiveController::compute_bass_delta(bass_predicted),
+            &BASS_BOUNDS,
+        ),
         harmonics: MarkovFirewall::clamp_instrument_delta(
-                       PredictiveController::compute_harmonics_delta(harm_predicted), &HARMONICS_AMBIENCE_BOUNDS),
-        ambience:  MarkovFirewall::clamp_instrument_delta(
-                       PredictiveController::compute_ambience_delta(amb_predicted), &HARMONICS_AMBIENCE_BOUNDS),
+            PredictiveController::compute_harmonics_delta(harm_predicted),
+            &HARMONICS_AMBIENCE_BOUNDS,
+        ),
+        ambience: MarkovFirewall::clamp_instrument_delta(
+            PredictiveController::compute_ambience_delta(amb_predicted),
+            &HARMONICS_AMBIENCE_BOUNDS,
+        ),
     };
 
     Ok((dsp_config, proof_log, persona))
@@ -198,12 +209,12 @@ pub fn build_dsp_config(
 /// Run AFTER DSP render with actual input + output PCM.
 /// Cryptographically binds audio to DspConfig (S-010).
 pub fn generate_certificate(
-    input_pcm:  &[f32],
+    input_pcm: &[f32],
     output_pcm: &[f32],
-    persona:    &PersonaConfig,
+    persona: &PersonaConfig,
     dsp_config: &DspConfig,
-    proof_log:  &ProofLog,
-    req:        &AetherRequest,
+    proof_log: &ProofLog,
+    req: &AetherRequest,
     system_version: &str,
 ) -> ExecutionCertificate {
     ExecutionProof::generate(
@@ -223,25 +234,24 @@ pub fn generate_certificate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lineos_types::analysis::{StemFeatures, StemMetrics,
-                                  MixMetrics};
+    use lineos_types::analysis::{MixMetrics, StemFeatures, StemMetrics};
 
     fn test_features() -> StemFeatures {
         StemFeatures {
-            bass:      StemMetrics::default(),
+            bass: StemMetrics::default(),
             harmonics: StemMetrics::default(),
-            drums:     StemMetrics::default(),
-            ambience:  StemMetrics::default(),
-            voice:     StemMetrics::default(),
-            mix:       MixMetrics::default(),
+            drums: StemMetrics::default(),
+            ambience: StemMetrics::default(),
+            voice: StemMetrics::default(),
+            mix: MixMetrics::default(),
         }
     }
 
     #[test]
     fn bridge_build_dsp_config_default_persona() {
-        let req      = AetherRequest::default();
+        let req = AetherRequest::default();
         let features = test_features();
-        let result   = build_dsp_config(&req, &features, None);
+        let result = build_dsp_config(&req, &features, None);
         assert!(result.is_ok());
         let (cfg, _, persona) = result.unwrap();
         assert_eq!(persona.id, "warm_analog");
@@ -251,14 +261,21 @@ mod tests {
     #[test]
     fn bridge_build_dsp_config_all_personas() {
         let features = test_features();
-        for id in ["warm_analog","clean_punch",
-                   "hybrid_hifi","cinematic_wide"] {
+        for id in [
+            "warm_analog",
+            "clean_punch",
+            "hybrid_hifi",
+            "cinematic_wide",
+        ] {
             let req = AetherRequest {
                 persona_id: Some(id.into()),
                 ..Default::default()
             };
-            assert!(build_dsp_config(&req, &features, None).is_ok(),
-                "Failed for persona: {}", id);
+            assert!(
+                build_dsp_config(&req, &features, None).is_ok(),
+                "Failed for persona: {}",
+                id
+            );
         }
     }
 
@@ -277,41 +294,33 @@ mod tests {
 
     #[test]
     fn bridge_deterministic() {
-        let req      = AetherRequest {
+        let req = AetherRequest {
             chaos_seed: Some(42),
             ..Default::default()
         };
         let features = test_features();
-        let (cfg1, _, _) = build_dsp_config(&req, &features, None)
-            .unwrap();
-        let (cfg2, _, _) = build_dsp_config(&req, &features, None)
-            .unwrap();
-        assert_eq!(cfg1.eq.low_shelf_gain_db,
-                   cfg2.eq.low_shelf_gain_db);
-        assert_eq!(cfg1.stereo.width,
-                   cfg2.stereo.width);
+        let (cfg1, _, _) = build_dsp_config(&req, &features, None).unwrap();
+        let (cfg2, _, _) = build_dsp_config(&req, &features, None).unwrap();
+        assert_eq!(cfg1.eq.low_shelf_gain_db, cfg2.eq.low_shelf_gain_db);
+        assert_eq!(cfg1.stereo.width, cfg2.stereo.width);
     }
 
     #[test]
     fn bridge_certificate_generation() {
-        let req      = AetherRequest {
-            chaos_seed:  Some(42),
-            project_id:  Some("test_proj".into()),
-            track_id:    Some("test_track".into()),
+        let req = AetherRequest {
+            chaos_seed: Some(42),
+            project_id: Some("test_proj".into()),
+            track_id: Some("test_track".into()),
             preset_name: Some("spotify".into()),
             ..Default::default()
         };
         let features = test_features();
-        let (cfg, log, persona) =
-            build_dsp_config(&req, &features, None).unwrap();
+        let (cfg, log, persona) = build_dsp_config(&req, &features, None).unwrap();
 
-        let input  = vec![0.1_f32; 1000];
+        let input = vec![0.1_f32; 1000];
         let output = vec![0.05_f32; 1000];
 
-        let cert = generate_certificate(
-            &input, &output, &persona,
-            &cfg, &log, &req, "1.0.0"
-        );
+        let cert = generate_certificate(&input, &output, &persona, &cfg, &log, &req, "1.0.0");
         assert_eq!(cert.persona_id, "warm_analog");
         assert_eq!(cert.preset_name, "spotify");
         assert_eq!(cert.version, "1.0");
@@ -321,25 +330,20 @@ mod tests {
 
     #[test]
     fn bridge_certificate_different_output_different_hash() {
-        let req      = AetherRequest {
+        let req = AetherRequest {
             chaos_seed: Some(42),
             ..Default::default()
         };
         let features = test_features();
-        let (cfg, log, persona) =
-            build_dsp_config(&req, &features, None).unwrap();
+        let (cfg, log, persona) = build_dsp_config(&req, &features, None).unwrap();
 
-        let input   = vec![0.1_f32; 100];
+        let input = vec![0.1_f32; 100];
         let output1 = vec![0.05_f32; 100];
         let mut output2 = output1.clone();
         output2[0] += 0.001;
 
-        let c1 = generate_certificate(
-            &input, &output1, &persona,
-            &cfg, &log, &req, "1.0.0");
-        let c2 = generate_certificate(
-            &input, &output2, &persona,
-            &cfg, &log, &req, "1.0.0");
+        let c1 = generate_certificate(&input, &output1, &persona, &cfg, &log, &req, "1.0.0");
+        let c2 = generate_certificate(&input, &output2, &persona, &cfg, &log, &req, "1.0.0");
 
         assert_ne!(c1.output_pcm_hash, c2.output_pcm_hash);
     }
@@ -348,45 +352,60 @@ mod tests {
     fn bridge_pre_analysis_zone_flags_wire_through() {
         use lineos_types::pre_analysis::PreAnalysisData;
 
-        let req      = AetherRequest::default();
+        let req = AetherRequest::default();
         let features = test_features();
 
         // Construct pre_analysis with zone flags active
         let mut pa = PreAnalysisData::silent();
-        pa.zone_flags.zone_sub_rumble   = true;
+        pa.zone_flags.zone_sub_rumble = true;
         pa.zone_flags.zone_cymbal_harsh = true;
 
         let (cfg, _, _) = build_dsp_config(&req, &features, Some(&pa)).unwrap();
 
         // Cymbal harsh zone: resolved band above 5000 Hz with negative gain
-        let harsh_band = cfg.eq.zone_bands.iter()
+        let harsh_band = cfg
+            .eq
+            .zone_bands
+            .iter()
             .find(|b| b.center_hz > 5000.0 && b.gain_db < 0.0);
-        assert!(harsh_band.is_some(),
+        assert!(
+            harsh_band.is_some(),
             "zone_cymbal_harsh=true must produce a high-mid cut band. \
-             Got bands: {:?}", cfg.eq.zone_bands);
+             Got bands: {:?}",
+            cfg.eq.zone_bands
+        );
 
         // Sub rumble zone: when active, S-007 merges it with bass zone.
         // Verify more bands exist than without pre_analysis flags.
         let (cfg_none, _, _) = build_dsp_config(&req, &features, None).unwrap();
-        assert!(cfg.eq.zone_bands.len() >= cfg_none.eq.zone_bands.len(),
+        assert!(
+            cfg.eq.zone_bands.len() >= cfg_none.eq.zone_bands.len(),
             "Zone flags active must produce >= bands than inactive. \
              With flags: {}, without: {}",
-            cfg.eq.zone_bands.len(), cfg_none.eq.zone_bands.len());
+            cfg.eq.zone_bands.len(),
+            cfg_none.eq.zone_bands.len()
+        );
     }
 
     #[test]
     fn bridge_no_pre_analysis_no_corrective_zones() {
-        let req      = AetherRequest::default();
+        let req = AetherRequest::default();
         let features = test_features();
 
         // Without pre_analysis and with default (zero) StemFeatures,
         // no corrective zones should fire
         let (cfg, _, _) = build_dsp_config(&req, &features, None).unwrap();
 
-        let sub_band = cfg.eq.zone_bands.iter()
+        let sub_band = cfg
+            .eq
+            .zone_bands
+            .iter()
             .find(|b| b.center_hz < 100.0 && b.gain_db < 0.0);
-        assert!(sub_band.is_none(),
+        assert!(
+            sub_band.is_none(),
             "No sub_rumble zone expected without pre_analysis. \
-             Got bands: {:?}", cfg.eq.zone_bands);
+             Got bands: {:?}",
+            cfg.eq.zone_bands
+        );
     }
 }

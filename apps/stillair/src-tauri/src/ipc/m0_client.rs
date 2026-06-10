@@ -25,8 +25,8 @@ const M0_PLAYBACK_BASE: &str = "http://127.0.0.1:7402";
 
 /// Per-request timeouts.
 /// Mastering can take 60-120s for large files — give it 5 minutes.
-const TIMEOUT_MASTER_SECS: u64  = 300;   // POST /master — long pipeline
-const TIMEOUT_DEFAULT_SECS: u64 =  30;   // health / blob / export
+const TIMEOUT_MASTER_SECS: u64 = 300; // POST /master — long pipeline
+const TIMEOUT_DEFAULT_SECS: u64 = 30; // health / blob / export
 
 /// Stateless reqwest client. Create per-request (Phase 7: pool with AppState).
 pub struct M0Client {
@@ -53,61 +53,76 @@ impl M0Client {
     /// GET /health — verify M0 is running before any operation.
     /// Guard for ASC 0x05 (WasmPanic / daemon unreachable).
     pub async fn health(&self) -> Result<M0HealthResponse, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{M0_HEALTH_BASE}/health"))
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Err(M0Error::Unhealthy);
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
     /// POST /master — trigger mastering pipeline.
     /// Returns MasterResponse with blob_id on success.
     /// Timeout: 300s — mastering a large file takes 60-120s.
-    pub async fn trigger_mastering(
-        &self,
-        req: MasterRequest,
-    ) -> Result<MasterResponse, M0Error> {
-        let resp = self.client
+    pub async fn trigger_mastering(&self, req: MasterRequest) -> Result<MasterResponse, M0Error> {
+        let resp = self
+            .client
             .post(format!("{M0_BASE}/master"))
             .json(&req)
             // Override the default 30s timeout — mastering is slow.
             .timeout(Duration::from_secs(TIMEOUT_MASTER_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             return Err(M0Error::RequestFailed(status));
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
     /// GET /blob/{id} — fetch Golden Blob as JSON.
     /// No binary data crosses IPC boundary — metrics only.
     pub async fn get_blob(&self, id: &str) -> Result<GoldenBlobJson, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{M0_BASE}/blob/{id}"))
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Err(M0Error::BlobNotFound(id.to_string()));
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
     pub async fn get_progress(&self, job_id: &str) -> Result<MasteringProgress, String> {
         let url = format!("{M0_BASE}/progress/{job_id}");
-        let resp = self.client.get(&url)
+        let resp = self
+            .client
+            .get(&url)
             .timeout(std::time::Duration::from_secs(5))
-            .send().await.map_err(|e| e.to_string())?
-            .json::<MasteringProgress>().await.map_err(|e| e.to_string())?;
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<MasteringProgress>()
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(resp)
     }
 
@@ -119,30 +134,39 @@ impl M0Client {
         format: &str,
         path: &str,
     ) -> Result<ExportResponse, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{M0_BASE}/export"))
             .json(&ExportRequest {
-                blob_id:     blob_id.to_string(),
-                format:      format.to_string(),
+                blob_id: blob_id.to_string(),
+                format: format.to_string(),
                 output_path: path.to_string(),
             })
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Err(M0Error::RequestFailed(resp.status().as_u16()));
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
     pub async fn export_certificate_png(
-        &self, blob_id: &str, output_path: &str
+        &self,
+        blob_id: &str,
+        output_path: &str,
     ) -> Result<(), String> {
         let url = format!("{M0_BASE}/cert/{blob_id}/png");
-        self.client.post(&url)
+        self.client
+            .post(&url)
             .json(&serde_json::json!({"output_path": output_path}))
-            .send().await.map_err(|e| e.to_string())?;
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -150,17 +174,19 @@ impl M0Client {
     /// Phase 12A (A-003 §8): cpal playback via xaak kernel.
     pub async fn playback_control(
         &self,
-        action:      &str,
+        action: &str,
         position_ms: Option<u64>,
     ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{M0_PLAYBACK_BASE}/playback/control"))
             .json(&PlaybackControlRequest {
-                action:      action.to_string(),
+                action: action.to_string(),
                 position_ms,
             })
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
@@ -170,11 +196,13 @@ impl M0Client {
         #[derive(serde::Deserialize)]
         #[allow(dead_code)]
         struct ControlResp {
-            status:  String,
-            state:   Option<crate::commands::playback::PlaybackStateJson>,
+            status: String,
+            state: Option<crate::commands::playback::PlaybackStateJson>,
             message: Option<String>,
         }
-        let body: ControlResp = resp.json().await
+        let body: ControlResp = resp
+            .json()
+            .await
             .map_err(|e| M0Error::ParseError(e.to_string()))?;
 
         if body.status == "ok" {
@@ -188,32 +216,40 @@ impl M0Client {
     pub async fn get_playback_state(
         &self,
     ) -> Result<Option<crate::commands::playback::PlaybackStateJson>, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{M0_PLAYBACK_BASE}/playback/state"))
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Err(M0Error::RequestFailed(resp.status().as_u16()));
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
     /// GET /playback/telemetry — live momentary LUFS from active blob (P12B-005).
     pub async fn get_live_telemetry(
         &self,
     ) -> Result<Option<crate::commands::playback::LiveTelemetryJson>, M0Error> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{M0_PLAYBACK_BASE}/playback/telemetry"))
             .timeout(Duration::from_secs(TIMEOUT_DEFAULT_SECS))
-            .send().await
+            .send()
+            .await
             .map_err(|e| M0Error::Unreachable(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Err(M0Error::RequestFailed(resp.status().as_u16()));
         }
-        resp.json().await.map_err(|e| M0Error::ParseError(e.to_string()))
+        resp.json()
+            .await
+            .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 }
 
@@ -222,7 +258,7 @@ impl M0Client {
 /// POST /playback/control body (Phase 12A)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlaybackControlRequest {
-    pub action:      String,
+    pub action: String,
     pub position_ms: Option<u64>,
 }
 
@@ -230,7 +266,7 @@ pub struct PlaybackControlRequest {
 #[serde(rename_all = "camelCase")]
 pub struct MasterRequest {
     pub audio_path: String,
-    pub preset_id:  String,
+    pub preset_id: String,
     pub flavour_id: String,
     pub intent_tone: f32,
     pub intent_dynamics: f32,
@@ -238,41 +274,41 @@ pub struct MasterRequest {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct MasteringProgress {
-    pub job_id:     String,
-    pub stage:      String,
+    pub job_id: String,
+    pub stage: String,
     pub elapsed_ms: u64,
-    pub blob_id:    Option<String>,
-    pub error:      Option<String>,
+    pub blob_id: Option<String>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct MasterResponse {
-    pub job_id:  Option<String>,
+    pub job_id: Option<String>,
     #[serde(default)]
     pub blob_id: Option<String>,
     #[serde(default)]
-    pub status:  Option<String>,
+    pub status: Option<String>,
     #[serde(default)]
     pub message: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct M0HealthResponse {
-    pub status: String,              // "ok" | "degraded"
+    pub status: String, // "ok" | "degraded"
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportRequest {
-    pub blob_id:     String,
-    pub format:      String,             // "wav" | "flac" | "opus"
-    pub output_path: String,             // absolute filesystem path
+    pub blob_id: String,
+    pub format: String,      // "wav" | "flac" | "opus"
+    pub output_path: String, // absolute filesystem path
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportResponse {
     pub written_path: String,
-    pub status:       String,        // "ok" | "error"
-    pub message:      Option<String>,
+    pub status: String, // "ok" | "error"
+    pub message: Option<String>,
 }
 
 // ── GoldenBlobJson — the IPC contract ────────────────────────────────────────
@@ -288,37 +324,37 @@ pub struct ExportResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GoldenBlobJson {
     /// Globally unique UUID, generated at blob creation.
-    pub id:               String,
+    pub id: String,
     /// Schema version, e.g. "1.0".
-    pub version:          String,
+    pub version: String,
     /// "audio" | "av" — immutable after creation.
     #[serde(rename = "type")]
-    pub blob_type:        String,
+    pub blob_type: String,
     /// ISO 8601 UTC creation timestamp.
-    pub created_at:       String,
+    pub created_at: String,
     /// SHA-256 hex of original input file(s).
-    pub input_hash:       String,
+    pub input_hash: String,
     /// Determinism seed, derived from input_hash. Serialized as string to preserve u64 precision in JS.
-    pub seed:             String,
+    pub seed: String,
     /// Semver of the producing engine (e.g. "0.4.0").
     pub pipeline_version: String,
     /// User-selected preset (e.g. "spotify"). Not in spec directly but needed
     /// for rule-engine evaluation — carried in provenance.pipeline_params.
-    pub preset_id:        String,
+    pub preset_id: String,
     /// BS.1770-4 loudness measurements + platform compliance.
-    pub loudness:         LoudnessMetricsJson,
+    pub loudness: LoudnessMetricsJson,
     /// Objective quality measurements.
-    pub quality:          QualityMetricsJson,
+    pub quality: QualityMetricsJson,
     /// Full audit trail.
-    pub provenance:       ProvenanceJson,
+    pub provenance: ProvenanceJson,
     #[serde(default = "default_schema_v1_gc")]
-    pub schema_version:   u32,
+    pub schema_version: u32,
     #[serde(default)]
-    pub aether_cert:      Option<String>,
+    pub aether_cert: Option<String>,
     #[serde(default)]
-    pub aether_persona:   Option<String>,
+    pub aether_persona: Option<String>,
     #[serde(default)]
-    pub aether_config:    Option<String>,
+    pub aether_config: Option<String>,
     #[serde(default)]
     pub stem_fingerprints: Option<StemFingerprints>,
     #[serde(default)]
@@ -333,22 +369,24 @@ pub struct GoldenBlobJson {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StageRecord {
-    pub stage:       String,
+    pub stage: String,
     pub duration_ms: u64,
-    pub stage_hash:  String,
+    pub stage_hash: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StemFingerprints {
-    pub voice:     String,
-    pub drums:     String,
-    pub bass:      String,
+    pub voice: String,
+    pub drums: String,
+    pub bass: String,
     pub harmonics: String,
-    pub ambience:  String,
-    pub pipeline:  String,
+    pub ambience: String,
+    pub pipeline: String,
 }
 
-fn default_schema_v1_gc() -> u32 { 1 }
+fn default_schema_v1_gc() -> u32 {
+    1
+}
 
 /// BS.1770-4 canonical values + EBU R128 + platform compliance flags.
 /// Authority: golden-blob-spec.md §LoudnessMetrics
@@ -357,22 +395,22 @@ fn default_schema_v1_gc() -> u32 { 1 }
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoudnessMetricsJson {
     // BS.1770-4 canonical (always present, measured)
-    pub integrated_lufs:          f32,
-    pub short_term_lufs:          f32,
-    pub momentary_lufs:           f32,
-    pub true_peak_dbtp:           f32,
-    pub lra:                      f32,
-    pub k_weighted:               bool,
+    pub integrated_lufs: f32,
+    pub short_term_lufs: f32,
+    pub momentary_lufs: f32,
+    pub true_peak_dbtp: f32,
+    pub lra: f32,
+    pub k_weighted: bool,
     // EBU R128 derived
-    pub ebu_r128_target_lufs:     f32,
-    pub ebu_r128_compliant:       bool,
+    pub ebu_r128_target_lufs: f32,
+    pub ebu_r128_compliant: bool,
     // Platform compliance (derived from BS.1770-4)
-    pub spotify_compliant:        bool,
-    pub youtube_compliant:        bool,
-    pub apple_music_compliant:    bool,
+    pub spotify_compliant: bool,
+    pub youtube_compliant: bool,
+    pub apple_music_compliant: bool,
     pub apple_podcasts_compliant: bool,
-    pub broadcast_compliant:      bool,
-    pub tidal_compliant:          bool,
+    pub broadcast_compliant: bool,
+    pub tidal_compliant: bool,
 }
 
 /// Objective quality measurements from the processed content.
@@ -381,30 +419,30 @@ pub struct LoudnessMetricsJson {
 pub struct QualityMetricsJson {
     // Stereo / phase
     pub stereo_correlation: f32,
-    pub phase_coherence:    f32,
-    pub stereo_width:       f32,
+    pub phase_coherence: f32,
+    pub stereo_width: f32,
     // Dynamic range
-    pub dynamic_range_db:   f32,
-    pub rms_db:             f32,
+    pub dynamic_range_db: f32,
+    pub rms_db: f32,
     // Spectral
-    pub spectral_centroid:  f32,
-    pub spectral_flatness:  f32,
+    pub spectral_centroid: f32,
+    pub spectral_flatness: f32,
     // Clipping
-    pub clips_detected:     u32,
-    pub clip_free:          bool,
+    pub clips_detected: u32,
+    pub clip_free: bool,
 }
 
 /// Full audit trail — every blob knows exactly how it was produced.
 /// Authority: golden-blob-spec.md §Provenance
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProvenanceJson {
-    pub engine_id:            String,   // e.g. "E11"
-    pub engine_version:       String,
-    pub processing_time_ms:   u64,
-    pub host_os:              String,
-    pub created_by:           String,
-    pub aether_enriched:      bool,
-    pub aether_devices:       Vec<String>,
+    pub engine_id: String, // e.g. "E11"
+    pub engine_version: String,
+    pub processing_time_ms: u64,
+    pub host_os: String,
+    pub created_by: String,
+    pub aether_enriched: bool,
+    pub aether_devices: Vec<String>,
 }
 
 // ── M0Error ───────────────────────────────────────────────────────────────────
@@ -426,7 +464,9 @@ pub enum M0Error {
 /// Allow M0Error to be returned from Tauri commands as String.
 impl serde::Serialize for M0Error {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         s.serialize_str(&self.to_string())
     }
 }
@@ -441,58 +481,58 @@ mod tests {
     fn test_golden_blob_json_has_all_spec_fields() {
         // Verify GoldenBlobJson can be constructed matching spec §Structure
         let blob = GoldenBlobJson {
-            id:               "uuid-test".into(),
-            version:          "1.0".into(),
-            blob_type:        "audio".into(),
-            created_at:       "2026-04-15T00:00:00Z".into(),
-            input_hash:       "abcdef1234567890".into(),
-            seed:             "42".into(),
+            id: "uuid-test".into(),
+            version: "1.0".into(),
+            blob_type: "audio".into(),
+            created_at: "2026-04-15T00:00:00Z".into(),
+            input_hash: "abcdef1234567890".into(),
+            seed: "42".into(),
             pipeline_version: "0.4.0".into(),
-            preset_id:        "spotify".into(),
+            preset_id: "spotify".into(),
             loudness: LoudnessMetricsJson {
-                integrated_lufs:          -14.0,
-                short_term_lufs:          -13.5,
-                momentary_lufs:           -12.0,
-                true_peak_dbtp:           -1.0,
-                lra:                       8.0,
-                k_weighted:               true,
-                ebu_r128_target_lufs:     -23.0,
-                ebu_r128_compliant:       false,
-                spotify_compliant:        true,
-                youtube_compliant:        true,
-                apple_music_compliant:    false,
+                integrated_lufs: -14.0,
+                short_term_lufs: -13.5,
+                momentary_lufs: -12.0,
+                true_peak_dbtp: -1.0,
+                lra: 8.0,
+                k_weighted: true,
+                ebu_r128_target_lufs: -23.0,
+                ebu_r128_compliant: false,
+                spotify_compliant: true,
+                youtube_compliant: true,
+                apple_music_compliant: false,
                 apple_podcasts_compliant: false,
-                broadcast_compliant:      false,
-                tidal_compliant:          true,
+                broadcast_compliant: false,
+                tidal_compliant: true,
             },
             quality: QualityMetricsJson {
                 stereo_correlation: 0.94,
-                phase_coherence:    0.97,
-                stereo_width:       0.74,
-                dynamic_range_db:   9.5,
-                rms_db:             -16.0,
-                spectral_centroid:  3_200.0,
-                spectral_flatness:  0.12,
-                clips_detected:     0,
-                clip_free:          true,
+                phase_coherence: 0.97,
+                stereo_width: 0.74,
+                dynamic_range_db: 9.5,
+                rms_db: -16.0,
+                spectral_centroid: 3_200.0,
+                spectral_flatness: 0.12,
+                clips_detected: 0,
+                clip_free: true,
             },
             provenance: ProvenanceJson {
-                engine_id:          "E11".into(),
-                engine_version:     "0.4.0".into(),
+                engine_id: "E11".into(),
+                engine_version: "0.4.0".into(),
                 processing_time_ms: 1_234,
-                host_os:            "linux-x86_64".into(),
-                created_by:         "session-001".into(),
-                aether_enriched:    false,
-                aether_devices:     vec![],
+                host_os: "linux-x86_64".into(),
+                created_by: "session-001".into(),
+                aether_enriched: false,
+                aether_devices: vec![],
             },
-            schema_version:   1,
-            aether_cert:      None,
-            aether_persona:   None,
-            aether_config:    None,
+            schema_version: 1,
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
             stem_fingerprints: None,
-            qr_base64:        None,
-            pcm_blake3:       None,
-            cert_signature:   None,
+            qr_base64: None,
+            pcm_blake3: None,
+            cert_signature: None,
             processing_timeline: vec![],
         };
 

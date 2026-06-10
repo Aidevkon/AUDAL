@@ -2,21 +2,21 @@ use lineos_types::analysis::StemMetrics;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AmbienceState {
-    Dry     = 0,
-    Subtle  = 1,
+    Dry = 0,
+    Subtle = 1,
     Present = 2,
-    Lush    = 3,
-    Wash    = 4,
+    Lush = 3,
+    Wash = 4,
 }
 
 impl AmbienceState {
     pub fn to_str(&self) -> &'static str {
         match self {
-            AmbienceState::Dry     => "dry",
-            AmbienceState::Subtle  => "subtle",
+            AmbienceState::Dry => "dry",
+            AmbienceState::Subtle => "subtle",
             AmbienceState::Present => "present",
-            AmbienceState::Lush    => "lush",
-            AmbienceState::Wash    => "wash",
+            AmbienceState::Lush => "lush",
+            AmbienceState::Wash => "wash",
         }
     }
 }
@@ -50,7 +50,8 @@ impl AmbienceMarkovStateClassifier {
 
     pub fn predict_next(state: AmbienceState) -> AmbienceState {
         let row = TRANSITION_MATRIX_AMBIENCE_V1[state as usize];
-        let next_idx = row.iter()
+        let next_idx = row
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -70,17 +71,27 @@ mod tests {
     use super::*;
 
     fn mock(rms: f32, crest: f32) -> StemMetrics {
-        StemMetrics { rms_db: rms, crest_factor_db: crest, ..StemMetrics::default() }
+        StemMetrics {
+            rms_db: rms,
+            crest_factor_db: crest,
+            ..StemMetrics::default()
+        }
     }
 
     #[test]
     fn classify_dry() {
-        assert_eq!(AmbienceMarkovStateClassifier::classify_ambience(&mock(-65.0, 5.0)), AmbienceState::Dry);
+        assert_eq!(
+            AmbienceMarkovStateClassifier::classify_ambience(&mock(-65.0, 5.0)),
+            AmbienceState::Dry
+        );
     }
 
     #[test]
     fn predict_next_from_dry_is_dry() {
-        assert_eq!(AmbienceMarkovStateClassifier::predict_next(AmbienceState::Dry), AmbienceState::Dry);
+        assert_eq!(
+            AmbienceMarkovStateClassifier::predict_next(AmbienceState::Dry),
+            AmbienceState::Dry
+        );
     }
 
     #[test]

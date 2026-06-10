@@ -10,10 +10,10 @@
 //!
 //! Authority: Phase 8 P8-008 (A/B config)
 
-use tauri::command;
 use crate::coach_narrative::coach_adapter::CoachAdapter;
-use crate::commands::insights::CoachFindingsJson;
 use crate::coach_narrative::CoachNarrativeJson;
+use crate::commands::insights::CoachFindingsJson;
+use tauri::command;
 
 /// Generate a plain-language coaching narrative from CoachFindings.
 ///
@@ -31,14 +31,15 @@ pub async fn get_coach_narrative(
 ) -> Result<CoachNarrativeJson, String> {
     // A/B switching: COACH_PROVIDER env var — phi (default) or gemma
     // Authority: Phase 8 P8-008
-    let provider_name = std::env::var("COACH_PROVIDER")
-        .unwrap_or_else(|_| "phi".into());
+    let provider_name = std::env::var("COACH_PROVIDER").unwrap_or_else(|_| "phi".into());
 
     let adapter = match provider_name.as_str() {
         "gemma" => CoachAdapter::gemma(),
-        _       => CoachAdapter::phi(),   // default: phi3.5:3.8b
+        _ => CoachAdapter::phi(), // default: phi3.5:3.8b
     };
 
-    adapter.generate(&findings).await
+    adapter
+        .generate(&findings)
+        .await
         .map_err(|e| format!("Coach narrative unavailable: {e}"))
 }

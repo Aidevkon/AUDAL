@@ -52,7 +52,7 @@ pub fn spawn_engine_thread(
                     }
                     thread::sleep(std::time::Duration::from_millis(1));
                 }
-                
+
                 output_producer.push_slice(&interleaved_out);
             } else {
                 // 3. Not enough samples yet — sleep 1ms and retry

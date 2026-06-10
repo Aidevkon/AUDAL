@@ -8,10 +8,21 @@ pub struct JourneyViewProps {
 
 #[component]
 pub fn JourneyView(props: JourneyViewProps) -> Element {
-    let stages = ["INITIALIZING", "ANALYZING", "STEMS", "MARKOV", "DSP", "SPATIAL", "CERTIFIED"];
+    let stages = [
+        "INITIALIZING",
+        "ANALYZING",
+        "STEMS",
+        "MARKOV",
+        "DSP",
+        "SPATIAL",
+        "CERTIFIED",
+    ];
     let current_stage = props.stage.read().clone();
     let current_stage_str = current_stage.as_str();
-    let current_idx = stages.iter().position(|&s| s == current_stage_str).unwrap_or(0);
+    let current_idx = stages
+        .iter()
+        .position(|&s| s == current_stage_str)
+        .unwrap_or(0);
     let elapsed_str = format!("{} ms", *props.elapsed_ms.read());
 
     rsx! {

@@ -13,16 +13,16 @@
 
 pub mod engine;
 pub mod player;
+pub mod repo;
 pub mod spectrum;
 pub mod telemetry_worker;
-pub mod repo;
 pub use repo::{AudioRepo, DspState, MixCommit};
 
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
 
 pub const TARGET_SAMPLE_RATE: u32 = 48_000;
-pub const TARGET_CHANNELS:    u16 = 2;
+pub const TARGET_CHANNELS: u16 = 2;
 
 // ── PcmTransfer ───────────────────────────────────────────────────────────────
 
@@ -30,11 +30,11 @@ pub const TARGET_CHANNELS:    u16 = 2;
 /// After this is passed to XaakKernel::load(), the caller must not
 /// access the samples — ownership is moved unconditionally (A-003 §2).
 pub struct PcmTransfer {
-    pub pcm_path:    std::path::PathBuf,
+    pub pcm_path: std::path::PathBuf,
     pub sample_rate: u32,
-    pub channels:    u16,
-    pub blob_id:     Uuid,
-    pub num_frames:  usize,
+    pub channels: u16,
+    pub blob_id: Uuid,
+    pub num_frames: usize,
 }
 
 // ── XaakKernel ────────────────────────────────────────────────────────────────
@@ -44,15 +44,15 @@ pub struct PcmTransfer {
 /// A-003 §4: uses lock-free HeapRb ring buffer, NOT Arc<RwLock<Vec<f32>>>.
 /// Consumers get a Box<dyn Pop<f32>> from stream_from() — zero-copy slice.
 pub struct XaakKernel {
-    blob_id:     Uuid,
+    blob_id: Uuid,
     sample_rate: u32,
-    channels:    u16,
+    channels: u16,
     duration_ms: u64,
-    num_frames:  usize,
+    num_frames: usize,
     /// Authoritative PCM backing store — supports seek via slice offset.
-    pcm:         memmap2::Mmap,
+    pcm: memmap2::Mmap,
     /// Kept alive to hold the ring buffer while consumer exists.
-    _producer:   Option<Box<dyn std::any::Any + Send>>,
+    _producer: Option<Box<dyn std::any::Any + Send>>,
 }
 
 impl XaakKernel {
@@ -67,8 +67,7 @@ impl XaakKernel {
         let num_samples = transfer.num_frames * transfer.channels as usize;
 
         let duration_ms = if transfer.sample_rate > 0 && transfer.channels > 0 {
-            (num_samples as u64 * 1000)
-                / (transfer.sample_rate as u64 * transfer.channels as u64)
+            (num_samples as u64 * 1000) / (transfer.sample_rate as u64 * transfer.channels as u64)
         } else {
             0
         };
@@ -85,13 +84,13 @@ impl XaakKernel {
         );
 
         Self {
-            blob_id:     transfer.blob_id,
+            blob_id: transfer.blob_id,
             sample_rate: transfer.sample_rate,
-            channels:    transfer.channels,
+            channels: transfer.channels,
             duration_ms,
-            num_frames:  transfer.num_frames,
-            pcm:         mmap,
-            _producer:   None,
+            num_frames: transfer.num_frames,
+            pcm: mmap,
+            _producer: None,
         }
     }
 
@@ -103,7 +102,9 @@ impl XaakKernel {
         // frame_offset = number of frames (NOT samples) to skip
         let frame_offset = if self.sample_rate > 0 {
             (position_ms * self.sample_rate as u64 / 1000) as usize
-        } else { 0 };
+        } else {
+            0
+        };
 
         let slice = if frame_offset < self.num_frames {
             let frames_to_play = self.num_frames - frame_offset;
@@ -111,10 +112,15 @@ impl XaakKernel {
             let byte_offset = frame_offset * self.channels as usize * 4;
             let pcm_bytes = &self.pcm[byte_offset..];
             unsafe {
-                let full_slice = std::slice::from_raw_parts(pcm_bytes.as_ptr() as *const f32, pcm_bytes.len() / 4);
+                let full_slice = std::slice::from_raw_parts(
+                    pcm_bytes.as_ptr() as *const f32,
+                    pcm_bytes.len() / 4,
+                );
                 &full_slice[..(frames_to_play * self.channels as usize)]
             }
-        } else { &[] };
+        } else {
+            &[]
+        };
 
         let capacity = slice.len().max(4096);
         let rb = HeapRb::<f32>::new(capacity);
@@ -134,12 +140,22 @@ impl XaakKernel {
 
     // ── Accessors (no PCM exposure) ───────────────────────────────────────────
 
-    pub fn blob_id(&self)     -> Uuid   { self.blob_id }
-    pub fn sample_rate(&self) -> u32    { self.sample_rate }
-    pub fn channels(&self)    -> u16    { self.channels }
-    pub fn duration_ms(&self) -> u64    { self.duration_ms }
+    pub fn blob_id(&self) -> Uuid {
+        self.blob_id
+    }
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+    pub fn channels(&self) -> u16 {
+        self.channels
+    }
+    pub fn duration_ms(&self) -> u64 {
+        self.duration_ms
+    }
     /// Returns number of f32 samples in the PCM buffer.
-    pub fn pcm_len(&self) -> usize { self.pcm.len() / 4 }
+    pub fn pcm_len(&self) -> usize {
+        self.pcm.len() / 4
+    }
     /// Release PCM and emit A-003 §2 audit event: m0d.xaak_buffer_released.
     pub fn release(self) {
         tracing::info!(
@@ -157,14 +173,14 @@ impl XaakKernel {
 /// Playback state for Tauri IPC — no PCM, metrics only (A-003 §2).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlaybackState {
-    pub blob_id:     String,
+    pub blob_id: String,
     pub position_ms: u64,
     pub duration_ms: u64,
-    pub is_playing:  bool,
+    pub is_playing: bool,
     pub sample_rate: u32,
-    pub channels:    u16,
-    pub ab_target:   String,
-    pub gain_match:  bool,
+    pub channels: u16,
+    pub ab_target: String,
+    pub gain_match: bool,
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -178,11 +194,11 @@ mod tests {
         let file = std::fs::File::create(&path).unwrap();
         file.set_len((samples * 4) as u64).unwrap();
         PcmTransfer {
-            pcm_path:    path,
+            pcm_path: path,
             sample_rate: 48000,
-            channels:    2,
-            blob_id:     uuid::Uuid::new_v4(),
-            num_frames:  samples / 2,
+            channels: 2,
+            blob_id: uuid::Uuid::new_v4(),
+            num_frames: samples / 2,
         }
     }
 
@@ -227,14 +243,14 @@ mod tests {
     #[test]
     fn test_playback_state_no_pcm() {
         let state = PlaybackState {
-            blob_id:     "test-blob".into(),
+            blob_id: "test-blob".into(),
             position_ms: 1234,
             duration_ms: 60_000,
-            is_playing:  true,
+            is_playing: true,
             sample_rate: TARGET_SAMPLE_RATE,
-            channels:    TARGET_CHANNELS,
-            ab_target:   "a".to_string(),
-            gain_match:  true,
+            channels: TARGET_CHANNELS,
+            ab_target: "a".to_string(),
+            gain_match: true,
         };
         let json = serde_json::to_string(&state).unwrap();
         // Must NOT contain any PCM — just metrics

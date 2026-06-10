@@ -3,10 +3,10 @@
 //! Never re-measures raw input audio. Never calls sp314-dsp pipeline stages.
 //! Authority: LineOS Constitution v2.0 §07
 
-use lineos_types::{GoldenBlob, Ebu128Measurement};
 use crate::lra::LraCalculator;
 use crate::windows;
 use alloc::vec::Vec;
+use lineos_types::{Ebu128Measurement, GoldenBlob};
 
 /// Produce a full Ebu128Measurement from a Golden Blob.
 ///
@@ -38,8 +38,8 @@ pub fn measure(blob: &GoldenBlob) -> Ebu128Measurement {
     Ebu128Measurement {
         // BS.1770-4 canonical values — from Golden Blob (not re-measured here)
         // TODO: 3b — bs1770_integrated removed in v3
-        integrated_lufs:    -14.0, // qm.bs1770_integrated,
-        true_peak_dbfs:     -1.0,  // qm.bs1770_true_peak,
+        integrated_lufs: -14.0, // qm.bs1770_integrated,
+        true_peak_dbfs: -1.0,   // qm.bs1770_true_peak,
         // Phase 3: computed from Golden Blob PCM output
         loudness_range_lu,
         short_term_lufs: Some(windows::short_term_lufs(&samples, sr, ch)),
@@ -58,8 +58,6 @@ fn pcm_from_blob(_blob: &GoldenBlob) -> Vec<f32> {
 mod tests {
     // use super::*;
     // use lineos_types::{MasteringIntent, MasteringPipeline, AudioChunk, PipelineConstants};
-
-
 
     #[test]
     fn test_measure_produces_valid_output() {

@@ -3,5 +3,6 @@
 
 pub mod types;
 
-pub use types::{BlackBoxMode, BlackBoxControl, OrbPosition,
-                MacroDelta, MediumControl, orb_resistance};
+pub use types::{
+    orb_resistance, BlackBoxControl, BlackBoxMode, MacroDelta, MediumControl, OrbPosition,
+};

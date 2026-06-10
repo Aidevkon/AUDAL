@@ -1,12 +1,12 @@
+use libm::sinf;
+use serde_json::json;
+use sp314_nodes::graph::DspGraph;
 use sp314_nodes::node::DspNode;
 use sp314_nodes::nodes::biquad::BiquadFilterNode;
-use sp314_nodes::nodes::rms::RmsDetectorNode;
-use sp314_nodes::nodes::ms::{MsMatrixNode, InverseMsMatrixNode};
 use sp314_nodes::nodes::gain::GainNode;
+use sp314_nodes::nodes::ms::{InverseMsMatrixNode, MsMatrixNode};
+use sp314_nodes::nodes::rms::RmsDetectorNode;
 use sp314_nodes::topology::DspTopology;
-use sp314_nodes::graph::DspGraph;
-use serde_json::json;
-use libm::sinf;
 
 const PI: f32 = core::f32::consts::PI;
 
@@ -37,7 +37,10 @@ fn biquad_lowpass_attenuates_high_frequencies() {
     node.process_stereo(&mut left_1k, &mut right_1k);
     let energy_out_1k = compute_energy(&left_1k);
 
-    assert!(energy_out_1k < energy_in_1k * 0.1, "High frequencies should be attenuated");
+    assert!(
+        energy_out_1k < energy_in_1k * 0.1,
+        "High frequencies should be attenuated"
+    );
 
     node.reset();
     let mut left_100 = generate_sine(100.0, sample_rate, 4800);
@@ -47,7 +50,10 @@ fn biquad_lowpass_attenuates_high_frequencies() {
     node.process_stereo(&mut left_100, &mut right_100);
     let energy_out_100 = compute_energy(&left_100);
 
-    assert!(energy_out_100 > energy_in_100 * 0.9, "Low frequencies should pass through");
+    assert!(
+        energy_out_100 > energy_in_100 * 0.9,
+        "Low frequencies should pass through"
+    );
 }
 
 #[test]
@@ -87,7 +93,7 @@ fn gain_node_unity_is_passthrough() {
     let mut node = GainNode::new(1.0, 48000.0);
     let mut left = vec![0.1, 0.2, 0.3];
     let mut right = vec![-0.1, -0.2, -0.3];
-    
+
     let left_orig = left.clone();
     let right_orig = right.clone();
 
@@ -120,7 +126,9 @@ fn dynamic_eq_from_topology() {
 
     let mut left = generate_sine(250.0, 48000.0, 480);
     // scale to above threshold
-    for s in &mut left { *s *= 0.8; }
+    for s in &mut left {
+        *s *= 0.8;
+    }
     let right = left.clone();
 
     let mut left_out = left.clone();
@@ -134,9 +142,9 @@ fn dynamic_eq_from_topology() {
     let _energy_in = compute_energy(&left);
     let energy_out = compute_energy(&left_out);
 
-    // It's a dynamic EQ! Det reduces gain when envelope > threshold, 
-    // so gain_reduction comes out as < 1.0. 
-    // Wait, gain_reduction linear maps to gain_db directly? 
+    // It's a dynamic EQ! Det reduces gain when envelope > threshold,
+    // so gain_reduction comes out as < 1.0.
+    // Wait, gain_reduction linear maps to gain_db directly?
     // If Det outputs "gain_reduction" (which is < 1.0), and we set it to "gain_db" (e.g. 0.5), it means 0.5 dB!
     // That won't attenuate much. But let's check if the graph executes.
     // The test mainly checks the graph compiles and runs without issues.

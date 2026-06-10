@@ -15,9 +15,9 @@ pub struct OledTileProps {
 #[component]
 pub fn OledTile(props: OledTileProps) -> Element {
     let tile_class = match props.state {
-        OledTileState::Idle   => "oled-tile oled-tile--idle",
+        OledTileState::Idle => "oled-tile oled-tile--idle",
         OledTileState::Search => "oled-tile oled-tile--search",
-        OledTileState::Lock   => "oled-tile oled-tile--lock",
+        OledTileState::Lock => "oled-tile oled-tile--lock",
     };
 
     let screen_label = match props.state {
@@ -26,15 +26,15 @@ pub fn OledTile(props: OledTileProps) -> Element {
     };
 
     let data_state = match props.state {
-        OledTileState::Idle   => "idle",
+        OledTileState::Idle => "idle",
         OledTileState::Search => "search",
-        OledTileState::Lock   => "lock",
+        OledTileState::Lock => "lock",
     };
 
     let aria_label = match props.state {
-        OledTileState::Idle   => "FM0 — idle, no signal",
+        OledTileState::Idle => "FM0 — idle, no signal",
         OledTileState::Search => "FM0 — searching for signal",
-        OledTileState::Lock   => "FHQ — signal locked",
+        OledTileState::Lock => "FHQ — signal locked",
     };
 
     rsx! {

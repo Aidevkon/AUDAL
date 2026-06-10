@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Deterministic: same AnalysisReport + Thresholds → identical CoachFindings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CoachFindings {
-    pub issues:         Vec<Issue>,
+    pub issues: Vec<Issue>,
     pub recommendation: String,
 }
 
@@ -19,10 +19,10 @@ pub struct CoachFindings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Issue {
     /// Stable rule ID (snake_case). Never changes once published.
-    pub id:       String,
+    pub id: String,
     pub severity: Severity,
-    pub params:   IssueParams,
-    pub tags:     Vec<String>,
+    pub params: IssueParams,
+    pub tags: Vec<String>,
 }
 
 /// Strictly numeric params — serde_json::Value is forbidden at the WASM boundary.
@@ -30,8 +30,8 @@ pub struct Issue {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IssueParams {
     pub current: f32,
-    pub target:  f32,
-    pub delta:   f32,
+    pub target: f32,
+    pub delta: f32,
 }
 
 /// Severity spectrum — exactly four values, in increasing priority order.
@@ -49,7 +49,7 @@ impl CoachFindings {
     /// Construct an empty findings set — clean track, no issues.
     pub fn empty() -> Self {
         Self {
-            issues:         Vec::new(),
+            issues: Vec::new(),
             recommendation: "Track is ready — proceed with export.".to_string(),
         }
     }
@@ -87,7 +87,11 @@ mod tests {
         let issue = Issue {
             id: "true_peak_exceeded".into(),
             severity: Severity::High,
-            params: IssueParams { current: 0.5, target: -1.0, delta: 1.5 },
+            params: IssueParams {
+                current: 0.5,
+                target: -1.0,
+                delta: 1.5,
+            },
             tags: vec!["compliance:critical".into()],
         };
         let f = CoachFindings {
@@ -118,7 +122,11 @@ mod tests {
             issues: vec![Issue {
                 id: "lufs_too_high".into(),
                 severity: Severity::Medium,
-                params: IssueParams { current: -12.0, target: -14.0, delta: 2.0 },
+                params: IssueParams {
+                    current: -12.0,
+                    target: -14.0,
+                    delta: 2.0,
+                },
                 tags: vec!["platform:spotify".into()],
             }],
             recommendation: "Reduce gain.".to_string(),

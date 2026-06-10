@@ -1,8 +1,8 @@
-use dioxus::prelude::*;
 use crate::panels::insights::InsightsPanel;
 use crate::panels::session::SessionPanel;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
+use dioxus::prelude::*;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct SamplingSiameseProps {
@@ -24,16 +24,22 @@ pub struct SamplingSiameseProps {
 
 #[component]
 pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
-    let mfd1_active = props.wizard_findings.read().iter()
+    let mfd1_active = props
+        .wizard_findings
+        .read()
+        .iter()
         .any(|f| f.mfd == crate::wizard::MfdTarget::Mfd1SignalAnalyzer);
 
-    let mfd2_active = props.wizard_findings.read().iter()
+    let mfd2_active = props
+        .wizard_findings
+        .read()
+        .iter()
         .any(|f| f.mfd == crate::wizard::MfdTarget::Mfd2SpatialTelemetry);
 
     rsx! {
         div {
             class: "sampling-siamese chassis-bezel chassis-substrate chassis-seam",
-            
+
             if *props.is_journey_active.read() {
                 crate::components::journey_view::JourneyView {
                     stage: props.journey_stage,
@@ -41,8 +47,8 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                 }
             } else {
                 // SESSION - LEFT (PSA)
-                div { 
-                    class: format!("siamese-col siamese-session{}", 
+                div {
+                    class: format!("siamese-col siamese-session{}",
                         if mfd1_active { " wizard-active" } else { "" }),
                     SessionPanel {
                         mode: props.mode,
@@ -69,7 +75,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
 
                 // INSIGHTS - CENTER (Spectral Dynamics)
                 div {
-                    class: format!("siamese-col siamese-insights{}", 
+                    class: format!("siamese-col siamese-insights{}",
                         if mfd2_active { " wizard-active" } else { "" }),
                     InsightsPanel {
                         mode: props.mode,
@@ -85,7 +91,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                         },
                     }
                 }
-                
+
                 // MASTERING CHAIN - RIGHT (25%)
                 div { class: "siamese-col siamese-dsp",
                     div { class: "mfd-panel",

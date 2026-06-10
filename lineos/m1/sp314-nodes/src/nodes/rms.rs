@@ -1,5 +1,5 @@
 use crate::node::DspNode;
-use libm::{expf, sqrtf, powf};
+use libm::{expf, powf, sqrtf};
 
 pub struct RmsDetectorNode {
     envelope_l: f32,
@@ -45,8 +45,16 @@ impl DspNode for RmsDetectorNode {
             let sq_l = *l * *l;
             let sq_r = *r * *r;
 
-            let coef_l = if sq_l > self.envelope_l { self.attack_coef } else { self.release_coef };
-            let coef_r = if sq_r > self.envelope_r { self.attack_coef } else { self.release_coef };
+            let coef_l = if sq_l > self.envelope_l {
+                self.attack_coef
+            } else {
+                self.release_coef
+            };
+            let coef_r = if sq_r > self.envelope_r {
+                self.attack_coef
+            } else {
+                self.release_coef
+            };
 
             self.envelope_l += (sq_l - self.envelope_l) * coef_l;
             self.envelope_r += (sq_r - self.envelope_r) * coef_r;

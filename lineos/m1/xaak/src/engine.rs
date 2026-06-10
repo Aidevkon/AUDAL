@@ -9,15 +9,18 @@
 //!   PlaybackWorker runs on a std::thread with the cpal::Stream.
 //!   Axum handlers send commands over mpsc; responses return via oneshot.
 
+use crate::{player::CpalPlayer, PcmTransfer, PlaybackState, XaakKernel};
+use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{self, Sender, Receiver, SyncSender};
 use std::thread;
-use crate::{XaakKernel, PlaybackState, PcmTransfer, player::CpalPlayer};
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum AbTarget { A, B }
+pub enum AbTarget {
+    A,
+    B,
+}
 
 pub enum PlaybackCmd {
     Load(PcmTransfer),
@@ -28,7 +31,9 @@ pub enum PlaybackCmd {
     Stop,
     Seek(u64),
     /// Switch A/B at current position (sample-accurate)
-    AbSwitch { target: AbTarget },
+    AbSwitch {
+        target: AbTarget,
+    },
     /// Caller sends a SyncSender; worker replies with Option<PlaybackState>.
     GetState(SyncSender<Option<PlaybackState>>),
 }
@@ -92,25 +97,25 @@ impl PlaybackHandle {
 // ── PlaybackWorker — owns cpal::Stream on a dedicated thread ─────────────────
 
 struct PlaybackWorker {
-    kernel:       Option<XaakKernel>,
-    kernel_b:     Option<XaakKernel>,
-    ab_target:    AbTarget,
-    gain_match:   bool,
-    player:       CpalPlayer,
-    position:     Arc<Mutex<u64>>,
-    playing:      bool,
+    kernel: Option<XaakKernel>,
+    kernel_b: Option<XaakKernel>,
+    ab_target: AbTarget,
+    gain_match: bool,
+    player: CpalPlayer,
+    position: Arc<Mutex<u64>>,
+    playing: bool,
 }
 
 impl PlaybackWorker {
     fn new() -> Self {
         Self {
-            kernel:     None,
-            kernel_b:   None,
-            ab_target:  AbTarget::A,
+            kernel: None,
+            kernel_b: None,
+            ab_target: AbTarget::A,
             gain_match: true,
-            player:     CpalPlayer::new(),
-            position:   Arc::new(Mutex::new(0)),
-            playing:    false,
+            player: CpalPlayer::new(),
+            position: Arc::new(Mutex::new(0)),
+            playing: false,
         }
     }
 
@@ -119,13 +124,17 @@ impl PlaybackWorker {
         let mut worker = Self::new();
         for cmd in rx {
             match cmd {
-                PlaybackCmd::Load(transfer)      => worker.load(transfer),
-                PlaybackCmd::LoadOriginal(t)     => worker.load_original(t),
+                PlaybackCmd::Load(transfer) => worker.load(transfer),
+                PlaybackCmd::LoadOriginal(t) => worker.load_original(t),
                 PlaybackCmd::AbSwitch { target } => worker.ab_switch(target),
-                PlaybackCmd::Play                => { let _ = worker.play(); }
-                PlaybackCmd::Pause             => worker.pause(),
-                PlaybackCmd::Stop              => worker.stop(),
-                PlaybackCmd::Seek(ms)          => { let _ = worker.seek(ms); }
+                PlaybackCmd::Play => {
+                    let _ = worker.play();
+                }
+                PlaybackCmd::Pause => worker.pause(),
+                PlaybackCmd::Stop => worker.stop(),
+                PlaybackCmd::Seek(ms) => {
+                    let _ = worker.seek(ms);
+                }
                 PlaybackCmd::GetState(resp_tx) => {
                     let _ = resp_tx.send(worker.state());
                 }
@@ -136,9 +145,13 @@ impl PlaybackWorker {
 
     fn load(&mut self, transfer: PcmTransfer) {
         self.player.stop();
-        if let Ok(mut p) = self.position.lock() { *p = 0; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = 0;
+        }
         self.playing = false;
-        if let Some(old) = self.kernel.take() { old.release(); }
+        if let Some(old) = self.kernel.take() {
+            old.release();
+        }
         self.kernel = Some(XaakKernel::load(transfer));
     }
 
@@ -158,10 +171,15 @@ impl PlaybackWorker {
             AbTarget::A => self.kernel.as_mut(),
             AbTarget::B => self.kernel_b.as_mut(),
         }
-            .ok_or_else(|| "xaak: play() — no PCM loaded".to_string())?;
-        let pos_ms   = *self.position.lock().unwrap();
+        .ok_or_else(|| "xaak: play() — no PCM loaded".to_string())?;
+        let pos_ms = *self.position.lock().unwrap();
         let consumer = kernel.stream_from(pos_ms);
-        self.player.play(consumer, kernel.sample_rate(), kernel.channels(), self.position.clone())?;
+        self.player.play(
+            consumer,
+            kernel.sample_rate(),
+            kernel.channels(),
+            self.position.clone(),
+        )?;
         self.playing = true;
         tracing::info!(blob_id = %kernel.blob_id(), pos_ms, "xaak: play");
         Ok(())
@@ -175,16 +193,22 @@ impl PlaybackWorker {
 
     fn stop(&mut self) {
         self.player.stop();
-        if let Ok(mut p) = self.position.lock() { *p = 0; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = 0;
+        }
         self.playing = false;
     }
 
     fn seek(&mut self, position_ms: u64) -> Result<(), String> {
         let was_playing = self.playing;
         self.player.stop();
-        if let Ok(mut p) = self.position.lock() { *p = position_ms; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = position_ms;
+        }
         self.playing = false;
-        if was_playing { self.play()?; }
+        if was_playing {
+            self.play()?;
+        }
         Ok(())
     }
 
@@ -198,17 +222,17 @@ impl PlaybackWorker {
             AbTarget::B => self.kernel_b.as_ref(),
         };
         k_opt.map(|k| PlaybackState {
-            blob_id:     k.blob_id().to_string(),
+            blob_id: k.blob_id().to_string(),
             position_ms: self.position_ms(),
             duration_ms: k.duration_ms(),
-            is_playing:  self.playing,
+            is_playing: self.playing,
             sample_rate: k.sample_rate(),
-            channels:    k.channels(),
-            ab_target:   match self.ab_target {
+            channels: k.channels(),
+            ab_target: match self.ab_target {
                 AbTarget::A => "a".to_string(),
                 AbTarget::B => "b".to_string(),
             },
-            gain_match:  self.gain_match,
+            gain_match: self.gain_match,
         })
     }
 }
@@ -220,39 +244,47 @@ impl PlaybackWorker {
 /// Production code uses PlaybackHandle.
 #[cfg(test)]
 pub struct PlaybackEngine {
-    kernel:   Option<XaakKernel>,
-    player:   CpalPlayer,
+    kernel: Option<XaakKernel>,
+    player: CpalPlayer,
     pub position: Arc<Mutex<u64>>,
-    playing:  bool,
+    playing: bool,
 }
 
 #[cfg(test)]
 impl PlaybackEngine {
     pub fn new() -> Self {
         Self {
-            kernel:   None,
-            player:   CpalPlayer::new(),
+            kernel: None,
+            player: CpalPlayer::new(),
             position: Arc::new(Mutex::new(0)),
-            playing:  false,
+            playing: false,
         }
     }
 
     pub fn load(&mut self, transfer: PcmTransfer) {
         self.player.stop();
-        if let Ok(mut p) = self.position.lock() { *p = 0; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = 0;
+        }
         self.playing = false;
-        if let Some(old) = self.kernel.take() { old.release(); }
+        if let Some(old) = self.kernel.take() {
+            old.release();
+        }
         self.kernel = Some(XaakKernel::load(transfer));
     }
 
     pub fn stop(&mut self) {
         self.player.stop();
-        if let Ok(mut p) = self.position.lock() { *p = 0; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = 0;
+        }
         self.playing = false;
     }
 
     pub fn seek(&mut self, position_ms: u64) -> Result<(), String> {
-        if let Ok(mut p) = self.position.lock() { *p = position_ms; }
+        if let Ok(mut p) = self.position.lock() {
+            *p = position_ms;
+        }
         Ok(())
     }
 
@@ -262,18 +294,20 @@ impl PlaybackEngine {
 
     pub fn state(&self) -> Option<PlaybackState> {
         self.kernel.as_ref().map(|k| PlaybackState {
-            blob_id:     k.blob_id().to_string(),
+            blob_id: k.blob_id().to_string(),
             position_ms: self.position_ms(),
             duration_ms: k.duration_ms(),
-            is_playing:  self.playing,
+            is_playing: self.playing,
             sample_rate: k.sample_rate(),
-            channels:    k.channels(),
-            ab_target:   "a".to_string(),
-            gain_match:  true,
+            channels: k.channels(),
+            ab_target: "a".to_string(),
+            gain_match: true,
         })
     }
 
-    pub fn has_kernel(&self) -> bool { self.kernel.is_some() }
+    pub fn has_kernel(&self) -> bool {
+        self.kernel.is_some()
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -281,18 +315,17 @@ impl PlaybackEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn make_transfer(samples: usize) -> PcmTransfer {
         let path = std::path::PathBuf::from(format!("/tmp/xaak-test-{}.pcm", uuid::Uuid::new_v4()));
         let file = std::fs::File::create(&path).unwrap();
         file.set_len((samples * 4) as u64).unwrap();
         PcmTransfer {
-            pcm_path:    path,
+            pcm_path: path,
             sample_rate: 48000,
-            channels:    2,
-            blob_id:     uuid::Uuid::new_v4(),
-            num_frames:  samples / 2,
+            channels: 2,
+            blob_id: uuid::Uuid::new_v4(),
+            num_frames: samples / 2,
         }
     }
 
@@ -352,7 +385,7 @@ mod tests {
         let mut engine = PlaybackEngine::new();
         engine.load(make_transfer(9_600));
         let state = engine.state().unwrap();
-        let json  = serde_json::to_string(&state).unwrap();
+        let json = serde_json::to_string(&state).unwrap();
         assert!(!json.contains("\"samples\""));
         assert!(json.contains("\"position_ms\""));
         assert!(json.contains("\"duration_ms\""));

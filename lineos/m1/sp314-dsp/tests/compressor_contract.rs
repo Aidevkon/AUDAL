@@ -1,12 +1,12 @@
 use serde_json::Value;
-use std::fs;
 use sp314_dsp::compressor::{
+    core::{CompressorBand, CompressorBandConfig},
     crossover::CrossoverLR4,
     envelope::EnvelopeFollower,
     gain::compute_gain_reduction,
-    core::{CompressorBand, CompressorBandConfig},
     stereo::{CompressorV3, CompressorV3Config},
 };
+use std::fs;
 
 fn load_fixture(name: &str) -> Value {
     let path = format!("tests/fixtures/{}.json", name);
@@ -33,7 +33,7 @@ fn crossover_lr4_sum_is_flat() {
         let tol = check["tolerance_db"].as_f64().unwrap() as f32;
 
         let w = 2.0 * std::f32::consts::PI * freq_hz / sample_rate as f32;
-        
+
         lr4.reset();
         for i in 0..1000 {
             let x = (i as f32 * w).sin();
@@ -49,9 +49,14 @@ fn crossover_lr4_sum_is_flat() {
                 peak_sum = sum.abs();
             }
         }
-        
+
         let sum_db = 20.0 * peak_sum.log10();
-        assert!((sum_db - expected_sum_db).abs() < tol, "Expected sum {} dB, got {} dB", expected_sum_db, sum_db);
+        assert!(
+            (sum_db - expected_sum_db).abs() < tol,
+            "Expected sum {} dB, got {} dB",
+            expected_sum_db,
+            sum_db
+        );
     }
 }
 
@@ -70,7 +75,7 @@ fn crossover_lr4_split_at_crossover_freq() {
     let tol = split["tolerance_db"].as_f64().unwrap() as f32;
 
     let w = 2.0 * std::f32::consts::PI * freq_hz / sample_rate as f32;
-    
+
     for i in 0..1000 {
         let x = (i as f32 * w).sin();
         lr4.process(x);
@@ -81,22 +86,36 @@ fn crossover_lr4_split_at_crossover_freq() {
     for i in 0..1000 {
         let x = ((i + 1000) as f32 * w).sin();
         let (low, high) = lr4.process(x);
-        if low.abs() > peak_low { peak_low = low.abs(); }
-        if high.abs() > peak_high { peak_high = high.abs(); }
+        if low.abs() > peak_low {
+            peak_low = low.abs();
+        }
+        if high.abs() > peak_high {
+            peak_high = high.abs();
+        }
     }
-    
+
     let low_db = 20.0 * peak_low.log10();
     let high_db = 20.0 * peak_high.log10();
 
-    assert!((low_db - exp_low).abs() < tol, "Expected low {} dB, got {} dB", exp_low, low_db);
-    assert!((high_db - exp_high).abs() < tol, "Expected high {} dB, got {} dB", exp_high, high_db);
+    assert!(
+        (low_db - exp_low).abs() < tol,
+        "Expected low {} dB, got {} dB",
+        exp_low,
+        low_db
+    );
+    assert!(
+        (high_db - exp_high).abs() < tol,
+        "Expected high {} dB, got {} dB",
+        exp_high,
+        high_db
+    );
 }
 
 #[test]
 fn crossover_lr4_no_phase_inversion() {
     let mut lr4 = CrossoverLR4::new(150.0, 48000);
     let mut min_sum = 1000.0;
-    
+
     for i in 0..1000 {
         // Feed an impulse
         let x = if i == 0 { 1.0 } else { 0.0 };
@@ -105,28 +124,35 @@ fn crossover_lr4_no_phase_inversion() {
         // let's just make sure low+high actually recovers the impulse.
         let sum = low + high;
         if i == 0 {
-            // Because of group delay, the sum of an impulse won't be a perfect impulse instantly, 
+            // Because of group delay, the sum of an impulse won't be a perfect impulse instantly,
             // but for LR4, the allpass characteristic means energy is preserved and phase is identical.
         }
-        if sum.abs() < min_sum { min_sum = sum.abs(); }
+        if sum.abs() < min_sum {
+            min_sum = sum.abs();
+        }
     }
-    
+
     // To strictly verify phase, feed a sine at 150Hz.
     // They should have exactly the same phase (or rather, their phase difference is 0).
     lr4.reset();
     let w = 2.0 * std::f32::consts::PI * 150.0 / 48000.0;
-    
+
     for i in 0..1000 {
         let x = (i as f32 * w).sin();
         lr4.process(x);
     }
-    
+
     // At steady state, check if low and high have the same sign.
     for i in 0..100 {
         let x = ((i + 1000) as f32 * w).sin();
         let (low, high) = lr4.process(x);
         // They should be in phase, so their product should be positive (or zero)
-        assert!(low * high >= -1e-6, "Phase inversion detected: low={}, high={}", low, high);
+        assert!(
+            low * high >= -1e-6,
+            "Phase inversion detected: low={}, high={}",
+            low,
+            high
+        );
     }
 }
 
@@ -181,7 +207,7 @@ fn envelope_rc_coeff_matches_reference() {
 #[test]
 fn envelope_attack_follows_linear_domain() {
     let mut env = EnvelopeFollower::new(10.0, 100.0, 48000);
-    
+
     // Process step from 0.0 to 1.0
     let out_db = env.process(1.0);
     // Envelope internal state should now be non-zero linear, then converted to db
@@ -194,13 +220,13 @@ fn envelope_attack_follows_linear_domain() {
 fn envelope_release_sample_rate_correct() {
     let mut env1 = EnvelopeFollower::new(10.0, 100.0, 48000);
     let mut env2 = EnvelopeFollower::new(10.0, 100.0, 44100);
-    
+
     env1.process(1.0);
     let r1 = env1.process(0.0);
-    
+
     env2.process(1.0);
     let r2 = env2.process(0.0);
-    
+
     // They should release by different amounts per sample because dt is different
     assert!(r1 != r2);
 }
@@ -249,7 +275,13 @@ fn gain_computer_matches_reference() {
         let exp_gr = case["expected_gr"].as_f64().unwrap() as f32;
 
         let gr = compute_gain_reduction(env_db, threshold, ratio, knee);
-        assert!((gr - exp_gr).abs() < 1e-4, "Env {}, Expected GR {}, got {}", env_db, exp_gr, gr);
+        assert!(
+            (gr - exp_gr).abs() < 1e-4,
+            "Env {}, Expected GR {}, got {}",
+            env_db,
+            exp_gr,
+            gr
+        );
     }
 }
 
@@ -264,27 +296,33 @@ fn gain_computer_c1_continuous() {
     let threshold = -18.0;
     let ratio = 3.0;
     let knee = 2.0;
-    
+
     // Knee boundaries are threshold - knee/2 = -19, and threshold + knee/2 = -17
     let eps = 1e-3;
-    
+
     // Lower boundary slope
     let gr1 = compute_gain_reduction(-19.0 - eps, threshold, ratio, knee);
     let gr2 = compute_gain_reduction(-19.0, threshold, ratio, knee);
     let gr3 = compute_gain_reduction(-19.0 + eps, threshold, ratio, knee);
-    
+
     let slope_below = (gr2 - gr1) / eps;
     let slope_above = (gr3 - gr2) / eps;
-    assert!((slope_below - slope_above).abs() < 0.01, "Discontinuity at lower boundary");
+    assert!(
+        (slope_below - slope_above).abs() < 0.01,
+        "Discontinuity at lower boundary"
+    );
 
     // Upper boundary slope
     let gr1 = compute_gain_reduction(-17.0 - eps, threshold, ratio, knee);
     let gr2 = compute_gain_reduction(-17.0, threshold, ratio, knee);
     let gr3 = compute_gain_reduction(-17.0 + eps, threshold, ratio, knee);
-    
+
     let slope_below = (gr2 - gr1) / eps;
     let slope_above = (gr3 - gr2) / eps;
-    assert!((slope_below - slope_above).abs() < 0.01, "Discontinuity at upper boundary");
+    assert!(
+        (slope_below - slope_above).abs() < 0.01,
+        "Discontinuity at upper boundary"
+    );
 }
 
 #[test]
@@ -329,7 +367,9 @@ fn compressor_band_reduces_loud_signal() {
     let mut peak = 0.0;
     for _ in 0..1000 {
         let x = band.process(1.0); // DC
-        if x.abs() > peak { peak = x.abs(); }
+        if x.abs() > peak {
+            peak = x.abs();
+        }
     }
     // Should be reduced
     assert!(peak < 1.0);
@@ -346,10 +386,17 @@ fn compressor_band_passes_quiet_signal() {
     let mut peak = 0.0;
     for _ in 0..1000 {
         let x = band.process(in_val); // DC
-        if x.abs() > peak { peak = x.abs(); }
+        if x.abs() > peak {
+            peak = x.abs();
+        }
     }
     // Should be exactly in_val
-    assert!((peak - in_val).abs() < 1e-4, "Expected {}, got {}", in_val, peak);
+    assert!(
+        (peak - in_val).abs() < 1e-4,
+        "Expected {}, got {}",
+        in_val,
+        peak
+    );
 }
 
 #[test]
@@ -426,13 +473,13 @@ fn compressor_v3_identity_no_gain_reduction() {
     // feed DC stereo signal
     let in_l = 0.5;
     let in_r = -0.3;
-    
+
     for _ in 0..1000 {
         let mut left = in_l;
         let mut right = in_r;
         comp.process_stereo(&mut left, &mut right);
     }
-    
+
     let mut left = in_l;
     let mut right = in_r;
     comp.process_stereo(&mut left, &mut right);
@@ -470,13 +517,13 @@ fn compressor_v3_ms_encode_decode_roundtrip() {
     let mut comp = CompressorV3::new(config, 48000);
     let in_l = 0.7;
     let in_r = -0.4;
-    
+
     for _ in 0..1000 {
         let mut left = in_l;
         let mut right = in_r;
         comp.process_stereo(&mut left, &mut right);
     }
-    
+
     let mut left = in_l;
     let mut right = in_r;
     comp.process_stereo(&mut left, &mut right);
@@ -490,7 +537,7 @@ fn compressor_v3_mid_independent_of_side() {
     let config = v3_default_config();
     // mid and side both compress above -18
     let mut comp = CompressorV3::new(config, 48000);
-    
+
     for _ in 0..1000 {
         let mut l = 1.0;
         let mut r = 1.0;
@@ -499,9 +546,9 @@ fn compressor_v3_mid_independent_of_side() {
     let mut l = 1.0;
     let mut r = 1.0;
     comp.process_stereo(&mut l, &mut r);
-    
+
     assert!(l < 1.0);
-    
+
     comp.reset();
     for _ in 0..1000 {
         let mut l = 0.01;
@@ -511,7 +558,7 @@ fn compressor_v3_mid_independent_of_side() {
     let mut l = 0.01;
     let mut r = -0.01;
     comp.process_stereo(&mut l, &mut r);
-    
+
     assert!((l - 0.01).abs() < 1e-4);
     assert!((r - -0.01).abs() < 1e-4);
 }

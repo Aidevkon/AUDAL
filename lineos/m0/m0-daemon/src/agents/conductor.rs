@@ -5,13 +5,10 @@
 //! Authority: Constitutional Agent Architecture Spec v3.1 §2.2
 //! Motto: "I build the plan. I do not execute it."
 
-use tokio::sync::{mpsc, oneshot};
+use super::operator::{ConductorError, ExecutionPlan, ExecutorError, Intent, MasteringOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use super::operator::{
-    Intent, ConductorError, ExecutorError,
-    ExecutionPlan, MasteringOutput,
-};
+use tokio::sync::{mpsc, oneshot};
 
 pub async fn run(mut rx: mpsc::Receiver<Intent>) {
     // AtomicBool: only one mastering job at a time
@@ -35,33 +32,28 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 }
 
                 let executor_tx = executor_tx.clone();
-                let busy_clone  = busy.clone();
+                let busy_clone = busy.clone();
 
                 // Spawn so HTTP handler is not blocked
                 tokio::spawn(async move {
                     // R2: build ExecutionPlan from MasteringParams
                     // Pure translation — no business logic on values
                     let plan = ExecutionPlan {
-                        audio_path:  params.audio_path,
-                        preset_id:   params.preset_id,
+                        audio_path: params.audio_path,
+                        preset_id: params.preset_id,
                         target_lufs: params.target_lufs,
-                        max_tp_db:   params.max_tp_db,
-                        session_id:  params.session_id.clone(),
+                        max_tp_db: params.max_tp_db,
+                        session_id: params.session_id.clone(),
                     };
 
                     // Dispatch to Executor (R3)
                     let (tx, rx) = oneshot::channel();
-                    let run_dsp_intent = Intent::RunDsp {
-                        plan,
-                        response: tx,
-                    };
+                    let run_dsp_intent = Intent::RunDsp { plan, response: tx };
 
                     if executor_tx.send(run_dsp_intent).await.is_err() {
-                        let _ = response.send(Err(
-                            ConductorError::ExecutorFailed(
-                                "Executor channel closed".into()
-                            )
-                        ));
+                        let _ = response.send(Err(ConductorError::ExecutorFailed(
+                            "Executor channel closed".into(),
+                        )));
                         busy_clone.store(false, Ordering::SeqCst);
                         return;
                     }
@@ -69,29 +61,23 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     // Await Executor result
                     match rx.await {
                         Err(_) => {
-                            let _ = response.send(Err(
-                                ConductorError::ExecutorFailed(
-                                    "Executor dropped oneshot".into()
-                                )
-                            ));
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(
+                                "Executor dropped oneshot".into(),
+                            )));
                         }
                         Ok(Err(ExecutorError::DspFailed(e))) => {
-                            let _ = response.send(Err(
-                                ConductorError::ExecutorFailed(e)
-                            ));
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(e)));
                         }
                         Ok(Err(ExecutorError::BlobStoreFailed(e))) => {
-                            let _ = response.send(Err(
-                                ConductorError::ExecutorFailed(e)
-                            ));
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(e)));
                         }
                         Ok(Ok(dsp_output)) => {
                             // R2: assemble MasteringOutput from DspOutput
                             let output = MasteringOutput {
-                                job_id:     params.session_id,
-                                blob_id:    dsp_output.blob_id,
-                                status:     "ok",
-                                pcm_data:   dsp_output.pcm_data,
+                                job_id: params.session_id,
+                                blob_id: dsp_output.blob_id,
+                                status: "ok",
+                                pcm_data: dsp_output.pcm_data,
                                 num_frames: dsp_output.num_frames,
                             };
                             let _ = response.send(Ok(output));
@@ -103,7 +89,11 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 });
             }
 
-            Intent::ExecuteBatchMastering { batch_id, items, response } => {
+            Intent::ExecuteBatchMastering {
+                batch_id,
+                items,
+                response,
+            } => {
                 // R2 decision: busy check
                 if busy.swap(true, Ordering::SeqCst) {
                     let _ = response.send(Err(ConductorError::Busy));
@@ -111,7 +101,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                 }
 
                 let executor_tx = executor_tx.clone();
-                let busy_clone  = busy.clone();
+                let busy_clone = busy.clone();
 
                 tokio::spawn(async move {
                     let total = items.len();
@@ -124,19 +114,21 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     // Step 3: compute per-track target offsets
                     // This preserves macro-dynamics between tracks.
                     // INV-AB-1: deterministic — same inputs → same targets
-                    let global_target = items.first()
-                        .map(|p| p.target_lufs)
-                        .unwrap_or(-14.0_f32);
+                    let global_target = items.first().map(|p| p.target_lufs).unwrap_or(-14.0_f32);
 
                     let mut track_lufs: Vec<f32> = Vec::with_capacity(total);
 
                     for params in &items {
                         let (tx, rx) = oneshot::channel();
-                        if executor_tx.send(Intent::RunAnalysis {
-                            audio_path: params.audio_path.clone(),
-                            session_id: params.session_id.clone(),
-                            response:   tx,
-                        }).await.is_err() {
+                        if executor_tx
+                            .send(Intent::RunAnalysis {
+                                audio_path: params.audio_path.clone(),
+                                session_id: params.session_id.clone(),
+                                response: tx,
+                            })
+                            .await
+                            .is_err()
+                        {
                             track_lufs.push(global_target);
                             continue;
                         }
@@ -162,7 +154,8 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     }
 
                     // Anchor = loudest track (highest LUFS = least negative)
-                    let anchor_lufs = track_lufs.iter()
+                    let anchor_lufs = track_lufs
+                        .iter()
                         .copied()
                         .filter(|l| l.is_finite() && *l > -70.0)
                         .fold(f32::NEG_INFINITY, f32::max);
@@ -176,7 +169,8 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                     // per_track_target = global_target - (anchor_lufs - track_lufs)
                     // Anchor → exactly global_target
                     // Quieter tracks → lower target (preserves relative dynamics)
-                    let per_track_targets: Vec<f32> = track_lufs.iter()
+                    let per_track_targets: Vec<f32> = track_lufs
+                        .iter()
                         .map(|&lufs| {
                             let offset = anchor_lufs - lufs;
                             (global_target - offset).clamp(-40.0, 0.0)
@@ -204,25 +198,26 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
 
                         // Build ExecutionPlan for this track
                         let plan = ExecutionPlan {
-                            audio_path:  params.audio_path.clone(),
-                            preset_id:   params.preset_id.clone(),
+                            audio_path: params.audio_path.clone(),
+                            preset_id: params.preset_id.clone(),
                             target_lufs: cohesion_target,
-                            max_tp_db:   params.max_tp_db,
-                            session_id:  params.session_id.clone(),
+                            max_tp_db: params.max_tp_db,
+                            session_id: params.session_id.clone(),
                         };
 
                         // Dispatch to Executor (R3) — sequential, await each
                         let (tx, rx) = oneshot::channel();
-                        if executor_tx.send(Intent::RunDsp {
-                            plan,
-                            response: tx,
-                        }).await.is_err() {
+                        if executor_tx
+                            .send(Intent::RunDsp { plan, response: tx })
+                            .await
+                            .is_err()
+                        {
                             outputs.push(super::operator::BatchTrackOutput {
                                 track_index: index,
-                                session_id:  params.session_id,
-                                blob_id:     String::new(),
-                                status:      "error",
-                                error:       Some("Executor channel closed".into()),
+                                session_id: params.session_id,
+                                blob_id: String::new(),
+                                status: "error",
+                                error: Some("Executor channel closed".into()),
                             });
                             continue;
                         }
@@ -231,28 +226,28 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>) {
                             Ok(Ok(dsp_output)) => {
                                 outputs.push(super::operator::BatchTrackOutput {
                                     track_index: index,
-                                    session_id:  params.session_id,
-                                    blob_id:     dsp_output.blob_id,
-                                    status:      "ok",
-                                    error:       None,
+                                    session_id: params.session_id,
+                                    blob_id: dsp_output.blob_id,
+                                    status: "ok",
+                                    error: None,
                                 });
                             }
                             Ok(Err(e)) => {
                                 outputs.push(super::operator::BatchTrackOutput {
                                     track_index: index,
-                                    session_id:  params.session_id,
-                                    blob_id:     String::new(),
-                                    status:      "error",
-                                    error:       Some(format!("{:?}", e)),
+                                    session_id: params.session_id,
+                                    blob_id: String::new(),
+                                    status: "error",
+                                    error: Some(format!("{:?}", e)),
                                 });
                             }
                             Err(_) => {
                                 outputs.push(super::operator::BatchTrackOutput {
                                     track_index: index,
-                                    session_id:  params.session_id,
-                                    blob_id:     String::new(),
-                                    status:      "error",
-                                    error:       Some("Executor dropped oneshot".into()),
+                                    session_id: params.session_id,
+                                    blob_id: String::new(),
+                                    status: "error",
+                                    error: Some("Executor dropped oneshot".into()),
                                 });
                             }
                         }

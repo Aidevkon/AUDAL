@@ -1,10 +1,10 @@
 // src/bin/sp314_master.rs
 
-use sp314_dsp::io::{WavReader, WavWriter, FlacWriter};
-use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
-use sp314_dsp::pipeline::presets::MasteringTarget;
+use sp314_dsp::io::{FlacWriter, WavReader, WavWriter};
 use sp314_dsp::metering::measure_integrated_lufs;
 use sp314_dsp::pipeline::autotune::autotune;
+use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
+use sp314_dsp::pipeline::presets::MasteringTarget;
 use std::env;
 
 fn mastered_path(input: &str, ext: &str) -> String {
@@ -39,8 +39,16 @@ fn main() {
     }
 
     let input_path = &args[1];
-    let preset_arg = if args.len() > 2 { args[2].as_str() } else { "spotify" };
-    let format_arg = if args.len() > 3 { args[3].as_str() } else { "flac" };
+    let preset_arg = if args.len() > 2 {
+        args[2].as_str()
+    } else {
+        "spotify"
+    };
+    let format_arg = if args.len() > 3 {
+        args[3].as_str()
+    } else {
+        "flac"
+    };
 
     let target = match preset_arg {
         "spotify" => MasteringTarget::SpotifyV3,
@@ -70,13 +78,24 @@ fn main() {
 
     let mins = (decoded.duration_secs / 60.0) as u32;
     let secs = (decoded.duration_secs % 60.0) as u32;
-    let channels_str = if decoded.num_channels == 1 { "mono" } else { "stereo" };
+    let channels_str = if decoded.num_channels == 1 {
+        "mono"
+    } else {
+        "stereo"
+    };
 
-    let format_str = if is_flac { "FLAC 24-bit (lossless)" } else { "WAV 32-bit (float)" };
+    let format_str = if is_flac {
+        "FLAC 24-bit (lossless)"
+    } else {
+        "WAV 32-bit (float)"
+    };
 
     println!("sp314-dsp v3.0.0 — Offline Mastering");
     println!("─────────────────────────────────────");
-    println!("Input:    {} ({} Hz, {}, {}m {:02}s)", input_path, decoded.sample_rate, channels_str, mins, secs);
+    println!(
+        "Input:    {} ({} Hz, {}, {}m {:02}s)",
+        input_path, decoded.sample_rate, channels_str, mins, secs
+    );
     println!("Preset:   {:?}", target);
     println!("Format:   {}", format_str);
     println!("Output:   {}", output_path);
@@ -85,10 +104,10 @@ fn main() {
     let input_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
 
     let base_config = target.engine_config(decoded.sample_rate);
-    
+
     // Autotune (from test_engine.rs)
     let autotune_result = autotune(input_lufs, target.target_lufs().unwrap_or(input_lufs));
-    
+
     let mut tuned_config = base_config;
     tuned_config.target_makeup_db = autotune_result.pre_gain_db;
 
@@ -98,20 +117,39 @@ fn main() {
     engine.process_offline(&mut decoded.left, &mut decoded.right);
 
     let output_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
-    
-    let out_peak = decoded.left.iter().chain(decoded.right.iter())
+
+    let out_peak = decoded
+        .left
+        .iter()
+        .chain(decoded.right.iter())
         .map(|s| s.abs())
         .fold(0.0_f32, f32::max);
-        
-    let out_peak_db = if out_peak < 1e-9 { -144.0 } else { 20.0 * out_peak.log10() };
+
+    let out_peak_db = if out_peak < 1e-9 {
+        -144.0
+    } else {
+        20.0 * out_peak.log10()
+    };
 
     if is_flac {
-        FlacWriter::write(&output_path, &decoded.left, &decoded.right, decoded.sample_rate).unwrap_or_else(|e| {
+        FlacWriter::write(
+            &output_path,
+            &decoded.left,
+            &decoded.right,
+            decoded.sample_rate,
+        )
+        .unwrap_or_else(|e| {
             println!("Error writing FLAC file: {}", e);
             std::process::exit(1);
         });
     } else {
-        WavWriter::write(&output_path, &decoded.left, &decoded.right, decoded.sample_rate).unwrap_or_else(|e| {
+        WavWriter::write(
+            &output_path,
+            &decoded.left,
+            &decoded.right,
+            decoded.sample_rate,
+        )
+        .unwrap_or_else(|e| {
             println!("Error writing WAV file: {}", e);
             std::process::exit(1);
         });
@@ -131,7 +169,10 @@ mod tests {
     #[test]
     fn test_mastered_path_logic() {
         assert_eq!(mastered_path("song.wav", "flac"), "song_mastered.flac");
-        assert_eq!(mastered_path("path/to/song.wav", "wav"), "path/to/song_mastered.wav");
+        assert_eq!(
+            mastered_path("path/to/song.wav", "wav"),
+            "path/to/song_mastered.wav"
+        );
         assert_eq!(mastered_path("song.WAV", "flac"), "song_mastered.flac");
         assert_eq!(mastered_path("song", "wav"), "song_mastered.wav");
     }

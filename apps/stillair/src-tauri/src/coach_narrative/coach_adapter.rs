@@ -20,8 +20,8 @@
 //!   ❌ Adding new issues not present in findings
 //!   ❌ Giving specific DSP values in narrative
 
-use crate::commands::insights::CoachFindingsJson;
 use super::{CoachNarrativeJson, FindingExplanation};
+use crate::commands::insights::CoachFindingsJson;
 use adapter_runtime::llm_client::{invoke, Provider};
 
 // ── Prompt configuration structs (deserialized from coach_prompt.toml) ────────
@@ -29,21 +29,21 @@ use adapter_runtime::llm_client::{invoke, Provider};
 #[derive(serde::Deserialize, Clone)]
 struct PromptConfig {
     identity: IdentityConfig,
-    output:   OutputConfig,
-    schema:   SchemaConfig,
+    output: OutputConfig,
+    schema: SchemaConfig,
     examples: ExamplesConfig,
 }
 
 #[derive(serde::Deserialize, Clone)]
 struct IdentityConfig {
-    role:  String,
+    role: String,
     style: String,
     rules: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Clone)]
 struct OutputConfig {
-    format:      String,
+    format: String,
     no_markdown: bool,
     #[allow(dead_code)]
     no_preamble: bool,
@@ -61,17 +61,16 @@ struct ExamplesConfig {
 
 #[derive(serde::Deserialize, Clone)]
 struct ExampleEntry {
-    issue_id:   String,
-    severity:   String,
-    title:      String,
-    why:        String,
+    issue_id: String,
+    severity: String,
+    title: String,
+    why: String,
     suggestion: String,
 }
 
 // Embedded fallback — compile-time guarantee that the file exists.
 // If the runtime asset path fails, this is used instead.
-const DEFAULT_PROMPT_TOML: &str =
-    include_str!("../../assets/coach_prompt.toml");
+const DEFAULT_PROMPT_TOML: &str = include_str!("../../assets/coach_prompt.toml");
 
 // ── CoachAdapter ──────────────────────────────────────────────────────────────
 
@@ -89,12 +88,20 @@ pub struct CoachAdapter {
 impl CoachAdapter {
     /// Default adapter — phi3.5:3.8b (fast, structured JSON output).
     pub fn phi() -> Self {
-        Self { provider: Provider::Ollama { model: "phi3.5:3.8b".into() } }
+        Self {
+            provider: Provider::Ollama {
+                model: "phi3.5:3.8b".into(),
+            },
+        }
     }
 
     /// Narrative-quality adapter — gemma2:9b (richer explanation text).
     pub fn gemma() -> Self {
-        Self { provider: Provider::Ollama { model: "gemma2:9b".into() } }
+        Self {
+            provider: Provider::Ollama {
+                model: "gemma2:9b".into(),
+            },
+        }
     }
 
     /// Load prompt configuration from assets/coach_prompt.toml.
@@ -108,7 +115,7 @@ impl CoachAdapter {
             .unwrap_or_else(|| std::path::Path::new("assets/coach_prompt.toml").to_path_buf());
 
         let content_bytes = match std::fs::read(&asset_path) {
-            Ok(b)  => {
+            Ok(b) => {
                 eprintln!("[CoachAdapter] loaded prompt config from {:?}", asset_path);
                 b
             }
@@ -121,13 +128,12 @@ impl CoachAdapter {
             }
         };
 
-        toml::from_str(
-            std::str::from_utf8(&content_bytes).unwrap_or(DEFAULT_PROMPT_TOML)
-        ).unwrap_or_else(|e| {
-            eprintln!("[CoachAdapter] TOML parse error ({e}) — using embedded fallback");
-            toml::from_str(DEFAULT_PROMPT_TOML)
-                .expect("embedded DEFAULT_PROMPT_TOML must always be valid TOML")
-        })
+        toml::from_str(std::str::from_utf8(&content_bytes).unwrap_or(DEFAULT_PROMPT_TOML))
+            .unwrap_or_else(|e| {
+                eprintln!("[CoachAdapter] TOML parse error ({e}) — using embedded fallback");
+                toml::from_str(DEFAULT_PROMPT_TOML)
+                    .expect("embedded DEFAULT_PROMPT_TOML must always be valid TOML")
+            })
     }
 
     /// Generate a CoachNarrative from CoachFindings.
@@ -153,30 +159,41 @@ impl CoachAdapter {
     /// Build a prompt using identity + rules from coach_prompt.toml.
     /// Teacher identity enforced — no DSP instructions permitted.
     fn build_prompt(&self, findings: &CoachFindingsJson, config: &PromptConfig) -> String {
-        let rules_text   = config.identity.rules
+        let rules_text = config
+            .identity
+            .rules
             .iter()
             .map(|r| format!("- {r}"))
             .collect::<Vec<_>>()
             .join("\n");
 
-        let examples_text = config.examples.good
+        let examples_text = config
+            .examples
+            .good
             .iter()
-            .map(|e| format!(
-                "  issue_id: {}, severity: {}, title: {}\n  why: {}\n  suggestion: {}",
-                e.issue_id, e.severity, e.title, e.why, e.suggestion
-            ))
+            .map(|e| {
+                format!(
+                    "  issue_id: {}, severity: {}, title: {}\n  why: {}\n  suggestion: {}",
+                    e.issue_id, e.severity, e.title, e.why, e.suggestion
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n\n");
 
         let issues_text = if findings.issues.is_empty() {
             "No issues found — the track is fully compliant.".to_string()
         } else {
-            findings.issues.iter().map(|i| {
-                format!(
-                    "- {} [severity: {}]: current={:.1}, target={:.1}, delta={:.1}, tags={:?}",
-                    i.id, i.severity, i.current, i.target, i.delta, i.tags
-                )
-            }).collect::<Vec<_>>().join("\n")
+            findings
+                .issues
+                .iter()
+                .map(|i| {
+                    format!(
+                        "- {} [severity: {}]: current={:.1}, target={:.1}, delta={:.1}, tags={:?}",
+                        i.id, i.severity, i.current, i.target, i.delta, i.tags
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
         };
 
         let no_markdown_rule = if config.output.no_markdown {
@@ -203,15 +220,15 @@ You MUST respond ONLY with valid {format} matching this EXACT schema:
 {schema}
 
 {no_md}"#,
-            role           = config.identity.role,
-            style          = config.identity.style,
-            rules          = rules_text,
-            issues         = issues_text,
+            role = config.identity.role,
+            style = config.identity.style,
+            rules = rules_text,
+            issues = issues_text,
             recommendation = findings.recommendation,
-            examples       = examples_text,
-            format         = config.output.format,
-            schema         = config.schema.template,
-            no_md          = no_markdown_rule,
+            examples = examples_text,
+            format = config.output.format,
+            schema = config.schema.template,
+            no_md = no_markdown_rule,
         )
     }
 
@@ -239,15 +256,16 @@ You MUST respond ONLY with valid {format} matching this EXACT schema:
         // Parse the validated intermediate shape — not public, stays in this fn
         #[derive(serde::Deserialize)]
         struct LlmOutput {
-            summary:      String,
+            summary: String,
             explanations: Vec<FindingExplanation>,
         }
 
-        let parsed: LlmOutput = serde_json::from_str(clean)
-            .map_err(|e| format!(
+        let parsed: LlmOutput = serde_json::from_str(clean).map_err(|e| {
+            format!(
                 "CoachAdapter: LLM returned invalid JSON: {e}\nRaw (first 200 chars): {}",
                 &clean[..clean.len().min(200)]
-            ))?;
+            )
+        })?;
 
         // Validate: every explanation must reference a known issue_id
         // Coach is FORBIDDEN from inventing new issues (Amendment §A6)
@@ -259,8 +277,7 @@ You MUST respond ONLY with valid {format} matching this EXACT schema:
                 return Err(format!(
                     "CoachAdapter: LLM invented unknown issue_id '{}'. \
                      Permitted IDs: {:?}",
-                    exp.issue_id,
-                    known_ids
+                    exp.issue_id, known_ids
                 ));
             }
         }
@@ -272,7 +289,7 @@ You MUST respond ONLY with valid {format} matching this EXACT schema:
 
         // Adapter Boundary crossed — return typed, validated struct
         Ok(CoachNarrativeJson {
-            summary:      parsed.summary,
+            summary: parsed.summary,
             explanations: parsed.explanations,
             model_used,
         })

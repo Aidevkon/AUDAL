@@ -7,44 +7,48 @@
 //!   2h podcast @48kHz stereo f32 = 2.7GB full load
 //!   With chunked I/O: ~2MB constant regardless of file size
 
+use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
-use hound::{WavReader, WavWriter, WavSpec, SampleFormat};
 
 /// Reads a WAV file in fixed-size chunks.
 /// Never loads the full file into RAM.
 pub struct WavChunkReader {
-    reader:      WavReader<BufReader<File>>,
+    reader: WavReader<BufReader<File>>,
     sample_rate: u32,
-    channels:    u16,
+    channels: u16,
 }
 
 impl WavChunkReader {
     pub fn open(path: &str) -> Result<Self, hound::Error> {
         let reader = WavReader::open(path)?;
-        let spec   = reader.spec();
+        let spec = reader.spec();
         Ok(Self {
             sample_rate: spec.sample_rate,
-            channels:    spec.channels,
+            channels: spec.channels,
             reader,
         })
     }
 
-    pub fn sample_rate(&self) -> u32 { self.sample_rate }
-    pub fn channels(&self)    -> u16 { self.channels }
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+    pub fn channels(&self) -> u16 {
+        self.channels
+    }
 
     /// Read next `chunk_frames` stereo frames → interleaved f32.
     /// Returns None at EOF.
     pub fn next_chunk(&mut self, chunk_frames: usize) -> Option<Vec<f32>> {
         let n_samples = chunk_frames * self.channels as usize;
-        let mut buf   = Vec::with_capacity(n_samples);
+        let mut buf = Vec::with_capacity(n_samples);
 
         let spec = self.reader.spec();
         match spec.sample_format {
             SampleFormat::Float => {
                 for sample in self.reader.samples::<f32>().take(n_samples) {
                     match sample {
-                        Ok(s)  => buf.push(s),
+                        Ok(s) => buf.push(s),
                         Err(_) => break,
                     }
                 }
@@ -53,14 +57,18 @@ impl WavChunkReader {
                 let max_val = (1i64 << (spec.bits_per_sample - 1)) as f32;
                 for sample in self.reader.samples::<i32>().take(n_samples) {
                     match sample {
-                        Ok(s)  => buf.push(s as f32 / max_val),
+                        Ok(s) => buf.push(s as f32 / max_val),
                         Err(_) => break,
                     }
                 }
             }
         }
 
-        if buf.is_empty() { None } else { Some(buf) }
+        if buf.is_empty() {
+            None
+        } else {
+            Some(buf)
+        }
     }
 
     /// Total sample count (all channels).
@@ -70,8 +78,7 @@ impl WavChunkReader {
 
     /// Duration in seconds.
     pub fn duration_secs(&self) -> f32 {
-        self.reader.len() as f32
-            / (self.sample_rate as f32 * self.channels as f32)
+        self.reader.len() as f32 / (self.sample_rate as f32 * self.channels as f32)
     }
 }
 
@@ -82,15 +89,16 @@ pub struct WavChunkWriter {
 }
 
 impl WavChunkWriter {
-    pub fn create(path: &str, sample_rate: u32,
-                  channels: u16) -> Result<Self, hound::Error> {
+    pub fn create(path: &str, sample_rate: u32, channels: u16) -> Result<Self, hound::Error> {
         let spec = WavSpec {
             channels,
             sample_rate,
             bits_per_sample: 32,
-            sample_format:   SampleFormat::Float,
+            sample_format: SampleFormat::Float,
         };
-        Ok(Self { writer: WavWriter::create(path, spec)? })
+        Ok(Self {
+            writer: WavWriter::create(path, spec)?,
+        })
     }
 
     /// Write interleaved f32 chunk directly to disk.
@@ -116,14 +124,11 @@ mod tests {
     fn write_then_read_chunk_roundtrip() {
         let path = "/tmp/test_stream_roundtrip.wav";
         let sample_rate = 48000u32;
-        let channels    = 2u16;
-        let chunk: Vec<f32> = (0..96000)
-            .map(|i| (i as f32 * 0.001).sin())
-            .collect();
+        let channels = 2u16;
+        let chunk: Vec<f32> = (0..96000).map(|i| (i as f32 * 0.001).sin()).collect();
 
         // Write
-        let mut writer = WavChunkWriter::create(path, sample_rate, channels)
-            .expect("write create");
+        let mut writer = WavChunkWriter::create(path, sample_rate, channels).expect("write create");
         writer.write_chunk(&chunk).expect("write chunk");
         writer.finalize().expect("finalize");
 
@@ -136,9 +141,12 @@ mod tests {
         assert_eq!(read_chunk.len(), chunk.len());
 
         // Verify roundtrip fidelity
-        let mse: f32 = chunk.iter().zip(read_chunk.iter())
+        let mse: f32 = chunk
+            .iter()
+            .zip(read_chunk.iter())
             .map(|(a, b)| (a - b).powi(2))
-            .sum::<f32>() / chunk.len() as f32;
+            .sum::<f32>()
+            / chunk.len() as f32;
         assert!(mse < 1e-10, "Roundtrip MSE={:.2e}", mse);
 
         std::fs::remove_file(path).ok();

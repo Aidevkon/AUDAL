@@ -1,4 +1,4 @@
-use sp314_nodes::topology::{DspTopology, TopologyNode, TopologyEdge};
+use sp314_nodes::topology::{DspTopology, TopologyEdge, TopologyNode};
 
 pub struct Merger;
 

@@ -30,8 +30,20 @@ fn iso226_returns_exact_value_at_reference_points() {
         let res80 = interpolate_iso226_correction(f, 80.0);
         let res90 = interpolate_iso226_correction(f, 90.0);
 
-        assert!((res80 - c80).abs() < 1e-4, "f={} expected {} got {}", f, c80, res80);
-        assert!((res90 - c90).abs() < 1e-4, "f={} expected {} got {}", f, c90, res90);
+        assert!(
+            (res80 - c80).abs() < 1e-4,
+            "f={} expected {} got {}",
+            f,
+            c80,
+            res80
+        );
+        assert!(
+            (res90 - c90).abs() < 1e-4,
+            "f={} expected {} got {}",
+            f,
+            c90,
+            res90
+        );
     }
 }
 
@@ -39,21 +51,26 @@ fn iso226_returns_exact_value_at_reference_points() {
 fn iso226_c1_continuity_at_interior_points() {
     let fixture = load_fixture("iso226_reference");
     let freqs = fixture["freqs_hz"].as_array().unwrap();
-    let tol = fixture["c1_continuity"]["tolerance_db_per_hz"].as_f64().unwrap() as f32;
+    let tol = fixture["c1_continuity"]["tolerance_db_per_hz"]
+        .as_f64()
+        .unwrap() as f32;
 
     for i in 1..(freqs.len() - 1) {
         let f = freqs[i].as_f64().unwrap() as f32;
-        
+
         let val_at_f = interpolate_iso226_correction(f, 80.0);
         let val_below = interpolate_iso226_correction(f - 0.5, 80.0);
         let val_above = interpolate_iso226_correction(f + 0.5, 80.0);
 
         let deriv_left = (val_at_f - val_below) / 0.5;
         let deriv_right = (val_above - val_at_f) / 0.5;
-        
+
         assert!(
             (deriv_left - deriv_right).abs() < tol,
-            "C1 discontinuity at {} Hz: left {} right {}", f, deriv_left, deriv_right
+            "C1 discontinuity at {} Hz: left {} right {}",
+            f,
+            deriv_left,
+            deriv_right
         );
     }
 }
@@ -70,7 +87,14 @@ fn iso226_phon_interpolation_valid_range() {
         let tol = check["tolerance"].as_f64().unwrap() as f32;
 
         let res = interpolate_iso226_correction(f, p);
-        assert!((res - exp).abs() < tol, "Interpolation error at f={} p={}: expected {} got {}", f, p, exp, res);
+        assert!(
+            (res - exp).abs() < tol,
+            "Interpolation error at f={} p={}: expected {} got {}",
+            f,
+            p,
+            exp,
+            res
+        );
     }
 }
 
@@ -78,14 +102,20 @@ fn iso226_phon_interpolation_valid_range() {
 fn iso226_boundary_clamping_low_frequency() {
     let val_5hz = interpolate_iso226_correction(5.0, 80.0);
     let val_20hz = interpolate_iso226_correction(20.0, 80.0);
-    assert_eq!(val_5hz, val_20hz, "Low frequencies must clamp to 20Hz value");
+    assert_eq!(
+        val_5hz, val_20hz,
+        "Low frequencies must clamp to 20Hz value"
+    );
 }
 
 #[test]
 fn iso226_boundary_clamping_high_frequency() {
     let val_20khz = interpolate_iso226_correction(20000.0, 80.0);
     let val_12_5khz = interpolate_iso226_correction(12500.0, 80.0);
-    assert_eq!(val_20khz, val_12_5khz, "High frequencies must clamp to 12500Hz value");
+    assert_eq!(
+        val_20khz, val_12_5khz,
+        "High frequencies must clamp to 12500Hz value"
+    );
 }
 
 #[test]
@@ -95,7 +125,7 @@ fn iso226_no_panic_on_boundary_inputs() {
     assert!(res1.is_finite());
     let res2 = interpolate_iso226_correction(48000.0, 90.0);
     assert!(res2.is_finite());
-    
+
     // Test phon clamping
     let res3 = interpolate_iso226_correction(1000.0, 50.0);
     let res4 = interpolate_iso226_correction(1000.0, 80.0);
@@ -155,14 +185,22 @@ fn spreading_spot_checks() {
     let spots = fixture["spot_checks"].as_array().unwrap();
 
     for check in spots {
-        if check.get("note_cap").is_some() { continue; }
-        
+        if check.get("note_cap").is_some() {
+            continue;
+        }
+
         let dz = check["dz"].as_f64().unwrap() as f32;
         let exp = check["expected_db"].as_f64().unwrap() as f32;
         let tol = check["tolerance"].as_f64().unwrap() as f32;
 
         let res = spreading_attenuation_db(dz);
-        assert!((res - exp).abs() < tol, "Spreading error at dz={}: expected {} got {}", dz, exp, res);
+        assert!(
+            (res - exp).abs() < tol,
+            "Spreading error at dz={}: expected {} got {}",
+            dz,
+            exp,
+            res
+        );
     }
 }
 
@@ -219,7 +257,7 @@ fn mask_deterministic_100_runs() {
     let fft = 1024;
     let num_bins = (fft / 2) + 1;
     let sr = 48000;
-    
+
     // We use a simple pseudo-random sequence for testing
     let mut spectrum = vec![0.0; num_bins];
     for i in 0..num_bins {

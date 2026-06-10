@@ -13,9 +13,9 @@ const OLLAMA_BASE: &str = "http://localhost:11434";
 
 #[derive(Serialize)]
 struct OllamaRequest<'a> {
-    model:   &'a str,
-    prompt:  &'a str,
-    stream:  bool,
+    model: &'a str,
+    prompt: &'a str,
+    stream: bool,
     options: OllamaOptions,
 }
 

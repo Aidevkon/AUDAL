@@ -1,8 +1,10 @@
-use dioxus::prelude::*;
 use super::types::EQState;
+use dioxus::prelude::*;
 
 pub fn eq_stroke_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
-    if points.is_empty() { return format!("M0,{} L{},{}", height/2.0, width, height/2.0); }
+    if points.is_empty() {
+        return format!("M0,{} L{},{}", height / 2.0, width, height / 2.0);
+    }
     let first = points[0];
     let mut path = format!("M{},{}", first.0 * width, first.1 * height);
     for p in &points[1..] {
@@ -10,7 +12,6 @@ pub fn eq_stroke_path(points: &[(f32, f32)], width: f32, height: f32) -> String 
     }
     path
 }
-
 
 /// EQ spectrum cell — mirrors SpectrumDisplay in InsightsPanel.
 /// Full-width EQ transfer curve with oscilloscope grid + freq labels.
@@ -78,17 +79,29 @@ pub fn EQDisplay(state: EQState) -> Element {
 
 /// Scale curve_points (normalized 0..1) to 400×160 viewBox with zero at y=80
 fn eq_stroke_path_scaled(points: &[(f32, f32)]) -> String {
-    if points.is_empty() { return "M10,80 L390,80".to_string(); }
+    if points.is_empty() {
+        return "M10,80 L390,80".to_string();
+    }
     let first = points[0];
-    let mut path = format!("M{:.1},{:.1}", 10.0 + first.0 * 380.0, 80.0 + (first.1 - 0.5) * 120.0);
+    let mut path = format!(
+        "M{:.1},{:.1}",
+        10.0 + first.0 * 380.0,
+        80.0 + (first.1 - 0.5) * 120.0
+    );
     for p in &points[1..] {
-        path.push_str(&format!(" L{:.1},{:.1}", 10.0 + p.0 * 380.0, 80.0 + (p.1 - 0.5) * 120.0));
+        path.push_str(&format!(
+            " L{:.1},{:.1}",
+            10.0 + p.0 * 380.0,
+            80.0 + (p.1 - 0.5) * 120.0
+        ));
     }
     path
 }
 
 fn eq_fill_path_scaled(points: &[(f32, f32)]) -> String {
-    if points.is_empty() { return "M10,80 L390,80 L390,80 L10,80 Z".to_string(); }
+    if points.is_empty() {
+        return "M10,80 L390,80 L390,80 L10,80 Z".to_string();
+    }
     let mut path = eq_stroke_path_scaled(points);
     path.push_str(" L390,80 L10,80 Z");
     path
@@ -125,8 +138,13 @@ fn EQGrid() -> Element {
 #[component]
 fn EQFreqLabels() -> Element {
     let labels: &[(&str, &str)] = &[
-        ("20Hz", "12"), ("100", "52"), ("500", "107"),
-        ("1k", "155"), ("5k", "222"), ("10k", "272"), ("20k", "345"),
+        ("20Hz", "12"),
+        ("100", "52"),
+        ("500", "107"),
+        ("1k", "155"),
+        ("5k", "222"),
+        ("10k", "272"),
+        ("20k", "345"),
     ];
     rsx! {
         g {

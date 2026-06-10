@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use super::types::SatTelemetry;
+use dioxus::prelude::*;
 
 /// SAT scope cell — mirrors StereoScope in InsightsPanel.
 /// Renders the soft-clip knee curve + THD bar as a scope-style visualization.
@@ -7,12 +7,13 @@ use super::types::SatTelemetry;
 pub fn SatDisplay(state: SatTelemetry) -> Element {
     // Build polyline points from knee_curve [f32; 64]
     // viewBox 0 0 120 120 — mirrors StereoScope viewBox
-    let knee_points: String = state.knee_curve
+    let knee_points: String = state
+        .knee_curve
         .iter()
         .enumerate()
         .map(|(i, &y)| {
             let x = i as f32 / 63.0 * 120.0;
-            let sy = (1.0 - y) * 120.0;  // invert Y
+            let sy = (1.0 - y) * 120.0; // invert Y
             format!("{:.1},{:.1}", x, sy)
         })
         .collect::<Vec<_>>()

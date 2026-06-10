@@ -7,16 +7,23 @@ use crate::types::SessionStateJson;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WizardFinding {
-    pub id:       &'static str,
+    pub id: &'static str,
     pub severity: WizardSeverity,
-    pub mfd:      MfdTarget,
+    pub mfd: MfdTarget,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum WizardSeverity { High, Medium, Low }
+pub enum WizardSeverity {
+    High,
+    Medium,
+    Low,
+}
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MfdTarget { Mfd1SignalAnalyzer, Mfd2SpatialTelemetry }
+pub enum MfdTarget {
+    Mfd1SignalAnalyzer,
+    Mfd2SpatialTelemetry,
+}
 
 /// Deterministic finding detection — same input = same findings, always.
 /// INV-WZ-1: no personality. INV-WZ-2: read-only.
@@ -170,7 +177,8 @@ impl CooldownTracker {
         findings: &'a [WizardFinding],
         now_ms: f64,
     ) -> Vec<&'a WizardFinding> {
-        findings.iter()
+        findings
+            .iter()
             .filter(|f| self.is_cooled_down(f.id, now_ms))
             .collect()
     }

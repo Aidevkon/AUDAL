@@ -6,20 +6,20 @@
 //! and drives the audio output callback via the ALSA backend on Linux.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::traits::{Split, Consumer};
+use ringbuf::traits::{Consumer, Split};
 use std::sync::{Arc, Mutex};
 
 /// cpal-backed audio output driver.
 /// Does not own PCM — receives a ring buffer consumer from XaakKernel.
 pub struct CpalPlayer {
-    stream:      Option<cpal::Stream>,
+    stream: Option<cpal::Stream>,
     position_ms: Arc<Mutex<u64>>,
 }
 
 impl CpalPlayer {
     pub fn new() -> Self {
         Self {
-            stream:      None,
+            stream: None,
             position_ms: Arc::new(Mutex::new(0)),
         }
     }
@@ -31,15 +31,16 @@ impl CpalPlayer {
     pub fn play<C>(
         &mut self,
         mut consumer: C,
-        sample_rate:  u32,
-        channels:     u16,
-        position_ms:  Arc<Mutex<u64>>,
+        sample_rate: u32,
+        channels: u16,
+        position_ms: Arc<Mutex<u64>>,
     ) -> Result<(), String>
     where
         C: Consumer<Item = f32> + Send + 'static,
     {
-        let host   = cpal::default_host();
-        let device = host.default_output_device()
+        let host = cpal::default_host();
+        let device = host
+            .default_output_device()
             .ok_or_else(|| "cpal: no default audio output device found".to_string())?;
 
         tracing::debug!(
@@ -56,14 +57,14 @@ impl CpalPlayer {
         };
 
         let pos = position_ms.clone();
-        let sr  = sample_rate as u64;
-        let ch  = channels as u64;
+        let sr = sample_rate as u64;
+        let ch = channels as u64;
 
         // TB-P6: ring buffer for telemetry worker
         // Audio callback only pushes raw samples — no math, no syscalls
         let telem_rb = ringbuf::HeapRb::<f32>::new(1024 * 16);
         let (telem_prod, telem_cons) = telem_rb.split();
-        let mut telem_prod = telem_prod;  // explicit binding
+        let mut telem_prod = telem_prod; // explicit binding
 
         // Spawn telemetry worker — FFT + UDP off audio thread
         crate::telemetry_worker::spawn(
@@ -73,29 +74,35 @@ impl CpalPlayer {
             position_ms.clone(),
         );
 
-        let stream = device.build_output_stream(
-            &config,
-            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                let filled = consumer.pop_slice(data);
-                // Fill any remaining frames with silence
-                for s in &mut data[filled..] { *s = 0.0; }
-                // Advance playback position
-                let frames   = filled as u64 / ch.max(1);
-                let delta_ms = frames.saturating_mul(1000) / sr.max(1);
-                if let Ok(mut p) = pos.lock() {
-                    *p = p.saturating_add(delta_ms);
-                }
-                // TB-P6: push raw samples to telemetry ring buffer
-                // Lock-free push — never blocks audio thread
-                let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod, data);
-            },
-            |err| tracing::error!("cpal stream error: {err}"),
-            None,
-        ).map_err(|e| format!("cpal: build_output_stream failed: {e}"))?;
+        let stream = device
+            .build_output_stream(
+                &config,
+                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                    let filled = consumer.pop_slice(data);
+                    // Fill any remaining frames with silence
+                    for s in &mut data[filled..] {
+                        *s = 0.0;
+                    }
+                    // Advance playback position
+                    let frames = filled as u64 / ch.max(1);
+                    let delta_ms = frames.saturating_mul(1000) / sr.max(1);
+                    if let Ok(mut p) = pos.lock() {
+                        *p = p.saturating_add(delta_ms);
+                    }
+                    // TB-P6: push raw samples to telemetry ring buffer
+                    // Lock-free push — never blocks audio thread
+                    let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod, data);
+                },
+                |err| tracing::error!("cpal stream error: {err}"),
+                None,
+            )
+            .map_err(|e| format!("cpal: build_output_stream failed: {e}"))?;
 
-        stream.play().map_err(|e| format!("cpal: stream.play() failed: {e}"))?;
+        stream
+            .play()
+            .map_err(|e| format!("cpal: stream.play() failed: {e}"))?;
 
-        self.stream      = Some(stream);
+        self.stream = Some(stream);
         self.position_ms = position_ms;
 
         tracing::info!("cpal: playback started");
@@ -126,7 +133,9 @@ impl CpalPlayer {
 }
 
 impl Default for CpalPlayer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Decimate audio block to 32 (L, R) pairs for Lissajous goniometer.
@@ -142,7 +151,9 @@ pub fn decimate_gonio(data: &[f32], channels: usize) -> [(f32, f32); 32] {
         let l = data.get(idx).copied().unwrap_or(0.0);
         let r = if ch > 1 {
             data.get(idx + 1).copied().unwrap_or(0.0)
-        } else { l };
+        } else {
+            l
+        };
         *pair = (l, r);
     }
     pairs

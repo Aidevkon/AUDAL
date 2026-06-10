@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LufsReport {
     /// Integrated loudness in LUFS (ITU-R BS.1770-4)
-    pub integrated_lufs:  f32,
+    pub integrated_lufs: f32,
     /// True peak in dBFS
-    pub true_peak_dbfs:   f32,
+    pub true_peak_dbfs: f32,
     /// Loudness Range in LU (EBU R128)
     pub loudness_range_lu: f32,
     /// Short-term loudness in LUFS (last 3s)
-    pub short_term_lufs:  Option<f32>,
+    pub short_term_lufs: Option<f32>,
 }
 
 /// v2.9 compatibility alias

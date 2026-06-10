@@ -1,10 +1,10 @@
 #![cfg(feature = "cli")]
 // tests/realtime_contract.rs
 
+use ringbuf::HeapRb;
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 use sp314_dsp::realtime::engine_thread::spawn_engine_thread;
-use ringbuf::HeapRb;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -40,12 +40,22 @@ fn process_block_matches_process_offline() {
     // In real-time mode, latency is kept in the buffer. In offline mode, the latency is shifted out.
     // Also, process_offline flushes the limiter with raw zeros (bypassing EQ/Comp),
     // whereas process_block processes the trailing zeros through the entire chain.
-    // Therefore, they are only bit-identical for the frames where they process the exact same inputs 
+    // Therefore, they are only bit-identical for the frames where they process the exact same inputs
     // and have the exact same lookahead context.
     let valid_len = len - sp314_dsp::limiter::LOOKAHEAD_SAMPLES;
     for i in 0..valid_len {
-        assert_eq!(left_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES], left_offline[i], "Left channel mismatch at frame {}", i);
-        assert_eq!(right_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES], right_offline[i], "Right channel mismatch at frame {}", i);
+        assert_eq!(
+            left_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES],
+            left_offline[i],
+            "Left channel mismatch at frame {}",
+            i
+        );
+        assert_eq!(
+            right_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES],
+            right_offline[i],
+            "Right channel mismatch at frame {}",
+            i
+        );
     }
 }
 
@@ -57,7 +67,7 @@ fn engine_thread_processes_without_glitch() {
 
     let rb_in = HeapRb::<f32>::new(4096 * 2);
     let (mut input_prod, input_cons) = rb_in.split();
-    
+
     let rb_out = HeapRb::<f32>::new(4096 * 2);
     let (output_prod, output_cons) = rb_out.split();
 
@@ -78,7 +88,12 @@ fn engine_thread_processes_without_glitch() {
     std::thread::sleep(Duration::from_millis(100));
 
     // Assert: output buffer contains >= 2048 stereo frames
-    assert!(output_cons.len() >= len * 2, "Engine did not keep up: expected >= {}, got {}", len * 2, output_cons.len());
+    assert!(
+        output_cons.len() >= len * 2,
+        "Engine did not keep up: expected >= {}, got {}",
+        len * 2,
+        output_cons.len()
+    );
 
     // Stop and join
     stop_signal.store(true, Ordering::SeqCst);

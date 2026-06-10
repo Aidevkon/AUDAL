@@ -3,14 +3,14 @@
 // Dynamic allocation — lives on heap.
 
 pub struct RingBuffer {
-    buffer:    std::vec::Vec<f32>,
+    buffer: std::vec::Vec<f32>,
     write_pos: usize,
 }
 
 impl RingBuffer {
     pub fn new(size: usize) -> Self {
         Self {
-            buffer:    vec![0.0_f32; size],
+            buffer: vec![0.0_f32; size],
             write_pos: 0,
         }
     }
@@ -34,7 +34,9 @@ impl RingBuffer {
         let mut max_val = 0.0_f32;
         for &val in self.buffer.iter() {
             let abs_val = libm::fabsf(val);
-            if abs_val > max_val { max_val = abs_val; }
+            if abs_val > max_val {
+                max_val = abs_val;
+            }
         }
         max_val
     }

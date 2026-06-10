@@ -13,61 +13,77 @@
 //! Laws: ❌ No SVG path computation  ❌ No inline hex  ❌ No std::f32 methods
 //! M/S fields: demo until backend amendment.
 
-use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
+use dioxus::prelude::*;
 
 // ── Demo Lissajous paths (FM0 idle) ───────────────────────────────────────────
-const DEMO_LISS_OUTER: &str =
-    "M 82,60 L 89,74 L 100,94 L 104,110 L 98,116 L 86,110 L 74,94 \
+const DEMO_LISS_OUTER: &str = "M 82,60 L 89,74 L 100,94 L 104,110 L 98,116 L 86,110 L 74,94 \
      L 66,74 L 60,60 L 54,46 L 46,26 L 34,10 L 22,4 L 16,10 \
      L 20,26 L 34,46 L 48,60 L 54,74 L 54,94 L 48,110 \
      L 38,116 L 28,108 L 22,92 L 26,74 L 38,60 L 52,46 \
      L 66,26 L 78,10 L 86,4 L 92,10 L 94,26 L 88,46 L 82,60";
 
-const DEMO_LISS_INNER: &str =
-    "M 60,60 L 72,73 L 84,78 L 84,66 L 72,47 L 60,38 \
+const DEMO_LISS_INNER: &str = "M 60,60 L 72,73 L 84,78 L 84,66 L 72,47 L 60,38 \
      L 48,47 L 36,66 L 36,78 L 48,73 L 60,60 \
      L 72,47 L 84,42 L 84,54 L 72,73 L 60,82 \
      L 48,73 L 36,54 L 36,42 L 48,47 L 60,60";
 
-const DEMO_LISS_D1: &str =
-    "M 60,60 L 81,73 L 90,60 L 81,47 L 60,60 \
+const DEMO_LISS_D1: &str = "M 60,60 L 81,73 L 90,60 L 81,47 L 60,60 \
      L 39,73 L 30,60 L 39,47 L 60,60 L 75,78 L 60,60 L 45,78 L 60,60";
 
-const DEMO_LISS_D2: &str =
-    "M 60,60 L 74,80 L 80,60 L 74,40 L 60,60 \
+const DEMO_LISS_D2: &str = "M 60,60 L 74,80 L 80,60 L 74,40 L 60,60 \
      L 46,80 L 40,60 L 46,40 L 60,60 L 70,88 L 60,60 L 50,88 L 60,60";
 
 // Demo M/S — pending backend amendment
-const DEMO_MID_PCT:  f32 = 62.0;
+const DEMO_MID_PCT: f32 = 62.0;
 const DEMO_SIDE_PCT: f32 = 38.0;
 
 // ── InsightsPanel ─────────────────────────────────────────────────────────────
 
 #[component]
 pub fn InsightsPanel(
-    mode:           Signal<CockpitMode>,
-    session_state:  Signal<Option<SessionStateJson>>,
+    mode: Signal<CockpitMode>,
+    session_state: Signal<Option<SessionStateJson>>,
     playback_state: Signal<Option<PlaybackStateJson>>,
-    viz_data:       Signal<Option<VisualizationDataJson>>,
+    viz_data: Signal<Option<VisualizationDataJson>>,
 ) -> Element {
     let state = session_state.read();
-    let viz   = viz_data.read();
+    let viz = viz_data.read();
 
-    let liss_outer   = viz.as_ref().map(|v| v.lissajous_path_outer.as_str()).unwrap_or(DEMO_LISS_OUTER).to_string();
-    let liss_inner   = viz.as_ref().map(|v| v.lissajous_path_inner.as_str()).unwrap_or(DEMO_LISS_INNER).to_string();
-    let liss_detail1 = viz.as_ref().map(|v| v.lissajous_path_detail1.as_str()).unwrap_or(DEMO_LISS_D1).to_string();
-    let liss_detail2 = viz.as_ref().map(|v| v.lissajous_path_detail2.as_str()).unwrap_or(DEMO_LISS_D2).to_string();
+    let liss_outer = viz
+        .as_ref()
+        .map(|v| v.lissajous_path_outer.as_str())
+        .unwrap_or(DEMO_LISS_OUTER)
+        .to_string();
+    let liss_inner = viz
+        .as_ref()
+        .map(|v| v.lissajous_path_inner.as_str())
+        .unwrap_or(DEMO_LISS_INNER)
+        .to_string();
+    let liss_detail1 = viz
+        .as_ref()
+        .map(|v| v.lissajous_path_detail1.as_str())
+        .unwrap_or(DEMO_LISS_D1)
+        .to_string();
+    let liss_detail2 = viz
+        .as_ref()
+        .map(|v| v.lissajous_path_detail2.as_str())
+        .unwrap_or(DEMO_LISS_D2)
+        .to_string();
 
     let (correlation, width, phase_coh) = match state.as_ref() {
-        Some(s) => (s.quality.stereo_correlation, s.quality.stereo_width, s.quality.phase_coherence),
-        None    => (0.21_f32, 0.62_f32, 0.31_f32),
+        Some(s) => (
+            s.quality.stereo_correlation,
+            s.quality.stereo_width,
+            s.quality.phase_coherence,
+        ),
+        None => (0.21_f32, 0.62_f32, 0.31_f32),
     };
 
-    let width_str  = format!("{:.2}", width);
-    let angle_str  = format!("+{:.0}°", phase_coh * 45.0);
+    let width_str = format!("{:.2}", width);
+    let angle_str = format!("+{:.0}°", phase_coh * 45.0);
 
     rsx! {
         ModuleFrame {
@@ -138,8 +154,8 @@ pub fn InsightsPanel(
 
 #[component]
 fn StereoScope(
-    path_outer:   String,
-    path_inner:   String,
+    path_outer: String,
+    path_inner: String,
     path_detail1: String,
     path_detail2: String,
 ) -> Element {

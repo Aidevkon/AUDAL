@@ -2,11 +2,11 @@ use lineos_corpus::contract::CorpusEnvelope;
 
 #[derive(Debug, Clone)]
 pub struct UserSpatialProfile {
-    pub width_tendency:  f32,  // [0.0=narrow, 1.0=wide]
-    pub depth_tendency:  f32,  // [0.0=front, 1.0=deep]
-    pub center_strength: f32,  // [0.0=weak, 1.0=strong]
-    pub lfe_tendency:    f32,  // [0.0=no sub, 1.0=full sub]
-    pub rear_decay:      f32,  // how long tails go to rear
+    pub width_tendency: f32,  // [0.0=narrow, 1.0=wide]
+    pub depth_tendency: f32,  // [0.0=front, 1.0=deep]
+    pub center_strength: f32, // [0.0=weak, 1.0=strong]
+    pub lfe_tendency: f32,    // [0.0=no sub, 1.0=full sub]
+    pub rear_decay: f32,      // how long tails go to rear
 }
 
 impl UserSpatialProfile {
@@ -42,7 +42,7 @@ impl UserSpatialProfile {
         let depth_tendency = (lush_wash_count as f32 / total_events as f32).min(1.0);
         let width_tendency = (cons_trans_count as f32 / total_events as f32).min(1.0);
         let rear_decay = (tail_count as f32 / total_events as f32).min(1.0);
-        
+
         let center_strength = 0.5; // fallback
         let lfe_tendency = 0.2; // fallback
 
@@ -57,21 +57,21 @@ impl UserSpatialProfile {
 
     pub fn default_podcast() -> Self {
         Self {
-            width_tendency:  0.3,
-            depth_tendency:  0.2,
+            width_tendency: 0.3,
+            depth_tendency: 0.2,
             center_strength: 0.8,
-            lfe_tendency:    0.1,
-            rear_decay:      0.3,
+            lfe_tendency: 0.1,
+            rear_decay: 0.3,
         }
     }
 
     pub fn default_music() -> Self {
         Self {
-            width_tendency:  0.7,
-            depth_tendency:  0.5,
+            width_tendency: 0.7,
+            depth_tendency: 0.5,
             center_strength: 0.5,
-            lfe_tendency:    0.4,
-            rear_decay:      0.5,
+            lfe_tendency: 0.4,
+            rear_decay: 0.5,
         }
     }
 
@@ -79,18 +79,15 @@ impl UserSpatialProfile {
     /// Predicted Tail → increase rear_decay temporarily
     /// Predicted Consonant → increase width_tendency temporarily
     /// INV-SP-1: deterministic
-    pub fn apply_markov_prediction(
-        &self,
-        predicted_voice_state: &str,
-    ) -> Self {
+    pub fn apply_markov_prediction(&self, predicted_voice_state: &str) -> Self {
         let mut modulated = self.clone();
         match predicted_voice_state {
-            "tail"      => modulated.rear_decay = (self.rear_decay + 0.2).min(1.0),
+            "tail" => modulated.rear_decay = (self.rear_decay + 0.2).min(1.0),
             "consonant" => modulated.width_tendency = (self.width_tendency + 0.15).min(1.0),
-            "vowel"     => modulated.center_strength = (self.center_strength + 0.1).min(1.0),
-            "silence"   => {
+            "vowel" => modulated.center_strength = (self.center_strength + 0.1).min(1.0),
+            "silence" => {
                 modulated.width_tendency = (self.width_tendency - 0.1).max(0.0);
-                modulated.rear_decay     = (self.rear_decay - 0.1).max(0.0);
+                modulated.rear_decay = (self.rear_decay - 0.1).max(0.0);
             }
             _ => {}
         }
@@ -142,7 +139,7 @@ mod tests {
         p.rear_decay = 0.95;
         let m = p.apply_markov_prediction("tail");
         assert!(m.rear_decay <= 1.0); // should clamp
-        
+
         let mut p2 = UserSpatialProfile::default_music();
         p2.width_tendency = 0.05;
         let m2 = p2.apply_markov_prediction("silence");

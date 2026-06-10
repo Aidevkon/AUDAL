@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex};
 #[derive(Debug, Clone, Copy, serde::Serialize, bincode::Decode)]
 pub struct RealtimeFrame {
     #[serde(with = "serde_arrays")]
-    pub spectrum:    [f32; 64],
-    pub gonio_path:  [(f32, f32); 32],
+    pub spectrum: [f32; 64],
+    pub gonio_path: [(f32, f32); 32],
     pub position_ms: u64,
 }
 
@@ -24,7 +24,7 @@ pub type LatestFrame = Arc<Mutex<Option<RealtimeFrame>>>;
 pub fn spawn_udp_listener(latest: LatestFrame) {
     std::thread::spawn(move || {
         let socket = match UdpSocket::bind("127.0.0.1:9000") {
-            Ok(s)  => s,
+            Ok(s) => s,
             Err(e) => {
                 tracing::error!("TB-P4: cannot bind UDP :9000 — {e}");
                 return;

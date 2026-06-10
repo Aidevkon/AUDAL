@@ -18,7 +18,7 @@ impl PhaseAligner {
         let (low_l, high_l) = self.crossover_l.process(*left);
         let (low_r, high_r) = self.crossover_r.process(*right);
         // LR4 sum rule: low + high (NO sign inversion)
-        *left  = low_l + high_l;
+        *left = low_l + high_l;
         *right = low_r + high_r;
     }
 

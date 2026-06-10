@@ -1,20 +1,20 @@
-use std::collections::{HashMap, VecDeque};
 use crate::node::DspNode;
-use crate::topology::DspTopology;
-use crate::nodes::input::InputNode;
-use crate::nodes::output::OutputNode;
-use crate::nodes::gain::GainNode;
+use crate::nodes::autolevel::AutoLevelNode;
 use crate::nodes::biquad::BiquadFilterNode;
-use crate::nodes::rms::RmsDetectorNode;
-use crate::nodes::ms::{MsMatrixNode, InverseMsMatrixNode};
 use crate::nodes::compressor::CompressorNode;
-use crate::nodes::limiter::LimiterNode;
-use crate::nodes::reverb::ReverbNode;
-use crate::nodes::width::WidthNode;
-use crate::nodes::noisegate::NoiseGateNode;
 use crate::nodes::deesser::DeEsserNode;
 use crate::nodes::dehum::DeHumNode;
-use crate::nodes::autolevel::AutoLevelNode;
+use crate::nodes::gain::GainNode;
+use crate::nodes::input::InputNode;
+use crate::nodes::limiter::LimiterNode;
+use crate::nodes::ms::{InverseMsMatrixNode, MsMatrixNode};
+use crate::nodes::noisegate::NoiseGateNode;
+use crate::nodes::output::OutputNode;
+use crate::nodes::reverb::ReverbNode;
+use crate::nodes::rms::RmsDetectorNode;
+use crate::nodes::width::WidthNode;
+use crate::topology::DspTopology;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug)]
 pub enum GraphError {
@@ -35,7 +35,7 @@ pub struct DspGraph {
     execution_order: Vec<String>,
     nodes: HashMap<String, Box<dyn DspNode>>,
     param_edges: Vec<ParamEdge>,
-    
+
     // Audio routing
     audio_deps: HashMap<String, Vec<String>>,
     buffers: HashMap<String, (Vec<f32>, Vec<f32>)>,
@@ -60,7 +60,7 @@ impl DspGraph {
     ) -> Result<Self, GraphError> {
         let mut nodes: HashMap<String, Box<dyn DspNode>> = HashMap::new();
         let mut buffers = HashMap::new();
-        
+
         let mut adj: HashMap<String, Vec<String>> = HashMap::new();
         let mut in_degree: HashMap<String, usize> = HashMap::new();
         let mut audio_deps: HashMap<String, Vec<String>> = HashMap::new();
@@ -72,110 +72,180 @@ impl DspGraph {
                 "Input" => Box::new(InputNode),
                 "Output" => Box::new(OutputNode),
                 "Gain" => {
-                    let gain = t_node.parameters.get("gain").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+                    let gain = t_node
+                        .parameters
+                        .get("gain")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1.0) as f32;
                     Box::new(GainNode::new(gain, sample_rate as f32))
-                },
+                }
                 "BiquadFilter" => {
                     let mut b = BiquadFilterNode::new(sample_rate as f32);
-                    if let Some(ft) = t_node.parameters.get("filter_type").and_then(|v| v.as_f64()) { b.set_parameter("filter_type", ft as f32); }
-                    if let Some(f) = t_node.parameters.get("freq_hz").and_then(|v| v.as_f64()) { b.set_parameter("freq_hz", f as f32); }
-                    if let Some(q) = t_node.parameters.get("q").and_then(|v| v.as_f64()) { b.set_parameter("q", q as f32); }
-                    if let Some(g) = t_node.parameters.get("gain_db").and_then(|v| v.as_f64()) { b.set_parameter("gain_db", g as f32); }
+                    if let Some(ft) = t_node
+                        .parameters
+                        .get("filter_type")
+                        .and_then(|v| v.as_f64())
+                    {
+                        b.set_parameter("filter_type", ft as f32);
+                    }
+                    if let Some(f) = t_node.parameters.get("freq_hz").and_then(|v| v.as_f64()) {
+                        b.set_parameter("freq_hz", f as f32);
+                    }
+                    if let Some(q) = t_node.parameters.get("q").and_then(|v| v.as_f64()) {
+                        b.set_parameter("q", q as f32);
+                    }
+                    if let Some(g) = t_node.parameters.get("gain_db").and_then(|v| v.as_f64()) {
+                        b.set_parameter("gain_db", g as f32);
+                    }
                     Box::new(b)
-                },
+                }
                 "RMS_Detector" => {
-                    let attack = t_node.parameters.get("attack_ms").and_then(|v| v.as_f64()).unwrap_or(10.0) as f32;
-                    let release = t_node.parameters.get("release_ms").and_then(|v| v.as_f64()).unwrap_or(100.0) as f32;
-                    let threshold = t_node.parameters.get("threshold_db").and_then(|v| v.as_f64()).unwrap_or(-20.0) as f32;
-                    Box::new(RmsDetectorNode::new(attack, release, threshold, sample_rate as f32))
-                },
+                    let attack = t_node
+                        .parameters
+                        .get("attack_ms")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(10.0) as f32;
+                    let release = t_node
+                        .parameters
+                        .get("release_ms")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(100.0) as f32;
+                    let threshold = t_node
+                        .parameters
+                        .get("threshold_db")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(-20.0) as f32;
+                    Box::new(RmsDetectorNode::new(
+                        attack,
+                        release,
+                        threshold,
+                        sample_rate as f32,
+                    ))
+                }
                 "MS_Matrix" => Box::new(MsMatrixNode),
                 "Inverse_MS_Matrix" => Box::new(InverseMsMatrixNode),
                 "Compressor" => {
                     let mut c = CompressorNode::new(sample_rate as f32);
-                    if let Some(t) = t_node.parameters.get("threshold_db").and_then(|v| v.as_f64()) { c.set_parameter("threshold_db", t as f32); }
-                    if let Some(r) = t_node.parameters.get("ratio").and_then(|v| v.as_f64()) { c.set_parameter("ratio", r as f32); }
-                    if let Some(k) = t_node.parameters.get("knee_db").and_then(|v| v.as_f64()) { c.set_parameter("knee_db", k as f32); }
-                    if let Some(a) = t_node.parameters.get("attack_ms").and_then(|v| v.as_f64()) { c.set_parameter("attack_ms", a as f32); }
-                    if let Some(rel) = t_node.parameters.get("release_ms").and_then(|v| v.as_f64()) { c.set_parameter("release_ms", rel as f32); }
-                    if let Some(m) = t_node.parameters.get("makeup_db").and_then(|v| v.as_f64()) { c.set_parameter("makeup_db", m as f32); }
+                    if let Some(t) = t_node
+                        .parameters
+                        .get("threshold_db")
+                        .and_then(|v| v.as_f64())
+                    {
+                        c.set_parameter("threshold_db", t as f32);
+                    }
+                    if let Some(r) = t_node.parameters.get("ratio").and_then(|v| v.as_f64()) {
+                        c.set_parameter("ratio", r as f32);
+                    }
+                    if let Some(k) = t_node.parameters.get("knee_db").and_then(|v| v.as_f64()) {
+                        c.set_parameter("knee_db", k as f32);
+                    }
+                    if let Some(a) = t_node.parameters.get("attack_ms").and_then(|v| v.as_f64()) {
+                        c.set_parameter("attack_ms", a as f32);
+                    }
+                    if let Some(rel) = t_node.parameters.get("release_ms").and_then(|v| v.as_f64())
+                    {
+                        c.set_parameter("release_ms", rel as f32);
+                    }
+                    if let Some(m) = t_node.parameters.get("makeup_db").and_then(|v| v.as_f64()) {
+                        c.set_parameter("makeup_db", m as f32);
+                    }
                     Box::new(c)
-                },
+                }
                 "MultibandCompressor" => {
-                    let f_low  = t_node.parameters
+                    let f_low = t_node
+                        .parameters
                         .get("f_low")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(200.0) as f32;
-                    let f_high = t_node.parameters
+                    let f_high = t_node
+                        .parameters
                         .get("f_high")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(3000.0) as f32;
-                    Box::new(
-                        crate::nodes::multiband::MultibandCompressorNode::new(
-                            sample_rate as f32,
-                            f_low,
-                            f_high,
-                        )
-                    )
-                },
+                    Box::new(crate::nodes::multiband::MultibandCompressorNode::new(
+                        sample_rate as f32,
+                        f_low,
+                        f_high,
+                    ))
+                }
                 "Harmonic" => {
-                    let drive       = t_node.parameters
+                    let drive = t_node
+                        .parameters
                         .get("drive")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(2.0) as f32;
-                    let mix         = t_node.parameters
+                    let mix = t_node
+                        .parameters
                         .get("mix")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(0.3) as f32;
-                    let even_amount = t_node.parameters
+                    let even_amount = t_node
+                        .parameters
                         .get("even_amount")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(0.6) as f32;
-                    let odd_amount  = t_node.parameters
+                    let odd_amount = t_node
+                        .parameters
                         .get("odd_amount")
                         .and_then(|v| v.as_f64())
                         .unwrap_or(0.2) as f32;
-                    Box::new(
-                        crate::nodes::harmonic::HarmonicNode::new(
-                            drive, mix, even_amount, odd_amount,
-                        )
-                    )
-                },
+                    Box::new(crate::nodes::harmonic::HarmonicNode::new(
+                        drive,
+                        mix,
+                        even_amount,
+                        odd_amount,
+                    ))
+                }
                 "Limiter" => {
                     let mut l = LimiterNode::new(sample_rate as f32);
-                    if let Some(c) = t_node.parameters.get("ceiling_db").and_then(|v| v.as_f64()) { l.set_parameter("ceiling_db", c as f32); }
+                    if let Some(c) = t_node.parameters.get("ceiling_db").and_then(|v| v.as_f64()) {
+                        l.set_parameter("ceiling_db", c as f32);
+                    }
                     Box::new(l)
-                },
+                }
                 "Reverb" => Box::new(ReverbNode::new(sample_rate)),
-                "Width"  => Box::new(WidthNode::new(sample_rate)),
+                "Width" => Box::new(WidthNode::new(sample_rate)),
                 "NoiseGate" => Box::new(NoiseGateNode::new(sample_rate)),
-                "DeEsser"   => Box::new(DeEsserNode::new(sample_rate)),
-                "DeHum"     => Box::new(DeHumNode::new(sample_rate)),
+                "DeEsser" => Box::new(DeEsserNode::new(sample_rate)),
+                "DeHum" => Box::new(DeHumNode::new(sample_rate)),
                 "AutoLevel" => Box::new(AutoLevelNode::new(sample_rate)),
                 _ => return Err(GraphError::UnknownNodeType(t_node.node_type.clone())),
             };
-            
+
             nodes.insert(t_node.node_id.clone(), node);
-            buffers.insert(t_node.node_id.clone(), (vec![0.0; block_size], vec![0.0; block_size]));
+            buffers.insert(
+                t_node.node_id.clone(),
+                (vec![0.0; block_size], vec![0.0; block_size]),
+            );
             in_degree.insert(t_node.node_id.clone(), 0);
             adj.insert(t_node.node_id.clone(), Vec::new());
         }
 
         // 2. Build edges
         for edge in &topology.edges {
-            if !nodes.contains_key(&edge.source) { return Err(GraphError::MissingNode(edge.source.clone())); }
-            if !nodes.contains_key(&edge.target) { return Err(GraphError::MissingNode(edge.target.clone())); }
+            if !nodes.contains_key(&edge.source) {
+                return Err(GraphError::MissingNode(edge.source.clone()));
+            }
+            if !nodes.contains_key(&edge.target) {
+                return Err(GraphError::MissingNode(edge.target.clone()));
+            }
 
             // Every edge dictates execution order: source must run before target
             adj.get_mut(&edge.source).unwrap().push(edge.target.clone());
             *in_degree.get_mut(&edge.target).unwrap() += 1;
 
             if edge.modulation_type == "audio" {
-                audio_deps.entry(edge.target.clone()).or_default().push(edge.source.clone());
+                audio_deps
+                    .entry(edge.target.clone())
+                    .or_default()
+                    .push(edge.source.clone());
             } else if edge.modulation_type == "parameter" {
                 param_edges.push(ParamEdge {
                     source_node: edge.source.clone(),
-                    source_output: edge.source_output.clone().unwrap_or_else(|| "envelope".to_string()),
+                    source_output: edge
+                        .source_output
+                        .clone()
+                        .unwrap_or_else(|| "envelope".to_string()),
                     target_node: edge.target.clone(),
                     target_parameter: edge.target_parameter.clone().unwrap_or_default(),
                 });
@@ -231,8 +301,16 @@ impl DspGraph {
 
         // 1. Resolve parameter modulation edges
         for edge in &self.param_edges {
-            if let Some(val) = self.nodes.get(&edge.source_node).unwrap().get_output(&edge.source_output) {
-                self.nodes.get_mut(&edge.target_node).unwrap().set_parameter_no_glide(&edge.target_parameter, val);
+            if let Some(val) = self
+                .nodes
+                .get(&edge.source_node)
+                .unwrap()
+                .get_output(&edge.source_output)
+            {
+                self.nodes
+                    .get_mut(&edge.target_node)
+                    .unwrap()
+                    .set_parameter_no_glide(&edge.target_parameter, val);
             }
         }
 
@@ -250,7 +328,10 @@ impl DspGraph {
                     buf_l[i] = 0.0_f32;
                     buf_r[i] = 0.0_f32;
                 }
-                self.nodes.get_mut(node_id).unwrap().process_stereo(buf_l, buf_r);
+                self.nodes
+                    .get_mut(node_id)
+                    .unwrap()
+                    .process_stereo(buf_l, buf_r);
                 continue;
             }
 
@@ -271,7 +352,10 @@ impl DspGraph {
             buf_l.copy_from_slice(&self.acc_left);
             buf_r.copy_from_slice(&self.acc_right);
 
-            self.nodes.get_mut(node_id).unwrap().process_stereo(buf_l, buf_r);
+            self.nodes
+                .get_mut(node_id)
+                .unwrap()
+                .process_stereo(buf_l, buf_r);
 
             if node_type == "Output" {
                 let len = left.len();

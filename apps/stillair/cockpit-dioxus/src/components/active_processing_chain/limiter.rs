@@ -1,9 +1,14 @@
-use dioxus::prelude::*;
-use super::types::LimiterState;
 use super::eq::eq_stroke_path;
+use super::types::LimiterState;
+use dioxus::prelude::*;
 
 pub fn lim_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
-    if points.is_empty() { return format!("M0,{} L{},{} L{},{} L0,{} Z", height, width, 0.0, width, height, height); }
+    if points.is_empty() {
+        return format!(
+            "M0,{} L{},{} L{},{} L0,{} Z",
+            height, width, 0.0, width, height, height
+        );
+    }
     let mut path = eq_stroke_path(points, width, height);
     path.push_str(&format!(" L{},{} L0,{} Z", width, height, height));
     path
@@ -16,7 +21,11 @@ pub fn lim_fill_path(points: &[(f32, f32)], width: f32, height: f32) -> String {
 pub fn LimDisplay(state: LimiterState) -> Element {
     let ceil_y = (state.ceiling_dbtp.abs() / 12.0 * 48.0).clamp(0.0, 48.0);
     let readout = format!("{:.2} dBTP", state.ceiling_dbtp);
-    let isp = if state.release_auto { format!("ISP×{} AUTO", state.isp_factor) } else { format!("ISP×{}", state.isp_factor) };
+    let isp = if state.release_auto {
+        format!("ISP×{} AUTO", state.isp_factor)
+    } else {
+        format!("ISP×{}", state.isp_factor)
+    };
 
     rsx! {
         div { class: "dsp-module-row",

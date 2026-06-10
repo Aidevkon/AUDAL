@@ -1,1131 +1,10 @@
 {
   "user_id": "proj_1",
-  "version": 17,
+  "version": 18,
   "presets": {
-    "unknown": {
-      "preset_id": "unknown",
-      "stems": {
-        "bass": {
-          "stem_type": "bass",
-          "transitions": {
-            "states": [
-              "sustained"
-            ],
-            "counts": [
-              [
-                58
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 58
-          },
-          "emissions": {
-            "sustained": {
-              "state": "sustained",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                60
-              ],
-              "rms_delta": [
-                0,
-                0,
-                58,
-                0,
-                2
-              ],
-              "transient_density": [
-                60,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                60,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                60
-              ],
-              "mfcc_bins": [
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ]
-              ],
-              "total": 60
-            }
-          },
-          "n_sessions": 2
-        },
-        "ambience": {
-          "stem_type": "ambience",
-          "transitions": {
-            "states": [
-              "lush"
-            ],
-            "counts": [
-              [
-                58
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 58
-          },
-          "emissions": {
-            "lush": {
-              "state": "lush",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                60
-              ],
-              "rms_delta": [
-                0,
-                0,
-                58,
-                0,
-                2
-              ],
-              "transient_density": [
-                60,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                60,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                60
-              ],
-              "mfcc_bins": [
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ]
-              ],
-              "total": 60
-            }
-          },
-          "n_sessions": 2
-        },
-        "harmonics": {
-          "stem_type": "harmonics",
-          "transitions": {
-            "states": [
-              "dense"
-            ],
-            "counts": [
-              [
-                58
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 58
-          },
-          "emissions": {
-            "dense": {
-              "state": "dense",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                60
-              ],
-              "rms_delta": [
-                0,
-                0,
-                58,
-                0,
-                2
-              ],
-              "transient_density": [
-                60,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                60,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                60
-              ],
-              "mfcc_bins": [
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ]
-              ],
-              "total": 60
-            }
-          },
-          "n_sessions": 2
-        },
-        "voice": {
-          "stem_type": "voice",
-          "transitions": {
-            "states": [
-              "vowel"
-            ],
-            "counts": [
-              [
-                58
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 58
-          },
-          "emissions": {
-            "vowel": {
-              "state": "vowel",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                60
-              ],
-              "rms_delta": [
-                0,
-                0,
-                58,
-                0,
-                2
-              ],
-              "transient_density": [
-                60,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                60,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                60
-              ],
-              "mfcc_bins": [
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ]
-              ],
-              "total": 60
-            }
-          },
-          "n_sessions": 2
-        },
-        "drums": {
-          "stem_type": "drums",
-          "transitions": {
-            "states": [
-              "sustain"
-            ],
-            "counts": [
-              [
-                58
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 58
-          },
-          "emissions": {
-            "sustain": {
-              "state": "sustain",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                60
-              ],
-              "rms_delta": [
-                0,
-                0,
-                58,
-                0,
-                2
-              ],
-              "transient_density": [
-                60,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                60,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                60
-              ],
-              "mfcc_bins": [
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  60,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ],
-                [
-                  0,
-                  0,
-                  60
-                ]
-              ],
-              "total": 60
-            }
-          },
-          "n_sessions": 2
-        }
-      }
-    },
     "warm": {
       "preset_id": "warm",
       "stems": {
-        "bass": {
-          "stem_type": "bass",
-          "transitions": {
-            "states": [
-              "sustained"
-            ],
-            "counts": [
-              [
-                87
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 87
-          },
-          "emissions": {
-            "sustained": {
-              "state": "sustained",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                90
-              ],
-              "rms_delta": [
-                0,
-                0,
-                87,
-                0,
-                3
-              ],
-              "transient_density": [
-                90,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                90,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                90
-              ],
-              "mfcc_bins": [
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  90,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ]
-              ],
-              "total": 90
-            }
-          },
-          "n_sessions": 3
-        },
-        "voice": {
-          "stem_type": "voice",
-          "transitions": {
-            "states": [
-              "vowel"
-            ],
-            "counts": [
-              [
-                87
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 87
-          },
-          "emissions": {
-            "vowel": {
-              "state": "vowel",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                90
-              ],
-              "rms_delta": [
-                0,
-                0,
-                87,
-                0,
-                3
-              ],
-              "transient_density": [
-                90,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                90,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                90
-              ],
-              "mfcc_bins": [
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  90,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ]
-              ],
-              "total": 90
-            }
-          },
-          "n_sessions": 3
-        },
-        "drums": {
-          "stem_type": "drums",
-          "transitions": {
-            "states": [
-              "sustain"
-            ],
-            "counts": [
-              [
-                87
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 87
-          },
-          "emissions": {
-            "sustain": {
-              "state": "sustain",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                90
-              ],
-              "rms_delta": [
-                0,
-                0,
-                87,
-                0,
-                3
-              ],
-              "transient_density": [
-                90,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                90,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                90
-              ],
-              "mfcc_bins": [
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  90,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ]
-              ],
-              "total": 90
-            }
-          },
-          "n_sessions": 3
-        },
-        "harmonics": {
-          "stem_type": "harmonics",
-          "transitions": {
-            "states": [
-              "dense"
-            ],
-            "counts": [
-              [
-                87
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 87
-          },
-          "emissions": {
-            "dense": {
-              "state": "dense",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                90
-              ],
-              "rms_delta": [
-                0,
-                0,
-                87,
-                0,
-                3
-              ],
-              "transient_density": [
-                90,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                90,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                90
-              ],
-              "mfcc_bins": [
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  90,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ]
-              ],
-              "total": 90
-            }
-          },
-          "n_sessions": 3
-        },
         "ambience": {
           "stem_type": "ambience",
           "transitions": {
@@ -1134,7 +13,7 @@
             ],
             "counts": [
               [
-                87
+                116
               ]
             ],
             "probs": [
@@ -1142,7 +21,7 @@
                 1.0
               ]
             ],
-            "n_transitions": 87
+            "n_transitions": 116
           },
           "emissions": {
             "lush": {
@@ -1152,114 +31,1235 @@
                 0,
                 0,
                 0,
-                90
+                120
               ],
               "rms_delta": [
                 0,
                 0,
-                87,
+                116,
                 0,
-                3
+                4
               ],
               "transient_density": [
-                90,
+                120,
                 0,
                 0,
                 0
               ],
               "spectral_centroid": [
                 0,
-                90,
+                120,
                 0,
                 0
               ],
               "spectral_flatness": [
                 0,
                 0,
-                90
+                120
               ],
               "mfcc_bins": [
                 [
-                  90,
+                  120,
                   0,
                   0
                 ],
                 [
                   0,
                   0,
-                  90
+                  120
                 ],
                 [
-                  90,
+                  120,
                   0,
                   0
                 ],
                 [
-                  90,
+                  120,
                   0,
                   0
                 ],
                 [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  0,
-                  0,
-                  90
-                ],
-                [
-                  90,
-                  0,
-                  0
-                ],
-                [
-                  90,
+                  120,
                   0,
                   0
                 ],
                 [
                   0,
-                  90,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  120,
                   0
                 ],
                 [
                   0,
                   0,
-                  90
+                  120
                 ],
                 [
                   0,
                   0,
-                  90
+                  120
                 ]
               ],
-              "total": 90
+              "total": 120
             }
           },
-          "n_sessions": 3
+          "n_sessions": 4
+        },
+        "harmonics": {
+          "stem_type": "harmonics",
+          "transitions": {
+            "states": [
+              "dense"
+            ],
+            "counts": [
+              [
+                116
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 116
+          },
+          "emissions": {
+            "dense": {
+              "state": "dense",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                120
+              ],
+              "rms_delta": [
+                0,
+                0,
+                116,
+                0,
+                4
+              ],
+              "transient_density": [
+                120,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                120,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                120
+              ],
+              "mfcc_bins": [
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  120,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ]
+              ],
+              "total": 120
+            }
+          },
+          "n_sessions": 4
+        },
+        "drums": {
+          "stem_type": "drums",
+          "transitions": {
+            "states": [
+              "sustain"
+            ],
+            "counts": [
+              [
+                116
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 116
+          },
+          "emissions": {
+            "sustain": {
+              "state": "sustain",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                120
+              ],
+              "rms_delta": [
+                0,
+                0,
+                116,
+                0,
+                4
+              ],
+              "transient_density": [
+                120,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                120,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                120
+              ],
+              "mfcc_bins": [
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  120,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ]
+              ],
+              "total": 120
+            }
+          },
+          "n_sessions": 4
+        },
+        "bass": {
+          "stem_type": "bass",
+          "transitions": {
+            "states": [
+              "sustained"
+            ],
+            "counts": [
+              [
+                116
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 116
+          },
+          "emissions": {
+            "sustained": {
+              "state": "sustained",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                120
+              ],
+              "rms_delta": [
+                0,
+                0,
+                116,
+                0,
+                4
+              ],
+              "transient_density": [
+                120,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                120,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                120
+              ],
+              "mfcc_bins": [
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  120,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ]
+              ],
+              "total": 120
+            }
+          },
+          "n_sessions": 4
+        },
+        "voice": {
+          "stem_type": "voice",
+          "transitions": {
+            "states": [
+              "vowel"
+            ],
+            "counts": [
+              [
+                116
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 116
+          },
+          "emissions": {
+            "vowel": {
+              "state": "vowel",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                120
+              ],
+              "rms_delta": [
+                0,
+                0,
+                116,
+                0,
+                4
+              ],
+              "transient_density": [
+                120,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                120,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                120
+              ],
+              "mfcc_bins": [
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  120,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  120,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ],
+                [
+                  0,
+                  0,
+                  120
+                ]
+              ],
+              "total": 120
+            }
+          },
+          "n_sessions": 4
+        }
+      }
+    },
+    "unknown": {
+      "preset_id": "unknown",
+      "stems": {
+        "ambience": {
+          "stem_type": "ambience",
+          "transitions": {
+            "states": [
+              "lush"
+            ],
+            "counts": [
+              [
+                58
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 58
+          },
+          "emissions": {
+            "lush": {
+              "state": "lush",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                60
+              ],
+              "rms_delta": [
+                0,
+                0,
+                58,
+                0,
+                2
+              ],
+              "transient_density": [
+                60,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                60,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                60
+              ],
+              "mfcc_bins": [
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ]
+              ],
+              "total": 60
+            }
+          },
+          "n_sessions": 2
+        },
+        "voice": {
+          "stem_type": "voice",
+          "transitions": {
+            "states": [
+              "vowel"
+            ],
+            "counts": [
+              [
+                58
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 58
+          },
+          "emissions": {
+            "vowel": {
+              "state": "vowel",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                60
+              ],
+              "rms_delta": [
+                0,
+                0,
+                58,
+                0,
+                2
+              ],
+              "transient_density": [
+                60,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                60,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                60
+              ],
+              "mfcc_bins": [
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ]
+              ],
+              "total": 60
+            }
+          },
+          "n_sessions": 2
+        },
+        "bass": {
+          "stem_type": "bass",
+          "transitions": {
+            "states": [
+              "sustained"
+            ],
+            "counts": [
+              [
+                58
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 58
+          },
+          "emissions": {
+            "sustained": {
+              "state": "sustained",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                60
+              ],
+              "rms_delta": [
+                0,
+                0,
+                58,
+                0,
+                2
+              ],
+              "transient_density": [
+                60,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                60,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                60
+              ],
+              "mfcc_bins": [
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ]
+              ],
+              "total": 60
+            }
+          },
+          "n_sessions": 2
+        },
+        "harmonics": {
+          "stem_type": "harmonics",
+          "transitions": {
+            "states": [
+              "dense"
+            ],
+            "counts": [
+              [
+                58
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 58
+          },
+          "emissions": {
+            "dense": {
+              "state": "dense",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                60
+              ],
+              "rms_delta": [
+                0,
+                0,
+                58,
+                0,
+                2
+              ],
+              "transient_density": [
+                60,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                60,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                60
+              ],
+              "mfcc_bins": [
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ]
+              ],
+              "total": 60
+            }
+          },
+          "n_sessions": 2
+        },
+        "drums": {
+          "stem_type": "drums",
+          "transitions": {
+            "states": [
+              "sustain"
+            ],
+            "counts": [
+              [
+                58
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 58
+          },
+          "emissions": {
+            "sustain": {
+              "state": "sustain",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                60
+              ],
+              "rms_delta": [
+                0,
+                0,
+                58,
+                0,
+                2
+              ],
+              "transient_density": [
+                60,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                60,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                60
+              ],
+              "mfcc_bins": [
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  60,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ],
+                [
+                  0,
+                  0,
+                  60
+                ]
+              ],
+              "total": 60
+            }
+          },
+          "n_sessions": 2
         }
       }
     },
     "default": {
       "preset_id": "default",
       "stems": {
-        "bass": {
-          "stem_type": "bass",
+        "harmonics": {
+          "stem_type": "harmonics",
           "transitions": {
             "states": [
-              "sustained"
+              "dense"
             ],
             "counts": [
               [
@@ -1274,132 +1274,8 @@
             "n_transitions": 319
           },
           "emissions": {
-            "sustained": {
-              "state": "sustained",
-              "rms_db": [
-                0,
-                0,
-                0,
-                0,
-                330
-              ],
-              "rms_delta": [
-                0,
-                0,
-                319,
-                0,
-                11
-              ],
-              "transient_density": [
-                330,
-                0,
-                0,
-                0
-              ],
-              "spectral_centroid": [
-                0,
-                330,
-                0,
-                0
-              ],
-              "spectral_flatness": [
-                0,
-                0,
-                330
-              ],
-              "mfcc_bins": [
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ],
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ],
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  270,
-                  60,
-                  0
-                ],
-                [
-                  2,
-                  328,
-                  0
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ],
-                [
-                  0,
-                  60,
-                  270
-                ]
-              ],
-              "total": 330
-            }
-          },
-          "n_sessions": 11
-        },
-        "ambience": {
-          "stem_type": "ambience",
-          "transitions": {
-            "states": [
-              "lush"
-            ],
-            "counts": [
-              [
-                319
-              ]
-            ],
-            "probs": [
-              [
-                1.0
-              ]
-            ],
-            "n_transitions": 319
-          },
-          "emissions": {
-            "lush": {
-              "state": "lush",
+            "dense": {
+              "state": "dense",
               "rms_db": [
                 0,
                 0,
@@ -1627,11 +1503,11 @@
           },
           "n_sessions": 11
         },
-        "harmonics": {
-          "stem_type": "harmonics",
+        "bass": {
+          "stem_type": "bass",
           "transitions": {
             "states": [
-              "dense"
+              "sustained"
             ],
             "counts": [
               [
@@ -1646,8 +1522,8 @@
             "n_transitions": 319
           },
           "emissions": {
-            "dense": {
-              "state": "dense",
+            "sustained": {
+              "state": "sustained",
               "rms_db": [
                 0,
                 0,
@@ -1772,6 +1648,130 @@
           "emissions": {
             "sustain": {
               "state": "sustain",
+              "rms_db": [
+                0,
+                0,
+                0,
+                0,
+                330
+              ],
+              "rms_delta": [
+                0,
+                0,
+                319,
+                0,
+                11
+              ],
+              "transient_density": [
+                330,
+                0,
+                0,
+                0
+              ],
+              "spectral_centroid": [
+                0,
+                330,
+                0,
+                0
+              ],
+              "spectral_flatness": [
+                0,
+                0,
+                330
+              ],
+              "mfcc_bins": [
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ],
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ],
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  270,
+                  60,
+                  0
+                ],
+                [
+                  2,
+                  328,
+                  0
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ],
+                [
+                  0,
+                  60,
+                  270
+                ]
+              ],
+              "total": 330
+            }
+          },
+          "n_sessions": 11
+        },
+        "ambience": {
+          "stem_type": "ambience",
+          "transitions": {
+            "states": [
+              "lush"
+            ],
+            "counts": [
+              [
+                319
+              ]
+            ],
+            "probs": [
+              [
+                1.0
+              ]
+            ],
+            "n_transitions": 319
+          },
+          "emissions": {
+            "lush": {
+              "state": "lush",
               "rms_db": [
                 0,
                 0,

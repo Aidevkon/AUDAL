@@ -2,21 +2,21 @@ use lineos_types::analysis::StemMetrics;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BassState {
-    Silent    = 0,
+    Silent = 0,
     Sustained = 1,
-    Walking   = 2,
-    Punchy    = 3,
-    Rumble    = 4,
+    Walking = 2,
+    Punchy = 3,
+    Rumble = 4,
 }
 
 impl BassState {
     pub fn to_str(&self) -> &'static str {
         match self {
-            BassState::Silent    => "silent",
+            BassState::Silent => "silent",
             BassState::Sustained => "sustained",
-            BassState::Walking   => "walking",
-            BassState::Punchy    => "punchy",
-            BassState::Rumble    => "rumble",
+            BassState::Walking => "walking",
+            BassState::Punchy => "punchy",
+            BassState::Rumble => "rumble",
         }
     }
 }
@@ -50,7 +50,8 @@ impl BassMarkovStateClassifier {
 
     pub fn predict_next(state: BassState) -> BassState {
         let row = TRANSITION_MATRIX_BASS_V1[state as usize];
-        let next_idx = row.iter()
+        let next_idx = row
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -70,17 +71,27 @@ mod tests {
     use super::*;
 
     fn mock(rms: f32, crest: f32) -> StemMetrics {
-        StemMetrics { rms_db: rms, crest_factor_db: crest, ..StemMetrics::default() }
+        StemMetrics {
+            rms_db: rms,
+            crest_factor_db: crest,
+            ..StemMetrics::default()
+        }
     }
 
     #[test]
     fn classify_silent() {
-        assert_eq!(BassMarkovStateClassifier::classify_bass(&mock(-65.0, 5.0)), BassState::Silent);
+        assert_eq!(
+            BassMarkovStateClassifier::classify_bass(&mock(-65.0, 5.0)),
+            BassState::Silent
+        );
     }
 
     #[test]
     fn predict_next_from_punchy_is_punchy() {
-        assert_eq!(BassMarkovStateClassifier::predict_next(BassState::Punchy), BassState::Punchy);
+        assert_eq!(
+            BassMarkovStateClassifier::predict_next(BassState::Punchy),
+            BassState::Punchy
+        );
     }
 
     #[test]

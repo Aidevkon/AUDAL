@@ -5,29 +5,49 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum CockpitEvent {
     // File lifecycle
-    FileDropped { path: String, name: String, format: String },
-    FileDropFailed { message: String },
+    FileDropped {
+        path: String,
+        name: String,
+        format: String,
+    },
+    FileDropFailed {
+        message: String,
+    },
     BackToIdle,
 
     // Preset selection
-    PresetSelected { preset_id: String },
+    PresetSelected {
+        preset_id: String,
+    },
 
     // Mastering
     MasterTriggered,
-    MasteringFailed { message: String },
-    MasteringComplete { blob_id: String },
+    MasteringFailed {
+        message: String,
+    },
+    MasteringComplete {
+        blob_id: String,
+    },
 
     // Export
-    ExportTriggered { format: String },
+    ExportTriggered {
+        format: String,
+    },
     ExportComplete,
-    ExportFailed { message: String },
+    ExportFailed {
+        message: String,
+    },
 
     // System
     FaultAcknowledged,
 
     // JINI (J-P6)
-    JiniSuggestionReady     { suggestion: crate::types::JiniSuggestionJson },
+    JiniSuggestionReady {
+        suggestion: crate::types::JiniSuggestionJson,
+    },
     JiniSuggestionAccepted,
     JiniSuggestionDismissed,
-    JiniPersonaChanged      { to: crate::types::JiniPersonaState },
+    JiniPersonaChanged {
+        to: crate::types::JiniPersonaState,
+    },
 }

@@ -8,44 +8,44 @@
 //!   FM2: Mastering progress indicator
 //!   FM5+: Golden Blob badge + EXPORT controls
 
-use dioxus::prelude::*;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::primary_signal_analyzer::PrimarySignalAnalyzer;
+use dioxus::prelude::*;
 
 use serde_json::json;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::ipc::invoke;
-use crate::state::cockpit_mode::{AscCode, CockpitMode};
 use crate::state::cockpit_event::CockpitEvent;
+use crate::state::cockpit_mode::{AscCode, CockpitMode};
 use crate::state::reducer::dispatch;
 use crate::types::{AudioMeta, SessionStateJson, VisualizationDataJson};
 
 const PRESETS: &[(&str, &str)] = &[
-    ("spotify",       "Spotify  −14 LUFS"),
-    ("youtube",       "YouTube  −14 LUFS"),
-    ("apple_music",   "Apple Music  −16 LUFS"),
+    ("spotify", "Spotify  −14 LUFS"),
+    ("youtube", "YouTube  −14 LUFS"),
+    ("apple_music", "Apple Music  −16 LUFS"),
     ("apple_podcast", "Apple Podcasts  −16 LUFS"),
-    ("tidal",         "Tidal  −14 LUFS"),
-    ("broadcast",     "Broadcast  −23 LUFS"),
-    ("amazon",        "Amazon Music  −14 LUFS"),
+    ("tidal", "Tidal  −14 LUFS"),
+    ("broadcast", "Broadcast  −23 LUFS"),
+    ("amazon", "Amazon Music  −14 LUFS"),
 ];
 
 const FLAVOURS: &[(&str, &str)] = &[
-    ("clean",     "CLEAN"),
-    ("warm",      "WARM"),
-    ("punch",     "PUNCH"),
-    ("air",       "AIR"),
-    ("film",      "FILM"),
+    ("clean", "CLEAN"),
+    ("warm", "WARM"),
+    ("punch", "PUNCH"),
+    ("air", "AIR"),
+    ("film", "FILM"),
     ("broadcast", "BROADCAST"),
 ];
 
 #[component]
 pub fn SessionPanel(
-    mode:          Signal<CockpitMode>,
+    mode: Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
-    viz_data:      Signal<Option<VisualizationDataJson>>,
+    viz_data: Signal<Option<VisualizationDataJson>>,
     show_mastered: Signal<bool>,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
     tone_angle: Signal<f32>,
@@ -54,88 +54,87 @@ pub fn SessionPanel(
     loud_angle: Signal<f32>,
     jini_persona: Signal<crate::types::JiniPersonaState>,
 ) -> Element {
-
     let flavour = use_signal(|| "clean".to_string());
 
     rsx! {
-        ModuleFrame {
-            title: "PRIMARY SIGNAL ANALYZER".to_string(),
-            panel_class: "panel-session".to_string(),
-            header_style: "color:var(--accent-session); border-bottom:2px solid var(--accent-session);".to_string(),
-            is_scrollable: true,
-            
-            { match mode.read().clone() {
-                        CockpitMode::Idle => {
-                            let m = mode;
-                            let on_load = move |_| {
-                                spawn_local(async move {
-                                    match crate::ipc::invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
-                                        Ok(Some(meta)) => {
-                                            dispatch(m, CockpitEvent::FileDropped {
-                                                path:   meta.path.clone(),
-                                                name:   meta.name.clone(),
-                                                format: meta.format.clone(),
-                                            });
-                                        }
-                                        Ok(None) => {}
-                                        Err(e) => dispatch(m, CockpitEvent::FileDropFailed {
-                                            message: format!("File open failed: {e}"),
-                                        }),
+    ModuleFrame {
+        title: "PRIMARY SIGNAL ANALYZER".to_string(),
+        panel_class: "panel-session".to_string(),
+        header_style: "color:var(--accent-session); border-bottom:2px solid var(--accent-session);".to_string(),
+        is_scrollable: true,
+
+        { match mode.read().clone() {
+                    CockpitMode::Idle => {
+                        let m = mode;
+                        let on_load = move |_| {
+                            spawn_local(async move {
+                                match crate::ipc::invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
+                                    Ok(Some(meta)) => {
+                                        dispatch(m, CockpitEvent::FileDropped {
+                                            path:   meta.path.clone(),
+                                            name:   meta.name.clone(),
+                                            format: meta.format.clone(),
+                                        });
                                     }
-                                });
-                            };
-                            rsx! {
-                                PrimarySignalAnalyzer {
-                                    filename: "NO FILE LOADED".to_string(),
-                                    format: "---".to_string(),
-                                    on_load_new: on_load,
+                                    Ok(None) => {}
+                                    Err(e) => dispatch(m, CockpitEvent::FileDropFailed {
+                                        message: format!("File open failed: {e}"),
+                                    }),
                                 }
+                            });
+                        };
+                        rsx! {
+                            PrimarySignalAnalyzer {
+                                filename: "NO FILE LOADED".to_string(),
+                                format: "---".to_string(),
+                                on_load_new: on_load,
                             }
-                        },
-                        CockpitMode::FileLoaded { name, format, path } => {
-                            let m = mode;
-                            let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
-                            rsx! {
-                                PrimarySignalAnalyzer {
-                                    filename: name.clone(),
-                                    format: format.clone(),
-                                    on_load_new: on_load,
-                                }
-                                FlavourMenu { flavour }
-                                PresetMenu { mode, path, name }
+                        }
+                    },
+                    CockpitMode::FileLoaded { name, format, path } => {
+                        let m = mode;
+                        let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
+                        rsx! {
+                            PrimarySignalAnalyzer {
+                                filename: name.clone(),
+                                format: format.clone(),
+                                on_load_new: on_load,
                             }
-                        },
-                        CockpitMode::PresetSelected { path, name, preset_id } => {
-                            let m = mode;
-                            let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
-                            rsx! {
-                                PrimarySignalAnalyzer {
-                                    filename: name.clone(),
-                                    format: String::new(),
-                                    on_load_new: on_load,
-                                }
-                                SelectedPreset { preset_id: preset_id.clone() }
-                                MasterButton { 
-                                    mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour,
-                                    tone_angle, dyn_angle, space_angle, loud_angle, jini_persona
-                                }
+                            FlavourMenu { flavour }
+                            PresetMenu { mode, path, name }
+                        }
+                    },
+                    CockpitMode::PresetSelected { path, name, preset_id } => {
+                        let m = mode;
+                        let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
+                        rsx! {
+                            PrimarySignalAnalyzer {
+                                filename: name.clone(),
+                                format: String::new(),
+                                on_load_new: on_load,
                             }
-                        },
-                        CockpitMode::Mastering { .. } => rsx! {
-                            MasteringProgress {}
-                        },
-                        CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
-                            GoldenBlobBadge {}
-                            ExportControls { mode, blob_id }
-                        },
-                        CockpitMode::Fault { code, message } => rsx! {
-                            FaultView { code, message }
-                        },
-                    }
+                            SelectedPreset { preset_id: preset_id.clone() }
+                            MasterButton {
+                                mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour,
+                                tone_angle, dyn_angle, space_angle, loud_angle, jini_persona
+                            }
+                        }
+                    },
+                    CockpitMode::Mastering { .. } => rsx! {
+                        MasteringProgress {}
+                    },
+                    CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
+                        GoldenBlobBadge {}
+                        ExportControls { mode, blob_id }
+                    },
+                    CockpitMode::Fault { code, message } => rsx! {
+                        FaultView { code, message }
+                    },
                 }
             }
         }
     }
+}
 #[component]
 fn FlavourMenu(mut flavour: Signal<String>) -> Element {
     rsx! {
@@ -175,7 +174,6 @@ fn FlavourMenu(mut flavour: Signal<String>) -> Element {
         }
     }
 }
-
 
 #[component]
 fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element {
@@ -222,7 +220,8 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
 
 #[component]
 fn SelectedPreset(preset_id: String) -> Element {
-    let label = PRESETS.iter()
+    let label = PRESETS
+        .iter()
         .find(|(id, _)| *id == preset_id.as_str())
         .map(|(_, l)| *l)
         .unwrap_or(&preset_id);
@@ -245,14 +244,14 @@ fn SelectedPreset(preset_id: String) -> Element {
 
 #[component]
 fn MasterButton(
-    mode:          Signal<CockpitMode>,
+    mode: Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
-    viz_data:      Signal<Option<VisualizationDataJson>>,
-    path:          String,
-    name:          String,
-    preset_id:     String,
+    viz_data: Signal<Option<VisualizationDataJson>>,
+    path: String,
+    name: String,
+    preset_id: String,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
-    flavour:       Signal<String>,
+    flavour: Signal<String>,
     tone_angle: Signal<f32>,
     dyn_angle: Signal<f32>,
     space_angle: Signal<f32>,
@@ -264,11 +263,12 @@ fn MasterButton(
         web_sys::console::log_1(&JsValue::from_str("[session] MASTER CLICKED"));
         let mode_val = format!("{:?}", mode.read().clone());
         #[cfg(debug_assertions)]
-        web_sys::console::log_1(&JsValue::from_str(
-            &format!("[session] current mode: {}", mode_val)
-        ));
+        web_sys::console::log_1(&JsValue::from_str(&format!(
+            "[session] current mode: {}",
+            mode_val
+        )));
 
-        let p  = path.clone();
+        let p = path.clone();
         let pr = preset_id.clone();
 
         // Use spawn_local — the correct WASM async primitive.
@@ -289,59 +289,73 @@ fn MasterButton(
                     "intentTone":     ((*tone_angle.read()  / 135.0) + 1.0) / 2.0,
                     "intentDynamics": ((*dyn_angle.read()   / 135.0) + 1.0) / 2.0,
                 }),
-            ).await {
-                Ok(id)  => id,
-                Err(e)  => {
+            )
+            .await
+            {
+                Ok(id) => id,
+                Err(e) => {
                     #[cfg(debug_assertions)]
-                    web_sys::console::log_1(&JsValue::from_str(
-                        &format!("[session] trigger_mastering FAILED: {e}")
-                    ));
-                    dispatch(mode, CockpitEvent::MasteringFailed {
-                        message: format!("Mastering failed: {e}"),
-                    });
+                    web_sys::console::log_1(&JsValue::from_str(&format!(
+                        "[session] trigger_mastering FAILED: {e}"
+                    )));
+                    dispatch(
+                        mode,
+                        CockpitEvent::MasteringFailed {
+                            message: format!("Mastering failed: {e}"),
+                        },
+                    );
                     return;
                 }
             };
             #[cfg(debug_assertions)]
-            web_sys::console::log_1(&JsValue::from_str(
-                &format!("[session] mastering done, blob_id={blob_id}")
-            ));
+            web_sys::console::log_1(&JsValue::from_str(&format!(
+                "[session] mastering done, blob_id={blob_id}"
+            )));
 
             // Single IPC call: all session data in one shot (P9-008)
             #[cfg(debug_assertions)]
             web_sys::console::log_1(&JsValue::from_str("[session] calling get_session_state..."));
-            
+
             let persona_str = match *jini_persona.read() {
-                crate::types::JiniPersonaState::Beginner     => "beginner",
+                crate::types::JiniPersonaState::Beginner => "beginner",
                 crate::types::JiniPersonaState::Intermediate => "intermediate",
-                crate::types::JiniPersonaState::Pro          => "pro",
+                crate::types::JiniPersonaState::Pro => "pro",
             };
 
             let state = match invoke::<crate::types::SessionStateJson, _>(
                 "get_session_state",
                 json!({ "blobId": blob_id, "persona": persona_str }),
-            ).await {
-                Ok(s)   => s,
-                Err(e)  => {
+            )
+            .await
+            {
+                Ok(s) => s,
+                Err(e) => {
                     #[cfg(debug_assertions)]
-                    web_sys::console::log_1(&JsValue::from_str(
-                        &format!("[session] get_session_state FAILED: {e}")
-                    ));
-                    dispatch(mode, CockpitEvent::MasteringFailed {
-                        message: format!("Session state failed: {e}"),
-                    });
+                    web_sys::console::log_1(&JsValue::from_str(&format!(
+                        "[session] get_session_state FAILED: {e}"
+                    )));
+                    dispatch(
+                        mode,
+                        CockpitEvent::MasteringFailed {
+                            message: format!("Session state failed: {e}"),
+                        },
+                    );
                     return;
                 }
             };
             #[cfg(debug_assertions)]
-            web_sys::console::log_1(&JsValue::from_str("[session] session state ok, transitioning to FM5"));
+            web_sys::console::log_1(&JsValue::from_str(
+                "[session] session state ok, transitioning to FM5",
+            ));
 
             // P14-003: Fetch viz immediately after session (UI Agent Context §3)
             let bid2 = blob_id.clone();
             if let Ok(viz) = invoke::<VisualizationDataJson, _>(
                 "get_visualization_data",
                 json!({ "blobId": bid2 }),
-            ).await {
+            )
+            .await
+            {
                 viz_data.set(Some(viz));
             }
 
@@ -435,17 +449,22 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
     let on_export = {
         let bid = blob_id.clone();
         move |_| {
-            let b   = bid.clone();
+            let b = bid.clone();
             let fmt = export_format.read().clone();
             spawn_local(async move {
-                dispatch(mode, CockpitEvent::ExportTriggered {
-                    format:  fmt.clone(),
-                });
+                dispatch(
+                    mode,
+                    CockpitEvent::ExportTriggered {
+                        format: fmt.clone(),
+                    },
+                );
 
                 match invoke::<crate::types::ExportResult, _>(
                     "export_audio",
                     json!({ "blobId": b, "format": fmt }),
-                ).await {
+                )
+                .await
+                {
                     Ok(r) => {
                         eprintln!("[export] written: {} ({})", r.written_path, r.format);
                         dispatch(mode, CockpitEvent::ExportComplete);
@@ -454,9 +473,12 @@ fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
                         dispatch(mode, CockpitEvent::ExportComplete);
                     }
                     Err(e) => {
-                        dispatch(mode, CockpitEvent::ExportFailed {
-                            message: format!("Export failed: {e}"),
-                        });
+                        dispatch(
+                            mode,
+                            CockpitEvent::ExportFailed {
+                                message: format!("Export failed: {e}"),
+                            },
+                        );
                     }
                 }
             });

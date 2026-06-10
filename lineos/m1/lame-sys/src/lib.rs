@@ -18,7 +18,7 @@
 
 #![allow(non_camel_case_types, non_snake_case, dead_code)]
 
-use std::os::raw::{c_int, c_float, c_uchar};
+use std::os::raw::{c_float, c_int, c_uchar};
 
 /// Opaque LAME global flags context. Obtained from `lame_init()`.
 pub enum lame_global_flags {}
@@ -52,21 +52,17 @@ extern "C" {
     ///
     /// Returns bytes written, 0 if buffer needs more input, or < 0 on error.
     pub fn lame_encode_buffer_interleaved_ieee_float(
-        gfp:          lame_t,
-        pcm:          *const c_float,
-        num_samples:  c_int,
-        mp3buf:       *mut c_uchar,
-        mp3buf_size:  c_int,
+        gfp: lame_t,
+        pcm: *const c_float,
+        num_samples: c_int,
+        mp3buf: *mut c_uchar,
+        mp3buf_size: c_int,
     ) -> c_int;
 
     /// Flush the encoder and write remaining frames. No decoder delay compensation.
     ///
     /// Returns bytes written or < 0 on error.
-    pub fn lame_encode_flush_nogap(
-        gfp:         lame_t,
-        mp3buf:      *mut c_uchar,
-        mp3buf_size: c_int,
-    ) -> c_int;
+    pub fn lame_encode_flush_nogap(gfp: lame_t, mp3buf: *mut c_uchar, mp3buf_size: c_int) -> c_int;
 
     /// Free LAME context. Call after encoding is complete.
     pub fn lame_close(gfp: lame_t) -> c_int;

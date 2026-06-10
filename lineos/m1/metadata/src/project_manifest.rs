@@ -2,39 +2,39 @@
 //! Written once per GoldenBlob. Immutable after creation.
 //! Authority: LineOS Constitution v2.0 §07
 
+use lineos_types::{Ebu128Measurement, GoldenBlob};
 use serde::{Deserialize, Serialize};
-use lineos_types::{GoldenBlob, Ebu128Measurement};
 
 /// Project manifest — produced once per mastering session.
 /// Contains the session's input hash (from GoldenBlob) + measurement summary.
 /// Downstream M1.6 sync uses this for cloud export — never syncs raw audio.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectManifest {
-    pub version:       String,
+    pub version: String,
     /// SHA-256 of input audio — from GoldenBlob (for audit trail)
-    pub input_hash:    String,
+    pub input_hash: String,
     /// Deterministic seed used for dither — for reproducibility audit
-    pub seed:          u64,
-    pub integrated_lufs:    f32,
-    pub true_peak_dbtp:     f32,
-    pub loudness_range_lu:  f32,
-    pub duration_seconds:   f32,
-    pub sample_rate:        u32,
-    pub channels:           u16,
+    pub seed: u64,
+    pub integrated_lufs: f32,
+    pub true_peak_dbtp: f32,
+    pub loudness_range_lu: f32,
+    pub duration_seconds: f32,
+    pub sample_rate: u32,
+    pub channels: u16,
 }
 
 impl ProjectManifest {
     pub fn generate(_blob: &GoldenBlob, measurement: &Ebu128Measurement) -> Self {
         Self {
-            version:            "1.0".to_string(),
-            input_hash:         "TODO".to_string(), // TODO: 3b — input_hash string logic removed
-            seed:               0, // TODO: 3b — blob.seed removed
-            integrated_lufs:    measurement.integrated_lufs,
-            true_peak_dbtp:     measurement.true_peak_dbfs, // changed field name
-            loudness_range_lu:  measurement.loudness_range_lu,
-            duration_seconds:   0.0, // TODO: 3b — duration_seconds removed
-            sample_rate:        48000, // TODO: 3b — sample_rate removed
-            channels:           2, // TODO: 3b — channels removed
+            version: "1.0".to_string(),
+            input_hash: "TODO".to_string(), // TODO: 3b — input_hash string logic removed
+            seed: 0,                        // TODO: 3b — blob.seed removed
+            integrated_lufs: measurement.integrated_lufs,
+            true_peak_dbtp: measurement.true_peak_dbfs, // changed field name
+            loudness_range_lu: measurement.loudness_range_lu,
+            duration_seconds: 0.0, // TODO: 3b — duration_seconds removed
+            sample_rate: 48000,    // TODO: 3b — sample_rate removed
+            channels: 2,           // TODO: 3b — channels removed
         }
     }
 
@@ -42,7 +42,6 @@ impl ProjectManifest {
         serde_json::to_string_pretty(self)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -79,10 +78,10 @@ mod tests {
 
     fn test_measurement() -> Ebu128Measurement {
         Ebu128Measurement {
-            integrated_lufs:    -14.0,
-            true_peak_dbfs:     -1.2,
-            loudness_range_lu:  6.0,
-            short_term_lufs:    Some(-13.0),
+            integrated_lufs: -14.0,
+            true_peak_dbfs: -1.2,
+            loudness_range_lu: 6.0,
+            short_term_lufs: Some(-13.0),
         }
     }
 

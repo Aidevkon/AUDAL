@@ -4,7 +4,11 @@ struct XorShiftRng {
 
 impl XorShiftRng {
     fn new(seed: u64) -> Self {
-        let state = if seed == 0 { 0xDEAD_BEEF_CAFE_1234 } else { seed };
+        let state = if seed == 0 {
+            0xDEAD_BEEF_CAFE_1234
+        } else {
+            seed
+        };
         Self { state }
     }
 
@@ -31,12 +35,18 @@ pub struct TpdfDither {
 
 impl TpdfDither {
     pub fn new(seed: u64) -> Self {
-        Self { rng: XorShiftRng::new(seed) }
+        Self {
+            rng: XorShiftRng::new(seed),
+        }
     }
 
     #[inline]
     pub fn process_sample(&mut self, x: f32, positive: bool) -> i32 {
-        let max_val = if positive { 8388607.0_f32 } else { 8388608.0_f32 };
+        let max_val = if positive {
+            8388607.0_f32
+        } else {
+            8388608.0_f32
+        };
         let scaled = x * max_val;
 
         let dither = self.rng.next_float() + self.rng.next_float();

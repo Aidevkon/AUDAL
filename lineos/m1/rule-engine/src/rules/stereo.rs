@@ -3,8 +3,8 @@
 //! R008: DC offset detected.
 //! All thresholds from &Thresholds (loaded from bmr-128.schema.json).
 
-use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 use crate::thresholds::Thresholds;
+use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 
 /// R007: Stereo correlation below threshold.
 /// Two severity levels:
@@ -18,8 +18,8 @@ pub fn stereo_correlation_weak(r: &AnalysisReport, t: &Thresholds) -> Option<Iss
             severity: Severity::High,
             params: IssueParams {
                 current: corr,
-                target:  t.stereo_corr_min,
-                delta:   corr - t.stereo_corr_min,
+                target: t.stereo_corr_min,
+                delta: corr - t.stereo_corr_min,
             },
             tags: vec!["stereo".into(), "mono_compat".into()],
         })
@@ -29,8 +29,8 @@ pub fn stereo_correlation_weak(r: &AnalysisReport, t: &Thresholds) -> Option<Iss
             severity: Severity::Medium,
             params: IssueParams {
                 current: corr,
-                target:  t.stereo_corr_min,
-                delta:   corr - t.stereo_corr_min,
+                target: t.stereo_corr_min,
+                delta: corr - t.stereo_corr_min,
             },
             tags: vec!["stereo".into()],
         })
@@ -48,8 +48,8 @@ pub fn dc_offset_detected(r: &AnalysisReport, t: &Thresholds) -> Option<Issue> {
             severity: Severity::Medium,
             params: IssueParams {
                 current: r.quality.dc_offset,
-                target:  0.0,
-                delta:   r.quality.dc_offset.abs(),
+                target: 0.0,
+                delta: r.quality.dc_offset.abs(),
             },
             tags: vec!["quality".into()],
         })
@@ -65,20 +65,29 @@ mod tests {
 
     fn thresholds() -> Thresholds {
         Thresholds {
-            preset_name: "spotify", target_lufs: Some(-14.0),
-            true_peak_max: -1.0, lufs_tolerance: 0.5,
-            dynamic_range_min: 6.0, stereo_corr_min: 0.8,
-            stereo_corr_warning: 0.5, dc_offset_max: 0.01, lra_max: 14.0,
+            preset_name: "spotify",
+            target_lufs: Some(-14.0),
+            true_peak_max: -1.0,
+            lufs_tolerance: 0.5,
+            dynamic_range_min: 6.0,
+            stereo_corr_min: 0.8,
+            stereo_corr_warning: 0.5,
+            dc_offset_max: 0.01,
+            lra_max: 14.0,
         }
     }
 
     fn report(corr: f32, dc: f32) -> AnalysisReport {
         AnalysisReport::from_metrics(
             QualityMetrics {
-                lufs_integrated: -14.0, lufs_short_term: -13.0,
-                lufs_momentary: -12.0, true_peak: -1.5,
-                loudness_range: 8.0, stereo_correlation: corr,
-                dynamic_range: 10.0, dc_offset: dc,
+                lufs_integrated: -14.0,
+                lufs_short_term: -13.0,
+                lufs_momentary: -12.0,
+                true_peak: -1.5,
+                loudness_range: 8.0,
+                stereo_correlation: corr,
+                dynamic_range: 10.0,
+                dc_offset: dc,
             },
             ComplianceFlags::all_pass(),
         )

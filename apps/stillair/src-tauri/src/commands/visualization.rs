@@ -21,19 +21,19 @@ use crate::ipc::m0_client::M0Client;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct VisualizationDataJson {
     /// Spectrum — SVG path, 400×160 viewBox. Closed fill path for gradient.
-    pub spectrum_svg_path:    String,
+    pub spectrum_svg_path: String,
 
     /// Lissajous outer orbit — SVG path, 120×120 viewBox. Rendered cyan.
-    pub lissajous_path_outer:   String,
+    pub lissajous_path_outer: String,
     /// Lissajous inner orbit — SVG path, 120×120 viewBox. Rendered magenta.
-    pub lissajous_path_inner:   String,
+    pub lissajous_path_inner: String,
     /// Additional detail traces for visual richness — rendered at low opacity.
     pub lissajous_path_detail1: String,
     pub lissajous_path_detail2: String,
 
     /// Waveform placeholders — Phase 15 replaces with real PCM snapshots.
     pub waveform_before_svg: String,
-    pub waveform_after_svg:  String,
+    pub waveform_after_svg: String,
 }
 
 /// Tauri command: get_visualization_data
@@ -48,7 +48,9 @@ pub async fn get_visualization_data(
     blob_id: String,
     client: tauri::State<'_, M0Client>,
 ) -> Result<VisualizationDataJson, String> {
-    let blob   = client.get_blob(&blob_id).await
+    let blob = client
+        .get_blob(&blob_id)
+        .await
         .map_err(|e| format!("IO_ERR:0x02:{e}"))?;
 
     // ── Spectrum ──────────────────────────────────────────────────────────────
@@ -61,33 +63,57 @@ pub async fn get_visualization_data(
     // Phase ratios driven by stereo correlation and width.
     // a=1, b=2 → figure-8 (standard goniometer shape).
     // Phase offset derived from correlation: high correlation = tight knot.
-    let corr   = blob.quality.stereo_correlation.clamp(-1.0, 1.0);
-    let width  = blob.quality.stereo_width.clamp(0.0, 1.0);
+    let corr = blob.quality.stereo_correlation.clamp(-1.0, 1.0);
+    let width = blob.quality.stereo_width.clamp(0.0, 1.0);
 
     // Outer orbit: a=1 b=2, phase = corr-derived offset, radius=stereo_width
     let outer_rx = (width * 44.0 + 6.0).clamp(6.0, 50.0);
     let outer_ry = 50.0_f32;
-    let outer_phase = libm::acosf(corr) as f32;  // 0=mono, π/2=wide, π=out-of-phase
+    let outer_phase = libm::acosf(corr) as f32; // 0=mono, π/2=wide, π=out-of-phase
 
-    let lissajous_outer   = compute_lissajous_path(outer_rx, outer_ry, 1.0, 2.0, outer_phase, 200);
-    let lissajous_inner   = compute_lissajous_path(outer_rx * 0.55, outer_ry * 0.45, 2.0, 3.0, outer_phase * 0.7, 180);
-    let lissajous_detail1 = compute_lissajous_path(outer_rx * 0.30, outer_ry * 0.65, 1.0, 3.0, outer_phase + 0.5, 120);
-    let lissajous_detail2 = compute_lissajous_path(outer_rx * 0.70, outer_ry * 0.25, 3.0, 2.0, outer_phase * 1.3, 120);
+    let lissajous_outer = compute_lissajous_path(outer_rx, outer_ry, 1.0, 2.0, outer_phase, 200);
+    let lissajous_inner = compute_lissajous_path(
+        outer_rx * 0.55,
+        outer_ry * 0.45,
+        2.0,
+        3.0,
+        outer_phase * 0.7,
+        180,
+    );
+    let lissajous_detail1 = compute_lissajous_path(
+        outer_rx * 0.30,
+        outer_ry * 0.65,
+        1.0,
+        3.0,
+        outer_phase + 0.5,
+        120,
+    );
+    let lissajous_detail2 = compute_lissajous_path(
+        outer_rx * 0.70,
+        outer_ry * 0.25,
+        3.0,
+        2.0,
+        outer_phase * 1.3,
+        120,
+    );
 
     // ── Waveform placeholders ─────────────────────────────────────────────────
     let before_path = compute_waveform_placeholder(blob.quality.rms_db, false);
-    let after_path  = compute_waveform_placeholder(blob.loudness.integrated_lufs, true);
+    let after_path = compute_waveform_placeholder(blob.loudness.integrated_lufs, true);
 
-    eprintln!("[visualization] blob_id={} corr={:.2} width={:.2}", blob.id, corr, width);
+    eprintln!(
+        "[visualization] blob_id={} corr={:.2} width={:.2}",
+        blob.id, corr, width
+    );
 
     Ok(VisualizationDataJson {
-        spectrum_svg_path:    spectrum_path,
-        lissajous_path_outer:   lissajous_outer,
-        lissajous_path_inner:   lissajous_inner,
+        spectrum_svg_path: spectrum_path,
+        lissajous_path_outer: lissajous_outer,
+        lissajous_path_inner: lissajous_inner,
         lissajous_path_detail1: lissajous_detail1,
         lissajous_path_detail2: lissajous_detail2,
-        waveform_before_svg:  before_path,
-        waveform_after_svg:   after_path,
+        waveform_before_svg: before_path,
+        waveform_after_svg: after_path,
     })
 }
 
@@ -134,17 +160,15 @@ fn compute_spectrum_path(centroid: f32, flatness: f32) -> String {
     for i in 0usize..64 {
         let x = 10.0 + i as f32 * 380.0 / 63.0;
         // Gaussian peak at centroid frequency
-        let sigma    = flatness * 80.0 + 40.0;
+        let sigma = flatness * 80.0 + 40.0;
         let distance = (x - center_x) / sigma;
-        let base     = libm::expf(-distance * distance * 0.5_f32);
+        let base = libm::expf(-distance * distance * 0.5_f32);
         // High-frequency texture: ripple driven by spectral flatness
-        let detail   = flatness * 0.22_f32
-            * libm::sinf(x * 0.3_f32)
-            * libm::expf(-x / 300.0_f32);
+        let detail = flatness * 0.22_f32 * libm::sinf(x * 0.3_f32) * libm::expf(-x / 300.0_f32);
         // Tilt: natural roll-off at high end (high shelf emulation)
-        let rolloff  = libm::expf(-(x - 10.0) * 0.003_f32);
-        let height   = ((base + detail) * rolloff).clamp(0.0_f32, 1.0_f32);
-        let y        = 148.0_f32 - height * 132.0_f32;
+        let rolloff = libm::expf(-(x - 10.0) * 0.003_f32);
+        let height = ((base + detail) * rolloff).clamp(0.0_f32, 1.0_f32);
+        let y = 148.0_f32 - height * 132.0_f32;
         points.push((x, y));
     }
 
@@ -163,13 +187,13 @@ fn compute_spectrum_path(centroid: f32, flatness: f32) -> String {
 /// All math: libm — no std::f32 methods.
 fn compute_waveform_placeholder(lufs_or_rms: f32, is_mastered: bool) -> String {
     let amplitude = ((-lufs_or_rms / 30.0_f32) * 50.0_f32).clamp(5.0_f32, 55.0_f32);
-    let freq      = if is_mastered { 0.04_f32 } else { 0.03_f32 };
+    let freq = if is_mastered { 0.04_f32 } else { 0.03_f32 };
 
     let mut path = String::from("M 0,60");
     for i in 1usize..=800 {
-        let x        = i as f32;
+        let x = i as f32;
         let envelope = libm::sinf(x * 0.002_f32) * 0.5_f32 + 0.5_f32;
-        let y        = 60.0_f32 - libm::sinf(x * freq) * amplitude * envelope;
+        let y = 60.0_f32 - libm::sinf(x * freq) * amplitude * envelope;
         path.push_str(&format!(" L {:.0},{:.1}", x, y));
     }
     path

@@ -31,8 +31,7 @@ fn print_usage_and_exit() -> ! {
 
 fn write_wav(path: &str, samples: &[f32], sample_rate: u32) {
     // WavWriter::write takes left and right channels for stereo. We pass the mono stem to both.
-    WavWriter::write(path, samples, samples, sample_rate)
-        .expect("Failed to write WAV file");
+    WavWriter::write(path, samples, samples, sample_rate).expect("Failed to write WAV file");
 }
 
 fn main() {
@@ -46,18 +45,20 @@ fn main() {
     println!("=== E14 Four-Stem Separator ===");
     println!("Input: {}", input_path);
 
-    let reader = WavReader::read(input_path)
-        .expect("Failed to open input WAV");
-        
+    let reader = WavReader::read(input_path).expect("Failed to open input WAV");
+
     let sample_rate = reader.sample_rate;
     let num_channels = reader.num_channels;
-    
+
     println!("  Sample rate: {} Hz", sample_rate);
     println!("  Channels:    {}", num_channels);
 
     // Mix down to mono if stereo
     let mono: Vec<f32> = if num_channels == 2 {
-        reader.left.iter().zip(reader.right.iter())
+        reader
+            .left
+            .iter()
+            .zip(reader.right.iter())
             .map(|(l, r)| (*l + *r) * 0.5_f32)
             .collect()
     } else {
@@ -65,8 +66,7 @@ fn main() {
     };
 
     let duration = mono.len() as f32 / sample_rate as f32;
-    println!("  Duration:    {:.1}s ({} samples)",
-             duration, mono.len());
+    println!("  Duration:    {:.1}s ({} samples)", duration, mono.len());
 
     // Run 4-stem separation
     println!("\nRunning stem separation...");
@@ -80,19 +80,19 @@ fn main() {
     println!("  Done in {}ms", elapsed);
 
     // Write output stems
-    let bass_path      = stem_path(input_path, "bass");
+    let bass_path = stem_path(input_path, "bass");
     let harmonics_path = stem_path(input_path, "harmonics");
-    let drums_path     = stem_path(input_path, "drums");
-    let ambience_path  = stem_path(input_path, "ambience");
+    let drums_path = stem_path(input_path, "drums");
+    let ambience_path = stem_path(input_path, "ambience");
 
     println!("\nWriting stems:");
-    write_wav(&bass_path,      &stems.bass,      sample_rate);
+    write_wav(&bass_path, &stems.bass, sample_rate);
     println!("  ✓ {}", bass_path);
     write_wav(&harmonics_path, &stems.harmonics, sample_rate);
     println!("  ✓ {}", harmonics_path);
-    write_wav(&drums_path,     &stems.drums,     sample_rate);
+    write_wav(&drums_path, &stems.drums, sample_rate);
     println!("  ✓ {}", drums_path);
-    write_wav(&ambience_path,  &stems.ambience,  sample_rate);
+    write_wav(&ambience_path, &stems.ambience, sample_rate);
     println!("  ✓ {}", ambience_path);
 
     println!("\n=== Done ===");

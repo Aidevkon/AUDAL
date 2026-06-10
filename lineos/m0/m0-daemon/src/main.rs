@@ -7,20 +7,20 @@
 //! New endpoints: POST /master, GET /blob/:id, POST /export
 //! Existing:      GET /health (port 7401)
 
+pub mod agents;
 mod app_state;
 pub mod audit;
 mod blob_store;
 mod cdn;
+pub mod domain;
+pub mod dsp;
 pub mod handlers;
-mod realtime_bridge;
 mod health;
+pub mod jini;
 mod marketplace;
 mod policy;
+mod realtime_bridge;
 mod registry;
-pub mod dsp;
-pub mod jini;
-pub mod agents;
-pub mod domain;
 
 use anyhow::Result;
 use app_state::AppState;
@@ -30,17 +30,17 @@ use std::sync::Arc;
 
 // Environment variable defaults
 #[allow(dead_code)]
-const REGISTRY_PATH:  &str = "lineos/m0/registry/m0-registry.json";
+const REGISTRY_PATH: &str = "lineos/m0/registry/m0-registry.json";
 #[allow(dead_code)]
 const CHECKSUMS_PATH: &str = "lineos/m0/registry/checksums.json";
 #[allow(dead_code)]
-const POLICIES_PATH:  &str = "lineos/m0/config/policies.toml";
+const POLICIES_PATH: &str = "lineos/m0/config/policies.toml";
 #[allow(dead_code)]
-const AUDIT_LOG_DIR:  &str = "lineos/m0/logs/audit";
+const AUDIT_LOG_DIR: &str = "lineos/m0/logs/audit";
 #[allow(dead_code)]
-const ASSETS_ROOT:    &str = "lineos/m0/assets/wasm";
+const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
 #[allow(dead_code)]
-const HEALTH_ADDR:    &str = "127.0.0.1:7401";
+const HEALTH_ADDR: &str = "127.0.0.1:7401";
 /// Mastering API — proxied through Caddy at 127.0.0.1:7400
 #[allow(dead_code)]
 const MASTERING_ADDR: &str = "127.0.0.1:7402";
@@ -59,11 +59,15 @@ async fn main() -> Result<()> {
     tracing::info!("Authority: M0 Constitution v2.0");
 
     // ── Read env overrides ────────────────────────────────────────────────────
-    let registry_path  = std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
-    let checksums_path = std::env::var("M0_CHECKSUMS_PATH").unwrap_or_else(|_| CHECKSUMS_PATH.to_string());
-    let policies_path  = std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
-    let audit_log_dir  = std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
-    let assets_root    = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
+    let registry_path =
+        std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
+    let checksums_path =
+        std::env::var("M0_CHECKSUMS_PATH").unwrap_or_else(|_| CHECKSUMS_PATH.to_string());
+    let policies_path =
+        std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
+    let audit_log_dir =
+        std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
+    let assets_root = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
 
     let gate = HealthGate::new();
 
@@ -114,8 +118,8 @@ async fn main() -> Result<()> {
     tracing::info!("✅ All health criteria passed — M0 is healthy");
 
     // ── Step 7: Build AppState for mastering API ──────────────────────────────
-    let audit_arc  = Arc::new(audit);
-    let app_state  = AppState::new(audit_arc.clone());
+    let audit_arc = Arc::new(audit);
+    let app_state = AppState::new(audit_arc.clone());
 
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
     // Phase 6: mastering router binds directly to 7402.
@@ -124,14 +128,14 @@ async fn main() -> Result<()> {
     let mastering_addr: SocketAddr = MASTERING_ADDR.parse()?;
 
     // ── Step 9: Start health endpoint (port 7401) ──────────────────────────────
-    let health_app  = health::health_router(gate.clone());
+    let health_app = health::health_router(gate.clone());
     let health_addr: SocketAddr = HEALTH_ADDR.parse()?;
 
     tracing::info!("Health endpoint:    http://{HEALTH_ADDR}");
     tracing::info!("Mastering endpoint: http://{MASTERING_ADDR}");
 
     // Run both routers concurrently
-    let health_listener    = tokio::net::TcpListener::bind(health_addr).await?;
+    let health_listener = tokio::net::TcpListener::bind(health_addr).await?;
     let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;
 
     tokio::select! {
@@ -155,18 +159,39 @@ fn mastering_router(state: AppState) -> axum::Router {
     use axum::routing::{get, post};
 
     axum::Router::new()
-        .route("/master",             post(handlers::master::trigger_mastering))
-        .route("/master/batch",       post(handlers::master::trigger_batch_mastering))
-        .route("/preview",            post(handlers::preview::create_preview))
-        .route("/preview/:id/:stem",  get(handlers::preview::get_preview_stem))
-        .route("/blob/:id",           get(handlers::blob::get_blob))
-        .route("/export",             post(handlers::export::export_audio))
-        .route("/progress/:job_id",         get(handlers::progress::get_progress))
-        .route("/progress/:job_id/stream",  get(handlers::progress::stream_progress))
+        .route("/master", post(handlers::master::trigger_mastering))
+        .route(
+            "/master/batch",
+            post(handlers::master::trigger_batch_mastering),
+        )
+        .route("/preview", post(handlers::preview::create_preview))
+        .route(
+            "/preview/:id/:stem",
+            get(handlers::preview::get_preview_stem),
+        )
+        .route("/blob/:id", get(handlers::blob::get_blob))
+        .route("/export", post(handlers::export::export_audio))
+        .route("/progress/:job_id", get(handlers::progress::get_progress))
+        .route(
+            "/progress/:job_id/stream",
+            get(handlers::progress::stream_progress),
+        )
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
-        .route("/playback/control",   post(handlers::playback::playback_control))
-        .route("/playback/state",     get(handlers::playback::get_playback_state))
-        .route("/playback/telemetry", get(handlers::playback::get_live_telemetry))
-        .route("/cert/:blob_id/png",  post(handlers::png_gen::export_cert_png))
+        .route(
+            "/playback/control",
+            post(handlers::playback::playback_control),
+        )
+        .route(
+            "/playback/state",
+            get(handlers::playback::get_playback_state),
+        )
+        .route(
+            "/playback/telemetry",
+            get(handlers::playback::get_live_telemetry),
+        )
+        .route(
+            "/cert/:blob_id/png",
+            post(handlers::png_gen::export_cert_png),
+        )
         .with_state(state)
 }

@@ -3,34 +3,34 @@
 // In v3, MasteringPipeline is replaced by DspGraph + pipelineforge.
 // MasteringIntent is the high-level request — maps to EngineConfig.
 
-use serde::{Deserialize, Serialize};
 use crate::config::LoudnessTarget;
+use serde::{Deserialize, Serialize};
 
 /// High-level mastering request.
 /// Replaces v2.9 MasteringIntent.
 /// In v3, this is translated to EngineConfig by the Rule Engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MasteringIntent {
-    pub target:      LoudnessTarget,
+    pub target: LoudnessTarget,
     pub preset_name: String,
-    pub stem_mode:   bool,
+    pub stem_mode: bool,
     pub target_makeup_db: f32,
 }
 
 impl MasteringIntent {
     pub fn spotify() -> Self {
         Self {
-            target:      LoudnessTarget::spotify(),
+            target: LoudnessTarget::spotify(),
             preset_name: "SpotifyV3".into(),
-            stem_mode:   false,
+            stem_mode: false,
             target_makeup_db: 0.0,
         }
     }
     pub fn podcast() -> Self {
         Self {
-            target:      LoudnessTarget::podcast(),
+            target: LoudnessTarget::podcast(),
             preset_name: "Podcast".into(),
-            stem_mode:   false,
+            stem_mode: false,
             target_makeup_db: 0.0,
         }
     }

@@ -1,14 +1,14 @@
 // src/limiter/mod.rs
 
+pub mod clipper;
+pub mod core;
 pub mod delay;
 pub mod envelope;
-pub mod core;
-pub mod true_peak;
 pub mod midside;
-pub mod clipper;
+pub mod true_peak;
 
-pub use core::{BrickwallLimiter, LimiterConfig};
-pub use envelope::{PeakFollower, DEFAULT_CEILING_LINEAR, DECAY_FLOOR_DB};
-pub use true_peak::TruePeakDetector;
-pub use midside::MidSideProcessor;
 pub use clipper::OversampledSoftClipper;
+pub use core::{BrickwallLimiter, LimiterConfig};
+pub use envelope::{PeakFollower, DECAY_FLOOR_DB, DEFAULT_CEILING_LINEAR};
+pub use midside::MidSideProcessor;
+pub use true_peak::TruePeakDetector;

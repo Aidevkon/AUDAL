@@ -15,9 +15,9 @@
 mod telemetry_listener;
 use tauri::Manager;
 
+pub mod coach_narrative;
 pub mod commands;
-pub mod ipc;
-pub mod coach_narrative;   // Phase 8: Aether Coach — LLM narrative layer
+pub mod ipc; // Phase 8: Aether Coach — LLM narrative layer
 
 pub fn run() {
     tauri::Builder::default()
@@ -26,9 +26,9 @@ pub fn run() {
             Ok(())
         })
         .setup(|app| {
-            let latest = std::sync::Arc::new(
-                std::sync::Mutex::new(None::<crate::telemetry_listener::RealtimeFrame>)
-            );
+            let latest = std::sync::Arc::new(std::sync::Mutex::new(
+                None::<crate::telemetry_listener::RealtimeFrame>,
+            ));
             app.manage(latest.clone());
             telemetry_listener::spawn_udp_listener(latest);
             Ok(())
@@ -43,12 +43,12 @@ pub fn run() {
             commands::mastering::export_certificate_png,
             commands::insights::evaluate_findings,
             commands::export::export_audio,
-            commands::coach::get_coach_narrative,    // Phase 8: Aether Coach
-            commands::session::get_session_state,    // P9-008: Session State Unification
+            commands::coach::get_coach_narrative, // Phase 8: Aether Coach
+            commands::session::get_session_state, // P9-008: Session State Unification
             // Phase 12A/12B: xaak playback (A-003 §8)
             commands::playback::playback_control,
             commands::playback::get_playback_state,
-            commands::playback::get_live_telemetry,   // P12B-005: live LUFS
+            commands::playback::get_live_telemetry, // P12B-005: live LUFS
             // Phase 13B: BMR-128 PDF report
             commands::report::export_pdf_report,
             commands::report::preview_pdf_report,

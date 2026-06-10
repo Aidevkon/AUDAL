@@ -104,14 +104,19 @@ fn presets_display_names_are_non_empty() {
     for t in targets.iter() {
         assert!(t.display_name().len() > 0);
     }
-    assert_eq!(MasteringTarget::Transparent.display_name(), "Natural (No Processing)");
-    assert!(MasteringTarget::BroadcastVideo.display_name().contains("EBU R128"));
+    assert_eq!(
+        MasteringTarget::Transparent.display_name(),
+        "Natural (No Processing)"
+    );
+    assert!(MasteringTarget::BroadcastVideo
+        .display_name()
+        .contains("EBU R128"));
 }
 
 #[test]
 fn presets_transparent_target_rms_is_none() {
     assert!(MasteringTarget::Transparent.target_lufs().is_none());
-    
+
     let active_targets = [
         MasteringTarget::SpotifyV3,
         MasteringTarget::PodcastVoice,

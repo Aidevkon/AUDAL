@@ -2,53 +2,53 @@
 //! Two themes: dark (in-app) + light (export PNG)
 //! Triggered via pdf_preview_ctx signal (blob_id)
 
+use crate::ipc::invoke;
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use crate::ipc::invoke;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct PdfPreviewProps {
-    pub blob_id:  String,
+    pub blob_id: String,
     pub on_close: EventHandler<()>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct StageRecord {
-    pub stage:       String,
+    pub stage: String,
     pub duration_ms: u64,
-    pub stage_hash:  String,
+    pub stage_hash: String,
 }
 
 #[derive(Clone, Debug)]
 struct CertData {
-    filename:   String,
-    lufs:       f32,
-    tp:         f32,
-    lra:        f32,
+    filename: String,
+    lufs: f32,
+    tp: f32,
+    lra: f32,
     blob_short: String,
-    date:       String,
-    qr_base64:  String,
-    voice:            String,
-    drums:            String,
-    bass:             String,
-    harmonics:        String,
-    ambience:         String,
-    pipeline:         String,
+    date: String,
+    qr_base64: String,
+    voice: String,
+    drums: String,
+    bass: String,
+    harmonics: String,
+    ambience: String,
+    pipeline: String,
     full_file_sha256: String,
-    cert_sha256:      String,
-    preset_id:        String,
-    persona_hash:     String,
-    corpus_hash:      String,
-    timeline:         Vec<StageRecord>,
+    cert_sha256: String,
+    preset_id: String,
+    persona_hash: String,
+    corpus_hash: String,
+    timeline: Vec<StageRecord>,
 }
 
 #[component]
 pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
-    let mut cert        = use_signal(|| Option::<CertData>::None);
-    let mut loading     = use_signal(|| true);
-    let mut err_msg     = use_signal(|| Option::<String>::None);
+    let mut cert = use_signal(|| Option::<CertData>::None);
+    let mut loading = use_signal(|| true);
+    let mut err_msg = use_signal(|| Option::<String>::None);
     let mut is_extended = use_signal(|| false);
-    let blob_id         = props.blob_id.clone();
+    let blob_id = props.blob_id.clone();
 
     use_effect(move || {
         let bid = blob_id.clone();
@@ -56,32 +56,68 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
             match invoke::<serde_json::Value, _>(
                 "get_golden_blob",
                 serde_json::json!({ "blobId": bid }),
-            ).await {
+            )
+            .await
+            {
                 Ok(blob) => {
                     let fp = blob["stem_fingerprints"].as_object();
                     let short = |s: &str| s.chars().take(8).collect::<String>();
                     let data = CertData {
-                        filename:   blob["id"].as_str()
-                                        .map(|s| format!("CERT-{}", &s[..8]))
-                                        .unwrap_or_else(|| "UNKNOWN".to_string()),
-                        lufs:       blob["loudness"]["integrated_lufs"].as_f64().unwrap_or(0.0) as f32,
-                        tp:         blob["loudness"]["true_peak_dbtp"].as_f64().unwrap_or(0.0) as f32,
-                        lra:        blob["loudness"]["lra"].as_f64().unwrap_or(0.0) as f32,
+                        filename: blob["id"]
+                            .as_str()
+                            .map(|s| format!("CERT-{}", &s[..8]))
+                            .unwrap_or_else(|| "UNKNOWN".to_string()),
+                        lufs: blob["loudness"]["integrated_lufs"].as_f64().unwrap_or(0.0) as f32,
+                        tp: blob["loudness"]["true_peak_dbtp"].as_f64().unwrap_or(0.0) as f32,
+                        lra: blob["loudness"]["lra"].as_f64().unwrap_or(0.0) as f32,
                         blob_short: bid.chars().take(8).collect(),
-                        date:       chrono_now(),
-                        qr_base64:  blob["qr_base64"].as_str().unwrap_or("").to_string(),
-                        voice:      fp.and_then(|f| f["voice"].as_str()).map(short).unwrap_or_default(),
-                        drums:      fp.and_then(|f| f["drums"].as_str()).map(short).unwrap_or_default(),
-                        bass:       fp.and_then(|f| f["bass"].as_str()).map(short).unwrap_or_default(),
-                        harmonics:  fp.and_then(|f| f["harmonics"].as_str()).map(short).unwrap_or_default(),
-                        ambience:   fp.and_then(|f| f["ambience"].as_str()).map(short).unwrap_or_default(),
-                        pipeline:   fp.and_then(|f| f["pipeline"].as_str()).map(short).unwrap_or_default(),
-                        full_file_sha256: blob["pcm_blake3"].as_str().unwrap_or("d7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8").to_string(),
-                        cert_sha256:      blob["cert_signature"].as_str().unwrap_or("eyJhbGciOiJFZERTQSJ9...").to_string(),
-                        preset_id:        blob["preset_id"].as_str().unwrap_or("dsp_abc123_def456").to_string(),
-                        persona_hash:     blob["aether_persona"].as_str().unwrap_or("persona_d3f8a9c2").to_string(),
-                        corpus_hash:      "corpus_e7b2f4a1".to_string(),
-                        timeline:         serde_json::from_value(blob["processing_timeline"].clone()).unwrap_or_default(),
+                        date: chrono_now(),
+                        qr_base64: blob["qr_base64"].as_str().unwrap_or("").to_string(),
+                        voice: fp
+                            .and_then(|f| f["voice"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        drums: fp
+                            .and_then(|f| f["drums"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        bass: fp
+                            .and_then(|f| f["bass"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        harmonics: fp
+                            .and_then(|f| f["harmonics"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        ambience: fp
+                            .and_then(|f| f["ambience"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        pipeline: fp
+                            .and_then(|f| f["pipeline"].as_str())
+                            .map(short)
+                            .unwrap_or_default(),
+                        full_file_sha256: blob["pcm_blake3"]
+                            .as_str()
+                            .unwrap_or(
+                                "d7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8",
+                            )
+                            .to_string(),
+                        cert_sha256: blob["cert_signature"]
+                            .as_str()
+                            .unwrap_or("eyJhbGciOiJFZERTQSJ9...")
+                            .to_string(),
+                        preset_id: blob["preset_id"]
+                            .as_str()
+                            .unwrap_or("dsp_abc123_def456")
+                            .to_string(),
+                        persona_hash: blob["aether_persona"]
+                            .as_str()
+                            .unwrap_or("persona_d3f8a9c2")
+                            .to_string(),
+                        corpus_hash: "corpus_e7b2f4a1".to_string(),
+                        timeline: serde_json::from_value(blob["processing_timeline"].clone())
+                            .unwrap_or_default(),
                     };
                     cert.set(Some(data));
                     loading.set(false);
@@ -388,10 +424,12 @@ fn chrono_now() -> String {
     #[cfg(target_arch = "wasm32")]
     {
         let d = js_sys::Date::new_0();
-        format!("{}-{:02}-{:02}",
+        format!(
+            "{}-{:02}-{:02}",
             d.get_full_year(),
             d.get_month() + 1,
-            d.get_date())
+            d.get_date()
+        )
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

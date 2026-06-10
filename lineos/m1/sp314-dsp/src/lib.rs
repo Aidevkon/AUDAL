@@ -26,25 +26,25 @@
 //! input → restoration → EQ → harmonic → compress → limit → meter → output
 //! ```
 
-pub mod psychoacoustic;
-pub mod masking_eq;
-pub mod harmonic;
 pub mod compressor;
-pub mod pipeline;
-pub mod limiter;
-pub mod metering;
+pub mod harmonic;
 #[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
 pub mod io;
+pub mod limiter;
+pub mod masking_eq;
+pub mod metering;
+pub mod pipeline;
+pub mod psychoacoustic;
 #[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
 pub mod realtime;
 pub mod restoration;
-pub mod verification;
 pub mod stft;
+pub mod verification;
 
 pub mod analysis;
-pub use analysis::{StemFeatures, StemMetrics, MixMetrics, StemFeatureAnalyzer, PreAnalyzer};
+pub use analysis::{MixMetrics, PreAnalyzer, StemFeatureAnalyzer, StemFeatures, StemMetrics};
 
-pub mod jini;
 pub mod cut_heal;
+pub mod jini;
 pub mod spatial;
 pub mod transforms;

@@ -6,8 +6,8 @@
 //! Same metrics → same findings. Always.
 //! INV-AB-1: deterministic.
 
+use super::operator::{AudioMetrics, Finding, Intent};
 use tokio::sync::mpsc;
-use super::operator::{Intent, Finding, AudioMetrics};
 
 /// Apply deterministic rules to AudioMetrics → Vec<Finding>.
 /// If-this-then-that only. No ML. No heuristics.
@@ -19,7 +19,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "loudness".into(),
             severity: "warning".into(),
-            message:  format!(
+            message: format!(
                 "Integrated loudness {:.1} LUFS is very low. \
                  Consider increasing gain.",
                 metrics.integrated_lufs
@@ -29,7 +29,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "loudness".into(),
             severity: "warning".into(),
-            message:  format!(
+            message: format!(
                 "Integrated loudness {:.1} LUFS exceeds \
                  recommended range.",
                 metrics.integrated_lufs
@@ -39,7 +39,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "loudness".into(),
             severity: "pass".into(),
-            message:  format!(
+            message: format!(
                 "Integrated loudness {:.1} LUFS — within target.",
                 metrics.integrated_lufs
             ),
@@ -51,7 +51,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "true_peak".into(),
             severity: "error".into(),
-            message:  format!(
+            message: format!(
                 "True peak {:.1} dBTP exceeds −1.0 dBTP ceiling. \
                  ITU-R BS.1770-4 violation.",
                 metrics.true_peak_dbtp
@@ -61,7 +61,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "true_peak".into(),
             severity: "warning".into(),
-            message:  format!(
+            message: format!(
                 "True peak {:.1} dBTP is close to ceiling.",
                 metrics.true_peak_dbtp
             ),
@@ -70,10 +70,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "true_peak".into(),
             severity: "pass".into(),
-            message:  format!(
-                "True peak {:.1} dBTP — compliant.",
-                metrics.true_peak_dbtp
-            ),
+            message: format!("True peak {:.1} dBTP — compliant.", metrics.true_peak_dbtp),
         });
     }
 
@@ -82,7 +79,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "dynamics".into(),
             severity: "warning".into(),
-            message:  format!(
+            message: format!(
                 "Loudness range {:.1} LU is very compressed.",
                 metrics.lra_lu
             ),
@@ -91,7 +88,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "dynamics".into(),
             severity: "info".into(),
-            message:  format!(
+            message: format!(
                 "Loudness range {:.1} LU is wide — \
                  suitable for classical or film.",
                 metrics.lra_lu
@@ -101,7 +98,7 @@ pub fn analyze(metrics: &AudioMetrics) -> Vec<Finding> {
         findings.push(Finding {
             category: "dynamics".into(),
             severity: "pass".into(),
-            message:  format!(
+            message: format!(
                 "Loudness range {:.1} LU — healthy dynamics.",
                 metrics.lra_lu
             ),
@@ -132,8 +129,8 @@ mod tests {
     fn metrics(lufs: f32, tp: f32, lra: f32) -> AudioMetrics {
         AudioMetrics {
             integrated_lufs: lufs,
-            true_peak_dbtp:  tp,
-            lra_lu:          lra,
+            true_peak_dbtp: tp,
+            lra_lu: lra,
         }
     }
 

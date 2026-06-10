@@ -1,8 +1,8 @@
 pub fn compute_gain_reduction(
-    envelope_db:  f32,
+    envelope_db: f32,
     threshold_db: f32,
-    ratio:        f32,
-    knee_db:      f32,
+    ratio: f32,
+    knee_db: f32,
 ) -> f32 {
     let overshoot = envelope_db - threshold_db;
     let slope_diff = 1.0 - (1.0 / ratio);

@@ -20,16 +20,21 @@ impl WavReader {
         let spec = reader.spec();
 
         let samples_raw: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Float => {
-                reader.samples::<f32>().map(|s| s.unwrap()).collect()
-            }
+            hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
             hound::SampleFormat::Int => {
                 let max_val = match spec.bits_per_sample {
                     16 => 32768.0,
                     24 => 8388608.0,
-                    _ => return Err(format!("Unsupported bit depth: {}", spec.bits_per_sample).into()),
+                    _ => {
+                        return Err(
+                            format!("Unsupported bit depth: {}", spec.bits_per_sample).into()
+                        )
+                    }
                 };
-                reader.samples::<i32>().map(|s| s.unwrap() as f32 / max_val).collect()
+                reader
+                    .samples::<i32>()
+                    .map(|s| s.unwrap() as f32 / max_val)
+                    .collect()
             }
         };
 

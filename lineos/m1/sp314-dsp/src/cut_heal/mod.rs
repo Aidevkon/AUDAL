@@ -9,13 +9,13 @@ impl SilenceCut {
         let mut regions = Vec::new();
         let threshold_amp = 10.0f32.powf(-60.0 / 20.0);
         let min_samples = (sample_rate as f32 * 0.200) as usize; // 200ms
-        
+
         let block_size = 512;
         let num_blocks = audio.len() / block_size;
-        
+
         let mut in_silence = false;
         let mut silence_start = 0;
-        
+
         for i in 0..num_blocks {
             let start = i * block_size;
             let end = (i + 1) * block_size;
@@ -25,7 +25,7 @@ impl SilenceCut {
                 sum_sq += sample * sample;
             }
             let rms = (sum_sq / block_size as f32).sqrt();
-            
+
             if rms < threshold_amp {
                 if !in_silence {
                     in_silence = true;
@@ -41,7 +41,7 @@ impl SilenceCut {
                 }
             }
         }
-        
+
         // Handle trailing silence
         if in_silence {
             let end = num_blocks * block_size;
@@ -50,7 +50,7 @@ impl SilenceCut {
                 regions.push((silence_start, end));
             }
         }
-        
+
         regions
     }
 }
@@ -62,32 +62,32 @@ impl BreathCut {
         let lower_amp = 10.0f32.powf(-60.0 / 20.0);
         let upper_amp = 10.0f32.powf(-30.0 / 20.0);
         let min_samples = (sample_rate as f32 * 0.050) as usize; // arbitrary min length for breath
-        
+
         let block_size = 512;
         let num_blocks = audio.len() / block_size;
-        
+
         let mut in_breath = false;
         let mut breath_start = 0;
-        
+
         for i in 0..num_blocks {
             let start = i * block_size;
             let end = (i + 1) * block_size;
             let block = &audio[start..end];
-            
+
             let mut sum_sq = 0.0;
             let mut zcr = 0;
             for j in 0..block.len() {
                 sum_sq += block[j] * block[j];
-                if j > 0 && block[j].signum() != block[j-1].signum() {
+                if j > 0 && block[j].signum() != block[j - 1].signum() {
                     zcr += 1;
                 }
             }
             let rms = (sum_sq / block_size as f32).sqrt();
             let zcr_rate = zcr as f32 / block_size as f32;
-            
+
             // High ZCR is typically > 0.05 for high-frequency noise like breath
             let is_breath = rms >= lower_amp && rms <= upper_amp && zcr_rate > 0.05;
-            
+
             if is_breath {
                 if !in_breath {
                     in_breath = true;
@@ -103,7 +103,7 @@ impl BreathCut {
                 }
             }
         }
-        
+
         if in_breath {
             let end = num_blocks * block_size;
             let len = end - breath_start;
@@ -111,7 +111,7 @@ impl BreathCut {
                 regions.push((breath_start, end));
             }
         }
-        
+
         regions
     }
 }
@@ -123,15 +123,15 @@ impl CrossfadeHeal {
         if cut_start < fade_len || cut_end + fade_len > audio.len() || cut_start >= cut_end {
             return;
         }
-        
+
         for i in 0..fade_len {
             let t = i as f32 / fade_len as f32;
             // Fade out before cut_start
             audio[cut_start - fade_len + i] *= t;
             // Fade in after cut_end
-            audio[cut_end + i] *= 1.0 - t ;
+            audio[cut_end + i] *= 1.0 - t;
         }
-        
+
         for i in cut_start..cut_end {
             audio[i] = 0.0;
         }
@@ -150,7 +150,7 @@ mod tests {
         }
         buf
     }
-    
+
     fn generate_noise(samples: usize, amp: f32) -> Vec<f32> {
         let mut buf = vec![0.0; samples];
         let mut seed = 42u32;
@@ -167,10 +167,10 @@ mod tests {
         // 300ms silence → detected
         let sr = 48000;
         let mut audio = generate_sine(440.0, sr, 48000, 0.5); // 1 sec tone
-        // insert 300ms silence in the middle
+                                                              // insert 300ms silence in the middle
         let start = 12000;
         let len = (sr as f32 * 0.3) as usize;
-        for i in start..start+len {
+        for i in start..start + len {
             audio[i] = 0.0;
         }
         let cuts = SilenceCut::detect(&audio, sr);
@@ -186,7 +186,7 @@ mod tests {
         let mut audio = generate_sine(440.0, sr, 48000, 0.5);
         let start = 12000;
         let len = (sr as f32 * 0.1) as usize; // 100ms is < 200ms
-        for i in start..start+len {
+        for i in start..start + len {
             audio[i] = 0.0;
         }
         let cuts = SilenceCut::detect(&audio, sr);
@@ -222,10 +222,10 @@ mod tests {
         let mut audio = generate_sine(440.0, sr, 48000, 0.5); // tone
         let start = 24000;
         let len = 12000; // 250ms
-        // Add breath-like noise (-40 dBFS approx => ~0.01 amplitude)
-        let noise = generate_noise(len, 0.01); 
+                         // Add breath-like noise (-40 dBFS approx => ~0.01 amplitude)
+        let noise = generate_noise(len, 0.01);
         for i in 0..len {
-            audio[start+i] = noise[i];
+            audio[start + i] = noise[i];
         }
         let cuts = BreathCut::detect(&audio, sr);
         assert!(!cuts.is_empty(), "Should detect breath");

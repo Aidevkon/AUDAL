@@ -66,7 +66,10 @@ mod tests {
     #[test]
     fn test_ambience_mapper_zeros() {
         let macros = AmbienceMacroControls {
-            space: 0.0, width: 0.0, tone: 0.0, loudness: 0.0
+            space: 0.0,
+            width: 0.0,
+            tone: 0.0,
+            loudness: 0.0,
         };
         let delta = AmbienceMicroMapper::map(&macros);
         assert_close(delta.reverb_time_delta_s, 0.0);
@@ -79,7 +82,10 @@ mod tests {
     #[test]
     fn test_ambience_mapper_mid() {
         let macros = AmbienceMacroControls {
-            space: 0.5, width: 0.5, tone: 0.5, loudness: 0.5
+            space: 0.5,
+            width: 0.5,
+            tone: 0.5,
+            loudness: 0.5,
         };
         let delta = AmbienceMicroMapper::map(&macros);
         assert_close(delta.reverb_time_delta_s, 0.4);
@@ -106,7 +112,10 @@ mod tests {
     #[test]
     fn test_ambience_mapper_max() {
         let macros = AmbienceMacroControls {
-            space: 1.0, width: 1.0, tone: 1.0, loudness: 1.0
+            space: 1.0,
+            width: 1.0,
+            tone: 1.0,
+            loudness: 1.0,
         };
         let delta = AmbienceMicroMapper::map(&macros);
         assert_close(delta.reverb_time_delta_s, 0.8);

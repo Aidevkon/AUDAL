@@ -9,18 +9,18 @@ use libm::{expf, fabsf, powf};
 
 pub struct RestorationChain {
     // De-Hum: 50Hz, 100Hz, 150Hz notches
-    notch_50:  Biquad,
+    notch_50: Biquad,
     notch_100: Biquad,
     notch_150: Biquad,
     hum_enabled: bool,
 
     // De-Ess
-    deess_hp:         Biquad,
-    env_l:            f32,
-    env_r:            f32,
-    deess_threshold:  f32,
-    deess_ratio:      f32,
-    deess_enabled:    bool,
+    deess_hp: Biquad,
+    env_l: f32,
+    env_r: f32,
+    deess_threshold: f32,
+    deess_ratio: f32,
+    deess_enabled: bool,
 
     // Low-Cut
     lowcut_hp: Biquad,
@@ -31,7 +31,7 @@ pub struct RestorationChain {
     gate_enabled: bool,
 
     // Precomputed coefficients — computed ONCE in new(), never in process()
-    attack_coef:  f32,
+    attack_coef: f32,
     release_coef: f32,
 }
 
@@ -39,18 +39,18 @@ impl RestorationChain {
     pub fn new(sample_rate: f32, config: RestorationConfig, pad_db_shift: f32) -> Self {
         Self {
             // High Q (20.0) — strictly targets hum without affecting bass
-            notch_50:  Biquad::new(FilterType::Notch, 50.0,  20.0, sample_rate),
+            notch_50: Biquad::new(FilterType::Notch, 50.0, 20.0, sample_rate),
             notch_100: Biquad::new(FilterType::Notch, 100.0, 20.0, sample_rate),
             notch_150: Biquad::new(FilterType::Notch, 150.0, 20.0, sample_rate),
             hum_enabled: config.hum_enabled,
 
             // De-Esser: detects harsh frequencies above 6kHz
-            deess_hp:        Biquad::new(FilterType::HighPass, 6000.0, 0.707, sample_rate),
-            env_l:           0.0,
-            env_r:           0.0,
+            deess_hp: Biquad::new(FilterType::HighPass, 6000.0, 0.707, sample_rate),
+            env_l: 0.0,
+            env_r: 0.0,
             deess_threshold: powf(10.0, -24.0 / 20.0), // -24 dBFS linear
-            deess_ratio:     4.0,
-            deess_enabled:   config.deess_enabled,
+            deess_ratio: 4.0,
+            deess_enabled: config.deess_enabled,
 
             // Low-Cut
             lowcut_hp: Biquad::new(FilterType::HighPass, 80.0, 0.707, sample_rate),
@@ -61,7 +61,7 @@ impl RestorationChain {
             gate_enabled: config.gate_enabled,
 
             // Precomputed once — 1ms attack, 50ms release
-            attack_coef:  expf(-1.0 / (sample_rate * 0.001)),
+            attack_coef: expf(-1.0 / (sample_rate * 0.001)),
             release_coef: expf(-1.0 / (sample_rate * 0.050)),
         }
     }
@@ -109,7 +109,8 @@ impl RestorationChain {
 
                 if self.env_l > self.deess_threshold {
                     let overshoot = self.env_l - self.deess_threshold;
-                    let reduction = 1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
+                    let reduction =
+                        1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
                     l *= reduction;
                 }
 
@@ -123,7 +124,8 @@ impl RestorationChain {
 
                 if self.env_r > self.deess_threshold {
                     let overshoot = self.env_r - self.deess_threshold;
-                    let reduction = 1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
+                    let reduction =
+                        1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
                     r *= reduction;
                 }
             }

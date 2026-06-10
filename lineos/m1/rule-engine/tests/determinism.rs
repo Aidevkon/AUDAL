@@ -115,11 +115,20 @@ fn test_true_peak_exceeded_is_high_severity() {
     let thresholds = make_thresholds();
     let findings = evaluate(&report, &thresholds);
 
-    let issue = findings.issues.iter().find(|i| i.id == "true_peak_exceeded");
-    assert!(issue.is_some(), "true_peak_exceeded must trigger when TP = 0.5 > -1.0");
+    let issue = findings
+        .issues
+        .iter()
+        .find(|i| i.id == "true_peak_exceeded");
+    assert!(
+        issue.is_some(),
+        "true_peak_exceeded must trigger when TP = 0.5 > -1.0"
+    );
     assert_eq!(issue.unwrap().severity, Severity::High);
-    assert!(findings.recommendation.contains("limiter"),
-        "Recommendation must reference limiter: {}", findings.recommendation);
+    assert!(
+        findings.recommendation.contains("limiter"),
+        "Recommendation must reference limiter: {}",
+        findings.recommendation
+    );
     assert!(findings.has_blocking());
 }
 
@@ -131,10 +140,16 @@ fn test_clean_track_no_issues() {
     let thresholds = make_thresholds();
     let findings = evaluate(&report, &thresholds);
 
-    assert!(findings.issues.is_empty(),
-        "Track at Spotify target must produce zero issues: {:?}", findings.issues);
-    assert!(findings.recommendation.contains("ready"),
-        "Recommendation must say 'ready': {}", findings.recommendation);
+    assert!(
+        findings.issues.is_empty(),
+        "Track at Spotify target must produce zero issues: {:?}",
+        findings.issues
+    );
+    assert!(
+        findings.recommendation.contains("ready"),
+        "Recommendation must say 'ready': {}",
+        findings.recommendation
+    );
     assert!(!findings.has_blocking());
 }
 
@@ -147,10 +162,16 @@ fn test_lufs_too_loud_triggers_compliance_and_reduce_recommendation() {
     let findings = evaluate(&report, &thresholds);
 
     let issue = findings.issues.iter().find(|i| i.id == "lufs_compliance");
-    assert!(issue.is_some(), "lufs_compliance must trigger at -12 LUFS (Spotify target -14)");
+    assert!(
+        issue.is_some(),
+        "lufs_compliance must trigger at -12 LUFS (Spotify target -14)"
+    );
     assert_eq!(issue.unwrap().severity, Severity::Medium);
-    assert!(findings.recommendation.contains("Reduce gain"),
-        "Got: {}", findings.recommendation);
+    assert!(
+        findings.recommendation.contains("Reduce gain"),
+        "Got: {}",
+        findings.recommendation
+    );
 }
 
 /// Golden: lufs_compliance triggers + "Increase gain" when too quiet.
@@ -163,10 +184,16 @@ fn test_lufs_too_quiet_triggers_compliance_and_increase_recommendation() {
 
     let issue = findings.issues.iter().find(|i| i.id == "lufs_compliance");
     assert!(issue.is_some(), "lufs_compliance must trigger at -20 LUFS");
-    assert_eq!(issue.unwrap().severity, Severity::High,
-        "delta.abs()=6.0 > 2.0 → High");
-    assert!(findings.recommendation.contains("Increase gain"),
-        "Got: {}", findings.recommendation);
+    assert_eq!(
+        issue.unwrap().severity,
+        Severity::High,
+        "delta.abs()=6.0 > 2.0 → High"
+    );
+    assert!(
+        findings.recommendation.contains("Increase gain"),
+        "Got: {}",
+        findings.recommendation
+    );
 }
 
 /// Golden: true_peak_exceeded recommendation takes priority over lufs_compliance.
@@ -176,8 +203,11 @@ fn test_true_peak_priority_over_lufs() {
     let thresholds = make_thresholds();
     let findings = evaluate(&report, &thresholds);
 
-    assert!(findings.recommendation.contains("limiter"),
-        "true_peak must dominate recommendation: {}", findings.recommendation);
+    assert!(
+        findings.recommendation.contains("limiter"),
+        "true_peak must dominate recommendation: {}",
+        findings.recommendation
+    );
 }
 
 /// Golden: lufs_compliance High fires when >2.0 LU from target.
@@ -190,8 +220,11 @@ fn test_lufs_compliance_high_severity_above_2lu() {
 
     let issue = findings.issues.iter().find(|i| i.id == "lufs_compliance");
     assert!(issue.is_some(), "Must trigger at -11.9 LUFS");
-    assert_eq!(issue.unwrap().severity, Severity::High,
-        "delta.abs()=2.1 > 2.0 → High");
+    assert_eq!(
+        issue.unwrap().severity,
+        Severity::High,
+        "delta.abs()=2.1 > 2.0 → High"
+    );
 }
 
 /// Golden: raw preset never triggers lufs_compliance.
@@ -210,8 +243,10 @@ fn test_raw_preset_no_lufs_compliance() {
         lra_max: 14.0,
     };
     let findings = evaluate(&report, &thresholds);
-    assert!(!findings.issues.iter().any(|i| i.id == "lufs_compliance"),
-        "Raw preset must not produce lufs_compliance issue");
+    assert!(
+        !findings.issues.iter().any(|i| i.id == "lufs_compliance"),
+        "Raw preset must not produce lufs_compliance issue"
+    );
 }
 
 /// Golden: weak stereo triggers High severity.
@@ -221,8 +256,14 @@ fn test_weak_stereo_high_severity() {
     let thresholds = make_thresholds();
     let findings = evaluate(&report, &thresholds);
 
-    let issue = findings.issues.iter().find(|i| i.id == "stereo_correlation_weak");
-    assert!(issue.is_some(), "stereo_correlation_weak must trigger at corr=0.3");
+    let issue = findings
+        .issues
+        .iter()
+        .find(|i| i.id == "stereo_correlation_weak");
+    assert!(
+        issue.is_some(),
+        "stereo_correlation_weak must trigger at corr=0.3"
+    );
     assert_eq!(issue.unwrap().severity, Severity::High);
 }
 
@@ -236,11 +277,20 @@ fn test_findings_serialize_to_json() {
     let json = findings.to_json().expect("Serialization must succeed");
     assert!(json.contains("issues"));
     assert!(json.contains("recommendation"));
-    assert!(!json.contains("\"High\""), "Severity must be lowercase: {json}");
+    assert!(
+        !json.contains("\"High\""),
+        "Severity must be lowercase: {json}"
+    );
     assert!(json.contains("\"high\"") || json.contains("\"medium\"") || json.contains("\"low\""));
     // New rule id must appear, not old ids
-    assert!(json.contains("lufs_compliance"), "Must use lufs_compliance id: {json}");
-    assert!(!json.contains("lufs_too_high"),  "Old id must not appear: {json}");
+    assert!(
+        json.contains("lufs_compliance"),
+        "Must use lufs_compliance id: {json}"
+    );
+    assert!(
+        !json.contains("lufs_too_high"),
+        "Old id must not appear: {json}"
+    );
 }
 
 /// Boundary: lufs at exactly tolerance boundary — no trigger.
@@ -251,8 +301,10 @@ fn test_lufs_exactly_at_tolerance_boundary() {
     let thresholds = make_thresholds();
     let findings = evaluate(&report, &thresholds);
 
-    assert!(!findings.issues.iter().any(|i| i.id == "lufs_compliance"),
-        "At exactly ±0.5 boundary: lufs_compliance must not trigger");
+    assert!(
+        !findings.issues.iter().any(|i| i.id == "lufs_compliance"),
+        "At exactly ±0.5 boundary: lufs_compliance must not trigger"
+    );
 }
 
 /// Golden: Apple Music preset with correct tag in lufs_compliance issue.
@@ -272,9 +324,16 @@ fn test_apple_music_preset_lufs_compliance_tag() {
     };
     let findings = evaluate(&report, &thresholds);
 
-    let issue = findings.issues.iter().find(|i| i.id == "lufs_compliance").unwrap();
-    assert!(issue.tags.iter().any(|t| t == "platform:apple_music"),
-        "Tag must say platform:apple_music: {:?}", issue.tags);
+    let issue = findings
+        .issues
+        .iter()
+        .find(|i| i.id == "lufs_compliance")
+        .unwrap();
+    assert!(
+        issue.tags.iter().any(|t| t == "platform:apple_music"),
+        "Tag must say platform:apple_music: {:?}",
+        issue.tags
+    );
     // delta = -14.0 - (-16.0) = 2.0; abs = 2.0 → Medium (not > 2.0)
     assert_eq!(issue.severity, Severity::Medium);
 }

@@ -4,23 +4,23 @@
 //! INV-CB-1: never modifies DSP behavior — background learning only.
 
 use lineos_corpus::contract::CorpusEnvelope;
-use lineos_corpus::store::{UserMarkovModel, aggregate_preset};
-use lineos_types::StemFeatures;
+use lineos_corpus::store::{aggregate_preset, UserMarkovModel};
 use lineos_types::pre_analysis::PreAnalysisData;
+use lineos_types::StemFeatures;
 
 pub struct CorpusOutput {
-    pub envelope:    CorpusEnvelope,
+    pub envelope: CorpusEnvelope,
     pub corpus_path: String,
 }
 
 pub fn run(
     streaming_features: &StemFeatures,
-    left_slice:         &[f32],
-    pre_analysis:       &PreAnalysisData,
-    blob_id:            &str,
-    sample_rate:        u32,
-    flavour_id:         &str,
-    project_id:         &str,
+    left_slice: &[f32],
+    pre_analysis: &PreAnalysisData,
+    blob_id: &str,
+    sample_rate: u32,
+    flavour_id: &str,
+    project_id: &str,
 ) -> CorpusOutput {
     use lineos_corpus::builder::build_timeline;
 
@@ -38,8 +38,7 @@ pub fn run(
     );
 
     // Write corpus.json — silent failure
-    let corpus_path = format!("session_{}.corpus.json",
-        &blob_id[..blob_id.len().min(8)]);
+    let corpus_path = format!("session_{}.corpus.json", &blob_id[..blob_id.len().min(8)]);
     if let Ok(json) = serde_json::to_string_pretty(&corpus_envelope) {
         let _ = std::fs::write(&corpus_path, json);
     }
@@ -60,13 +59,15 @@ pub fn run(
     // Every 10 sessions: recompute global preset snapshot
     if user_model.version % 10 == 0 {
         if let Some(global) = aggregate_preset(flavour_id, &[&user_model]) {
-            let global_path = format!("global_{}_v{}.json",
-                flavour_id, user_model.version / 10);
+            let global_path = format!("global_{}_v{}.json", flavour_id, user_model.version / 10);
             if let Ok(json) = serde_json::to_string(&global) {
                 let _ = std::fs::write(&global_path, json);
             }
         }
     }
 
-    CorpusOutput { envelope: corpus_envelope, corpus_path }
+    CorpusOutput {
+        envelope: corpus_envelope,
+        corpus_path,
+    }
 }

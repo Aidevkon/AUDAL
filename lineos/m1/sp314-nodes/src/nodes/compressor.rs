@@ -1,7 +1,7 @@
 use crate::node::DspNode;
+use libm::{fmaxf, fminf, powf};
 use sp314_dsp::compressor::envelope::EnvelopeFollower;
 use sp314_dsp::compressor::gain::compute_gain_reduction;
-use libm::{powf, fmaxf, fminf};
 
 pub struct CompressorNode {
     env_l: EnvelopeFollower,
@@ -37,7 +37,7 @@ impl CompressorNode {
     fn recompute_envelopes(&mut self) {
         // Re-create the envelope followers to update attack/release coefficients
         let sr = self.sample_rate as u32;
-        // In order to not lose state, we could manually compute coeffs, but EnvelopeFollower 
+        // In order to not lose state, we could manually compute coeffs, but EnvelopeFollower
         // doesn't expose them. For now, replacing is fine since this happens between blocks.
         self.env_l = EnvelopeFollower::new(self.attack_ms, self.release_ms, sr);
         self.env_r = EnvelopeFollower::new(self.attack_ms, self.release_ms, sr);
@@ -53,8 +53,10 @@ impl DspNode for CompressorNode {
             let env_l_db = self.env_l.process(*l);
             let env_r_db = self.env_r.process(*r);
 
-            let gr_l_db = compute_gain_reduction(env_l_db, self.threshold_db, self.ratio, self.knee_db);
-            let gr_r_db = compute_gain_reduction(env_r_db, self.threshold_db, self.ratio, self.knee_db);
+            let gr_l_db =
+                compute_gain_reduction(env_l_db, self.threshold_db, self.ratio, self.knee_db);
+            let gr_r_db =
+                compute_gain_reduction(env_r_db, self.threshold_db, self.ratio, self.knee_db);
 
             let gr_db = fminf(gr_l_db, gr_r_db); // Stereo link (apply max reduction)
             self.current_gr_db = gr_db;

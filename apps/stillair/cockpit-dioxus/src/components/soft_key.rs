@@ -4,35 +4,35 @@ use dioxus::prelude::*;
 pub enum SoftKeyVariant {
     #[default]
     Standard, // Grey
-    Active,   // Amber
-    Danger,   // Red
+    Active, // Amber
+    Danger, // Red
 }
 
 #[derive(Props, PartialEq, Clone)]
 pub struct SoftKeyProps {
     /// The button text or content
     pub label: String,
-    
+
     /// Triggered state -> true if it should appear "pressed" or "activated"
     #[props(default = false)]
     pub active: bool,
-    
+
     /// Disabled state
     #[props(default = false)]
     pub disabled: bool,
-    
+
     /// Color and usage variant
     #[props(default = Default::default())]
     pub variant: SoftKeyVariant,
-    
+
     /// If true, adds the guard rails to the left and right
     #[props(default = false)]
     pub is_guarded: bool,
-    
+
     /// Optional tooltip
     #[props(default = "".to_string())]
     pub title: String,
-    
+
     /// Click handler
     pub onclick: EventHandler<MouseEvent>,
 }
@@ -45,9 +45,9 @@ pub fn SoftKey(props: SoftKeyProps) -> Element {
         SoftKeyVariant::Active => "btn-avionics btn-active",
         SoftKeyVariant::Danger => "btn-abort",
     };
-    
+
     let active_class = if props.active { "is-pressed" } else { "" };
-    
+
     let button_element = rsx! {
         button {
             class: "{base_class} {active_class}",

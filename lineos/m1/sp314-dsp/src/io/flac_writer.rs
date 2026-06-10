@@ -46,16 +46,19 @@ impl FlacWriter {
             &flacenc::config::Encoder::default(),
             source,
             flacenc::config::Encoder::default().block_sizes[0],
-        ).map_err(|e| format!("FLAC encoding error: {:?}", e))?;
+        )
+        .map_err(|e| format!("FLAC encoding error: {:?}", e))?;
 
         let mut file = std::fs::File::create(path)?;
-        
+
         let mut sink = flacenc::bitsink::ByteSink::new();
-        flac_stream.write(&mut sink).map_err(|e| format!("FLAC write error: {:?}", e))?;
-        
+        flac_stream
+            .write(&mut sink)
+            .map_err(|e| format!("FLAC write error: {:?}", e))?;
+
         use std::io::Write;
         file.write_all(sink.as_slice())?;
-        
+
         Ok(())
     }
 }

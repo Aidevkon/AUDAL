@@ -1,12 +1,13 @@
 pub mod chaos;
-pub mod semantic;
-pub mod mapping;
-pub mod intent;
-pub mod personas;
-pub mod tuning;
 pub mod control;
+pub mod intent;
+pub mod mapping;
 pub mod markov;
+pub mod personas;
+pub mod semantic;
 pub mod simulation;
+pub mod tuning;
 
-pub use control::{BlackBoxMode, BlackBoxControl, OrbPosition,
-                  MacroDelta, MediumControl, orb_resistance};
+pub use control::{
+    orb_resistance, BlackBoxControl, BlackBoxMode, MacroDelta, MediumControl, OrbPosition,
+};

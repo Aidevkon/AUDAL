@@ -207,7 +207,10 @@ mod tests {
     async fn health_criteria_default_c6_c7_true() {
         let gate = HealthGate::new();
         let criteria = gate.get_criteria().await;
-        assert!(criteria.health_endpoint_responding, "C6 must be true by design");
+        assert!(
+            criteria.health_endpoint_responding,
+            "C6 must be true by design"
+        );
         assert!(criteria.health_independence, "C7 must be true by design");
     }
 }

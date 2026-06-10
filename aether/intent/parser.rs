@@ -25,14 +25,17 @@ impl IntentParser {
         // Resolution order §6:
 
         // 1. Explicit persona selection
-        for persona_id in ["warm_analog", "clean_punch",
-                            "hybrid_hifi", "cinematic_wide"] {
-            if lower.contains(persona_id)
-               || lower.contains(&persona_id.replace('_', " ")) {
+        for persona_id in [
+            "warm_analog",
+            "clean_punch",
+            "hybrid_hifi",
+            "cinematic_wide",
+        ] {
+            if lower.contains(persona_id) || lower.contains(&persona_id.replace('_', " ")) {
                 return Intent {
-                    goal:     IntentGoal::SelectPersona(persona_id.to_string()),
+                    goal: IntentGoal::SelectPersona(persona_id.to_string()),
                     strength: IntentStrength::new(1.0),
-                    context:  Some(input.to_string()),
+                    context: Some(input.to_string()),
                 };
             }
         }
@@ -44,7 +47,7 @@ impl IntentParser {
         Intent {
             goal,
             strength: IntentStrength::new(strength),
-            context:  None,
+            context: None,
         }
     }
 
@@ -53,15 +56,15 @@ impl IntentParser {
     /// delta > 0 = increase, delta < 0 = decrease.
     pub fn from_handle(handle: &str, delta: f32) -> Intent {
         let goal = match (handle, delta >= 0.0) {
-            ("warmth",      true)  => IntentGoal::IncreaseWarmth,
-            ("warmth",      false) => IntentGoal::DecreaseWarmth,
-            ("punch",       true)  => IntentGoal::IncreasePunch,
-            ("punch",       false) => IntentGoal::DecreasePunch,
-            ("forwardness", true)  => IntentGoal::IncreaseForwardness,
+            ("warmth", true) => IntentGoal::IncreaseWarmth,
+            ("warmth", false) => IntentGoal::DecreaseWarmth,
+            ("punch", true) => IntentGoal::IncreasePunch,
+            ("punch", false) => IntentGoal::DecreasePunch,
+            ("forwardness", true) => IntentGoal::IncreaseForwardness,
             ("forwardness", false) => IntentGoal::DecreaseForwardness,
-            ("smoothness",  true)  => IntentGoal::IncreaseSmootness,
-            ("smoothness",  false) => IntentGoal::DecreaseSmootness,
-            _                      => IntentGoal::NoOp,
+            ("smoothness", true) => IntentGoal::IncreaseSmootness,
+            ("smoothness", false) => IntentGoal::DecreaseSmootness,
+            _ => IntentGoal::NoOp,
         };
         Intent::new(goal, delta.abs().clamp(0.0, 1.0))
     }
@@ -70,47 +73,120 @@ impl IntentParser {
 
     fn match_goal(lower: &str) -> IntentGoal {
         // Warmth
-        if Self::has_any(lower, &["more warm", "warmer", "add warm",
-                                   "more body", "fuller", "richer",
-                                   "more low", "boost low"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "more warm",
+                "warmer",
+                "add warm",
+                "more body",
+                "fuller",
+                "richer",
+                "more low",
+                "boost low",
+            ],
+        ) {
             return IntentGoal::IncreaseWarmth;
         }
-        if Self::has_any(lower, &["less warm", "less body", "thin",
-                                   "reduce mud", "less mud", "cleaner low"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "less warm",
+                "less body",
+                "thin",
+                "reduce mud",
+                "less mud",
+                "cleaner low",
+            ],
+        ) {
             return IntentGoal::DecreaseWarmth;
         }
 
         // Punch
-        if Self::has_any(lower, &["more punch", "punchier", "more attack",
-                                   "tighter", "more transient", "harder hit",
-                                   "more impact"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "more punch",
+                "punchier",
+                "more attack",
+                "tighter",
+                "more transient",
+                "harder hit",
+                "more impact",
+            ],
+        ) {
             return IntentGoal::IncreasePunch;
         }
-        if Self::has_any(lower, &["less punch", "softer", "less attack",
-                                   "smoother attack", "less transient"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "less punch",
+                "softer",
+                "less attack",
+                "smoother attack",
+                "less transient",
+            ],
+        ) {
             return IntentGoal::DecreasePunch;
         }
 
         // Forwardness
-        if Self::has_any(lower, &["more forward", "more presence",
-                                   "brighter", "more air", "more open",
-                                   "more clarity", "cut through"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "more forward",
+                "more presence",
+                "brighter",
+                "more air",
+                "more open",
+                "more clarity",
+                "cut through",
+            ],
+        ) {
             return IntentGoal::IncreaseForwardness;
         }
-        if Self::has_any(lower, &["less forward", "pull back", "darker",
-                                   "less presence", "more recessed",
-                                   "less harsh", "less bright"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "less forward",
+                "pull back",
+                "darker",
+                "less presence",
+                "more recessed",
+                "less harsh",
+                "less bright",
+            ],
+        ) {
             return IntentGoal::DecreaseForwardness;
         }
 
         // Smoothness
-        if Self::has_any(lower, &["smoother", "less harsh", "remove harsh",
-                                   "less sibilanc", "de-ess", "softer high",
-                                   "less edge", "more polished"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "smoother",
+                "less harsh",
+                "remove harsh",
+                "less sibilanc",
+                "de-ess",
+                "softer high",
+                "less edge",
+                "more polished",
+            ],
+        ) {
             return IntentGoal::IncreaseSmootness;
         }
-        if Self::has_any(lower, &["more edge", "more grit", "more aggress",
-                                   "less smooth", "rawer", "more bite"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "more edge",
+                "more grit",
+                "more aggress",
+                "less smooth",
+                "rawer",
+                "more bite",
+            ],
+        ) {
             return IntentGoal::DecreaseSmootness;
         }
 
@@ -119,13 +195,25 @@ impl IntentParser {
 
     fn extract_strength(lower: &str) -> f32 {
         // Intensity modifiers
-        if Self::has_any(lower, &["slightly", "a bit", "subtle",
-                                   "a little", "just a touch"]) {
+        if Self::has_any(
+            lower,
+            &["slightly", "a bit", "subtle", "a little", "just a touch"],
+        ) {
             return 0.25;
         }
-        if Self::has_any(lower, &["much more", "much less", "a lot",
-                                   "significantly", "dramatically",
-                                   "extremely", "way more", "way less"]) {
+        if Self::has_any(
+            lower,
+            &[
+                "much more",
+                "much less",
+                "a lot",
+                "significantly",
+                "dramatically",
+                "extremely",
+                "way more",
+                "way less",
+            ],
+        ) {
             return 0.9;
         }
         // Default: medium strength
@@ -139,16 +227,18 @@ impl IntentParser {
             let mut start = 0;
             while let Some(pos) = text[start..].find(p) {
                 let abs_pos = start + pos;
-                let before_ok = abs_pos == 0
-                    || !text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
+                let before_ok =
+                    abs_pos == 0 || !text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
                 let after_pos = abs_pos + p.len();
-                let after_ok = after_pos >= text.len()
-                    || !text.as_bytes()[after_pos].is_ascii_alphanumeric();
+                let after_ok =
+                    after_pos >= text.len() || !text.as_bytes()[after_pos].is_ascii_alphanumeric();
                 if before_ok && after_ok {
                     return true;
                 }
                 start = abs_pos + 1;
-                if start >= text.len() { break; }
+                if start >= text.len() {
+                    break;
+                }
             }
             false
         })
@@ -214,7 +304,7 @@ mod tests {
 
     #[test]
     fn intent_serializable() {
-        let i    = Intent::new(IntentGoal::IncreaseWarmth, 0.5);
+        let i = Intent::new(IntentGoal::IncreaseWarmth, 0.5);
         let json = serde_json::to_string(&i).unwrap();
         let i2: Intent = serde_json::from_str(&json).unwrap();
         assert_eq!(i, i2);

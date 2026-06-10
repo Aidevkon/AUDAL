@@ -1,15 +1,15 @@
-use dioxus::prelude::*;
 use crate::components::screw::Screw;
+use dioxus::prelude::*;
 
 #[derive(Props, PartialEq, Clone)]
 pub struct ModuleFrameProps {
     /// The engraved title shown at the top of the module
     pub title: String,
-    
+
     /// Optional specific class for the panel (e.g., "panel-session")
     #[props(default = "".to_string())]
     pub panel_class: String,
-    
+
     /// Optional CSS style for the header (e.g., color, border-bottom)
     #[props(default = "".to_string())]
     pub header_style: String,

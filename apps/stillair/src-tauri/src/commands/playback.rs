@@ -9,14 +9,18 @@ use crate::ipc::m0_client::M0Client;
 /// Playback state visible to the Cockpit — metrics only, no PCM (A-003 §2).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PlaybackStateJson {
-    pub blob_id:     String,
+    pub blob_id: String,
     pub position_ms: u64,
     pub duration_ms: u64,
-    pub is_playing:  bool,
+    pub is_playing: bool,
     pub sample_rate: u32,
-    pub channels:    u16,
-    #[serde(alias = "ab_target", deserialize_with = "deserialize_active_ab", default = "default_active_ab")]
-    pub active_ab:   String,
+    pub channels: u16,
+    #[serde(
+        alias = "ab_target",
+        deserialize_with = "deserialize_active_ab",
+        default = "default_active_ab"
+    )]
+    pub active_ab: String,
 }
 
 fn default_active_ab() -> String {
@@ -37,10 +41,10 @@ where
 /// Live telemetry — momentary LUFS + short-term during playback (P12B-005).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LiveTelemetryJson {
-    pub momentary_lufs:  f32,
+    pub momentary_lufs: f32,
     pub short_term_lufs: f32,
-    pub true_peak_dbtp:  f32,
-    pub position_ms:     u64,
+    pub true_peak_dbtp: f32,
+    pub position_ms: u64,
 }
 
 /// Control playback.
@@ -49,11 +53,12 @@ pub struct LiveTelemetryJson {
 /// position_ms: required for "seek", ignored otherwise.
 #[tauri::command]
 pub async fn playback_control(
-    action:      String,
+    action: String,
     position_ms: Option<u64>,
-    client:      tauri::State<'_, M0Client>,
+    client: tauri::State<'_, M0Client>,
 ) -> Result<Option<PlaybackStateJson>, String> {
-    client.playback_control(&action, position_ms)
+    client
+        .playback_control(&action, position_ms)
         .await
         .map_err(|e| format!("IO_ERR:0x02:Playback failed: {e}"))
 }
@@ -63,7 +68,8 @@ pub async fn playback_control(
 pub async fn get_playback_state(
     client: tauri::State<'_, M0Client>,
 ) -> Result<Option<PlaybackStateJson>, String> {
-    client.get_playback_state()
+    client
+        .get_playback_state()
         .await
         .map_err(|e| format!("IO_ERR:0x02:Get playback state failed: {e}"))
 }
@@ -75,7 +81,8 @@ pub async fn get_playback_state(
 pub async fn get_live_telemetry(
     client: tauri::State<'_, M0Client>,
 ) -> Result<Option<LiveTelemetryJson>, String> {
-    client.get_live_telemetry()
+    client
+        .get_live_telemetry()
         .await
         .map_err(|e| format!("IO_ERR:0x02:Live telemetry failed: {e}"))
 }

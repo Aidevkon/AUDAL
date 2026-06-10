@@ -4,14 +4,14 @@
 //! INV-WZ-7: findings appear spatially, exactly where the issue occurs.
 //! INV-WZ-10: one HUD instance per MFD, new finding supersedes old.
 
+use crate::wizard::{MfdTarget, WizardFinding, WizardSeverity};
 use dioxus::prelude::*;
-use crate::wizard::{WizardFinding, WizardSeverity, MfdTarget};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct MfdHudProps {
-    pub findings:   Vec<WizardFinding>,
-    pub target:     MfdTarget,
-    pub on_dismiss: EventHandler<&'static str>,  // finding id
+    pub findings: Vec<WizardFinding>,
+    pub target: MfdTarget,
+    pub on_dismiss: EventHandler<&'static str>, // finding id
 }
 
 /// Renders finding indicators spatially over a specific MFD.
@@ -20,10 +20,8 @@ pub struct MfdHudProps {
 #[component]
 pub fn MfdHud(props: MfdHudProps) -> Element {
     let valid = validated_findings(&props.findings);
-    let mfd_findings: Vec<&&WizardFinding> = valid
-        .iter()
-        .filter(|f| f.mfd == props.target)
-        .collect();
+    let mfd_findings: Vec<&&WizardFinding> =
+        valid.iter().filter(|f| f.mfd == props.target).collect();
 
     if mfd_findings.is_empty() {
         return rsx! {};
@@ -73,23 +71,24 @@ pub fn MfdHud(props: MfdHudProps) -> Element {
 
 fn severity_str(s: &WizardSeverity) -> &'static str {
     match s {
-        WizardSeverity::High   => "high",
+        WizardSeverity::High => "high",
         WizardSeverity::Medium => "medium",
-        WizardSeverity::Low    => "low",
+        WizardSeverity::Low => "low",
     }
 }
 
 fn severity_label(s: &WizardSeverity) -> &'static str {
     match s {
-        WizardSeverity::High   => "HIGH",
+        WizardSeverity::High => "HIGH",
         WizardSeverity::Medium => "MED",
-        WizardSeverity::Low    => "LOW",
+        WizardSeverity::Low => "LOW",
     }
 }
 
 fn validated_findings(findings: &[WizardFinding]) -> Vec<&WizardFinding> {
     let mut seen = std::collections::HashSet::new();
-    findings.iter()
+    findings
+        .iter()
         .filter(|f| seen.insert(f.id))
         .take(8)
         .collect()

@@ -7,13 +7,20 @@ use sp314_dsp::stft::StftEngine;
 fn clean_kick_and_bass(duration_s: f32, sample_rate: u32) -> Vec<f32> {
     let n = (duration_s * sample_rate as f32) as usize;
     let mut phase_bass = 0.0_f32;
-    (0..n).map(|i| {
-        let t = i as f32 / sample_rate as f32;
-        let kick = if t >= 0.1 { libm::sinf(2.0 * core::f32::consts::PI * 50.0 * (t - 0.1)) * libm::expf(-(t - 0.1) * 40.0) } else { 0.0 };
-        phase_bass += 2.0 * core::f32::consts::PI * 150.0 / sample_rate as f32;
-        let bass = libm::sinf(phase_bass) * 0.5;
-        (kick + bass).clamp(-1.0, 1.0)
-    }).collect()
+    (0..n)
+        .map(|i| {
+            let t = i as f32 / sample_rate as f32;
+            let kick = if t >= 0.1 {
+                libm::sinf(2.0 * core::f32::consts::PI * 50.0 * (t - 0.1))
+                    * libm::expf(-(t - 0.1) * 40.0)
+            } else {
+                0.0
+            };
+            phase_bass += 2.0 * core::f32::consts::PI * 150.0 / sample_rate as f32;
+            let bass = libm::sinf(phase_bass) * 0.5;
+            (kick + bass).clamp(-1.0, 1.0)
+        })
+        .collect()
 }
 
 #[test]
@@ -23,9 +30,15 @@ fn test_maestro_smart_ducking() {
 
     let mut stft = StftEngine::new();
     let (frames, _) = stft.forward(&signal);
-    
-    let mag_frames: Vec<Vec<f32>> = frames.iter()
-        .map(|frame| frame.iter().map(|c| (c.re * c.re + c.im * c.im).sqrt()).collect())
+
+    let mag_frames: Vec<Vec<f32>> = frames
+        .iter()
+        .map(|frame| {
+            frame
+                .iter()
+                .map(|c| (c.re * c.re + c.im * c.im).sqrt())
+                .collect()
+        })
         .collect();
 
     let mut nmf = NmfEngine::new(2);
@@ -35,16 +48,16 @@ fn test_maestro_smart_ducking() {
     nmf.resolve_low_end_clash();
 
     let n_frames = frames.len();
-    
+
     // Kick is a transient, Bass is sustained.
     // Correct Row-Major slice summation
     let energy_c0: f32 = nmf.h[0..n_frames].iter().sum();
     let energy_c1: f32 = nmf.h[n_frames..2 * n_frames].iter().sum();
-    
+
     // Bass has more total energy over 1s because it is sustained
-    let (kick_c, bass_c) = if energy_c1 > energy_c0 { 
+    let (kick_c, bass_c) = if energy_c1 > energy_c0 {
         (0, 1)
-    } else { 
+    } else {
         (1, 0)
     };
 
@@ -66,16 +79,21 @@ fn test_maestro_smart_ducking() {
     let ducking_target = bass_sustain * 0.5;
 
     // Absolute Bounds (Gate)
-    assert!(bass_sustain > 0.01, "Gate Failed: No baseline bass detected in test signal");
+    assert!(
+        bass_sustain > 0.01,
+        "Gate Failed: No baseline bass detected in test signal"
+    );
     assert!(
         bass_at_hit > bass_sustain * 0.05,
         "ANTI-VACUUM FAILED! Bass dropped below 5% of sustain. Sustain: {:.2}, At Hit: {:.2}",
-        bass_sustain, bass_at_hit
+        bass_sustain,
+        bass_at_hit
     );
 
     assert!(
         bass_at_hit < ducking_target,
         "MAESTRO DUCKING FAILED! The Bass did not duck for the Kick. Sustain: {:.2}, At Hit: {:.2}",
-        bass_sustain, bass_at_hit
+        bass_sustain,
+        bass_at_hit
     );
 }

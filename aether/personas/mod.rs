@@ -5,7 +5,8 @@
 pub mod config;
 pub mod manager;
 
-pub use config::{PersonaConfig, MacroHandleConfig, MacroHandles,
-                 DspBaseConfig, ZonePriorities, CurveShape, ChaosProfile,
-                 MacroControls, PersonaOverride, PERSONA_OVERRIDE_DELTA_MAX};
+pub use config::{
+    ChaosProfile, CurveShape, DspBaseConfig, MacroControls, MacroHandleConfig, MacroHandles,
+    PersonaConfig, PersonaOverride, ZonePriorities, PERSONA_OVERRIDE_DELTA_MAX,
+};
 pub use manager::PersonaManager;

@@ -1,5 +1,5 @@
-use sp314_nodes::topology::DspTopology;
 use serde_json::json;
+use sp314_nodes::topology::DspTopology;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Flavor {

@@ -94,8 +94,7 @@ impl AuditLog {
 
     /// Append an audit entry. Synchronous write. Failed write = fatal halt.
     pub fn write(&self, entry: AuditEntry) -> Result<()> {
-        let line = serde_json::to_string(&entry)
-            .context("Failed to serialize audit entry")?;
+        let line = serde_json::to_string(&entry).context("Failed to serialize audit entry")?;
 
         let mut file = self
             .file
@@ -137,27 +136,47 @@ pub fn entry_startup() -> AuditEntry {
 }
 
 pub fn entry_health_gate_passed() -> AuditEntry {
-    AuditEntry::new(EVENT_HEALTH_GATE_PASSED, AuditLevel::Audit, "Health gate passed — all 7 criteria satisfied")
+    AuditEntry::new(
+        EVENT_HEALTH_GATE_PASSED,
+        AuditLevel::Audit,
+        "Health gate passed — all 7 criteria satisfied",
+    )
 }
 
 pub fn entry_asset_served(path: &str, digest: &str) -> AuditEntry {
-    AuditEntry::new(EVENT_ASSET_SERVED, AuditLevel::Info, &format!("Asset served: {path}"))
-        .with_metadata(serde_json::json!({ "path": path, "blake3": digest }))
+    AuditEntry::new(
+        EVENT_ASSET_SERVED,
+        AuditLevel::Info,
+        &format!("Asset served: {path}"),
+    )
+    .with_metadata(serde_json::json!({ "path": path, "blake3": digest }))
 }
 
 pub fn entry_policy_violation(destination: &str, reason: &str) -> AuditEntry {
-    AuditEntry::new(EVENT_POLICY_VIOLATION, AuditLevel::Audit, &format!("Policy violation: {destination}"))
-        .with_metadata(serde_json::json!({ "destination": destination, "reason": reason }))
+    AuditEntry::new(
+        EVENT_POLICY_VIOLATION,
+        AuditLevel::Audit,
+        &format!("Policy violation: {destination}"),
+    )
+    .with_metadata(serde_json::json!({ "destination": destination, "reason": reason }))
 }
 
 pub fn entry_proxy_request(method: &str, path: &str, status: u16) -> AuditEntry {
-    AuditEntry::new(EVENT_PROXY_REQUEST, AuditLevel::Info, &format!("{method} {path} → {status}"))
-        .with_metadata(serde_json::json!({ "method": method, "path": path, "status": status }))
+    AuditEntry::new(
+        EVENT_PROXY_REQUEST,
+        AuditLevel::Info,
+        &format!("{method} {path} → {status}"),
+    )
+    .with_metadata(serde_json::json!({ "method": method, "path": path, "status": status }))
 }
 
 pub fn entry_marketplace_rejection(engine_id: &str, reason: &str) -> AuditEntry {
-    AuditEntry::new(EVENT_MARKETPLACE_REJECTION, AuditLevel::Audit, &format!("Marketplace rejection: {engine_id}"))
-        .with_metadata(serde_json::json!({ "engine_id": engine_id, "reason": reason }))
+    AuditEntry::new(
+        EVENT_MARKETPLACE_REJECTION,
+        AuditLevel::Audit,
+        &format!("Marketplace rejection: {engine_id}"),
+    )
+    .with_metadata(serde_json::json!({ "engine_id": engine_id, "reason": reason }))
 }
 
 pub fn entry_shutdown() -> AuditEntry {
@@ -194,10 +213,17 @@ mod tests {
 
         log.write(entry_startup()).unwrap();
         log.write(entry_health_gate_passed()).unwrap();
-        log.write(entry_asset_served("sp314.wasm", "aabbccdd")).unwrap();
-        log.write(entry_policy_violation("https://example.com", "not declared")).unwrap();
-        log.write(entry_proxy_request("GET", "/telemetry", 200)).unwrap();
-        log.write(entry_marketplace_rejection("E100", "signature invalid")).unwrap();
+        log.write(entry_asset_served("sp314.wasm", "aabbccdd"))
+            .unwrap();
+        log.write(entry_policy_violation(
+            "https://example.com",
+            "not declared",
+        ))
+        .unwrap();
+        log.write(entry_proxy_request("GET", "/telemetry", 200))
+            .unwrap();
+        log.write(entry_marketplace_rejection("E100", "signature invalid"))
+            .unwrap();
         log.write(entry_shutdown()).unwrap();
 
         // Read back: expect 7 lines

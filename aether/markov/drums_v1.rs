@@ -2,25 +2,24 @@ use lineos_types::analysis::StemMetrics;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DrumsState {
-    Quiet     = 0,
-    BuildUp   = 1,
+    Quiet = 0,
+    BuildUp = 1,
     Transient = 2,
-    Decay     = 3,
-    Sustain   = 4,
+    Decay = 3,
+    Sustain = 4,
 }
 
 impl DrumsState {
     pub fn to_str(&self) -> &'static str {
         match self {
-            DrumsState::Quiet     => "quiet",
-            DrumsState::BuildUp   => "buildup",
+            DrumsState::Quiet => "quiet",
+            DrumsState::BuildUp => "buildup",
             DrumsState::Transient => "transient",
-            DrumsState::Decay     => "decay",
-            DrumsState::Sustain   => "sustain",
+            DrumsState::Decay => "decay",
+            DrumsState::Sustain => "sustain",
         }
     }
 }
-
 
 pub const TRANSITION_MATRIX_DRUMS_V1: [[f32; 5]; 5] = [
     [0.70, 0.15, 0.10, 0.05, 0.00],
@@ -51,7 +50,8 @@ impl DrumsMarkovStateClassifier {
 
     pub fn predict_next(state: DrumsState) -> DrumsState {
         let row = TRANSITION_MATRIX_DRUMS_V1[state as usize];
-        let next_idx = row.iter()
+        let next_idx = row
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -71,17 +71,27 @@ mod tests {
     use super::*;
 
     fn mock(rms: f32, crest: f32) -> StemMetrics {
-        StemMetrics { rms_db: rms, crest_factor_db: crest, ..StemMetrics::default() }
+        StemMetrics {
+            rms_db: rms,
+            crest_factor_db: crest,
+            ..StemMetrics::default()
+        }
     }
 
     #[test]
     fn classify_quiet() {
-        assert_eq!(DrumsMarkovStateClassifier::classify_drums(&mock(-65.0, 5.0)), DrumsState::Quiet);
+        assert_eq!(
+            DrumsMarkovStateClassifier::classify_drums(&mock(-65.0, 5.0)),
+            DrumsState::Quiet
+        );
     }
 
     #[test]
     fn predict_next_from_transient_is_decay() {
-        assert_eq!(DrumsMarkovStateClassifier::predict_next(DrumsState::Transient), DrumsState::Decay);
+        assert_eq!(
+            DrumsMarkovStateClassifier::predict_next(DrumsState::Transient),
+            DrumsState::Decay
+        );
     }
 
     #[test]

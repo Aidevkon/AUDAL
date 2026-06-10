@@ -3,7 +3,7 @@
 //! No DSP — pure window computation from already-processed samples.
 //! All float math uses libm — no std::f32 methods.
 
-use crate::lra::{ms_to_lufs};
+use crate::lra::ms_to_lufs;
 
 /// Momentary loudness: last 400ms window (EBU R128 §2.2).
 /// Returns NEG_INFINITY if fewer samples than window size.
@@ -30,7 +30,9 @@ pub fn short_term_lufs(samples: &[f32], sample_rate: u32, channels: u16) -> f32 
 
 #[inline]
 fn mean_square(samples: &[f32]) -> f32 {
-    if samples.is_empty() { return 0.0; }
+    if samples.is_empty() {
+        return 0.0;
+    }
     let sum: f32 = samples.iter().map(|&s| s * s).sum();
     sum / samples.len() as f32
 }
@@ -71,6 +73,9 @@ mod tests {
             .collect();
         let result = short_term_lufs(&samples, sr, ch);
         // Should be meaningful LUFS value — not infinity, not silence
-        assert!(result > -50.0 && result < 0.0, "ST LUFS out of range: {result}");
+        assert!(
+            result > -50.0 && result < 0.0,
+            "ST LUFS out of range: {result}"
+        );
     }
 }

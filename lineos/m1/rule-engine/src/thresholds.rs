@@ -18,27 +18,27 @@ use serde::{Deserialize, Serialize};
 pub struct Thresholds {
     // ── Selected preset (set by Cockpit, loaded from schema) ─────────────────
     /// Name of the user-selected BMR-128 preset (e.g. "spotify", "broadcast")
-    pub preset_name:  &'static str,
+    pub preset_name: &'static str,
     /// LUFS target for the selected preset. None = raw preset, lufs_compliance skips.
-    pub target_lufs:  Option<f32>,
+    pub target_lufs: Option<f32>,
 
     // ── Universal limits (from bmr-128.schema.json) ───────────────────────────
     /// Absolute true peak ceiling (dBTP) — from selected preset
-    pub true_peak_max:  f32,
+    pub true_peak_max: f32,
     /// LUFS compliance tolerance band (±LU) — symmetric
     pub lufs_tolerance: f32,
 
     // ── Quality thresholds ──────────────────────────────────────────────────
     /// Minimum acceptable dynamic range before "over-compressed" warning (dB)
-    pub dynamic_range_min:   f32,
+    pub dynamic_range_min: f32,
     /// Minimum stereo correlation before "low" warning
-    pub stereo_corr_min:     f32,
+    pub stereo_corr_min: f32,
     /// Minimum stereo correlation before "weak/phase issue" warning (more severe)
     pub stereo_corr_warning: f32,
     /// Maximum acceptable DC offset magnitude
-    pub dc_offset_max:       f32,
+    pub dc_offset_max: f32,
     /// Maximum acceptable LRA before "high dynamics" info
-    pub lra_max:             f32,
+    pub lra_max: f32,
 }
 
 impl Thresholds {
@@ -51,17 +51,17 @@ impl Thresholds {
         let true_peak_max = schema.max_true_peak_db;
 
         Self {
-            preset_name:  preset,
+            preset_name: preset,
             target_lufs,
             true_peak_max,
             // Quality thresholds not yet in bmr-128.schema.json — rule-engine defaults.
             // Phase 5 will migrate these into the schema.
-            lufs_tolerance:      0.5,
-            dynamic_range_min:   6.0,
-            stereo_corr_min:     0.8,
+            lufs_tolerance: 0.5,
+            dynamic_range_min: 6.0,
+            stereo_corr_min: 0.8,
             stereo_corr_warning: 0.5,
-            dc_offset_max:       0.01,
-            lra_max:             14.0,
+            dc_offset_max: 0.01,
+            lra_max: 14.0,
         }
     }
 
@@ -74,7 +74,7 @@ impl Thresholds {
 #[cfg(test)]
 mod tests {
     // use super::*;
-    
+
     // use std::collections::BTreeMap;
 
     /* TODO: 3b — restore tests

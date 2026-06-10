@@ -15,11 +15,11 @@ pub mod coach_adapter;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CoachNarrativeJson {
     /// 2–3 sentence plain-language overview of all findings.
-    pub summary:      String,
+    pub summary: String,
     /// Per-finding explanations in plain language. Teacher voice — no DSP values.
     pub explanations: Vec<FindingExplanation>,
     /// Model that produced this narrative — "phi3.5:3.8b" or "gemma2:9b".
-    pub model_used:   String,
+    pub model_used: String,
 }
 
 /// Explanation for a single issue from CoachFindings.
@@ -28,14 +28,14 @@ pub struct CoachNarrativeJson {
 pub struct FindingExplanation {
     /// Must exactly match an IssueJson.id from the CoachFindings input.
     /// Validated by CoachAdapter.validate_output() — cross-checked against known IDs.
-    pub issue_id:   String,
+    pub issue_id: String,
     /// Mirrors IssueJson.severity — "info" | "low" | "medium" | "high".
     /// Coach never modifies severity — it only echoes what rule-engine determined.
-    pub severity:   String,
+    pub severity: String,
     /// Short human-readable title for the finding.
-    pub title:      String,
+    pub title: String,
     /// Why this finding matters to the listener — teacher voice.
-    pub why:        String,
+    pub why: String,
     /// Directional suggestion only — no specific values, no plugin names.
     pub suggestion: String,
 }

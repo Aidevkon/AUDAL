@@ -1,15 +1,15 @@
-pub const L_HARM: usize = 17;  // time frames window
-pub const L_PERC: usize = 17;  // frequency bins window
+pub const L_HARM: usize = 17; // time frames window
+pub const L_PERC: usize = 17; // frequency bins window
 
 /// Compute 1D sliding median with edge clamping (nearest mode).
 /// input:  slice of f32 values
 /// window: odd window size
 /// output: Vec<f32> same length as input
 fn sliding_median(input: &[f32], window: usize) -> Vec<f32> {
-    let n    = input.len();
+    let n = input.len();
     let half = window / 2;
     let mut result = vec![0.0_f32; n];
-    let mut buf    = vec![0.0_f32; window];
+    let mut buf = vec![0.0_f32; window];
 
     for i in 0..n {
         // Fill window with edge clamping (nearest)
@@ -19,7 +19,7 @@ fn sliding_median(input: &[f32], window: usize) -> Vec<f32> {
                 (i + k).saturating_sub(half)
             } else {
                 let j = i + k - half;
-                j.min(n - 1)  // Right side — clamp to n-1
+                j.min(n - 1) // Right side — clamp to n-1
             };
             buf[k] = input[idx];
         }
@@ -48,16 +48,15 @@ impl Default for HpssProcessor {
 }
 
 impl HpssProcessor {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Apply HPSS to a magnitude spectrogram.
     /// Input:  magnitudes[n_frames][n_bins] (flat: row-major)
     /// Output: (harmonic_mask, percussive_mask)
     ///         each is Vec<f32> of length n_frames * n_bins
-    pub fn process(
-        &self,
-        magnitudes: &[Vec<f32>],
-    ) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
+    pub fn process(&self, magnitudes: &[Vec<f32>]) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
         let n_frames = magnitudes.len();
         if n_frames == 0 {
             return (Vec::new(), Vec::new());
@@ -68,9 +67,7 @@ impl HpssProcessor {
         let mut mag_harm = vec![vec![0.0_f32; n_bins]; n_frames];
         for b in 0..n_bins {
             // Extract column (time series for this bin)
-            let col: Vec<f32> = (0..n_frames)
-                .map(|t| magnitudes[t][b])
-                .collect();
+            let col: Vec<f32> = (0..n_frames).map(|t| magnitudes[t][b]).collect();
             let filtered = sliding_median(&col, L_HARM);
             for t in 0..n_frames {
                 mag_harm[t][b] = filtered[t];
@@ -121,19 +118,13 @@ impl HpssStreamContext {
     /// Process a chunk of magnitude frames with history context.
     /// Prepends L_HARM history frames for correct boundary handling.
     /// Returns masks only for the NEW frames (not the history prefix).
-    pub fn process_chunk(
-        &mut self,
-        chunk_frames: &[Vec<f32>],
-    ) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
+    pub fn process_chunk(&mut self, chunk_frames: &[Vec<f32>]) -> (Vec<Vec<f32>>, Vec<Vec<f32>>) {
         if chunk_frames.is_empty() {
             return (Vec::new(), Vec::new());
         }
 
         // Build context window: history + new chunk
-        let mut context: Vec<Vec<f32>> = self.frame_history
-            .iter()
-            .cloned()
-            .collect();
+        let mut context: Vec<Vec<f32>> = self.frame_history.iter().cloned().collect();
         let history_len = context.len();
         context.extend_from_slice(chunk_frames);
 

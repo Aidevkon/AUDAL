@@ -1,11 +1,7 @@
-
 use sp314_dsp::masking_eq::{
-    MaskingAwareEQ, MaskingEQConfig,
-    biquad::{rbj_peaking_coeffs, process_biquad}, HOP_SIZE, EQ_BANDS
+    biquad::{process_biquad, rbj_peaking_coeffs},
+    MaskingAwareEQ, MaskingEQConfig, EQ_BANDS, HOP_SIZE,
 };
-
-
-
 
 #[test]
 fn biquad_stable_no_nan_no_inf() {
@@ -35,12 +31,19 @@ fn cold_start_no_silence() {
     let mut block = vec![1.0; 512]; // DC offset of 1.0
     let mut right = block.to_vec();
     eq.process_block(&mut block, &mut right);
-    
+
     // With identity filter at start, output should be exactly input for first 511 samples
     for i in 0..511 {
-        assert_eq!(block[i], 1.0, "Cold start muted or altered signal at sample {}", i);
+        assert_eq!(
+            block[i], 1.0,
+            "Cold start muted or altered signal at sample {}",
+            i
+        );
     }
-    assert!((block[511] - 1.0).abs() < 0.1, "Cold start muted at hop boundary");
+    assert!(
+        (block[511] - 1.0).abs() < 0.1,
+        "Cold start muted at hop boundary"
+    );
 }
 
 // ==========================================
@@ -74,7 +77,7 @@ fn coeff_transition_linear_step() {
     };
     let mut eq = MaskingAwareEQ::new(config, 48000).unwrap();
     let mut block = vec![0.5; HOP_SIZE * 2]; // 2 hops
-    
+
     // First hop processes
     let mut right1 = block[0..HOP_SIZE].to_vec();
     eq.process_block(&mut block[0..HOP_SIZE], &mut right1);
@@ -130,7 +133,7 @@ fn process_block_deterministic_100_runs() {
         max_boost_db: 12.0,
         target_phon: 80.0,
     };
-    
+
     // We use a simple pseudo-random sequence for testing
     let mut block_in = vec![0.0; HOP_SIZE];
     for i in 0..HOP_SIZE {
@@ -158,7 +161,6 @@ fn process_block_deterministic_100_runs() {
     }
 }
 
-
 #[test]
 fn process_block_no_nan_no_inf() {
     let config = MaskingEQConfig {
@@ -172,7 +174,7 @@ fn process_block_no_nan_no_inf() {
     for i in 0..block.len() {
         block[i] = ((i * 137) % 200) as f32 / 100.0 - 1.0;
     }
-    
+
     let mut right = block.to_vec();
     eq.process_block(&mut block, &mut right);
     for x in block {

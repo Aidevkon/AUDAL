@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Telemetry {
     pub peak_db: f32,
-    pub rms_db:  f32,
-    pub lufs:    f32,
+    pub rms_db: f32,
+    pub lufs: f32,
 }
 
 pub fn analyze_offline_pre_pass(left: &[f32], right: &[f32]) -> Telemetry {
@@ -10,22 +10,30 @@ pub fn analyze_offline_pre_pass(left: &[f32], right: &[f32]) -> Telemetry {
 
     let len = left.len();
     if len == 0 {
-        return Telemetry { peak_db: -144.0, rms_db: -144.0, lufs: -144.0 };
+        return Telemetry {
+            peak_db: -144.0,
+            rms_db: -144.0,
+            lufs: -144.0,
+        };
     }
 
     let mut max_peak = 0.0_f32;
-    let mut sum_sq   = 0.0_f32;
-    let mut comp     = 0.0_f32;
+    let mut sum_sq = 0.0_f32;
+    let mut comp = 0.0_f32;
 
     for i in 0..len {
         let abs_l = libm::fabsf(left[i]);
         let abs_r = libm::fabsf(right[i]);
-        if abs_l > max_peak { max_peak = abs_l; }
-        if abs_r > max_peak { max_peak = abs_r; }
+        if abs_l > max_peak {
+            max_peak = abs_l;
+        }
+        if abs_r > max_peak {
+            max_peak = abs_r;
+        }
 
         let y = (left[i] * left[i] + right[i] * right[i]) - comp;
         let t = sum_sq + y;
-        comp  = (t - sum_sq) - y;
+        comp = (t - sum_sq) - y;
         sum_sq = t;
     }
 
@@ -44,5 +52,9 @@ pub fn analyze_offline_pre_pass(left: &[f32], right: &[f32]) -> Telemetry {
 
     let lufs = crate::metering::measure_integrated_lufs(left, right);
 
-    Telemetry { peak_db, rms_db, lufs }
+    Telemetry {
+        peak_db,
+        rms_db,
+        lufs,
+    }
 }

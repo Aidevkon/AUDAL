@@ -89,7 +89,12 @@ impl Cdn {
             tracing::warn!("Asset '{}' not in checksums.json — serving without hash verification (Phase 1 stub)", asset_name);
         }
 
-        tracing::info!("CDN served '{}' ({} bytes, blake3={})", asset_name, bytes.len(), &actual_blake3[..16]);
+        tracing::info!(
+            "CDN served '{}' ({} bytes, blake3={})",
+            asset_name,
+            bytes.len(),
+            &actual_blake3[..16]
+        );
         Ok(bytes)
     }
 
@@ -101,7 +106,10 @@ impl Cdn {
         for (name, entry) in &self.checksums.assets {
             // Skip empty-hash placeholders
             if entry.blake3.is_empty() {
-                tracing::debug!("Skipping verification of '{}' — empty hash (pending stub)", name);
+                tracing::debug!(
+                    "Skipping verification of '{}' — empty hash (pending stub)",
+                    name
+                );
                 continue;
             }
 
@@ -115,7 +123,10 @@ impl Cdn {
                     if actual != entry.blake3 {
                         failures.push((
                             name.clone(),
-                            format!("Hash mismatch: expected={}, actual={}", entry.blake3, actual),
+                            format!(
+                                "Hash mismatch: expected={}, actual={}",
+                                entry.blake3, actual
+                            ),
                         ));
                     }
                 }
@@ -159,7 +170,10 @@ mod tests {
                 format!(r#""{name}": {{ "blake3": "{hash}", "sha256": "", "size_bytes": 0 }}"#)
             })
             .collect();
-        format!(r#"{{ "version": "0.1.0", "assets": {{ {} }} }}"#, entries.join(", "))
+        format!(
+            r#"{{ "version": "0.1.0", "assets": {{ {} }} }}"#,
+            entries.join(", ")
+        )
     }
 
     #[tokio::test]
@@ -170,11 +184,16 @@ mod tests {
         let real_hash = blake3_hex(content);
 
         let mut cs_file = NamedTempFile::new().unwrap();
-        cs_file.write_all(checksums_json(&[("test.wasm", &real_hash)]).as_bytes()).unwrap();
-
-        let cdn = Cdn::load(dir.path().to_str().unwrap(), cs_file.path().to_str().unwrap())
-            .await
+        cs_file
+            .write_all(checksums_json(&[("test.wasm", &real_hash)]).as_bytes())
             .unwrap();
+
+        let cdn = Cdn::load(
+            dir.path().to_str().unwrap(),
+            cs_file.path().to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
         let served = cdn.serve("test.wasm").await.unwrap();
         assert_eq!(served, content);
@@ -187,16 +206,30 @@ mod tests {
 
         // Register a different (wrong) hash
         let mut cs_file = NamedTempFile::new().unwrap();
-        cs_file.write_all(checksums_json(&[("tampered.wasm", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")]).as_bytes()).unwrap();
-
-        let cdn = Cdn::load(dir.path().to_str().unwrap(), cs_file.path().to_str().unwrap())
-            .await
+        cs_file
+            .write_all(
+                checksums_json(&[(
+                    "tampered.wasm",
+                    "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+                )])
+                .as_bytes(),
+            )
             .unwrap();
+
+        let cdn = Cdn::load(
+            dir.path().to_str().unwrap(),
+            cs_file.path().to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
         let result = cdn.serve("tampered.wasm").await;
         assert!(result.is_err(), "Tampered asset must not be served");
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("CDN tamper detected"), "Error must indicate tamper: {err}");
+        assert!(
+            err.contains("CDN tamper detected"),
+            "Error must indicate tamper: {err}"
+        );
     }
 
     #[tokio::test]
@@ -207,11 +240,16 @@ mod tests {
         let hash = blake3_hex(content);
 
         let mut cs_file = NamedTempFile::new().unwrap();
-        cs_file.write_all(checksums_json(&[("sp314.wasm", &hash)]).as_bytes()).unwrap();
-
-        let cdn = Cdn::load(dir.path().to_str().unwrap(), cs_file.path().to_str().unwrap())
-            .await
+        cs_file
+            .write_all(checksums_json(&[("sp314.wasm", &hash)]).as_bytes())
             .unwrap();
+
+        let cdn = Cdn::load(
+            dir.path().to_str().unwrap(),
+            cs_file.path().to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
         let failures = cdn.verify_all().await;
         assert!(failures.is_empty(), "No failures expected: {failures:?}");
@@ -223,11 +261,22 @@ mod tests {
         write_asset(&dir, "bad.wasm", b"actual content");
 
         let mut cs_file = NamedTempFile::new().unwrap();
-        cs_file.write_all(checksums_json(&[("bad.wasm", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]).as_bytes()).unwrap();
-
-        let cdn = Cdn::load(dir.path().to_str().unwrap(), cs_file.path().to_str().unwrap())
-            .await
+        cs_file
+            .write_all(
+                checksums_json(&[(
+                    "bad.wasm",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                )])
+                .as_bytes(),
+            )
             .unwrap();
+
+        let cdn = Cdn::load(
+            dir.path().to_str().unwrap(),
+            cs_file.path().to_str().unwrap(),
+        )
+        .await
+        .unwrap();
 
         let failures = cdn.verify_all().await;
         assert!(!failures.is_empty(), "Should detect tampered asset");

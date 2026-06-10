@@ -18,8 +18,8 @@ pub struct AbToggleProps {
 #[component]
 pub fn AbToggle(props: AbToggleProps) -> Element {
     let outer_class = match props.state {
-        AbToggleState::A       => "ab-toggle ab-toggle--a",
-        AbToggleState::B       => "ab-toggle ab-toggle--b",
+        AbToggleState::A => "ab-toggle ab-toggle--a",
+        AbToggleState::B => "ab-toggle ab-toggle--b",
         AbToggleState::Toggled => "ab-toggle ab-toggle--toggled",
     };
 

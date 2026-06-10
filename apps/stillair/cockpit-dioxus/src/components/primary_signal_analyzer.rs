@@ -109,7 +109,7 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                     svg {
                         view_box: "0 0 400 100", preserve_aspect_ratio: "none",
                         style: "position:absolute; inset:0; width:100%; height:100%;",
-                        
+
                         // Grid lines
                         line { x1:"0", y1:"50", x2:"400", y2:"50", stroke:"rgba(255,255,255,0.1)", stroke_width:"1", stroke_dasharray:"4 4" }
                         line { x1:"200", y1:"0", x2:"200", y2:"100", stroke:"rgba(255,255,255,0.1)", stroke_width:"1", stroke_dasharray:"4 4" }
@@ -120,7 +120,7 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                         path { d:"M0,90 Q100,10 200,60 T400,20", fill:"none", stroke:"var(--accent-cyan)", stroke_width:"1.5" }
                         // Delta curve (red)
                         path { d:"M0,50 Q100,40 200,40 T400,60", fill:"none", stroke:"var(--status-err)", stroke_width:"2", opacity: "0.8" }
-                        
+
                         text { x:"2", y:"96", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "20Hz" }
                         text { x:"375", y:"96", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "20kHz" }
                     }
@@ -142,7 +142,7 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                         text { x:"2", y:"10", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", " 0" }
                         text { x:"2", y:"32", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "-20" }
                         text { x:"2", y:"56", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "-40" }
-                        
+
                         // Grid lines
                         line { x1:"25", y1:"7", x2:"400", y2:"7", stroke:"rgba(255,255,255,0.05)", stroke_width:"1" }
                         line { x1:"25", y1:"29", x2:"400", y2:"29", stroke:"rgba(255,255,255,0.05)", stroke_width:"1" }
@@ -150,7 +150,7 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
 
                         // Loudness history line (cyan)
                         path { d:"M25,53 L50,45 L75,30 L100,28 L150,32 L200,20 L250,15 L300,22 L350,10 L400,12", fill:"none", stroke:"var(--accent-insights)", stroke_width:"1.5" }
-                        
+
                         // Highlight block for short-term peak
                         rect { x:"240", y:"15", width:"20", height:"38", fill:"var(--accent-insights)", opacity:"0.2" }
                     }

@@ -8,7 +8,8 @@
 pub fn sdr_db(reference: &[f32], estimated: &[f32]) -> f32 {
     assert_eq!(reference.len(), estimated.len());
     let signal_power: f32 = reference.iter().map(|x| x * x).sum();
-    let noise: Vec<f32> = reference.iter()
+    let noise: Vec<f32> = reference
+        .iter()
         .zip(estimated.iter())
         .map(|(r, e)| r - e)
         .collect();
@@ -21,18 +22,18 @@ pub fn sdr_db(reference: &[f32], estimated: &[f32]) -> f32 {
 
 /// Compute SDR for all 4 stems.
 pub struct StemSdr {
-    pub drums:     f32,
-    pub bass:      f32,
+    pub drums: f32,
+    pub bass: f32,
     pub harmonics: f32,
-    pub ambience:  f32,
+    pub ambience: f32,
 }
 
 impl StemSdr {
     pub fn all_above(&self, threshold_db: f32) -> bool {
-        self.drums     > threshold_db &&
-        self.bass      > threshold_db &&
-        self.harmonics > threshold_db &&
-        self.ambience  > threshold_db
+        self.drums > threshold_db
+            && self.bass > threshold_db
+            && self.harmonics > threshold_db
+            && self.ambience > threshold_db
     }
 }
 
@@ -59,7 +60,8 @@ mod tests {
     fn sdr_above_6db_gate() {
         // Simulate decent separation: estimate = reference + small noise
         let reference: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.1).sin()).collect();
-        let estimated: Vec<f32> = reference.iter()
+        let estimated: Vec<f32> = reference
+            .iter()
             .enumerate()
             .map(|(i, r)| r + 0.1 * (i as f32 * 0.3).sin())
             .collect();

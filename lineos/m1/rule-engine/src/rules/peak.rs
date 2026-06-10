@@ -3,8 +3,8 @@
 //! Severity: High (blocking) — must not export until resolved.
 //! All thresholds from &Thresholds (loaded from bmr-128.schema.json).
 
-use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 use crate::thresholds::Thresholds;
+use crate::types::{AnalysisReport, Issue, IssueParams, Severity};
 
 /// R004: True peak exceeds the ceiling from bmr-128.schema.json.
 /// This is a BLOCKING issue (High severity). Track must be re-limited.
@@ -15,8 +15,8 @@ pub fn true_peak_exceeded(r: &AnalysisReport, t: &Thresholds) -> Option<Issue> {
             severity: Severity::High,
             params: IssueParams {
                 current: r.quality.true_peak,
-                target:  t.true_peak_max,
-                delta:   r.quality.true_peak - t.true_peak_max,
+                target: t.true_peak_max,
+                delta: r.quality.true_peak - t.true_peak_max,
             },
             tags: vec!["compliance:critical".into()],
         })
@@ -32,20 +32,29 @@ mod tests {
 
     fn thresholds() -> Thresholds {
         Thresholds {
-            preset_name: "spotify", target_lufs: Some(-14.0),
-            true_peak_max: -1.0, lufs_tolerance: 0.5,
-            dynamic_range_min: 6.0, stereo_corr_min: 0.8,
-            stereo_corr_warning: 0.5, dc_offset_max: 0.01, lra_max: 14.0,
+            preset_name: "spotify",
+            target_lufs: Some(-14.0),
+            true_peak_max: -1.0,
+            lufs_tolerance: 0.5,
+            dynamic_range_min: 6.0,
+            stereo_corr_min: 0.8,
+            stereo_corr_warning: 0.5,
+            dc_offset_max: 0.01,
+            lra_max: 14.0,
         }
     }
 
     fn report(tp: f32) -> AnalysisReport {
         AnalysisReport::from_metrics(
             QualityMetrics {
-                lufs_integrated: -14.0, lufs_short_term: -13.0,
-                lufs_momentary: -12.0, true_peak: tp,
-                loudness_range: 8.0, stereo_correlation: 0.95,
-                dynamic_range: 10.0, dc_offset: 0.0,
+                lufs_integrated: -14.0,
+                lufs_short_term: -13.0,
+                lufs_momentary: -12.0,
+                true_peak: tp,
+                loudness_range: 8.0,
+                stereo_correlation: 0.95,
+                dynamic_range: 10.0,
+                dc_offset: 0.0,
             },
             ComplianceFlags::all_pass(),
         )

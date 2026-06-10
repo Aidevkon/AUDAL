@@ -26,8 +26,8 @@ use serde::{Deserialize, Serialize};
 use tokio::time::{timeout, Duration};
 
 use crate::coach_narrative::CoachNarrativeJson;
-use crate::commands::insights::{evaluate_findings, CoachFindingsJson};
 use crate::commands::coach::get_coach_narrative;
+use crate::commands::insights::{evaluate_findings, CoachFindingsJson};
 use crate::ipc::m0_client::{GoldenBlobJson, LoudnessMetricsJson, M0Client, QualityMetricsJson};
 
 /// Maximum time to wait for Ollama coach inference.
@@ -40,39 +40,39 @@ const COACH_TIMEOUT_SECS: u64 = 25;
 /// All fields are pre-computed by the mastering pipeline — never re-derived here.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceJson {
-    pub spotify:   bool,
-    pub youtube:   bool,
-    pub apple:     bool,
-    pub tidal:     bool,
+    pub spotify: bool,
+    pub youtube: bool,
+    pub apple: bool,
+    pub tidal: bool,
     pub broadcast: bool,
-    pub ebu_r128:  bool,
+    pub ebu_r128: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ZoneFlagsJson {
-    pub zone_cymbal_harsh:    bool,
-    pub zone_sub_rumble:      bool,
-    pub zone_boxiness:        bool,
-    pub zone_phase_issue:     bool,
+    pub zone_cymbal_harsh: bool,
+    pub zone_sub_rumble: bool,
+    pub zone_boxiness: bool,
+    pub zone_phase_issue: bool,
     pub zone_harsh_resonance: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VerificationResultJson {
-    pub passed:         bool,
+    pub passed: bool,
     pub trim_applied_db: f32,
-    pub was_trimmed:    bool,
-    pub warning:        Option<String>,
+    pub was_trimmed: bool,
+    pub warning: Option<String>,
 }
 
 /// JINI suggestion — personality-aware mastering recommendation.
 /// Authority: JINI Spec v1.0 J-P8
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct JiniSuggestionJson {
-    pub narrative:    String,
-    pub action_type:  String,     // "macro_change" | "flavour_switch" | "nothing"
-    pub action_label: String,     // human readable e.g. "Switch to Clean mode"
-    pub confidence:   f32,
+    pub narrative: String,
+    pub action_type: String,  // "macro_change" | "flavour_switch" | "nothing"
+    pub action_label: String, // human readable e.g. "Switch to Clean mode"
+    pub confidence: f32,
 }
 
 /// Complete session snapshot for a mastered Golden Blob.
@@ -86,15 +86,15 @@ pub struct JiniSuggestionJson {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStateJson {
     /// Golden Blob ID this snapshot was generated from.
-    pub blob_id:    String,
+    pub blob_id: String,
 
     /// BS.1770-4 canonical loudness measurements.
     /// Source: GoldenBlobJson.loudness — never re-measured.
-    pub loudness:   LoudnessMetricsJson,
+    pub loudness: LoudnessMetricsJson,
 
     /// Objective quality measurements (stereo, dynamic range, clipping).
     /// Source: GoldenBlobJson.quality — never re-measured.
-    pub quality:    QualityMetricsJson,
+    pub quality: QualityMetricsJson,
 
     /// Platform compliance summary derived from loudness flags.
     /// Source: GoldenBlobJson.loudness.*_compliant fields.
@@ -102,20 +102,20 @@ pub struct SessionStateJson {
 
     /// Rule-engine findings — deterministic, computed in-process.
     /// Source: lineos-rule-engine::evaluate() on GoldenBlobJson metrics.
-    pub findings:   CoachFindingsJson,
+    pub findings: CoachFindingsJson,
 
     /// Coach narrative — stochastic LLM output, None if unavailable.
     /// Unavailability is non-fatal: Ollama may not be running, provider
     /// may be misconfigured, or narrative generation may have timed out.
-    pub narrative:  Option<CoachNarrativeJson>,
+    pub narrative: Option<CoachNarrativeJson>,
 
     #[serde(default)]
-    pub aether_cert:    Option<String>,
+    pub aether_cert: Option<String>,
     #[serde(default)]
     pub aether_persona: Option<String>,
     #[serde(default)]
-    pub aether_config:  Option<String>,
-    
+    pub aether_config: Option<String>,
+
     #[serde(default)]
     pub zone_flags: Option<ZoneFlagsJson>,
 
@@ -133,9 +133,9 @@ pub struct SessionStateJson {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DspChainStateJson {
-    pub eq_active:   bool,
+    pub eq_active: bool,
     pub comp_active: bool,
-    pub sat_active:  bool,
+    pub sat_active: bool,
     pub limit_active: bool,
 }
 
@@ -156,7 +156,7 @@ pub struct DspChainStateJson {
 pub async fn get_session_state(
     blob_id: String,
     persona: Option<String>,
-    client:  tauri::State<'_, M0Client>,
+    client: tauri::State<'_, M0Client>,
 ) -> Result<SessionStateJson, String> {
     eprintln!("[get_session_state] START blob_id={blob_id}");
 
@@ -165,50 +165,62 @@ pub async fn get_session_state(
         .get_blob(&blob_id)
         .await
         .map_err(|e| format!("Session: blob fetch failed: {e}"))?;
-    eprintln!("[get_session_state] blob fetched ok (lufs={})", blob.loudness.integrated_lufs);
+    eprintln!(
+        "[get_session_state] blob fetched ok (lufs={})",
+        blob.loudness.integrated_lufs
+    );
 
     // Step 2: Evaluate findings via rule-engine (in-process, deterministic)
     let findings: CoachFindingsJson = evaluate_findings(blob.clone())
         .await
         .map_err(|e| format!("Session: rule-engine failed: {e}"))?;
-    eprintln!("[get_session_state] findings ok ({} issues)", findings.issues.len());
+    eprintln!(
+        "[get_session_state] findings ok ({} issues)",
+        findings.issues.len()
+    );
 
     // Step 3: Get coach narrative (best-effort, 25s timeout)
-    eprintln!("[get_session_state] calling coach (max {}s)...", COACH_TIMEOUT_SECS);
-    let narrative: Option<CoachNarrativeJson> =
-        match timeout(
-            Duration::from_secs(COACH_TIMEOUT_SECS),
-            get_coach_narrative(findings.clone()),
-        ).await {
-            Ok(Ok(n))  => {
-                eprintln!("[get_session_state] coach narrative ok");
-                Some(n)
-            }
-            Ok(Err(e)) => {
-                eprintln!("[get_session_state] coach narrative err (non-fatal): {e}");
-                None
-            }
-            Err(_elapsed) => {
-                eprintln!("[get_session_state] coach timeout after {COACH_TIMEOUT_SECS}s — returning None");
-                None
-            }
-        };
+    eprintln!(
+        "[get_session_state] calling coach (max {}s)...",
+        COACH_TIMEOUT_SECS
+    );
+    let narrative: Option<CoachNarrativeJson> = match timeout(
+        Duration::from_secs(COACH_TIMEOUT_SECS),
+        get_coach_narrative(findings.clone()),
+    )
+    .await
+    {
+        Ok(Ok(n)) => {
+            eprintln!("[get_session_state] coach narrative ok");
+            Some(n)
+        }
+        Ok(Err(e)) => {
+            eprintln!("[get_session_state] coach narrative err (non-fatal): {e}");
+            None
+        }
+        Err(_elapsed) => {
+            eprintln!(
+                "[get_session_state] coach timeout after {COACH_TIMEOUT_SECS}s — returning None"
+            );
+            None
+        }
+    };
 
     // Step 4: Compose compliance summary from pre-computed loudness flags
     let compliance = ComplianceJson {
-        spotify:   blob.loudness.spotify_compliant,
-        youtube:   blob.loudness.youtube_compliant,
-        apple:     blob.loudness.apple_music_compliant,
-        tidal:     blob.loudness.tidal_compliant,
+        spotify: blob.loudness.spotify_compliant,
+        youtube: blob.loudness.youtube_compliant,
+        apple: blob.loudness.apple_music_compliant,
+        tidal: blob.loudness.tidal_compliant,
         broadcast: blob.loudness.broadcast_compliant,
-        ebu_r128:  blob.loudness.ebu_r128_compliant,
+        ebu_r128: blob.loudness.ebu_r128_compliant,
     };
 
     use lineos_types::JiniPersonaId;
     let persona_id = match persona.as_deref() {
         Some("beginner") => JiniPersonaId::Beginner,
-        Some("pro")      => JiniPersonaId::Pro,
-        _                => JiniPersonaId::Intermediate,
+        Some("pro") => JiniPersonaId::Pro,
+        _ => JiniPersonaId::Intermediate,
     };
 
     // Step 5 (J-P8): Build JINI suggestion from quality + zone flags
@@ -220,32 +232,39 @@ pub async fn get_session_state(
     );
 
     let dsp_chain = blob.aether_config.as_ref().and_then(|cfg_str| {
-        serde_json::from_str::<serde_json::Value>(cfg_str).ok().map(|cfg| {
-            DspChainStateJson {
-                eq_active:    cfg["eq"]["low_shelf_gain_db"].as_f64().unwrap_or(0.0).abs() > 0.01
-                           || cfg["eq"]["high_shelf_gain_db"].as_f64().unwrap_or(0.0).abs() > 0.01
-                           || cfg["eq"]["zone_bands"].as_array().map(|a| !a.is_empty()).unwrap_or(false),
-                comp_active:  cfg["dynamics"]["comp_ratio"].as_f64().unwrap_or(1.0) > 1.0,
-                sat_active:   cfg["sat"]["drive"].as_f64().unwrap_or(0.0) > 0.0
-                           && cfg["sat"]["mix"].as_f64().unwrap_or(0.0) > 0.0,
+        serde_json::from_str::<serde_json::Value>(cfg_str)
+            .ok()
+            .map(|cfg| DspChainStateJson {
+                eq_active: cfg["eq"]["low_shelf_gain_db"].as_f64().unwrap_or(0.0).abs() > 0.01
+                    || cfg["eq"]["high_shelf_gain_db"]
+                        .as_f64()
+                        .unwrap_or(0.0)
+                        .abs()
+                        > 0.01
+                    || cfg["eq"]["zone_bands"]
+                        .as_array()
+                        .map(|a| !a.is_empty())
+                        .unwrap_or(false),
+                comp_active: cfg["dynamics"]["comp_ratio"].as_f64().unwrap_or(1.0) > 1.0,
+                sat_active: cfg["sat"]["drive"].as_f64().unwrap_or(0.0) > 0.0
+                    && cfg["sat"]["mix"].as_f64().unwrap_or(0.0) > 0.0,
                 limit_active: true,
-            }
-        })
+            })
     });
 
     eprintln!("[get_session_state] DONE — returning SessionStateJson");
     Ok(SessionStateJson {
         blob_id,
         loudness: blob.loudness,
-        quality:  blob.quality,
+        quality: blob.quality,
         compliance,
         findings,
         narrative,
-        aether_cert:    blob.aether_cert.clone(),
+        aether_cert: blob.aether_cert.clone(),
         aether_persona: blob.aether_persona.clone(),
-        aether_config:  blob.aether_config.clone(),
-        zone_flags:     Some(ZoneFlagsJson::default()),
-        verification:   Some(VerificationResultJson {
+        aether_config: blob.aether_config.clone(),
+        zone_flags: Some(ZoneFlagsJson::default()),
+        verification: Some(VerificationResultJson {
             passed: true,
             trim_applied_db: 0.0,
             was_trimmed: false,
@@ -264,26 +283,44 @@ pub async fn get_session_state(
 /// Rule-based, deterministic. No LLM, no network.
 fn build_jini_suggestion(
     quality: &QualityMetricsJson,
-    zones:   &ZoneFlagsJson,
-    lufs:    f32,
+    zones: &ZoneFlagsJson,
+    lufs: f32,
     persona_id: lineos_types::JiniPersonaId,
 ) -> JiniSuggestionJson {
     use lineos_types::*;
 
     let behaviour = BehaviourVector {
-        loudness: if lufs < -18.0      { LoudnessBehaviour::TooQuiet }
-                  else if lufs > -8.0  { LoudnessBehaviour::TooLoud }
-                  else                 { LoudnessBehaviour::Balanced },
-        spectral: if zones.zone_boxiness       { SpectralBehaviour::Boxy }
-                  else if zones.zone_cymbal_harsh { SpectralBehaviour::Harsh }
-                  else                           { SpectralBehaviour::Neutral },
-        dynamics: if quality.dynamic_range_db < 6.0 { DynamicsBehaviour::Overcompressed }
-                  else                              { DynamicsBehaviour::Stable },
-        stereo:   if quality.stereo_correlation < 0.3 { StereoBehaviour::Unstable }
-                  else if quality.stereo_width < 0.1  { StereoBehaviour::Mono }
-                  else                                { StereoBehaviour::Wide },
-        quality:  if quality.clips_detected > 0 { QualityBehaviour::Clipping }
-                  else                          { QualityBehaviour::Clean },
+        loudness: if lufs < -18.0 {
+            LoudnessBehaviour::TooQuiet
+        } else if lufs > -8.0 {
+            LoudnessBehaviour::TooLoud
+        } else {
+            LoudnessBehaviour::Balanced
+        },
+        spectral: if zones.zone_boxiness {
+            SpectralBehaviour::Boxy
+        } else if zones.zone_cymbal_harsh {
+            SpectralBehaviour::Harsh
+        } else {
+            SpectralBehaviour::Neutral
+        },
+        dynamics: if quality.dynamic_range_db < 6.0 {
+            DynamicsBehaviour::Overcompressed
+        } else {
+            DynamicsBehaviour::Stable
+        },
+        stereo: if quality.stereo_correlation < 0.3 {
+            StereoBehaviour::Unstable
+        } else if quality.stereo_width < 0.1 {
+            StereoBehaviour::Mono
+        } else {
+            StereoBehaviour::Wide
+        },
+        quality: if quality.clips_detected > 0 {
+            QualityBehaviour::Clipping
+        } else {
+            QualityBehaviour::Clean
+        },
     };
 
     // Priority: Quality → Loudness → Spectral → Dynamics → Stereo
@@ -302,7 +339,8 @@ fn build_jini_suggestion(
         )
     } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
         (
-            "The mix is quite hot — you might want to bring the loudness down for better dynamics.".to_string(),
+            "The mix is quite hot — you might want to bring the loudness down for better dynamics."
+                .to_string(),
             Some(JiniAction::SuggestMacroChange {
                 handle: MacroHandle::Loudness,
                 delta: -0.15,
@@ -322,8 +360,12 @@ fn build_jini_suggestion(
         )
     } else if behaviour.spectral != SpectralBehaviour::Neutral {
         let (desc, handle, delta) = match behaviour.spectral {
-            SpectralBehaviour::Boxy  => ("Some boxiness in the low-mids", MacroHandle::Tone, -0.1),
-            SpectralBehaviour::Harsh => ("Harshness in the upper frequencies", MacroHandle::Tone, -0.1),
+            SpectralBehaviour::Boxy => ("Some boxiness in the low-mids", MacroHandle::Tone, -0.1),
+            SpectralBehaviour::Harsh => (
+                "Harshness in the upper frequencies",
+                MacroHandle::Tone,
+                -0.1,
+            ),
             _ => ("Spectral balance could be improved", MacroHandle::Tone, 0.0),
         };
         (
@@ -337,7 +379,8 @@ fn build_jini_suggestion(
         )
     } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed {
         (
-            "The mix sounds a bit squashed — easing the dynamics could restore some life.".to_string(),
+            "The mix sounds a bit squashed — easing the dynamics could restore some life."
+                .to_string(),
             Some(JiniAction::SuggestMacroChange {
                 handle: MacroHandle::Dynamics,
                 delta: -0.1,
@@ -365,24 +408,25 @@ fn build_jini_suggestion(
 
     let action_ref = action.as_ref().unwrap_or(&JiniAction::SuggestNothing);
     let action_label = match action_ref {
-        JiniAction::SuggestMacroChange { handle, delta, .. } =>
-            format!("{} {:?} by {:.0}%",
-                if *delta < 0.0 { "Reduce" } else { "Increase" },
-                handle, delta.abs() * 100.0),
-        JiniAction::SuggestFlavourSwitch { to, .. } =>
-            format!("Switch to {:?} mode", to),
+        JiniAction::SuggestMacroChange { handle, delta, .. } => format!(
+            "{} {:?} by {:.0}%",
+            if *delta < 0.0 { "Reduce" } else { "Increase" },
+            handle,
+            delta.abs() * 100.0
+        ),
+        JiniAction::SuggestFlavourSwitch { to, .. } => format!("Switch to {:?} mode", to),
         JiniAction::SuggestNothing => String::new(),
     };
 
     let action_type = match action_ref {
-        JiniAction::SuggestMacroChange { .. }   => "macro_change",
+        JiniAction::SuggestMacroChange { .. } => "macro_change",
         JiniAction::SuggestFlavourSwitch { .. } => "flavour_switch",
-        JiniAction::SuggestNothing              => "nothing",
+        JiniAction::SuggestNothing => "nothing",
     };
 
     JiniSuggestionJson {
         narrative,
-        action_type:  action_type.to_string(),
+        action_type: action_type.to_string(),
         action_label,
         confidence,
     }
@@ -395,34 +439,34 @@ mod tests {
     use super::*;
     fn make_loudness(lufs: f32, tp: f32) -> LoudnessMetricsJson {
         LoudnessMetricsJson {
-            integrated_lufs:          lufs,
-            short_term_lufs:          lufs + 0.5,
-            momentary_lufs:           lufs + 1.0,
-            true_peak_dbtp:           tp,
-            lra:                      6.0,
-            k_weighted:               true,
-            ebu_r128_target_lufs:     -23.0,
-            ebu_r128_compliant:       lufs <= -23.0 && tp <= -1.0,
-            spotify_compliant:        lufs <= -13.0 && tp <= -1.0,
-            youtube_compliant:        lufs <= -13.0 && tp <= -1.0,
-            apple_music_compliant:    lufs <= -15.0 && tp <= -1.0,
+            integrated_lufs: lufs,
+            short_term_lufs: lufs + 0.5,
+            momentary_lufs: lufs + 1.0,
+            true_peak_dbtp: tp,
+            lra: 6.0,
+            k_weighted: true,
+            ebu_r128_target_lufs: -23.0,
+            ebu_r128_compliant: lufs <= -23.0 && tp <= -1.0,
+            spotify_compliant: lufs <= -13.0 && tp <= -1.0,
+            youtube_compliant: lufs <= -13.0 && tp <= -1.0,
+            apple_music_compliant: lufs <= -15.0 && tp <= -1.0,
             apple_podcasts_compliant: lufs <= -15.0 && tp <= -1.0,
-            broadcast_compliant:      lufs <= -22.0 && tp <= -1.0,
-            tidal_compliant:          lufs <= -13.0 && tp <= -1.0,
+            broadcast_compliant: lufs <= -22.0 && tp <= -1.0,
+            tidal_compliant: lufs <= -13.0 && tp <= -1.0,
         }
     }
 
     fn make_quality() -> QualityMetricsJson {
         QualityMetricsJson {
             stereo_correlation: 0.94,
-            phase_coherence:    0.97,
-            stereo_width:       0.74,
-            dynamic_range_db:   9.5,
-            rms_db:             -16.0,
-            spectral_centroid:  3_200.0,
-            spectral_flatness:  0.12,
-            clips_detected:     0,
-            clip_free:          true,
+            phase_coherence: 0.97,
+            stereo_width: 0.74,
+            dynamic_range_db: 9.5,
+            rms_db: -16.0,
+            spectral_centroid: 3_200.0,
+            spectral_flatness: 0.12,
+            clips_detected: 0,
+            clip_free: true,
         }
     }
 
@@ -430,33 +474,37 @@ mod tests {
     fn test_compliance_derived_from_loudness_flags() {
         let loudness = make_loudness(-14.0, -1.5);
         let compliance = ComplianceJson {
-            spotify:   loudness.spotify_compliant,
-            youtube:   loudness.youtube_compliant,
-            apple:     loudness.apple_music_compliant,
-            tidal:     loudness.tidal_compliant,
+            spotify: loudness.spotify_compliant,
+            youtube: loudness.youtube_compliant,
+            apple: loudness.apple_music_compliant,
+            tidal: loudness.tidal_compliant,
             broadcast: loudness.broadcast_compliant,
-            ebu_r128:  loudness.ebu_r128_compliant,
+            ebu_r128: loudness.ebu_r128_compliant,
         };
         assert!(compliance.spotify);
         assert!(compliance.youtube);
         assert!(compliance.tidal);
-        assert!(!compliance.apple);     // -14 > -15 target
+        assert!(!compliance.apple); // -14 > -15 target
         assert!(!compliance.broadcast); // -14 > -22 target
-        assert!(!compliance.ebu_r128);  // -14 > -23 target
+        assert!(!compliance.ebu_r128); // -14 > -23 target
     }
 
     #[test]
     fn test_session_state_json_serializes() {
         let state = SessionStateJson {
-            blob_id:    "test-blob-001".into(),
-            loudness:   make_loudness(-14.0, -1.5),
-            quality:    make_quality(),
+            blob_id: "test-blob-001".into(),
+            loudness: make_loudness(-14.0, -1.5),
+            quality: make_quality(),
             compliance: ComplianceJson {
-                spotify: true, youtube: true, apple: false,
-                tidal: true, broadcast: false, ebu_r128: false,
+                spotify: true,
+                youtube: true,
+                apple: false,
+                tidal: true,
+                broadcast: false,
+                ebu_r128: false,
             },
             findings: CoachFindingsJson {
-                issues:         vec![],
+                issues: vec![],
                 recommendation: "Master sounds great. No critical issues.".into(),
             },
             narrative: None,

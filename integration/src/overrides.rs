@@ -15,17 +15,17 @@ use crate::config::*;
 /// None = use Aether value. Some(v) = replace with v (clamped).
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DspOverrides {
-    pub low_shelf_gain_db:  Option<f32>,
-    pub low_shelf_freq_hz:  Option<f32>,
+    pub low_shelf_gain_db: Option<f32>,
+    pub low_shelf_freq_hz: Option<f32>,
     pub high_shelf_gain_db: Option<f32>,
     pub high_shelf_freq_hz: Option<f32>,
-    pub comp_threshold_db:  Option<f32>,
-    pub comp_ratio:         Option<f32>,
-    pub comp_attack_ms:     Option<f32>,
-    pub comp_release_ms:    Option<f32>,
-    pub sat_drive:          Option<f32>,
-    pub sat_mix:            Option<f32>,
-    pub stereo_width:       Option<f32>,
+    pub comp_threshold_db: Option<f32>,
+    pub comp_ratio: Option<f32>,
+    pub comp_attack_ms: Option<f32>,
+    pub comp_release_ms: Option<f32>,
+    pub sat_drive: Option<f32>,
+    pub sat_mix: Option<f32>,
+    pub stereo_width: Option<f32>,
 }
 
 impl DspOverrides {
@@ -36,56 +36,56 @@ impl DspOverrides {
         DspConfig {
             instrument_deltas: config.instrument_deltas.clone(),
             eq: DspEqConfig {
-                low_shelf_gain_db:  self.low_shelf_gain_db
-                    .map(|v| v.clamp(CFW_EQ_GAIN_MIN_DB,
-                                     CFW_EQ_GAIN_MAX_DB))
+                low_shelf_gain_db: self
+                    .low_shelf_gain_db
+                    .map(|v| v.clamp(CFW_EQ_GAIN_MIN_DB, CFW_EQ_GAIN_MAX_DB))
                     .unwrap_or(config.eq.low_shelf_gain_db),
-                low_shelf_freq_hz:  self.low_shelf_freq_hz
-                    .map(|v| v.clamp(CFW_EQ_FREQ_MIN_HZ,
-                                     CFW_EQ_FREQ_MAX_HZ))
+                low_shelf_freq_hz: self
+                    .low_shelf_freq_hz
+                    .map(|v| v.clamp(CFW_EQ_FREQ_MIN_HZ, CFW_EQ_FREQ_MAX_HZ))
                     .unwrap_or(config.eq.low_shelf_freq_hz),
-                high_shelf_gain_db: self.high_shelf_gain_db
-                    .map(|v| v.clamp(CFW_EQ_GAIN_MIN_DB,
-                                     CFW_EQ_GAIN_MAX_DB))
+                high_shelf_gain_db: self
+                    .high_shelf_gain_db
+                    .map(|v| v.clamp(CFW_EQ_GAIN_MIN_DB, CFW_EQ_GAIN_MAX_DB))
                     .unwrap_or(config.eq.high_shelf_gain_db),
-                high_shelf_freq_hz: self.high_shelf_freq_hz
-                    .map(|v| v.clamp(CFW_EQ_FREQ_MIN_HZ,
-                                     CFW_EQ_FREQ_MAX_HZ))
+                high_shelf_freq_hz: self
+                    .high_shelf_freq_hz
+                    .map(|v| v.clamp(CFW_EQ_FREQ_MIN_HZ, CFW_EQ_FREQ_MAX_HZ))
                     .unwrap_or(config.eq.high_shelf_freq_hz),
                 zone_bands: config.eq.zone_bands.clone(),
             },
             dynamics: DspDynamicsConfig {
-                comp_threshold_db: self.comp_threshold_db
-                    .map(|v| v.clamp(CFW_COMP_THRESHOLD_MIN_DB,
-                                     CFW_COMP_THRESHOLD_MAX_DB))
+                comp_threshold_db: self
+                    .comp_threshold_db
+                    .map(|v| v.clamp(CFW_COMP_THRESHOLD_MIN_DB, CFW_COMP_THRESHOLD_MAX_DB))
                     .unwrap_or(config.dynamics.comp_threshold_db),
-                comp_ratio:        self.comp_ratio
-                    .map(|v| v.clamp(CFW_COMP_RATIO_MIN,
-                                     CFW_COMP_RATIO_MAX))
+                comp_ratio: self
+                    .comp_ratio
+                    .map(|v| v.clamp(CFW_COMP_RATIO_MIN, CFW_COMP_RATIO_MAX))
                     .unwrap_or(config.dynamics.comp_ratio),
-                comp_attack_ms:    self.comp_attack_ms
-                    .map(|v| v.clamp(CFW_COMP_ATTACK_MIN_MS,
-                                     CFW_COMP_ATTACK_MAX_MS))
+                comp_attack_ms: self
+                    .comp_attack_ms
+                    .map(|v| v.clamp(CFW_COMP_ATTACK_MIN_MS, CFW_COMP_ATTACK_MAX_MS))
                     .unwrap_or(config.dynamics.comp_attack_ms),
-                comp_release_ms:   self.comp_release_ms
-                    .map(|v| v.clamp(CFW_COMP_RELEASE_MIN_MS,
-                                     CFW_COMP_RELEASE_MAX_MS))
+                comp_release_ms: self
+                    .comp_release_ms
+                    .map(|v| v.clamp(CFW_COMP_RELEASE_MIN_MS, CFW_COMP_RELEASE_MAX_MS))
                     .unwrap_or(config.dynamics.comp_release_ms),
             },
             sat: DspSatConfig {
-                drive: self.sat_drive
-                    .map(|v| v.clamp(CFW_SAT_DRIVE_MIN,
-                                     CFW_SAT_DRIVE_MAX))
+                drive: self
+                    .sat_drive
+                    .map(|v| v.clamp(CFW_SAT_DRIVE_MIN, CFW_SAT_DRIVE_MAX))
                     .unwrap_or(config.sat.drive),
-                mix:   self.sat_mix
-                    .map(|v| v.clamp(CFW_SAT_MIX_MIN,
-                                     CFW_SAT_MIX_MAX))
+                mix: self
+                    .sat_mix
+                    .map(|v| v.clamp(CFW_SAT_MIX_MIN, CFW_SAT_MIX_MAX))
                     .unwrap_or(config.sat.mix),
             },
             stereo: DspStereoConfig {
-                width: self.stereo_width
-                    .map(|v| v.clamp(CFW_STEREO_WIDTH_MIN,
-                                     CFW_STEREO_WIDTH_MAX))
+                width: self
+                    .stereo_width
+                    .map(|v| v.clamp(CFW_STEREO_WIDTH_MIN, CFW_STEREO_WIDTH_MAX))
                     .unwrap_or(config.stereo.width),
             },
             ambience: config.ambience.clone(),
@@ -98,40 +98,43 @@ impl DspOverrides {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aether::personas::manager::PersonaManager;
-    use aether::mapping::mapper::MacroMicroMapper;
-    use aether::personas::config::MacroControls;
-    use aether::semantic::ZoneAdjustments;
-    use aether::chaos::ChaosDelta;
     use crate::firewall::IntegrationFirewall;
     use crate::proof_log::ProofLog;
+    use aether::chaos::ChaosDelta;
+    use aether::mapping::mapper::MacroMicroMapper;
+    use aether::personas::config::MacroControls;
+    use aether::personas::manager::PersonaManager;
+    use aether::semantic::ZoneAdjustments;
 
     fn test_dsp_config() -> DspConfig {
         let persona = PersonaManager::load().default_persona().clone();
-        let macros  = MacroControls::default();
-        let micro   = MacroMicroMapper::map(&persona, &macros);
+        let macros = MacroControls::default();
+        let micro = MacroMicroMapper::map(&persona, &macros);
         let mut log = ProofLog::new();
         IntegrationFirewall::build(
-            &persona, &macros, &micro,
+            &persona,
+            &macros,
+            &micro,
             &ZoneAdjustments::empty(),
-            &ChaosDelta::zero(), 0, &mut log
-        ).unwrap()
+            &ChaosDelta::zero(),
+            0,
+            &mut log,
+        )
+        .unwrap()
     }
 
     #[test]
     fn overrides_none_passthrough() {
-        let cfg    = test_dsp_config();
+        let cfg = test_dsp_config();
         let result = DspOverrides::default().apply(&cfg);
-        assert_eq!(result.eq.low_shelf_gain_db,
-                   cfg.eq.low_shelf_gain_db);
-        assert_eq!(result.dynamics.comp_ratio,
-                   cfg.dynamics.comp_ratio);
+        assert_eq!(result.eq.low_shelf_gain_db, cfg.eq.low_shelf_gain_db);
+        assert_eq!(result.dynamics.comp_ratio, cfg.dynamics.comp_ratio);
     }
 
     #[test]
     fn overrides_some_applied_and_clamped() {
         let cfg = test_dsp_config();
-        let ov  = DspOverrides {
+        let ov = DspOverrides {
             comp_ratio: Some(99.0),
             ..Default::default()
         };
@@ -141,15 +144,14 @@ mod tests {
 
     #[test]
     fn overrides_preserves_zone_bands() {
-        let cfg    = test_dsp_config();
+        let cfg = test_dsp_config();
         let result = DspOverrides::default().apply(&cfg);
-        assert_eq!(result.eq.zone_bands.len(),
-                   cfg.eq.zone_bands.len());
+        assert_eq!(result.eq.zone_bands.len(), cfg.eq.zone_bands.len());
     }
 
     #[test]
     fn overrides_persona_id_preserved() {
-        let cfg    = test_dsp_config();
+        let cfg = test_dsp_config();
         let result = DspOverrides::default().apply(&cfg);
         assert_eq!(result.persona_id, cfg.persona_id);
     }

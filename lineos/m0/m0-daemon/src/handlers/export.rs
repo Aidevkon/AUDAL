@@ -20,10 +20,10 @@
 //!   ❌ Returning raw audio bytes to the frontend
 //!   ❌ Static linking of LAME (LGPL violation)
 
-use axum::{Json, extract::State};
+use axum::{extract::State, Json};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use chrono::Utc;
 
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
@@ -33,16 +33,16 @@ use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality};
 
 #[derive(Debug, Deserialize)]
 pub struct ExportRequest {
-    pub blob_id:     String,
-    pub format:      String,     // "wav" | "flac" | "opus" | "mp3"
-    pub output_path: String,     // absolute path chosen by user via native dialog
+    pub blob_id: String,
+    pub format: String,      // "wav" | "flac" | "opus" | "mp3"
+    pub output_path: String, // absolute path chosen by user via native dialog
 }
 
 #[derive(Debug, Serialize)]
 pub struct ExportResponse {
-    pub status:       String,           // "ok" | "error"
+    pub status: String, // "ok" | "error"
     pub written_path: Option<String>,
-    pub message:      Option<String>,
+    pub message: Option<String>,
 }
 
 // ── Format enum ───────────────────────────────────────────────────────────────
@@ -62,24 +62,26 @@ pub enum ExportFormat {
 impl ExportFormat {
     pub fn from_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
-            "wav"  => Ok(Self::Wav),
+            "wav" => Ok(Self::Wav),
             "flac" => Ok(Self::Flac),
             "opus" => Ok(Self::Opus),
             // MP3 via LAME — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
-            "mp3"  => Ok(Self::Mp3),
+            "mp3" => Ok(Self::Mp3),
             // AIFF — Logic Pro native, uncompressed 32-bit float big-endian
             "aiff" | "aif" => Ok(Self::Aiff),
-            other  => Err(format!("Unsupported format: {other}. Use wav/flac/opus/mp3/aiff")),
+            other => Err(format!(
+                "Unsupported format: {other}. Use wav/flac/opus/mp3/aiff"
+            )),
         }
     }
 
     #[allow(dead_code)]
     pub fn extension(&self) -> &'static str {
         match self {
-            Self::Wav  => "wav",
+            Self::Wav => "wav",
             Self::Flac => "flac",
             Self::Opus => "opus",
-            Self::Mp3  => "mp3",
+            Self::Mp3 => "mp3",
             Self::Aiff => "aiff",
         }
     }
@@ -91,26 +93,30 @@ impl ExportFormat {
 /// Audio bytes remain in M0 storage — only the path is returned.
 pub async fn export_audio(
     State(state): State<AppState>,
-    Json(req):    Json<ExportRequest>,
+    Json(req): Json<ExportRequest>,
 ) -> Json<ExportResponse> {
     // Validate format
     let format = match ExportFormat::from_str(&req.format) {
-        Ok(f)  => f,
-        Err(e) => return Json(ExportResponse {
-            status:       "error".into(),
-            written_path: None,
-            message:      Some(e),
-        }),
+        Ok(f) => f,
+        Err(e) => {
+            return Json(ExportResponse {
+                status: "error".into(),
+                written_path: None,
+                message: Some(e),
+            })
+        }
     };
 
     // Fetch blob
     let blob = match state.blob_store.get(&req.blob_id) {
         Some(b) => b,
-        None    => return Json(ExportResponse {
-            status:       "error".into(),
-            written_path: None,
-            message:      Some(format!("blob not found: {}", req.blob_id)),
-        }),
+        None => {
+            return Json(ExportResponse {
+                status: "error".into(),
+                written_path: None,
+                message: Some(format!("blob not found: {}", req.blob_id)),
+            })
+        }
     };
 
     let output_path = std::path::PathBuf::from(&req.output_path);
@@ -119,46 +125,52 @@ pub async fn export_audio(
     if let Some(parent) = output_path.parent() {
         if let Err(e) = tokio::fs::create_dir_all(parent).await {
             return Json(ExportResponse {
-                status:       "error".into(),
+                status: "error".into(),
                 written_path: None,
-                message:      Some(format!("Cannot create export directory: {e}")),
+                message: Some(format!("Cannot create export directory: {e}")),
             });
         }
     }
 
     // Export audio (blocking I/O)
-    let blob_clone  = blob.clone();
-    let path_str    = req.output_path.clone();
-    let format_str  = req.format.clone();
+    let blob_clone = blob.clone();
+    let path_str = req.output_path.clone();
+    let format_str = req.format.clone();
     let path_for_io = output_path.clone();
 
     let result = tokio::task::spawn_blocking(move || {
         export_blob(&blob_clone, format, &path_for_io)
             .and_then(|()| write_sidecar(&blob_clone, &format_str, &path_for_io))
-    }).await
+    })
+    .await
     .map_err(|e| format!("Export task join error: {e}"))
     .and_then(|r| r);
 
     match result {
         Ok(()) => {
-            state.audit.write(
-                AuditEntry::new("m0d.export_complete", AuditLevel::Audit,
-                    &format!("format={} path={path_str}", req.format))
-            ).ok();
+            state
+                .audit
+                .write(AuditEntry::new(
+                    "m0d.export_complete",
+                    AuditLevel::Audit,
+                    &format!("format={} path={path_str}", req.format),
+                ))
+                .ok();
             Json(ExportResponse {
-                status:       "ok".into(),
+                status: "ok".into(),
                 written_path: Some(path_str),
-                message:      None,
+                message: None,
             })
         }
         Err(e) => {
-            state.audit.write(
-                AuditEntry::new("m0d.export_failed", AuditLevel::Audit, &e)
-            ).ok();
+            state
+                .audit
+                .write(AuditEntry::new("m0d.export_failed", AuditLevel::Audit, &e))
+                .ok();
             Json(ExportResponse {
-                status:       "error".into(),
+                status: "error".into(),
                 written_path: None,
-                message:      Some(e),
+                message: Some(e),
             })
         }
     }
@@ -170,10 +182,10 @@ pub async fn export_audio(
 fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(), String> {
     match format {
         ExportFormat::Flac => export_flac(blob, path),
-        ExportFormat::Wav  => export_wav(blob, path),
+        ExportFormat::Wav => export_wav(blob, path),
         ExportFormat::Opus => export_opus(blob, path),
         // MP3: LAME encoder — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
-        ExportFormat::Mp3  => export_mp3(blob, path),
+        ExportFormat::Mp3 => export_mp3(blob, path),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
         ExportFormat::Aiff => export_aiff(blob, path),
     }
@@ -188,8 +200,7 @@ fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — mastering may have failed".into());
     }
-    std::fs::write(path, &audio_bytes)
-        .map_err(|e| format!("FLAC write failed: {e}"))
+    std::fs::write(path, &audio_bytes).map_err(|e| format!("FLAC write failed: {e}"))
 }
 
 /// WAV: decode f32 LE PCM bytes → write 32-bit float WAV via hound.
@@ -203,21 +214,23 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     let samples = pcm_bytes_to_f32(&audio_bytes);
 
     let spec = hound::WavSpec {
-        channels:        blob.channels,
-        sample_rate:     blob.sample_rate,
+        channels: blob.channels,
+        sample_rate: blob.sample_rate,
         bits_per_sample: 32,
-        sample_format:   hound::SampleFormat::Float,
+        sample_format: hound::SampleFormat::Float,
     };
 
-    let mut writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| format!("WAV create failed: {e}"))?;
+    let mut writer =
+        hound::WavWriter::create(path, spec).map_err(|e| format!("WAV create failed: {e}"))?;
 
     for &sample in &samples {
-        writer.write_sample(sample)
+        writer
+            .write_sample(sample)
             .map_err(|e| format!("WAV write sample failed: {e}"))?;
     }
 
-    writer.finalize()
+    writer
+        .finalize()
         .map_err(|e| format!("WAV finalize failed: {e}"))
 }
 
@@ -225,7 +238,8 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
 /// Phase 10 delivers WAV + FLAC. Opus wired in Phase 11 after libopus install.
 fn export_opus(_blob: &StoredBlob, _path: &Path) -> Result<(), String> {
     Err("Opus export requires libopus-dev (Phase 11). \
-         Use WAV, FLAC, MP3, or AIFF.".into())
+         Use WAV, FLAC, MP3, or AIFF."
+        .into())
 }
 
 /// AIFF export — Logic Pro native format.
@@ -248,9 +262,9 @@ fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     }
 
     let pcm = pcm_bytes_to_f32(&audio_bytes);
-    let channels    = blob.channels.max(1);
+    let channels = blob.channels.max(1);
     let sample_rate = blob.sample_rate;
-    let num_frames  = (pcm.len() / channels as usize) as u32;
+    let num_frames = (pcm.len() / channels as usize) as u32;
     let bit_depth: u16 = 32;
 
     // Convert interleaved f32 LE PCM → f32 BE (AIFF is big-endian)
@@ -260,10 +274,10 @@ fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         pcm_be.extend_from_slice(&s.to_bits().to_be_bytes());
     }
 
-    let pcm_size  = pcm_be.len() as u32;
-    let ssnd_size = pcm_size + 8;  // offset(4) + blockSize(4) + PCM data
-    let comm_size = 18u32;         // channels(2) + frames(4) + bitDepth(2) + sampleRate(10)
-    // FORM data = 4 ("AIFF") + 8 (COMM header) + 18 (COMM body) + 8 (SSND header) + ssnd_size
+    let pcm_size = pcm_be.len() as u32;
+    let ssnd_size = pcm_size + 8; // offset(4) + blockSize(4) + PCM data
+    let comm_size = 18u32; // channels(2) + frames(4) + bitDepth(2) + sampleRate(10)
+                           // FORM data = 4 ("AIFF") + 8 (COMM header) + 18 (COMM body) + 8 (SSND header) + ssnd_size
     let form_size = 4 + (8 + comm_size) + (8 + ssnd_size);
 
     let mut buf: Vec<u8> = Vec::with_capacity(12 + 8 + comm_size as usize + 8 + ssnd_size as usize);
@@ -285,8 +299,8 @@ fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     // ── SSND chunk ───────────────────────────────────────────────────────
     buf.extend_from_slice(b"SSND");
     buf.extend_from_slice(&ssnd_size.to_be_bytes());
-    buf.extend_from_slice(&0u32.to_be_bytes());  // offset (always 0)
-    buf.extend_from_slice(&0u32.to_be_bytes());  // blockSize (always 0)
+    buf.extend_from_slice(&0u32.to_be_bytes()); // offset (always 0)
+    buf.extend_from_slice(&0u32.to_be_bytes()); // blockSize (always 0)
     buf.extend_from_slice(&pcm_be);
 
     tracing::info!(
@@ -296,8 +310,7 @@ fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         "m0d: AIFF export complete"
     );
 
-    std::fs::write(path, &buf)
-        .map_err(|e| format!("AIFF write failed: {e}"))
+    std::fs::write(path, &buf).map_err(|e| format!("AIFF write failed: {e}"))
 }
 
 /// Convert f64 to 80-bit IEEE 754 extended precision.
@@ -314,11 +327,11 @@ fn f64_to_80bit_extended(val: f64) -> [u8; 10] {
     }
 
     let bits = val.to_bits();
-    let sign:    u16 = ((bits >> 63) as u16) << 15;
-    let exp_f64: i32 = ((bits >> 52) & 0x7ff) as i32 - 1023;  // unbiased double exponent
-    let exp_80:  u16 = (exp_f64 + 16383) as u16;               // rebias for 80-bit extended
-    let mantissa_f64 = bits & 0x000f_ffff_ffff_ffff;            // 52-bit fraction
-    // 80-bit explicit mantissa: leading 1 + 52-bit fraction left-shifted to 63 bits
+    let sign: u16 = ((bits >> 63) as u16) << 15;
+    let exp_f64: i32 = ((bits >> 52) & 0x7ff) as i32 - 1023; // unbiased double exponent
+    let exp_80: u16 = (exp_f64 + 16383) as u16; // rebias for 80-bit extended
+    let mantissa_f64 = bits & 0x000f_ffff_ffff_ffff; // 52-bit fraction
+                                                     // 80-bit explicit mantissa: leading 1 + 52-bit fraction left-shifted to 63 bits
     let mantissa_80: u64 = (1u64 << 63) | (mantissa_f64 << 11);
 
     let exp_word = sign | exp_80;
@@ -337,9 +350,8 @@ fn f64_to_80bit_extended(val: f64) -> [u8; 10] {
 /// No DSP re-run — reads stored f32 LE PCM bytes from the Golden Blob.
 fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     use lame_sys::{
-        lame_init, lame_set_num_channels, lame_set_in_samplerate, lame_set_quality,
-        lame_init_params, lame_encode_buffer_interleaved_ieee_float,
-        lame_encode_flush_nogap, lame_close,
+        lame_close, lame_encode_buffer_interleaved_ieee_float, lame_encode_flush_nogap, lame_init,
+        lame_init_params, lame_set_in_samplerate, lame_set_num_channels, lame_set_quality,
     };
 
     let audio_bytes = std::fs::read(&blob.audio_path)
@@ -363,23 +375,35 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     // Wrap in a guard so lame_close is always called even on error
     struct LameGuard(lame_sys::lame_t);
     impl Drop for LameGuard {
-        fn drop(&mut self) { unsafe { lame_close(self.0); } }
+        fn drop(&mut self) {
+            unsafe {
+                lame_close(self.0);
+            }
+        }
     }
     let _guard = LameGuard(gfp);
 
     unsafe {
         let r = lame_set_num_channels(gfp, blob.channels as i32);
-        if r < 0 { return Err(format!("MP3: lame_set_num_channels failed: {r}")); }
+        if r < 0 {
+            return Err(format!("MP3: lame_set_num_channels failed: {r}"));
+        }
 
         let r = lame_set_in_samplerate(gfp, blob.sample_rate as i32);
-        if r < 0 { return Err(format!("MP3: lame_set_in_samplerate failed: {r}")); }
+        if r < 0 {
+            return Err(format!("MP3: lame_set_in_samplerate failed: {r}"));
+        }
 
         // Quality 2: near-lossless for mastering (0=highest quality, 9=lowest)
         let r = lame_set_quality(gfp, 2);
-        if r < 0 { return Err(format!("MP3: lame_set_quality failed: {r}")); }
+        if r < 0 {
+            return Err(format!("MP3: lame_set_quality failed: {r}"));
+        }
 
         let r = lame_init_params(gfp);
-        if r < 0 { return Err(format!("MP3: lame_init_params failed: {r}")); }
+        if r < 0 {
+            return Err(format!("MP3: lame_init_params failed: {r}"));
+        }
     }
 
     // ── Encode interleaved PCM ───────────────────────────────────────────
@@ -398,20 +422,19 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         )
     };
     if encoded_len < 0 {
-        return Err(format!("MP3: lame_encode_buffer_interleaved_ieee_float failed: {encoded_len}"));
+        return Err(format!(
+            "MP3: lame_encode_buffer_interleaved_ieee_float failed: {encoded_len}"
+        ));
     }
     mp3_out.extend_from_slice(&mp3_buf[..encoded_len as usize]);
 
     // ── Flush remaining frames (no decoder delay padding) ───────────────
-    let flushed_len = unsafe {
-        lame_encode_flush_nogap(
-            gfp,
-            mp3_buf.as_mut_ptr(),
-            mp3_buf_size as i32,
-        )
-    };
+    let flushed_len =
+        unsafe { lame_encode_flush_nogap(gfp, mp3_buf.as_mut_ptr(), mp3_buf_size as i32) };
     if flushed_len < 0 {
-        return Err(format!("MP3: lame_encode_flush_nogap failed: {flushed_len}"));
+        return Err(format!(
+            "MP3: lame_encode_flush_nogap failed: {flushed_len}"
+        ));
     }
     mp3_out.extend_from_slice(&mp3_buf[..flushed_len as usize]);
 
@@ -421,15 +444,14 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         "m0d: MP3 export complete (LAME dynamic — LGPL compliant)"
     );
 
-    std::fs::write(path, &mp3_out)
-        .map_err(|e| format!("MP3: write failed: {e}"))
+    std::fs::write(path, &mp3_out).map_err(|e| format!("MP3: write failed: {e}"))
 }
-
 
 /// Decode f32 LE PCM bytes to sample slice.
 /// Samples stored as raw IEEE 754 little-endian floats, 4 bytes per sample.
 fn pcm_bytes_to_f32(bytes: &[u8]) -> Vec<f32> {
-    bytes.chunks_exact(4)
+    bytes
+        .chunks_exact(4)
         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
         .collect()
 }
@@ -440,21 +462,21 @@ fn pcm_bytes_to_f32(bytes: &[u8]) -> Vec<f32> {
 /// Contains Golden Blob metrics — no audio bytes, no re-measurement.
 #[derive(Serialize)]
 pub struct ExportSidecar<'a> {
-    pub blob_id:       &'a str,
-    pub preset_id:     &'a str,
+    pub blob_id: &'a str,
+    pub preset_id: &'a str,
     pub export_format: &'a str,
-    pub exported_at:   String,
-    pub loudness:      &'a StoredLoudness,
-    pub quality:       &'a StoredQuality,
-    pub compliance:    ComplianceSummary,
+    pub exported_at: String,
+    pub loudness: &'a StoredLoudness,
+    pub quality: &'a StoredQuality,
+    pub compliance: ComplianceSummary,
 }
 
 #[derive(Serialize)]
 pub struct ComplianceSummary {
-    pub spotify:   bool,
-    pub youtube:   bool,
-    pub apple:     bool,
-    pub tidal:     bool,
+    pub spotify: bool,
+    pub youtube: bool,
+    pub apple: bool,
+    pub tidal: bool,
     pub broadcast: bool,
 }
 
@@ -464,17 +486,17 @@ pub fn write_sidecar(blob: &StoredBlob, format: &str, audio_path: &Path) -> Resu
     let sidecar_path = audio_path.with_extension("stillair.json");
 
     let sidecar = ExportSidecar {
-        blob_id:       &blob.id,
-        preset_id:     &blob.preset_id,
+        blob_id: &blob.id,
+        preset_id: &blob.preset_id,
         export_format: format,
-        exported_at:   Utc::now().to_rfc3339(),
-        loudness:      &blob.loudness,
-        quality:       &blob.quality,
+        exported_at: Utc::now().to_rfc3339(),
+        loudness: &blob.loudness,
+        quality: &blob.quality,
         compliance: ComplianceSummary {
-            spotify:   blob.loudness.spotify_compliant,
-            youtube:   blob.loudness.youtube_compliant,
-            apple:     blob.loudness.apple_music_compliant,
-            tidal:     blob.loudness.tidal_compliant,
+            spotify: blob.loudness.spotify_compliant,
+            youtube: blob.loudness.youtube_compliant,
+            apple: blob.loudness.apple_music_compliant,
+            tidal: blob.loudness.tidal_compliant,
             broadcast: blob.loudness.broadcast_compliant,
         },
     };
@@ -482,8 +504,7 @@ pub fn write_sidecar(blob: &StoredBlob, format: &str, audio_path: &Path) -> Resu
     let json = serde_json::to_string_pretty(&sidecar)
         .map_err(|e| format!("Sidecar serialize failed: {e}"))?;
 
-    std::fs::write(&sidecar_path, json)
-        .map_err(|e| format!("Sidecar write failed: {e}"))
+    std::fs::write(&sidecar_path, json).map_err(|e| format!("Sidecar write failed: {e}"))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -494,22 +515,43 @@ mod tests {
 
     #[test]
     fn test_export_format_from_str() {
-        assert!(matches!(ExportFormat::from_str("wav"),  Ok(ExportFormat::Wav)));
-        assert!(matches!(ExportFormat::from_str("flac"), Ok(ExportFormat::Flac)));
-        assert!(matches!(ExportFormat::from_str("opus"), Ok(ExportFormat::Opus)));
-        assert!(matches!(ExportFormat::from_str("mp3"),  Ok(ExportFormat::Mp3)));
-        assert!(matches!(ExportFormat::from_str("aiff"), Ok(ExportFormat::Aiff)));
-        assert!(matches!(ExportFormat::from_str("aif"),  Ok(ExportFormat::Aiff)));
-        assert!(matches!(ExportFormat::from_str("WAV"),  Ok(ExportFormat::Wav)));
+        assert!(matches!(
+            ExportFormat::from_str("wav"),
+            Ok(ExportFormat::Wav)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("flac"),
+            Ok(ExportFormat::Flac)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("opus"),
+            Ok(ExportFormat::Opus)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("mp3"),
+            Ok(ExportFormat::Mp3)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("aiff"),
+            Ok(ExportFormat::Aiff)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("aif"),
+            Ok(ExportFormat::Aiff)
+        ));
+        assert!(matches!(
+            ExportFormat::from_str("WAV"),
+            Ok(ExportFormat::Wav)
+        ));
         assert!(ExportFormat::from_str("aac").is_err());
     }
 
     #[test]
     fn test_export_format_extension() {
-        assert_eq!(ExportFormat::Wav.extension(),  "wav");
+        assert_eq!(ExportFormat::Wav.extension(), "wav");
         assert_eq!(ExportFormat::Flac.extension(), "flac");
         assert_eq!(ExportFormat::Opus.extension(), "opus");
-        assert_eq!(ExportFormat::Mp3.extension(),  "mp3");
+        assert_eq!(ExportFormat::Mp3.extension(), "mp3");
         assert_eq!(ExportFormat::Aiff.extension(), "aiff");
     }
 
@@ -534,9 +576,7 @@ mod tests {
     #[test]
     fn test_pcm_bytes_roundtrip() {
         let samples = vec![0.5f32, -0.5f32, 1.0f32, 0.0f32];
-        let bytes: Vec<u8> = samples.iter()
-            .flat_map(|s| s.to_le_bytes())
-            .collect();
+        let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
         let decoded = pcm_bytes_to_f32(&bytes);
         assert_eq!(decoded.len(), samples.len());
         for (a, b) in decoded.iter().zip(samples.iter()) {
