@@ -131,4 +131,38 @@ fn test_e2e_maestro_render_to_wav() {
     }
 
     println!("SUCCESS! Mastered WAV file written to: target/mastered_output_stereo.wav");
+
+    // Quality Gate assertions
+    // Read output WAV and verify mastering quality
+    let mut reader = hound::WavReader::open("target/mastered_output_stereo.wav")
+        .expect("Output WAV not found");
+    let spec = reader.spec();
+
+    // Gate: correct format
+    assert_eq!(spec.channels, 2, "Must be stereo");
+    assert!(spec.sample_rate >= 44100, "Sample rate too low");
+
+    // Gate: read samples and check bounds
+    let samples: Vec<f32> = reader.samples::<f32>()
+        .map(|s| s.unwrap()).collect();
+    assert!(!samples.is_empty(), "Output must not be empty");
+
+    // Gate: no NaN or Inf
+    for (i, &s) in samples.iter().enumerate() {
+        assert!(s.is_finite(),
+            "Sample[{}] = {} is NaN/Inf", i, s);
+    }
+
+    // Gate: peak within range (-1.0 to 1.0 with headroom)
+    let peak = samples.iter().map(|s| s.abs())
+        .fold(0.0f32, f32::max);
+    assert!(peak > 0.001, "Output too quiet: peak={:.4}", peak);
+    assert!(peak <= 1.0,  "Output clips: peak={:.4}", peak);
+
+    // Gate: RMS above noise floor
+    let rms = (samples.iter().map(|s| s * s).sum::<f32>()
+        / samples.len() as f32).sqrt();
+    assert!(rms > 0.001, "Output RMS too low: {:.4}", rms);
+
+    println!("Quality Gate PASS: peak={:.3}, rms={:.4}", peak, rms);
 }

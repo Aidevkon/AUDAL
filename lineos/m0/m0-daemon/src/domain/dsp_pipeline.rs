@@ -1,6 +1,5 @@
 use std::time::Instant;
-use chrono::Utc;
-use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality, StoredProvenance};
+use crate::blob_store::StoredBlob;
 use crate::handlers::master::MasterRequest;
 // Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
 // Computed on raw stems before mix — tamper-proof certificate
@@ -32,7 +31,7 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
-    use crate::handlers::decode;
+
 
     // NODE 1: DECODE
     let decoded = crate::domain::nodes::decode_node::run(
@@ -50,6 +49,9 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let _chunk_original             = decoded.chunk_original;
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
+
+    // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
+    use sp314_dsp::spatial::user_profile::UserSpatialProfile;
 
     // NODE 3: SCOUT (NMF + Maestro)
     let scout_out = crate::domain::nodes::scout_node::run(
