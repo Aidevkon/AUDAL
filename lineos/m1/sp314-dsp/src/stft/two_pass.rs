@@ -381,10 +381,14 @@ impl TwoPassEngine {
     /// All DSP context is stateful across chunks.
     /// INV-ST-2: W never modified.
     /// INV-ST-3: peak RAM ~2MB/chunk.
-    pub fn process_chunks<F>(
+    /// Process with adaptive ducking_gain from Maestro.
+    /// ducking_gain: [0.3, 1.0] — replaces COLLISION_DUCKING_GAIN.
+    /// Use process_chunks for default behavior (ducking_gain=0.707).
+    pub fn process_chunks_with_params<F>(
         &mut self,
-        signal: &[f32],
-        scout:  &ScoutResult,
+        signal:       &[f32],
+        scout:        &ScoutResult,
+        ducking_gain: f32,
         mut callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -462,7 +466,7 @@ impl TwoPassEngine {
             // One-pole gain smoothing prevents zipper noise at chunk boundaries.
             let bass_chunk = {
                 let collision = detect_collision(&drums_chunk, &bass_chunk);
-                let target_gain = if collision { COLLISION_DUCKING_GAIN } else { 1.0_f32 };
+                let target_gain = if collision { ducking_gain } else { 1.0_f32 };
                 let mut processed = bass_chunk;
                 let alpha = COLLISION_SMOOTHING_ALPHA;
                 processed.iter_mut().for_each(|s| {
@@ -507,6 +511,21 @@ impl TwoPassEngine {
             voice_transient_density: voice_transient_sum / avg,
             drums_transient_density: drums_transient_sum / avg,
         })
+    }
+
+    /// Default process_chunks — uses COLLISION_DUCKING_GAIN (0.707).
+    /// Backward compatible with all existing callers.
+    pub fn process_chunks<F>(
+        &mut self,
+        signal:   &[f32],
+        scout:    &ScoutResult,
+        callback: F,
+    ) -> Result<RenderMetadata, StreamError>
+    where
+        F: FnMut(&FiveStemsChunk),
+    {
+        self.process_chunks_with_params(
+            signal, scout, COLLISION_DUCKING_GAIN, callback)
     }
 }
 
