@@ -120,3 +120,37 @@ pub fn snare_with_reverb(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f3
         (hit + tail).clamp(-1.0, 1.0)
     }).collect()
 }
+
+/// Generate a mix where Kick and Bass are at the EXACT same frequency (50Hz).
+/// kick: fast decaying 50Hz sine.
+/// bass: sustained 50Hz sine.
+pub fn kick_and_bass_clash(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // Kick: 50Hz transient (decays in ~50ms)
+        let kick = libm::sinf(2.0 * core::f32::consts::PI * 50.0 * t) * libm::expf(-t * 40.0);
+        // Bass: Sustained 50Hz note (starts after 100ms to avoid phase cancellation at hit)
+        let bass = if t > 0.1 { libm::sinf(2.0 * core::f32::consts::PI * 50.0 * t) * 0.5 } else { 0.0 };
+        
+        (kick + bass).clamp(-1.0, 1.0)
+    }).collect()
+}
+
+/// Generate a mix where a Hi-Hat and Vocal Sibilance ("S") share the exact same high-frequency noise profile.
+pub fn hihat_and_sibilance_clash(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    // FIXED: Use u32 to properly overflow and generate noise
+    let mut state = 42u32; 
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // 32-bit LCG
+        state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+        let noise = (state as f32 / u32::MAX as f32) * 2.0 - 1.0;
+        
+        let hat_env = if t > 0.1 && t < 0.15 { libm::expf(-(t - 0.1) * 100.0) } else { 0.0 };
+        let sib_env = if t > 0.4 && t < 0.55 { libm::expf(-(t - 0.4) * 20.0) } else { 0.0 };
+        
+        (noise * hat_env + noise * sib_env * 0.8).clamp(-1.0, 1.0)
+    }).collect()
+}

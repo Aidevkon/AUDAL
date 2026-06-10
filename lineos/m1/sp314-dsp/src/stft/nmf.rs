@@ -313,6 +313,168 @@ impl NmfEngine {
         }
         mask
     }
+
+    /// S.2 Fix: Resolves Low-End Clashes via Envelope Correlation (Slew-Rate Limiting).
+    /// Identifies the transient (Kick) and sustained (Bass) components, and physically 
+    /// restricts the Bass from having sharp transients, transferring that excess energy to the Kick.
+    pub fn resolve_low_end_clash(&mut self) {
+        let n_frames = self.h.len() / self.n_components;
+        let k = self.n_components;
+        if k < 2 || n_frames < 2 { return; }
+
+        // Step A: Find Kick (max Crest Factor) and Bass (min Crest Factor)
+        let mut crest_factors = vec![0.0_f32; k];
+        for c in 0..k {
+            let mut peak = 0.0_f32;
+            let mut sum = 0.0_f32;
+            for f in 0..n_frames {
+                let val = self.h[c * n_frames + f];
+                if val > peak { peak = val; }
+                sum += val;
+            }
+            let mean = sum / n_frames as f32;
+            crest_factors[c] = if mean > 1e-6 { peak / mean } else { 0.0 };
+        }
+
+        let mut kick_c = 0;
+        let mut bass_c = 0;
+        let mut max_cf = -1.0_f32;
+        let mut min_cf = f32::MAX;
+
+        for c in 0..k {
+            if crest_factors[c] > max_cf { max_cf = crest_factors[c]; kick_c = c; }
+            if crest_factors[c] < min_cf { min_cf = crest_factors[c]; bass_c = c; }
+        }
+
+        if kick_c == bass_c { return; }
+
+        // Step B: Transient-Aware Energy Reallocation (With Hold Window)
+        let mut prev_total = 0.0_f32;
+        let mut current_bass = 0.0_f32;
+        let mut transient_holdout = 0; // Keeps bass locked out for the duration of the hit
+
+        for f in 0..n_frames {
+            let raw_kick = self.h[kick_c * n_frames + f];
+            let raw_bass = self.h[bass_c * n_frames + f];
+            let total_energy = raw_kick + raw_bass;
+
+            // Attack: Energy jumps significantly
+            let is_attack = total_energy > prev_total * 1.5 && total_energy > 10.0;
+            // Decay: Energy drops rapidly
+            let is_decay  = total_energy < prev_total * 0.8 && prev_total > 10.0;
+
+            if is_attack {
+                // Lock out the bass for 3 frames (~60ms) to let the kick ring out
+                transient_holdout = 3; 
+            }
+
+            if transient_holdout > 0 || is_decay {
+                // Transient Phase: Bass yields completely
+                current_bass *= 0.5;
+                if transient_holdout > 0 {
+                    transient_holdout -= 1;
+                }
+            } else {
+                // Sustain Phase: Energy is stable. Bass hoovers it up!
+                current_bass = current_bass * 0.5 + total_energy * 0.5;
+            }
+
+            // Clamp to physical bounds
+            if current_bass > total_energy {
+                current_bass = total_energy;
+            }
+
+            // Reallocate
+            self.h[bass_c * n_frames + f] = current_bass;
+            self.h[kick_c * n_frames + f] = total_energy - current_bass;
+
+            prev_total = total_energy;
+        }
+    }
+
+    /// S.1 Fix: Resolves High-End Clashes via Morphological Component Analysis.
+    /// Distinguishes Hi-Hats (short bursts) from Sibilance (long breaths) based on event duration.
+    pub fn resolve_high_end_clash(&mut self) {
+        let n_frames = self.h.len() / self.n_components;
+        let k = self.n_components;
+        if k < 2 || n_frames < 2 { return; }
+
+        // Step A: Identify Hat (Transient) and Sib (Sustain) components
+        // Sibilance has many active frames. Hats have very few.
+        let mut active_frame_counts = vec![0; k];
+        for c in 0..k {
+            let mean = self.h[c * n_frames .. (c + 1) * n_frames].iter().sum::<f32>() / n_frames as f32;
+            active_frame_counts[c] = self.h[c * n_frames .. (c + 1) * n_frames]
+                .iter()
+                .filter(|&&v| v > mean * 1.5)
+                .count();
+        }
+
+        let mut hat_c = 0;
+        let mut sib_c = 0;
+        let mut min_active = usize::MAX;
+        let mut max_active = 0;
+
+        for c in 0..k {
+            if active_frame_counts[c] < min_active { min_active = active_frame_counts[c]; hat_c = c; }
+            if active_frame_counts[c] > max_active { max_active = active_frame_counts[c]; sib_c = c; }
+        }
+
+        if hat_c == sib_c { return; }
+
+        // Step B: Morphological Routing (Event Width Measurement)
+        let mut in_event = false;
+        let mut event_start = 0;
+        let noise_floor = 50.0_f32; 
+
+        // At 48kHz with 512 hop, 1 frame = 10.6ms. 
+        // 8 frames = ~85ms. Anything shorter is a Hat.
+        let hat_max_frames = 8; 
+
+        for f in 0..n_frames {
+            let raw_hat = self.h[hat_c * n_frames + f];
+            let raw_sib = self.h[sib_c * n_frames + f];
+            let total = raw_hat + raw_sib;
+
+            if total > noise_floor && !in_event {
+                in_event = true;
+                event_start = f;
+            } else if total <= noise_floor && in_event {
+                in_event = false;
+                let event_length = f - event_start;
+
+                // Route retroactively based on the completed event's morphology
+                let is_hat = event_length <= hat_max_frames;
+
+                for ef in event_start..f {
+                    let e_total = self.h[hat_c * n_frames + ef] + self.h[sib_c * n_frames + ef];
+                    if is_hat {
+                        self.h[hat_c * n_frames + ef] = e_total;
+                        self.h[sib_c * n_frames + ef] = 0.0;
+                    } else {
+                        self.h[hat_c * n_frames + ef] = 0.0;
+                        self.h[sib_c * n_frames + ef] = e_total;
+                    }
+                }
+            }
+        }
+        
+        // Handle edge case where an event touches the absolute end of the track
+        if in_event {
+            let event_length = n_frames - event_start;
+            let is_hat = event_length <= hat_max_frames;
+            for ef in event_start..n_frames {
+                let e_total = self.h[hat_c * n_frames + ef] + self.h[sib_c * n_frames + ef];
+                if is_hat {
+                    self.h[hat_c * n_frames + ef] = e_total;
+                    self.h[sib_c * n_frames + ef] = 0.0;
+                } else {
+                    self.h[hat_c * n_frames + ef] = 0.0;
+                    self.h[sib_c * n_frames + ef] = e_total;
+                }
+            }
+        }
+    }
 }
 
 /// Find the most spectrally diverse window in the signal.
