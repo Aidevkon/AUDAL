@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 use crate::contract::*;
 use lineos_types::analysis::{StemFeatures, StemMetrics};
 use lineos_types::pre_analysis::PreAnalysisData;
