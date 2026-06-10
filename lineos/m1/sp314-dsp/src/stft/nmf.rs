@@ -475,6 +475,76 @@ impl NmfEngine {
             }
         }
     }
+
+    /// S.3 Fix: Resolves Mid-Range Formant Clashes via Modulation Tracking.
+    /// Distinguishes static Synthesizers from vibrating Human Voices by measuring Amplitude Modulation.
+    pub fn resolve_formant_clash(&mut self) {
+        let n_frames = self.h.len() / self.n_components;
+        let k = self.n_components;
+        if k < 2 || n_frames < 2 { return; }
+
+        let mut in_event = false;
+        let mut event_start = 0;
+        let noise_floor = 50.0_f32;
+
+        // Hardcode for routing logic (C0 = Harmonics/Synth, C1 = Voice)
+        let synth_c = 0;
+        let vocal_c = 1;
+
+        // Helper closure to analyze and route a completed audio event
+        let mut process_event = |start: usize, end: usize, h: &mut [f32]| {
+            let mut delta_sum = 0.0;
+            let mut energy_sum = 0.0;
+            
+            // Calculate Frame-to-Frame Variation (Amplitude Modulation)
+            for ef in (start + 1)..end {
+                let mut prev = 0.0;
+                let mut curr = 0.0;
+                for c in 0..k {
+                    prev += h[c * n_frames + ef - 1];
+                    curr += h[c * n_frames + ef];
+                }
+                delta_sum += (curr - prev).abs();
+                energy_sum += curr;
+            }
+            
+            // Modulation Index: High variance = Human Vibrato, Low variance = Static Synth
+            let modulation_index = if energy_sum > 0.0 { delta_sum / energy_sum } else { 0.0 };
+            let is_vocal = modulation_index > 0.05; 
+
+            // Route retroactive event energy
+            for ef in start..end {
+                let mut e_total = 0.0;
+                for c in 0..k { 
+                    e_total += h[c * n_frames + ef]; 
+                    h[c * n_frames + ef] = 0.0; // Clear all components
+                }
+                if is_vocal {
+                    h[vocal_c * n_frames + ef] = e_total; // Route to Voice
+                } else {
+                    h[synth_c * n_frames + ef] = e_total; // Route to Synth
+                }
+            }
+        };
+
+        for f in 0..n_frames {
+            let mut total = 0.0;
+            for c in 0..k { total += self.h[c * n_frames + f]; }
+
+            if total > noise_floor && !in_event {
+                in_event = true;
+                event_start = f;
+            } else if total <= noise_floor && in_event {
+                in_event = false;
+                process_event(event_start, f, &mut self.h);
+            }
+        }
+        
+        // Edge case: track ends while an event is still playing
+        if in_event {
+            process_event(event_start, n_frames, &mut self.h);
+        }
+    }
 }
 
 /// Find the most spectrally diverse window in the signal.
