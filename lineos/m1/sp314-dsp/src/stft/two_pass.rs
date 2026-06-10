@@ -15,6 +15,7 @@ use crate::stft::hpss::HpssStreamContext;
 use crate::stft::stem_renderer::FiveStems;
 use crate::spatial::channel_assign::StemChannelAssignments;
 use crate::spatial::SpatialPreAnalysis;
+use lineos_corpus::mfcc::MfccAnalyzer;
 
 /// Constitutional chunk size — 65536 samples = ~1.37s at 48kHz
 pub const CHUNK_FRAMES: usize = 65536;
@@ -283,6 +284,22 @@ impl TwoPassEngine {
         let proxy_harm  = self.proxy_stem(harmonics_idx, proxy_n, n_bins, &proxy);
         let proxy_amb   = self.proxy_stem(ambience_idx,  proxy_n, n_bins, &proxy);
 
+        // M-P2: Compute per-stem MFCC fingerprints from proxy stems.
+        // Only first 4096 samples (~85ms) — keeps scout() latency minimal.
+        // 4096 samples is sufficient for timbral fingerprint.
+        // INV-AB-1: deterministic — same proxy → same MFCCs.
+        let stem_mfccs = {
+            let mut mfcc  = MfccAnalyzer::new();
+            let limit     = 4096_usize;
+            StemMfccs {
+                voice:     mfcc.compute(&proxy_voice[..proxy_voice.len().min(limit)]),
+                drums:     mfcc.compute(&proxy_drums[..proxy_drums.len().min(limit)]),
+                bass:      mfcc.compute(&proxy_bass[..proxy_bass.len().min(limit)]),
+                harmonics: mfcc.compute(&proxy_harm[..proxy_harm.len().min(limit)]),
+                ambience:  mfcc.compute(&proxy_amb[..proxy_amb.len().min(limit)]),
+            }
+        };
+
         // Duplicate proxy signal as stereo for spatial analysis
         let proxy_stereo_l = proxy_voice.clone();
         let proxy_stereo_r = proxy_voice.clone();
@@ -339,7 +356,7 @@ impl TwoPassEngine {
             lfe_scale,
             global_rms_gain,
             spatial_pre,
-            stem_mfccs: StemMfccs::zero(), // populated in M-P2
+            stem_mfccs,
         }
     }
 
