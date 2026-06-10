@@ -55,15 +55,26 @@ pub fn autotune_dsp(
     let mut best_lufs = -144.0_f32;
     let mut iterations = 0usize;
 
+    // Pre-allocate test buffers ONCE — reused every iteration.
+    // Avoids 8 × 2 × 96000 × 4 bytes = ~6MB of heap churn.
+    let mut test_l = ref_l.clone();
+    let mut test_r = ref_r.clone();
+
     for _ in 0..AUTOTUNE_MAX_ITERATIONS {
         iterations += 1;
         let mid = (min_gain + max_gain) / 2.0_f32;
 
-        // Apply input gain to test buffer
-        let gain_linear = 10.0_f32.powf(mid / 20.0_f32);
+        // Apply input gain in-place — no allocation
+        let gain_linear = libm::powf(10.0_f32, mid / 20.0_f32);
+        for (dst, &src) in test_l.iter_mut().zip(ref_l.iter()) {
+            *dst = src * gain_linear;
+        }
+        for (dst, &src) in test_r.iter_mut().zip(ref_r.iter()) {
+            *dst = src * gain_linear;
+        }
         let mut test_audio = StereoBuffer {
-            left:       ref_l.iter().map(|s| s * gain_linear).collect(),
-            right:      ref_r.iter().map(|s| s * gain_linear).collect(),
+            left:       test_l.clone(),
+            right:      test_r.clone(),
             sample_rate,
             num_frames: ref_l.len(),
         };
