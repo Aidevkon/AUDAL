@@ -172,135 +172,39 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     let sc    = 1.0;  // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
 
-    // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
-    // Run full EBU R128 windowed analysis on the mapped PCM
-    // Post-master samples for telemetry are interleaved manually
-    let mut post_master_samples = Vec::with_capacity(n_total * 2);
-    for i in 0..n_total {
-        post_master_samples.push(left_slice[i]);
-        post_master_samples.push(right_slice[i]);
-    }
-    let post_master_sr       = chunk.sample_rate;
-    let post_master_channels = 2_u16;
-
-    let telemetry_lra = {
-        let mut calc = LraCalculator::new(post_master_sr);
-        calc.feed_samples(&post_master_samples, post_master_channels);
-        calc.compute()
-    };
-
-    let telemetry_momentary  = momentary_lufs(
-        &post_master_samples,
-        post_master_sr,
-        post_master_channels,
-    );
-    let telemetry_short_term = short_term_lufs(
-        &post_master_samples,
-        post_master_sr,
-        post_master_channels,
-    );
-
-    tracing::info!(
-        "Telemetry: lra={:.2} LU, momentary={:.2} LUFS, short_term={:.2} LUFS",
-        telemetry_lra, telemetry_momentary, telemetry_short_term
-    );
-
     // Sync mapped file to disk before returning path
     mmap.flush().unwrap_or_default();
     
-    let cert = aether_bridge::generate_certificate(
-        &_pcm_samples_for_telemetry,
-        &post_master_samples,
-        &persona_config,
-        &dsp_config,
-        &proof_log,
-        &aether_req,
-        env!("CARGO_PKG_VERSION"),
-    );
-
-    let cert_json = serde_json::to_string(&cert).unwrap_or_default();
-    let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
-
-    let qr_base64 = crate::handlers::certificate::generate_qr_base64(
-        &blob_id,
-        req.audio_path.split('/').next_back().unwrap_or("unknown"),
-        lufs,
-        tp,
-        telemetry_lra,
-        &fingerprints,
-    );
-
-    let pcm_blake3 = crate::handlers::certificate::blake3_pcm(left_slice);
-    let cert_sig   = crate::handlers::certificate::sign_certificate(
-        &blob_id, &pcm_blake3,
-        lufs, &fingerprints
-    );
-
     let processing_timeline = profiler.finalize();
 
-    Ok((StoredBlob {
-        id:               blob_id.clone(),
-        version:          "1.0".into(),
-        blob_type:        "audio".into(),
-        created_at:       Utc::now().to_rfc3339(),
-        input_hash:       input_hash_hex,
+    let cert_out = crate::domain::nodes::certificate_node::run(
+        &blob_id,
+        lufs,
+        tp,
+        &pre_analysis,
+        &fingerprints,
+        &proof_log,
+        &persona_config,
+        &aether_req,
+        &dsp_config,
+        left_slice,
+        right_slice,
+        file_path,
+        &input_hash_hex,
+        chunk.sample_rate,
+        2,
+        0, // duration_ms proxy
+        target_lufs,
+        chunk.sample_rate,
+        elapsed,
         seed,
-        pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
-        preset_id:        preset_id.to_string(),
-        stem_fingerprints: Some(fingerprints),
-        qr_base64,
-        pcm_blake3:       Some(pcm_blake3),
-        cert_signature:   Some(cert_sig),
+        preset_id,
+        &_pcm_samples_for_telemetry,
+        n_total,
         processing_timeline,
-        loudness: StoredLoudness {
-            integrated_lufs:          lufs,
-            short_term_lufs:          telemetry_short_term,   // Phase 9: real 3s window
-            momentary_lufs:           telemetry_momentary,    // Phase 9: real 400ms window
-            true_peak_dbtp:           tp,
-            lra:                      telemetry_lra,           // Phase 9: real LRA (was 0.0)
-            k_weighted:               true,
-            ebu_r128_target_lufs:     -23.0,
-            ebu_r128_compliant:       lufs <= -23.0 && tp <= -1.0,
-            spotify_compliant:        platform_ok(lufs, -14.0, tp),
-            youtube_compliant:        platform_ok(lufs, -14.0, tp),
-            apple_music_compliant:    platform_ok(lufs, -16.0, tp),
-            apple_podcasts_compliant: platform_ok(lufs, -16.0, tp),
-            broadcast_compliant:      platform_ok(lufs, -23.0, tp),
-            tidal_compliant:          platform_ok(lufs, -14.0, tp),
-        },
-        quality: StoredQuality {
-            stereo_correlation: sc,
-            phase_coherence:    0.97,       // Phase 7: real M/S phase analysis
-            stereo_width:       0.5,        // Phase 7: real M/S width analysis
-            dynamic_range_db:   dr,
-            rms_db:             lufs + 3.0, // Phase 7: real RMS measurement
-            spectral_centroid:  3_200.0,    // Phase 7: FFT spectral analysis
-            spectral_flatness:  0.12,       // Phase 7: FFT flatness analysis
-            clips_detected:     0,
-            clip_free:          tp <= -1.0,
-        },
-        provenance: StoredProvenance {
-            engine_id:          "E11".into(),
-            engine_version:     env!("CARGO_PKG_VERSION").to_string(),
-            processing_time_ms: elapsed,
-            host_os:            std::env::consts::OS.to_string(),
-            created_by:         "stillair-cockpit".into(),
-            aether_enriched:    true,
-            aether_devices:     vec![],
-        },
-        schema_version: 2,
-        aether_cert:    Some(cert_json),
-        aether_persona: Some(persona_config.id),
-        aether_config:  Some(config_json),
-        // Phase 10: audio payload (never crosses WASM boundary — Amendment A-002 §3)
-        sample_rate:  post_master_sr,
-        channels:     post_master_channels,
-        num_frames:   n_total,
-        audio_path:   file_path.clone(),
-    },
-    file_path,
-    None
-))
+    )?;
+
+    Ok((cert_out.blob, cert_out.file_path, None))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
