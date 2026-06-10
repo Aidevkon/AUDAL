@@ -99,3 +99,24 @@ pub fn hi_hat(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f32> {
     // The NMF will separate this into high-centroid component
     white_noise(-6.0, duration_s, sample_rate, seed)
 }
+
+/// Generate a snare drum with a mathematically perfect exponential reverb tail.
+/// hit: sharp transient (fast decay).
+/// tail: broadband noise decaying via e^(-alpha * t).
+pub fn snare_with_reverb(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f32> {
+    let n = (duration_s * sample_rate as f32) as usize;
+    let mut state = seed;
+    (0..n).map(|i| {
+        let t = i as f32 / sample_rate as f32;
+        // LCG noise
+        state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+        let noise = ((state >> 33) as f32 / u32::MAX as f32) * 2.0 - 1.0;
+        
+        // Transient Hit: sharp 20ms decay
+        let hit = noise * libm::expf(-t * 150.0);
+        // Reverb Tail: 1.0s RT60 (alpha ~ 6.9)
+        let tail = noise * libm::expf(-t * 6.9) * 0.5;
+        
+        (hit + tail).clamp(-1.0, 1.0)
+    }).collect()
+}

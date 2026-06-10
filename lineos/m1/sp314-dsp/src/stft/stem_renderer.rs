@@ -42,7 +42,7 @@ pub fn component_transient_density(h: &[f32], n_frames: usize) -> f32 {
 
 /// Refine NMF masks before iSTFT reconstruction.
 /// INV-AB-1: deterministic — fixed threshold, no randomness
-/// FIR (not IIR) — prev_row buffer prevents smearing
+/// FIR + Exponential Decay Binding to prevent Reverb Vacuum
 pub fn refine_mask(masks: &mut Vec<Vec<f32>>) {
     let n_frames = masks.len();
     if n_frames < 3 { return; }
@@ -59,13 +59,25 @@ pub fn refine_mask(masks: &mut Vec<Vec<f32>>) {
     }
 
     // Step 2: Temporal smoothing — 3-frame pure FIR moving average
-    // prev_row holds unmutated values to prevent IIR smearing
     let mut prev_row = masks[0].clone();
     for f in 1..n_frames - 1 {
         for b in 0..n_bins {
             let curr_val = masks[f][b];
             masks[f][b] = (prev_row[b] + curr_val + masks[f+1][b]) / 3.0;
-            prev_row[b] = curr_val; // save UNMUTATED for next iteration
+            prev_row[b] = curr_val; 
+        }
+    }
+
+    // Step 3: Exponential Decay Binding (S.4 Anti-Vacuum Fix)
+    // Prevents the NMF from aggressively cutting off reverb tails.
+    // beta = 0.95 gives a smoother release curve (~2.5s) to safely catch all tails.
+    const DECAY_BETA: f32 = 0.95;
+    for f in 1..n_frames {
+        for b in 0..n_bins {
+            let physical_floor = masks[f-1][b] * DECAY_BETA;
+            if masks[f][b] < physical_floor {
+                masks[f][b] = physical_floor;
+            }
         }
     }
 }
