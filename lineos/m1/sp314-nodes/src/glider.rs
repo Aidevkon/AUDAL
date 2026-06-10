@@ -67,6 +67,7 @@ impl ParameterGlider {
     /// Called once per sample inside process_block().
     /// Zero allocation. Pure arithmetic — no libm.
     #[inline(always)]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> f32 {
         if self.samples_left == 0 {
             return self.current;

@@ -39,7 +39,7 @@ pub fn run(audio_path: &str, preset_id: &str) -> Result<DecodedAudio, String> {
         .map(|lufs| (lufs as f32).clamp(-40.0, 0.0));
 
     let path_hash = compute_sha256_bytes(audio_path.as_bytes());
-    let input_hash_hex = hex::encode(&path_hash);
+    let input_hash_hex = hex::encode(path_hash);
     let seed = derive_seed(&path_hash);
 
     let pcm = decode::decode_audio(audio_path).map_err(|e| format!("Decode error: {e}"))?;

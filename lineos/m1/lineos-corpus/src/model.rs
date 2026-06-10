@@ -114,7 +114,7 @@ impl TransitionMatrix {
 
         self.states = all_states;
         self.counts = new_counts;
-        self.n_transitions = self.n_transitions + other.n_transitions;
+        self.n_transitions += other.n_transitions;
         self.probs = normalize_rows(&self.counts);
     }
 

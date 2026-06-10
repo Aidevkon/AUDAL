@@ -76,7 +76,7 @@ impl DspAdapter {
         if output_lufs > -69.0 {
             let correction_db = target_lufs - output_lufs;
             // Clamp correction to ±18dB to avoid wild swings
-            let correction_db = correction_db.max(-18.0_f32).min(18.0_f32);
+            let correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
             for s in left.iter_mut() {
                 *s *= correction_linear;

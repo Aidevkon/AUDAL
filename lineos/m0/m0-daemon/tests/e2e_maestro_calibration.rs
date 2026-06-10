@@ -112,25 +112,15 @@ fn maestro_calibration_broadband_signals() {
     );
     println!("Distance ratio B/A: {:.2}x", dist_b / dist_a.max(0.001));
 
-    // Absolute Bounds (Gate)
+    // Absolute Bounds (Gate) — linear domain [0.3, 1.0]
     assert!(
-        params_a.ducking_gain <= 0.0,
-        "Gate Failed: Ducking cannot be positive (A: {:.2})",
+        params_a.ducking_gain >= 0.3 && params_a.ducking_gain <= 1.0,
+        "Gate Failed: ducking_gain out of linear range [0.3, 1.0]: {:.3}",
         params_a.ducking_gain
     );
     assert!(
-        params_a.ducking_gain >= -12.0,
-        "Gate Failed: Ducking too aggressive/muting (A: {:.2})",
-        params_a.ducking_gain
-    );
-    assert!(
-        params_b.ducking_gain <= 0.0,
-        "Gate Failed: Ducking cannot be positive (B: {:.2})",
-        params_b.ducking_gain
-    );
-    assert!(
-        params_b.ducking_gain >= -12.0,
-        "Gate Failed: Ducking too aggressive/muting (B: {:.2})",
+        params_b.ducking_gain >= 0.3 && params_b.ducking_gain <= 1.0,
+        "Gate Failed: ducking_gain out of linear range [0.3, 1.0]: {:.3}",
         params_b.ducking_gain
     );
 

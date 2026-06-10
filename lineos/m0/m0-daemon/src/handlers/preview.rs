@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 //! POST /preview — scout + diverse window → 5 stem WAV files
 //! GET  /preview/:id/:stem — serve stem WAV
 //! Authority: spatial-mixer-widget-v1_0.md §4.1
@@ -109,14 +110,10 @@ pub async fn create_preview(
             .await;
 
     match result {
-        Err(e) => {
-            return Json(serde_json::json!({
-                "error": format!("spawn_blocking panic: {e}")
-            }));
-        }
-        Ok(Err(e)) => {
-            return Json(serde_json::json!({ "error": e }));
-        }
+        Err(e) => Json(serde_json::json!({
+            "error": format!("spawn_blocking panic: {e}")
+        })),
+        Ok(Err(e)) => Json(serde_json::json!({ "error": e })),
         Ok(Ok((stems_wav, scout_meta, duration_s, sample_rate))) => {
             state_bg
                 .preview_store

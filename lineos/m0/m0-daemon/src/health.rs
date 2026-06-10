@@ -49,10 +49,12 @@ pub struct HealthGate {
 
 impl HealthGate {
     pub fn new() -> Self {
-        let mut criteria = HealthCriteria::default();
         // C6/C7 are structural invariants — always true by design
-        criteria.health_endpoint_responding = true;
-        criteria.health_independence = true;
+        let criteria = HealthCriteria {
+            health_endpoint_responding: true,
+            health_independence: true,
+            ..Default::default()
+        };
         Self {
             criteria: Arc::new(RwLock::new(criteria)),
         }

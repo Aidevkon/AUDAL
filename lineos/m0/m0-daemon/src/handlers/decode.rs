@@ -261,7 +261,6 @@ fn sanitize_sample(s: f32) -> f32 {
 // Channel helpers
 
 /// Mono interleaved -> stereo interleaved (duplicate each sample).
-
 pub fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
     let mut out = Vec::with_capacity(mono.len() * 2);
     for &s in mono {

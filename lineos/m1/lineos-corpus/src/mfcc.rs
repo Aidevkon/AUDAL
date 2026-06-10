@@ -1,4 +1,3 @@
-#![allow(clippy::needless_range_loop)]
 //! MFCC — Mel-Frequency Cepstral Coefficients
 //! Authority: corpus-learning-spec-v1_2.md
 //! Zero heap allocation in compute() — all buffers pre-allocated.

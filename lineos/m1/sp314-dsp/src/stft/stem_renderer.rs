@@ -41,6 +41,7 @@ pub fn component_transient_density(h: &[f32], n_frames: usize) -> f32 {
 /// Refine NMF masks before iSTFT reconstruction.
 /// INV-AB-1: deterministic — fixed threshold, no randomness
 /// FIR + Exponential Decay Binding to prevent Reverb Vacuum
+#[allow(clippy::ptr_arg)]
 pub fn refine_mask(masks: &mut Vec<Vec<f32>>) {
     let n_frames = masks.len();
     if n_frames < 3 {

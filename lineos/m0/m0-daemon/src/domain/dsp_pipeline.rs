@@ -159,8 +159,8 @@ fn run_dsp_internal(
     let lufs = dsp_out.lufs;
     let tp = dsp_out.true_peak;
     profiler.mark_stage("Mastering", left_slice);
-    let dr = 10.0; // dynamic range proxy for v3
-    let sc = 1.0; // stereo correlation proxy for v3
+    let _dr = 10.0; // dynamic range proxy for v3
+    let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
 
     // Sync mapped file to disk before returning path
@@ -201,6 +201,7 @@ fn run_dsp_internal(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// LUFS within 1 LU of target AND TP ≤ ceiling → platform compliant.
+#[allow(dead_code)]
 fn platform_ok(lufs: f32, target: f32, tp: f32) -> bool {
     lufs <= target + 1.0 && tp <= -1.0
 }

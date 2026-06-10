@@ -109,6 +109,7 @@ pub struct HpssStreamContext {
 }
 
 impl HpssStreamContext {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             frame_history: std::collections::VecDeque::with_capacity(L_HARM),

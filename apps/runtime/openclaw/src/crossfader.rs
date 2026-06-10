@@ -79,10 +79,9 @@ impl Crossfader {
 
         // For the remainder of the block (if crossfade ends mid-block), use graph B entirely
         if fade_this_block < self.block_size {
-            for i in fade_this_block..self.block_size {
-                left[i] = self.buf_b_left[i];
-                right[i] = self.buf_b_right[i];
-            }
+            let rem = fade_this_block..self.block_size;
+            left[rem.clone()].copy_from_slice(&self.buf_b_left[rem.clone()]);
+            right[rem.clone()].copy_from_slice(&self.buf_b_right[rem]);
             self.fade_samples_remaining = 0;
             self.active = false;
             return true;

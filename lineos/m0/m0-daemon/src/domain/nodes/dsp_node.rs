@@ -15,6 +15,7 @@ pub struct DspOutput {
     pub aether_req: aether_bridge::AetherRequest,
 }
 
+#[allow(clippy::ptr_arg)]
 pub fn run(
     chunk_left: &mut Vec<f32>,
     chunk_right: &mut Vec<f32>,

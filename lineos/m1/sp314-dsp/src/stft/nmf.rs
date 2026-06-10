@@ -60,6 +60,7 @@ impl NmfEngine {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(N_COMPONENTS)
     }

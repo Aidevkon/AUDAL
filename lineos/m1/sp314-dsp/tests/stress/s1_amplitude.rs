@@ -6,6 +6,7 @@ use super::generators::*;
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
 
+#[allow(deprecated)]
 fn make_engine(sample_rate: u32) -> Sp314MasteringEngine {
     let mut config = MasteringTarget::SpotifyV3.engine_config(sample_rate);
     // Stress tests use explicit -1.0 dBFS ceiling.

@@ -9,7 +9,7 @@ use std::io::BufWriter;
 
 pub fn generate_silent_certificate(blob: &StoredBlob, output_path: &str) {
     let result = std::panic::catch_unwind(|| _generate(blob, output_path));
-    if let Err(_) = result {
+    if result.is_err() {
         eprintln!(
             "[cert] PDF generation failed silently for {}",
             &blob.id[..8]

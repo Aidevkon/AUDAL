@@ -1,3 +1,4 @@
+#![allow(clippy::doc_lazy_continuation)]
 //! LineOS Rule Engine — deterministic coach-core.
 //! Authority: LineOS Constitution v2.0 §07 · Coach-Core README v1.0
 //!
@@ -8,7 +9,7 @@
 //!   - `evaluate(&AnalysisReport, &Thresholds) → CoachFindings`
 //!   - `Thresholds::from_schema(&Bmr128Schema)`
 //!   - All types: AnalysisReport, QualityMetrics, ComplianceFlags,
-//!                CoachFindings, Issue, IssueParams, Severity
+//!    CoachFindings, Issue, IssueParams, Severity
 
 pub mod evaluator;
 pub mod rules;
