@@ -232,4 +232,42 @@ mod tests {
         assert!((final_club - 0.471).abs() < 0.001);
         assert!((final_radio - 0.884).abs() < 0.001);
     }
+
+    #[test]
+    fn test_flavour_instant_switch() {
+        let repo = AudioRepo::new_with_flavours(DspState::default());
+        // checkout club_punch → ducking_depth = 1.5
+        let mut repo = repo;
+        repo.checkout("club_punch").unwrap();
+        let state = repo.head_state();
+        assert!((state.ducking_depth - 1.5).abs() < 0.001,
+            "Club Punch ducking_depth should be 1.5, got {}", state.ducking_depth);
+    }
+
+    #[test]
+    fn test_flavour_main_preserved() {
+        let custom = DspState { ducking_depth: 1.23, ..DspState::default() };
+        let mut repo = AudioRepo::new_with_flavours(DspState::default());
+        // commit custom state to main
+        repo.commit(custom, "my custom mix");
+        // switch to flavour
+        repo.checkout("club_punch").unwrap();
+        assert!((repo.head_state().ducking_depth - 1.5).abs() < 0.001);
+        // return to main — custom mix preserved
+        repo.checkout("main").unwrap();
+        assert!((repo.head_state().ducking_depth - 1.23).abs() < 0.001,
+            "Main branch custom mix should be preserved");
+    }
+
+    #[test]
+    fn test_all_flavours_valid() {
+        use crate::flavours;
+        for (name, state) in flavours::ALL {
+            let resolved = flavours::from_name(name).unwrap();
+            assert_eq!(resolved.ducking_depth, state.ducking_depth);
+            assert!(state.ducking_depth > 0.0);
+            assert!(state.ms_width > 0.0);
+        }
+        assert_eq!(flavours::ALL.len(), 6);
+    }
 }
