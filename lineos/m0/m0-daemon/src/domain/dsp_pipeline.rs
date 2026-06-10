@@ -42,94 +42,22 @@ fn run_dsp_internal(req: &MasterRequest, start: Instant) -> Result<(StoredBlob, 
     use lineos_telemetry::lra::LraCalculator;
     use lineos_telemetry::windows::{momentary_lufs, short_term_lufs};
 
-    // Load schema from shared contract (embedded at compile-time for determinism)
-    let schema: serde_json::Value = serde_json::from_str(
-        include_str!("../../../../shared/schema/bmr-128.schema.json")
-    ).map_err(|e| format!("Schema load error: {e}"))?;
+    // NODE 1: DECODE
+    let decoded = crate::domain::nodes::decode_node::run(
+        audio_path, preset_id)?;
+    let target_lufs                 = decoded.target_lufs;
+    let input_hash_hex              = decoded.input_hash_hex;
+    let seed                        = decoded.seed;
+    let original_sr                 = decoded.original_sr;
+    let original_ch                 = decoded.original_ch;
+    let duration_ms                 = decoded.duration_ms;
+    let _pcm_samples_for_telemetry  = decoded.pcm_samples;
+    let _pcm_channels_for_telemetry = decoded.pcm_channels;
+    let _pcm_sr_for_telemetry       = decoded.pcm_sample_rate;
+    let mut chunk                   = decoded.chunk;
+    let _chunk_original             = decoded.chunk_original;
 
-    // Target LUFS from schema preset — clamped to valid range
-    let target_lufs: Option<f32> = schema.get("presets")
-        .and_then(|p| p.get(preset_id))
-        .and_then(|p| p.get("target_lufs"))
-        .and_then(|l| l.as_f64())
-        .map(|lufs| (lufs as f32).clamp(-40.0, 0.0));
-
-    // Determinism seed from SHA-256 of the file path (stable identity)
-    let path_hash    = compute_sha256_bytes(audio_path.as_bytes());
-    let input_hash_hex = hex::encode(path_hash);
-    let seed           = derive_seed(&path_hash);
-
-    // ── Phase 7: Real decode ──────────────────────────────────────────────────
-    // decode_audio() is CPU-bound (symphonia + rubato). Since run_dsp_internal is synchronous, we run it directly.
-    let path_owned = audio_path.to_string();
-    let pcm = decode::decode_audio(&path_owned)
-      .map_err(|e| format!("Decode error: {e}"))?;
-
-
-    let original_sr  = pcm.original_sr;
-    let original_ch   = pcm.original_ch;
-    let duration_ms   = pcm.duration_ms;
-
-    tracing::info!(
-        "Decoded: {} samples, sr={}, ch={}, first5={:?}",
-        pcm.samples.len(),
-        pcm.sample_rate,
-        pcm.channels,
-        &pcm.samples[..5.min(pcm.samples.len())],
-    );
-    profiler.mark_stage("Ingest", &pcm.samples);
-
-    // ── Silence guard (after real decode) ────────────────────────────────────
-    let rms = compute_rms(&pcm.samples);
-    let rms_dbfs = if rms > 0.0 { 20.0 * (rms as f64).log10() as f32 }
-                   else         { f32::NEG_INFINITY };
-
-    // Rough normalization gain estimate (RMS-based) — used only for overflow guard.
-    // Full LUFS-accurate gain computed inside sp314-dsp AnalysisAccumulator.
-    let norm_gain_check = rms_to_lufs(rms);
-    tracing::info!("RMS: {:.2} dBFS, est. LUFS: {:.4}", rms_dbfs, norm_gain_check);
-
-    if rms_dbfs < -60.0 {
-        return Err(format!(
-            "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
-        ));
-    }
-
-    // ── Normalization gain overflow guard ─────────────────────────────────────
-    // AnalysisAccumulator::normalization_gain_linear() returns inf when
-    // integrated_lufs == f32::NEG_INFINITY (no valid LUFS blocks — track < 400ms
-    // or K-weighted energy below absolute gate). inf * sample = NaN in Stage 1.
-    // Guard: if rough-LUFS signals the gain would exceed 32× (30 dB), the track
-    // is too quiet or too short to normalize safely — fail with a clear message.
-    let rough_lufs = norm_gain_check; // already computed: rms_to_lufs(rms)
-    let rough_gain_db = -14.0_f32 - rough_lufs; // worst-case against Spotify target
-    if rough_gain_db > 30.0 {
-        return Err(format!(
-            "DSP arithmetic error — normalization gain would exceed 32× \
-             (input RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB). \
-             Track too quiet or too short (< 400ms) for loudness normalization."
-        ));
-    }
-
-    // ── P7 audit — audio_decoded (per P7-002 spec) ───────────────────────────
-    // Records: original format metadata before normalize/resample.
-    // inlined here (no AppState in run_dsp — audit is written by trigger_mastering)
-    // We encode this in the blob provenance for now; full audit write is in caller.
-    let _ = (original_sr, original_ch, duration_ms); // used in provenance below
-
-    // Build AudioChunk — always 48000 Hz stereo after decode.
-    // Clone samples first so telemetry can read full-track PCM after DSP completes.
-    let _pcm_samples_for_telemetry = pcm.samples.clone();   // Phase 9
-    let _pcm_channels_for_telemetry = pcm.channels;          // Phase 9
-    let _pcm_sr_for_telemetry      = pcm.sample_rate;        // Phase 9
-    // Create StereoBuffer (AudioChunk)
-    let mut chunk = AudioChunk {
-        left: pcm.samples.iter().step_by(2).copied().collect(),
-        right: pcm.samples.iter().skip(1).step_by(2).copied().collect(),
-        sample_rate: pcm.sample_rate,
-        num_frames: pcm.samples.len() / 2,
-    };
-    let _chunk_original = chunk.clone();
+    profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     // NMF phase RAM: ~7MB (was ~8GB for 2h file)
