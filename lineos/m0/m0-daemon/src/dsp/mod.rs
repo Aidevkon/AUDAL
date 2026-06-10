@@ -4,13 +4,15 @@
 // Orchestrates: pipelineforge → sp314-nodes DspGraph → process_offline
 
 pub mod autotune;
+pub mod maestro;
+pub use maestro::{AutoTuningController, RenderParams};
 
 use pipelineforge::conditions::{ConditionSet, EngineerCondition};
 use pipelineforge::forge::Pipelineforge;
 use sp314_nodes::graph::DspGraph;
 use sp314_nodes::topology::DspTopology;
 use lineos_types::{
-    StereoBuffer, LufsReport, MasteringIntent,
+    LufsReport, MasteringIntent,
 };
 use sp314_dsp::limiter::{BrickwallLimiter, LimiterConfig};
 
