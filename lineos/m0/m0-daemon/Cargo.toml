@@ -73,6 +73,7 @@ futures-util = "0.3"
 ringbuf = "0.3"
 memmap2 = "0.9.10"
 arc-swap = "1"
+surrealdb = { version = "3.1.4", features = ["kv-surrealkv"] }
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile   = "3"
