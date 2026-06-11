@@ -23,3 +23,6 @@ pub async fn init_test() -> Result<DbConn, surrealdb::Error> {
     db.use_ns("creator_os").use_db("test").await?;
     Ok(Arc::new(db))
 }
+
+pub mod schema;
+pub use schema::{Project, Track, Session};
