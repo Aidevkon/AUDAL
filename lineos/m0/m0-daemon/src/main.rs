@@ -204,5 +204,8 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/mix/revert",   post(handlers::mix::post_revert))
         .route("/mix/flavours", get(handlers::mix::get_flavours))
         .route("/mix/flavour",  post(handlers::mix::post_flavour))
+        .route("/tinder/variations", get(handlers::tinder::get_variations))
+        .route("/tinder/like",       post(handlers::tinder::post_like))
+        .route("/tinder/result",     post(handlers::tinder::post_result))
         .with_state(state)
 }

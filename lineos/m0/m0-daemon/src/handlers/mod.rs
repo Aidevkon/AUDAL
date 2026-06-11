@@ -10,3 +10,4 @@ pub mod preview;
 pub mod progress;
 pub mod timeline;
 pub mod mix;
+pub mod tinder;
