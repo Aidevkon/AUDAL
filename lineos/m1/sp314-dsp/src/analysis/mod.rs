@@ -18,3 +18,5 @@ pub mod ear_fatigue;
 pub use ear_fatigue::{EarFatigueModel, EarFatigueDelta};
 pub mod morph_curve;
 pub use morph_curve::{MorphCurve, CurveType};
+pub mod album_conductor;
+pub use album_conductor::{AlbumConductor, TrackPlan};
