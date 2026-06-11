@@ -7,6 +7,7 @@
 
 use super::operator::{ConductorError, ExecutionPlan, ExecutorError, Intent, MasteringOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::domain::nodes::album_certificate_node::AlbumCertificate;
 use std::sync::Arc;
 use arc_swap::ArcSwap;
 use xaak::repo::DspState;
@@ -307,12 +308,60 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                         }
                     }
 
+                    let ok_count = outputs.iter().filter(|o| o.status == "ok").count();
                     tracing::info!(
                         batch_id = %batch_id,
                         "Conductor: batch complete — {}/{} ok",
-                        outputs.iter().filter(|o| o.status == "ok").count(),
-                        total
+                        ok_count, total
                     );
+
+                    // AB-P7: Generate AlbumCertificate from batch results
+                    // Build minimal StoredBlob proxies from outputs
+                    let fatigue_map: Vec<bool> = proxy_analyses.windows(2)
+                        .map(|w| {
+                            let model = sp314_dsp::analysis::ear_fatigue::EarFatigueModel::default();
+                            model.compute_delta(&w[0]).fatigue_detected
+                        })
+                        .chain(std::iter::once(false))
+                        .collect();
+
+                    let album_cert_path = {
+                        // Build proxy blobs from track_lufs + blob_ids
+                        let proxy_blobs: Vec<crate::blob_store::StoredBlob> = outputs.iter()
+                            .zip(track_lufs.iter())
+                            .map(|(o, &lufs)| crate::blob_store::StoredBlob {
+                                id:          o.blob_id.clone(),
+                                input_hash:  o.session_id.clone(),
+                                loudness: crate::blob_store::StoredLoudness {
+                                    integrated_lufs: lufs,
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            })
+                            .collect();
+
+                        let anchor_idx = proxy_analyses.iter()
+                            .enumerate()
+                            .max_by(|(_, a), (_, b)|
+                                a.integrated_lufs.partial_cmp(&b.integrated_lufs).unwrap())
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+
+                        let cert = AlbumCertificate::from_tracks(
+                            &batch_id,
+                            &proxy_blobs,
+                            anchor_idx,
+                            &fatigue_map,
+                        );
+                        let path = cert.write_to_disk(&batch_id);
+                        tracing::info!(
+                            batch_id = %batch_id,
+                            "AB-P7: AlbumCertificate written → {:?}",
+                            path
+                        );
+                        path
+                    };
+                    let _ = album_cert_path;
 
                     let _ = response.send(Ok(outputs));
                     busy_clone.store(false, Ordering::SeqCst);

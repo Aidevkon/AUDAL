@@ -13,7 +13,7 @@ fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Err
     s.serialize_str(&v.to_string())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StageRecord {
     pub stage: String,
     pub duration_ms: u64,
@@ -27,7 +27,7 @@ fn default_schema_v1() -> u32 {
 /// Golden Blob as stored by M0.
 /// Audio bytes stored separately — only metrics/metadata serialized to JSON.
 /// Field contract: golden-blob-spec.md v1.0 §Structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredBlob {
     // Top-level fields — golden-blob-spec.md §Top-level
     pub id: String,
@@ -86,7 +86,7 @@ pub struct StoredBlob {
 }
 
 /// BS.1770-4 canonical values + platform compliance flags.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredLoudness {
     pub integrated_lufs: f32,
     pub short_term_lufs: f32,
@@ -104,7 +104,7 @@ pub struct StoredLoudness {
     pub tidal_compliant: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredQuality {
     pub stereo_correlation: f32,
     pub phase_coherence: f32,
@@ -117,7 +117,7 @@ pub struct StoredQuality {
     pub clip_free: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredProvenance {
     pub engine_id: String,
     pub engine_version: String,
@@ -128,7 +128,7 @@ pub struct StoredProvenance {
     pub aether_devices: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StemFingerprints {
     pub voice: String,
     pub drums: String,
