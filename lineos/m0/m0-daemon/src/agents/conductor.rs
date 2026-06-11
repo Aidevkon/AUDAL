@@ -22,7 +22,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
     // Conductor holds its own channel to Executor
     // Created once at startup — persists for the lifetime of the agent
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(4);
-    tokio::spawn(super::executor::run(executor_rx, head_state_ptr));
+    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone()));
 
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -106,6 +106,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
 
                 let executor_tx = executor_tx.clone();
                 let busy_clone = busy.clone();
+                let head_state_ptr = head_state_ptr.clone();
 
                 tokio::spawn(async move {
                     let total = items.len();
@@ -228,7 +229,26 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                                 track_lufs.get(index.saturating_sub(1)).copied().unwrap_or(-14.0),
                             );
                         }
-                        let _ = ear_delta; // will be used in AB-P6 DspState commit
+                        // AB-P6: Apply EarFatigue delta to DspState via ArcSwap.
+                        // Audio thread reads new state on next frame — zero dropout.
+                        if ear_delta.fatigue_detected {
+                            let current = head_state_ptr.load_full();
+                            let adjusted = DspState {
+                                ducking_depth:  (current.ducking_depth
+                                    * ear_delta.ducking_multiplier).clamp(0.3, 1.0),
+                                ms_width:       (current.ms_width
+                                    * ear_delta.width_multiplier).clamp(0.5, 2.0),
+                                sidechain_hold: current.sidechain_hold,
+                                lfe_gain:       current.lfe_gain,
+                            };
+                            head_state_ptr.store(std::sync::Arc::new(adjusted));
+                            tracing::info!(
+                                batch_id = %batch_id,
+                                "AB-P6: EarFatigue ArcSwap — ducking={:.3} width={:.3}",
+                                adjusted.ducking_depth,
+                                adjusted.ms_width,
+                            );
+                        }
 
                         // Build ExecutionPlan for this track
                         let plan = ExecutionPlan {
