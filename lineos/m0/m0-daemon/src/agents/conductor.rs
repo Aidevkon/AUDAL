@@ -11,6 +11,8 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use xaak::repo::DspState;
 use tokio::sync::{mpsc, oneshot};
+use sp314_dsp::analysis::ear_fatigue::EarFatigueModel;
+use sp314_dsp::analysis::morph_curve::{MorphCurve, CurveType};
 
 pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<DspState>>) {
     // AtomicBool: only one mastering job at a time
@@ -187,6 +189,18 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                     );
                     // ── End Album Cohesion Pre-Pass ──────────────────────
 
+                    // EarFatigue uses integrated_lufs as proxy
+                    // Full PreAnalysisData available in pre-pass above
+                    let ear_model = EarFatigueModel::default();
+                    // Build proxy analyses from track_lufs for EarFatigue
+                    let proxy_analyses: Vec<lineos_types::pre_analysis::PreAnalysisData> =
+                        track_lufs.iter().map(|&lufs| {
+                            lineos_types::pre_analysis::PreAnalysisData {
+                                integrated_lufs: lufs,
+                                ..lineos_types::pre_analysis::PreAnalysisData::silent()
+                            }
+                        }).collect();
+
                     for (index, params) in items.into_iter().enumerate() {
                         let cohesion_target = per_track_targets
                             .get(index)
@@ -197,6 +211,24 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                             "Conductor: batch track {}/{} — {}",
                             index + 1, total, params.audio_path
                         );
+
+                        let ear_delta = if index > 0 {
+                            proxy_analyses.get(index - 1)
+                                .map(|prev| ear_model.compute_delta(prev))
+                                .unwrap_or_default()
+                        } else {
+                            sp314_dsp::analysis::ear_fatigue::EarFatigueDelta::default()
+                        };
+
+                        if ear_delta.fatigue_detected {
+                            tracing::info!(
+                                batch_id = %batch_id,
+                                "EarFatigue: track {} recovery (prev LUFS={:.1})",
+                                index + 1,
+                                track_lufs.get(index.saturating_sub(1)).copied().unwrap_or(-14.0),
+                            );
+                        }
+                        let _ = ear_delta; // will be used in AB-P6 DspState commit
 
                         // Build ExecutionPlan for this track
                         let plan = ExecutionPlan {
