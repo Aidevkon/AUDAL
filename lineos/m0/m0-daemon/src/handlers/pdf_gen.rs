@@ -252,3 +252,79 @@ fn _generate_album(cert: &AlbumCertificate, output_path: &str) {
         eprintln!("[cert] Album certificate saved: {}", output_path);
     }
 }
+
+use axum::{extract::{State, Path}, response::Response};
+use axum::http::{header, StatusCode};
+use crate::app_state::AppState;
+
+/// GET /blob/:id/certificate.pdf
+/// Returns the pre-generated per-track certificate PDF.
+pub async fn get_track_certificate_pdf(
+    State(_app): State<AppState>,
+    Path(blob_id): Path<String>,
+) -> Response {
+    let short_id = &blob_id[..blob_id.len().min(8)];
+    let pdf_path = format!("{}_certificate.pdf", short_id);
+
+    match std::fs::read(&pdf_path) {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/pdf")
+            .header(
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"certificate_{}.pdf\"", short_id),
+            )
+            .body(axum::body::Body::from(bytes))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(axum::body::Body::from("Certificate not found"))
+            .unwrap(),
+    }
+}
+
+/// GET /album/:batch_id/certificate.pdf
+/// Generates (if needed) and returns the album certificate PDF.
+pub async fn get_album_certificate_pdf(
+    State(_app): State<AppState>,
+    Path(batch_id): Path<String>,
+) -> Response {
+    let short_id  = &batch_id[..batch_id.len().min(8)];
+    let json_path = format!("album_{}.certificate.json", short_id);
+    let pdf_path  = format!("album_{}_certificate.pdf", short_id);
+
+    // Generate PDF from JSON if not already exists
+    if !std::path::Path::new(&pdf_path).exists() {
+        match std::fs::read_to_string(&json_path) {
+            Ok(json) => {
+                if let Ok(cert) = serde_json::from_str::<
+                    crate::domain::nodes::album_certificate_node::AlbumCertificate
+                >(&json) {
+                    generate_album_certificate_pdf(&cert, &pdf_path);
+                }
+            }
+            Err(_) => {
+                return Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(axum::body::Body::from("Album certificate not found"))
+                    .unwrap();
+            }
+        }
+    }
+
+    match std::fs::read(&pdf_path) {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/pdf")
+            .header(
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"album_certificate_{}.pdf\"", short_id),
+            )
+            .body(axum::body::Body::from(bytes))
+            .unwrap(),
+        Err(_) => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(axum::body::Body::from("Certificate PDF generation failed"))
+            .unwrap(),
+    }
+}
