@@ -168,3 +168,87 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
         eprintln!("[cert] Certificate saved: {}", output_path);
     }
 }
+
+use crate::domain::nodes::album_certificate_node::AlbumCertificate;
+
+pub fn generate_album_certificate_pdf(cert: &AlbumCertificate, output_path: &str) {
+    let result = std::panic::catch_unwind(|| _generate_album(cert, output_path));
+    if result.is_err() {
+        eprintln!("[cert] Album PDF generation failed for {}", &cert.album_id[..cert.album_id.len().min(8)]);
+    }
+}
+
+fn _generate_album(cert: &AlbumCertificate, output_path: &str) {
+    use printpdf::*;
+    use std::fs::File;
+    use std::io::BufWriter;
+
+    let (doc, page1, layer1) = PdfDocument::new(
+        "CreatorOS Album Certificate",
+        Mm(210.0), Mm(297.0), "Layer 1",
+    );
+    let layer    = doc.get_page(page1).get_layer(layer1);
+    let font     = doc.add_builtin_font(BuiltinFont::Courier).unwrap();
+    let font_bold = doc.add_builtin_font(BuiltinFont::CourierBold).unwrap();
+
+    // Header
+    layer.use_text("CREATOR OS", 20.0, Mm(20.0), Mm(277.0), &font_bold);
+    layer.use_text("ALBUM MASTERING CERTIFICATE", 14.0, Mm(20.0), Mm(268.0), &font);
+
+    let line = Line {
+        points: vec![
+            (Point::new(Mm(20.0), Mm(264.0)), false),
+            (Point::new(Mm(190.0), Mm(264.0)), false),
+        ],
+        is_closed: false,
+    };
+    layer.add_line(line);
+
+    // Album metadata
+    layer.use_text("ALBUM ID:", 9.0, Mm(20.0), Mm(257.0), &font_bold);
+    layer.use_text(&cert.album_id, 9.0, Mm(20.0), Mm(251.0), &font);
+
+    layer.use_text(
+        format!("Tracks: {}   Anchor: Track {}   Anchor LUFS: {:.2}",
+            cert.track_count, cert.anchor_track_idx + 1, cert.anchor_lufs),
+        9.0, Mm(20.0), Mm(243.0), &font,
+    );
+
+    // Cryptographic proof
+    layer.use_text("CRYPTOGRAPHIC PROOF", 11.0, Mm(20.0), Mm(233.0), &font_bold);
+    layer.use_text(
+        format!("Album Hash (SHA-256): {}", cert.album_hash),
+        8.0, Mm(20.0), Mm(226.0), &font,
+    );
+
+    // Track summary
+    layer.use_text("TRACK SUMMARY", 11.0, Mm(20.0), Mm(216.0), &font_bold);
+    let mut y = 209.0f32;
+    for i in 0..cert.track_count {
+        let lufs    = cert.track_lufs.get(i).copied().unwrap_or(-14.0);
+        let fatigue = cert.ear_fatigue_applied.get(i).copied().unwrap_or(false);
+        let blob_id = cert.track_blob_ids.get(i).map(|s| &s[..s.len().min(8)]).unwrap_or("?");
+        layer.use_text(
+            format!("  Track {:2}  {:.2} LUFS  {}  [{}]",
+                i + 1, lufs,
+                if fatigue { "EarFatigue:YES" } else { "EarFatigue:NO " },
+                blob_id,
+            ),
+            8.0, Mm(20.0), Mm(y), &font,
+        );
+        y -= 6.0;
+        if y < 30.0 { break; }
+    }
+
+    // Footer
+    layer.use_text(
+        &format!("Pipeline v{}  |  {}  |  CreatorOS",
+            cert.pipeline_version, &cert.created_at[..10]),
+        8.0, Mm(20.0), Mm(20.0), &font,
+    );
+
+    if let Ok(file) = File::create(output_path) {
+        let _ = doc.save(&mut BufWriter::new(file));
+        eprintln!("[cert] Album certificate saved: {}", output_path);
+    }
+}
