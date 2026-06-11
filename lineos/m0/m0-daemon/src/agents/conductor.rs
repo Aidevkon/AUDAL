@@ -15,7 +15,11 @@ use tokio::sync::{mpsc, oneshot};
 use sp314_dsp::analysis::ear_fatigue::EarFatigueModel;
 use sp314_dsp::analysis::morph_curve::{MorphCurve, CurveType};
 
-pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<DspState>>) {
+pub async fn run(
+    mut rx: mpsc::Receiver<Intent>,
+    head_state_ptr: Arc<ArcSwap<DspState>>,
+    db: crate::db::DbConn,
+) {
     // AtomicBool: only one mastering job at a time
     // R2 decision: is the system busy?
     let busy = Arc::new(AtomicBool::new(false));
@@ -23,7 +27,7 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
     // Conductor holds its own channel to Executor
     // Created once at startup — persists for the lifetime of the agent
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(4);
-    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone()));
+    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone(), db.clone()));
 
     while let Some(intent) = rx.recv().await {
         match intent {

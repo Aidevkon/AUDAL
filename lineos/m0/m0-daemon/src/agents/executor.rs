@@ -13,7 +13,11 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use xaak::repo::DspState;
 
-pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<DspState>>) {
+pub async fn run(
+    mut rx: mpsc::Receiver<Intent>,
+    head_state_ptr: Arc<ArcSwap<DspState>>,
+    db: crate::db::DbConn,
+) {
     while let Some(intent) = rx.recv().await {
         match intent {
             Intent::Shutdown => break,
@@ -80,11 +84,40 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                             }
                         }
 
+                        // Persist Track to SurrealDB
+                        let track_lufs  = blob.loudness.integrated_lufs;
+                        let track_tp    = blob.loudness.true_peak_dbtp;
+                        let track_blob  = blob.id.clone();
+                        let track_path  = blob.audio_path
+                            .to_string_lossy().to_string();
+                        let db_clone    = db.clone();
+                        tokio::spawn(async move {
+                            let created_at = chrono::Utc::now().to_rfc3339();
+                            let aql = format!(
+                                "CREATE tracks CONTENT {{ \
+                                    blob_id: '{}', \
+                                    audio_path: '{}', \
+                                    lufs: {}, \
+                                    true_peak: {}, \
+                                    created_at: '{}', \
+                                    project_id: 'default', \
+                                    flavour_id: 'neutral', \
+                                    duration_ms: 0 \
+                                }}",
+                                track_blob.replace('\'', "\\'"),
+                                track_path.replace('\'', "\\'"),
+                                track_lufs,
+                                track_tp,
+                                created_at,
+                            );
+                            let _ = db_clone.query(aql).await;
+                        });
+
                         let output = DspOutput {
-                            blob_id: blob.id.clone(),
-                            lufs:    blob.loudness.integrated_lufs,
+                            blob_id:   blob.id.clone(),
+                            lufs:      blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
-                            pcm_data: Some(_chunk_original),
+                            pcm_data:  Some(_chunk_original),
                             num_frames: blob.num_frames,
                         };
                         let _ = response.send(Ok(output));

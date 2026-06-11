@@ -18,6 +18,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use xaak::engine::PlaybackHandle;
 use xaak::repo::{AudioRepo, DspState};
+use crate::db::DbConn;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MasteringProgress {
@@ -50,16 +51,35 @@ pub struct AppState {
     pub audio_repo: Arc<RwLock<AudioRepo>>,
     /// Lock-free hot pointer for audio thread.
     pub head_state_ptr: Arc<ArcSwap<DspState>>,
+    /// Embedded SurrealDB — Projects, Tracks, Sessions.
+    /// Privacy moat: 100% local, kv-surrealkv backend.
+    pub db: DbConn,
 }
 
 impl AppState {
-    pub fn new(audit: Arc<AuditLog>) -> Self {
+    pub async fn new(audit: Arc<AuditLog>) -> Self {
         let (progress_tx, _) = broadcast::channel(128);
         let initial_dsp_state = DspState::default();
         let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state.clone());
         let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
-        let operator = crate::agents::operator::spawn_agents(audit.clone(), head_state_ptr.clone());
         let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
+
+        // Initialize SurrealDB — persistent local storage
+        // ~/.creator_os/db survives reboots (Privacy Moat)
+        let fallback_path = format!(
+            "{}/.creator_os/db",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
+        let db_path = std::env::var("CREATOR_OS_DB_PATH")
+            .unwrap_or(fallback_path);
+        std::fs::create_dir_all(&db_path).unwrap_or_default();
+        let db = crate::db::init(&db_path).await
+            .expect("Failed to initialize SurrealDB");
+        crate::db::schema::migrate(&db).await
+            .unwrap_or_else(|e| tracing::warn!("DB migrate: {}", e));
+
+        let operator = crate::agents::operator::spawn_agents(audit.clone(), head_state_ptr.clone(), db.clone());
+
         Self {
             audit,
             blob_store: BlobStore::new(),
@@ -71,6 +91,7 @@ impl AppState {
             realtime: RealtimeBridge::new(),
             audio_repo: audio_repo_arc,
             head_state_ptr,
+            db,
         }
     }
 }
