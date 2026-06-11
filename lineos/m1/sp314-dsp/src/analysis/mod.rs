@@ -16,3 +16,5 @@ pub mod phantom_master;
 pub use phantom_master::PhantomMaster;
 pub mod ear_fatigue;
 pub use ear_fatigue::{EarFatigueModel, EarFatigueDelta};
+pub mod morph_curve;
+pub use morph_curve::{MorphCurve, CurveType};
