@@ -19,7 +19,8 @@ async fn test_agent_pipeline_executes_mastering() {
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state);
+    let db = m0d::db::init_test().await.expect("test db");
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db);
 
     // Allow agents to start
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -76,7 +77,8 @@ async fn test_conductor_rejects_concurrent_mastering() {
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state);
+    let db = m0d::db::init_test().await.expect("test db");
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Send two concurrent mastering requests
@@ -151,7 +153,8 @@ async fn test_schema_agent_validates_and_queries() {
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir).expect("Failed to open audit log"));
 
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-    let operator = m0d::agents::operator::spawn_agents(audit, dummy_head_state);
+    let db = m0d::db::init_test().await.expect("test db");
+    let operator = m0d::agents::operator::spawn_agents(audit, dummy_head_state, db);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Test 1: valid patch accepted
