@@ -13,6 +13,7 @@ pub struct DspOutput {
     pub proof_log: integration::proof_log::ProofLog,
     pub persona_config: aether::personas::config::PersonaConfig,
     pub aether_req: aether_bridge::AetherRequest,
+    pub user_model: Option<lineos_corpus::store::UserMarkovModel>,
 }
 
 #[allow(clippy::ptr_arg)]
@@ -81,14 +82,26 @@ pub fn run(
             .map_err(|e| format!("AetherBridge error: {}", e))?;
 
     // NODE 2: CORPUS (Must run BEFORE master mutates slices)
-    let _corpus_out = crate::domain::nodes::corpus_node::run(
+    // Load UserMarkovModel from state dir
+    let proj_id = project_id.unwrap_or("default");
+    let state_dir = format!(
+        "{}/.creator_os/state",
+        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    );
+    let model_path = format!("{}/user_model_{}.json", state_dir, proj_id);
+    let user_model = std::fs::read_to_string(&model_path)
+        .ok()
+        .and_then(|json| lineos_corpus::store::UserMarkovModel::from_json(&json).ok())
+        .unwrap_or_else(|| lineos_corpus::store::UserMarkovModel::new(proj_id));
+
+    let corpus_out = crate::domain::nodes::corpus_node::run(
         streaming_features,
         left_slice,
         &pre_analysis,
         blob_id,
         sample_rate,
         flavour_id,
-        project_id.unwrap_or("default"),
+        user_model,
     );
 
     // DspAdapter::master (Mutates left_slice / right_slice)
@@ -116,5 +129,6 @@ pub fn run(
         proof_log,
         persona_config,
         aether_req,
+        user_model: Some(corpus_out.user_model),
     })
 }

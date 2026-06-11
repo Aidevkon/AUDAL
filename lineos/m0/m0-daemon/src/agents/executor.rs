@@ -62,16 +62,31 @@ pub async fn run(mut rx: mpsc::Receiver<Intent>, head_state_ptr: Arc<ArcSwap<Dsp
                     Ok(Err(e)) => {
                         let _ = response.send(Err(ExecutorError::DspFailed(e)));
                     }
-                    Ok(Ok((blob, _chunk_original, _target_lufs))) => {
+                    Ok(Ok((blob, _chunk_original, user_model_opt))) => {
+                        // Executor: persist UserMarkovModel to ~/.creator_os/state/
+                        // Zero file I/O in DSP layer — this is the correct layer
+                        // Executor: persist UserMarkovModel — single overwrite
+                        if let Some(ref model) = user_model_opt {
+                            let state_dir = format!(
+                                "{}/.creator_os/state",
+                                std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                            );
+                            let _ = std::fs::create_dir_all(&state_dir);
+                            if let Ok(json) = model.to_json() {
+                                let model_path = format!(
+                                    "{}/user_model_corpus.json", state_dir
+                                );
+                                let _ = std::fs::write(&model_path, json);
+                            }
+                        }
+
                         let output = DspOutput {
                             blob_id: blob.id.clone(),
-                            lufs: blob.loudness.integrated_lufs,
+                            lufs:    blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
                             pcm_data: Some(_chunk_original),
                             num_frames: blob.num_frames,
                         };
-                        // Store blob — Executor is responsible for persistence
-                        // This is execution, not decision-making
                         let _ = response.send(Ok(output));
                     }
                 }

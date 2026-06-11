@@ -15,7 +15,7 @@ pub fn run_dsp(
     req: &MasterRequest,
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
+) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
     run_dsp_internal(req, start, head_state)
 }
 
@@ -37,7 +37,7 @@ fn run_dsp_internal(
     req: &MasterRequest,
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<f32>), String> {
+) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
@@ -203,7 +203,7 @@ fn run_dsp_internal(
         processing_timeline,
     )?;
 
-    Ok((cert_out.blob, cert_out.file_path, None))
+    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
