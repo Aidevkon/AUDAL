@@ -9,3 +9,10 @@ apps/stillair/cockpit-dioxus/dist/
 .venv/
 target/
 session_*.corpus.json
+
+# Runtime generated files
+user_model_*.json
+global_*.json
+*.corpus.json
+*.certificate.json
+*.certificate.pdf
