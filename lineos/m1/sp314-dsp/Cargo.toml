@@ -16,6 +16,7 @@ hound = { version = "3.5", optional = true }
 flacenc = { version = "0.3", optional = true }
 lineos-types = { path = "../lineos-types" }
 lineos-corpus = { path = "../lineos-corpus" }
+xaak = { path = "../xaak" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.cpal]
 version  = "0.15"
