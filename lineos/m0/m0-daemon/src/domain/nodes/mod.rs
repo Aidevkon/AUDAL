@@ -4,3 +4,5 @@ pub mod decode_node;
 pub mod dsp_node;
 pub mod render_node;
 pub mod scout_node;
+pub mod album_certificate_node;
+pub use album_certificate_node::AlbumCertificate;
