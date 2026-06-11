@@ -160,6 +160,11 @@ pub fn run(
         audio_path: file_path.clone(),
     };
 
+    // Generate PDF certificate — silent, never blocks pipeline
+    let pdf_path = format!("{}_certificate.pdf",
+        &blob.id[..blob.id.len().min(8)]);
+    crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path);
+
     Ok(CertificateOutput { blob, file_path })
 }
 
