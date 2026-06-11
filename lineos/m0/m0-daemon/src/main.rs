@@ -12,6 +12,7 @@ mod app_state;
 pub mod audit;
 mod blob_store;
 mod cdn;
+pub mod db;
 pub mod domain;
 pub mod dsp;
 pub mod handlers;
@@ -119,7 +120,7 @@ async fn main() -> Result<()> {
 
     // ── Step 7: Build AppState for mastering API ──────────────────────────────
     let audit_arc = Arc::new(audit);
-    let app_state = AppState::new(audit_arc.clone());
+    let app_state = AppState::new(audit_arc.clone()).await;
 
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
     // Phase 6: mastering router binds directly to 7402.
@@ -197,6 +198,13 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/cert/:blob_id/png",
             post(handlers::png_gen::export_cert_png),
         )
+        .route("/projects",
+            post(handlers::projects::create_project)
+            .get(handlers::projects::list_projects))
+        .route("/projects/:id",
+            get(handlers::projects::get_project))
+        .route("/projects/:id/tracks",
+            get(handlers::projects::list_tracks))
         .route("/mix/state",    get(handlers::mix::get_state))
         .route("/mix/commit",   post(handlers::mix::post_commit))
         .route("/mix/checkout", post(handlers::mix::post_checkout))

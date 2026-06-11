@@ -11,3 +11,4 @@ pub mod progress;
 pub mod timeline;
 pub mod mix;
 pub mod tinder;
+pub mod projects;
