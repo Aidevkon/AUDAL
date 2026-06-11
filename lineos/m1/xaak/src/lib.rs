@@ -17,7 +17,9 @@ pub mod player;
 pub mod repo;
 pub mod spectrum;
 pub mod telemetry_worker;
+pub mod tinder;
 pub use repo::{AudioRepo, DspState, MixCommit};
+pub use tinder::{generate_variations, weighted_centroid};
 pub use flavours::{from_name as flavour_from_name, ALL as FLAVOURS};
 
 use ringbuf::{traits::*, HeapRb};
