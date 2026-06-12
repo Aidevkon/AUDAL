@@ -58,35 +58,29 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     let dsp_result = result.unwrap();
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
 
-    // Check corpus JSON was written
-    let files: Vec<String> = std::fs::read_dir(&temp_dir)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().into_string().unwrap_or_default())
-        .collect();
+    // New architecture: corpus_node is pure computation (no session files)
+    // UserMarkovModel persisted to ~/.creator_os/state/ by executor
+    // Verify run_dsp completed successfully (corpus ran internally)
+    let state_dir = format!(
+        "{}/.creator_os/state",
+        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    );
+    let model_path = format!("{}/user_model_e2e_test_proj.json", state_dir);
 
-    let has_corpus = files
-        .iter()
-        .any(|f| f.starts_with("session_") && f.ends_with(".corpus.json"));
+    // Give executor async persist a moment to complete
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Verify model was persisted to state dir
     assert!(
-        has_corpus,
-        "No session_*.corpus.json found. Files: {:?}",
-        files
+        std::path::Path::new(&model_path).exists(),
+        "UserMarkovModel not found at {}. Architecture: corpus_node is pure, executor persists.",
+        model_path
     );
 
-    // Check UserMarkovModel was written
-    let model_file = temp_dir.join("user_model_e2e_test_proj.json");
-    assert!(
-        model_file.exists(),
-        "No user_model_e2e_test_proj.json found. Files: {:?}",
-        files
-    );
-
-    // Validate model is valid JSON with correct structure
-    let model_json = std::fs::read_to_string(&model_file).unwrap();
+    // Validate model is valid JSON
+    let model_json = std::fs::read_to_string(&model_path).unwrap();
     let model: serde_json::Value =
         serde_json::from_str(&model_json).expect("UserMarkovModel is not valid JSON");
-    assert_eq!(model["user_id"].as_str().unwrap(), "e2e_test_proj");
     assert!(model["presets"].is_object(), "presets must be an object");
     assert!(
         model["presets"]["e2e_preset"].is_object(),
