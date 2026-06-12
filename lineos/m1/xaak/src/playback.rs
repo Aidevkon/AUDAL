@@ -3,12 +3,12 @@
 //! Foundation for EDL scrubbing (edl-spec-v1_0.md Phase 1)
 
 #[derive(Debug, Clone, Default)]
-pub struct PlaybackState {
+pub struct ScrubState {
     pub position_ms: u64,
     pub playing:     bool,
 }
 
-impl PlaybackState {
+impl ScrubState {
     pub fn new() -> Self {
         Self { position_ms: 0, playing: false }
     }
