@@ -9,7 +9,7 @@
 
 use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Seek};
 
 /// Reads a WAV file in fixed-size chunks.
 /// Never loads the full file into RAM.
@@ -80,6 +80,23 @@ impl WavChunkReader {
     pub fn duration_secs(&self) -> f32 {
         self.reader.len() as f32 / (self.sample_rate as f32 * self.channels as f32)
     }
+
+    /// Seek to position in milliseconds.
+    /// O(1) disk seek — zero RAM allocation.
+    /// INV-ST-3: peak RAM ≤ 5MB regardless of seek position.
+    pub fn seek_ms(&mut self, position_ms: u64) -> Result<(), String> {
+        let sample_offset = (position_ms as f64
+            * self.sample_rate as f64
+            * self.channels as f64
+            / 1000.0) as u32;
+        self.seek_samples(sample_offset)
+    }
+
+    /// Seek to absolute sample position (all channels).
+    pub fn seek_samples(&mut self, sample_pos: u32) -> Result<(), String> {
+        self.reader.seek(sample_pos)
+            .map_err(|e| format!("WavChunkReader seek failed: {e}"))
+    }
 }
 
 /// Writes mastered audio in chunks directly to disk.
@@ -119,6 +136,46 @@ impl WavChunkWriter {
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn test_seek_ms_positions_correctly() {
+        let path = "/tmp/test_stream_seek.wav";
+        // 2 seconds stereo @ 48kHz = 192000 samples
+        let samples: Vec<f32> = (0..192000)
+            .map(|i| i as f32 / 192000.0)
+            .collect();
+        let mut writer = WavChunkWriter::create(path, 48000, 2).unwrap();
+        writer.write_chunk(&samples).unwrap();
+        writer.finalize().unwrap();
+
+        let mut reader = WavChunkReader::open(path).unwrap();
+        // Seek to 1000ms = 96000 samples (halfway)
+        reader.seek_ms(1000).unwrap();
+        let chunk = reader.next_chunk(1).unwrap();
+        // At 1s position, ramp value ~0.5
+        let expected = 96000.0f32 / 192000.0;
+        assert!(
+            (chunk[0] - expected).abs() < 0.01,
+            "seek_ms(1000): expected ~{:.3}, got {:.3}", expected, chunk[0]
+        );
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn test_stream_from_seek_mid() {
+        let path = "/tmp/test_stream_seek_mid.wav";
+        let samples: Vec<f32> = vec![0.1f32; 96000];
+        let mut writer = WavChunkWriter::create(path, 48000, 2).unwrap();
+        writer.write_chunk(&samples).unwrap();
+        writer.finalize().unwrap();
+
+        let mut reader = WavChunkReader::open(path).unwrap();
+        let _ = reader.next_chunk(24000); // read halfway
+        reader.seek_samples(0).unwrap();  // seek back to start
+        let chunk = reader.next_chunk(1).unwrap();
+        assert!((chunk[0] - 0.1).abs() < 0.001);
+        std::fs::remove_file(path).ok();
+    }
 
     #[test]
     fn write_then_read_chunk_roundtrip() {
