@@ -56,31 +56,30 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     // Must not timeout
     assert!(result.is_ok(), "Test timed out");
     let dsp_result = result.unwrap();
-    assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
+    assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.as_ref().err());
+    let dsp_result = dsp_result.unwrap();
 
-    // New architecture: corpus_node is pure computation (no session files)
-    // UserMarkovModel persisted to ~/.creator_os/state/ by executor
-    // Verify run_dsp completed successfully (corpus ran internally)
-    let state_dir = format!(
-        "{}/.creator_os/state",
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-    );
-    let model_path = format!("{}/user_model_e2e_test_proj.json", state_dir);
+    // New architecture: run_dsp returns (blob, path, Option<UserMarkovModel>)
+    // corpus_node is pure — no disk writes
+    // Verify UserMarkovModel bubbled up through the pipeline
+    let (_blob, _path, user_model_opt) = dsp_result;
 
-    // Give executor async persist a moment to complete
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-    // Verify model was persisted to state dir
     assert!(
-        std::path::Path::new(&model_path).exists(),
-        "UserMarkovModel not found at {}. Architecture: corpus_node is pure, executor persists.",
-        model_path
+        user_model_opt.is_some(),
+        "UserMarkovModel should bubble up from corpus_node via run_dsp tuple"
     );
 
-    // Validate model is valid JSON
-    let model_json = std::fs::read_to_string(&model_path).unwrap();
-    let model: serde_json::Value =
-        serde_json::from_str(&model_json).expect("UserMarkovModel is not valid JSON");
+    let user_model = user_model_opt.unwrap();
+    assert!(
+        user_model.version > 0,
+        "UserMarkovModel version should be > 0 after update, got {}",
+        user_model.version
+    );
+
+    // Validate model has the correct preset
+    let json = user_model.to_json().expect("Failed to serialize user model");
+    let model: serde_json::Value = serde_json::from_str(&json)
+        .expect("UserMarkovModel is not valid JSON");
     assert!(model["presets"].is_object(), "presets must be an object");
     assert!(
         model["presets"]["e2e_preset"].is_object(),
