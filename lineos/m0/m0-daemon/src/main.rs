@@ -182,18 +182,14 @@ fn mastering_router(state: AppState) -> axum::Router {
             get(handlers::progress::stream_progress),
         )
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
-        .route(
-            "/playback/control",
-            post(handlers::playback::playback_control),
-        )
-        .route(
-            "/playback/state",
-            get(handlers::playback::get_playback_state),
-        )
-        .route(
-            "/playback/telemetry",
-            get(handlers::playback::get_live_telemetry),
-        )
+        .route("/playback",
+            get(handlers::playback::get_playback))
+        .route("/playback/seek",
+            post(handlers::playback::post_seek))
+        .route("/playback/play",
+            post(handlers::playback::post_play))
+        .route("/playback/pause",
+            post(handlers::playback::post_pause))
         .route(
             "/cert/:blob_id/png",
             post(handlers::png_gen::export_cert_png),

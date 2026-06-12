@@ -22,6 +22,9 @@ pub use repo::{AudioRepo, DspState, MixCommit};
 pub use tinder::{generate_variations, weighted_centroid};
 pub use flavours::{from_name as flavour_from_name, ALL as FLAVOURS};
 
+pub mod playback;
+pub use playback::PlaybackState;
+
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
 
@@ -172,20 +175,7 @@ impl XaakKernel {
     }
 }
 
-// ── PlaybackState ─────────────────────────────────────────────────────────────
 
-/// Playback state for Tauri IPC — no PCM, metrics only (A-003 §2).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PlaybackState {
-    pub blob_id: String,
-    pub position_ms: u64,
-    pub duration_ms: u64,
-    pub is_playing: bool,
-    pub sample_rate: u32,
-    pub channels: u16,
-    pub ab_target: String,
-    pub gain_match: bool,
-}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -244,21 +234,5 @@ mod tests {
         assert_eq!(consumer.occupied_len(), 0);
     }
 
-    #[test]
-    fn test_playback_state_no_pcm() {
-        let state = PlaybackState {
-            blob_id: "test-blob".into(),
-            position_ms: 1234,
-            duration_ms: 60_000,
-            is_playing: true,
-            sample_rate: TARGET_SAMPLE_RATE,
-            channels: TARGET_CHANNELS,
-            ab_target: "a".to_string(),
-            gain_match: true,
-        };
-        let json = serde_json::to_string(&state).unwrap();
-        // Must NOT contain any PCM — just metrics
-        assert!(json.contains("\"is_playing\":true"));
-        assert!(!json.contains("samples"));
-    }
+
 }

@@ -19,6 +19,7 @@ use tokio::sync::broadcast;
 use xaak::engine::PlaybackHandle;
 use xaak::repo::{AudioRepo, DspState};
 use crate::db::DbConn;
+use xaak::playback::PlaybackState;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MasteringProgress {
@@ -54,6 +55,7 @@ pub struct AppState {
     /// Embedded SurrealDB — Projects, Tracks, Sessions.
     /// Privacy moat: 100% local, kv-surrealkv backend.
     pub db: DbConn,
+    pub playback_state: Arc<ArcSwap<PlaybackState>>,
 }
 
 impl AppState {
@@ -92,6 +94,7 @@ impl AppState {
             audio_repo: audio_repo_arc,
             head_state_ptr,
             db,
+            playback_state: Arc::new(ArcSwap::from_pointee(PlaybackState::new())),
         }
     }
 }
