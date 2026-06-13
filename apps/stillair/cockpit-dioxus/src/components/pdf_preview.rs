@@ -181,14 +181,14 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                                                 border-radius:4px;padding:4px 8px;color:#3a5a4a;
                                                 font-family:monospace;font-size:10px;cursor:pointer;
                                                 white-space:nowrap;",
-                                        onclick: move |_| {
-                                            #[cfg(target_arch = "wasm32")]
-                                            {
-                                                if let Some(window) = web_sys::window() {
-                                                    let _ = window.navigator().clipboard().map(|cb| {
-                                                        let text = c.full_file_sha256.clone();
-                                                        let _ = cb.write_text(&text);
-                                                    });
+                                        onclick: {
+                                            let _text = c.full_file_sha256.clone();
+                                            move |_| {
+                                                #[cfg(target_arch = "wasm32")]
+                                                {
+                                                    if let Some(window) = web_sys::window() {
+                                                        let _ = window.navigator().clipboard().write_text(&_text);
+                                                    }
                                                 }
                                             }
                                         },
@@ -207,14 +207,14 @@ pub fn PdfPreviewModal(props: PdfPreviewProps) -> Element {
                                                 border-radius:4px;padding:4px 8px;color:#3a5a4a;
                                                 font-family:monospace;font-size:10px;cursor:pointer;
                                                 white-space:nowrap;",
-                                        onclick: move |_| {
-                                            #[cfg(target_arch = "wasm32")]
-                                            {
-                                                if let Some(window) = web_sys::window() {
-                                                    let _ = window.navigator().clipboard().map(|cb| {
-                                                        let text = c.cert_sha256.clone();
-                                                        let _ = cb.write_text(&text);
-                                                    });
+                                        onclick: {
+                                            let _text = c.cert_sha256.clone();
+                                            move |_| {
+                                                #[cfg(target_arch = "wasm32")]
+                                                {
+                                                    if let Some(window) = web_sys::window() {
+                                                        let _ = window.navigator().clipboard().write_text(&_text);
+                                                    }
                                                 }
                                             }
                                         },

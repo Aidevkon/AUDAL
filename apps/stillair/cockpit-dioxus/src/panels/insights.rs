@@ -15,8 +15,9 @@
 
 use crate::components::module_frame::ModuleFrame;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
+use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson, RealtimeFrameJson};
 use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 // ── Demo Lissajous paths (FM0 idle) ───────────────────────────────────────────
 const DEMO_LISS_OUTER: &str = "M 82,60 L 89,74 L 100,94 L 104,110 L 98,116 L 86,110 L 74,94 \
@@ -52,26 +53,42 @@ pub fn InsightsPanel(
     let state = session_state.read();
     let viz = viz_data.read();
 
-    let liss_outer = viz
-        .as_ref()
-        .map(|v| v.lissajous_path_outer.as_str())
-        .unwrap_or(DEMO_LISS_OUTER)
-        .to_string();
-    let liss_inner = viz
-        .as_ref()
-        .map(|v| v.lissajous_path_inner.as_str())
-        .unwrap_or(DEMO_LISS_INNER)
-        .to_string();
-    let liss_detail1 = viz
-        .as_ref()
-        .map(|v| v.lissajous_path_detail1.as_str())
-        .unwrap_or(DEMO_LISS_D1)
-        .to_string();
-    let liss_detail2 = viz
-        .as_ref()
-        .map(|v| v.lissajous_path_detail2.as_str())
-        .unwrap_or(DEMO_LISS_D2)
-        .to_string();
+    let mut realtime: Signal<Option<RealtimeFrameJson>> = use_signal(|| None);
+
+    use_effect(move || {
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(16).await;
+                if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
+                    realtime.set(Some(frame));
+                }
+            }
+        });
+    });
+
+    let (liss_outer, liss_inner, liss_detail1, liss_detail2) = match realtime.read().as_ref() {
+        Some(frame) => {
+            let mut path = String::with_capacity(frame.gonio_path.len() * 15);
+            for (i, pair) in frame.gonio_path.iter().enumerate() {
+                let x = 60.0 + (pair[0] * 50.0);
+                let y = 60.0 - (pair[1] * 50.0);
+                if i == 0 {
+                    path.push_str(&format!("M {:.1},{:.1} ", x, y));
+                } else {
+                    path.push_str(&format!("L {:.1},{:.1} ", x, y));
+                }
+            }
+            (path, String::new(), String::new(), String::new())
+        }
+        None => {
+            (
+                viz.as_ref().map(|v| v.lissajous_path_outer.as_str()).unwrap_or(DEMO_LISS_OUTER).to_string(),
+                viz.as_ref().map(|v| v.lissajous_path_inner.as_str()).unwrap_or(DEMO_LISS_INNER).to_string(),
+                viz.as_ref().map(|v| v.lissajous_path_detail1.as_str()).unwrap_or(DEMO_LISS_D1).to_string(),
+                viz.as_ref().map(|v| v.lissajous_path_detail2.as_str()).unwrap_or(DEMO_LISS_D2).to_string(),
+            )
+        }
+    };
 
     let (correlation, width, phase_coh) = match state.as_ref() {
         Some(s) => (
@@ -104,6 +121,9 @@ pub fn InsightsPanel(
                             path_inner:   liss_inner,
                             path_detail1: liss_detail1,
                             path_detail2: liss_detail2,
+                        }
+                        div { class: "spectrum-container", style: "height: 60px; margin-top: 10px;",
+                            SpectrumBars { spectrum: realtime.read().as_ref().map(|f| f.spectrum.clone()) }
                         }
                     }
 
@@ -319,3 +339,39 @@ fn SpatialHeatMap() -> Element {
         }
     }
 }
+
+// ── SpectrumBars ─────────────────────────────────────────────────────────────
+
+#[component]
+fn SpectrumBars(spectrum: Option<Vec<f32>>) -> Element {
+    let bars = spectrum.unwrap_or_else(|| vec![-40.0; 64]);
+    
+    rsx! {
+        svg {
+            view_box: "0 0 640 120",
+            width: "100%", height: "100%",
+            preserve_aspect_ratio: "none",
+            {
+                bars.iter().enumerate().map(|(i, &db)| {
+                    let clamped = db.clamp(-80.0, 0.0);
+                    let pct = (clamped + 80.0) / 80.0;
+                    let h = pct * 120.0;
+                    let y = 120.0 - h;
+                    let x = i as f32 * 10.0;
+                    let opacity = 0.3 + (pct * 0.7);
+                    
+                    rsx! {
+                        rect {
+                            key: "{i}",
+                            x: "{x}", y: "{y}",
+                            width: "8", height: "{h}",
+                            fill: "var(--accent-insights)",
+                            opacity: "{opacity}"
+                        }
+                    }
+                })
+            }
+        }
+    }
+}
+

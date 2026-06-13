@@ -106,13 +106,11 @@ fn run_dsp_internal(
         .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut mmap =
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
-    let (left_bytes, right_bytes) = mmap.split_at_mut(n_total_with_tail * 4);
-    let left_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(left_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
-    };
-    let right_slice: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(right_bytes.as_mut_ptr() as *mut f32, n_total_with_tail)
-    };
+    // Allocate in-memory arrays for DSP (sp314-dsp requires planar arrays)
+    let mut left_vec = vec![0.0_f32; n_total_with_tail];
+    let mut right_vec = vec![0.0_f32; n_total_with_tail];
+    let left_slice = &mut left_vec[..];
+    let right_slice = &mut right_vec[..];
 
     let repo_state = head_state.load_full();
     let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
@@ -170,6 +168,15 @@ fn run_dsp_internal(
     let _dr = 10.0; // dynamic range proxy for v3
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
+
+    // Interleave planar slices into mmap for playback (xaak/cpal expect interleaved)
+    let mmap_f32: &mut [f32] = unsafe {
+        std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total_with_tail * 2)
+    };
+    for i in 0..n_total_with_tail {
+        mmap_f32[i * 2] = left_slice[i];
+        mmap_f32[i * 2 + 1] = right_slice[i];
+    }
 
     // Sync mapped file to disk before returning path
     mmap.flush().unwrap_or_default();

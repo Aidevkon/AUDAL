@@ -73,6 +73,13 @@ pub struct VisualizationDataJson {
     pub waveform_after_svg: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RealtimeFrameJson {
+    pub spectrum: Vec<f32>,
+    pub gonio_path: Vec<[f32; 2]>,
+    pub position_ms: u64,
+}
+
 // ── ComplianceJson ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

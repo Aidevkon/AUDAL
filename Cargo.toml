@@ -29,3 +29,17 @@ members = [
 
 [profile.release]
 opt-level = 'z'
+
+# Optimize all third-party dependencies (like rustfft) to speed up math
+[profile.dev.package."*"]
+opt-level = 3
+
+# Optimize our DSP and engine crates
+[profile.dev.package.sp314-dsp]
+opt-level = 3
+
+[profile.dev.package.sp314-nodes]
+opt-level = 3
+
+[profile.dev.package.xaak]
+opt-level = 3

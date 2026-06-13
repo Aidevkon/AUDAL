@@ -4,48 +4,73 @@ use std::sync::Arc;
 use crate::app_state::AppState;
 use xaak::playback::ScrubState;
 
-#[derive(Deserialize)]
-pub struct SeekRequest {
-    pub position_ms: u64,
-}
+
 
 #[derive(Deserialize)]
-pub struct PlayRequest {
+pub struct PlaybackControlRequest {
+    pub action: String,
     pub position_ms: Option<u64>,
 }
 
 #[derive(Serialize)]
-pub struct PlaybackResponse {
-    pub ok:          bool,
-    pub position_ms: u64,
-    pub playing:     bool,
+pub struct ControlResp {
+    pub status: String,
+    pub state: Option<xaak::PlaybackState>,
+    pub message: Option<String>,
 }
 
-pub async fn post_seek(
+pub async fn post_control(
     State(app): State<AppState>,
-    Json(req):  Json<SeekRequest>,
-) -> Json<PlaybackResponse> {
-    app.playback_state.store(Arc::new(ScrubState::paused_at(req.position_ms)));
-    Json(PlaybackResponse { ok: true, position_ms: req.position_ms, playing: false })
+    Json(req):  Json<PlaybackControlRequest>,
+) -> Json<ControlResp> {
+    // 1. Send command to xaak engine
+    match req.action.as_str() {
+        "play" => {
+            app.playback.play();
+            if let Some(pos) = req.position_ms {
+                app.playback_state.store(Arc::new(ScrubState::playing_at(pos)));
+            } else {
+                let current = app.playback_state.load_full().position_ms;
+                app.playback_state.store(Arc::new(ScrubState::playing_at(current)));
+            }
+        }
+        "pause" => {
+            app.playback.pause();
+            let current = app.playback_state.load_full().position_ms;
+            app.playback_state.store(Arc::new(ScrubState::paused_at(current)));
+        }
+        "stop" => {
+            app.playback.stop();
+            app.playback_state.store(Arc::new(ScrubState::paused_at(0)));
+        }
+        "seek" => {
+            if let Some(pos) = req.position_ms {
+                app.playback.seek(pos);
+                let current_state = app.playback_state.load_full();
+                if current_state.playing {
+                    app.playback_state.store(Arc::new(ScrubState::playing_at(pos)));
+                } else {
+                    app.playback_state.store(Arc::new(ScrubState::paused_at(pos)));
+                }
+            }
+        }
+        _ => {}
+    }
+
+    // 2. Return xaak engine state to UI
+    let state = app.playback.get_state();
+    Json(ControlResp {
+        status: "ok".to_string(),
+        state,
+        message: None,
+    })
 }
 
-pub async fn post_play(
-    State(app): State<AppState>,
-    Json(req):  Json<PlayRequest>,
-) -> Json<PlaybackResponse> {
-    let current = app.playback_state.load_full();
-    let pos = req.position_ms.unwrap_or(current.position_ms);
-    app.playback_state.store(Arc::new(ScrubState::playing_at(pos)));
-    Json(PlaybackResponse { ok: true, position_ms: pos, playing: true })
-}
-
-pub async fn post_pause(State(app): State<AppState>) -> Json<PlaybackResponse> {
-    let current = app.playback_state.load_full();
-    app.playback_state.store(Arc::new(ScrubState::paused_at(current.position_ms)));
-    Json(PlaybackResponse { ok: true, position_ms: current.position_ms, playing: false })
-}
-
-pub async fn get_playback(State(app): State<AppState>) -> Json<PlaybackResponse> {
-    let state = app.playback_state.load_full();
-    Json(PlaybackResponse { ok: true, position_ms: state.position_ms, playing: state.playing })
+pub async fn get_state(State(app): State<AppState>) -> Json<ControlResp> {
+    let state = app.playback.get_state();
+    Json(ControlResp {
+        status: "ok".to_string(),
+        state,
+        message: None,
+    })
 }

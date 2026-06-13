@@ -17,6 +17,7 @@ pub async fn run(
     mut rx: mpsc::Receiver<Intent>,
     head_state_ptr: Arc<ArcSwap<DspState>>,
     db: crate::db::DbConn,
+    blob_store: crate::blob_store::BlobStore,
 ) {
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -113,12 +114,15 @@ pub async fn run(
                             let _ = db_clone.query(aql).await;
                         });
 
+                        blob_store.insert(blob.clone());
+
                         let output = DspOutput {
                             blob_id:   blob.id.clone(),
                             lufs:      blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
                             pcm_data:  Some(_chunk_original),
                             num_frames: blob.num_frames,
+                            sample_rate: blob.sample_rate,
                         };
                         let _ = response.send(Ok(output));
                     }

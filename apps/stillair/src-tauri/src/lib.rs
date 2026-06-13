@@ -23,14 +23,11 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             app.manage(ipc::m0_client::M0Client::new());
-            Ok(())
-        })
-        .setup(|app| {
-            let latest = std::sync::Arc::new(std::sync::Mutex::new(
-                None::<crate::telemetry_listener::RealtimeFrame>,
-            ));
-            app.manage(latest.clone());
-            telemetry_listener::spawn_udp_listener(latest);
+            
+            let latest_arc = std::sync::Arc::new(std::sync::Mutex::new(None));
+            app.manage(crate::telemetry_listener::LatestFrame(latest_arc.clone()));
+            telemetry_listener::spawn_udp_listener(latest_arc);
+            
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())

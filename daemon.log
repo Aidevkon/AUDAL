@@ -1,35 +1,37 @@
-warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
-package:   /home/aidevcon/Documents/creator-os/apps/runtime/openclaw/Cargo.toml
-workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
-warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
-package:   /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus/Cargo.toml
-workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
-warning: /home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon/Cargo.toml: file `/home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon/src/main.rs` found to be present in multiple build targets:
-  * `lib` target `m0d`
-  * `bin` target `m0d`
-   Compiling m0d v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.90s
-     Running `target/debug/m0d`
-[2m2026-06-02T13:29:56.899067Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m m0d starting — LineOS M0 v0.1.0
-[2m2026-06-02T13:29:56.899149Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Authority: M0 Constitution v2.0
-[2m2026-06-02T13:29:56.899372Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Audit log ready: lineos/m0/logs/audit
-[2m2026-06-02T13:29:56.899929Z[0m [32m INFO[0m [2mm0d::registry[0m[2m:[0m Registry loaded: 4 wasm_modules, 1 engines, 0 revoked_keys
-[2m2026-06-02T13:29:56.899982Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Registry loaded OK
-[2m2026-06-02T13:29:56.900114Z[0m [32m INFO[0m [2mm0d::cdn[0m[2m:[0m CDN loaded: 4 registered assets (root=lineos/m0/assets/wasm)
-[2m2026-06-02T13:29:56.900390Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m CDN verified OK
-[2m2026-06-02T13:29:56.900662Z[0m [32m INFO[0m [2mm0d::policy[0m[2m:[0m Policy engine loaded: 0 allowed destinations (deny-by-default)
-[2m2026-06-02T13:29:56.900704Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Policy engine loaded OK (deny-by-default active)
-[2m2026-06-02T13:29:56.900731Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Caddy integration: Phase 1 stub (process management in Phase 2)
-[2m2026-06-02T13:29:56.900829Z[0m [33m WARN[0m [2mm0d[0m[2m:[0m Could not create /run/lineos: Permission denied (os error 13) (normal in dev)
-[2m2026-06-02T13:29:56.900862Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m ✅ All health criteria passed — M0 is healthy
-[2m2026-06-02T13:29:56.901271Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Health endpoint:    http://127.0.0.1:7401
-[2m2026-06-02T13:29:56.901307Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Mastering endpoint: http://127.0.0.1:7402
-[2m2026-06-02T13:29:59.212233Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m Decoded: 1920000 samples, sr=48000, ch=2, first5=[0.0, 0.0, 0.0, 0.0, 0.0]
-[2m2026-06-02T13:29:59.269410Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m RMS: -13.41 dBFS, est. LUFS: -14.4094
-[2m2026-06-02T13:30:10.913009Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m Autotune (native): input_gain_db=5.34 lufs=-14.00 iter=8 ok=true
-[2m2026-06-02T13:30:20.706723Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m pre-analysis: lufs=-6.1 tp=4.6 lra=4.4 td=2.0/s corr=0.81 profile=[-4.1,-2.8,-4.3,-9.3,-13.1,-17.2] zones=[sub=true box=true harsh=false phase=false res=false]
-[2m2026-06-02T13:30:33.640994Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m Post-DSP integrated LUFS: -14.0000
-[2m2026-06-02T13:30:33.716163Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m Telemetry: lra=0.93 LU, momentary=-18.05 LUFS, short_term=-17.11 LUFS
-[2m2026-06-02T13:30:35.582914Z[0m [32m INFO[0m [2mxaak[0m[2m:[0m xaak: PCM buffer loaded [3mevent[0m[2m=[0m"m0d.xaak_buffer_allocated" [3mblob_id[0m[2m=[0m8de0baa6-aa89-4fc3-a27e-15fbe8f7c839 [3msize_bytes[0m[2m=[0m7680000 [3msample_rate[0m[2m=[0m48000 [3mchannels[0m[2m=[0m2 [3mduration_ms[0m[2m=[0m20000
-[2m2026-06-02T13:30:35.923908Z[0m [32m INFO[0m [2mm0d::handlers::master[0m[2m:[0m m0d: PCM transferred to xaak (A-003 §2) [3mblob_id[0m[2m=[0m8de0baa6-aa89-4fc3-a27e-15fbe8f7c839
-[2m2026-06-02T13:30:35.923910Z[0m [32m INFO[0m [2mxaak[0m[2m:[0m xaak: PCM buffer loaded [3mevent[0m[2m=[0m"m0d.xaak_buffer_allocated" [3mblob_id[0m[2m=[0m8de0baa6-aa89-4fc3-a27e-15fbe8f7c839 [3msize_bytes[0m[2m=[0m7680000 [3msample_rate[0m[2m=[0m48000 [3mchannels[0m[2m=[0m2 [3mduration_ms[0m[2m=[0m20000
+[2m2026-06-11T22:21:38.658402Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m m0d starting — LineOS M0 v0.1.0
+[2m2026-06-11T22:21:38.658648Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Authority: M0 Constitution v2.0
+[2m2026-06-11T22:21:38.659734Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Audit log ready: lineos/m0/logs/audit
+[2m2026-06-11T22:21:38.660993Z[0m [32m INFO[0m [2mm0d::registry[0m[2m:[0m Registry loaded: 4 wasm_modules, 1 engines, 0 revoked_keys
+[2m2026-06-11T22:21:38.661131Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Registry loaded OK
+[2m2026-06-11T22:21:38.661509Z[0m [32m INFO[0m [2mm0d::cdn[0m[2m:[0m CDN loaded: 4 registered assets (root=lineos/m0/assets/wasm)
+[2m2026-06-11T22:21:38.662431Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m CDN verified OK
+[2m2026-06-11T22:21:38.663110Z[0m [32m INFO[0m [2mm0d::policy[0m[2m:[0m Policy engine loaded: 0 allowed destinations (deny-by-default)
+[2m2026-06-11T22:21:38.663217Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Policy engine loaded OK (deny-by-default active)
+[2m2026-06-11T22:21:38.663278Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Caddy integration: Phase 1 stub (process management in Phase 2)
+[2m2026-06-11T22:21:38.663553Z[0m [33m WARN[0m [2mm0d[0m[2m:[0m Could not create /run/lineos: Permission denied (os error 13) (normal in dev)
+[2m2026-06-11T22:21:38.663641Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m ✅ All health criteria passed — M0 is healthy
+[2m2026-06-11T22:21:38.669030Z[0m [32m INFO[0m [2msurrealdb::core::kvs::ds[0m[2m:[0m Starting kvs store at absolute path surrealkv:/home/aidevcon/.creator_os/db
+[2m2026-06-11T22:21:38.673194Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Enabling value log separation: true
+[2m2026-06-11T22:21:38.673323Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting value log max file size: 134217728
+[2m2026-06-11T22:21:38.673384Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting value log threshold: 4096
+[2m2026-06-11T22:21:38.673498Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Versioning enabled: false with retention period: 0ns
+[2m2026-06-11T22:21:38.673582Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Versioning with versioned_index: false
+[2m2026-06-11T22:21:38.673654Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting max memtable size: 268435456
+[2m2026-06-11T22:21:38.673713Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting block cache capacity: 6193444864
+[2m2026-06-11T22:21:38.673867Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting block size: 65536
+[2m2026-06-11T22:21:38.674103Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m === Starting LSM tree initialization ===
+[2m2026-06-11T22:21:38.674196Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Database path: "/home/aidevcon/.creator_os/db"
+[2m2026-06-11T22:21:38.674642Z[0m [32m INFO[0m [2msurrealkv::levels[0m[2m:[0m Loading manifest from "/home/aidevcon/.creator_os/db/manifest/00000000000000000000.manifest"
+[2m2026-06-11T22:21:38.674928Z[0m [32m INFO[0m [2msurrealkv::levels[0m[2m:[0m Manifest loaded successfully: version=1, log_number=0, last_sequence=0, tables=0, levels=6
+[2m2026-06-11T22:21:38.675494Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Manifest state: log_number=0, last_sequence=0
+[2m2026-06-11T22:21:38.675583Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Starting WAL recovery from directory: "/home/aidevcon/.creator_os/db/wal"
+[2m2026-06-11T22:21:38.675782Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Replaying WAL segments #00000000000000000000 to #00000000000000000000
+[2m2026-06-11T22:21:38.679595Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Replayed 151 batches from WAL segment #00000000000000000000
+[2m2026-06-11T22:21:38.679739Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m WAL recovery complete: 151 batches across 1 segments, 1 memtables created, max_seq_num=Some(171)
+[2m2026-06-11T22:21:38.680036Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Recovery: setting last memtable (wal=0) as active with 171 entries
+[2m2026-06-11T22:21:38.680297Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m === LSM tree initialization complete ===
+[2m2026-06-11T22:21:38.681321Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Sync mode: every transaction commit
+[2m2026-06-11T22:21:38.681457Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Grouped commit: enabled (timeout=5000000ns, wait_threshold=12, max_batch_size=4096)
+[2m2026-06-11T22:21:38.681795Z[0m [32m INFO[0m [2msurrealdb::core::kvs::ds[0m[2m:[0m Started surrealkv kvs store
+[2m2026-06-11T22:21:39.119223Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Health endpoint:    http://127.0.0.1:7401
+[2m2026-06-11T22:21:39.119317Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Mastering endpoint: http://127.0.0.1:7402

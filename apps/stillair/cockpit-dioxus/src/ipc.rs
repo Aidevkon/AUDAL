@@ -41,8 +41,8 @@ fn is_tauri() -> bool {
         None => return false,
     };
     let val: JsValue = window.into();
-    match Reflect::get(&val, &JsValue::from_str("__TAURI_INTERNALS__")) {
-        Ok(internals) => !internals.is_undefined() && !internals.is_null(),
+    match Reflect::get(&val, &JsValue::from_str("__TAURI__")) {
+        Ok(tauri) => !tauri.is_undefined() && !tauri.is_null(),
         Err(_) => false,
     }
 }
@@ -93,25 +93,32 @@ where
         .ok_or_else(|| "[IPC] no window — are we in a WASM context?".to_string())?;
     let window_val: JsValue = window.into();
 
-    // 3. Get window.__TAURI_INTERNALS__
-    let internals = Reflect::get(&window_val, &JsValue::from_str("__TAURI_INTERNALS__"))
-        .map_err(|e| format!("[IPC] Reflect::get __TAURI_INTERNALS__ failed: {e:?}"))?;
-    if internals.is_undefined() || internals.is_null() {
-        return Err("[IPC] window.__TAURI_INTERNALS__ is undefined. \
+    // 3. Get window.__TAURI__
+    let tauri = Reflect::get(&window_val, &JsValue::from_str("__TAURI__"))
+        .map_err(|e| format!("[IPC] Reflect::get __TAURI__ failed: {e:?}"))?;
+    if tauri.is_undefined() || tauri.is_null() {
+        return Err("[IPC] window.__TAURI__ is undefined. \
                     Check tauri.conf.json withGlobalTauri:true"
             .to_string());
     }
 
-    // 4. Get the invoke function
-    let invoke_val = Reflect::get(&internals, &JsValue::from_str("invoke"))
+    // 4. Get the core object
+    let core = Reflect::get(&tauri, &JsValue::from_str("core"))
+        .map_err(|e| format!("[IPC] Reflect::get core failed: {e:?}"))?;
+    if core.is_undefined() || core.is_null() {
+        return Err("[IPC] window.__TAURI__.core is undefined.".to_string());
+    }
+
+    // 5. Get the invoke function
+    let invoke_val = Reflect::get(&core, &JsValue::from_str("invoke"))
         .map_err(|e| format!("[IPC] Reflect::get invoke failed: {e:?}"))?;
     let invoke_fn: Function = invoke_val
         .dyn_into()
-        .map_err(|_| "[IPC] __TAURI_INTERNALS__.invoke is not a function".to_string())?;
+        .map_err(|_| "[IPC] __TAURI__.core.invoke is not a function".to_string())?;
 
-    // 5. Call invoke(command, args) → Promise
+    // 6. Call invoke(command, args) → Promise
     let promise_val = invoke_fn
-        .call2(&internals, &JsValue::from_str(command), &args_js)
+        .call2(&core, &JsValue::from_str(command), &args_js)
         .map_err(|e| format!("[IPC] invoke({command}) call failed: {e:?}"))?;
 
     let promise: Promise = promise_val

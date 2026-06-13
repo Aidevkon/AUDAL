@@ -80,11 +80,17 @@ impl AppState {
         crate::db::schema::migrate(&db).await
             .unwrap_or_else(|e| tracing::warn!("DB migrate: {}", e));
 
-        let operator = crate::agents::operator::spawn_agents(audit.clone(), head_state_ptr.clone(), db.clone());
+        let blob_store = BlobStore::new();
+        let operator = crate::agents::operator::spawn_agents(
+            audit.clone(),
+            head_state_ptr.clone(),
+            db.clone(),
+            blob_store.clone(),
+        );
 
         Self {
             audit,
-            blob_store: BlobStore::new(),
+            blob_store,
             playback: PlaybackHandle::spawn(),
             progress: Arc::new(DashMap::new()),
             operator,

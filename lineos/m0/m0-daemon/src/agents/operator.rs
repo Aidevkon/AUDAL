@@ -105,6 +105,7 @@ pub struct DspOutput {
     pub true_peak: f32,
     pub pcm_data: Option<std::path::PathBuf>,
     pub num_frames: usize,
+    pub sample_rate: u32,
 }
 
 /// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
@@ -124,6 +125,7 @@ pub struct MasteringOutput {
     pub status: &'static str,
     pub pcm_data: Option<std::path::PathBuf>,
     pub num_frames: usize,
+    pub sample_rate: u32,
 }
 
 /// Output for a single track in a batch job
@@ -280,15 +282,20 @@ impl Operator {
 
 /// Spawn all four agent tasks. Call once from main().
 /// Returns Operator — wire into AppState.
-pub fn spawn_agents(audit: Arc<AuditLog>, head_state_ptr: Arc<ArcSwap<DspState>>, db: crate::db::DbConn) -> Operator {
+pub fn spawn_agents(
+    audit: Arc<AuditLog>,
+    head_state_ptr: Arc<ArcSwap<DspState>>,
+    db: crate::db::DbConn,
+    blob_store: crate::blob_store::BlobStore,
+) -> Operator {
     let (schema_tx, schema_rx) = mpsc::channel::<Intent>(32);
     let (conductor_tx, conductor_rx) = mpsc::channel::<Intent>(32);
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(32);
     let (wizard_tx, wizard_rx) = mpsc::channel::<Intent>(32);
 
     tokio::spawn(crate::agents::schema::run(schema_rx));
-    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone()));
-    tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr, db.clone()));
+    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone()));
+    tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr, db.clone(), blob_store));
     tokio::spawn(crate::agents::wizard::run(wizard_rx));
 
     Operator::new(schema_tx, conductor_tx, executor_tx, wizard_tx, audit)

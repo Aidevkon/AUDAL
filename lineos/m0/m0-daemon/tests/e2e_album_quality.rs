@@ -3,8 +3,7 @@
 //! The same DspState that the Conductor commits is what
 //! the audio thread reads via ArcSwap.
 
-use arc_swap::ArcSwap;
-use std::sync::Arc;
+
 use xaak::repo::{AudioRepo, DspState};
 
 #[test]

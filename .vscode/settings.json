@@ -6,6 +6,7 @@
         "apps/stillair/cockpit-dioxus/Trunk.toml",
         "apps/stillair/cockpit-dioxus/index.html",
         "apps/stillair/src-tauri/**/*",
+        "lineos/docs/**/*",
         "lineos/m0/m0-daemon/src/**/*",
         "lineos/m0/m0-daemon/Cargo.toml",
         "lineos/m1/lineos-types/**/*",

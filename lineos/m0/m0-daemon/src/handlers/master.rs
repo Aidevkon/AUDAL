@@ -183,7 +183,7 @@ pub async fn trigger_mastering(
                     if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
                         let transfer = xaak::PcmTransfer {
                             pcm_path: path,
-                            sample_rate: 48000,
+                            sample_rate: output.sample_rate,
                             channels: 2,
                             blob_id: b_id,
                             num_frames: output.num_frames,

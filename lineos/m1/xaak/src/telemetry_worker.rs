@@ -1,5 +1,4 @@
 use ringbuf::traits::*;
-use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -13,33 +12,21 @@ where
             channels, sample_rate
         );
 
-        let udp_tx = match UdpSocket::bind("127.0.0.1:0") {
-            Ok(s) => {
-                s.set_nonblocking(true).unwrap_or_default();
-                eprintln!("[WORKER] UDP bound to {:?}", s.local_addr());
-                Some(s)
-            }
-            Err(e) => {
-                eprintln!("[WORKER] Failed to bind UDP: {}", e);
-                None
-            }
-        };
+        let sender = crate::telemetry::UdpTelemetrySender::new();
 
         let mut analyzer = crate::spectrum::SpectrumAnalyzer::new();
         let ch = channels.max(1);
         let chunk_size = 1024 * ch;
-        let mut buffer = Vec::with_capacity(chunk_size);
+        // Use a fixed stack array to strictly eliminate heap allocations
+        // 1024 frames * 2 channels max = 2048
+        let mut buffer = [0.0f32; 2048];
         let mut iter_count = 0;
 
         loop {
             let available = consumer.occupied_len();
             if available >= chunk_size {
-                buffer.clear();
-                for _ in 0..chunk_size {
-                    if let Some(s) = consumer.try_pop() {
-                        buffer.push(s);
-                    }
-                }
+                let slice = &mut buffer[..chunk_size];
+                let _filled = consumer.pop_slice(slice);
 
                 iter_count += 1;
                 if iter_count % 50 == 0 {
@@ -48,24 +35,13 @@ where
 
                 let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
 
-                let frame = lineos_types::RealtimeFrame {
-                    spectrum: analyzer.compute(&buffer, ch),
-                    gonio_path: crate::player::decimate_gonio(&buffer, ch),
+                let frame = lineos_types::telemetry::RealtimeFrame {
+                    spectrum: analyzer.compute(&buffer[..chunk_size], ch),
+                    gonio_path: crate::player::decimate_gonio(&buffer[..chunk_size], ch),
                     position_ms,
                 };
 
-                if let Some(ref sock) = udp_tx {
-                    match bincode::encode_to_vec(frame, bincode::config::standard()) {
-                        Ok(bytes) => {
-                            if let Err(e) = sock.send_to(&bytes, "127.0.0.1:9000") {
-                                if e.kind() != std::io::ErrorKind::WouldBlock {
-                                    eprintln!("[WORKER] send_to error: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => eprintln!("[WORKER] Bincode error: {}", e),
-                    }
-                }
+                sender.send_frame(&frame);
             } else {
                 std::thread::sleep(Duration::from_millis(2));
             }

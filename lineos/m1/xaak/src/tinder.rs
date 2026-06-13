@@ -22,7 +22,7 @@ pub fn generate_variations(base: &DspState, n: usize) -> Vec<DspState> {
     variations.push(*base);
 
     // Interpolate between base and each flavour
-    for (i, preset) in presets.iter().enumerate() {
+    for (_i, preset) in presets.iter().enumerate() {
         if variations.len() >= n { break; }
         let t = 0.5_f32; // midpoint between base and preset
         variations.push(lerp_state(base, preset, t));

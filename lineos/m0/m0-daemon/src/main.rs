@@ -10,7 +10,7 @@
 pub mod agents;
 mod app_state;
 pub mod audit;
-mod blob_store;
+pub mod blob_store;
 mod cdn;
 pub mod db;
 pub mod domain;
@@ -182,14 +182,10 @@ fn mastering_router(state: AppState) -> axum::Router {
             get(handlers::progress::stream_progress),
         )
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
-        .route("/playback",
-            get(handlers::playback::get_playback))
-        .route("/playback/seek",
-            post(handlers::playback::post_seek))
-        .route("/playback/play",
-            post(handlers::playback::post_play))
-        .route("/playback/pause",
-            post(handlers::playback::post_pause))
+        .route("/playback/state",
+            get(handlers::playback::get_state))
+        .route("/playback/control",
+            post(handlers::playback::post_control))
         .route(
             "/cert/:blob_id/png",
             post(handlers::png_gen::export_cert_png),

@@ -16,6 +16,7 @@ pub mod flavours;
 pub mod player;
 pub mod repo;
 pub mod spectrum;
+pub mod telemetry;
 pub mod telemetry_worker;
 pub mod tinder;
 pub use repo::{AudioRepo, DspState, MixCommit};
