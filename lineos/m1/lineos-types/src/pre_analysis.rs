@@ -92,6 +92,12 @@ pub struct PreAnalysisData {
 
     // ── Zone Activation ──
     pub zone_flags: ZoneActivationFlags,
+
+    // ── Rhythm Analysis ──
+    pub bpm: f32,                    // 0.0 if not detected
+    pub beats_ms: Vec<u32>,          // beat timestamps in ms
+    pub downbeats_ms: Vec<u32>,      // downbeat timestamps in ms
+    pub transients_ms: Vec<u32>,     // onset timestamps in ms
 }
 
 impl PreAnalysisData {
@@ -114,6 +120,10 @@ impl PreAnalysisData {
             band_phase_correlation: [1.0; 6],
             resonant_peaks_hz: vec![],
             zone_flags: ZoneActivationFlags::default(),
+            bpm: 0.0,
+            beats_ms: vec![],
+            downbeats_ms: vec![],
+            transients_ms: vec![],
         }
     }
 }

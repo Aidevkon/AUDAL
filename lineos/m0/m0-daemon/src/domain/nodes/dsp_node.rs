@@ -35,7 +35,21 @@ pub fn run(
     blob_id: &str,
 ) -> Result<DspOutput, String> {
     // Pre-Analysis
-    let pre_analysis = PreAnalyzer::run(chunk_left, chunk_right, sample_rate);
+    let mut pre_analysis = PreAnalyzer::run(chunk_left, chunk_right, sample_rate);
+
+    // Rhythm Analysis
+    let mono_samples: Vec<f32> = chunk_left
+        .iter()
+        .zip(chunk_right.iter())
+        .map(|(l, r)| (*l + *r) * 0.5)
+        .collect();
+    let detector = crate::dsp::beat_detector::BeatDetector::new(sample_rate);
+    let (bpm, beats_ms, downbeats_ms, transients_ms) = detector.analyze(&mono_samples);
+    tracing::info!("Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats", bpm, transients_ms.len(), downbeats_ms.len());
+    pre_analysis.bpm = bpm;
+    pre_analysis.beats_ms = beats_ms;
+    pre_analysis.downbeats_ms = downbeats_ms;
+    pre_analysis.transients_ms = transients_ms;
 
     // Autotune
     let autotune_result = sp314_dsp::pipeline::autotune::autotune(

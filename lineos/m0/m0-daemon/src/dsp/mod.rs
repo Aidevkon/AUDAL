@@ -4,6 +4,7 @@
 // Orchestrates: pipelineforge → sp314-nodes DspGraph → process_offline
 
 pub mod autotune;
+pub mod beat_detector;
 pub mod maestro;
 pub use maestro::{AutoTuningController, RenderParams};
 
