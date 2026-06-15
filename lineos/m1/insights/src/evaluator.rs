@@ -6,7 +6,7 @@
 //! Never calls DPS code. Never re-measures audio.
 
 use lineos_metadata::bmr128::Bmr128Report;
-use lineos_types::{Bmr128Schema, Ebu128Measurement};
+use lineos_types::{Ebu128Measurement, PreAnalysisData, LoudnessTarget};
 use serde::{Deserialize, Serialize};
 
 /// Evaluation result for a single platform preset.
@@ -31,19 +31,23 @@ pub struct InsightsReport {
 /// Evaluate compliance across all presets from bmr-128.schema.json.
 ///
 /// All threshold values come from `schema.presets` — never hardcoded.
-pub fn evaluate_all(measurement: &Ebu128Measurement, _schema: &Bmr128Schema) -> InsightsReport {
-    let results: Vec<PresetResult> = Vec::new();
+pub fn evaluate_all(measurement: &Ebu128Measurement, pre_analysis: &PreAnalysisData) -> InsightsReport {
+    let mut results: Vec<PresetResult> = Vec::new();
 
-    // TODO: 3b — Bmr128Schema no longer has presets map.
-    /*
-    let pre = lineos_types::PreAnalysisData::silent();
-    for (preset_name, thresholds) in &schema.presets {
+    let presets = vec![
+        ("Spotify", LoudnessTarget::spotify()),
+        ("YouTube", LoudnessTarget::youtube()),
+        ("Broadcast", LoudnessTarget::broadcast()),
+        ("Podcast", LoudnessTarget::podcast()),
+    ];
+
+    for (preset_name, target) in &presets {
         let report = Bmr128Report::generate(
             measurement,
-            &pre,
+            pre_analysis,
             preset_name,
-            thresholds.target_lufs,
-            thresholds.true_peak_ceiling_dbfs,
+            Some(target.target_lufs),
+            target.max_true_peak_db,
         );
         let passes = report.compliance.passes;
         results.push(PresetResult {
@@ -67,9 +71,8 @@ pub fn evaluate_all(measurement: &Ebu128Measurement, _schema: &Bmr128Schema) -> 
                   .unwrap_or(core::cmp::Ordering::Equal)
         })
         .map(|r| r.preset.clone());
-    */
-    let recommended = None;
-    let hints = generate_hints(measurement, &results);
+
+    let hints = generate_hints(measurement, pre_analysis, &results);
 
     InsightsReport {
         preset_results: results,
@@ -79,7 +82,7 @@ pub fn evaluate_all(measurement: &Ebu128Measurement, _schema: &Bmr128Schema) -> 
 }
 
 /// Generate actionable hints for the rule engine (Phase 4 input).
-fn generate_hints(m: &Ebu128Measurement, results: &[PresetResult]) -> Vec<String> {
+fn generate_hints(m: &Ebu128Measurement, pre_analysis: &PreAnalysisData, results: &[PresetResult]) -> Vec<String> {
     let mut hints: Vec<String> = Vec::new();
     let passing = results.iter().filter(|r| r.passes).count();
 
@@ -94,15 +97,12 @@ fn generate_hints(m: &Ebu128Measurement, results: &[PresetResult]) -> Vec<String
             m.true_peak_dbfs
         ));
     }
-    // TODO: 3b — stereo correlation hint removed
-    /*
-    if m.stereo_correlation < 0.5 {
+    if pre_analysis.global_phase_correlation < 0.5 {
         hints.push(format!(
             "Low stereo correlation ({:.2}). Check for phase issues or out-of-phase content.",
-            m.stereo_correlation
+            pre_analysis.global_phase_correlation
         ));
     }
-    */
     if m.loudness_range_lu > 14.0 {
         hints.push(format!(
             "High LRA ({:.1} LU). Dynamic content may be reduced on streaming platforms.",
@@ -121,12 +121,47 @@ fn generate_hints(m: &Ebu128Measurement, results: &[PresetResult]) -> Vec<String
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use lineos_types::{Bmr128Schema, PipelineConstants, PresetThresholds, Ebu128Measurement};
-    // use std::collections::BTreeMap;
+    use super::*;
 
-    /* TODO: 3b — restore tests
-    fn test_schema() -> Bmr128Schema {
-    ...
-    */
+    fn test_measurement() -> Ebu128Measurement {
+        Ebu128Measurement {
+            integrated_lufs: -14.0,
+            true_peak_dbfs: -1.0,
+            loudness_range_lu: 6.0,
+            short_term_lufs: Some(-13.0),
+        }
+    }
+
+    #[test]
+    fn test_evaluate_all_passes() {
+        let m = test_measurement();
+        let pre = PreAnalysisData::silent();
+        let report = evaluate_all(&m, &pre);
+        
+        // At -14.0 LUFS, Spotify & YouTube (-14.0) should pass.
+        // Broadcast (-23.0) and Podcast (-16.0) will fail (too loud).
+        assert!(!report.preset_results.is_empty());
+        let spotify_res = report.preset_results.iter().find(|r| r.preset == "Spotify").unwrap();
+        assert!(spotify_res.passes);
+    }
+
+    #[test]
+    fn test_generate_hints_low_correlation() {
+        let m = test_measurement();
+        let mut pre = PreAnalysisData::silent();
+        pre.global_phase_correlation = 0.3; // below 0.5
+
+        let hints = generate_hints(&m, &pre, &[]);
+        assert!(hints.iter().any(|h| h.contains("Low stereo correlation")));
+    }
+
+    #[test]
+    fn test_generate_hints_high_correlation() {
+        let m = test_measurement();
+        let mut pre = PreAnalysisData::silent();
+        pre.global_phase_correlation = 0.8; // above 0.5
+
+        let hints = generate_hints(&m, &pre, &[]);
+        assert!(!hints.iter().any(|h| h.contains("Low stereo correlation")));
+    }
 }
