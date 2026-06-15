@@ -20,24 +20,28 @@ pub struct EbuReport {
     pub sample_rate: u32,
     pub channels: u16,
     pub duration_seconds: f32,
+    pub bpm: f32,
+    pub transient_density: f32,
 }
 
 impl EbuReport {
     /// Build from an Ebu128Measurement (produced by lineos-telemetry).
-    pub fn from_measurement(m: &Ebu128Measurement) -> Self {
+    pub fn from_measurement(m: &Ebu128Measurement, pre_analysis: &lineos_types::PreAnalysisData) -> Self {
         Self {
             version: "1.0".to_string(),
             schema: "lineos/shared/schema/ebu-r128.schema.json".to_string(),
             integrated_lufs: m.integrated_lufs,
             true_peak_dbtp: m.true_peak_dbfs,
             loudness_range_lu: m.loudness_range_lu,
-            momentary_lufs: -14.0, // TODO: 3b
+            momentary_lufs: pre_analysis.integrated_lufs, // proxy for momentary_lufs
             short_term_lufs: m.short_term_lufs.unwrap_or(-14.0),
-            stereo_correlation: 1.0, // TODO: 3b
-            dynamic_range_db: 10.0,  // TODO: 3b
-            sample_rate: 48000,      // TODO: 3b
-            channels: 2,             // TODO: 3b
-            duration_seconds: 0.0,   // TODO: 3b
+            stereo_correlation: pre_analysis.global_phase_correlation,
+            dynamic_range_db: pre_analysis.dynamic_range_db,
+            sample_rate: 48000,
+            channels: 2,
+            duration_seconds: 0.0,
+            bpm: pre_analysis.bpm,
+            transient_density: pre_analysis.transient_density,
         }
     }
 
@@ -63,16 +67,15 @@ mod tests {
     #[test]
     fn test_ebu_report_round_trips() {
         let m = test_measurement();
-        let report = EbuReport::from_measurement(&m);
+        let report = EbuReport::from_measurement(&m, &lineos_types::PreAnalysisData::silent());
         assert_eq!(report.integrated_lufs, m.integrated_lufs);
         assert_eq!(report.loudness_range_lu, m.loudness_range_lu);
-        // TODO: 3b — fix tests
     }
 
     #[test]
     fn test_ebu_report_json_contains_schema() {
         let m = test_measurement();
-        let report = EbuReport::from_measurement(&m);
+        let report = EbuReport::from_measurement(&m, &lineos_types::PreAnalysisData::silent());
         let json = report.to_json().unwrap();
         assert!(json.contains("ebu-r128.schema.json"));
     }

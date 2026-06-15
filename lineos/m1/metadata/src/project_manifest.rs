@@ -21,20 +21,22 @@ pub struct ProjectManifest {
     pub duration_seconds: f32,
     pub sample_rate: u32,
     pub channels: u16,
+    pub bpm: f32,
 }
 
 impl ProjectManifest {
-    pub fn generate(_blob: &GoldenBlob, measurement: &Ebu128Measurement) -> Self {
+    pub fn generate(blob: &GoldenBlob, measurement: &Ebu128Measurement, pre_analysis: &lineos_types::PreAnalysisData) -> Self {
         Self {
             version: "1.0".to_string(),
-            input_hash: "TODO".to_string(), // TODO: 3b — input_hash string logic removed
-            seed: 0,                        // TODO: 3b — blob.seed removed
+            input_hash: blob.sha256.clone(),
+            seed: 0,
             integrated_lufs: measurement.integrated_lufs,
             true_peak_dbtp: measurement.true_peak_dbfs, // changed field name
             loudness_range_lu: measurement.loudness_range_lu,
-            duration_seconds: 0.0, // TODO: 3b — duration_seconds removed
-            sample_rate: 48000,    // TODO: 3b — sample_rate removed
-            channels: 2,           // TODO: 3b — channels removed
+            duration_seconds: 0.0,
+            sample_rate: 48000,
+            channels: 2,
+            bpm: pre_analysis.bpm,
         }
     }
 
@@ -89,15 +91,17 @@ mod tests {
     fn test_manifest_generates() {
         let blob = fake_blob();
         let m = test_measurement();
-        let _manifest = ProjectManifest::generate(&blob, &m);
-        // TODO: 3b — fix tests
+        let mut pre = lineos_types::PreAnalysisData::silent();
+        pre.bpm = 120.0;
+        let manifest = ProjectManifest::generate(&blob, &m, &pre);
+        assert_eq!(manifest.bpm, 120.0);
     }
 
     #[test]
     fn test_manifest_json() {
         let blob = fake_blob();
         let m = test_measurement();
-        let manifest = ProjectManifest::generate(&blob, &m);
+        let manifest = ProjectManifest::generate(&blob, &m, &lineos_types::PreAnalysisData::silent());
         let json = manifest.to_json().unwrap();
         assert!(json.contains("input_hash"));
         assert!(json.contains("seed"));

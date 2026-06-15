@@ -36,9 +36,11 @@ pub fn evaluate_all(measurement: &Ebu128Measurement, _schema: &Bmr128Schema) -> 
 
     // TODO: 3b — Bmr128Schema no longer has presets map.
     /*
+    let pre = lineos_types::PreAnalysisData::silent();
     for (preset_name, thresholds) in &schema.presets {
         let report = Bmr128Report::generate(
             measurement,
+            &pre,
             preset_name,
             thresholds.target_lufs,
             thresholds.true_peak_ceiling_dbfs,

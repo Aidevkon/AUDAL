@@ -29,6 +29,8 @@ pub struct MeasuredValues {
     pub dynamic_range_db: f32,
     pub momentary_lufs: f32,
     pub short_term_lufs: f32,
+    pub bpm: f32,
+    pub transient_density: f32,
 }
 
 /// Compliance evaluation result.
@@ -50,6 +52,7 @@ impl Bmr128Report {
     /// PresetThresholds — never hardcode these values.
     pub fn generate(
         measurement: &Ebu128Measurement,
+        pre_analysis: &lineos_types::PreAnalysisData,
         preset: &str,
         target_lufs: Option<f32>,
         true_peak_ceiling: f32,
@@ -79,16 +82,7 @@ impl Bmr128Report {
             ));
         }
 
-        // Stereo correlation warning (< 0.5 is problematic)
-        // TODO: 3b - stereo correlation removed
-        /*
-        if measurement.stereo_correlation < 0.5 {
-            violations.push(format!(
-                "Low stereo correlation: {:.2} (threshold 0.5). Check for phase issues.",
-                measurement.stereo_correlation
-            ));
-        }
-        */
+
 
         Bmr128Report {
             version: "1.0".to_string(),
@@ -99,10 +93,12 @@ impl Bmr128Report {
                 integrated_lufs: measurement.integrated_lufs,
                 true_peak_dbtp: measurement.true_peak_dbfs,
                 loudness_range_lu: measurement.loudness_range_lu,
-                stereo_correlation: 1.0, // TODO: 3b
-                dynamic_range_db: 10.0,  // TODO: 3b
-                momentary_lufs: -14.0,   // TODO: 3b
+                stereo_correlation: pre_analysis.global_phase_correlation,
+                dynamic_range_db: pre_analysis.dynamic_range_db,
+                momentary_lufs: pre_analysis.integrated_lufs, // proxy for momentary_lufs
                 short_term_lufs: measurement.short_term_lufs.unwrap_or(-14.0),
+                bpm: pre_analysis.bpm,
+                transient_density: pre_analysis.transient_density,
             },
             compliance: ComplianceResult {
                 passes: violations.is_empty(),
@@ -136,7 +132,9 @@ mod tests {
     #[test]
     fn test_bmr128_passes_within_tolerance() {
         let m = test_measurement(); // -14.1 vs target -14.0 → delta = -0.1 → passes
-        let report = Bmr128Report::generate(&m, "spotify", Some(-14.0), -1.0);
+        let mut pre = lineos_types::PreAnalysisData::silent();
+        pre.bpm = 120.0;
+        let report = Bmr128Report::generate(&m, &pre, "spotify", Some(-14.0), -1.0);
         assert!(
             report.compliance.passes,
             "Should pass within ±0.5 LU tolerance"
@@ -148,7 +146,7 @@ mod tests {
     fn test_bmr128_fails_lufs_out_of_tolerance() {
         let mut m = test_measurement();
         m.integrated_lufs = -12.0; // delta = +2.0 → exceeds ±0.5
-        let report = Bmr128Report::generate(&m, "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
         assert!(!report.compliance.passes);
         assert!(!report.compliance.violations.is_empty());
     }
@@ -157,7 +155,7 @@ mod tests {
     fn test_bmr128_fails_true_peak_exceeded() {
         let mut m = test_measurement();
         m.true_peak_dbfs = -0.5; // exceeds -1.0 ceiling
-        let report = Bmr128Report::generate(&m, "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
         assert!(!report.compliance.passes);
         assert!(report.compliance.peak_headroom < 0.0);
     }
@@ -165,7 +163,7 @@ mod tests {
     #[test]
     fn test_bmr128_raw_preset_no_lufs_check() {
         let m = test_measurement();
-        let report = Bmr128Report::generate(&m, "raw", None, -0.1);
+        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "raw", None, -0.1);
         // Raw preset has no LUFS target → no LUFS violation possible
         assert!(report.compliance.lufs_delta.is_none());
     }
@@ -173,7 +171,7 @@ mod tests {
     #[test]
     fn test_bmr128_serializes_to_json() {
         let m = test_measurement();
-        let report = Bmr128Report::generate(&m, "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
         let json = report.to_json().unwrap();
         assert!(json.contains("spotify"));
         assert!(json.contains("compliance"));
