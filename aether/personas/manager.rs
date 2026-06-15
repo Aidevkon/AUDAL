@@ -127,7 +127,7 @@ mod tests {
                 p.chaos.air_depth,
             ] {
                 assert!(
-                    depth >= 0.0 && depth <= 1.0,
+                    (0.0..=1.0).contains(&depth),
                     "chaos depth out of bounds in {}: {}",
                     id,
                     depth

@@ -85,7 +85,7 @@ fn spectral_flux_detects_correct_beats() {
     // Frame 0 kick → expect beat near frame 0-5
     // Frame 1000ms / (512/48000) ≈ frame 93
     let kick1_detected = beats.iter().any(|&b| b <= 5);
-    let kick2_detected = beats.iter().any(|&b| b >= 88 && b <= 98);
+    let kick2_detected = beats.iter().any(|&b| (88..=98).contains(&b));
 
     assert!(
         kick1_detected,

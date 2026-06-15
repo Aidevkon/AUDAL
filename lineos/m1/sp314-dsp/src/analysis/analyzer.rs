@@ -260,7 +260,7 @@ mod tests {
     fn analyze_stereo_mix_metrics_reasonable() {
         // Sine-like signal: centroid should be above 0
         let signal: Vec<f32> = (0..4800)
-            .map(|i| libm::sinf(2.0 * 3.14159 * 440.0 * i as f32 / 48000.0))
+            .map(|i| libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
             .collect();
         let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
         assert!(result.mix.spectral_centroid_hz > 0.0);

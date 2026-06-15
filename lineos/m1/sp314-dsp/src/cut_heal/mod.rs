@@ -224,9 +224,7 @@ mod tests {
         let len = 12000; // 250ms
                          // Add breath-like noise (-40 dBFS approx => ~0.01 amplitude)
         let noise = generate_noise(len, 0.01);
-        for i in 0..len {
-            audio[start + i] = noise[i];
-        }
+        audio[start..(len + start)].copy_from_slice(&noise[..len]);
         let cuts = BreathCut::detect(&audio, sr);
         assert!(!cuts.is_empty(), "Should detect breath");
     }

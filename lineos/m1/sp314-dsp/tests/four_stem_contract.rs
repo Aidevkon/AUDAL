@@ -36,13 +36,13 @@ fn four_stem_reconstruction_within_mastering_tolerance() {
     // Sum of all 4 stems must equal original
     let margin = fft_size;
     let mut max_err = 0.0_f32;
-    for i in margin..n - margin {
+    for (i, &sig) in signal.iter().enumerate().take(n - margin).skip(margin) {
         let sum = stems.bass[i]
             + stems.harmonics[i]
             + stems.voice[i]
             + stems.drums[i]
             + stems.ambience[i];
-        let err = (signal[i] - sum).abs();
+        let err = (sig - sum).abs();
         if err > max_err {
             max_err = err;
         }

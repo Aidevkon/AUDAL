@@ -84,7 +84,7 @@ fn stft_oracle_noise_passes() {
     // Python: np.random.seed(42), randn * 0.1
     // Approximate with known pattern
     let signal: Vec<f32> = (0..48000)
-        .map(|i| ((i as f32 * 1.6180339887) % 1.0 - 0.5) * 0.1)
+        .map(|i| ((i as f32 * 1.618_034) % 1.0 - 0.5) * 0.1)
         .collect();
 
     let mse = reconstruction_mse(&signal);

@@ -52,11 +52,11 @@ fn test_kick_and_bass_separation() {
     let hit_frame = 1;
     let sustain_frame = (0.5 * sample_rate as f32 / 1024.0) as usize;
 
-    let c0_hit = nmf.h[0 * n_frames + hit_frame];
-    let c0_sustain = nmf.h[0 * n_frames + sustain_frame];
+    let c0_hit = nmf.h[hit_frame];
+    let c0_sustain = nmf.h[sustain_frame];
 
-    let c1_hit = nmf.h[1 * n_frames + hit_frame];
-    let c1_sustain = nmf.h[1 * n_frames + sustain_frame];
+    let c1_hit = nmf.h[n_frames + hit_frame];
+    let c1_sustain = nmf.h[n_frames + sustain_frame];
 
     println!(
         "Component 0 -> Hit: {:.4}, Sustain: {:.4}",

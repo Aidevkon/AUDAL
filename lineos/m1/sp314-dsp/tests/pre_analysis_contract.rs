@@ -169,6 +169,13 @@ fn strip_meta(mut v: Value) -> Value {
         obj.remove("sample_rate");
         obj.remove("duration_ms");
         obj.remove("channel_count");
+        // Add rhythm fields since Python oracle doesn't generate them
+        if !obj.contains_key("bpm") {
+            obj.insert("bpm".to_string(), serde_json::json!(0.0));
+            obj.insert("beats_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
+            obj.insert("downbeats_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
+            obj.insert("transients_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
+        }
     }
     v
 }

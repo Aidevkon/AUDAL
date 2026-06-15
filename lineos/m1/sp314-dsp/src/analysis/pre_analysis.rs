@@ -170,6 +170,10 @@ impl PreAnalyzer {
             band_phase_correlation,
             resonant_peaks_hz,
             zone_flags,
+            bpm: 0.0,
+            beats_ms: vec![],
+            downbeats_ms: vec![],
+            transients_ms: vec![],
         }
     }
 }
