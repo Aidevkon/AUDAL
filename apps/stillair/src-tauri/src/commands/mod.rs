@@ -1,3 +1,4 @@
+pub mod album;
 pub mod coach; // Phase 8: Aether Coach
 pub mod export;
 pub mod insights;

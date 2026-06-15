@@ -38,3 +38,5 @@ libm                = "0.2"  # Phase 14: SVG path math in visualization.rs — n
 bincode = "2"
 tracing = "0.1"
 serde_arrays = "0.1"
+reqwest-eventsource = "0.6"
+futures-util = "0.3"

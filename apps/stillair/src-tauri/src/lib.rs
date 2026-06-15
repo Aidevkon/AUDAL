@@ -52,6 +52,7 @@ pub fn run() {
             // Phase 14: precomputed SVG paths (UI Agent Context v2.1 §2)
             commands::visualization::get_visualization_data,
             commands::telemetry::get_live_telemetry_realtime,
+            commands::album::subscribe_album_events,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Still Air");
