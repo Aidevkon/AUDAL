@@ -3,7 +3,6 @@
 
 use crate::dsp::DspAdapter;
 use lineos_types::{LoudnessTarget, MasteringIntent, StemFeatures};
-use sp314_dsp::analysis::PreAnalyzer;
 
 pub struct DspOutput {
     pub lufs: f32,
@@ -33,24 +32,8 @@ pub fn run(
     project_id: Option<&str>,
     track_id: Option<&str>,
     blob_id: &str,
+    pre_analysis: lineos_types::pre_analysis::PreAnalysisData,
 ) -> Result<DspOutput, String> {
-    // Pre-Analysis
-    let mut pre_analysis = PreAnalyzer::run(chunk_left, chunk_right, sample_rate);
-
-    // Rhythm Analysis
-    let mono_samples: Vec<f32> = chunk_left
-        .iter()
-        .zip(chunk_right.iter())
-        .map(|(l, r)| (*l + *r) * 0.5)
-        .collect();
-    let detector = crate::dsp::beat_detector::BeatDetector::new(sample_rate);
-    let (bpm, beats_ms, downbeats_ms, transients_ms) = detector.analyze(&mono_samples);
-    tracing::info!("Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats", bpm, transients_ms.len(), downbeats_ms.len());
-    pre_analysis.bpm = bpm;
-    pre_analysis.beats_ms = beats_ms;
-    pre_analysis.downbeats_ms = downbeats_ms;
-    pre_analysis.transients_ms = transients_ms;
-
     // Autotune
     let autotune_result = sp314_dsp::pipeline::autotune::autotune(
         pre_analysis.integrated_lufs,

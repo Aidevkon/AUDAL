@@ -61,6 +61,22 @@ fn run_dsp_internal(
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
 
+    // Pre-Analysis and Rhythm Detection
+    use sp314_dsp::analysis::PreAnalyzer;
+    let mut pre_analysis = PreAnalyzer::run(&chunk.left, &chunk.right, chunk.sample_rate);
+    let mono_samples: Vec<f32> = chunk.left
+        .iter()
+        .zip(chunk.right.iter())
+        .map(|(l, r)| (*l + *r) * 0.5)
+        .collect();
+    let detector = crate::dsp::beat_detector::BeatDetector::new(chunk.sample_rate);
+    let (bpm, beats_ms, downbeats_ms, transients_ms) = detector.analyze(&mono_samples);
+    tracing::info!("Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats", bpm, transients_ms.len(), downbeats_ms.len());
+    pre_analysis.bpm = bpm;
+    pre_analysis.beats_ms = beats_ms;
+    pre_analysis.downbeats_ms = downbeats_ms;
+    pre_analysis.transients_ms = transients_ms;
+
     // NODE 3: SCOUT (NMF + Maestro)
     let scout_out = crate::domain::nodes::scout_node::run(
         &chunk.left,
@@ -68,6 +84,7 @@ fn run_dsp_internal(
         chunk.sample_rate,
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
+        &pre_analysis,
     )?;
     let mut two_pass = scout_out.engine;
     let scout = scout_out.scout;
@@ -156,6 +173,7 @@ fn run_dsp_internal(
         req.project_id.as_deref(),
         req.track_id.as_deref(),
         &blob_id,
+        pre_analysis.clone(),
     )?;
     let pre_analysis = dsp_out.pre_analysis;
     let dsp_config = dsp_out.dsp_config;

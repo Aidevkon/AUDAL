@@ -1,159 +1,52 @@
 //! Maestro Calibration Test
-//! Validates MFCC distance thresholds (5.0 / 15.0) with broadband signals.
-//!
-//! Proves:
-//! 1. kick_drum + bass_line → LOW distance (similar low-freq timbre)
-//! 2. hi_hat + bass_line   → HIGH distance (different timbre)
-//! 3. Thresholds 5.0/15.0 are correctly placed
+//! Validates BPM thresholds (<100, <=130, >130) for ducking gain.
+//! Authority: maestro-controller-spec-v1_0.md
 
 use m0d::dsp::maestro::AutoTuningController;
-use sp314_dsp::stft::two_pass::TwoPassEngine;
-
-fn kick_drum(duration_s: f32, sample_rate: u32) -> Vec<f32> {
-    let n = (duration_s * sample_rate as f32) as usize;
-    (0..n)
-        .map(|i| {
-            let t = i as f32 / sample_rate as f32;
-            let sub =
-                libm::sinf(2.0 * core::f32::consts::PI * 60.0 * t) * libm::expf(-t * 30.0) * 0.8;
-            let body =
-                libm::sinf(2.0 * core::f32::consts::PI * 120.0 * t) * libm::expf(-t * 50.0) * 0.4;
-            let click =
-                libm::sinf(2.0 * core::f32::consts::PI * 2000.0 * t) * libm::expf(-t * 200.0) * 0.3;
-            (sub + body + click).clamp(-1.0, 1.0)
-        })
-        .collect()
-}
-
-fn bass_line(freq_hz: f32, duration_s: f32, sample_rate: u32) -> Vec<f32> {
-    let n = (duration_s * sample_rate as f32) as usize;
-    (0..n)
-        .map(|i| {
-            let t = i as f32 / sample_rate as f32;
-            let f1 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * t) * 0.6;
-            let f2 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * 2.0 * t) * 0.3;
-            let f3 = libm::sinf(2.0 * core::f32::consts::PI * freq_hz * 3.0 * t) * 0.15;
-            (f1 + f2 + f3).clamp(-1.0, 1.0)
-        })
-        .collect()
-}
-
-fn white_noise(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f32> {
-    let n = (duration_s * sample_rate as f32) as usize;
-    let mut state = seed;
-    (0..n)
-        .map(|_| {
-            state = state.wrapping_mul(1664525).wrapping_add(1013904223);
-            ((state >> 33) as f32 / u32::MAX as f32) * 2.0 - 1.0
-        })
-        .collect()
-}
+use lineos_types::pre_analysis::PreAnalysisData;
 
 #[test]
-fn maestro_calibration_broadband_signals() {
-    let sr = 48000u32;
-    let dur = 2.0f32;
+fn maestro_calibration_bpm_thresholds() {
+    // 1. BPM < 100
+    let mut pre_a = PreAnalysisData::silent();
+    pre_a.bpm = 90.0;
+    pre_a.transient_density = 0.5;
+    let params_a = AutoTuningController::compute_render_params(&pre_a);
 
-    // Track A: kick + bass = low-end collision
-    let kick = kick_drum(dur, sr);
-    let bass = bass_line(50.0, dur, sr);
-    let mono_a: Vec<f32> = kick
-        .iter()
-        .zip(bass.iter())
-        .map(|(k, b)| (k + b) * 0.5)
-        .collect();
+    // 2. BPM <= 130
+    let mut pre_b = PreAnalysisData::silent();
+    pre_b.bpm = 120.0;
+    let params_b = AutoTuningController::compute_render_params(&pre_b);
 
-    // Track B: hi-hat + bass = no collision
-    let hhat = white_noise(dur, sr, 42);
-    let mono_b: Vec<f32> = hhat
-        .iter()
-        .zip(bass.iter())
-        .map(|(h, b)| (h + b) * 0.5)
-        .collect();
-
-    let mut engine_a = TwoPassEngine::new();
-    let scout_a = engine_a.scout(&mono_a, sr);
-
-    let mut engine_b = TwoPassEngine::new();
-    let scout_b = engine_b.scout(&mono_b, sr);
-
-    println!("Scout A stem MFCCs (first 3 coeffs):");
-    println!(
-        "  bass:  [{:.3}, {:.3}, {:.3}]",
-        scout_a.stem_mfccs.bass[0], scout_a.stem_mfccs.bass[1], scout_a.stem_mfccs.bass[2]
-    );
-    println!(
-        "  drums: [{:.3}, {:.3}, {:.3}]",
-        scout_a.stem_mfccs.drums[0], scout_a.stem_mfccs.drums[1], scout_a.stem_mfccs.drums[2]
-    );
-
-    println!("Scout B stem MFCCs (first 3 coeffs):");
-    println!(
-        "  bass:  [{:.3}, {:.3}, {:.3}]",
-        scout_b.stem_mfccs.bass[0], scout_b.stem_mfccs.bass[1], scout_b.stem_mfccs.bass[2]
-    );
-    println!(
-        "  drums: [{:.3}, {:.3}, {:.3}]",
-        scout_b.stem_mfccs.drums[0], scout_b.stem_mfccs.drums[1], scout_b.stem_mfccs.drums[2]
-    );
-
-    let dist_a = scout_a.stem_mfccs.bass_drums_distance();
-    let dist_b = scout_b.stem_mfccs.bass_drums_distance();
-    let params_a = AutoTuningController::compute_render_params(&scout_a, None, "techno");
-    let params_b = AutoTuningController::compute_render_params(&scout_b, None, "techno");
+    // 3. BPM > 130
+    let mut pre_c = PreAnalysisData::silent();
+    pre_c.bpm = 150.0;
+    let params_c = AutoTuningController::compute_render_params(&pre_c);
 
     println!(
-        "Track A (kick+bass): distance={:.3}, ducking={:.3}",
-        dist_a, params_a.ducking_gain
+        "Track A (90 BPM): ducking_gain={:.3}, release_ms={:.1}",
+        params_a.ducking_gain, params_a.release_ms
     );
     println!(
-        "Track B (hhat+bass): distance={:.3}, ducking={:.3}",
-        dist_b, params_b.ducking_gain
+        "Track B (120 BPM): ducking_gain={:.3}, release_ms={:.1}",
+        params_b.ducking_gain, params_b.release_ms
     );
-    println!("Distance ratio B/A: {:.2}x", dist_b / dist_a.max(0.001));
+    println!(
+        "Track C (150 BPM): ducking_gain={:.3}, release_ms={:.1}",
+        params_c.ducking_gain, params_c.release_ms
+    );
 
-    // Absolute Bounds (Gate) — linear domain [0.3, 1.0]
+    // Assert ranges
     assert!(
-        params_a.ducking_gain >= 0.3 && params_a.ducking_gain <= 1.0,
-        "Gate Failed: ducking_gain out of linear range [0.3, 1.0]: {:.3}",
-        params_a.ducking_gain
+        params_a.ducking_gain >= 0.3 && params_a.ducking_gain <= 0.5,
+        "Gate Failed: ducking_gain for <100 BPM should be [0.3, 0.5]"
     );
     assert!(
-        params_b.ducking_gain >= 0.3 && params_b.ducking_gain <= 1.0,
-        "Gate Failed: ducking_gain out of linear range [0.3, 1.0]: {:.3}",
-        params_b.ducking_gain
+        (params_b.ducking_gain - 0.55).abs() < 0.001,
+        "Gate Failed: ducking_gain for <=130 BPM should be 0.55"
     );
-
-    // Track A must have MORE ducking than Track B
     assert!(
-        params_a.ducking_gain <= params_b.ducking_gain,
-        "Kick+bass (dist={:.3}) should duck more than hhat+bass (dist={:.3})",
-        dist_a,
-        dist_b
-    );
-
-    // Log threshold calibration info
-    println!("Threshold check:");
-    println!(
-        "  dist_a={:.3} vs threshold 5.0:  {}",
-        dist_a,
-        if dist_a < 5.0 {
-            "AGGRESSIVE (< 5.0)"
-        } else if dist_a < 15.0 {
-            "DEFAULT (5-15)"
-        } else {
-            "SUBTLE (> 15.0)"
-        }
-    );
-    println!(
-        "  dist_b={:.3} vs threshold 15.0: {}",
-        dist_b,
-        if dist_b < 5.0 {
-            "AGGRESSIVE (< 5.0)"
-        } else if dist_b < 15.0 {
-            "DEFAULT (5-15)"
-        } else {
-            "SUBTLE (> 15.0)"
-        }
+        (params_c.ducking_gain - 0.75).abs() < 0.001,
+        "Gate Failed: ducking_gain for >130 BPM should be 0.75"
     );
 }

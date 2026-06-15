@@ -2,7 +2,6 @@
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P3
 
 use crate::dsp::maestro::{AutoTuningController, RenderParams};
-use lineos_corpus::store::UserMarkovModel;
 use sp314_dsp::stft::two_pass::{ScoutResult, TwoPassEngine};
 
 pub struct ScoutOutput {
@@ -16,8 +15,9 @@ pub fn run(
     left: &[f32],
     right: &[f32],
     sample_rate: u32,
-    project_id: &str,
-    flavour_id: &str,
+    _project_id: &str,
+    _flavour_id: &str,
+    pre_analysis: &lineos_types::pre_analysis::PreAnalysisData,
 ) -> Result<ScoutOutput, String> {
     // Build mono mix
     let mono: Vec<f32> = left
@@ -35,19 +35,14 @@ pub fn run(
     let mut engine = TwoPassEngine::new();
     let scout = engine.scout(scout_slice, sample_rate);
 
-    // Maestro — load user model, compute adaptive ducking_gain
-    let model_path = format!("user_model_{}.json", project_id);
-    let user_model = std::fs::read_to_string(&model_path)
-        .ok()
-        .and_then(|json| UserMarkovModel::from_json(&json).ok());
-
-    let render_params =
-        AutoTuningController::compute_render_params(&scout, user_model.as_ref(), flavour_id);
+    // Maestro — compute adaptive ducking_gain based on rhythm
+    let render_params = AutoTuningController::compute_render_params(pre_analysis);
 
     tracing::info!(
         event = "m0d.maestro_params",
         ducking_gain = render_params.ducking_gain,
-        bass_drums_distance = scout.stem_mfccs.bass_drums_distance(),
+        release_ms = render_params.release_ms,
+        bpm = pre_analysis.bpm,
         "Maestro: adaptive ducking_gain computed"
     );
 

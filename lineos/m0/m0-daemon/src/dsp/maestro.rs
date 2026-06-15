@@ -1,15 +1,13 @@
 //! Maestro Auto-Tuning Controller
 //! Authority: lineos/docs/maestro-controller-spec-v1_0.md
 //!
-//! Bridges AI Brain (UserMarkovModel + StemMfccs) → DSP Muscle (ducking_gain).
+//! Bridges AI Brain (PreAnalysisData + BPM) → DSP Muscle (ducking_gain).
 //! Pure function — no side effects, no I/O.
 //! INV-AB-1: same inputs → same output.
 //! INV-MAESTRO-1: ducking_gain clamped to [0.3, 1.0]
 //! INV-MAESTRO-2: pure function
-//! INV-MAESTRO-3: no model → distance-only logic
 
-use lineos_corpus::store::UserMarkovModel;
-use sp314_dsp::stft::two_pass::ScoutResult;
+use lineos_types::pre_analysis::PreAnalysisData;
 
 /// Parameters computed by Maestro for Pass 2.
 /// Replaces hardcoded COLLISION_DUCKING_GAIN.
@@ -17,13 +15,17 @@ use sp314_dsp::stft::two_pass::ScoutResult;
 pub struct RenderParams {
     /// Adaptive ducking gain for bass when collision detected.
     /// Range: [0.3, 1.0]. Default: 0.707 (-3dB).
+    // ducking_gain: volume target during sidechain (0.0=silent, 1.0=no duck)
     pub ducking_gain: f32,
+    /// Release time for ducking envelope
+    pub release_ms: f32,
 }
 
 impl Default for RenderParams {
     fn default() -> Self {
         Self {
             ducking_gain: 0.707,
+            release_ms: 120.0,
         }
     }
 }
@@ -31,71 +33,40 @@ impl Default for RenderParams {
 pub struct AutoTuningController;
 
 impl AutoTuningController {
-    /// Compute render params from scout MFCC data + historical model.
-    ///
-    /// Logic:
-    ///   1. Compute L2 distance between bass and drums MFCC fingerprints
-    ///   2. Map distance to ducking_gain (low distance = high collision risk)
-    ///   3. Apply historical modifier from UserMarkovModel if available
-    ///   4. Clamp to [0.3, 1.0]
-    pub fn compute_render_params(
-        scout: &ScoutResult,
-        model: Option<&UserMarkovModel>,
-        preset: &str,
-    ) -> RenderParams {
-        let distance = scout.stem_mfccs.bass_drums_distance();
+    /// Compute render params from BPM and Transient Density.
+    pub fn compute_render_params(pre_analysis: &PreAnalysisData) -> RenderParams {
+        let bpm = pre_analysis.bpm;
 
-        // MFCC distance → base ducking gain (linear, not dB)
-        // Low distance = similar timbre = high collision risk = more ducking
-        let base_gain = if distance < 5.0 {
-            0.5_f32   // -6dB aggressive
-        } else if distance < 15.0 {
-            0.707_f32 // -3dB default
+        // ducking_gain semantics:
+        //   0.3 = DEEP ducking (volume drops to 30% during sidechain) → pumping effect
+        //   0.8 = SHALLOW ducking (volume stays at 80%) → transparent compression
+        // Relationship is INVERSE to BPM:
+        //   Low BPM  → deep ducking  (wide gaps → room for pump)
+        //   High BPM → shallow ducking (dense beats → no time for release)
+
+        let (ducking_gain, release_ms): (f32, f32) = if bpm == 0.0 {
+            // Ambient / spoken word / no rhythm detected
+            (0.8, 200.0)
+        } else if bpm < 100.0 {
+            // Trap / Dubstep / Slow Hip-Hop — deep pump
+            let density = pre_analysis.transient_density;
+            let gain = (0.3 + density * 0.15).clamp(0.3, 0.5);
+            (gain, 250.0)
+        } else if bpm <= 130.0 {
+            // Standard Pop / Mid-tempo
+            (0.55, 120.0)
         } else {
-            0.9_f32   // -1dB subtle
+            // DnB / Techno / Fast EDM — shallow, fast recovery
+            (0.75, 50.0)
         };
 
-        let modifier = if let Some(m) = model {
-            Self::historical_modifier(m, preset)
-        } else {
-            1.0_f32
-        };
+        // DSP safety clamps
+        let ducking_gain = ducking_gain.clamp(0.0, 1.0);
+        let release_ms = release_ms.clamp(10.0, 500.0);
 
-        // INV-MAESTRO-1: ducking_gain clamped to [0.3, 1.0]
-        let ducking_gain = (base_gain * modifier).clamp(0.3_f32, 1.0_f32);
-
-        RenderParams { ducking_gain }
-    }
-
-    /// Compute historical collision modifier from model.
-    /// Returns value in [0.7, 1.2] — multiplied into ducking_gain.
-    fn historical_modifier(model: &UserMarkovModel, preset: &str) -> f32 {
-        let preset_model = match model.preset(preset) {
-            Some(p) => p,
-            None => return 1.0,
-        };
-
-        // Check drums stem collision history via transient density
-        let drums_model = match preset_model.stem("drums") {
-            Some(s) => s,
-            None => return 1.0,
-        };
-
-        // Use n_sessions as proxy for collision experience
-        // More sessions with drums model → user works with transient-heavy music
-        let sessions = drums_model.n_sessions;
-        if sessions == 0 {
-            return 1.0;
-        }
-
-        // High transient history → apply more aggressive ducking
-        // Low history → subtle ducking
-        if sessions >= 10 {
-            0.8_f32 // aggressive: multiply base_gain × 0.8
-        } else if sessions >= 3 {
-            0.9_f32 // moderate
-        } else {
-            1.0_f32 // no modification yet
+        RenderParams {
+            ducking_gain,
+            release_ms,
         }
     }
 }
@@ -103,55 +74,51 @@ impl AutoTuningController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sp314_dsp::stft::two_pass::StemMfccs;
 
     #[test]
-    fn low_distance_gives_aggressive_ducking() {
-        // distance < 5.0 → base_gain = 0.5
-        let bass = [0.0f32; 13];
-        let mut drums = [0.0f32; 13];
-        // L2 distance = 2.0 → below 5.0 threshold
-        drums[0] = 2.0;
-        let d = StemMfccs::distance(&bass, &drums);
-        assert!(d < 5.0, "Distance should be < 5.0, got {:.2}", d);
-        let base_gain = if d < 5.0 {
-            0.5_f32
-        } else if d < 15.0 {
-            0.707_f32
-        } else {
-            0.9_f32
-        };
-        assert!((base_gain - 0.5_f32).abs() < 0.001);
+    fn bpm_0_gives_subtle_ducking() {
+        let mut pre = PreAnalysisData::silent();
+        pre.bpm = 0.0;
+        let params = AutoTuningController::compute_render_params(&pre);
+        assert!((params.ducking_gain - 0.8).abs() < 0.001);
+        assert!((params.release_ms - 200.0).abs() < 0.001);
     }
 
     #[test]
-    fn high_distance_gives_subtle_ducking() {
-        let bass = [0.0f32; 13];
-        let mut drums = [0.0f32; 13];
-        // L2 distance ~20.0 → above 15.0 threshold
-        for k in 0..13 {
-            drums[k] = 20.0 / (13.0_f32).sqrt();
-        }
-        let d = StemMfccs::distance(&bass, &drums);
-        assert!(d >= 15.0, "Distance should be >= 15.0, got {:.2}", d);
-        let base_gain = if d < 5.0 {
-            0.5_f32
-        } else if d < 15.0 {
-            0.707_f32
-        } else {
-            0.9_f32
-        };
-        assert!((base_gain - 0.9_f32).abs() < 0.001);
+    fn bpm_75_gives_deep_ducking() {
+        let mut pre = PreAnalysisData::silent();
+        pre.bpm = 75.0;
+        pre.transient_density = 0.5; // => gain = 0.3 + 0.5*0.15 = 0.375
+        let params = AutoTuningController::compute_render_params(&pre);
+        assert!(params.ducking_gain >= 0.3 && params.ducking_gain <= 0.5);
+        assert!((params.release_ms - 250.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn bpm_120_gives_standard_ducking() {
+        let mut pre = PreAnalysisData::silent();
+        pre.bpm = 120.0;
+        let params = AutoTuningController::compute_render_params(&pre);
+        assert!((params.ducking_gain - 0.55).abs() < 0.001);
+        assert!((params.release_ms - 120.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn bpm_160_gives_shallow_ducking() {
+        let mut pre = PreAnalysisData::silent();
+        pre.bpm = 160.0;
+        let params = AutoTuningController::compute_render_params(&pre);
+        assert!((params.ducking_gain - 0.75).abs() < 0.001);
+        assert!((params.release_ms - 50.0).abs() < 0.001);
     }
 
     #[test]
     fn render_params_clamped() {
-        let params = RenderParams { ducking_gain: 2.0 };
-        // After clamping
-        let clamped = params.ducking_gain.clamp(0.3, 1.0);
-        assert_eq!(clamped, 1.0);
-        let params2 = RenderParams { ducking_gain: 0.1 };
-        let clamped2 = params2.ducking_gain.clamp(0.3, 1.0);
-        assert_eq!(clamped2, 0.3);
+        // We can't directly inject bad ducking_gain through compute_render_params easily,
+        // but we can ensure compute_render_params outputs values within clamps.
+        let pre = PreAnalysisData::silent();
+        let params = AutoTuningController::compute_render_params(&pre);
+        assert!(params.ducking_gain >= 0.0 && params.ducking_gain <= 1.0);
+        assert!(params.release_ms >= 10.0 && params.release_ms <= 500.0);
     }
 }
