@@ -173,9 +173,14 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/blob/:id", get(handlers::blob::get_blob))
         .route("/blob/:id/certificate.pdf",
             get(handlers::pdf_gen::get_track_certificate_pdf))
-        .route("/album/:batch_id/certificate.pdf",
-            get(handlers::pdf_gen::get_album_certificate_pdf))
-        .route("/export", post(handlers::export::export_audio))
+        .route(
+            "/album/:batch_id/certificate.pdf",
+            get(handlers::pdf_gen::get_album_certificate_pdf),
+        )
+        .route(
+            "/album/:batch_id/events/stream",
+            get(handlers::album::stream_album_events),
+        ).route("/export", post(handlers::export::export_audio))
         .route("/progress/:job_id", get(handlers::progress::get_progress))
         .route(
             "/progress/:job_id/stream",

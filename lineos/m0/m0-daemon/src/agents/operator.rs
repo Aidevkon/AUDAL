@@ -115,6 +115,7 @@ pub struct AnalysisResult {
     pub session_id: String,
     pub integrated_lufs: f32,
     pub true_peak_dbtp: f32,
+    pub bpm: f32,
 }
 
 /// Output from Conductor (R2) → HTTP handler
@@ -287,6 +288,7 @@ pub fn spawn_agents(
     head_state_ptr: Arc<ArcSwap<DspState>>,
     db: crate::db::DbConn,
     blob_store: crate::blob_store::BlobStore,
+    album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
 ) -> Operator {
     let (schema_tx, schema_rx) = mpsc::channel::<Intent>(32);
     let (conductor_tx, conductor_rx) = mpsc::channel::<Intent>(32);
@@ -294,7 +296,7 @@ pub fn spawn_agents(
     let (wizard_tx, wizard_rx) = mpsc::channel::<Intent>(32);
 
     tokio::spawn(crate::agents::schema::run(schema_rx));
-    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone()));
+    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone(), album_tx));
     tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr, db.clone(), blob_store));
     tokio::spawn(crate::agents::wizard::run(wizard_rx));
 

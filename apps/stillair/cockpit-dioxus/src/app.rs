@@ -57,6 +57,7 @@ pub fn App() -> Element {
     let mut is_journey_active: Signal<bool> = use_signal(|| false);
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
+    let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -112,6 +113,31 @@ pub fn App() -> Element {
                                     cb.as_ref().unchecked_ref(),
                                 );
                                 cb.forget();
+
+                                let cb_album = wasm_bindgen::closure::Closure::wrap(Box::new(
+                                    move |ev: JsValue| {
+                                        if let Ok(payload) =
+                                            js_sys::Reflect::get(&ev, &JsValue::from_str("payload"))
+                                        {
+                                            if let Ok(bpm_val) = js_sys::Reflect::get(
+                                                &payload,
+                                                &JsValue::from_str("bpm"),
+                                            ) {
+                                                if let Some(b) = bpm_val.as_f64() {
+                                                    bpm_signal.set(b as f32);
+                                                    web_sys::console::log_1(&JsValue::from_str(&format!("BPM: {}", b)));
+                                                }
+                                            }
+                                        }
+                                    },
+                                ) as Box<dyn FnMut(JsValue)>);
+
+                                let _ = listen_fn.call2(
+                                    &event_api,
+                                    &JsValue::from_str("album://pre_analysis"),
+                                    cb_album.as_ref().unchecked_ref(),
+                                );
+                                cb_album.forget();
                             }
                         }
                     }

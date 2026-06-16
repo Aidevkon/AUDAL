@@ -30,6 +30,17 @@ pub struct MasteringProgress {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum AlbumEvent {
+    #[serde(rename = "pre_analysis")]
+    PreAnalysis {
+        track: usize,
+        bpm: f32,
+        ducking_gain: f32,
+    },
+}
+
 /// Shared application state for the mastering API router (port 7400).
 #[derive(Clone)]
 pub struct AppState {
@@ -56,11 +67,13 @@ pub struct AppState {
     /// Privacy moat: 100% local, kv-surrealkv backend.
     pub db: DbConn,
     pub playback_state: Arc<ArcSwap<ScrubState>>,
+    pub album_tx: broadcast::Sender<AlbumEvent>,
 }
 
 impl AppState {
     pub async fn new(audit: Arc<AuditLog>) -> Self {
         let (progress_tx, _) = broadcast::channel(128);
+        let (album_tx, _) = broadcast::channel(64);
         let initial_dsp_state = DspState::default();
         let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state.clone());
         let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
@@ -86,6 +99,7 @@ impl AppState {
             head_state_ptr.clone(),
             db.clone(),
             blob_store.clone(),
+            album_tx.clone(),
         );
 
         Self {
@@ -101,6 +115,7 @@ impl AppState {
             head_state_ptr,
             db,
             playback_state: Arc::new(ArcSwap::from_pointee(ScrubState::new())),
+            album_tx,
         }
     }
 }

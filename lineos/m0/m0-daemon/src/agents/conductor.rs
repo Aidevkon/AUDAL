@@ -20,6 +20,7 @@ pub async fn run(
     head_state_ptr: Arc<ArcSwap<DspState>>,
     db: crate::db::DbConn,
     blob_store: crate::blob_store::BlobStore,
+    album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
 ) {
     // AtomicBool: only one mastering job at a time
     // R2 decision: is the system busy?
@@ -112,8 +113,9 @@ pub async fn run(
                 }
 
                 let executor_tx = executor_tx.clone();
-                let busy_clone = busy.clone();
+                let album_tx = album_tx.clone();
                 let head_state_ptr = head_state_ptr.clone();
+                let busy_clone = busy.clone();
 
                 tokio::spawn(async move {
                     let total = items.len();
@@ -129,6 +131,7 @@ pub async fn run(
                     let global_target = items.first().map(|p| p.target_lufs).unwrap_or(-14.0_f32);
 
                     let mut track_lufs: Vec<f32> = Vec::with_capacity(total);
+                    let mut track_analyses: Vec<super::operator::AnalysisResult> = Vec::with_capacity(total);
 
                     for params in &items {
                         let (tx, rx) = oneshot::channel();
@@ -142,6 +145,12 @@ pub async fn run(
                             .is_err()
                         {
                             track_lufs.push(global_target);
+                            track_analyses.push(super::operator::AnalysisResult {
+                                session_id: params.session_id.clone(),
+                                integrated_lufs: global_target,
+                                true_peak_dbtp: 0.0,
+                                bpm: 0.0,
+                            });
                             continue;
                         }
                         match rx.await {
@@ -153,6 +162,7 @@ pub async fn run(
                                     analysis.integrated_lufs
                                 );
                                 track_lufs.push(analysis.integrated_lufs);
+                                track_analyses.push(analysis);
                             }
                             _ => {
                                 tracing::warn!(
@@ -161,6 +171,12 @@ pub async fn run(
                                     params.audio_path
                                 );
                                 track_lufs.push(global_target);
+                                track_analyses.push(super::operator::AnalysisResult {
+                                    session_id: params.session_id.clone(),
+                                    integrated_lufs: global_target,
+                                    true_peak_dbtp: 0.0,
+                                    bpm: 0.0,
+                                });
                             }
                         }
                     }
@@ -256,6 +272,19 @@ pub async fn run(
                                 adjusted.ms_width,
                             );
                         }
+
+                        let ducking = if ear_delta.fatigue_detected {
+                            let current = head_state_ptr.load();
+                            (current.ducking_depth * ear_delta.ducking_multiplier).clamp(0.3, 1.0)
+                        } else {
+                            1.0
+                        };
+                        let bpm = track_analyses.get(index).map(|a| a.bpm).unwrap_or(0.0);
+                        let _ = album_tx.send(crate::app_state::AlbumEvent::PreAnalysis {
+                            track: index + 1,
+                            bpm,
+                            ducking_gain: ducking,
+                        });
 
                         // Build ExecutionPlan for this track
                         let plan = ExecutionPlan {

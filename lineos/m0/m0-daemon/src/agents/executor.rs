@@ -147,6 +147,7 @@ pub async fn run(
                         session_id,
                         integrated_lufs: analysis.integrated_lufs,
                         true_peak_dbtp: analysis.true_peak_dbtp,
+                        bpm: analysis.bpm,
                     })
                 })
                 .await
