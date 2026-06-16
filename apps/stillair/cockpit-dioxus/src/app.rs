@@ -17,6 +17,7 @@
 //! Amendment A-003 §5: no PCM — PlaybackStateJson only.
 
 
+use crate::ipc::invoke;
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
 use crate::panels::{coach::CoachPanel, mastered::MasteredView};
@@ -60,6 +61,7 @@ pub fn App() -> Element {
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
+    let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
@@ -144,6 +146,52 @@ pub fn App() -> Element {
                                     cb_album.as_ref().unchecked_ref(),
                                 );
                                 cb_album.forget();
+
+                                let cb_drop = wasm_bindgen::closure::Closure::wrap(Box::new(
+                                    move |ev: JsValue| {
+                                        if let Ok(payload) =
+                                            js_sys::Reflect::get(&ev, &JsValue::from_str("payload"))
+                                        {
+                                            if let Ok(paths) = js_sys::Reflect::get(
+                                                &payload,
+                                                &JsValue::from_str("paths"),
+                                            ) {
+                                                let paths_array = js_sys::Array::from(&paths);
+                                                let count = paths_array.length() as u32;
+
+                                                if count > 0 {
+                                                    let first_path = paths_array
+                                                        .get(0)
+                                                        .as_string()
+                                                        .unwrap_or_default();
+
+                                                    dropped_path.set(Some(first_path));
+
+                                                    if count == 1 {
+                                                        hangar_state.set(
+                                                            HangarInterviewState::Detection {
+                                                                track_count: 1,
+                                                            },
+                                                        );
+                                                    } else {
+                                                        hangar_state.set(
+                                                            HangarInterviewState::Detection {
+                                                                track_count: count as usize,
+                                                            },
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                ) as Box<dyn FnMut(JsValue)>);
+
+                                let _ = listen_fn.call2(
+                                    &event_api,
+                                    &JsValue::from_str("tauri://file-drop"),
+                                    cb_drop.as_ref().unchecked_ref(),
+                                );
+                                cb_drop.forget();
                             }
                         }
                     }
@@ -314,7 +362,16 @@ pub fn App() -> Element {
                         }
                     },
                     HangarInterviewState::Ignition { platform, flavour } => {
-                        let _ = (platform, flavour); // stub — real path from drop event
+                        if let Some(path) = dropped_path.read().clone() {
+                            spawn_local(async move {
+                                let _ = invoke::<crate::types::AudioMeta, _>(
+                                    "load_audio_file",
+                                    serde_json::json!({ "path": path })
+                                ).await;
+                                // TODO: dispatch FileDropped with real metadata
+                            });
+                        }
+                        let _ = (platform, flavour);
                         rsx! { p { "Analysing." } }
                     },
                     HangarInterviewState::Analysing => rsx! {
