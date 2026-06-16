@@ -8,7 +8,7 @@
 //! Existing:      GET /health (port 7401)
 
 pub mod agents;
-mod app_state;
+pub mod app_state;
 pub mod audit;
 pub mod blob_store;
 mod cdn;

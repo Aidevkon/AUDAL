@@ -15,11 +15,15 @@
 //!   └──────────────────────────────────────────────────────────────────────┘
 
 use dioxus::prelude::*;
+use crate::components::neon_canvas::NeonCanvas;
+use crate::types::RealtimeFrameJson;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct PrimarySignalAnalyzerProps {
     pub filename: String,
     pub format: String,
+    pub telemetry: Option<Signal<Option<RealtimeFrameJson>>>,
+    pub bpm: f32,
     // Add additional props like session state when backend provides it
     pub on_load_new: EventHandler<()>,
 }
@@ -106,23 +110,14 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                     }
                 }
                 div { class: "psa-canvas",
-                    svg {
-                        view_box: "0 0 400 100", preserve_aspect_ratio: "none",
-                        style: "position:absolute; inset:0; width:100%; height:100%;",
-
-                        // Grid lines
-                        line { x1:"0", y1:"50", x2:"400", y2:"50", stroke:"rgba(255,255,255,0.1)", stroke_width:"1", stroke_dasharray:"4 4" }
-                        line { x1:"200", y1:"0", x2:"200", y2:"100", stroke:"rgba(255,255,255,0.1)", stroke_width:"1", stroke_dasharray:"4 4" }
-
-                        // A curve (white)
-                        path { d:"M0,80 Q100,20 200,50 T400,30", fill:"none", stroke:"rgba(255,255,255,0.6)", stroke_width:"1.5" }
-                        // B curve (cyan)
-                        path { d:"M0,90 Q100,10 200,60 T400,20", fill:"none", stroke:"var(--accent-cyan)", stroke_width:"1.5" }
-                        // Delta curve (red)
-                        path { d:"M0,50 Q100,40 200,40 T400,60", fill:"none", stroke:"var(--status-err)", stroke_width:"2", opacity: "0.8" }
-
-                        text { x:"2", y:"96", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "20Hz" }
-                        text { x:"375", y:"96", fill:"rgba(255,255,255,0.3)", font_size:"8", font_family:"monospace", "20kHz" }
+                    NeonCanvas {
+                        telemetry: props.telemetry,
+                        session_state: None,
+                        bpm: props.bpm,
+                        width: 600,
+                        height: 250,
+                        paused: false,
+                        is_delta_mode: false,
                     }
                 }
             }

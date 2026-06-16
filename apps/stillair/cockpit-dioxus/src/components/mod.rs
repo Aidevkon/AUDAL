@@ -13,4 +13,5 @@ pub mod soft_key;
 pub mod timecode;
 pub mod transport_bar;
 pub mod transport_button;
+pub mod neon_canvas;
 pub use pdf_preview::PdfPreviewModal;

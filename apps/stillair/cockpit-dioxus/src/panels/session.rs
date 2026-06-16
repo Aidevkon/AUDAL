@@ -87,6 +87,8 @@ pub fn SessionPanel(
                             PrimarySignalAnalyzer {
                                 filename: "NO FILE LOADED".to_string(),
                                 format: "---".to_string(),
+                                telemetry: None,
+                                bpm: 0.0,
                                 on_load_new: on_load,
                             }
                         }
@@ -98,6 +100,8 @@ pub fn SessionPanel(
                             PrimarySignalAnalyzer {
                                 filename: name.clone(),
                                 format: format.clone(),
+                                telemetry: None,
+                                bpm: 0.0,
                                 on_load_new: on_load,
                             }
                             FlavourMenu { flavour }
@@ -111,6 +115,8 @@ pub fn SessionPanel(
                             PrimarySignalAnalyzer {
                                 filename: name.clone(),
                                 format: String::new(),
+                                telemetry: None,
+                                bpm: 0.0,
                                 on_load_new: on_load,
                             }
                             SelectedPreset { preset_id: preset_id.clone() }
