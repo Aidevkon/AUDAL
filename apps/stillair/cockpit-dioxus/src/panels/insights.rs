@@ -14,6 +14,8 @@
 //! M/S fields: demo until backend amendment.
 
 use crate::components::module_frame::ModuleFrame;
+use crate::components::neon_canvas::NeonCanvas;
+use crate::components::intent_bay::IntentBay;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson, RealtimeFrameJson};
 use dioxus::prelude::*;
@@ -43,17 +45,30 @@ const DEMO_SIDE_PCT: f32 = 38.0;
 
 // ── InsightsPanel ─────────────────────────────────────────────────────────────
 
+#[derive(Props, Clone, PartialEq)]
+pub struct InsightsPanelProps {
+    pub mode: Signal<CockpitMode>,
+    pub session_state: Signal<Option<SessionStateJson>>,
+    pub playback_state: Signal<Option<PlaybackStateJson>>,
+    pub viz_data: Signal<Option<VisualizationDataJson>>,
+    pub tone_angle: Signal<f32>,
+    pub dyn_angle: Signal<f32>,
+    pub space_angle: Signal<f32>,
+    pub loud_angle: Signal<f32>,
+    pub on_down_tone: EventHandler<MouseEvent>,
+    pub on_down_dyn: EventHandler<MouseEvent>,
+    pub on_down_space: EventHandler<MouseEvent>,
+    pub on_down_loud: EventHandler<MouseEvent>,
+}
+
 #[component]
-pub fn InsightsPanel(
-    mode: Signal<CockpitMode>,
-    session_state: Signal<Option<SessionStateJson>>,
-    playback_state: Signal<Option<PlaybackStateJson>>,
-    viz_data: Signal<Option<VisualizationDataJson>>,
-) -> Element {
-    let state = session_state.read();
-    let viz = viz_data.read();
+pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
+    let state = props.session_state.read();
+    let viz = props.viz_data.read();
 
     let mut realtime: Signal<Option<RealtimeFrameJson>> = use_signal(|| None);
+    let mut intents_active = use_signal(|| false);
+    let mut spatial_collapsed = use_signal(|| false);
 
     use_effect(move || {
         spawn_local(async move {
@@ -66,29 +81,7 @@ pub fn InsightsPanel(
         });
     });
 
-    let (liss_outer, liss_inner, liss_detail1, liss_detail2) = match realtime.read().as_ref() {
-        Some(frame) => {
-            let mut path = String::with_capacity(frame.gonio_path.len() * 15);
-            for (i, pair) in frame.gonio_path.iter().enumerate() {
-                let x = 60.0 + (pair[0] * 50.0);
-                let y = 60.0 - (pair[1] * 50.0);
-                if i == 0 {
-                    path.push_str(&format!("M {:.1},{:.1} ", x, y));
-                } else {
-                    path.push_str(&format!("L {:.1},{:.1} ", x, y));
-                }
-            }
-            (path, String::new(), String::new(), String::new())
-        }
-        None => {
-            (
-                viz.as_ref().map(|v| v.lissajous_path_outer.as_str()).unwrap_or(DEMO_LISS_OUTER).to_string(),
-                viz.as_ref().map(|v| v.lissajous_path_inner.as_str()).unwrap_or(DEMO_LISS_INNER).to_string(),
-                viz.as_ref().map(|v| v.lissajous_path_detail1.as_str()).unwrap_or(DEMO_LISS_D1).to_string(),
-                viz.as_ref().map(|v| v.lissajous_path_detail2.as_str()).unwrap_or(DEMO_LISS_D2).to_string(),
-            )
-        }
-    };
+    // Removed lissajous code to fix unused variable warnings since StereoScope is gone
 
     let (correlation, width, phase_coh) = match state.as_ref() {
         Some(s) => (
@@ -111,59 +104,82 @@ pub fn InsightsPanel(
 
             div { class: "spatial-body",
 
-                // ── TOP ROW: Lissajous (left) + Metrics stack (right) ─────────
-                div { class: "spatial-top-row",
-
-                    // Left: square goniometer
-                    div { class: "spatial-scope-cell oled-screen",
-                        StereoScope {
-                            path_outer:   liss_outer,
-                            path_inner:   liss_inner,
-                            path_detail1: liss_detail1,
-                            path_detail2: liss_detail2,
-                        }
-                        div { class: "spectrum-container", style: "height: 60px; margin-top: 10px;",
-                            SpectrumBars { spectrum: realtime.read().as_ref().map(|f| f.spectrum.clone()) }
+                div { class: "center-mfd-stack",
+                    div { class: "canvas-reactive-zone",
+                        NeonCanvas {
+                            telemetry: Some(realtime),
+                            session_state: Some(props.session_state),
+                            bpm: 0.0,
+                            width: 800,
+                            height: if *intents_active.read() { 180 } else { 280 },
+                            paused: false,
+                            is_delta_mode: false,
                         }
                     }
-
-                    // Right: 4 stacked metric readouts
-                    div { class: "spatial-metrics-col",
-                        MetricRow {
-                            label: "MID",
-                            value: format!("{:.0}%", DEMO_MID_PCT),
-                            color: "var(--accent-insights)",
-                            bar_pct: DEMO_MID_PCT,
-                        }
-                        MetricRow {
-                            label: "SIDE",
-                            value: format!("{:.0}%", DEMO_SIDE_PCT),
-                            color: "var(--accent-magenta)",
-                            bar_pct: DEMO_SIDE_PCT,
-                        }
-                        MetricRow {
-                            label: "WIDTH",
-                            value: width_str,
-                            color: "var(--accent-insights)",
-                            bar_pct: width * 100.0,
-                        }
-                        MetricRow {
-                            label: "VECTOR",
-                            value: angle_str,
-                            color: "var(--accent-amber)",
-                            bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                    div {
+                        class: if *intents_active.read() { "intent-reveal-zone active" }
+                               else { "intent-reveal-zone" },
+                        onmouseenter: move |_| intents_active.set(true),
+                        onmouseleave: move |_| intents_active.set(false),
+                        IntentBay {
+                            tone_angle: props.tone_angle,
+                            dyn_angle: props.dyn_angle,
+                            space_angle: props.space_angle,
+                            loud_angle: props.loud_angle,
+                            on_down_tone: props.on_down_tone.clone(),
+                            on_down_dyn: props.on_down_dyn.clone(),
+                            on_down_space: props.on_down_space.clone(),
+                            on_down_loud: props.on_down_loud.clone(),
                         }
                     }
                 }
 
-                // ── CORRELATION: full-width horizontal meter ──────────────────
-                div { class: "spatial-corr-cell oled-screen",
-                    CorrelationMeter { correlation }
+                button { onclick: move |_| spatial_collapsed.toggle(),
+                    if *spatial_collapsed.read() { "▶ SPATIAL" } else { "▼ SPATIAL" }
                 }
 
-                // ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────
-                div { class: "spatial-heatmap-cell oled-screen",
-                    SpatialHeatMap {}
+                if !*spatial_collapsed.read() {
+                    // ── TOP ROW: Metrics stack ─────────
+                    div { class: "spatial-top-row",
+
+                        // Right: 4 stacked metric readouts
+                        div { class: "spatial-metrics-col",
+                            MetricRow {
+                                label: "MID",
+                                value: format!("{:.0}%", DEMO_MID_PCT),
+                                color: "var(--accent-insights)",
+                                bar_pct: DEMO_MID_PCT,
+                            }
+                            MetricRow {
+                                label: "SIDE",
+                                value: format!("{:.0}%", DEMO_SIDE_PCT),
+                                color: "var(--accent-magenta)",
+                                bar_pct: DEMO_SIDE_PCT,
+                            }
+                            MetricRow {
+                                label: "WIDTH",
+                                value: width_str,
+                                color: "var(--accent-insights)",
+                                bar_pct: width * 100.0,
+                            }
+                            MetricRow {
+                                label: "VECTOR",
+                                value: angle_str,
+                                color: "var(--accent-amber)",
+                                bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                            }
+                        }
+                    }
+
+                    // ── CORRELATION: full-width horizontal meter ──────────────────
+                    div { class: "spatial-corr-cell oled-screen",
+                        CorrelationMeter { correlation }
+                    }
+
+                    // ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────
+                    div { class: "spatial-heatmap-cell oled-screen",
+                        SpatialHeatMap {}
+                    }
                 }
             }
         }

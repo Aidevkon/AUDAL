@@ -18,12 +18,16 @@ use dioxus::prelude::*;
 use crate::components::neon_canvas::NeonCanvas;
 use crate::types::RealtimeFrameJson;
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum AnalysisStage { Idle, Mfcc, Loudness, Bpm, Corpus, Complete }
+
 #[derive(Props, Clone, PartialEq)]
 pub struct PrimarySignalAnalyzerProps {
     pub filename: String,
     pub format: String,
     pub telemetry: Option<Signal<Option<RealtimeFrameJson>>>,
     pub bpm: f32,
+    pub stage: Signal<AnalysisStage>,
     // Add additional props like session state when backend provides it
     pub on_load_new: EventHandler<()>,
 }
@@ -82,6 +86,17 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                 MeterRow { label: "INTEGRATED", value: format!("{int_lufs:.1} LUFS"), pct: 75.0 }
                 MeterRow { label: "SHORT-TERM", value: format!("{st_lufs:.1} LUFS"), pct: 85.0 }
                 MeterRow { label: "TRUE PEAK",  value: format!("{tp_dbtp:.2} dBTP"), pct: 92.0 }
+
+                div { class: "analysis-leds",
+                    div { class: if *props.stage.read() >= AnalysisStage::Mfcc
+                                 { "led active" } else { "led" }, "MFCC" }
+                    div { class: if *props.stage.read() >= AnalysisStage::Loudness
+                                 { "led active" } else { "led" }, "LOUDNESS" }
+                    div { class: if *props.stage.read() >= AnalysisStage::Bpm
+                                 { "led active" } else { "led" }, "BPM" }
+                    div { class: if *props.stage.read() >= AnalysisStage::Corpus
+                                 { "led active" } else { "led" }, "CORPUS" }
+                }
 
                 div { class: "psa-controls-row",
                     div { class: "psa-control-item",

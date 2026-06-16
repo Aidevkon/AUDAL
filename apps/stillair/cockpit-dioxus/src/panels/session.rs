@@ -9,7 +9,7 @@
 //!   FM5+: Golden Blob badge + EXPORT controls
 
 use crate::components::module_frame::ModuleFrame;
-use crate::components::primary_signal_analyzer::PrimarySignalAnalyzer;
+use crate::components::primary_signal_analyzer::{PrimarySignalAnalyzer, AnalysisStage};
 use dioxus::prelude::*;
 
 use serde_json::json;
@@ -89,6 +89,7 @@ pub fn SessionPanel(
                                 format: "---".to_string(),
                                 telemetry: None,
                                 bpm: 0.0,
+                                stage: use_signal(|| AnalysisStage::Idle),
                                 on_load_new: on_load,
                             }
                         }
@@ -102,6 +103,7 @@ pub fn SessionPanel(
                                 format: format.clone(),
                                 telemetry: None,
                                 bpm: 0.0,
+                                stage: use_signal(|| AnalysisStage::Idle),
                                 on_load_new: on_load,
                             }
                             FlavourMenu { flavour }
@@ -117,6 +119,7 @@ pub fn SessionPanel(
                                 format: String::new(),
                                 telemetry: None,
                                 bpm: 0.0,
+                                stage: use_signal(|| AnalysisStage::Idle),
                                 on_load_new: on_load,
                             }
                             SelectedPreset { preset_id: preset_id.clone() }

@@ -179,6 +179,22 @@ pub fn App() -> Element {
                     dyn_angle,
                     space_angle,
                     loud_angle,
+                    on_down_tone: move |_| {
+                        if *intent_open.read() {
+                            // Close: remove open immediately, play seal animation for 1600ms
+                            intent_open.set(false);
+                            intent_closing.set(true);
+                            spawn_local(async move {
+                                TimeoutFuture::new(1_600).await;
+                                intent_closing.set(false);
+                            });
+                        } else if !*intent_closing.read() {
+                            intent_open.set(true);
+                        }
+                    },
+                    on_down_dyn: move |_| {},
+                    on_down_space: move |_| {},
+                    on_down_loud: move |_| {},
                     jini_persona,
                     is_journey_active,
                     journey_stage,
@@ -211,30 +227,7 @@ pub fn App() -> Element {
                     else if *intent_closing.read() { "hangar-layer intent-closing" }
                     else                           { "hangar-layer" }
                 },
-                div { class: "intent-knob-bay",
-                    IntentBay {
-                        tone_angle,
-                        dyn_angle,
-                        space_angle,
-                        loud_angle,
-                        on_down_tone: move |_| {
-                            if *intent_open.read() {
-                                // Close: remove open immediately, play seal animation for 1600ms
-                                intent_open.set(false);
-                                intent_closing.set(true);
-                                spawn_local(async move {
-                                    TimeoutFuture::new(1_600).await;
-                                    intent_closing.set(false);
-                                });
-                            } else if !*intent_closing.read() {
-                                intent_open.set(true);
-                            }
-                        },
-                        on_down_dyn: move |_| {},
-                        on_down_space: move |_| {},
-                        on_down_loud: move |_| {},
-                    }
-                }
+                div { class: "intent-knob-bay" }
                 div { class: "coach-panel chassis-bezel",
                     CoachPanel { mode, session_state, wizard_findings, jini_suggestion, jini_persona }
                 }

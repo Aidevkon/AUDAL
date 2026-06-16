@@ -34,13 +34,18 @@
 .mfd-bay {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 28fr 44fr 28fr;
     gap: var(--panel-inset);
     padding: var(--panel-inset);
     min-height: 0;
     overflow: visible;
     isolation: isolate;
 }
+
+.center-mfd-stack { display:flex; flex-direction:column; height:100%; gap:1rem; }
+.canvas-reactive-zone { flex:1; transition:flex 0.6s cubic-bezier(0.2,0.8,0.2,1); min-height:120px; }
+.intent-reveal-zone { flex-basis:40px; opacity:0.3; transition:all 0.6s cubic-bezier(0.2,0.8,0.2,1); overflow:hidden; }
+.intent-reveal-zone.active { flex-basis:140px; opacity:1.0; }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    12. Spectrum
