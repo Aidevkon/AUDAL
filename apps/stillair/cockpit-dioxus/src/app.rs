@@ -64,8 +64,8 @@ pub fn App() -> Element {
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
-    let mut last_platform: Signal<Option<String>> = use_signal(|| None);
-    let mut last_flavour: Signal<Option<String>>  = use_signal(|| None);
+    let last_platform: Signal<Option<String>> = use_signal(|| None);
+    let last_flavour: Signal<Option<String>>  = use_signal(|| None);
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
@@ -366,12 +366,11 @@ pub fn App() -> Element {
                         }
                     },
                     HangarInterviewState::Ignition { platform, flavour } => {
-                        last_platform.set(Some(platform.clone()));
-                        last_flavour.set(Some(flavour.clone()));
-
                         if let Some(path) = dropped_path.read().clone() {
                             let m = mode;
                             let mut hs = hangar_state;
+                            let mut lp = last_platform;
+                            let mut lf = last_flavour;
                             
                             let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
                             let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
@@ -379,6 +378,9 @@ pub fn App() -> Element {
                             let fl = flavour.clone();
 
                             spawn_local(async move {
+                                lp.set(Some(pr.clone()));
+                                lf.set(Some(fl.clone()));
+
                                 match invoke::<crate::types::AudioMeta, _>(
                                     "load_audio_file",
                                     serde_json::json!({ "path": path.clone() })
