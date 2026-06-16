@@ -25,7 +25,7 @@ pub fn IntentBay(props: IntentBayProps) -> Element {
                 div { class: "intent-knobs",
                     IntentKnob {
                         label: "TONE",
-                        range: "Warm ↔ Bright",
+                        range: "Dark ↔ Bright",
                         angle: props.tone_angle,
                         highlighted: true,
                         on_down: move |e| props.on_down_tone.call(e)
