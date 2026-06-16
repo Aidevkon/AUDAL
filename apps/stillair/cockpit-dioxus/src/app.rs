@@ -59,7 +59,10 @@ pub fn App() -> Element {
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
-    let mut hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
+    // TODO: When file drop is implemented (OB-P2 full),
+    // wire Ignition → CockpitMode::FileLoaded { path, name, format }
+    // and Analysing → drive AnalysisStage LEDs in Left MFD
+    let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -256,14 +259,15 @@ pub fn App() -> Element {
                         button { onclick: move |_| {}, "Club Punch" }
                         button { onclick: move |_| {}, "Neutral" }
                     },
-                    HangarInterviewState::Ignition { .. } => rsx! {
-                        p { "Analysing." }
+                    HangarInterviewState::Ignition { platform, flavour } => {
+                        let _ = (platform, flavour); // stub — real path from drop event
+                        rsx! { p { "Analysing." } }
                     },
                     HangarInterviewState::Analysing => rsx! {
                         p { "Analysing." }
                     },
                     HangarInterviewState::Ready => {
-                        // Connection point: also update CockpitMode
+                        // Stub — full CockpitMode wiring when file drop implemented
                         rsx! {
                             div { class: "coach-panel chassis-bezel",
                                 CoachPanel { 
