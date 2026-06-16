@@ -64,6 +64,8 @@ pub fn App() -> Element {
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
+    let mut last_platform: Signal<Option<String>> = use_signal(|| None);
+    let mut last_flavour: Signal<Option<String>>  = use_signal(|| None);
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
@@ -364,9 +366,18 @@ pub fn App() -> Element {
                         }
                     },
                     HangarInterviewState::Ignition { platform, flavour } => {
+                        last_platform.set(Some(platform.clone()));
+                        last_flavour.set(Some(flavour.clone()));
+
                         if let Some(path) = dropped_path.read().clone() {
                             let m = mode;
                             let mut hs = hangar_state;
+                            
+                            let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
+                            let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
+                            let pr = platform.clone();
+                            let fl = flavour.clone();
+
                             spawn_local(async move {
                                 match invoke::<crate::types::AudioMeta, _>(
                                     "load_audio_file",
@@ -379,6 +390,29 @@ pub fn App() -> Element {
                                             format: meta.format.clone(),
                                         });
                                         hs.set(HangarInterviewState::Analysing);
+
+                                        match invoke::<String, _>(
+                                            "trigger_mastering",
+                                            serde_json::json!({
+                                                "audioPath":      path.clone(),
+                                                "presetId":       pr,
+                                                "flavourId":      fl,
+                                                "intentTone":     tone,
+                                                "intentDynamics": dynval,
+                                            })
+                                        ).await {
+                                            Ok(blob_id) => {
+                                                dispatch(m, CockpitEvent::MasteringComplete {
+                                                    blob_id: blob_id.clone(),
+                                                });
+                                                hs.set(HangarInterviewState::Ready);
+                                            }
+                                            Err(e) => {
+                                                dispatch(m, CockpitEvent::MasteringFailed {
+                                                    message: format!("{e}"),
+                                                });
+                                            }
+                                        }
                                     }
                                     Err(_) => {
                                         hs.set(HangarInterviewState::Analysing);
@@ -386,7 +420,6 @@ pub fn App() -> Element {
                                 }
                             });
                         }
-                        let _ = (platform, flavour);
                         rsx! { p { "Analysing." } }
                     },
                     HangarInterviewState::Analysing => rsx! {
