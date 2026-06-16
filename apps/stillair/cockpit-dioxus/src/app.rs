@@ -62,7 +62,7 @@ pub fn App() -> Element {
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
-    let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
+    let mut hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -252,12 +252,62 @@ pub fn App() -> Element {
                         button { onclick: move |_| {}, "Broadcast" }
                         button { onclick: move |_| {}, "Broadcast US" }
                     },
-                    HangarInterviewState::FlavourCard { .. } => rsx! {
-                        p { "How do you want it to sound?" }
-                        button { onclick: move |_| {}, "Warm Analog" }
-                        button { onclick: move |_| {}, "Clean & Clear" }
-                        button { onclick: move |_| {}, "Club Punch" }
-                        button { onclick: move |_| {}, "Neutral" }
+                    HangarInterviewState::FlavourCard { platform, track_count: _track_count } => {
+                        // Progressive gate: if sessions >= 5, show memory prompt
+                        // STUBS: Set to 5 and "Warm Analog" to force render the UI
+                        let sessions: u32 = 5; 
+                        let last_flavour: Option<String> = Some("Warm Analog".to_string());
+                        
+                        if sessions >= 5 && last_flavour.is_some() {
+                            let flav_text = last_flavour.clone().unwrap();
+                            let flav_action = last_flavour.unwrap();
+                            
+                            let p1 = platform.clone();
+                            rsx! {
+                                p { "Last time: {flav_text}. Same this time?" }
+                                button { onclick: move |_| {
+                                    hangar_state.set(HangarInterviewState::Ignition {
+                                        platform: p1.clone(),
+                                        flavour: flav_action.clone(),
+                                    });
+                                }, "Yes" }
+                                button { onclick: move |_| {
+                                    // TODO: clear memory and show full flavour card
+                                }, "Change it" }
+                            }
+                        } else {
+                            let p1 = platform.clone();
+                            let p2 = platform.clone();
+                            let p3 = platform.clone();
+                            let p4 = platform.clone();
+                            rsx! {
+                                p { "How do you want it to sound?" }
+                                button { onclick: move |_| {
+                                    hangar_state.set(HangarInterviewState::Ignition {
+                                        platform: p1.clone(),
+                                        flavour: "Warm Analog".to_string(),
+                                    });
+                                }, "Warm Analog" }
+                                button { onclick: move |_| {
+                                    hangar_state.set(HangarInterviewState::Ignition {
+                                        platform: p2.clone(),
+                                        flavour: "Clean & Clear".to_string(),
+                                    });
+                                }, "Clean & Clear" }
+                                button { onclick: move |_| {
+                                    hangar_state.set(HangarInterviewState::Ignition {
+                                        platform: p3.clone(),
+                                        flavour: "Club Punch".to_string(),
+                                    });
+                                }, "Club Punch" }
+                                button { onclick: move |_| {
+                                    hangar_state.set(HangarInterviewState::Ignition {
+                                        platform: p4.clone(),
+                                        flavour: "Neutral".to_string(),
+                                    });
+                                }, "Neutral" }
+                            }
+                        }
                     },
                     HangarInterviewState::Ignition { platform, flavour } => {
                         let _ = (platform, flavour); // stub — real path from drop event

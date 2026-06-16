@@ -4,7 +4,7 @@ pub enum HangarInterviewState {
     Detection { track_count: usize },
     AwaitingMore { track_count: usize },
     PlatformCard { selected: Option<String> },
-    FlavourCard { selected: Option<String> },
+    FlavourCard { platform: String, track_count: usize },
     Ignition { platform: String, flavour: String },
     Analysing,
     Ready,

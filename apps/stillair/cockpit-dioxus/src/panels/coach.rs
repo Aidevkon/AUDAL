@@ -186,6 +186,8 @@ fn JiniNarrative(
     persona: Signal<JiniPersonaState>,
 ) -> Element {
     let current_persona = persona.read().clone();
+    let mut jini_click_count = use_signal(|| 0u8);
+    let mut show_persona_override = use_signal(|| false);
     rsx! {
         div {
             style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
@@ -231,6 +233,14 @@ fn JiniNarrative(
                         "JINI"
                     }
                     div {
+                        onclick: move |_| {
+                            let count = *jini_click_count.read() + 1;
+                            jini_click_count.set(count);
+                            if count >= 3 {
+                                jini_click_count.set(0);
+                                show_persona_override.set(true);
+                            }
+                        },
                         style: "color:var(--text-primary); font-size:0.82rem; \
                                 line-height:1.6; font-style:italic;",
                         "{s.narrative}"
@@ -243,6 +253,23 @@ fn JiniNarrative(
                     }
                 }
             } }
+
+            if *show_persona_override.read() {
+                div { class: "persona-override-modal",
+                    button { onclick: move |_| {
+                        show_persona_override.set(false);
+                    }, "BEGINNER" }
+                    button { onclick: move |_| {
+                        show_persona_override.set(false);
+                    }, "INTERMEDIATE" }
+                    button { onclick: move |_| {
+                        show_persona_override.set(false);
+                    }, "PRO" }
+                    button { onclick: move |_| {
+                        show_persona_override.set(false);
+                    }, "✕" }
+                }
+            }
         }
     }
 }

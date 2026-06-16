@@ -22,22 +22,7 @@ use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 // ── Demo Lissajous paths (FM0 idle) ───────────────────────────────────────────
-const DEMO_LISS_OUTER: &str = "M 82,60 L 89,74 L 100,94 L 104,110 L 98,116 L 86,110 L 74,94 \
-     L 66,74 L 60,60 L 54,46 L 46,26 L 34,10 L 22,4 L 16,10 \
-     L 20,26 L 34,46 L 48,60 L 54,74 L 54,94 L 48,110 \
-     L 38,116 L 28,108 L 22,92 L 26,74 L 38,60 L 52,46 \
-     L 66,26 L 78,10 L 86,4 L 92,10 L 94,26 L 88,46 L 82,60";
 
-const DEMO_LISS_INNER: &str = "M 60,60 L 72,73 L 84,78 L 84,66 L 72,47 L 60,38 \
-     L 48,47 L 36,66 L 36,78 L 48,73 L 60,60 \
-     L 72,47 L 84,42 L 84,54 L 72,73 L 60,82 \
-     L 48,73 L 36,54 L 36,42 L 48,47 L 60,60";
-
-const DEMO_LISS_D1: &str = "M 60,60 L 81,73 L 90,60 L 81,47 L 60,60 \
-     L 39,73 L 30,60 L 39,47 L 60,60 L 75,78 L 60,60 L 45,78 L 60,60";
-
-const DEMO_LISS_D2: &str = "M 60,60 L 74,80 L 80,60 L 74,40 L 60,60 \
-     L 46,80 L 40,60 L 46,40 L 60,60 L 70,88 L 60,60 L 50,88 L 60,60";
 
 // Demo M/S — pending backend amendment
 const DEMO_MID_PCT: f32 = 62.0;
@@ -64,7 +49,6 @@ pub struct InsightsPanelProps {
 #[component]
 pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
     let state = props.session_state.read();
-    let viz = props.viz_data.read();
 
     let mut realtime: Signal<Option<RealtimeFrameJson>> = use_signal(|| None);
     let mut intents_active = use_signal(|| false);

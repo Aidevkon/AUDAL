@@ -7,7 +7,6 @@ use dioxus::prelude::*;
 use crate::types::{RealtimeFrameJson, SessionStateJson};
 use libm;
 
-const SMOOTHING_FACTOR: f64  = 0.08;
 const FALLBACK_PULSE_MS: f64 = 500.0;
 const GRID_COLS: u32         = 12;
 const GRID_ROWS: u32         = 8;
@@ -56,7 +55,6 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             
             ctx.clear_rect(0.0, 0.0, width, height);
 
-            let window = web_sys::window().unwrap();
             let time_ms = js_sys::Date::now();
             let mut spectrum = vec![];
             if let Some(telemetry_signal) = &props_clone.telemetry {
@@ -112,7 +110,7 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
 
 fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms: f64) {
     ctx.set_global_alpha(0.15);
-    ctx.set_stroke_style(&JsValue::from_str("#00d1ff"));
+    ctx.set_stroke_style_str("#00d1ff");
     ctx.set_line_width(1.0);
     ctx.begin_path();
 
@@ -144,7 +142,7 @@ fn render_topography(ctx: &CanvasRenderingContext2d, width: f64, height: f64, sp
     let avg = spectrum.iter().sum::<f32>() / spectrum.len() as f32;
     let color = if avg > -12.0 { "#ff2a7f" } else { "#00d1ff" };
 
-    ctx.set_stroke_style(&JsValue::from_str(color));
+    ctx.set_stroke_style_str(color);
     ctx.set_line_width(2.0);
     ctx.begin_path();
 
@@ -168,7 +166,7 @@ fn render_lasers(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_m
     let opacity = 0.4 + 0.6 * libm::sin(phase * PI * 2.0).abs();
 
     ctx.set_global_alpha(opacity);
-    ctx.set_stroke_style(&JsValue::from_str("#c8a832"));
+    ctx.set_stroke_style_str("#c8a832");
     ctx.set_line_width(1.0);
     ctx.begin_path();
 
