@@ -11,3 +11,8 @@ pub mod executor;
 pub mod operator;
 pub mod schema;
 pub mod wizard;
+
+pub mod corpus_agent;
+pub mod git_agent;
+pub mod persona_agent;
+pub mod session_agent;
