@@ -21,6 +21,7 @@ use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
 use crate::panels::{coach::CoachPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
+use crate::state::presets::{FLAVOURS, PLATFORMS};
 use crate::state::hangar_interview::HangarInterviewState;
 use crate::types::{
     CockpitTier, JiniPersonaState, JiniSuggestionJson, SessionStateJson, VisualizationDataJson,
@@ -247,10 +248,24 @@ pub fn App() -> Element {
                     },
                     HangarInterviewState::PlatformCard { .. } => rsx! {
                         p { "Where is this going?" }
-                        button { onclick: move |_| {}, "Spotify / Apple" }
-                        button { onclick: move |_| {}, "Podcast" }
-                        button { onclick: move |_| {}, "Broadcast" }
-                        button { onclick: move |_| {}, "Broadcast US" }
+                        for p in PLATFORMS {
+                            {
+                                let id = p.id;
+                                rsx! {
+                                    button {
+                                        onclick: move |_| {
+                                            hangar_state.set(
+                                                HangarInterviewState::FlavourCard {
+                                                    platform: id.to_string(),
+                                                    track_count: 1,
+                                                }
+                                            );
+                                        },
+                                        "{p.label}"
+                                    }
+                                }
+                            }
+                        }
                     },
                     HangarInterviewState::FlavourCard { platform, track_count: _track_count } => {
                         // Progressive gate: if sessions >= 5, show memory prompt
@@ -276,36 +291,25 @@ pub fn App() -> Element {
                                 }, "Change it" }
                             }
                         } else {
-                            let p1 = platform.clone();
-                            let p2 = platform.clone();
-                            let p3 = platform.clone();
-                            let p4 = platform.clone();
                             rsx! {
                                 p { "How do you want it to sound?" }
-                                button { onclick: move |_| {
-                                    hangar_state.set(HangarInterviewState::Ignition {
-                                        platform: p1.clone(),
-                                        flavour: "Warm Analog".to_string(),
-                                    });
-                                }, "Warm Analog" }
-                                button { onclick: move |_| {
-                                    hangar_state.set(HangarInterviewState::Ignition {
-                                        platform: p2.clone(),
-                                        flavour: "Clean & Clear".to_string(),
-                                    });
-                                }, "Clean & Clear" }
-                                button { onclick: move |_| {
-                                    hangar_state.set(HangarInterviewState::Ignition {
-                                        platform: p3.clone(),
-                                        flavour: "Club Punch".to_string(),
-                                    });
-                                }, "Club Punch" }
-                                button { onclick: move |_| {
-                                    hangar_state.set(HangarInterviewState::Ignition {
-                                        platform: p4.clone(),
-                                        flavour: "Neutral".to_string(),
-                                    });
-                                }, "Neutral" }
+                                for f in FLAVOURS {
+                                    {
+                                        let id = f.id;
+                                        let platform_clone = platform.clone();
+                                        rsx! {
+                                            button {
+                                                onclick: move |_| {
+                                                    hangar_state.set(HangarInterviewState::Ignition {
+                                                        platform: platform_clone.clone(),
+                                                        flavour: id.to_string(),
+                                                    });
+                                                },
+                                                "{f.label}"
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     },

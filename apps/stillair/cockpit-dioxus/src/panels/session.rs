@@ -21,25 +21,9 @@ use crate::state::cockpit_event::CockpitEvent;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
 use crate::state::reducer::dispatch;
 use crate::types::{AudioMeta, SessionStateJson, VisualizationDataJson};
+use crate::state::presets::{FLAVOURS, PLATFORMS};
 
-const PRESETS: &[(&str, &str)] = &[
-    ("spotify", "Spotify  −14 LUFS"),
-    ("youtube", "YouTube  −14 LUFS"),
-    ("apple_music", "Apple Music  −16 LUFS"),
-    ("apple_podcast", "Apple Podcasts  −16 LUFS"),
-    ("tidal", "Tidal  −14 LUFS"),
-    ("broadcast", "Broadcast  −23 LUFS"),
-    ("amazon", "Amazon Music  −14 LUFS"),
-];
 
-const FLAVOURS: &[(&str, &str)] = &[
-    ("clean", "CLEAN"),
-    ("warm", "WARM"),
-    ("punch", "PUNCH"),
-    ("air", "AIR"),
-    ("film", "FILM"),
-    ("broadcast", "BROADCAST"),
-];
 
 #[component]
 pub fn SessionPanel(
@@ -157,11 +141,12 @@ fn FlavourMenu(mut flavour: Signal<String>) -> Element {
             }
             div {
                 style: "display:flex; gap:0.35rem; flex-wrap:wrap;",
-                for (fid, label) in FLAVOURS {
+                for f in FLAVOURS {
                     {
-                        let fid  = fid.to_string();
+                        let fid  = f.id.to_string();
                         let fid2 = fid.clone();
                         let is_active = *flavour.read() == fid;
+                        let label = f.label;
                         rsx! {
                             button {
                                 key: "{fid}",
@@ -197,11 +182,11 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
             }
             div {
                 style: "display:flex; flex-direction:column; gap:0.35rem;",
-                for (preset_id, label) in PRESETS {
+                for p in PLATFORMS {
                     {
-                        let pid  = preset_id.to_string();
+                        let pid  = p.id.to_string();
                         let pid2 = pid.clone();
-                        let lbl  = label.to_string();
+                        let lbl  = p.label.to_string();
                         rsx! {
                             button {
                                 key: "{pid}",
@@ -229,10 +214,10 @@ fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element 
 
 #[component]
 fn SelectedPreset(preset_id: String) -> Element {
-    let label = PRESETS
+    let label = PLATFORMS
         .iter()
-        .find(|(id, _)| *id == preset_id.as_str())
-        .map(|(_, l)| *l)
+        .find(|p| p.id == preset_id.as_str())
+        .map(|p| p.label)
         .unwrap_or(&preset_id);
     rsx! {
         div {
