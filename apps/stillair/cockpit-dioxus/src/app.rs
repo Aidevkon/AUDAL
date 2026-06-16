@@ -24,6 +24,8 @@ use crate::panels::{coach::CoachPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
 use crate::state::presets::{FLAVOURS, PLATFORMS};
 use crate::state::hangar_interview::HangarInterviewState;
+use crate::state::reducer::dispatch;
+use crate::state::cockpit_event::CockpitEvent;
 use crate::types::{
     CockpitTier, JiniPersonaState, JiniSuggestionJson, SessionStateJson, VisualizationDataJson,
 };
@@ -363,12 +365,25 @@ pub fn App() -> Element {
                     },
                     HangarInterviewState::Ignition { platform, flavour } => {
                         if let Some(path) = dropped_path.read().clone() {
+                            let m = mode;
+                            let mut hs = hangar_state;
                             spawn_local(async move {
-                                let _ = invoke::<crate::types::AudioMeta, _>(
+                                match invoke::<crate::types::AudioMeta, _>(
                                     "load_audio_file",
-                                    serde_json::json!({ "path": path })
-                                ).await;
-                                // TODO: dispatch FileDropped with real metadata
+                                    serde_json::json!({ "path": path.clone() })
+                                ).await {
+                                    Ok(meta) => {
+                                        dispatch(m, CockpitEvent::FileDropped {
+                                            path:   path.clone(),
+                                            name:   meta.name.clone(),
+                                            format: meta.format.clone(),
+                                        });
+                                        hs.set(HangarInterviewState::Analysing);
+                                    }
+                                    Err(_) => {
+                                        hs.set(HangarInterviewState::Analysing);
+                                    }
+                                }
                             });
                         }
                         let _ = (platform, flavour);
