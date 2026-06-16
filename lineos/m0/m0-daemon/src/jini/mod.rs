@@ -108,7 +108,7 @@ fn build_prompt(behaviour: &BehaviourVector, persona: &JiniPersonaId) -> String 
     };
 
     format!(
-        "{}\n\nAudio analysis:\n\
+        "{}\n\n{}\n\nAudio analysis:\n\
          - Loudness: {:?}\n\
          - Spectral: {:?}\n\
          - Dynamics: {:?}\n\
@@ -121,6 +121,7 @@ fn build_prompt(behaviour: &BehaviourVector, persona: &JiniPersonaId) -> String 
          \"delta\": float, \"reason\": \"string\", \
          \"to\": \"warm|clean|punch|air|film|broadcast\"}}, \
          \"confidence\": float}}",
+        lineos_types::jini::BRAND_VOICE_CONSTITUTION,
         schema,
         behaviour.loudness,
         behaviour.spectral,

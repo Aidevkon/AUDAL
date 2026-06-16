@@ -16,11 +16,12 @@
 //! Amendment A-002 §3: no core imports.
 //! Amendment A-003 §5: no PCM — PlaybackStateJson only.
 
-use crate::components::intent_bay::IntentBay;
+
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
 use crate::panels::{coach::CoachPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
+use crate::state::hangar_interview::HangarInterviewState;
 use crate::types::{
     CockpitTier, JiniPersonaState, JiniSuggestionJson, SessionStateJson, VisualizationDataJson,
 };
@@ -58,6 +59,7 @@ pub fn App() -> Element {
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
+    let mut hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -227,9 +229,50 @@ pub fn App() -> Element {
                     else if *intent_closing.read() { "hangar-layer intent-closing" }
                     else                           { "hangar-layer" }
                 },
-                div { class: "intent-knob-bay" }
-                div { class: "coach-panel chassis-bezel",
-                    CoachPanel { mode, session_state, wizard_findings, jini_suggestion, jini_persona }
+                match hangar_state.read().clone() {
+                    HangarInterviewState::AwaitingDrop => rsx! {
+                        div { class: "hangar-drop-zone",
+                            p { "Drop your audio here." }
+                        }
+                    },
+                    HangarInterviewState::Detection { .. } => rsx! {
+                        p { "Single track." }
+                    },
+                    HangarInterviewState::AwaitingMore { .. } => rsx! {
+                        p { "Waiting for more tracks..." }
+                        button { onclick: move |_| {}, "[+] Add" }
+                    },
+                    HangarInterviewState::PlatformCard { .. } => rsx! {
+                        p { "Where is this going?" }
+                        button { onclick: move |_| {}, "Spotify / Apple" }
+                        button { onclick: move |_| {}, "Podcast" }
+                        button { onclick: move |_| {}, "Broadcast" }
+                        button { onclick: move |_| {}, "Broadcast US" }
+                    },
+                    HangarInterviewState::FlavourCard { .. } => rsx! {
+                        p { "How do you want it to sound?" }
+                        button { onclick: move |_| {}, "Warm Analog" }
+                        button { onclick: move |_| {}, "Clean & Clear" }
+                        button { onclick: move |_| {}, "Club Punch" }
+                        button { onclick: move |_| {}, "Neutral" }
+                    },
+                    HangarInterviewState::Ignition { .. } => rsx! {
+                        p { "Analysing." }
+                    },
+                    HangarInterviewState::Analysing => rsx! {
+                        p { "Analysing." }
+                    },
+                    HangarInterviewState::Ready => {
+                        // Connection point: also update CockpitMode
+                        rsx! {
+                            div { class: "coach-panel chassis-bezel",
+                                CoachPanel { 
+                                    mode, session_state, wizard_findings,
+                                    jini_suggestion, jini_persona 
+                                }
+                            }
+                        }
+                    },
                 }
             }
         }
