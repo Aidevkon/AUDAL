@@ -21,6 +21,7 @@ pub async fn run(
     db: crate::db::DbConn,
     blob_store: crate::blob_store::BlobStore,
     album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
+    progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
 ) {
     // AtomicBool: only one mastering job at a time
     // R2 decision: is the system busy?
@@ -29,7 +30,7 @@ pub async fn run(
     // Conductor holds its own channel to Executor
     // Created once at startup — persists for the lifetime of the agent
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(4);
-    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone()));
+    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone(), progress_tx));
 
     while let Some(intent) = rx.recv().await {
         match intent {

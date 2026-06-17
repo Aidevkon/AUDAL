@@ -135,6 +135,22 @@ async fn main() -> Result<()> {
     tracing::info!("Health endpoint:    http://{HEALTH_ADDR}");
     tracing::info!("Mastering endpoint: http://{MASTERING_ADDR}");
 
+    // Pre-warm the LLM so first real request skips cold start
+    tokio::spawn(async {
+        tracing::info!("[m0d] pre-warming gemma2:9b...");
+        let _ = reqwest::Client::new()
+            .post("http://localhost:11434/api/generate")
+            .json(&serde_json::json!({
+                "model": "gemma2:9b",
+                "prompt": "ready",
+                "stream": false,
+                "keep_alive": "30m"
+            }))
+            .send()
+            .await;
+        tracing::info!("[m0d] pre-warm done");
+    });
+
     // Run both routers concurrently
     let health_listener = tokio::net::TcpListener::bind(health_addr).await?;
     let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;

@@ -19,7 +19,21 @@ use crate::components::neon_canvas::NeonCanvas;
 use crate::types::RealtimeFrameJson;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum AnalysisStage { Idle, Mfcc, Loudness, Bpm, Corpus, Complete }
+pub enum AnalysisStage {
+    Idle, Ingest, Scout, Stems, Spatial, Master, Certified
+}
+
+pub fn stage_from_str(s: &str) -> AnalysisStage {
+    match s {
+        "Ingest"      => AnalysisStage::Ingest,
+        "Scout Pass"  => AnalysisStage::Scout,
+        "Stem Engine" => AnalysisStage::Stems,
+        "Spatial"     => AnalysisStage::Spatial,
+        "Mastering"   => AnalysisStage::Master,
+        "CERTIFIED"   => AnalysisStage::Certified,
+        _             => AnalysisStage::Idle,
+    }
+}
 
 #[derive(Props, Clone, PartialEq)]
 pub struct PrimarySignalAnalyzerProps {
@@ -27,7 +41,7 @@ pub struct PrimarySignalAnalyzerProps {
     pub format: String,
     pub telemetry: Option<Signal<Option<RealtimeFrameJson>>>,
     pub bpm: f32,
-    pub stage: Signal<AnalysisStage>,
+    pub journey_stage: Signal<String>,
     // Add additional props like session state when backend provides it
 }
 
@@ -87,14 +101,21 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                 MeterRow { label: "TRUE PEAK",  value: format!("{tp_dbtp:.2} dBTP"), pct: 92.0 }
 
                 div { class: "analysis-leds",
-                    div { class: if *props.stage.read() >= AnalysisStage::Mfcc
-                                 { "led active" } else { "led" }, "MFCC" }
-                    div { class: if *props.stage.read() >= AnalysisStage::Loudness
-                                 { "led active" } else { "led" }, "LOUDNESS" }
-                    div { class: if *props.stage.read() >= AnalysisStage::Bpm
-                                 { "led active" } else { "led" }, "BPM" }
-                    div { class: if *props.stage.read() >= AnalysisStage::Corpus
-                                 { "led active" } else { "led" }, "CORPUS" }
+                    {
+                        let current = stage_from_str(&props.journey_stage.read());
+                        let class_ingest = if current == AnalysisStage::Ingest { "led active pulse" } else if current >= AnalysisStage::Ingest { "led active" } else { "led" };
+                        let class_scout = if current == AnalysisStage::Scout { "led active pulse" } else if current >= AnalysisStage::Scout { "led active" } else { "led" };
+                        let class_stems = if current == AnalysisStage::Stems { "led active pulse" } else if current >= AnalysisStage::Stems { "led active" } else { "led" };
+                        let class_spatial = if current == AnalysisStage::Spatial { "led active pulse" } else if current >= AnalysisStage::Spatial { "led active" } else { "led" };
+                        let class_master = if current == AnalysisStage::Master { "led active pulse" } else if current >= AnalysisStage::Master { "led active" } else { "led" };
+                        rsx! {
+                            div { class: "{class_ingest}", "INGEST" }
+                            div { class: "{class_scout}", "SCOUT" }
+                            div { class: "{class_stems}", "STEMS" }
+                            div { class: "{class_spatial}", "SPATIAL" }
+                            div { class: "{class_master}", "MASTER" }
+                        }
+                    }
                 }
 
 

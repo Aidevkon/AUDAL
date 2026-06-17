@@ -15,8 +15,10 @@ pub fn run_dsp(
     req: &MasterRequest,
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
+    progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
+    job_id: String,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
-    run_dsp_internal(req, start, head_state)
+    run_dsp_internal(req, start, head_state, progress_tx, job_id)
 }
 
 #[inline(always)]
@@ -37,10 +39,24 @@ fn run_dsp_internal(
     req: &MasterRequest,
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
+    progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
+    job_id: String,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
+
+    let emit_progress = |stage_name: &str| {
+        if let Some(tx) = &progress_tx {
+            let _ = tx.send(crate::app_state::MasteringProgress {
+                job_id: job_id.clone(),
+                stage: stage_name.into(),
+                elapsed_ms: start.elapsed().as_millis() as u64,
+                blob_id: None,
+                error: None,
+            });
+        }
+    };
 
     // NODE 1: DECODE
     let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id)?;
@@ -57,6 +73,7 @@ fn run_dsp_internal(
     let _chunk_original = decoded.chunk_original;
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
+    emit_progress("Ingest");
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
@@ -91,6 +108,7 @@ fn run_dsp_internal(
     let render_params = scout_out.render_params;
     let mono = scout_out.mono;
     profiler.mark_stage("Scout Pass", &mono);
+    emit_progress("Scout Pass");
 
     use lineos_types::{MixMetrics, StemFeatures, StemMetrics};
     let streaming_features = StemFeatures {
@@ -146,6 +164,7 @@ fn run_dsp_internal(
         right_slice,
     )?;
     profiler.mark_stage("Stem Engine", left_slice);
+    emit_progress("Stem Engine");
 
     // Markov spatial modulation (simplified — full in Phase 8)
     let profile = UserSpatialProfile::default_podcast();
@@ -155,6 +174,7 @@ fn run_dsp_internal(
     // chunk.left  = left_slice;
     // chunk.right = right_slice;
     profiler.mark_stage("Spatial", &chunk.left);
+    emit_progress("Spatial");
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
     let dsp_out = crate::domain::nodes::dsp_node::run(
@@ -183,6 +203,7 @@ fn run_dsp_internal(
     let lufs = dsp_out.lufs;
     let tp = dsp_out.true_peak;
     profiler.mark_stage("Mastering", left_slice);
+    emit_progress("Mastering");
     let _dr = 10.0; // dynamic range proxy for v3
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;

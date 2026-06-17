@@ -9,7 +9,7 @@
 //!   FM5+: Golden Blob badge + EXPORT controls
 
 use crate::components::module_frame::ModuleFrame;
-use crate::components::primary_signal_analyzer::{PrimarySignalAnalyzer, AnalysisStage};
+use crate::components::primary_signal_analyzer::PrimarySignalAnalyzer;
 use dioxus::prelude::*;
 
 use serde_json::json;
@@ -21,7 +21,7 @@ use crate::state::cockpit_event::CockpitEvent;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
 use crate::state::reducer::dispatch;
 use crate::types::{SessionStateJson, VisualizationDataJson};
-use crate::state::presets::{FLAVOURS, PLATFORMS};
+use crate::state::presets::PLATFORMS;
 
 
 
@@ -37,9 +37,8 @@ pub fn SessionPanel(
     space_angle: Signal<f32>,
     loud_angle: Signal<f32>,
     jini_persona: Signal<crate::types::JiniPersonaState>,
+    journey_stage: Signal<String>,
 ) -> Element {
-    let flavour = use_signal(|| "clean".to_string());
-
     rsx! {
     ModuleFrame {
         title: "PRIMARY SIGNAL ANALYZER".to_string(),
@@ -55,21 +54,19 @@ pub fn SessionPanel(
                                 format: "---".to_string(),
                                 telemetry: None,
                                 bpm: 0.0,
-                                stage: use_signal(|| AnalysisStage::Idle),
+                                journey_stage,
                             }
                         }
                     },
-                    CockpitMode::FileLoaded { name, format, path } => {
+                    CockpitMode::FileLoaded { name, format, path: _ } => {
                         rsx! {
                             PrimarySignalAnalyzer {
                                 filename: name.clone(),
                                 format: format.clone(),
                                 telemetry: None,
                                 bpm: 0.0,
-                                stage: use_signal(|| AnalysisStage::Idle),
+                                journey_stage,
                             }
-                            FlavourMenu { flavour }
-                            PresetMenu { mode, path, name }
                         }
                     },
                     CockpitMode::PresetSelected { path, name, preset_id } => {
@@ -79,11 +76,11 @@ pub fn SessionPanel(
                                 format: String::new(),
                                 telemetry: None,
                                 bpm: 0.0,
-                                stage: use_signal(|| AnalysisStage::Idle),
+                                journey_stage,
                             }
                             SelectedPreset { preset_id: preset_id.clone() }
                             MasterButton {
-                                mode, session_state, viz_data, path, name, preset_id, wizard_findings, flavour,
+                                mode, session_state, viz_data, path, name, preset_id, wizard_findings,
                                 tone_angle, dyn_angle, space_angle, loud_angle, jini_persona
                             }
                         }
@@ -98,89 +95,6 @@ pub fn SessionPanel(
                     CockpitMode::Fault { code, message } => rsx! {
                         FaultView { code, message }
                     },
-                }
-            }
-        }
-    }
-}
-#[component]
-fn FlavourMenu(mut flavour: Signal<String>) -> Element {
-    rsx! {
-        div {
-            style: "padding:0.75rem 1.5rem 0.5rem;",
-            div {
-                style: "color:var(--text-secondary); font-size:0.6rem; \
-                        letter-spacing:0.15em; text-transform:uppercase; \
-                        margin-bottom:0.5rem;",
-                "CHARACTER"
-            }
-            div {
-                style: "display:flex; gap:0.35rem; flex-wrap:wrap;",
-                for f in FLAVOURS {
-                    {
-                        let fid  = f.id.to_string();
-                        let fid2 = fid.clone();
-                        let is_active = *flavour.read() == fid;
-                        let label = f.label;
-                        rsx! {
-                            button {
-                                key: "{fid}",
-                                onclick: move |_| flavour.set(fid2.clone()),
-                                style: format!(
-                                    "font-family:monospace; font-size:0.6rem; \
-                                     letter-spacing:0.15em; padding:4px 10px; \
-                                     background:transparent; cursor:pointer; \
-                                     border:1px solid {}; color:{};",
-                                    if is_active { "var(--accent-cyan)" } else { "var(--border-subtle)" },
-                                    if is_active { "var(--accent-cyan)" } else { "var(--text-muted)" }
-                                ),
-                                "{label}"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn PresetMenu(mode: Signal<CockpitMode>, path: String, name: String) -> Element {
-    rsx! {
-        div {
-            style: "padding:1rem 1.5rem;",
-            div {
-                style: "color:var(--text-secondary); font-size:0.65rem;
-                        letter-spacing:0.15em; text-transform:uppercase;
-                        margin-bottom:0.75rem;",
-                "SELECT TARGET PLATFORM"
-            }
-            div {
-                style: "display:flex; flex-direction:column; gap:0.35rem;",
-                for p in PLATFORMS {
-                    {
-                        let pid  = p.id.to_string();
-                        let pid2 = pid.clone();
-                        let lbl  = p.label.to_string();
-                        rsx! {
-                            button {
-                                key: "{pid}",
-                                id:  "preset-{pid}",
-                                onclick: move |_| {
-                                    dispatch(mode, CockpitEvent::PresetSelected {
-                                        preset_id: pid2.clone(),
-                                    });
-                                },
-                                style: "background:var(--surface-panel);
-                                        color:var(--text-primary);
-                                        border:1px solid var(--border-subtle);
-                                        border-radius:4px; padding:0.5rem 0.75rem;
-                                        font-size:0.75rem; cursor:pointer;
-                                        text-align:left; transition:border-color 0.15s;",
-                                "{lbl}"
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -220,7 +134,6 @@ fn MasterButton(
     name: String,
     preset_id: String,
     mut wizard_findings: Signal<Vec<crate::wizard::WizardFinding>>,
-    flavour: Signal<String>,
     tone_angle: Signal<f32>,
     dyn_angle: Signal<f32>,
     space_angle: Signal<f32>,
@@ -254,7 +167,6 @@ fn MasterButton(
                 json!({
                     "audioPath":      p,
                     "presetId":       pr,
-                    "flavourId":      flavour.read().clone(),
                     "intentTone":     ((*tone_angle.read()  / 135.0) + 1.0) / 2.0,
                     "intentDynamics": ((*dyn_angle.read()   / 135.0) + 1.0) / 2.0,
                 }),

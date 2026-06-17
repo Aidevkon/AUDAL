@@ -1008,3 +1008,11 @@
     border-top: 1px solid var(--border-subtle);
 }
 
+
+.led.active.pulse {
+    animation: led-pulse 1.2s ease-in-out infinite;
+}
+@keyframes led-pulse {
+    0%, 100% { opacity: 1.0; }
+    50%      { opacity: 0.4; }
+}

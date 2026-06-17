@@ -244,4 +244,4 @@ pub const SCHEMA_PRO: PersonaSchema = PersonaSchema {
 
 pub const OLLAMA_TIMEOUT_MS: u64 = 5_000;
 pub const OLLAMA_ENDPOINT: &str = "http://localhost:11434/api/generate";
-pub const GEMMA_MODEL: &str = "gemma4:latest";
+pub const GEMMA_MODEL: &str = "gemma2:9b";

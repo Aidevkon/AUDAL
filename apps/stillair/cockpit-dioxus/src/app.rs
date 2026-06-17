@@ -350,13 +350,18 @@ pub fn App() -> Element {
                         let platform_clone = platform.clone();
                         let current_path = dropped_path.read().clone();
                         
-                        let m = mode;
+                        let m_mode = mode;
                         let hs = hangar_state;
                         let mut lp = last_platform;
                         let mut lf = last_flavour;
                         
                         let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
                         let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
+                        
+                        let mut viz_data_sig = viz_data;
+                        let mut session_state_sig = session_state;
+                        let mut wizard_findings_sig = wizard_findings;
+                        let jini_persona_sig = jini_persona;
 
                         rsx! {
                             JiniFlavourSelector {
@@ -371,48 +376,87 @@ pub fn App() -> Element {
                                             lp.set(Some(pr.clone()));
                                             lf.set(Some(fl.clone()));
 
-                                            match invoke::<crate::types::AudioMeta, _>(
+                                            // Step 1: load file metadata
+                                            let meta = match invoke::<crate::types::AudioMeta, _>(
                                                 "load_audio_file",
                                                 serde_json::json!({ "path": path.clone() })
                                             ).await {
-                                                Ok(meta) => {
-                                                    dispatch(m, CockpitEvent::FileDropped {
-                                                        path:   path.clone(),
-                                                        name:   meta.name.clone(),
-                                                        format: meta.format.clone(),
-                                                    });
-                                                    dispatch_hangar(hs, HangarEvent::AnalysisStarted);
-
-                                                    match invoke::<String, _>(
-                                                        "trigger_mastering",
-                                                        serde_json::json!({
-                                                            "audioPath":      path.clone(),
-                                                            "presetId":       pr,
-                                                            "flavourId":      fl,
-                                                            "intentTone":     tone,
-                                                            "intentDynamics": dynval,
-                                                        })
-                                                    ).await {
-                                                        Ok(blob_id) => {
-                                                            dispatch(m, CockpitEvent::MasteringComplete {
-                                                                blob_id: blob_id.clone(),
-                                                            });
-                                                            dispatch_hangar(hs, HangarEvent::AnalysisComplete);
-                                                        }
-                                                        Err(e) => {
-                                                            dispatch(m, CockpitEvent::MasteringFailed {
-                                                                message: format!("{e}"),
-                                                            });
-                                                        }
-                                                    }
-                                                }
+                                                Ok(m) => m,
                                                 Err(e) => {
-                                                    dispatch(m, CockpitEvent::MasteringFailed {
-                                                        message: format!("{e}"),
+                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
+                                                        message: format!("Load failed: {e}")
                                                     });
                                                     dispatch_hangar(hs, HangarEvent::Reset);
+                                                    return;
                                                 }
+                                            };
+                                            dispatch(m_mode, CockpitEvent::FileDropped {
+                                                path: path.clone(),
+                                                name: meta.name.clone(),
+                                                format: meta.format.clone(),
+                                            });
+                                            dispatch_hangar(hs, HangarEvent::AnalysisStarted);
+
+                                            // Step 2: trigger_mastering
+                                            let blob_id = match invoke::<String, _>(
+                                                "trigger_mastering",
+                                                serde_json::json!({
+                                                    "audioPath":      path.clone(),
+                                                    "presetId":       pr,
+                                                    "flavourId":      fl,
+                                                    "intentTone":     tone,
+                                                    "intentDynamics": dynval,
+                                                })
+                                            ).await {
+                                                Ok(id) => id,
+                                                Err(e) => {
+                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
+                                                        message: format!("Mastering failed: {e}")
+                                                    });
+                                                    dispatch_hangar(hs, HangarEvent::Reset);
+                                                    return;
+                                                }
+                                            };
+
+                                            // Step 3: get_session_state
+                                            let persona_str = match *jini_persona_sig.read() {
+                                                crate::types::JiniPersonaState::Beginner => "beginner",
+                                                crate::types::JiniPersonaState::Intermediate => "intermediate",
+                                                crate::types::JiniPersonaState::Pro => "pro",
+                                            };
+                                            let state = match invoke::<crate::types::SessionStateJson, _>(
+                                                "get_session_state",
+                                                serde_json::json!({ "blobId": blob_id.clone(), "persona": persona_str })
+                                            ).await {
+                                                Ok(s) => s,
+                                                Err(e) => {
+                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
+                                                        message: format!("Session state failed: {e}")
+                                                    });
+                                                    dispatch_hangar(hs, HangarEvent::Reset);
+                                                    return;
+                                                }
+                                            };
+
+                                            // Step 4: get_visualization_data
+                                            let bid2 = blob_id.clone();
+                                            if let Ok(viz) = invoke::<crate::types::VisualizationDataJson, _>(
+                                                "get_visualization_data",
+                                                serde_json::json!({ "blobId": bid2 })
+                                            ).await {
+                                                viz_data_sig.set(Some(viz));
                                             }
+
+                                            // Step 5: wizard findings
+                                            let findings = crate::wizard::detect_findings(&state);
+                                            wizard_findings_sig.set(findings);
+
+                                            // Step 6: session state
+                                            session_state_sig.set(Some(state));
+
+                                            // Step 7: complete
+                                            dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id });
+                                            dispatch_hangar(hs, HangarEvent::AnalysisComplete);
                                         });
                                     }
                                 }
@@ -420,10 +464,10 @@ pub fn App() -> Element {
                         }
                     },
                     HangarInterviewState::Ignition { .. } => rsx! {
-                        JiniAnalysing {}
+                        JiniAnalysing { stage: journey_stage.read().clone() }
                     },
                     HangarInterviewState::Analysing => rsx! {
-                        JiniAnalysing {}
+                        JiniAnalysing { stage: journey_stage.read().clone() }
                     },
                     HangarInterviewState::Ready => rsx! { div {} },
                             }

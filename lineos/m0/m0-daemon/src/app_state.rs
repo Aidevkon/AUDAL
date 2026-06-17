@@ -100,6 +100,7 @@ impl AppState {
             db.clone(),
             blob_store.clone(),
             album_tx.clone(),
+            progress_tx.clone(),
         );
 
         Self {

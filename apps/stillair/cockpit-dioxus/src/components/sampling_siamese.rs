@@ -65,6 +65,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                         space_angle: props.space_angle,
                         loud_angle: props.loud_angle,
                         jini_persona: props.jini_persona,
+                        journey_stage: props.journey_stage,
                     }
                     crate::components::hud_overlay::MfdHud {
                         findings: props.wizard_findings.read().clone(),

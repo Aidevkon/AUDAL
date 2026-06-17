@@ -18,6 +18,7 @@ pub async fn run(
     head_state_ptr: Arc<ArcSwap<DspState>>,
     db: crate::db::DbConn,
     blob_store: crate::blob_store::BlobStore,
+    progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
 ) {
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -53,8 +54,10 @@ pub async fn run(
 
                 // spawn_blocking: DSP is CPU-intensive, must not block async runtime
                 let head_state = head_state_ptr.clone();
+                let p_tx = progress_tx.clone();
+                let j_id = plan.session_id.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    crate::domain::dsp_pipeline::run_dsp(&req, start, head_state)
+                    crate::domain::dsp_pipeline::run_dsp(&req, start, head_state, Some(p_tx), j_id)
                 })
                 .await;
 
