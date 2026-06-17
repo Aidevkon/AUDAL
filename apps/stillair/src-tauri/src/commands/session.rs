@@ -32,7 +32,7 @@ use crate::ipc::m0_client::{GoldenBlobJson, LoudnessMetricsJson, M0Client, Quali
 
 /// Maximum time to wait for Ollama coach inference.
 /// If exceeded, narrative = None (non-fatal). Cockpit still transitions to FM5.
-const COACH_TIMEOUT_SECS: u64 = 25;
+const COACH_TIMEOUT_SECS: u64 = 90;
 
 // ── SessionStateJson ──────────────────────────────────────────────────────────
 

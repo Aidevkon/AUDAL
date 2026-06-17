@@ -46,7 +46,7 @@ pub async fn invoke(model: &str, prompt: &str) -> Result<String, String> {
         stream: false,
         options: OllamaOptions {
             temperature: 0.3,
-            num_predict: 512,
+            num_predict: 80,
         },
     };
     let resp = client
