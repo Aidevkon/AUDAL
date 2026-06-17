@@ -6,6 +6,7 @@ pub mod journey_view;
 pub mod module_frame;
 pub mod oled_tile;
 pub mod pdf_preview;
+pub mod jini;
 pub mod primary_signal_analyzer;
 pub mod sampling_siamese;
 pub mod screw;

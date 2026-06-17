@@ -21,9 +21,15 @@ use crate::ipc::invoke;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
+use crate::components::jini::drop_zone::JiniDropZone;
+use crate::components::jini::detection::JiniDetection;
+use crate::components::jini::platform_selector::JiniPlatformSelector;
+use crate::components::jini::flavour_selector::JiniFlavourSelector;
+use crate::components::jini::analysing::JiniAnalysing;
+use crate::components::jini::awaiting_more::JiniAwaitingMore;
 use crate::panels::{jini_panel::JiniPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
-use crate::state::presets::{FLAVOURS, PLATFORMS};
+
 use crate::state::hangar_interview::HangarInterviewState;
 use crate::state::hangar_reducer::dispatch_hangar;
 use crate::state::hangar_event::HangarEvent;
@@ -290,9 +296,7 @@ pub fn App() -> Element {
                             panel_class: "hangar-module".to_string(),
                             match other_state {
                     HangarInterviewState::AwaitingDrop => rsx! {
-                        div { class: "hangar-drop-zone",
-                            p { "Drop your audio here." }
-                        }
+                        JiniDropZone {}
                     },
                     HangarInterviewState::Detection { track_count } => {
                         use_effect(move || {
@@ -302,153 +306,101 @@ pub fn App() -> Element {
                             });
                         });
                         rsx! {
-                            p { class: "jini-text",
-                                if track_count == 1 { "Single track." }
-                                else { "Album. {track_count} tracks." }
-                            }
+                            JiniDetection { track_count }
                         }
                     },
                     HangarInterviewState::AwaitingMore { .. } => rsx! {
-                        p { "Waiting for more tracks..." }
-                        button { 
-                            onclick: move |_| {
+                        JiniAwaitingMore {
+                            on_proceed: move |_| {
                                 dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
-                            }, 
-                            "[+] Add" 
+                            }
                         }
                     },
                     HangarInterviewState::PlatformCard { .. } => rsx! {
-                        p { "Where is this going?" }
-                        for p in PLATFORMS {
-                            {
-                                let id = p.id;
-                                rsx! {
-                                    button {
-                                        onclick: move |_| {
-                                            dispatch_hangar(
-                                                hangar_state,
-                                                HangarEvent::PlatformChosen {
-                                                    platform: id.to_string(),
-                                                }
-                                            );
-                                        },
-                                        "{p.label}"
-                                    }
-                                }
+                        JiniPlatformSelector {
+                            on_select: move |platform| {
+                                dispatch_hangar(hangar_state, HangarEvent::PlatformChosen { platform });
                             }
                         }
                     },
-                    HangarInterviewState::FlavourCard { platform: _platform, track_count: _track_count } => {
-                        // Progressive gate: if sessions >= 5, show memory prompt
-                        // STUBS: Set to 5 and "Warm Analog" to force render the UI
-                        let sessions: u32 = 5; 
-                        let last_flavour: Option<String> = Some("Warm Analog".to_string());
+                    HangarInterviewState::FlavourCard { platform, track_count: _ } => {
+                        let platform_clone = platform.clone();
+                        let current_path = dropped_path.read().clone();
                         
-                        if sessions >= 5 && last_flavour.is_some() {
-                            let flav_text = last_flavour.clone().unwrap();
-                            let flav_action = last_flavour.unwrap();
-                            
+                        let m = mode;
+                        let hs = hangar_state;
+                        let mut lp = last_platform;
+                        let mut lf = last_flavour;
+                        
+                        let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
+                        let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
 
-                            rsx! {
-                                p { "Last time: {flav_text}. Same this time?" }
-                                button { onclick: move |_| {
-                                    dispatch_hangar(
-                                        hangar_state,
-                                        HangarEvent::FlavourChosen {
-                                            flavour: flav_action.clone(),
-                                        }
-                                    );
-                                }, "Yes" }
-                                button { onclick: move |_| {
-                                    // TODO: clear memory and show full flavour card
-                                }, "Change it" }
-                            }
-                        } else {
-                            rsx! {
-                                p { "How do you want it to sound?" }
-                                for f in FLAVOURS {
-                                    {
-                                        let id = f.id;
+                        rsx! {
+                            JiniFlavourSelector {
+                                on_select: move |flavour: String| {
+                                    dispatch_hangar(hs, HangarEvent::FlavourChosen { flavour: flavour.clone() });
+                                    
+                                    if let Some(path) = current_path.clone() {
+                                        let pr = platform_clone.clone();
+                                        let fl = flavour;
+                                        
+                                        spawn_local(async move {
+                                            lp.set(Some(pr.clone()));
+                                            lf.set(Some(fl.clone()));
 
-                                        rsx! {
-                                            button {
-                                                onclick: move |_| {
-                                                    dispatch_hangar(
-                                                        hangar_state,
-                                                        HangarEvent::FlavourChosen {
-                                                            flavour: id.to_string(),
+                                            match invoke::<crate::types::AudioMeta, _>(
+                                                "load_audio_file",
+                                                serde_json::json!({ "path": path.clone() })
+                                            ).await {
+                                                Ok(meta) => {
+                                                    dispatch(m, CockpitEvent::FileDropped {
+                                                        path:   path.clone(),
+                                                        name:   meta.name.clone(),
+                                                        format: meta.format.clone(),
+                                                    });
+                                                    dispatch_hangar(hs, HangarEvent::AnalysisStarted);
+
+                                                    match invoke::<String, _>(
+                                                        "trigger_mastering",
+                                                        serde_json::json!({
+                                                            "audioPath":      path.clone(),
+                                                            "presetId":       pr,
+                                                            "flavourId":      fl,
+                                                            "intentTone":     tone,
+                                                            "intentDynamics": dynval,
+                                                        })
+                                                    ).await {
+                                                        Ok(blob_id) => {
+                                                            dispatch(m, CockpitEvent::MasteringComplete {
+                                                                blob_id: blob_id.clone(),
+                                                            });
+                                                            dispatch_hangar(hs, HangarEvent::AnalysisComplete);
                                                         }
-                                                    );
-                                                },
-                                                "{f.label}"
+                                                        Err(e) => {
+                                                            dispatch(m, CockpitEvent::MasteringFailed {
+                                                                message: format!("{e}"),
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    dispatch(m, CockpitEvent::MasteringFailed {
+                                                        message: format!("{e}"),
+                                                    });
+                                                    dispatch_hangar(hs, HangarEvent::Reset);
+                                                }
                                             }
-                                        }
+                                        });
                                     }
                                 }
                             }
                         }
                     },
-                    HangarInterviewState::Ignition { platform, flavour } => {
-                        if let Some(path) = dropped_path.read().clone() {
-                            let m = mode;
-                            let mut hs = hangar_state;
-                            let mut lp = last_platform;
-                            let mut lf = last_flavour;
-                            
-                            let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
-                            let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
-                            let pr = platform.clone();
-                            let fl = flavour.clone();
-
-                            spawn_local(async move {
-                                lp.set(Some(pr.clone()));
-                                lf.set(Some(fl.clone()));
-
-                                match invoke::<crate::types::AudioMeta, _>(
-                                    "load_audio_file",
-                                    serde_json::json!({ "path": path.clone() })
-                                ).await {
-                                    Ok(meta) => {
-                                        dispatch(m, CockpitEvent::FileDropped {
-                                            path:   path.clone(),
-                                            name:   meta.name.clone(),
-                                            format: meta.format.clone(),
-                                        });
-                                        dispatch_hangar(hs, HangarEvent::AnalysisStarted);
-
-                                        match invoke::<String, _>(
-                                            "trigger_mastering",
-                                            serde_json::json!({
-                                                "audioPath":      path.clone(),
-                                                "presetId":       pr,
-                                                "flavourId":      fl,
-                                                "intentTone":     tone,
-                                                "intentDynamics": dynval,
-                                            })
-                                        ).await {
-                                            Ok(blob_id) => {
-                                                dispatch(m, CockpitEvent::MasteringComplete {
-                                                    blob_id: blob_id.clone(),
-                                                });
-                                                dispatch_hangar(hs, HangarEvent::AnalysisComplete);
-                                            }
-                                            Err(e) => {
-                                                dispatch(m, CockpitEvent::MasteringFailed {
-                                                    message: format!("{e}"),
-                                                });
-                                            }
-                                        }
-                                    }
-                                    Err(_) => {
-                                        hs.set(HangarInterviewState::Analysing);
-                                    }
-                                }
-                            });
-                        }
-                        rsx! { p { "Analysing." } }
+                    HangarInterviewState::Ignition { .. } => rsx! {
+                        JiniAnalysing {}
                     },
                     HangarInterviewState::Analysing => rsx! {
-                        p { "Analysing." }
+                        JiniAnalysing {}
                     },
                     HangarInterviewState::Ready => rsx! { div {} },
                             }
