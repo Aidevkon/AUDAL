@@ -25,6 +25,8 @@ use crate::panels::{jini_panel::JiniPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
 use crate::state::presets::{FLAVOURS, PLATFORMS};
 use crate::state::hangar_interview::HangarInterviewState;
+use crate::state::hangar_reducer::dispatch_hangar;
+use crate::state::hangar_event::HangarEvent;
 use crate::state::reducer::dispatch;
 use crate::state::cockpit_event::CockpitEvent;
 use crate::types::{
@@ -70,7 +72,7 @@ pub fn App() -> Element {
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
-    let mut hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
+    let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -172,19 +174,7 @@ pub fn App() -> Element {
 
                                                     dropped_path.set(Some(first_path));
 
-                                                    if count == 1 {
-                                                        hangar_state.set(
-                                                            HangarInterviewState::Detection {
-                                                                track_count: 1,
-                                                            },
-                                                        );
-                                                    } else {
-                                                        hangar_state.set(
-                                                            HangarInterviewState::Detection {
-                                                                track_count: count as usize,
-                                                            },
-                                                        );
-                                                    }
+                                                    dispatch_hangar(hangar_state, HangarEvent::FilesDropped { count: count as usize });
                                                 }
                                             }
                                         }
@@ -319,10 +309,10 @@ pub fn App() -> Element {
                                 rsx! {
                                     button {
                                         onclick: move |_| {
-                                            hangar_state.set(
-                                                HangarInterviewState::FlavourCard {
+                                            dispatch_hangar(
+                                                hangar_state,
+                                                HangarEvent::PlatformChosen {
                                                     platform: id.to_string(),
-                                                    track_count: 1,
                                                 }
                                             );
                                         },
@@ -332,7 +322,7 @@ pub fn App() -> Element {
                             }
                         }
                     },
-                    HangarInterviewState::FlavourCard { platform, track_count: _track_count } => {
+                    HangarInterviewState::FlavourCard { platform: _platform, track_count: _track_count } => {
                         // Progressive gate: if sessions >= 5, show memory prompt
                         // STUBS: Set to 5 and "Warm Analog" to force render the UI
                         let sessions: u32 = 5; 
@@ -342,14 +332,16 @@ pub fn App() -> Element {
                             let flav_text = last_flavour.clone().unwrap();
                             let flav_action = last_flavour.unwrap();
                             
-                            let p1 = platform.clone();
+
                             rsx! {
                                 p { "Last time: {flav_text}. Same this time?" }
                                 button { onclick: move |_| {
-                                    hangar_state.set(HangarInterviewState::Ignition {
-                                        platform: p1.clone(),
-                                        flavour: flav_action.clone(),
-                                    });
+                                    dispatch_hangar(
+                                        hangar_state,
+                                        HangarEvent::FlavourChosen {
+                                            flavour: flav_action.clone(),
+                                        }
+                                    );
                                 }, "Yes" }
                                 button { onclick: move |_| {
                                     // TODO: clear memory and show full flavour card
@@ -361,14 +353,16 @@ pub fn App() -> Element {
                                 for f in FLAVOURS {
                                     {
                                         let id = f.id;
-                                        let platform_clone = platform.clone();
+
                                         rsx! {
                                             button {
                                                 onclick: move |_| {
-                                                    hangar_state.set(HangarInterviewState::Ignition {
-                                                        platform: platform_clone.clone(),
-                                                        flavour: id.to_string(),
-                                                    });
+                                                    dispatch_hangar(
+                                                        hangar_state,
+                                                        HangarEvent::FlavourChosen {
+                                                            flavour: id.to_string(),
+                                                        }
+                                                    );
                                                 },
                                                 "{f.label}"
                                             }
@@ -404,7 +398,7 @@ pub fn App() -> Element {
                                             name:   meta.name.clone(),
                                             format: meta.format.clone(),
                                         });
-                                        hs.set(HangarInterviewState::Analysing);
+                                        dispatch_hangar(hs, HangarEvent::AnalysisStarted);
 
                                         match invoke::<String, _>(
                                             "trigger_mastering",
@@ -420,7 +414,7 @@ pub fn App() -> Element {
                                                 dispatch(m, CockpitEvent::MasteringComplete {
                                                     blob_id: blob_id.clone(),
                                                 });
-                                                hs.set(HangarInterviewState::Ready);
+                                                dispatch_hangar(hs, HangarEvent::AnalysisComplete);
                                             }
                                             Err(e) => {
                                                 dispatch(m, CockpitEvent::MasteringFailed {
