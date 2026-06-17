@@ -285,97 +285,107 @@ pub fn App() -> Element {
                     else if *intent_closing.read() { "hangar-layer intent-closing" }
                     else                           { "hangar-layer" }
                 },
-                div { class: "coach-panel chassis-bezel",
-                    div { class: "jini-narrative-area",
-                        match hangar_state.read().clone() {
-                            HangarInterviewState::AwaitingDrop => rsx! {
-                                div { class: "hangar-drop-surface",
-                                    p { class: "jini-text", "Drop your audio here." }
-                                }
-                            },
-                            HangarInterviewState::Detection { track_count } => rsx! {
-                                p { class: "jini-text",
-                                    if track_count == 1 { "Single track." }
-                                    else { "Album. {track_count} tracks." }
-                                }
-                            },
-                            HangarInterviewState::AwaitingMore { track_count, .. } => rsx! {
-                                p { class: "jini-text", "Adding tracks... {track_count} so far." }
-                                button { class: "jini-btn", "[+] Add more" }
-                            },
-                            HangarInterviewState::PlatformCard { .. } => rsx! {
-                                p { class: "jini-text", "Where is this going?" }
-                                div { class: "jini-cards",
-                                    for p in PLATFORMS {
-                                        {
-                                            let id = p.id;
-                                            rsx! {
-                                                button {
-                                                    class: "jini-card",
-                                                    onclick: move |_| {
-                                                        hangar_state.set(
-                                                            HangarInterviewState::FlavourCard {
-                                                                platform: id.to_string(),
-                                                                track_count: 1,
-                                                            }
-                                                        );
-                                                    },
-                                                    "{p.label}"
-                                                }
+                match hangar_state.read().clone() {
+                    HangarInterviewState::AwaitingDrop => rsx! {
+                        div { class: "jini-narrative-area",
+                            div { class: "hangar-drop-surface",
+                                p { class: "jini-text", "Drop your audio here." }
+                            }
+                        }
+                    },
+                    HangarInterviewState::Detection { track_count } => rsx! {
+                        div { class: "jini-narrative-area",
+                            p { class: "jini-text",
+                                if track_count == 1 { "Single track." }
+                                else { "Album. {track_count} tracks." }
+                            }
+                        }
+                    },
+                    HangarInterviewState::AwaitingMore { track_count, .. } => rsx! {
+                        div { class: "jini-narrative-area",
+                            p { class: "jini-text", "Adding tracks... {track_count} so far." }
+                            button { class: "jini-btn", "[+] Add more" }
+                        }
+                    },
+                    HangarInterviewState::PlatformCard { .. } => rsx! {
+                        div { class: "jini-narrative-area",
+                            p { class: "jini-text", "Where is this going?" }
+                            div { class: "jini-cards",
+                                for p in PLATFORMS {
+                                    {
+                                        let id = p.id;
+                                        rsx! {
+                                            button {
+                                                class: "jini-card",
+                                                onclick: move |_| {
+                                                    hangar_state.set(
+                                                        HangarInterviewState::FlavourCard {
+                                                            platform: id.to_string(),
+                                                            track_count: 1,
+                                                        }
+                                                    );
+                                                },
+                                                "{p.label}"
                                             }
                                         }
                                     }
                                 }
-                            },
-                            HangarInterviewState::FlavourCard { platform, track_count: _track_count } => {
-                                let sessions: u32 = 5; 
-                                let last_flavour: Option<String> = Some("Warm Analog".to_string());
-                                
-                                if sessions >= 5 && last_flavour.is_some() {
-                                    let flav_text = last_flavour.clone().unwrap();
-                                    let flav_action = last_flavour.unwrap();
-                                    
-                                    let p1 = platform.clone();
-                                    rsx! {
-                                        p { class: "jini-text", "Last time: {flav_text}. Same this time?" }
-                                        div { class: "jini-cards",
-                                            button { class: "jini-card", onclick: move |_| {
-                                                hangar_state.set(HangarInterviewState::Ignition {
-                                                    platform: p1.clone(),
-                                                    flavour: flav_action.clone(),
-                                                });
-                                            }, "Yes" }
-                                            button { class: "jini-card", onclick: move |_| {
-                                                // TODO: clear memory and show full flavour card
-                                            }, "Change it" }
-                                        }
+                            }
+                        }
+                    },
+                    HangarInterviewState::FlavourCard { platform, track_count: _track_count } => {
+                        let sessions: u32 = 5; 
+                        let last_flavour: Option<String> = Some("Warm Analog".to_string());
+                        
+                        if sessions >= 5 && last_flavour.is_some() {
+                            let flav_text = last_flavour.clone().unwrap();
+                            let flav_action = last_flavour.unwrap();
+                            
+                            let p1 = platform.clone();
+                            rsx! {
+                                div { class: "jini-narrative-area",
+                                    p { class: "jini-text", "Last time: {flav_text}. Same this time?" }
+                                    div { class: "jini-cards",
+                                        button { class: "jini-card", onclick: move |_| {
+                                            hangar_state.set(HangarInterviewState::Ignition {
+                                                platform: p1.clone(),
+                                                flavour: flav_action.clone(),
+                                            });
+                                        }, "Yes" }
+                                        button { class: "jini-card", onclick: move |_| {
+                                            // TODO: clear memory and show full flavour card
+                                        }, "Change it" }
                                     }
-                                } else {
-                                    rsx! {
-                                        p { class: "jini-text", "How do you want it to sound?" }
-                                        div { class: "jini-cards",
-                                            for f in FLAVOURS {
-                                                {
-                                                    let id = f.id;
-                                                    let platform_clone = platform.clone();
-                                                    rsx! {
-                                                        button {
-                                                            class: "jini-card",
-                                                            onclick: move |_| {
-                                                                hangar_state.set(HangarInterviewState::Ignition {
-                                                                    platform: platform_clone.clone(),
-                                                                    flavour: id.to_string(),
-                                                                });
-                                                            },
-                                                            "{f.label}"
-                                                        }
+                                }
+                            }
+                        } else {
+                            rsx! {
+                                div { class: "jini-narrative-area",
+                                    p { class: "jini-text", "How do you want it to sound?" }
+                                    div { class: "jini-cards",
+                                        for f in FLAVOURS {
+                                            {
+                                                let id = f.id;
+                                                let platform_clone = platform.clone();
+                                                rsx! {
+                                                    button {
+                                                        class: "jini-card",
+                                                        onclick: move |_| {
+                                                            hangar_state.set(HangarInterviewState::Ignition {
+                                                                platform: platform_clone.clone(),
+                                                                flavour: id.to_string(),
+                                                            });
+                                                        },
+                                                        "{f.label}"
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            },
+                            }
+                        }
+                    },
                     HangarInterviewState::Ignition { platform, flavour } => {
                         if let Some(path) = dropped_path.read().clone() {
                             let m = mode;
@@ -433,20 +443,26 @@ pub fn App() -> Element {
                                 }
                             });
                         }
-                        rsx! { p { class: "jini-text", "Analysing." } }
+                        rsx! { 
+                            div { class: "jini-narrative-area",
+                                p { class: "jini-text", "Analysing." } 
+                            }
+                        }
                     },
                     HangarInterviewState::Analysing => rsx! {
-                        p { class: "jini-text", "Analysing." }
+                        div { class: "jini-narrative-area",
+                            p { class: "jini-text", "Analysing." }
+                        }
                     },
                     HangarInterviewState::Ready => rsx! {
-                        CoachPanel { 
-                            mode, session_state, wizard_findings,
-                            jini_suggestion, jini_persona 
+                        div { class: "coach-panel chassis-bezel",
+                            CoachPanel { 
+                                mode, session_state, wizard_findings,
+                                jini_suggestion, jini_persona 
+                            }
                         }
                     },
                 }
-            }
-        }
             }
         }
     }
