@@ -85,8 +85,17 @@ pub fn SessionPanel(
                             }
                         }
                     },
-                    CockpitMode::Mastering { .. } => rsx! {
-                        MasteringProgress {}
+                    CockpitMode::Mastering { path: _, preset_id } => {
+                        let name = preset_id.clone();
+                        rsx! {
+                            PrimarySignalAnalyzer {
+                                filename: name,
+                                format: String::new(),
+                                telemetry: None,
+                                bpm: 0.0,
+                                journey_stage,
+                            }
+                        }
                     },
                     CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
                         GoldenBlobBadge {}
@@ -269,36 +278,7 @@ fn MasterButton(
     }
 }
 
-#[component]
-fn MasteringProgress() -> Element {
-    rsx! {
-        div {
-            style: "display:flex; flex-direction:column; align-items:center;
-                    justify-content:center; height:100%; padding:2rem;",
-            div {
-                style: "color:var(--accent-master); font-size:0.75rem;
-                        letter-spacing:0.2em; text-transform:uppercase;
-                        font-weight:600; margin-bottom:1.5rem;",
-                "MASTERING IN PROGRESS"
-            }
-            // Animated progress bar
-            div {
-                style: "width:100%; height:3px; background:var(--border-subtle);
-                        border-radius:2px; overflow:hidden;",
-                div {
-                    style: "height:100%; background:var(--accent-master);
-                            width:60%; border-radius:2px;
-                            animation:pulse 1.5s ease-in-out infinite;",
-                }
-            }
-            div {
-                style: "color:var(--text-muted); font-size:0.65rem;
-                        margin-top:1rem; letter-spacing:0.1em;",
-                "sp314-dsp · 8-stage pipeline"
-            }
-        }
-    }
-}
+
 
 #[component]
 fn GoldenBlobBadge() -> Element {

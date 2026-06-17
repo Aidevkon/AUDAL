@@ -87,6 +87,9 @@ pub fn reduce(mode: CockpitMode, event: CockpitEvent) -> CockpitMode {
         (mode, CockpitEvent::JiniSuggestionDismissed) => mode,
         (mode, CockpitEvent::JiniPersonaChanged { .. }) => mode,
 
+        // Abort wildcard — allow reset from any state
+        (_, CockpitEvent::BackToIdle) => CockpitMode::Idle,
+
         // Illegal transitions — return mode unchanged, no panic
         (mode, _) => mode,
     }

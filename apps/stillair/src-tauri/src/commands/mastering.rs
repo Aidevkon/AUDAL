@@ -181,7 +181,7 @@ pub async fn trigger_mastering(
     );
 
     loop {
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(33)).await;
 
         let progress = client
             .get_progress(&job_id)
