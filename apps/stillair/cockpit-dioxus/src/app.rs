@@ -223,6 +223,11 @@ pub fn App() -> Element {
                 intent_open,
                 intent_closing,
                 presentation,
+                hangar_state,
+                jini_persona,
+                dropped_path,
+                last_platform,
+                last_flavour,
             }
 
             // ── Work Layer — 65% Middle ──────────────────────────────────────
@@ -395,6 +400,10 @@ pub fn App() -> Element {
                                                 name: meta.name.clone(),
                                                 format: meta.format.clone(),
                                             });
+                                            dispatch(m_mode, CockpitEvent::PresetSelected {
+                                                preset_id: pr.clone(),
+                                            });
+                                            dispatch(m_mode, CockpitEvent::MasterTriggered);
                                             dispatch_hangar(hs, HangarEvent::AnalysisStarted);
 
                                             // Step 2: trigger_mastering

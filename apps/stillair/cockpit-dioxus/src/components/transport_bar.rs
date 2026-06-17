@@ -10,8 +10,11 @@ use crate::components::{
     timecode::TimecodeDisplay,
     transport_button::{LedColor, SkipActuator, TransportActuator},
 };
+use crate::state::cockpit_event::CockpitEvent;
+use crate::state::reducer::dispatch;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson};
+use crate::types::{PlaybackStateJson, SessionStateJson, JiniPersonaState};
+use crate::state::hangar_interview::HangarInterviewState;
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -61,8 +64,6 @@ async fn invoke_playback(
     }
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
 #[derive(Props, Clone, PartialEq)]
 pub struct TransportBarProps {
     pub mode: Signal<CockpitMode>,
@@ -71,12 +72,17 @@ pub struct TransportBarProps {
     pub intent_open: Signal<bool>,
     pub intent_closing: Signal<bool>,
     pub presentation: crate::state::cockpit_presentation::CockpitPresentation,
+    pub hangar_state: Signal<HangarInterviewState>,
+    pub jini_persona: Signal<JiniPersonaState>,
+    pub dropped_path: Signal<Option<String>>,
+    pub last_platform: Signal<Option<String>>,
+    pub last_flavour: Signal<Option<String>>,
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 #[component]
-pub fn TransportBar(props: TransportBarProps) -> Element {
+pub fn TransportBar(mut props: TransportBarProps) -> Element {
     let mut mode = props.mode;
     let mut session_state = props.session_state;
     let tier = props.tier;
@@ -484,10 +490,16 @@ pub fn TransportBar(props: TransportBarProps) -> Element {
                                         });
                                     },
                                     AbortState::Armed => {
-                                        let mut s = session_state.write();
-                                        *s = None;
-                                        let mut m = mode.write();
-                                        *m = CockpitMode::Idle;
+                                        dispatch(props.mode, CockpitEvent::BackToIdle);
+                                        props.hangar_state.set(HangarInterviewState::AwaitingDrop);
+                                        props.session_state.set(None);
+                                        props.dropped_path.set(None);
+                                        props.last_platform.set(None);
+                                        props.last_flavour.set(None);
+                                        
+                                        // Reset persona to default
+                                        props.jini_persona.set(JiniPersonaState::Intermediate);
+
                                         abort_state.set(AbortState::Triggered);
                                         spawn_local(async move {
                                             gloo_timers::future::TimeoutFuture::new(4_000).await;
