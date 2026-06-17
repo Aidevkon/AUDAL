@@ -2,7 +2,6 @@ pub mod ab_toggle;
 pub mod active_processing_chain;
 pub mod hud_overlay;
 pub mod intent_bay;
-pub mod journey_view;
 pub mod module_frame;
 pub mod oled_tile;
 pub mod pdf_preview;

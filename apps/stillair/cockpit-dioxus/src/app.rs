@@ -107,7 +107,10 @@ pub fn App() -> Element {
                                                 &JsValue::from_str("stage"),
                                             ) {
                                                 if let Some(s) = stage_val.as_string() {
-                                                    stage_queue.write().push_back(s.clone());
+                                                    let mut q = stage_queue.write();
+                                                    if q.back() != Some(&s) {
+                                                        q.push_back(s.clone());
+                                                    }
                                                 }
                                             }
                                             if let Ok(elapsed_val) = js_sys::Reflect::get(
