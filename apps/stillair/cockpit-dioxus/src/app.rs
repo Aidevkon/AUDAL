@@ -70,6 +70,8 @@ pub fn App() -> Element {
     let jini_persona: Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
     let mut is_journey_active: Signal<bool> = use_signal(|| false);
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
+    let mut stage_queue: Signal<std::collections::VecDeque<String>> =
+        use_signal(|| std::collections::VecDeque::new());
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
@@ -105,14 +107,7 @@ pub fn App() -> Element {
                                                 &JsValue::from_str("stage"),
                                             ) {
                                                 if let Some(s) = stage_val.as_string() {
-                                                    journey_stage.set(s.clone());
-                                                    // INV-JV-2: always returns to standard layout after CERTIFIED
-                                                    if s == "CERTIFIED" || s == "ERROR" {
-                                                        spawn_local(async move {
-                                                            gloo_timers::future::TimeoutFuture::new(1000).await;
-                                                            is_journey_active.set(false);
-                                                        });
-                                                    }
+                                                    stage_queue.write().push_back(s.clone());
                                                 }
                                             }
                                             if let Ok(elapsed_val) = js_sys::Reflect::get(
@@ -208,9 +203,25 @@ pub fn App() -> Element {
         });
     });
 
+    // ── Queue Playback Timer ──────────────────────────────────────────────────
+    use_effect(move || {
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(500).await;
+                let next = stage_queue.write().pop_front();
+                if let Some(stage) = next {
+                    journey_stage.set(stage.clone());
+                    if stage == "CERTIFIED" || stage == "ERROR" {
+                        // let it display, then tear down journey
+                        gloo_timers::future::TimeoutFuture::new(800).await;
+                        is_journey_active.set(false);
+                    }
+                }
+            }
+        });
+    });
+
     rsx! {
-
-
         div { id: "app-shell", class: "app-shell",
 
             // ── Transport bar (bottom strip) ──────────────────────────────────
@@ -462,6 +473,14 @@ pub fn App() -> Element {
 
                                             // Step 6: session state
                                             session_state_sig.set(Some(state));
+
+                                            // wait for visual queue to drain
+                                            loop {
+                                                if stage_queue.read().is_empty() && !*is_journey_active.read() {
+                                                    break;
+                                                }
+                                                gloo_timers::future::TimeoutFuture::new(100).await;
+                                            }
 
                                             // Step 7: complete
                                             dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id });
