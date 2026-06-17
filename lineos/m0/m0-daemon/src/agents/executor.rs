@@ -143,6 +143,11 @@ pub async fn run(
                     let right: Vec<f32> = pcm.samples.iter().skip(1).step_by(2).copied().collect();
                     use sp314_dsp::analysis::PreAnalyzer;
                     let analysis = PreAnalyzer::run(&left, &right, pcm.sample_rate);
+
+                    // TODO: Auto input-trim based on pre-analysis loudness.
+                    // Replaces manual INPUT TRIM removed from UI.
+                    // Calculate headroom and apply gain before DSP chain.
+
                     Ok(super::operator::AnalysisResult {
                         session_id,
                         integrated_lufs: analysis.integrated_lufs,

@@ -97,15 +97,7 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                                  { "led active" } else { "led" }, "CORPUS" }
                 }
 
-                div { class: "psa-controls-row",
-                    div { class: "psa-control-item",
-                        "INPUT TRIM: ", span { style: "color:var(--text-primary); font-weight:700;", "+0.0 dB" },
-                        span { style: "color:var(--accent-amber); margin-left:4px;", "(◉ encoder)" }
-                    }
-                    div { class: "psa-control-item",
-                        "REF LOCK: ", span { style: "color:var(--status-err); font-weight:700;", "[OFF]" }
-                    }
-                }
+
             }
 
             // ── CELL 4: A/B SPECTRAL ───────────────────────────────────────────
