@@ -21,7 +21,7 @@ use crate::ipc::invoke;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
-use crate::panels::{coach::CoachPanel, mastered::MasteredView};
+use crate::panels::{jini_panel::JiniPanel, mastered::MasteredView};
 use crate::state::cockpit_mode::CockpitMode;
 use crate::state::presets::{FLAVOURS, PLATFORMS};
 use crate::state::hangar_interview::HangarInterviewState;
@@ -288,7 +288,7 @@ pub fn App() -> Element {
                 },
                 match hangar_state.read().clone() {
                     HangarInterviewState::Ready => rsx! {
-                        CoachPanel { 
+                        JiniPanel { 
                             mode, session_state, wizard_findings,
                             jini_suggestion, jini_persona 
                         }

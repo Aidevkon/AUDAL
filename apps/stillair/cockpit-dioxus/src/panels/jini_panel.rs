@@ -27,7 +27,7 @@ pub struct FindingData {
 }
 
 #[component]
-pub fn CoachPanel(
+pub fn JiniPanel(
     mode: Signal<CockpitMode>,
     session_state: Signal<Option<SessionStateJson>>,
     wizard_findings: ReadOnlySignal<Vec<crate::wizard::WizardFinding>>,
@@ -85,7 +85,7 @@ pub fn CoachPanel(
     rsx! {
         ModuleFrame {
             show_screws: false,
-            title: "HANGAR".to_string(),
+            title: "JINI".to_string(),
             is_scrollable: true,
 
             { match state.as_ref() {
@@ -181,7 +181,7 @@ pub fn CoachPanel(
 // ── JINI Sub-components (J-P5) ─────────────────────────────────────────────────
 
 #[component]
-fn JiniNarrative(
+pub fn JiniNarrative(
     suggestion: Option<JiniSuggestionJson>,
     persona: Signal<JiniPersonaState>,
 ) -> Element {
