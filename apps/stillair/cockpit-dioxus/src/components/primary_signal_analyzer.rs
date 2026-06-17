@@ -29,7 +29,6 @@ pub struct PrimarySignalAnalyzerProps {
     pub bpm: f32,
     pub stage: Signal<AnalysisStage>,
     // Add additional props like session state when backend provides it
-    pub on_load_new: EventHandler<()>,
 }
 
 #[component]
@@ -105,11 +104,6 @@ pub fn PrimarySignalAnalyzer(props: PrimarySignalAnalyzerProps) -> Element {
                     }
                     div { class: "psa-control-item",
                         "REF LOCK: ", span { style: "color:var(--status-err); font-weight:700;", "[OFF]" }
-                    }
-                    button {
-                        class: "psa-load-btn",
-                        onclick: move |_| props.on_load_new.call(()),
-                        "LOAD NEW"
                     }
                 }
             }

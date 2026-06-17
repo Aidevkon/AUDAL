@@ -20,7 +20,7 @@ use crate::ipc::invoke;
 use crate::state::cockpit_event::CockpitEvent;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
 use crate::state::reducer::dispatch;
-use crate::types::{AudioMeta, SessionStateJson, VisualizationDataJson};
+use crate::types::{SessionStateJson, VisualizationDataJson};
 use crate::state::presets::{FLAVOURS, PLATFORMS};
 
 
@@ -49,24 +49,6 @@ pub fn SessionPanel(
 
         { match mode.read().clone() {
                     CockpitMode::Idle => {
-                        let m = mode;
-                        let on_load = move |_| {
-                            spawn_local(async move {
-                                match crate::ipc::invoke::<Option<AudioMeta>, _>("open_audio_file", json!({})).await {
-                                    Ok(Some(meta)) => {
-                                        dispatch(m, CockpitEvent::FileDropped {
-                                            path:   meta.path.clone(),
-                                            name:   meta.name.clone(),
-                                            format: meta.format.clone(),
-                                        });
-                                    }
-                                    Ok(None) => {}
-                                    Err(e) => dispatch(m, CockpitEvent::FileDropFailed {
-                                        message: format!("File open failed: {e}"),
-                                    }),
-                                }
-                            });
-                        };
                         rsx! {
                             PrimarySignalAnalyzer {
                                 filename: "NO FILE LOADED".to_string(),
@@ -74,13 +56,10 @@ pub fn SessionPanel(
                                 telemetry: None,
                                 bpm: 0.0,
                                 stage: use_signal(|| AnalysisStage::Idle),
-                                on_load_new: on_load,
                             }
                         }
                     },
                     CockpitMode::FileLoaded { name, format, path } => {
-                        let m = mode;
-                        let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
                         rsx! {
                             PrimarySignalAnalyzer {
                                 filename: name.clone(),
@@ -88,15 +67,12 @@ pub fn SessionPanel(
                                 telemetry: None,
                                 bpm: 0.0,
                                 stage: use_signal(|| AnalysisStage::Idle),
-                                on_load_new: on_load,
                             }
                             FlavourMenu { flavour }
                             PresetMenu { mode, path, name }
                         }
                     },
                     CockpitMode::PresetSelected { path, name, preset_id } => {
-                        let m = mode;
-                        let on_load = move |_| dispatch(m, CockpitEvent::BackToIdle);
                         rsx! {
                             PrimarySignalAnalyzer {
                                 filename: name.clone(),
@@ -104,7 +80,6 @@ pub fn SessionPanel(
                                 telemetry: None,
                                 bpm: 0.0,
                                 stage: use_signal(|| AnalysisStage::Idle),
-                                on_load_new: on_load,
                             }
                             SelectedPreset { preset_id: preset_id.clone() }
                             MasterButton {

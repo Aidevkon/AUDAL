@@ -294,12 +294,28 @@ pub fn App() -> Element {
                             p { "Drop your audio here." }
                         }
                     },
-                    HangarInterviewState::Detection { .. } => rsx! {
-                        p { "Single track." }
+                    HangarInterviewState::Detection { track_count } => {
+                        use_effect(move || {
+                            spawn_local(async move {
+                                TimeoutFuture::new(1200).await;
+                                dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
+                            });
+                        });
+                        rsx! {
+                            p { class: "jini-text",
+                                if track_count == 1 { "Single track." }
+                                else { "Album. {track_count} tracks." }
+                            }
+                        }
                     },
                     HangarInterviewState::AwaitingMore { .. } => rsx! {
                         p { "Waiting for more tracks..." }
-                        button { onclick: move |_| {}, "[+] Add" }
+                        button { 
+                            onclick: move |_| {
+                                dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
+                            }, 
+                            "[+] Add" 
+                        }
                     },
                     HangarInterviewState::PlatformCard { .. } => rsx! {
                         p { "Where is this going?" }
