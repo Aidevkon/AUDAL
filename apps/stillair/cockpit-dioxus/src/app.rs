@@ -165,22 +165,29 @@ pub fn App() -> Element {
                                         if let Ok(payload) =
                                             js_sys::Reflect::get(&ev, &JsValue::from_str("payload"))
                                         {
-                                            if let Ok(paths) = js_sys::Reflect::get(
+                                            if let Ok(ev_type) = js_sys::Reflect::get(
                                                 &payload,
-                                                &JsValue::from_str("paths"),
+                                                &JsValue::from_str("type"),
                                             ) {
-                                                let paths_array = js_sys::Array::from(&paths);
-                                                let count = paths_array.length() as u32;
+                                                if ev_type.as_string().unwrap_or_default() == "drop" {
+                                                    if let Ok(paths) = js_sys::Reflect::get(
+                                                        &payload,
+                                                        &JsValue::from_str("paths"),
+                                                    ) {
+                                                        let paths_array = js_sys::Array::from(&paths);
+                                                        let count = paths_array.length() as u32;
 
-                                                if count > 0 {
-                                                    let first_path = paths_array
-                                                        .get(0)
-                                                        .as_string()
-                                                        .unwrap_or_default();
+                                                        if count > 0 {
+                                                            let first_path = paths_array
+                                                                .get(0)
+                                                                .as_string()
+                                                                .unwrap_or_default();
 
-                                                    dropped_path.set(Some(first_path));
+                                                            dropped_path.set(Some(first_path));
 
-                                                    dispatch_hangar(hangar_state, HangarEvent::FilesDropped { count: count as usize });
+                                                            dispatch_hangar(hangar_state, HangarEvent::FilesDropped { count: count as usize });
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -189,7 +196,7 @@ pub fn App() -> Element {
 
                                 let _ = listen_fn.call2(
                                     &event_api,
-                                    &JsValue::from_str("tauri://file-drop"),
+                                    &JsValue::from_str("tauri://drag-drop"),
                                     cb_drop.as_ref().unchecked_ref(),
                                 );
                                 cb_drop.forget();
@@ -295,8 +302,24 @@ pub fn App() -> Element {
                             show_screws: false,
                             panel_class: "hangar-module".to_string(),
                             match other_state {
-                    HangarInterviewState::AwaitingDrop => rsx! {
-                        JiniDropZone {}
+                    HangarInterviewState::AwaitingDrop => {
+                        let hs = hangar_state;
+                        let mut dp = dropped_path;
+                        rsx! {
+                            JiniDropZone {
+                                on_browse: move |_| {
+                                    spawn_local(async move {
+                                        if let Ok(Some(meta)) = invoke::<Option<crate::types::AudioMeta>, _>(
+                                            "open_audio_file",
+                                            serde_json::json!({})
+                                        ).await {
+                                            dp.set(Some(meta.path.clone()));
+                                            dispatch_hangar(hs, HangarEvent::FilesDropped { count: 1 });
+                                        }
+                                    });
+                                }
+                            }
+                        }
                     },
                     HangarInterviewState::Detection { track_count } => {
                         use_effect(move || {
