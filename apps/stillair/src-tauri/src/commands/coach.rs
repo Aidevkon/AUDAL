@@ -31,11 +31,11 @@ pub async fn get_coach_narrative(
 ) -> Result<CoachNarrativeJson, String> {
     // A/B switching: COACH_PROVIDER env var — phi (default) or gemma
     // Authority: Phase 8 P8-008
-    let provider_name = std::env::var("COACH_PROVIDER").unwrap_or_else(|_| "phi".into());
+    let provider_name = std::env::var("COACH_PROVIDER").unwrap_or_else(|_| "gemma".into());
 
     let adapter = match provider_name.as_str() {
-        "gemma" => CoachAdapter::gemma(),
-        _ => CoachAdapter::phi(), // default: phi3.5:3.8b
+        "phi" => CoachAdapter::phi(),
+        _ => CoachAdapter::gemma(), // default: gemma2:9b
     };
 
     adapter
