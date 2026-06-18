@@ -189,6 +189,15 @@ pub async fn trigger_mastering(
                             num_frames: output.num_frames,
                         };
                         state_bg.playback.load(transfer);
+
+                        let raw_transfer = xaak::PcmTransfer {
+                            pcm_path: std::path::PathBuf::from(format!("/tmp/m0d-raw-{}.pcm", blob_id_str)),
+                            sample_rate: output.sample_rate,
+                            channels: 2,
+                            blob_id: b_id,
+                            num_frames: output.num_frames,
+                        };
+                        state_bg.playback.load_raw(raw_transfer);
                     }
                 }
             }

@@ -28,6 +28,10 @@ impl CpalPlayer {
     ///
     /// Accepts any type that implements Consumer<Item = f32> + Send + 'static,
     /// matching the opaque return from XaakKernel::stream_from().
+    ///
+    /// `raw_consumer` — optional consumer from kernel_raw (pre-mastering PCM).
+    ///   When present, its samples are tapped in parallel and pushed to the
+    ///   raw telemetry ring buffer for spectrum_before computation.
     pub fn play<C>(
         &mut self,
         mut consumer: C,
@@ -61,17 +65,17 @@ impl CpalPlayer {
         let sr = sample_rate as u64;
         let ch = channels as u64;
 
-        // TB-P6: ring buffer for telemetry worker
-        // Audio callback only pushes raw samples — no math, no syscalls
+        // TB-P6: ring buffers for telemetry worker (mastered + raw).
+        // Audio callback only pushes raw samples — no math, no syscalls.
         let telem_rb = ringbuf::HeapRb::<f32>::new(1024 * 16);
         let (telem_prod, telem_cons) = telem_rb.split();
-        let mut telem_prod = telem_prod; // explicit binding
-        
+        let mut telem_prod = telem_prod;
+
         let telem_rb_raw = ringbuf::HeapRb::<f32>::new(1024 * 16);
         let (telem_prod_raw, telem_cons_raw) = telem_rb_raw.split();
         let mut telem_prod_raw = telem_prod_raw;
 
-        // Spawn telemetry worker — FFT + UDP off audio thread
+        // Spawn telemetry worker — FFT + UDP off audio thread.
         crate::telemetry_worker::spawn(
             telem_cons,
             Some(telem_cons_raw),
@@ -80,34 +84,65 @@ impl CpalPlayer {
             position_ms.clone(),
         );
 
+        // Scratch buffer for raw tap (avoids heap allocation in callback).
         let mut raw_scratch = vec![0.0f32; 16384];
 
         let stream = device
             .build_output_stream(
                 &config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    let filled = consumer.pop_slice(data);
-                    
-                    // -- parallel raw tap --
-                    if let Some(ref mut raw_cons) = raw_consumer {
-                        let to_read = filled.min(raw_scratch.len());
-                        let raw_filled = raw_cons.pop_slice(&mut raw_scratch[..to_read]);
-                        let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod_raw, &raw_scratch[..raw_filled]);
+                    // Drain mastered consumer into speaker output buffer.
+                    let mut filled = 0;
+                    while filled < data.len() {
+                        let n = consumer.pop_slice(&mut data[filled..]);
+                        if n == 0 { break; }
+                        filled += n;
                     }
 
-                    // Fill any remaining frames with silence
+                    // Parallel raw tap — mirror the same number of samples from
+                    // kernel_raw into the raw telemetry ring buffer.
+                    if let Some(ref mut raw_cons) = raw_consumer {
+                        let to_read = filled.min(raw_scratch.len());
+                        let mut raw_filled = 0;
+                        while raw_filled < to_read {
+                            let n = raw_cons.pop_slice(&mut raw_scratch[raw_filled..to_read]);
+                            if n == 0 { break; }
+                            raw_filled += n;
+                        }
+                        let mut pushed = 0;
+                        while pushed < raw_filled {
+                            let n = ringbuf::traits::Producer::push_slice(
+                                &mut telem_prod_raw,
+                                &raw_scratch[pushed..raw_filled],
+                            );
+                            if n == 0 { break; }
+                            pushed += n;
+                        }
+                    }
+
+                    // Silence-pad any underrun frames.
                     for s in &mut data[filled..] {
                         *s = 0.0;
                     }
-                    // Advance playback position
+
+                    // Advance playback position.
                     let frames = filled as u64 / ch.max(1);
                     let delta_ms = frames.saturating_mul(1000) / sr.max(1);
                     if let Ok(mut p) = pos.lock() {
                         *p = p.saturating_add(delta_ms);
                     }
-                    // TB-P6: push raw samples to telemetry ring buffer
-                    // Lock-free push — never blocks audio thread
-                    let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod, data);
+
+                    // TB-P6: push mastered samples to telemetry ring buffer.
+                    // Lock-free — never blocks audio thread.
+                    let mut pushed = 0;
+                    while pushed < data.len() {
+                        let n = ringbuf::traits::Producer::push_slice(
+                            &mut telem_prod,
+                            &data[pushed..],
+                        );
+                        if n == 0 { break; }
+                        pushed += n;
+                    }
                 },
                 |err| tracing::error!("cpal stream error: {err}"),
                 None,

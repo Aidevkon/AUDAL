@@ -1,68 +1,82 @@
+//! telemetry_worker.rs — Off-thread FFT + UDP telemetry for dual-spectrum delta.
+//!
+//! Consumes mastered PCM (telem_cons) and raw PCM (telem_cons_raw) from
+//! lock-free ring buffers filled by the cpal callback, computes two 64-band
+//! spectra per chunk (spectrum_after = mastered, spectrum_before = raw),
+//! and ships a RealtimeFrame via UDP to the Tauri telemetry listener.
+//!
+//! This thread MUST NOT be joined or awaited from the audio thread.
+
 use ringbuf::traits::*;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-pub fn spawn<C>(mut consumer: C, mut raw_consumer: Option<C>, sample_rate: u32, channels: usize, pos_mutex: Arc<Mutex<u64>>)
+pub fn spawn<C>(
+    mut consumer: C,
+    mut raw_consumer: Option<C>,
+    sample_rate: u32,
+    channels: usize,
+    pos_mutex: Arc<Mutex<u64>>,
+)
 where
     C: Consumer<Item = f32> + Observer + Send + 'static,
 {
     std::thread::spawn(move || {
-        eprintln!(
-            "[WORKER] Thread spawned. CH: {}, SR: {}",
-            channels, sample_rate
-        );
+        tracing::debug!(sample_rate, channels, "xaak: telemetry worker started");
 
         let sender = crate::telemetry::UdpTelemetrySender::new();
-
-        let mut analyzer_after = crate::spectrum::SpectrumAnalyzer::new();
+        let mut analyzer_after  = crate::spectrum::SpectrumAnalyzer::new();
         let mut analyzer_before = crate::spectrum::SpectrumAnalyzer::new();
-        
+
         let ch = channels.max(1);
+        // chunk_size: 1024 frames × channels (2048 samples for stereo).
         let chunk_size = 1024 * ch;
-        // Use a fixed stack array to strictly eliminate heap allocations
-        // 1024 frames * 2 channels max = 2048
-        let mut buffer = [0.0f32; 2048];
+        // Fixed stack buffers — zero heap allocation per iteration.
+        let mut buffer     = [0.0f32; 2048];
         let mut raw_buffer = [0.0f32; 2048];
-        let mut iter_count = 0;
 
         loop {
-            let available = consumer.occupied_len();
-            if available >= chunk_size {
-                let slice = &mut buffer[..chunk_size];
-                let _filled = consumer.pop_slice(slice);
-                
-                let mut spectrum_before = [-120.0f32; 64];
-                if let Some(ref mut raw_cons) = raw_consumer {
-                    let raw_available = raw_cons.occupied_len();
-                    if raw_available >= chunk_size {
-                        let raw_slice = &mut raw_buffer[..chunk_size];
-                        let _raw_filled = raw_cons.pop_slice(raw_slice);
-                        spectrum_before = analyzer_before.compute(raw_slice, ch);
-                    }
-                }
-
-                let spectrum_after = analyzer_after.compute(&buffer[..chunk_size], ch);
-
-                iter_count += 1;
-                if iter_count <= 100 {
-                    eprintln!("[WORKER] before[0..3]={:?} after[0..3]={:?}", &spectrum_before[0..3], &spectrum_after[0..3]);
-                } else if iter_count % 50 == 0 {
-                    eprintln!("[WORKER] Processed 50 chunks. before[0]={:.1}, after[0]={:.1}", spectrum_before[0], spectrum_after[0]);
-                }
-
-                let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
-
-                let frame = lineos_types::telemetry::RealtimeFrame {
-                    spectrum_before,
-                    spectrum_after,
-                    gonio_path: crate::player::decimate_gonio(&buffer[..chunk_size], ch),
-                    position_ms,
-                };
-
-                sender.send_frame(&frame);
-            } else {
+            // Wait until a full chunk is available in the mastered ring buffer.
+            if consumer.occupied_len() < chunk_size {
                 std::thread::sleep(Duration::from_millis(2));
+                continue;
             }
+
+            // Drain exactly chunk_size samples from the mastered tap.
+            let mut read = 0;
+            while read < chunk_size {
+                let n = consumer.pop_slice(&mut buffer[read..chunk_size]);
+                if n == 0 { break; }
+                read += n;
+            }
+
+            // Compute spectrum_before from raw (pre-mastering) PCM if available.
+            let mut spectrum_before = [-120.0f32; 64];
+            if let Some(ref mut raw_cons) = raw_consumer {
+                if raw_cons.occupied_len() >= chunk_size {
+                    let mut raw_read = 0;
+                    while raw_read < chunk_size {
+                        let n = raw_cons.pop_slice(&mut raw_buffer[raw_read..chunk_size]);
+                        if n == 0 { break; }
+                        raw_read += n;
+                    }
+                    spectrum_before = analyzer_before.compute(&raw_buffer[..chunk_size], ch);
+                }
+            }
+
+            // Compute spectrum_after from mastered PCM.
+            let spectrum_after = analyzer_after.compute(&buffer[..chunk_size], ch);
+
+            let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
+
+            let frame = lineos_types::telemetry::RealtimeFrame {
+                spectrum_before,
+                spectrum_after,
+                gonio_path: crate::player::decimate_gonio(&buffer[..chunk_size], ch),
+                position_ms,
+            };
+
+            sender.send_frame(&frame);
         }
     });
 }
