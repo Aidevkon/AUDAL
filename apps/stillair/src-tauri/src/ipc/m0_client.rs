@@ -227,9 +227,23 @@ impl M0Client {
         if !resp.status().is_success() {
             return Err(M0Error::RequestFailed(resp.status().as_u16()));
         }
-        resp.json()
+        #[derive(serde::Deserialize)]
+        #[allow(dead_code)]
+        struct ControlResp {
+            status: String,
+            state: Option<crate::commands::playback::PlaybackStateJson>,
+            message: Option<String>,
+        }
+        let body: ControlResp = resp
+            .json()
             .await
-            .map_err(|e| M0Error::ParseError(e.to_string()))
+            .map_err(|e| M0Error::ParseError(e.to_string()))?;
+
+        if body.status == "ok" {
+            Ok(body.state)
+        } else {
+            Err(M0Error::RequestFailed(400))
+        }
     }
 
     /// GET /playback/telemetry — live momentary LUFS from active blob (P12B-005).

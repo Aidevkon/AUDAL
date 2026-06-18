@@ -181,37 +181,73 @@ pub async fn trigger_mastering(
     );
 
     let mut last_stage = String::new();
-    loop {
-        tokio::time::sleep(std::time::Duration::from_millis(33)).await;
+    let url = format!("http://127.0.0.1:7402/progress/{job_id}/stream");
+    eprintln!("[SSE-OPEN] subscribing for job {}", job_id);
+    let mut es = reqwest_eventsource::EventSource::get(url);
 
-        let progress = client
-            .get_progress(&job_id)
-            .await
-            .map_err(|e| e.to_string())?;
+    use futures_util::StreamExt;
+    while let Some(event) = es.next().await {
+        match event {
+            Ok(reqwest_eventsource::Event::Open) => continue,
+            Ok(reqwest_eventsource::Event::Message(message)) => {
+                #[derive(serde::Deserialize)]
+                struct SseProgress {
+                    #[serde(rename = "jobId", alias = "job_id", default)]
+                    job_id: String,
+                    stage: String,
+                    #[serde(rename = "blobId", alias = "blob_id")]
+                    blob_id: Option<String>,
+                    error: Option<String>,
+                }
 
-        if progress.stage != last_stage {
-            last_stage = progress.stage.clone();
-            let _ = app.emit(
-                "mastering://progress",
-                serde_json::json!({
-                    "stage":      progress.stage,
-                    "job_id":     progress.job_id,
-                    "elapsed_ms": progress.elapsed_ms,
-                    "blob_id":    progress.blob_id,
-                }),
-            );
-        }
+                let progress: SseProgress = match serde_json::from_str(&message.data) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("[SSE-ERROR] parse fail: {}", e);
+                        continue;
+                    }
+                };
 
-        match progress.stage.as_str() {
-            "CERTIFIED" => {
-                return progress.blob_id.ok_or("CERTIFIED but no blob_id".into());
+                eprintln!("[SSE-TRAP] stage={} (emitting={})", progress.stage, progress.stage != last_stage);
+
+                if progress.stage != last_stage {
+                    last_stage = progress.stage.clone();
+                    let _ = app.emit(
+                        "mastering://progress",
+                        serde_json::json!({
+                            "stage":      progress.stage,
+                            "job_id":     progress.job_id,
+                            "elapsed_ms": 0,
+                            "blob_id":    progress.blob_id,
+                        }),
+                    );
+                }
+
+                match progress.stage.as_str() {
+                    "CERTIFIED" => {
+                        eprintln!("[SSE-CLOSE] stream closed for job {}", job_id);
+                        es.close();
+                        return progress.blob_id.ok_or("CERTIFIED but no blob_id".into());
+                    }
+                    "ERROR" => {
+                        eprintln!("[SSE-CLOSE] stream closed with error for job {}", job_id);
+                        es.close();
+                        return Err(progress.error.unwrap_or("Mastering failed".into()));
+                    }
+                    _ => continue,
+                }
             }
-            "ERROR" => {
-                return Err(progress.error.unwrap_or("Mastering failed".into()));
+            Err(e) => {
+                eprintln!("[SSE-ERROR] stream error: {}", e);
+                eprintln!("[SSE-CLOSE] stream disconnected prematurely for job {}", job_id);
+                es.close();
+                return Err("SSE Stream disconnected prematurely".into());
             }
-            _ => continue,
         }
     }
+
+    eprintln!("[SSE-CLOSE] stream ended unexpectedly for job {}", job_id);
+    Err("Mastering stream ended unexpectedly".into())
 }
 
 // ── get_golden_blob ───────────────────────────────────────────────────────────

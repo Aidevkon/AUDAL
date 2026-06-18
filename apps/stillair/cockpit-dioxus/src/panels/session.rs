@@ -97,9 +97,14 @@ pub fn SessionPanel(
                             }
                         }
                     },
-                    CockpitMode::CoachReady { blob_id } | CockpitMode::Exporting { blob_id, .. } => rsx! {
-                        GoldenBlobBadge {}
-                        ExportControls { mode, blob_id }
+                    CockpitMode::CoachReady { .. } | CockpitMode::Exporting { .. } => rsx! {
+                        PrimarySignalAnalyzer {
+                            filename: "CERTIFIED MASTER".to_string(), // Keep consistent with previous logic or use empty string
+                            format: String::new(),
+                            telemetry: None,
+                            bpm: 0.0,
+                            journey_stage,
+                        }
                     },
                     CockpitMode::Fault { code, message } => rsx! {
                         FaultView { code, message }
@@ -281,7 +286,7 @@ fn MasterButton(
 
 
 #[component]
-fn GoldenBlobBadge() -> Element {
+pub fn GoldenBlobBadge() -> Element {
     rsx! {
         div {
             style: "padding:1rem 1.5rem; border-bottom:1px solid var(--border-subtle);",
@@ -303,7 +308,7 @@ fn GoldenBlobBadge() -> Element {
 }
 
 #[component]
-fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
+pub fn ExportControls(mode: Signal<CockpitMode>, blob_id: String) -> Element {
     let mut export_format = use_signal(|| "flac".to_string());
     let mut pdf_preview_ctx = use_context::<Signal<Option<String>>>();
 

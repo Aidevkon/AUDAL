@@ -290,6 +290,7 @@ pub fn spawn_agents(
     blob_store: crate::blob_store::BlobStore,
     album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
     progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
+    progress_map: Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>,
 ) -> Operator {
     let (schema_tx, schema_rx) = mpsc::channel::<Intent>(32);
     let (conductor_tx, conductor_rx) = mpsc::channel::<Intent>(32);
@@ -297,8 +298,8 @@ pub fn spawn_agents(
     let (wizard_tx, wizard_rx) = mpsc::channel::<Intent>(32);
 
     tokio::spawn(crate::agents::schema::run(schema_rx));
-    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone(), album_tx, progress_tx.clone()));
-    tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr, db.clone(), blob_store, progress_tx));
+    tokio::spawn(crate::agents::conductor::run(conductor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone(), album_tx, progress_tx.clone(), progress_map.clone()));
+    tokio::spawn(crate::agents::executor::run(executor_rx, head_state_ptr, db.clone(), blob_store, progress_tx, progress_map));
     tokio::spawn(crate::agents::wizard::run(wizard_rx));
 
     Operator::new(schema_tx, conductor_tx, executor_tx, wizard_tx, audit)

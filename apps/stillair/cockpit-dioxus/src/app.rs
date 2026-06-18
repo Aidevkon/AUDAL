@@ -103,6 +103,13 @@ pub fn App() -> Element {
                 lp.set(Some(pr.clone()));
                 lf.set(Some(fl.clone()));
 
+                web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!(
+                    "[NEW-SESSION] queue_len={}, journey_active={}, mode={:?}",
+                    stage_queue.read().len(),
+                    *is_journey_active.read(),
+                    *m_mode.read()
+                )));
+
                 // Step 1: load file metadata
                 let meta = match crate::ipc::invoke::<crate::types::AudioMeta, _>(
                     "load_audio_file",
@@ -117,6 +124,16 @@ pub fn App() -> Element {
                         return;
                     }
                 };
+                if !matches!(*m_mode.read(), CockpitMode::Idle) {
+                    dispatch(m_mode, CockpitEvent::BackToIdle);
+                }
+                is_journey_active_sig.set(false);
+                let mut stage_queue_guard = stage_queue.write();
+                stage_queue_guard.clear();
+                drop(stage_queue_guard);
+                let mut journey_stage_sig = journey_stage;
+                journey_stage_sig.set("INITIALIZING".into());
+
                 dispatch(m_mode, CockpitEvent::FileDropped {
                     path: path.clone(),
                     name: meta.name.clone(),
@@ -205,15 +222,16 @@ pub fn App() -> Element {
                 }
 
                 // Step 7: complete
-                web_sys::console::error_1(&format!(
-                    "[TRAP] FSM: queue drained. mode={:?} about to dispatch MasteringComplete",
-                    *m_mode.read()
+                // Step 7: complete
+                web_sys::console::log_1(&format!(
+                    "[FSM-TRAP] queue drained, journey_active={}, mode={:?}",
+                    *is_journey_active_sig.read(), *m_mode.read()
                 ).into());
 
                 dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id: blob_id.clone() });
 
-                web_sys::console::error_1(&format!(
-                    "[TRAP] FSM: after MasteringComplete. mode={:?}",
+                web_sys::console::log_1(&format!(
+                    "[FSM-TRAP] after MasteringComplete dispatch, mode={:?}",
                     *m_mode.read()
                 ).into());
 
@@ -507,14 +525,15 @@ pub fn App() -> Element {
                         }
                     },
                     HangarInterviewState::Detection { track_count } => {
-                        use_effect(move || {
-                            spawn_local(async move {
-                                TimeoutFuture::new(1200).await;
-                                dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
-                            });
-                        });
+                        let dp = dropped_path.read().clone().unwrap_or_default();
                         rsx! {
-                            JiniDetection { track_count }
+                            JiniDetection {
+                                key: "{dp}",
+                                track_count,
+                                on_timeout: move |_| {
+                                    dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
+                                }
+                            }
                         }
                     },
                     HangarInterviewState::AwaitingMore { .. } => rsx! {
@@ -551,6 +570,9 @@ pub fn App() -> Element {
                         rsx! {
                             JiniFlavourSelector {
                                 on_select: move |flavour: String| {
+                                    web_sys::console::log_1(&format!(
+                                        "[NEW-SESSION] starting, current mode={:?}", *m_mode.read()
+                                    ).into());
                                     dispatch_hangar(hs, HangarEvent::FlavourChosen { flavour: flavour.clone() });
                                     
                                     if let Some(path) = current_path.clone() {

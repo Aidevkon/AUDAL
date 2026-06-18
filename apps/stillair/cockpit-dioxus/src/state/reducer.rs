@@ -11,8 +11,10 @@ use dioxus::prelude::*;
 /// This is the ONLY place mode mutation happens — components never
 /// call mode.set() directly.
 pub fn dispatch(mut mode: Signal<CockpitMode>, event: CockpitEvent) {
+    web_sys::console::error_1(&format!("[TRAP] DISPATCH: event={:?} mode={:?}", event, *mode.read()).into());
     let current = mode.read().clone();
     let next = reduce(current, event);
+    web_sys::console::error_1(&format!("[TRAP] DISPATCH RESULT: next_mode={:?}", next).into());
     mode.set(next);
 }
 

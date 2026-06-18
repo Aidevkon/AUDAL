@@ -16,3 +16,6 @@ global_*.json
 *.corpus.json
 *.certificate.json
 *.certificate.pdf
+*_certificate.pdf
+test_progress.sh
+m0-audit-*.ndjson

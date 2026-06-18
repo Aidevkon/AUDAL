@@ -33,11 +33,7 @@ pub fn MfdHud(props: MfdHudProps) -> Element {
             style: "position: absolute; top: 0; left: 0; \
                     width: 100%; height: 100%; \
                     pointer-events: none; \
-                    z-index: 100; \
-                    display: flex; flex-direction: column; \
-                    justify-content: flex-end; \
-                    padding: 8px; box-sizing: border-box; \
-                    gap: 4px;",
+                    z-index: 100;",
 
             for finding in mfd_findings {
                 div {
@@ -52,7 +48,8 @@ pub fn MfdHud(props: MfdHudProps) -> Element {
                             background: rgba(0,0,0,0.75); \
                             display: flex; justify-content: space-between; \
                             align-items: center; gap: 12px; \
-                            cursor: pointer;",
+                            cursor: pointer; \
+                            {spatial_style(finding.id)}",
                     onclick: {
                         let id = finding.id;
                         let dismiss = props.on_dismiss;
@@ -66,6 +63,27 @@ pub fn MfdHud(props: MfdHudProps) -> Element {
                 }
             }
         }
+    }
+}
+
+fn spatial_style(id: &str) -> &'static str {
+    match id {
+        // MFD1 (PSA)
+        "true_peak_clip" => "position: absolute; top: 32px; right: 16px;",
+        "lufs_deviation" => "position: absolute; top: 72px; right: 16px;",
+        "dynamic_crush"  => "position: absolute; bottom: 32px; right: 16px;",
+        "cymbal_harsh"   => "position: absolute; top: 30%; right: 25%;",
+        "boxiness"       => "position: absolute; bottom: 30%; left: 25%;",
+        "harsh_resonance"=> "position: absolute; top: 45%; left: 45%;",
+        "verification_failed" => "position: absolute; top: 12px; left: 50%; transform: translateX(-50%);",
+        
+        // MFD2 (Spatial)
+        "phase_issue"     => "position: absolute; bottom: 32px; right: 16px;",
+        "stereo_collapse" => "position: absolute; top: 32px; left: 16px;",
+        "sub_rumble"      => "position: absolute; bottom: 32px; left: 16px;",
+        
+        // Fallback
+        _ => "position: absolute; bottom: 16px; left: 16px;",
     }
 }
 

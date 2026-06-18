@@ -6,8 +6,10 @@ pub fn dispatch_hangar(
     mut state: Signal<HangarInterviewState>,
     event: HangarEvent,
 ) {
+    web_sys::console::error_1(&format!("[TRAP] HANGAR_DISPATCH: event={:?} state={:?}", event, *state.read()).into());
     let current = state.read().clone();
     let next = reduce_hangar(current, event);
+    web_sys::console::error_1(&format!("[TRAP] HANGAR_DISPATCH RESULT: next_state={:?}", next).into());
     state.set(next);
 }
 

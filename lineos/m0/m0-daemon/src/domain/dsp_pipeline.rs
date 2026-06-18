@@ -16,9 +16,10 @@ pub fn run_dsp(
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
+    progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
-    run_dsp_internal(req, start, head_state, progress_tx, job_id)
+    run_dsp_internal(req, start, head_state, progress_tx, progress_map, job_id)
 }
 
 #[inline(always)]
@@ -40,6 +41,7 @@ fn run_dsp_internal(
     start: Instant,
     head_state: Arc<ArcSwap<DspState>>,
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
+    progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
 ) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
@@ -47,18 +49,23 @@ fn run_dsp_internal(
     let preset_id = &req.preset_id;
 
     let emit_progress = |stage_name: &str| {
+        let p = crate::app_state::MasteringProgress {
+            job_id: job_id.clone(),
+            stage: stage_name.into(),
+            elapsed_ms: start.elapsed().as_millis() as u64,
+            blob_id: None,
+            error: None,
+        };
+        if let Some(map) = &progress_map {
+            map.insert(job_id.clone(), p.clone());
+        }
         if let Some(tx) = &progress_tx {
-            let _ = tx.send(crate::app_state::MasteringProgress {
-                job_id: job_id.clone(),
-                stage: stage_name.into(),
-                elapsed_ms: start.elapsed().as_millis() as u64,
-                blob_id: None,
-                error: None,
-            });
+            let _ = tx.send(p);
         }
     };
 
     // NODE 1: DECODE
+    emit_progress("Ingest");
     let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id)?;
     let target_lufs = decoded.target_lufs;
     let input_hash_hex = decoded.input_hash_hex;
@@ -73,7 +80,6 @@ fn run_dsp_internal(
     let _chunk_original = decoded.chunk_original;
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
-    emit_progress("Ingest");
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
@@ -95,6 +101,7 @@ fn run_dsp_internal(
     pre_analysis.transients_ms = transients_ms;
 
     // NODE 3: SCOUT (NMF + Maestro)
+    emit_progress("Scout Pass");
     let scout_out = crate::domain::nodes::scout_node::run(
         &chunk.left,
         &chunk.right,
@@ -108,7 +115,6 @@ fn run_dsp_internal(
     let render_params = scout_out.render_params;
     let mono = scout_out.mono;
     profiler.mark_stage("Scout Pass", &mono);
-    emit_progress("Scout Pass");
 
     use lineos_types::{MixMetrics, StemFeatures, StemMetrics};
     let streaming_features = StemFeatures {
@@ -150,6 +156,7 @@ fn run_dsp_internal(
     let repo_state = head_state.load_full();
     let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
 
+    emit_progress("Stem Engine");
     let fingerprints = crate::domain::nodes::render_node::run(
         &mut two_pass,
         &mono,
@@ -164,9 +171,9 @@ fn run_dsp_internal(
         right_slice,
     )?;
     profiler.mark_stage("Stem Engine", left_slice);
-    emit_progress("Stem Engine");
 
     // Markov spatial modulation (simplified — full in Phase 8)
+    emit_progress("Spatial");
     let profile = UserSpatialProfile::default_podcast();
     let modulated = profile.apply_markov_prediction("vowel");
     let _ = modulated;
@@ -174,9 +181,9 @@ fn run_dsp_internal(
     // chunk.left  = left_slice;
     // chunk.right = right_slice;
     profiler.mark_stage("Spatial", &chunk.left);
-    emit_progress("Spatial");
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
+    emit_progress("Mastering");
     let dsp_out = crate::domain::nodes::dsp_node::run(
         &mut chunk.left,
         &mut chunk.right,
@@ -203,7 +210,6 @@ fn run_dsp_internal(
     let lufs = dsp_out.lufs;
     let tp = dsp_out.true_peak;
     profiler.mark_stage("Mastering", left_slice);
-    emit_progress("Mastering");
     let _dr = 10.0; // dynamic range proxy for v3
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
@@ -248,6 +254,20 @@ fn run_dsp_internal(
         n_total,
         processing_timeline,
     )?;
+
+    let p = crate::app_state::MasteringProgress {
+        job_id: job_id.clone(),
+        stage: "CERTIFIED".into(),
+        elapsed_ms: start.elapsed().as_millis() as u64,
+        blob_id: Some(cert_out.blob.id.clone()),
+        error: None,
+    };
+    if let Some(map) = &progress_map {
+        map.insert(job_id.clone(), p.clone());
+    }
+    if let Some(tx) = &progress_tx {
+        let _ = tx.send(p);
+    }
 
     Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
 }

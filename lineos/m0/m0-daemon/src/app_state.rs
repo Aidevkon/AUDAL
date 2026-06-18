@@ -94,6 +94,7 @@ impl AppState {
             .unwrap_or_else(|e| tracing::warn!("DB migrate: {}", e));
 
         let blob_store = BlobStore::new();
+        let progress_map = Arc::new(DashMap::new());
         let operator = crate::agents::operator::spawn_agents(
             audit.clone(),
             head_state_ptr.clone(),
@@ -101,13 +102,14 @@ impl AppState {
             blob_store.clone(),
             album_tx.clone(),
             progress_tx.clone(),
+            progress_map.clone(),
         );
 
         Self {
             audit,
             blob_store,
             playback: PlaybackHandle::spawn(),
-            progress: Arc::new(DashMap::new()),
+            progress: progress_map,
             operator,
             preview_store: PreviewStore::new(),
             progress_tx,

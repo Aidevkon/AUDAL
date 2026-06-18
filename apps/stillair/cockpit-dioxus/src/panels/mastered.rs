@@ -44,14 +44,11 @@ pub fn MasteredView(
     let session = session_state.read();
     let viz = viz_data.read();
 
-    let before_path = viz
-        .as_ref()
-        .map(|v| v.waveform_before_svg.clone())
-        .unwrap_or_default();
-    let after_path = viz
-        .as_ref()
-        .map(|v| v.waveform_after_svg.clone())
-        .unwrap_or_default();
+    let before_wave = viz.as_ref().map(|v| v.waveform_before_svg.clone()).unwrap_or_default();
+    let after_wave = viz.as_ref().map(|v| v.waveform_after_svg.clone()).unwrap_or_default();
+
+    let before_path = before_wave;
+    let after_path = after_wave;
 
     rsx! {
         div {

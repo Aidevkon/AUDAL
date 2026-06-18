@@ -54,12 +54,28 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
     let mut intents_active = use_signal(|| false);
     let mut spatial_collapsed = use_signal(|| false);
 
+    let mut tele_generation = use_signal(|| 0u64);
+
     use_effect(move || {
+        let my_gen = *tele_generation.peek() + 1;
+        tele_generation.set(my_gen);
         spawn_local(async move {
             loop {
-                gloo_timers::future::TimeoutFuture::new(16).await;
-                if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
-                    realtime.set(Some(frame));
+                if *tele_generation.peek() != my_gen { break; }
+
+                let m = props.mode.read().clone();
+                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::CoachReady { .. } | CockpitMode::Exporting { .. });
+                
+                if is_active {
+                    web_sys::console::log_1(&format!(
+                        "[TELE-TRAP] polling, mode={:?}", m
+                    ).into());
+                    if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
+                        realtime.set(Some(frame));
+                    }
+                    gloo_timers::future::TimeoutFuture::new(200).await;
+                } else {
+                    gloo_timers::future::TimeoutFuture::new(200).await;
                 }
             }
         });

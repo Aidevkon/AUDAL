@@ -137,11 +137,11 @@ async fn main() -> Result<()> {
 
     // Pre-warm the LLM so first real request skips cold start
     tokio::spawn(async {
-        tracing::info!("[m0d] pre-warming gemma2:9b...");
+        tracing::info!("[m0d] pre-warming llama3.2:1b...");
         let _ = reqwest::Client::new()
             .post("http://localhost:11434/api/generate")
             .json(&serde_json::json!({
-                "model": "gemma2:9b",
+                "model": "llama3.2:1b",
                 "prompt": "ready",
                 "stream": false,
                 "keep_alive": "30m"

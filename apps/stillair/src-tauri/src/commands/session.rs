@@ -184,27 +184,16 @@ pub async fn get_session_state(
         "[get_session_state] calling coach (max {}s)...",
         COACH_TIMEOUT_SECS
     );
-    let narrative: Option<CoachNarrativeJson> = match timeout(
-        Duration::from_secs(COACH_TIMEOUT_SECS),
-        get_coach_narrative(findings.clone()),
-    )
-    .await
-    {
-        Ok(Ok(n)) => {
-            eprintln!("[get_session_state] coach narrative ok");
-            Some(n)
-        }
-        Ok(Err(e)) => {
-            eprintln!("[get_session_state] coach narrative err (non-fatal): {e}");
-            None
-        }
-        Err(_elapsed) => {
-            eprintln!(
-                "[get_session_state] coach timeout after {COACH_TIMEOUT_SECS}s — returning None"
-            );
-            None
-        }
-    };
+    let findings_clone = findings.clone();
+    tokio::spawn(async move {
+        let _ = timeout(
+            Duration::from_secs(COACH_TIMEOUT_SECS),
+            get_coach_narrative(findings_clone),
+        )
+        .await;
+    });
+    
+    let narrative = None; // Unblock UI immediately so export buttons appear
 
     // Step 4: Compose compliance summary from pre-computed loudness flags
     let compliance = ComplianceJson {

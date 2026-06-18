@@ -113,13 +113,15 @@ pub fn TransportBar(mut props: TransportBarProps) -> Element {
                         continue;
                     }
 
-                    if let Ok(Some(state)) =
-                        crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
-                            "get_playback_state",
-                        )
-                        .await
-                    {
-                        playback_state.clone().set(Some(state));
+                    match crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>("get_playback_state").await {
+                        Ok(Some(state)) => {
+                            playback_state.clone().set(Some(state));
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            web_sys::console::error_1(&format!("[TransportBar] get_playback_state error: {e}. Stopping poll.").into());
+                            break;
+                        }
                     }
                 }
             });

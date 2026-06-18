@@ -1,0 +1,509 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "JINI narration matrix. Pre-computed avionics-grade narration strings. Runtime does .replace() on placeholders. NO LLM at runtime.",
+    "placeholders": ["{track_name}", "{lufs}", "{peak}", "{platform}", "{bpm}", "{flavour}", "{correlation}"],
+    "selection": "Rust picks one variation at random from the array for the matched key.",
+    "voice": "Avionics instrument + maitre co-pilot. Max 2 sentences. Action-first. No greetings. No emojis. Never identifies as AI.",
+    "zones": {
+      "zone_a": "System status during analysis (Ingest/Scout/Stems/Spatial). Axes: stage x persona. NO findings here (not computed yet).",
+      "zone_b": "Action + payload during Mastering. Axes: finding x flavour x persona.",
+      "zone_c": "Telemetry sign-off at Certified. Axes: platform x persona."
+    }
+  },
+
+  "zone_a": {
+    "Ingest": {
+      "beginner": [
+        "Reading your track. Getting everything ready.",
+        "Loading {track_name}. One moment.",
+        "Bringing your audio in. Setting up."
+      ],
+      "intermediate": [
+        "Decoding {track_name}. Preparing the signal chain.",
+        "Ingesting audio data. Building the work buffer.",
+        "Reading raw samples. Staging for analysis."
+      ],
+      "pro": [
+        "Decoding {track_name} to 64-bit float PCM.",
+        "Ingest pass. Allocating zero-copy sample buffer.",
+        "Raw PCM staged. Sample integrity verified."
+      ]
+    },
+    "Scout": {
+      "beginner": [
+        "Listening to the colour of your sound.",
+        "Getting to know your mix.",
+        "Studying how your track feels."
+      ],
+      "intermediate": [
+        "Reading the tonal balance. Mapping the spectrum.",
+        "Scanning frequency contour and energy.",
+        "Profiling timbre across the spectrum."
+      ],
+      "pro": [
+        "Scout pass. Extracting MFCC timbre fingerprint.",
+        "Spectral profiling. Mapping energy distribution.",
+        "Analysing crest factor and tonal topography."
+      ]
+    },
+    "Stems": {
+      "beginner": [
+        "Separating the drums from the music.",
+        "Splitting the parts of your track apart.",
+        "Finding each piece of your sound."
+      ],
+      "intermediate": [
+        "Isolating rhythmic and melodic layers.",
+        "Separating transients from sustained tones.",
+        "Splitting percussion from harmonic content."
+      ],
+      "pro": [
+        "Stem engine. NMF harmonic-percussive separation.",
+        "Isolating transient layer via HPSS.",
+        "Decomposing spectrogram into basis components."
+      ]
+    },
+    "Spatial": {
+      "beginner": [
+        "Checking the left and right balance.",
+        "Looking at the width of your sound.",
+        "Mapping how wide your track feels."
+      ],
+      "intermediate": [
+        "Mapping the stereo field. Checking width.",
+        "Analysing stereo image and balance.",
+        "Reading the spatial spread of the mix."
+      ],
+      "pro": [
+        "Spatial pass. Measuring phase correlation.",
+        "Mapping stereo field. Checking mono compatibility.",
+        "Analysing inter-channel coherence."
+      ]
+    }
+  },
+
+  "zone_b": {
+    "Muddy": {
+      "Clean": {
+        "beginner": [
+          "Your low end was a little cloudy. Clearing it up for a clean sound.",
+          "Cleaning up some muddiness so everything sounds clearer.",
+          "Tidying the low frequencies for a cleaner result."
+        ],
+        "intermediate": [
+          "Clearing low-mid buildup. Tightening for a clean profile.",
+          "Reducing muddiness in the low-mids. Restoring clarity.",
+          "Cutting masking frequencies. Cleaning the foundation."
+        ],
+        "pro": [
+          "Clearing low-mid masking. Surgical cut for clean transfer.",
+          "Attenuating 200-400Hz buildup. Restoring transient clarity.",
+          "Removing spectral masking. Tightening low-mid definition."
+        ]
+      },
+      "Warm": {
+        "beginner": [
+          "Your low end was muddy. Smoothing it into a warm, rich sound.",
+          "Clearing the cloudiness, then adding gentle warmth.",
+          "Tidying the lows and warming up your track."
+        ],
+        "intermediate": [
+          "Clearing low-mid mud. Imprinting {flavour} character.",
+          "Reducing buildup, then adding harmonic warmth.",
+          "Tightening the lows. Shaping a warm signature."
+        ],
+        "pro": [
+          "Clearing low-mid masking. Exciting odd harmonics for {flavour} signature.",
+          "Attenuating mud, injecting even-order saturation.",
+          "Surgical low-mid cut. Tube-stage harmonic warmth applied."
+        ]
+      },
+      "Punch": {
+        "beginner": [
+          "Cleared the muddiness and made your drums hit harder.",
+          "Tidied the lows so the punch comes through.",
+          "Cleaning up, then adding power to the beat."
+        ],
+        "intermediate": [
+          "Clearing low-mid mud. Tightening transients for punch.",
+          "Reducing buildup, sharpening the attack.",
+          "Cleaning the lows, then driving dynamic impact."
+        ],
+        "pro": [
+          "Clearing low-mid masking. Transient shaping for {flavour} impact.",
+          "Attenuating mud, enhancing attack envelope.",
+          "Surgical cut, then punch-band transient drive."
+        ]
+      },
+      "Air": {
+        "beginner": [
+          "Cleared the cloudy low end and opened up the top.",
+          "Tidied the lows and added openness up high.",
+          "Cleaning the mud, lifting the brightness."
+        ],
+        "intermediate": [
+          "Clearing low-mid mud. Opening the high end for air.",
+          "Reducing buildup, lifting the upper spectrum.",
+          "Cleaning the lows, extending the top end."
+        ],
+        "pro": [
+          "Clearing low-mid masking. High-shelf lift for {flavour} extension.",
+          "Attenuating mud, opening 10kHz-plus air band.",
+          "Surgical cut, then upper-octave shelf extension."
+        ]
+      }
+    },
+    "Harsh": {
+      "Clean": {
+        "beginner": [
+          "Some sharp edges were tiring to listen to. Smoothing them out.",
+          "Softening the harsh parts for an easier, clean sound.",
+          "Taming the sharpness so it feels comfortable."
+        ],
+        "intermediate": [
+          "Taming harsh resonance. Smoothing for a clean profile.",
+          "Reducing upper-mid harshness. Restoring balance.",
+          "Controlling sharp peaks. Clean tonal result."
+        ],
+        "pro": [
+          "Taming harsh upper-mid resonance. Dynamic notch applied.",
+          "Attenuating 2-5kHz harshness. Restoring smooth response.",
+          "De-essing resonant peaks. Clean spectral balance."
+        ]
+      },
+      "Warm": {
+        "beginner": [
+          "Smoothed the harsh parts and added a warm feel.",
+          "Softening the sharpness, warming things up.",
+          "Taming the edges and adding richness."
+        ],
+        "intermediate": [
+          "Taming harsh resonance. Imprinting {flavour} warmth.",
+          "Smoothing sharp peaks, adding harmonic body.",
+          "Controlling harshness, shaping a warm tone."
+        ],
+        "pro": [
+          "Taming harsh resonance. Even-order saturation for {flavour} body.",
+          "Attenuating 2-5kHz, applying tube-stage warmth.",
+          "Dynamic notch, then harmonic warmth imprint."
+        ]
+      },
+      "Punch": {
+        "beginner": [
+          "Smoothed the harsh edges and made the hits stronger.",
+          "Softening sharpness while keeping the punch.",
+          "Taming the edge, driving the beat."
+        ],
+        "intermediate": [
+          "Taming harshness. Tightening transients for punch.",
+          "Smoothing peaks, sharpening the attack.",
+          "Controlling resonance, driving impact."
+        ],
+        "pro": [
+          "Taming harsh resonance. Transient drive for {flavour} impact.",
+          "Attenuating 2-5kHz, enhancing attack envelope.",
+          "Dynamic notch, then punch-band transient shaping."
+        ]
+      },
+      "Air": {
+        "beginner": [
+          "Smoothed the harsh parts and kept the top open.",
+          "Softening sharpness while keeping it bright.",
+          "Taming the edge, opening the air."
+        ],
+        "intermediate": [
+          "Taming harshness. Opening clean air up top.",
+          "Smoothing peaks, extending the high end gently.",
+          "Controlling resonance, lifting smooth air."
+        ],
+        "pro": [
+          "Taming harsh resonance. Smooth high-shelf for {flavour}.",
+          "Attenuating 2-5kHz, opening air above 10kHz.",
+          "Dynamic notch, then resonance-free air extension."
+        ]
+      }
+    },
+    "Flat": {
+      "Clean": {
+        "beginner": [
+          "Your track sounded a bit flat. Adding life while keeping it clean.",
+          "Giving your sound more depth and clarity.",
+          "Bringing energy to a flat mix, cleanly."
+        ],
+        "intermediate": [
+          "Restoring dynamics to a flat mix. Clean profile.",
+          "Adding spectral movement. Clean tonal balance.",
+          "Lifting a flat response. Restoring clarity."
+        ],
+        "pro": [
+          "Restoring dynamic range to compressed source. Clean transfer.",
+          "Re-expanding micro-dynamics. Clean spectral lift.",
+          "Counter-shaping flat response. Transient recovery."
+        ]
+      },
+      "Warm": {
+        "beginner": [
+          "Your track was flat. Adding warmth and life.",
+          "Bringing depth and a warm glow to the sound.",
+          "Lifting a flat mix with gentle warmth."
+        ],
+        "intermediate": [
+          "Restoring dynamics. Imprinting {flavour} warmth.",
+          "Adding movement, then harmonic body.",
+          "Lifting a flat response, shaping warm tone."
+        ],
+        "pro": [
+          "Restoring dynamic range. Even-order warmth for {flavour}.",
+          "Re-expanding dynamics, applying tube saturation.",
+          "Counter-shaping flatness, then harmonic warmth."
+        ]
+      },
+      "Punch": {
+        "beginner": [
+          "Your track was flat. Adding punch and energy.",
+          "Bringing the beat to life with more impact.",
+          "Lifting a flat mix, driving the hits."
+        ],
+        "intermediate": [
+          "Restoring dynamics. Driving transients for punch.",
+          "Adding movement, sharpening the attack.",
+          "Lifting flatness, building dynamic impact."
+        ],
+        "pro": [
+          "Restoring dynamic range. Transient drive for {flavour} impact.",
+          "Re-expanding dynamics, enhancing attack envelope.",
+          "Counter-shaping flatness, then punch-band drive."
+        ]
+      },
+      "Air": {
+        "beginner": [
+          "Your track was flat. Adding openness and sparkle.",
+          "Bringing brightness and air to the sound.",
+          "Lifting a flat mix, opening the top."
+        ],
+        "intermediate": [
+          "Restoring dynamics. Opening air for {flavour}.",
+          "Adding movement, lifting the high end.",
+          "Lifting flatness, extending the top."
+        ],
+        "pro": [
+          "Restoring dynamic range. High-shelf air for {flavour}.",
+          "Re-expanding dynamics, opening upper octaves.",
+          "Counter-shaping flatness, then air-band extension."
+        ]
+      }
+    },
+    "Quiet": {
+      "Clean": {
+        "beginner": [
+          "Your track was quiet. Bringing it up to full volume, cleanly.",
+          "Raising the level so it plays loud and clear.",
+          "Boosting the volume while keeping it clean."
+        ],
+        "intermediate": [
+          "Raising integrated loudness. Clean gain structure.",
+          "Lifting level to target. Preserving clarity.",
+          "Calibrating loudness upward. Clean transfer."
+        ],
+        "pro": [
+          "Raising integrated loudness to target. Clean gain staging.",
+          "Lifting RMS, preserving transient integrity.",
+          "Loudness calibration, transparent limiting."
+        ]
+      },
+      "Warm": {
+        "beginner": [
+          "Your track was quiet. Raising it with a warm touch.",
+          "Bringing up the volume and adding warmth.",
+          "Boosting level with a rich, warm feel."
+        ],
+        "intermediate": [
+          "Raising loudness. Imprinting {flavour} warmth.",
+          "Lifting level, adding harmonic body.",
+          "Calibrating loudness, shaping warm tone."
+        ],
+        "pro": [
+          "Raising integrated loudness. Even-order warmth for {flavour}.",
+          "Lifting RMS, applying tube-stage saturation.",
+          "Loudness calibration, then harmonic warmth."
+        ]
+      },
+      "Punch": {
+        "beginner": [
+          "Your track was quiet. Raising it and adding punch.",
+          "Bringing up the level with extra impact.",
+          "Boosting volume, driving the beat."
+        ],
+        "intermediate": [
+          "Raising loudness. Driving transients for punch.",
+          "Lifting level, sharpening the attack.",
+          "Calibrating loudness, building impact."
+        ],
+        "pro": [
+          "Raising integrated loudness. Transient drive for {flavour}.",
+          "Lifting RMS, enhancing attack envelope.",
+          "Loudness calibration, then punch-band drive."
+        ]
+      },
+      "Air": {
+        "beginner": [
+          "Your track was quiet. Raising it and opening the top.",
+          "Bringing up the level with added brightness.",
+          "Boosting volume, lifting the air."
+        ],
+        "intermediate": [
+          "Raising loudness. Opening air for {flavour}.",
+          "Lifting level, extending the high end.",
+          "Calibrating loudness, opening the top."
+        ],
+        "pro": [
+          "Raising integrated loudness. High-shelf air for {flavour}.",
+          "Lifting RMS, opening upper octaves.",
+          "Loudness calibration, then air-band extension."
+        ]
+      }
+    },
+    "Perfect": {
+      "Clean": {
+        "beginner": [
+          "Your mix was already great. Just a light, clean polish.",
+          "Barely touched it. Your track was already clean.",
+          "A gentle finishing pass. It was already in great shape."
+        ],
+        "intermediate": [
+          "Mix is well balanced. Applying transparent polish.",
+          "Minimal correction needed. Clean finishing pass.",
+          "Strong source. Light clean-profile polish."
+        ],
+        "pro": [
+          "Source within tolerance. Transparent clean transfer.",
+          "Minimal intervention. Clean polish, integrity preserved.",
+          "Well-engineered source. Light transparent finishing."
+        ]
+      },
+      "Warm": {
+        "beginner": [
+          "Your mix was already great. Adding just a touch of warmth.",
+          "Barely touched it, only a warm glow on top.",
+          "A gentle warm finish. It was already solid."
+        ],
+        "intermediate": [
+          "Mix is well balanced. Light {flavour} character added.",
+          "Minimal correction. Gentle harmonic warmth.",
+          "Strong source. Subtle warm signature."
+        ],
+        "pro": [
+          "Source within tolerance. Subtle even-order {flavour} warmth.",
+          "Minimal intervention. Light tube-stage colour.",
+          "Well-engineered source. Gentle harmonic imprint."
+        ]
+      },
+      "Punch": {
+        "beginner": [
+          "Your mix was already great. Adding a little extra punch.",
+          "Barely touched it, just a bit more impact.",
+          "A gentle punch finish. It was already solid."
+        ],
+        "intermediate": [
+          "Mix is well balanced. Light transient enhancement.",
+          "Minimal correction. Gentle punch added.",
+          "Strong source. Subtle dynamic drive."
+        ],
+        "pro": [
+          "Source within tolerance. Subtle transient drive for {flavour}.",
+          "Minimal intervention. Light attack enhancement.",
+          "Well-engineered source. Gentle punch-band shaping."
+        ]
+      },
+      "Air": {
+        "beginner": [
+          "Your mix was already great. Adding a touch of sparkle.",
+          "Barely touched it, just opened the top a little.",
+          "A gentle air finish. It was already solid."
+        ],
+        "intermediate": [
+          "Mix is well balanced. Light air opening.",
+          "Minimal correction. Gentle high-end lift.",
+          "Strong source. Subtle top extension."
+        ],
+        "pro": [
+          "Source within tolerance. Subtle high-shelf for {flavour}.",
+          "Minimal intervention. Light air-band opening.",
+          "Well-engineered source. Gentle upper-octave extension."
+        ]
+      }
+    }
+  },
+
+  "zone_c": {
+    "Spotify": {
+      "beginner": [
+        "Done. Your track is ready for Spotify at the perfect volume.",
+        "Certified. Tuned for Spotify and ready to share.",
+        "All set for Spotify. Your master is ready."
+      ],
+      "intermediate": [
+        "Certified. Calibrated to {lufs} LUFS for Spotify.",
+        "Mastering complete. Spotify loudness target met.",
+        "Ready for Spotify. Peak secured at {peak} dBTP."
+      ],
+      "pro": [
+        "Certified. Integrated {lufs} LUFS, true peak {peak} dBTP, Spotify-compliant.",
+        "Mastering complete. {platform} target met. Phase correlation {correlation}.",
+        "Sign-off. {lufs} LUFS calibrated, ceiling locked at {peak} dBTP."
+      ]
+    },
+    "Apple": {
+      "beginner": [
+        "Done. Your track is ready for Apple at the right volume.",
+        "Certified. Tuned for Apple and ready to go.",
+        "All set for Apple. Your master is ready."
+      ],
+      "intermediate": [
+        "Certified. Calibrated to {lufs} LUFS for Apple.",
+        "Mastering complete. Apple loudness target met.",
+        "Ready for Apple. Peak secured at {peak} dBTP."
+      ],
+      "pro": [
+        "Certified. Integrated {lufs} LUFS, true peak {peak} dBTP, Apple-compliant.",
+        "Mastering complete. {platform} target met. Phase correlation {correlation}.",
+        "Sign-off. {lufs} LUFS calibrated, ceiling locked at {peak} dBTP."
+      ]
+    },
+    "Youtube": {
+      "beginner": [
+        "Done. Your track is ready for YouTube at the right volume.",
+        "Certified. Tuned for YouTube and ready to upload.",
+        "All set for YouTube. Your master is ready."
+      ],
+      "intermediate": [
+        "Certified. Calibrated to {lufs} LUFS for YouTube.",
+        "Mastering complete. YouTube loudness target met.",
+        "Ready for YouTube. Peak secured at {peak} dBTP."
+      ],
+      "pro": [
+        "Certified. Integrated {lufs} LUFS, true peak {peak} dBTP, YouTube-compliant.",
+        "Mastering complete. {platform} target met. Phase correlation {correlation}.",
+        "Sign-off. {lufs} LUFS calibrated, ceiling locked at {peak} dBTP."
+      ]
+    },
+    "Broadcast": {
+      "beginner": [
+        "Done. Your track meets broadcast standards.",
+        "Certified. Tuned for broadcast and ready.",
+        "All set for broadcast. Your master is ready."
+      ],
+      "intermediate": [
+        "Certified. Calibrated to {lufs} LUFS for broadcast.",
+        "Mastering complete. Broadcast loudness standard met.",
+        "Ready for broadcast. Peak secured at {peak} dBTP."
+      ],
+      "pro": [
+        "Certified. Integrated {lufs} LUFS, true peak {peak} dBTP, broadcast-compliant.",
+        "Mastering complete. {platform} standard met. Phase correlation {correlation}.",
+        "Sign-off. {lufs} LUFS calibrated, ceiling locked at {peak} dBTP."
+      ]
+    }
+  }
+}
