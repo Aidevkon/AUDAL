@@ -77,10 +77,155 @@ pub fn App() -> Element {
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
     let last_platform: Signal<Option<String>> = use_signal(|| None);
     let last_flavour: Signal<Option<String>>  = use_signal(|| None);
+    let mut pending_master_req: Signal<Option<(String, String, String, f32, f32)>> = use_signal(|| None);
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
     let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
+
+    // ── Mastering Orchestration Task (Root Scope) ─────────────────────────────
+    use_effect(move || {
+        let req = pending_master_req.read().clone();
+        if let Some((path, pr, fl, tone, dynval)) = req {
+            pending_master_req.write().take();
+            
+            let mut m_mode = mode;
+            let mut hs = hangar_state;
+            let mut lp = last_platform;
+            let mut lf = last_flavour;
+            let mut viz_data_sig = viz_data;
+            let mut session_state_sig = session_state;
+            let mut wizard_findings_sig = wizard_findings;
+            let jini_persona_sig = jini_persona;
+            let mut is_journey_active_sig = is_journey_active;
+            
+            spawn_local(async move {
+                lp.set(Some(pr.clone()));
+                lf.set(Some(fl.clone()));
+
+                // Step 1: load file metadata
+                let meta = match crate::ipc::invoke::<crate::types::AudioMeta, _>(
+                    "load_audio_file",
+                    serde_json::json!({ "path": path.clone() })
+                ).await {
+                    Ok(m) => m,
+                    Err(e) => {
+                        dispatch(m_mode, CockpitEvent::MasteringFailed {
+                            message: format!("Load failed: {e}")
+                        });
+                        dispatch_hangar(hs, HangarEvent::Reset);
+                        return;
+                    }
+                };
+                dispatch(m_mode, CockpitEvent::FileDropped {
+                    path: path.clone(),
+                    name: meta.name.clone(),
+                    format: meta.format.clone(),
+                });
+                dispatch(m_mode, CockpitEvent::PresetSelected {
+                    preset_id: pr.clone(),
+                });
+                dispatch(m_mode, CockpitEvent::MasterTriggered);
+                is_journey_active_sig.set(true);
+                dispatch_hangar(hs, HangarEvent::AnalysisStarted);
+
+                // Step 2: trigger_mastering
+                let blob_id = match crate::ipc::invoke::<String, _>(
+                    "trigger_mastering",
+                    serde_json::json!({
+                        "audioPath":      path.clone(),
+                        "presetId":       pr,
+                        "flavourId":      fl,
+                        "intentTone":     tone,
+                        "intentDynamics": dynval,
+                    })
+                ).await {
+                    Ok(id) => id,
+                    Err(e) => {
+                        dispatch(m_mode, CockpitEvent::MasteringFailed {
+                            message: format!("Mastering failed: {e}")
+                        });
+                        dispatch_hangar(hs, HangarEvent::Reset);
+                        return;
+                    }
+                };
+
+                // Step 3: get_session_state
+                let persona_str = match *jini_persona_sig.read() {
+                    crate::types::JiniPersonaState::Beginner => "beginner",
+                    crate::types::JiniPersonaState::Intermediate => "intermediate",
+                    crate::types::JiniPersonaState::Pro => "pro",
+                };
+                let state = match crate::ipc::invoke::<crate::types::SessionStateJson, _>(
+                    "get_session_state",
+                    serde_json::json!({ "blobId": blob_id.clone(), "persona": persona_str })
+                ).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        dispatch(m_mode, CockpitEvent::MasteringFailed {
+                            message: format!("Session state failed: {e}")
+                        });
+                        dispatch_hangar(hs, HangarEvent::Reset);
+                        return;
+                    }
+                };
+
+                // Step 4: get_visualization_data
+                if let Ok(viz) = crate::ipc::invoke::<crate::types::VisualizationDataJson, _>(
+                    "get_visualization_data",
+                    serde_json::json!({ "blobId": blob_id.clone() })
+                ).await {
+                    viz_data_sig.set(Some(viz));
+                }
+
+                // Step 5: wizard findings
+                let findings = crate::wizard::detect_findings(&state);
+                wizard_findings_sig.set(findings);
+
+                // Step 6: session state
+                session_state_sig.set(Some(state));
+
+                // wait for visual queue to drain
+                web_sys::console::error_1(&format!("[TRAP] ENTERING DRAIN LOOP. is_journey_active={}", *is_journey_active_sig.read()).into());
+                
+                loop {
+                    let empty = stage_queue.read().is_empty();
+                    let active = *is_journey_active_sig.read();
+                    
+                    web_sys::console::error_1(&format!(
+                        "[TRAP] WAIT LOOP PING: queue_empty={}, journey_active={}", 
+                        empty, active
+                    ).into());
+
+                    if empty && !active {
+                        web_sys::console::error_1(&format!("[TRAP] LOOP BREAK CONDITION MET!").into());
+                        break;
+                    }
+                    gloo_timers::future::TimeoutFuture::new(500).await;
+                }
+
+                // Step 7: complete
+                web_sys::console::error_1(&format!(
+                    "[TRAP] FSM: queue drained. mode={:?} about to dispatch MasteringComplete",
+                    *m_mode.read()
+                ).into());
+
+                dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id: blob_id.clone() });
+
+                web_sys::console::error_1(&format!(
+                    "[TRAP] FSM: after MasteringComplete. mode={:?}",
+                    *m_mode.read()
+                ).into());
+
+                dispatch_hangar(hs, HangarEvent::AnalysisComplete);
+
+                web_sys::console::error_1(&format!(
+                    "[TRAP] FSM: after AnalysisComplete. hangar should be Ready now"
+                ).into());
+            });
+        }
+    });
+
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -107,8 +252,10 @@ pub fn App() -> Element {
                                                 &JsValue::from_str("stage"),
                                             ) {
                                                 if let Some(s) = stage_val.as_string() {
+                                                    if s == "DISPATCHED" { return; }
                                                     let mut q = stage_queue.write();
                                                     if q.back() != Some(&s) {
+                                                        web_sys::console::error_1(&format!("[TRAP] LISTENER PUSHED STAGE: {}", s).into());
                                                         q.push_back(s.clone());
                                                     }
                                                 }
@@ -213,11 +360,14 @@ pub fn App() -> Element {
                 gloo_timers::future::TimeoutFuture::new(500).await;
                 let next = stage_queue.write().pop_front();
                 if let Some(stage) = next {
+                    web_sys::console::error_1(&format!("[TRAP] TIMER POPPED STAGE: {}", stage).into());
                     journey_stage.set(stage.clone());
                     if stage == "CERTIFIED" || stage == "ERROR" {
                         // let it display, then tear down journey
+                        web_sys::console::error_1(&format!("[TRAP] TIMER: reached CERTIFIED/ERROR. Waiting 800ms to teardown").into());
                         gloo_timers::future::TimeoutFuture::new(800).await;
                         is_journey_active.set(false);
+                        web_sys::console::error_1(&format!("[TRAP] TIMER: is_journey_active SET TO FALSE").into());
                     }
                 }
             }
@@ -309,10 +459,26 @@ pub fn App() -> Element {
                     else                           { "hangar-layer" }
                 },
                 match hangar_state.read().clone() {
-                    HangarInterviewState::Ready => rsx! {
-                        JiniPanel { 
-                            mode, session_state, wizard_findings,
-                            jini_suggestion, jini_persona 
+                    HangarInterviewState::Ready => {
+                        let m = mode.read().clone();
+                        web_sys::console::error_1(&format!("[READY] mode={:?}", m).into());
+
+                        let blob = match m {
+                            crate::state::cockpit_mode::CockpitMode::CoachReady { blob_id } => Some(blob_id),
+                            crate::state::cockpit_mode::CockpitMode::Exporting { blob_id, .. } => Some(blob_id),
+                            _ => None,
+                        };
+                        rsx! {
+                            div { class: "jini-ready-surface",
+                                p { class: "jini-text", "Certified. Your master is ready." }
+                                if let Some(blob_id) = blob {
+                                    crate::panels::session::GoldenBlobBadge {}
+                                    crate::panels::session::ExportControls {
+                                        mode,
+                                        blob_id,
+                                    }
+                                }
+                            }
                         }
                     },
                     other_state => rsx! {
@@ -390,105 +556,7 @@ pub fn App() -> Element {
                                     if let Some(path) = current_path.clone() {
                                         let pr = platform_clone.clone();
                                         let fl = flavour;
-                                        
-                                        spawn_local(async move {
-                                            lp.set(Some(pr.clone()));
-                                            lf.set(Some(fl.clone()));
-
-                                            // Step 1: load file metadata
-                                            let meta = match invoke::<crate::types::AudioMeta, _>(
-                                                "load_audio_file",
-                                                serde_json::json!({ "path": path.clone() })
-                                            ).await {
-                                                Ok(m) => m,
-                                                Err(e) => {
-                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
-                                                        message: format!("Load failed: {e}")
-                                                    });
-                                                    dispatch_hangar(hs, HangarEvent::Reset);
-                                                    return;
-                                                }
-                                            };
-                                            dispatch(m_mode, CockpitEvent::FileDropped {
-                                                path: path.clone(),
-                                                name: meta.name.clone(),
-                                                format: meta.format.clone(),
-                                            });
-                                            dispatch(m_mode, CockpitEvent::PresetSelected {
-                                                preset_id: pr.clone(),
-                                            });
-                                            dispatch(m_mode, CockpitEvent::MasterTriggered);
-                                            dispatch_hangar(hs, HangarEvent::AnalysisStarted);
-
-                                            // Step 2: trigger_mastering
-                                            let blob_id = match invoke::<String, _>(
-                                                "trigger_mastering",
-                                                serde_json::json!({
-                                                    "audioPath":      path.clone(),
-                                                    "presetId":       pr,
-                                                    "flavourId":      fl,
-                                                    "intentTone":     tone,
-                                                    "intentDynamics": dynval,
-                                                })
-                                            ).await {
-                                                Ok(id) => id,
-                                                Err(e) => {
-                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
-                                                        message: format!("Mastering failed: {e}")
-                                                    });
-                                                    dispatch_hangar(hs, HangarEvent::Reset);
-                                                    return;
-                                                }
-                                            };
-
-                                            // Step 3: get_session_state
-                                            let persona_str = match *jini_persona_sig.read() {
-                                                crate::types::JiniPersonaState::Beginner => "beginner",
-                                                crate::types::JiniPersonaState::Intermediate => "intermediate",
-                                                crate::types::JiniPersonaState::Pro => "pro",
-                                            };
-                                            let state = match invoke::<crate::types::SessionStateJson, _>(
-                                                "get_session_state",
-                                                serde_json::json!({ "blobId": blob_id.clone(), "persona": persona_str })
-                                            ).await {
-                                                Ok(s) => s,
-                                                Err(e) => {
-                                                    dispatch(m_mode, CockpitEvent::MasteringFailed {
-                                                        message: format!("Session state failed: {e}")
-                                                    });
-                                                    dispatch_hangar(hs, HangarEvent::Reset);
-                                                    return;
-                                                }
-                                            };
-
-                                            // Step 4: get_visualization_data
-                                            let bid2 = blob_id.clone();
-                                            if let Ok(viz) = invoke::<crate::types::VisualizationDataJson, _>(
-                                                "get_visualization_data",
-                                                serde_json::json!({ "blobId": bid2 })
-                                            ).await {
-                                                viz_data_sig.set(Some(viz));
-                                            }
-
-                                            // Step 5: wizard findings
-                                            let findings = crate::wizard::detect_findings(&state);
-                                            wizard_findings_sig.set(findings);
-
-                                            // Step 6: session state
-                                            session_state_sig.set(Some(state));
-
-                                            // wait for visual queue to drain
-                                            loop {
-                                                if stage_queue.read().is_empty() && !*is_journey_active.read() {
-                                                    break;
-                                                }
-                                                gloo_timers::future::TimeoutFuture::new(100).await;
-                                            }
-
-                                            // Step 7: complete
-                                            dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id });
-                                            dispatch_hangar(hs, HangarEvent::AnalysisComplete);
-                                        });
+                                        pending_master_req.set(Some((path, pr, fl, tone, dynval)));
                                     }
                                 }
                             }

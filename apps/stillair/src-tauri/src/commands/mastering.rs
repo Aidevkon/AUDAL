@@ -180,6 +180,7 @@ pub async fn trigger_mastering(
         serde_json::json!({"stage": "ANALYZING", "job_id": &job_id}),
     );
 
+    let mut last_stage = String::new();
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(33)).await;
 
@@ -188,15 +189,18 @@ pub async fn trigger_mastering(
             .await
             .map_err(|e| e.to_string())?;
 
-        let _ = app.emit(
-            "mastering://progress",
-            serde_json::json!({
-                "stage":      progress.stage,
-                "job_id":     progress.job_id,
-                "elapsed_ms": progress.elapsed_ms,
-                "blob_id":    progress.blob_id,
-            }),
-        );
+        if progress.stage != last_stage {
+            last_stage = progress.stage.clone();
+            let _ = app.emit(
+                "mastering://progress",
+                serde_json::json!({
+                    "stage":      progress.stage,
+                    "job_id":     progress.job_id,
+                    "elapsed_ms": progress.elapsed_ms,
+                    "blob_id":    progress.blob_id,
+                }),
+            );
+        }
 
         match progress.stage.as_str() {
             "CERTIFIED" => {
