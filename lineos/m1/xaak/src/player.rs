@@ -31,6 +31,7 @@ impl CpalPlayer {
     pub fn play<C>(
         &mut self,
         mut consumer: C,
+        mut raw_consumer: Option<C>,
         sample_rate: u32,
         channels: u16,
         position_ms: Arc<Mutex<u64>>,
@@ -65,20 +66,35 @@ impl CpalPlayer {
         let telem_rb = ringbuf::HeapRb::<f32>::new(1024 * 16);
         let (telem_prod, telem_cons) = telem_rb.split();
         let mut telem_prod = telem_prod; // explicit binding
+        
+        let telem_rb_raw = ringbuf::HeapRb::<f32>::new(1024 * 16);
+        let (telem_prod_raw, telem_cons_raw) = telem_rb_raw.split();
+        let mut telem_prod_raw = telem_prod_raw;
 
         // Spawn telemetry worker — FFT + UDP off audio thread
         crate::telemetry_worker::spawn(
             telem_cons,
+            Some(telem_cons_raw),
             sample_rate,
             channels as usize,
             position_ms.clone(),
         );
+
+        let mut raw_scratch = vec![0.0f32; 16384];
 
         let stream = device
             .build_output_stream(
                 &config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let filled = consumer.pop_slice(data);
+                    
+                    // -- parallel raw tap --
+                    if let Some(ref mut raw_cons) = raw_consumer {
+                        let to_read = filled.min(raw_scratch.len());
+                        let raw_filled = raw_cons.pop_slice(&mut raw_scratch[..to_read]);
+                        let _ = ringbuf::traits::Producer::push_slice(&mut telem_prod_raw, &raw_scratch[..raw_filled]);
+                    }
+
                     // Fill any remaining frames with silence
                     for s in &mut data[filled..] {
                         *s = 0.0;

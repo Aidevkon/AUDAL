@@ -10,8 +10,10 @@
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 pub struct RealtimeFrame {
-    /// 64-band log-spaced spectrum (dBFS). -120.0 = silence.
-    pub spectrum: [f32; 64],
+    /// 64-band log-spaced spectrum (dBFS) for the raw input audio. -120.0 = silence.
+    pub spectrum_before: [f32; 64],
+    /// 64-band log-spaced spectrum (dBFS) for the mastered audio. -120.0 = silence.
+    pub spectrum_after: [f32; 64],
     /// 32 (L, R) pairs for Lissajous goniometer path.
     pub gonio_path: [(f32, f32); 32],
     /// Playback position ms.
@@ -21,7 +23,8 @@ pub struct RealtimeFrame {
 impl RealtimeFrame {
     pub fn silence(position_ms: u64) -> Self {
         Self {
-            spectrum: [-120.0f32; 64],
+            spectrum_before: [-120.0f32; 64],
+            spectrum_after: [-120.0f32; 64],
             gonio_path: [(0.0f32, 0.0f32); 32],
             position_ms,
         }

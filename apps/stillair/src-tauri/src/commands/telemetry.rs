@@ -4,7 +4,8 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct RealtimeFrameJson {
-    pub spectrum: Vec<f32>,        // converted from [f32; 64]
+    pub spectrum_before: Vec<f32>, // converted from [f32; 64]
+    pub spectrum_after: Vec<f32>,  // converted from [f32; 64]
     pub gonio_path: Vec<[f32; 2]>, // converted from [(f32,f32); 32]
     pub position_ms: u64,
 }
@@ -21,7 +22,8 @@ pub fn get_live_telemetry_realtime(latest: State<'_, LatestFrame>) -> Option<Rea
     
     // Explicit conversion
     Some(RealtimeFrameJson {
-        spectrum: frame.spectrum.to_vec(),
+        spectrum_before: frame.spectrum_before.to_vec(),
+        spectrum_after: frame.spectrum_after.to_vec(),
         gonio_path: frame.gonio_path.iter().map(|(l, r)| [*l, *r]).collect(),
         position_ms: frame.position_ms,
     })

@@ -26,6 +26,8 @@ pub enum PlaybackCmd {
     Load(PcmTransfer),
     /// Load original (pre-master) PCM for B side
     LoadOriginal(PcmTransfer),
+    /// Load raw PCM for telemetry (never played to speakers)
+    LoadRaw(PcmTransfer),
     Play,
     Pause,
     Stop,
@@ -66,6 +68,10 @@ impl PlaybackHandle {
         let _ = self.tx.send(PlaybackCmd::LoadOriginal(transfer));
     }
 
+    pub fn load_raw(&self, transfer: PcmTransfer) {
+        let _ = self.tx.send(PlaybackCmd::LoadRaw(transfer));
+    }
+
     pub fn ab_switch(&self, target: AbTarget) {
         let _ = self.tx.send(PlaybackCmd::AbSwitch { target });
     }
@@ -99,6 +105,7 @@ impl PlaybackHandle {
 struct PlaybackWorker {
     kernel: Option<XaakKernel>,
     kernel_b: Option<XaakKernel>,
+    kernel_raw: Option<XaakKernel>,
     ab_target: AbTarget,
     gain_match: bool,
     player: CpalPlayer,
@@ -111,6 +118,7 @@ impl PlaybackWorker {
         Self {
             kernel: None,
             kernel_b: None,
+            kernel_raw: None,
             ab_target: AbTarget::A,
             gain_match: true,
             player: CpalPlayer::new(),
@@ -126,6 +134,7 @@ impl PlaybackWorker {
             match cmd {
                 PlaybackCmd::Load(transfer) => worker.load(transfer),
                 PlaybackCmd::LoadOriginal(t) => worker.load_original(t),
+                PlaybackCmd::LoadRaw(t) => worker.load_raw(t),
                 PlaybackCmd::AbSwitch { target } => worker.ab_switch(target),
                 PlaybackCmd::Play => {
                     let _ = worker.play();
@@ -159,6 +168,10 @@ impl PlaybackWorker {
         self.kernel_b = Some(XaakKernel::load(transfer));
     }
 
+    pub fn load_raw(&mut self, transfer: PcmTransfer) {
+        self.kernel_raw = Some(XaakKernel::load(transfer));
+    }
+
     pub fn ab_switch(&mut self, target: AbTarget) {
         let pos = self.position_ms();
         self.ab_target = target;
@@ -174,8 +187,10 @@ impl PlaybackWorker {
         .ok_or_else(|| "xaak: play() — no PCM loaded".to_string())?;
         let pos_ms = *self.position.lock().unwrap();
         let consumer = kernel.stream_from(pos_ms);
+        let raw_consumer = self.kernel_raw.as_mut().map(|kr| kr.stream_from(pos_ms));
         self.player.play(
             consumer,
+            raw_consumer,
             kernel.sample_rate(),
             kernel.channels(),
             self.position.clone(),
