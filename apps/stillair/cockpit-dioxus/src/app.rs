@@ -475,123 +475,118 @@ pub fn App() -> Element {
                     else if *intent_closing.read() { "hangar-layer intent-closing" }
                     else                           { "hangar-layer" }
                 },
-                match hangar_state.read().clone() {
-                    HangarInterviewState::Ready => {
-                        let m = mode.read().clone();
-                        web_sys::console::error_1(&format!("[READY] mode={:?}", m).into());
+                ModuleFrame {
+                    title: "JINI".to_string(),
+                    show_screws: false,
+                    panel_class: "hangar-module".to_string(),
+                    match hangar_state.read().clone() {
+                        HangarInterviewState::Ready => {
+                            let m = mode.read().clone();
+                            web_sys::console::error_1(&format!("[READY] mode={:?}", m).into());
 
-                        let blob = match m {
-                            crate::state::cockpit_mode::CockpitMode::CoachReady { blob_id } => Some(blob_id),
-                            crate::state::cockpit_mode::CockpitMode::Exporting { blob_id, .. } => Some(blob_id),
-                            _ => None,
-                        };
-                        rsx! {
-                            div { class: "jini-ready-surface",
-                                p { class: "jini-text", "Certified. Your master is ready." }
-                                if let Some(blob_id) = blob {
-                                    crate::panels::session::GoldenBlobBadge {}
-                                    crate::panels::session::ExportControls {
-                                        mode,
-                                        blob_id,
+                            let blob = match m {
+                                crate::state::cockpit_mode::CockpitMode::CoachReady { blob_id } => Some(blob_id),
+                                crate::state::cockpit_mode::CockpitMode::Exporting { blob_id, .. } => Some(blob_id),
+                                _ => None,
+                            };
+                            rsx! {
+                                div { class: "jini-ready-surface",
+                                    p { class: "jini-text", "Certified. Your master is ready." }
+                                    if let Some(blob_id) = blob {
+                                        crate::panels::session::GoldenBlobBadge {}
+                                        crate::panels::session::ExportControls {
+                                            mode,
+                                            blob_id,
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    other_state => rsx! {
-                        ModuleFrame {
-                            title: "JINI".to_string(),
-                            show_screws: false,
-                            panel_class: "hangar-module".to_string(),
-                            match other_state {
-                    HangarInterviewState::AwaitingDrop => {
-                        let hs = hangar_state;
-                        let mut dp = dropped_path;
-                        rsx! {
-                            JiniDropZone {
-                                on_browse: move |_| {
-                                    spawn_local(async move {
-                                        if let Ok(Some(meta)) = invoke::<Option<crate::types::AudioMeta>, _>(
-                                            "open_audio_file",
-                                            serde_json::json!({})
-                                        ).await {
-                                            dp.set(Some(meta.path.clone()));
-                                            dispatch_hangar(hs, HangarEvent::FilesDropped { count: 1 });
-                                        }
-                                    });
+                        },
+                        HangarInterviewState::AwaitingDrop => {
+                            let hs = hangar_state;
+                            let mut dp = dropped_path;
+                            rsx! {
+                                JiniDropZone {
+                                    on_browse: move |_| {
+                                        spawn_local(async move {
+                                            if let Ok(Some(meta)) = invoke::<Option<crate::types::AudioMeta>, _>(
+                                                "open_audio_file",
+                                                serde_json::json!({})
+                                            ).await {
+                                                dp.set(Some(meta.path.clone()));
+                                                dispatch_hangar(hs, HangarEvent::FilesDropped { count: 1 });
+                                            }
+                                        });
+                                    }
                                 }
                             }
-                        }
-                    },
-                    HangarInterviewState::Detection { track_count } => {
-                        let dp = dropped_path.read().clone().unwrap_or_default();
-                        rsx! {
-                            JiniDetection {
-                                key: "{dp}",
-                                track_count,
-                                on_timeout: move |_| {
+                        },
+                        HangarInterviewState::Detection { track_count } => {
+                            let dp = dropped_path.read().clone().unwrap_or_default();
+                            rsx! {
+                                JiniDetection {
+                                    key: "{dp}",
+                                    track_count,
+                                    on_timeout: move |_| {
+                                        dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
+                                    }
+                                }
+                            }
+                        },
+                        HangarInterviewState::AwaitingMore { .. } => rsx! {
+                            JiniAwaitingMore {
+                                on_proceed: move |_| {
                                     dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
                                 }
                             }
-                        }
-                    },
-                    HangarInterviewState::AwaitingMore { .. } => rsx! {
-                        JiniAwaitingMore {
-                            on_proceed: move |_| {
-                                dispatch_hangar(hangar_state, HangarEvent::DetectionTimeout);
+                        },
+                        HangarInterviewState::PlatformCard { .. } => rsx! {
+                            JiniPlatformSelector {
+                                on_select: move |platform| {
+                                    dispatch_hangar(hangar_state, HangarEvent::PlatformChosen { platform });
+                                }
                             }
-                        }
-                    },
-                    HangarInterviewState::PlatformCard { .. } => rsx! {
-                        JiniPlatformSelector {
-                            on_select: move |platform| {
-                                dispatch_hangar(hangar_state, HangarEvent::PlatformChosen { platform });
-                            }
-                        }
-                    },
-                    HangarInterviewState::FlavourCard { platform, track_count: _ } => {
-                        let platform_clone = platform.clone();
-                        let current_path = dropped_path.read().clone();
-                        
-                        let m_mode = mode;
-                        let hs = hangar_state;
-                        let mut lp = last_platform;
-                        let mut lf = last_flavour;
-                        
-                        let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
-                        let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
-                        
-                        let mut viz_data_sig = viz_data;
-                        let mut session_state_sig = session_state;
-                        let mut wizard_findings_sig = wizard_findings;
-                        let jini_persona_sig = jini_persona;
+                        },
+                        HangarInterviewState::FlavourCard { platform, track_count: _ } => {
+                            let platform_clone = platform.clone();
+                            let current_path = dropped_path.read().clone();
+                            
+                            let m_mode = mode;
+                            let hs = hangar_state;
+                            let mut lp = last_platform;
+                            let mut lf = last_flavour;
+                            
+                            let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
+                            let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
+                            
+                            let mut viz_data_sig = viz_data;
+                            let mut session_state_sig = session_state;
+                            let mut wizard_findings_sig = wizard_findings;
+                            let jini_persona_sig = jini_persona;
 
-                        rsx! {
-                            JiniFlavourSelector {
-                                on_select: move |flavour: String| {
-                                    web_sys::console::log_1(&format!(
-                                        "[NEW-SESSION] starting, current mode={:?}", *m_mode.read()
-                                    ).into());
-                                    dispatch_hangar(hs, HangarEvent::FlavourChosen { flavour: flavour.clone() });
-                                    
-                                    if let Some(path) = current_path.clone() {
-                                        let pr = platform_clone.clone();
-                                        let fl = flavour;
-                                        pending_master_req.set(Some((path, pr, fl, tone, dynval)));
+                            rsx! {
+                                JiniFlavourSelector {
+                                    on_select: move |flavour: String| {
+                                        web_sys::console::log_1(&format!(
+                                            "[NEW-SESSION] starting, current mode={:?}", *m_mode.read()
+                                        ).into());
+                                        dispatch_hangar(hs, HangarEvent::FlavourChosen { flavour: flavour.clone() });
+                                        
+                                        if let Some(path) = current_path.clone() {
+                                            let pr = platform_clone.clone();
+                                            let fl = flavour;
+                                            pending_master_req.set(Some((path, pr, fl, tone, dynval)));
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    HangarInterviewState::Ignition { .. } => rsx! {
-                        JiniAnalysing { stage: journey_stage.read().clone() }
-                    },
-                    HangarInterviewState::Analysing => rsx! {
-                        JiniAnalysing { stage: journey_stage.read().clone() }
-                    },
-                    HangarInterviewState::Ready => rsx! { div {} },
-                            }
-                        }
+                        },
+                        HangarInterviewState::Ignition { .. } => rsx! {
+                            JiniAnalysing { stage: journey_stage.read().clone() }
+                        },
+                        HangarInterviewState::Analysing => rsx! {
+                            JiniAnalysing { stage: journey_stage.read().clone() }
+                        },
                     }
                 }
             }
