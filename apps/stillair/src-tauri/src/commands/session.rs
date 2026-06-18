@@ -1,3 +1,4 @@
+
 //! P9-008 — Session State Unification.
 //! Authority: Phase 9, Still Air state-machine.md §4
 //!
@@ -23,6 +24,74 @@
 //!   ❌ LLM invocation outside CoachAdapter / adapter-runtime
 
 use serde::{Deserialize, Serialize};
+
+use std::collections::HashMap;
+
+#[derive(serde::Deserialize)]
+struct JiniMatrix {
+    zone_a: HashMap<String, HashMap<String, Vec<String>>>,
+    zone_b: HashMap<String, HashMap<String, HashMap<String, Vec<String>>>>,
+    zone_c: HashMap<String, HashMap<String, Vec<String>>>,
+}
+
+struct LiveData<'a> {
+    lufs: f32,
+    peak: f32,
+    platform: &'a str,
+    flavour: &'a str,
+    correlation: f32,
+}
+
+fn resolve_narration(
+    zone: &str,
+    stage: &str,
+    finding: &str,
+    flavour: &str,
+    platform: &str,
+    persona: &str,
+    live: &LiveData,
+) -> Option<String> {
+    let asset_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("assets/jini_matrix.json")))
+        .unwrap_or_else(|| std::path::Path::new("assets/jini_matrix.json").to_path_buf());
+
+    let content = match std::fs::read_to_string(&asset_path) {
+        Ok(c) => c,
+        Err(_) => include_str!("../../../../../lineos/m0/m0-daemon/src/assets/jini_matrix.json").to_string(),
+    };
+    
+    let matrix: JiniMatrix = serde_json::from_str(&content).ok()?;
+    
+    let variations = match zone {
+        "zone_a" => matrix.zone_a.get(stage)?.get(persona)?,
+        "zone_b" => matrix.zone_b.get(finding)?.get(flavour)?.get(persona)?,
+        "zone_c" => matrix.zone_c.get(platform)?.get(persona)?,
+        _ => return None,
+    };
+    
+    if variations.is_empty() {
+        return None;
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let choice = &variations[(now as usize) % variations.len()];
+
+    let resolved = choice
+        .replace("{track_name}", "your track")
+        .replace("{bpm}", "120")
+        .replace("{lufs}", &format!("{:.1}", live.lufs))
+        .replace("{peak}", &format!("{:.1}", live.peak))
+        .replace("{correlation}", &format!("{:.2}", live.correlation))
+        .replace("{platform}", live.platform)
+        .replace("{flavour}", live.flavour);
+
+    Some(resolved)
+}
+
 use tokio::time::{timeout, Duration};
 
 use crate::coach_narrative::CoachNarrativeJson;
@@ -156,6 +225,8 @@ pub struct DspChainStateJson {
 pub async fn get_session_state(
     blob_id: String,
     persona: Option<String>,
+    flavour: Option<String>,
+    platform: Option<String>,
     client: tauri::State<'_, M0Client>,
 ) -> Result<SessionStateJson, String> {
     eprintln!("[get_session_state] START blob_id={blob_id}");
@@ -218,6 +289,8 @@ pub async fn get_session_state(
         &ZoneFlagsJson::default(),
         blob.loudness.integrated_lufs,
         persona_id,
+        flavour,
+        platform,
     );
 
     let dsp_chain = blob.aether_config.as_ref().and_then(|cfg_str| {
@@ -275,6 +348,8 @@ fn build_jini_suggestion(
     zones: &ZoneFlagsJson,
     lufs: f32,
     persona_id: lineos_types::JiniPersonaId,
+    flavour: Option<String>,
+    platform: Option<String>,
 ) -> JiniSuggestionJson {
     use lineos_types::*;
 
@@ -314,85 +389,103 @@ fn build_jini_suggestion(
 
     // Priority: Quality → Loudness → Spectral → Dynamics → Stereo
     // Mirrors sp314-dsp/src/jini/mod.rs rule_based_suggestion() logic
-    let _persona = persona_id;
+    let _persona = persona_id.clone();
 
-    let (narrative, action, confidence) = if behaviour.quality == QualityBehaviour::Clipping {
-        (
-            "Clipping detected — consider reducing input gain before mastering.".to_string(),
-            Some(JiniAction::SuggestMacroChange {
-                handle: MacroHandle::Loudness,
-                delta: -0.2,
-                reason: "Clipping detected".to_string(),
-            }),
-            0.95,
-        )
-    } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
-        (
-            "The mix is quite hot — you might want to bring the loudness down for better dynamics."
-                .to_string(),
-            Some(JiniAction::SuggestMacroChange {
-                handle: MacroHandle::Loudness,
-                delta: -0.15,
-                reason: "Loudness exceeds target range".to_string(),
-            }),
-            0.85,
-        )
+    let persona_str = match persona_id {
+        JiniPersonaId::Beginner => "beginner",
+        JiniPersonaId::Intermediate => "intermediate",
+        JiniPersonaId::Pro => "pro",
+    };
+
+    let finding_key = if behaviour.quality == QualityBehaviour::Clipping {
+        "Harsh"
     } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
-        (
-            "The track is very quiet — a small loudness boost would help it compete.".to_string(),
-            Some(JiniAction::SuggestMacroChange {
-                handle: MacroHandle::Loudness,
-                delta: 0.15,
-                reason: "Loudness below target range".to_string(),
-            }),
-            0.80,
-        )
-    } else if behaviour.spectral != SpectralBehaviour::Neutral {
-        let (desc, handle, delta) = match behaviour.spectral {
-            SpectralBehaviour::Boxy => ("Some boxiness in the low-mids", MacroHandle::Tone, -0.1),
-            SpectralBehaviour::Harsh => (
-                "Harshness in the upper frequencies",
-                MacroHandle::Tone,
-                -0.1,
-            ),
-            _ => ("Spectral balance could be improved", MacroHandle::Tone, 0.0),
-        };
-        (
-            format!("{desc} — a tone adjustment could help."),
-            Some(JiniAction::SuggestMacroChange {
-                handle,
-                delta,
-                reason: desc.to_string(),
-            }),
-            0.75,
-        )
-    } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed {
-        (
-            "The mix sounds a bit squashed — easing the dynamics could restore some life."
-                .to_string(),
-            Some(JiniAction::SuggestMacroChange {
-                handle: MacroHandle::Dynamics,
-                delta: -0.1,
-                reason: "Over-compressed dynamic range".to_string(),
-            }),
-            0.70,
-        )
-    } else if behaviour.stereo == StereoBehaviour::Unstable {
-        (
-            "Stereo correlation is low — check for phase issues.".to_string(),
-            Some(JiniAction::SuggestMacroChange {
-                handle: MacroHandle::Width,
-                delta: -0.1,
-                reason: "Low stereo correlation".to_string(),
-            }),
-            0.65,
-        )
+        "Quiet"
+    } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
+        "Harsh"
+    } else if behaviour.spectral == SpectralBehaviour::Muddy || behaviour.spectral == SpectralBehaviour::Boxy || behaviour.spectral == SpectralBehaviour::Thin {
+        "Muddy"
+    } else if behaviour.spectral == SpectralBehaviour::Harsh {
+        "Harsh"
+    } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
+        "Flat"
     } else {
-        (
-            "Everything looks good — the mix is well-balanced.".to_string(),
-            Some(JiniAction::SuggestNothing),
-            0.90,
-        )
+        "Perfect"
+    };
+
+    let flavour_str = match flavour.as_deref().unwrap_or("Clean") {
+        "warm" | "Warm" => "Warm",
+        "punch" | "Punch" => "Punch",
+        "air" | "Air" => "Air",
+        _ => "Clean",
+    };
+
+    let platform_str = match platform.as_deref().unwrap_or("Spotify") {
+        "apple" | "Apple" | "apple_music" => "Apple",
+        "youtube" | "Youtube" | "YouTube" => "Youtube",
+        "broadcast" | "Broadcast" => "Broadcast",
+        _ => "Spotify",
+    };
+
+    let live = LiveData {
+        lufs,
+        peak: quality.clips_detected as f32,
+        platform: platform_str,
+        flavour: flavour_str,
+        correlation: quality.stereo_correlation,
+    };
+
+    let narrative_opt = resolve_narration("zone_b", "", finding_key, flavour_str, platform_str, persona_str, &live);
+    
+    // Fallback if matrix resolving fails
+    let (narrative, action, confidence) = if let Some(n) = narrative_opt {
+        // Derive action using the existing if/else logic but without strings
+        let act = if behaviour.quality == QualityBehaviour::Clipping {
+            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.2, reason: "Clipping detected".to_string() })
+        } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
+            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.15, reason: "Loudness exceeds target range".to_string() })
+        } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
+            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: 0.15, reason: "Loudness below target range".to_string() })
+        } else if behaviour.spectral != SpectralBehaviour::Neutral {
+            let (to, reason) = match behaviour.spectral {
+                SpectralBehaviour::Muddy => (FlavourId::Clean, "Muddy low-end"),
+                SpectralBehaviour::Harsh => (FlavourId::Warm, "Harsh upper-mids"),
+                SpectralBehaviour::Thin => (FlavourId::Warm, "Thin low-end"),
+                SpectralBehaviour::Boxy => (FlavourId::Clean, "Boxy lower-mids"),
+                _ => (FlavourId::Clean, "Spectral imbalance"),
+            };
+            Some(JiniAction::SuggestFlavourSwitch { to, reason: reason.to_string() })
+        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
+            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Dynamics, delta: -0.1, reason: "Over-compressed dynamic range".to_string() })
+        } else if behaviour.stereo == StereoBehaviour::Unstable {
+            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Width, delta: -0.1, reason: "Low stereo correlation".to_string() })
+        } else {
+            Some(JiniAction::SuggestNothing)
+        };
+        (n, act, 0.95)
+    } else {
+        if behaviour.quality == QualityBehaviour::Clipping {
+            ("Clipping detected - consider reducing input gain before mastering.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.2, reason: "Clipping detected".to_string() }), 0.95)
+        } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
+            ("The mix is quite hot - you might want to bring the loudness down for better dynamics.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.15, reason: "Loudness exceeds target range".to_string() }), 0.85)
+        } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
+            ("The track is very quiet - a small loudness boost would help it compete.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: 0.15, reason: "Loudness below target range".to_string() }), 0.80)
+        } else if behaviour.spectral != SpectralBehaviour::Neutral {
+            let (to, reason) = match behaviour.spectral {
+                SpectralBehaviour::Muddy => (FlavourId::Clean, "Muddy low-end"),
+                SpectralBehaviour::Harsh => (FlavourId::Warm, "Harsh upper-mids"),
+                SpectralBehaviour::Thin => (FlavourId::Warm, "Thin low-end"),
+                SpectralBehaviour::Boxy => (FlavourId::Clean, "Boxy lower-mids"),
+                _ => (FlavourId::Clean, "Spectral imbalance"),
+            };
+            (format!("{} detected - switching to {:?} flavour.", reason, to), Some(JiniAction::SuggestFlavourSwitch { to, reason: reason.to_string() }), 0.75)
+        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
+            ("The track sounds over-compressed - let's restore some dynamics.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Dynamics, delta: -0.1, reason: "Over-compressed dynamic range".to_string() }), 0.70)
+        } else if behaviour.stereo == StereoBehaviour::Unstable {
+            ("Stereo correlation is low - check for phase issues.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Width, delta: -0.1, reason: "Low stereo correlation".to_string() }), 0.65)
+        } else {
+            ("Everything looks good - the mix is well-balanced.".to_string(), Some(JiniAction::SuggestNothing), 0.90)
+        }
     };
 
     let action_ref = action.as_ref().unwrap_or(&JiniAction::SuggestNothing);
@@ -425,6 +518,22 @@ fn build_jini_suggestion(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn test_matrix_resolution() {
+        let quality = make_quality();
+        let zones = ZoneFlagsJson::default();
+        let s = build_jini_suggestion(
+            &quality,
+            &zones,
+            -14.0,
+            lineos_types::JiniPersonaId::Intermediate,
+            Some("Warm".to_string()),
+            Some("Spotify".to_string()),
+        );
+        eprintln!("Test result: {:?}", s.narrative);
+    }
+
     use super::*;
     fn make_loudness(lufs: f32, tp: f32) -> LoudnessMetricsJson {
         LoudnessMetricsJson {

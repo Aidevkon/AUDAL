@@ -255,20 +255,6 @@ fn run_dsp_internal(
         processing_timeline,
     )?;
 
-    let p = crate::app_state::MasteringProgress {
-        job_id: job_id.clone(),
-        stage: "CERTIFIED".into(),
-        elapsed_ms: start.elapsed().as_millis() as u64,
-        blob_id: Some(cert_out.blob.id.clone()),
-        error: None,
-    };
-    if let Some(map) = &progress_map {
-        map.insert(job_id.clone(), p.clone());
-    }
-    if let Some(tx) = &progress_tx {
-        let _ = tx.send(p);
-    }
-
     Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
 }
 

@@ -175,7 +175,7 @@ pub fn App() -> Element {
                 };
                 let state = match crate::ipc::invoke::<crate::types::SessionStateJson, _>(
                     "get_session_state",
-                    serde_json::json!({ "blobId": blob_id.clone(), "persona": persona_str })
+                    serde_json::json!({ "blobId": blob_id.clone(), "persona": persona_str, "flavour": fl.clone(), "platform": pr.clone() })
                 ).await {
                     Ok(s) => s,
                     Err(e) => {
@@ -273,7 +273,6 @@ pub fn App() -> Element {
                                                     if s == "DISPATCHED" { return; }
                                                     let mut q = stage_queue.write();
                                                     if q.back() != Some(&s) {
-                                                        web_sys::console::error_1(&format!("[TRAP] LISTENER PUSHED STAGE: {}", s).into());
                                                         q.push_back(s.clone());
                                                     }
                                                 }

@@ -121,6 +121,16 @@ pub async fn run(
 
                         blob_store.insert(blob.clone());
 
+                        let p = crate::app_state::MasteringProgress {
+                            job_id: plan.session_id.clone(),
+                            stage: "CERTIFIED".into(),
+                            elapsed_ms: start.elapsed().as_millis() as u64,
+                            blob_id: Some(blob.id.clone()),
+                            error: None,
+                        };
+                        progress_map.insert(plan.session_id.clone(), p.clone());
+                        let _ = progress_tx.send(p);
+
                         let output = DspOutput {
                             blob_id:   blob.id.clone(),
                             lufs:      blob.loudness.integrated_lufs,
