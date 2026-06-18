@@ -113,7 +113,7 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                             width: 800,
                             height: if *intents_active.read() { 180 } else { 280 },
                             paused: false,
-                            is_delta_mode: false,
+                            is_delta_mode: true,
                         }
                     }
                     div {

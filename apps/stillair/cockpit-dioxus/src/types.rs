@@ -75,7 +75,10 @@ pub struct VisualizationDataJson {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RealtimeFrameJson {
-    pub spectrum: Vec<f32>,
+    /// Pre-mastering spectrum (Ghost — raw/before DSP). 64 log-spaced dBFS bands.
+    pub spectrum_before: Vec<f32>,
+    /// Post-mastering spectrum (Core — after DSP). 64 log-spaced dBFS bands.
+    pub spectrum_after: Vec<f32>,
     pub gonio_path: Vec<[f32; 2]>,
     pub position_ms: u64,
 }
