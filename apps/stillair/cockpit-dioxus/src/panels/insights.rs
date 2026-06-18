@@ -172,9 +172,11 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                     }
 
                     // ── CORRELATION: full-width horizontal meter ──────────────────
-                    div { class: "spatial-corr-cell oled-screen",
-                        CorrelationMeter { correlation }
-                    }
+                    // ARCHIVED: correlation bar — to be re-homed to Left MFD
+                    //           (Spatial Telemetry) in a later pass. See TODO.
+                    // div { class: "spatial-corr-cell oled-screen",
+                    //     CorrelationMeter { correlation }
+                    // }
 
                     // ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────
                     div { class: "spatial-heatmap-cell oled-screen",
