@@ -72,7 +72,25 @@ pub async fn run(
                     Ok(Err(e)) => {
                         let _ = response.send(Err(ExecutorError::DspFailed(e)));
                     }
-                    Ok(Ok((blob, _chunk_original, user_model_opt))) => {
+                    Ok(Ok((blob, mastered_path, user_model_opt, chunk_original))) => {
+                        // Write raw PCM to disk for telemetry
+                        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob.id);
+                        let n = chunk_original.num_frames;
+                        let mut raw_interleaved = Vec::with_capacity(n * 2);
+                        for i in 0..n {
+                            raw_interleaved.push(chunk_original.left.get(i).copied().unwrap_or(0.0));
+                            raw_interleaved.push(chunk_original.right.get(i).copied().unwrap_or(0.0));
+                        }
+                        let raw_bytes: &[u8] = unsafe {
+                            std::slice::from_raw_parts(
+                                raw_interleaved.as_ptr() as *const u8,
+                                raw_interleaved.len() * 4,
+                            )
+                        };
+                        if std::fs::write(&raw_path, raw_bytes).is_ok() {
+                            eprintln!("[RAW-SAVE] wrote raw PCM {} bytes to {}", raw_bytes.len(), raw_path);
+                        }
+
                         // Executor: persist UserMarkovModel to ~/.creator_os/state/
                         // Zero file I/O in DSP layer — this is the correct layer
                         // Executor: persist UserMarkovModel — single overwrite
@@ -135,7 +153,7 @@ pub async fn run(
                             blob_id:   blob.id.clone(),
                             lufs:      blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
-                            pcm_data:  Some(_chunk_original),
+                            pcm_data:  Some(mastered_path),
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,
                         };

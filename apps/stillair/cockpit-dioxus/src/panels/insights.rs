@@ -64,7 +64,10 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                 if *tele_generation.peek() != my_gen { break; }
 
                 let m = props.mode.read().clone();
-                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::CoachReady { .. } | CockpitMode::Exporting { .. });
+                // Poll whenever audio could be playing. CoachReady is the state
+                // where the certified master plays — it MUST be included.
+                // Idle: no file loaded. Exporting: I/O locked. Fault: broken.
+                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::Exporting { .. } | CockpitMode::Fault { .. });
                 
                 if is_active {
                     web_sys::console::log_1(&format!(

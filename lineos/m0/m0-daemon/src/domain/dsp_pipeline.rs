@@ -18,7 +18,7 @@ pub fn run_dsp(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
+) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>, lineos_types::AudioChunk), String> {
     run_dsp_internal(req, start, head_state, progress_tx, progress_map, job_id)
 }
 
@@ -43,7 +43,7 @@ fn run_dsp_internal(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>), String> {
+) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>, lineos_types::AudioChunk), String> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
@@ -77,7 +77,7 @@ fn run_dsp_internal(
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let mut chunk = decoded.chunk;
-    let _chunk_original = decoded.chunk_original;
+    let chunk_original = decoded.chunk_original;
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
 
@@ -255,7 +255,7 @@ fn run_dsp_internal(
         processing_timeline,
     )?;
 
-    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
+    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model, chunk_original))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

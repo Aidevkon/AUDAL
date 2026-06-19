@@ -62,13 +62,29 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             Rc::new(RefCell::new(None));
         let g = f.clone();
 
+        // Clone the canvas element handle so the RAF closure can read its
+        // dimensions live every frame. This makes the canvas resilient to
+        // container resizes (e.g. intent-reveal-zone expanding/collapsing).
+        let canvas_for_raf = canvas_el.clone();
+
         let props_clone = props_for_effect.clone();
         let f_clone = f.clone();
 
         *g.borrow_mut() = Some(wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-            let width  = props_clone.width as f64;
-            let height = props_clone.height as f64;
+            // Sync draw buffer to CSS display size each frame.
+            // canvas.width/height (the draw buffer) must equal clientWidth/clientHeight
+            // (the CSS display size) or coordinates distort. We do this lazily — only
+            // when the size actually changes — to avoid thrashing the GPU texture.
+            let cw = canvas_for_raf.client_width()  as u32;
+            let ch = canvas_for_raf.client_height() as u32;
+            if cw > 0 && ch > 0 {
+                if canvas_for_raf.width()  != cw { canvas_for_raf.set_width(cw);  }
+                if canvas_for_raf.height() != ch { canvas_for_raf.set_height(ch); }
+            }
 
+            // Read the now-correct draw-buffer dimensions for all coordinate math.
+            let width  = canvas_for_raf.width()  as f64;
+            let height = canvas_for_raf.height() as f64;
             ctx.clear_rect(0.0, 0.0, width, height);
 
             let time_ms = js_sys::Date::now();
@@ -86,7 +102,35 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             // ── Draw ──────────────────────────────────────────────────────
             render_grid(&ctx, width, height, time_ms);
 
-            // Iteration 1: plain dual-line delta landscape.
+            // [CANVAS-NEW] one-shot: confirm which canvas instance this is.
+            {
+                use std::sync::atomic::{AtomicBool, Ordering};
+                static CN: AtomicBool = AtomicBool::new(false);
+                if !CN.swap(true, Ordering::Relaxed) {
+                    web_sys::console::log_1(&format!(
+                        "[CANVAS-NEW] instance active — is_delta_mode={} buf={}x{}",
+                        props_clone.is_delta_mode, width as u32, height as u32
+                    ).into());
+                }
+            }
+
+            // [DRAW-CHECK] throttled: confirm spectrum data reaches this closure.
+            {
+                use std::sync::atomic::{AtomicU32, Ordering};
+                static FC: AtomicU32 = AtomicU32::new(0);
+                let n = FC.fetch_add(1, Ordering::Relaxed);
+                if n % 60 == 0 {
+                    let b20 = spectrum_before.get(20).copied().unwrap_or(f32::NAN);
+                    let a20 = spectrum_after.get(20).copied().unwrap_or(f32::NAN);
+                    web_sys::console::log_1(&format!(
+                        "[DRAW-CHECK] frame={} delta={} before.len={} after.len={} before[20]={:.1} after[20]={:.1}",
+                        n, props_clone.is_delta_mode,
+                        spectrum_before.len(), spectrum_after.len(),
+                        b20, a20
+                    ).into());
+                }
+            }
+
             // Ghost FIRST (drawn under Core), Core on top.
             if props_clone.is_delta_mode {
                 render_ghost(&ctx, width, height, &spectrum_before);
@@ -139,6 +183,33 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
     }
 }
 
+// ── Projection helper ───────────────────────────────────────────────────────
+//
+// Maps a (base_x, base_y, z) point into 2D canvas coordinates using the same
+// vanishing point as render_grid() — top-center at (width/2, 0).
+//
+// z = 0.0 → foreground (no transform, Core sits here)
+// z = 1.0 → full depth (maximum push toward horizon)
+//
+// Tuning constants are derived from the grid geometry:
+//   SKEW_H (0.22): horizontal compression factor — at z=0.65 the Ghost edges
+//                  compress ~14% toward centre, matching the grid's convergence.
+//   SKEW_V (0.30): vertical lift factor — at z=0.65 Ghost rises ~54px on a
+//                  280px canvas, placing it visibly above Core on the grid plane.
+
+const GHOST_Z: f64 = 1.0;  // Ghost depth (0=front … 1=back). Use 1.0 with tiny SKEW_V.
+const CORE_Z:  f64 = 0.0;  // Core sits at the foreground — identity transform.
+const SKEW_H:  f64 = 0.06; // horizontal pixels: at z=1 left-edge moves ~24px inward (400*0.06)
+const SKEW_V:  f64 = 0.10; // vertical pixels: at z=1 Ghost rises ~28px on a 280px canvas
+
+#[inline]
+fn project(base_x: f64, base_y: f64, z: f64, width: f64, height: f64) -> (f64, f64) {
+    let vp_x = width * 0.5; // matches render_grid vanishing point
+    let rx = base_x + (vp_x - base_x) * z * SKEW_H;
+    let ry = base_y - height * z * SKEW_V;
+    (rx, ry)
+}
+
 // ── Grid ─────────────────────────────────────────────────────────────────────
 
 fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms: f64) {
@@ -168,20 +239,53 @@ fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms:
 }
 
 // ── Ghost line (spectrum_before — pre-mastering / raw PCM) ───────────────────
-// Iteration 1: thin, slightly dimmed. Drawn BEFORE Core so Core sits on top.
+// Step (a): Z-skew applied at GHOST_Z so Ghost sits on the grid's back plane.
 
 fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum: &[f32]) {
-    if spectrum.is_empty() { return; }
+    // [DEBUG] fallback stroke when spectrum empty — confirms canvas/RAF is alive
+    if spectrum.is_empty() {
+        ctx.set_global_alpha(0.25);
+        ctx.set_stroke_style_str("#ffffff");
+        ctx.set_line_width(1.0);
+        ctx.begin_path();
+        ctx.move_to(0.0, height * 0.45);
+        ctx.line_to(width, height * 0.45);
+        ctx.stroke();
+        ctx.set_global_alpha(1.0);
+        return;
+    }
 
-    ctx.set_global_alpha(0.55);
-    ctx.set_stroke_style_str("#4488aa"); // muted cyan — iteration 2 will style this properly
-    ctx.set_line_width(1.5);
+    // [SKEW-CHECK] one-shot: print actual projected coords to browser console.
+    // Remove after confirming lines are on-screen.
+    {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static SC: AtomicBool = AtomicBool::new(false);
+        if !SC.swap(true, Ordering::Relaxed) {
+            let bands = [0usize, 20, 63];
+            let mut msg = format!("[SKEW-CHECK] canvas={}x{}  z_ghost={} z_core={} SKEW_H={} SKEW_V={}",
+                width as u32, height as u32, GHOST_Z, CORE_Z, SKEW_H, SKEW_V);
+            for &idx in &bands {
+                if let Some(&db) = spectrum.get(idx) {
+                    let bx = (idx as f64 / spectrum.len() as f64) * width;
+                    let by = height - ((db.clamp(-60.0,0.0)+60.0) as f64/60.0*height*0.8);
+                    let (rx, ry) = project(bx, by, GHOST_Z, width, height);
+                    msg.push_str(&format!("  | ghost[{}] base=({:.0},{:.0}) proj=({:.0},{:.0})", idx, bx, by, rx, ry));
+                }
+            }
+            web_sys::console::log_1(&msg.into());
+        }
+    }
+
+    ctx.set_global_alpha(0.45);
+    ctx.set_stroke_style_str("#aabbcc");
+    ctx.set_line_width(1.0);
     ctx.begin_path();
 
     for (i, &db) in spectrum.iter().enumerate() {
-        let x = (i as f64 / spectrum.len() as f64) * width;
-        let y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
-        if i == 0 { ctx.move_to(x, y); } else { ctx.line_to(x, y); }
+        let base_x = (i as f64 / spectrum.len() as f64) * width;
+        let base_y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
+        let (rx, ry) = project(base_x, base_y, GHOST_Z, width, height);
+        if i == 0 { ctx.move_to(rx, ry); } else { ctx.line_to(rx, ry); }
     }
 
     ctx.stroke();
@@ -189,7 +293,7 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
 }
 
 // ── Core line (spectrum_after — post-mastering / mastered PCM) ───────────────
-// Iteration 1: full opacity, drawn ON TOP of Ghost.
+// Step (a): Z-skew applied at CORE_Z (0.0 = no transform — Core stays front).
 
 fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum: &[f32]) {
     if spectrum.is_empty() { return; }
@@ -202,9 +306,10 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
     ctx.begin_path();
 
     for (i, &db) in spectrum.iter().enumerate() {
-        let x = (i as f64 / spectrum.len() as f64) * width;
-        let y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
-        if i == 0 { ctx.move_to(x, y); } else { ctx.line_to(x, y); }
+        let base_x = (i as f64 / spectrum.len() as f64) * width;
+        let base_y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
+        let (rx, ry) = project(base_x, base_y, CORE_Z, width, height);
+        if i == 0 { ctx.move_to(rx, ry); } else { ctx.line_to(rx, ry); }
     }
 
     ctx.stroke();

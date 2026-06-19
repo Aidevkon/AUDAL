@@ -85,9 +85,15 @@ pub fn App() -> Element {
 
     // ── Mastering Orchestration Task (Root Scope) ─────────────────────────────
     use_effect(move || {
+        // read() subscribes this effect to pending_master_req.
+        // When FlavourSelector calls .set(Some(req)), this effect fires.
+        // The write().take() below sets it back to None → effect re-runs once
+        // → sees None → if let Some doesn't match → returns immediately.
+        // One bounce only. The dioxus-signals WARN is a false positive here
+        // because the guard prevents re-entry on the None case.
         let req = pending_master_req.read().clone();
         if let Some((path, pr, fl, tone, dynval)) = req {
-            pending_master_req.write().take();
+            pending_master_req.write().take(); // clear before spawn — prevents double-fire
             
             let mut m_mode = mode;
             let mut hs = hangar_state;
