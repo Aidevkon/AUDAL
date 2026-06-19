@@ -19,10 +19,29 @@ use crate::types::{RealtimeFrameJson, SessionStateJson};
 use libm;
 
 const FALLBACK_PULSE_MS: f64 = 500.0;
-const GRID_COLS: u32         = 12;
-const GRID_ROWS: u32         = 8;
-const MAX_JITTER_PX: f64     = 6.0;
+const GRID_COLS: u32         = 8;
+const GRID_ROWS: u32         = 5;
+const MAX_JITTER_PX: f64     = 2.0;  // reduced — iso lines are already dynamic enough
 const PI: f64                = core::f64::consts::PI;
+
+// ── Isometric projection constants ───────────────────────────────────────────
+// One shared projection for grid, Ghost, and Core.
+// iso_project(x, y, z) maps:
+//   x → frequency axis  (goes lower-right as x increases)
+//   y → amplitude axis  (goes straight up as y increases)
+//   z → depth axis      (goes upper-left as z increases = Ghost sits behind Core)
+//
+// Tuning:
+//   ISO_ANGLE    — angle of x/z axes from horizontal (30° = classic iso)
+//   Z_DEPTH_SCALE — pixels of separation per z unit; set high enough that
+//                   Ghost (z=1) is clearly above/behind Core (z=0).
+//   X_FREQ_SCALE  — fraction of canvas width used for the frequency axis;
+//                   keeps the projected floor inside the canvas at ISO_ANGLE=30°.
+const ISO_ANGLE:     f64 = PI / 6.0;   // 30°
+const Z_DEPTH_SCALE: f64 = 80.0;       // px depth per z unit
+const X_FREQ_SCALE:  f64 = 0.55;       // frequency axis uses 55% of canvas width
+const GHOST_Z:       f64 = 1.0;        // Ghost = back plane
+const CORE_Z:        f64 = 0.0;        // Core  = front plane
 
 #[derive(Props, Clone, PartialEq)]
 pub struct NeonCanvasProps {
@@ -114,7 +133,7 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 }
             }
 
-            // [DRAW-CHECK] throttled: confirm spectrum data reaches this closure.
+            // [DRAW-CHECK] + [BIN-DUMP] throttled — fires every ~60 frames (~1s).
             {
                 use std::sync::atomic::{AtomicU32, Ordering};
                 static FC: AtomicU32 = AtomicU32::new(0);
@@ -128,12 +147,26 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                         spectrum_before.len(), spectrum_after.len(),
                         b20, a20
                     ).into());
+
+                    // [BIN-DUMP] raw bins 0..10 — same block, guaranteed to fire.
+                    let fmt = |v: &[f32]| -> String {
+                        v.iter().take(10)
+                            .map(|&x| format!("{:.1}", x))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    };
+                    web_sys::console::log_1(&format!(
+                        "[BIN-DUMP] after[0..10]=[{}] before[0..10]=[{}]",
+                        fmt(&spectrum_after),
+                        fmt(&spectrum_before),
+                    ).into());
                 }
             }
 
             // Ghost FIRST (drawn under Core), Core on top.
             if props_clone.is_delta_mode {
                 render_ghost(&ctx, width, height, &spectrum_before);
+
                 render_core(&ctx, width, height, &spectrum_after);
             } else {
                 // Legacy single-line fallback (non-delta callers).
@@ -183,55 +216,85 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
     }
 }
 
-// ── Projection helper ───────────────────────────────────────────────────────
+// ── Oblique / Cavalier projection ─────────────────────────────────────────────
 //
-// Maps a (base_x, base_y, z) point into 2D canvas coordinates using the same
-// vanishing point as render_grid() — top-center at (width/2, 0).
+// ONE shared function for grid, Ghost, and Core.
 //
-// z = 0.0 → foreground (no transform, Core sits here)
-// z = 1.0 → full depth (maximum push toward horizon)
+// Axes — the pro-audio standard (FabFilter Pro-Q, iZotope Ozone style):
+//   X axis (frequency):  HORIZONTAL  — left to right, no tilt
+//   Y axis (amplitude):  VERTICAL    — straight up, no tilt
+//   Z axis (depth):      45° tilt    — each z unit shoves the plane RIGHT and UP
 //
-// Tuning constants are derived from the grid geometry:
-//   SKEW_H (0.22): horizontal compression factor — at z=0.65 the Ghost edges
-//                  compress ~14% toward centre, matching the grid's convergence.
-//   SKEW_V (0.30): vertical lift factor — at z=0.65 Ghost rises ~54px on a
-//                  280px canvas, placing it visibly above Core on the grid plane.
-
-const GHOST_Z: f64 = 1.0;  // Ghost depth (0=front … 1=back). Use 1.0 with tiny SKEW_V.
-const CORE_Z:  f64 = 0.0;  // Core sits at the foreground — identity transform.
-const SKEW_H:  f64 = 0.06; // horizontal pixels: at z=1 left-edge moves ~24px inward (400*0.06)
-const SKEW_V:  f64 = 0.10; // vertical pixels: at z=1 Ghost rises ~28px on a 280px canvas
+// Inputs (all normalized):
+//   x: 0..1 — frequency bin position (0=lowest, 1=highest)
+//   y: 0..1 — amplitude (0=floor/silence, 1=peak)
+//   z: 0.0  — Core (front plane)  |  1.0 — Ghost (back plane)
+//
+// At z=0 this is an exact flat spectrum plot (horizontal+vertical).
+// At z=1 the whole plane shifts up-right by (Z_OFFX, Z_OFFY) — parallel copy.
+//
+// Tuning constants (all proportional to canvas size — responsive):
+//   MARGIN_L  — left padding before frequency axis starts
+//   PLOT_W    — horizontal width for the frequency axis
+//   FLOOR_Y   — y position of the silence floor (front plane baseline)
+//   AMP_H     — maximum amplitude height in pixels (loudest peak)
+//   Z_OFFX    — depth offset RIGHT per z unit
+//   Z_OFFY    — depth offset UP per z unit
 
 #[inline]
-fn project(base_x: f64, base_y: f64, z: f64, width: f64, height: f64) -> (f64, f64) {
-    let vp_x = width * 0.5; // matches render_grid vanishing point
-    let rx = base_x + (vp_x - base_x) * z * SKEW_H;
-    let ry = base_y - height * z * SKEW_V;
-    (rx, ry)
+fn oblique_project(x: f64, y: f64, z: f64, w: f64, h: f64) -> (f64, f64) {
+    let margin_l = w * 0.08;
+    let plot_w   = w * 0.78;
+    let floor_y  = h * 0.80;
+    let amp_h    = h * 0.45;
+    let z_offx   = w * 0.14;
+    let z_offy   = h * 0.28;
+
+    let sx = margin_l + x * plot_w + z * z_offx;
+    let sy = floor_y  - y * amp_h  - z * z_offy;
+    (sx, sy)
 }
 
 // ── Grid ─────────────────────────────────────────────────────────────────────
+//
+// Oblique floor:
+//   - Horizontal amplitude lines on front plane (z=0) and back plane (z=1)
+//   - Depth connectors: short 45° lines from z=0 to z=1 at a few x positions
+// Sparse: ~6 amplitude bands, ~5 depth connectors.
 
-fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms: f64) {
-    ctx.set_global_alpha(0.15);
-    ctx.set_stroke_style_str("#00d1ff");
+fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, _time_ms: f64) {
+    // Floor plane only (y=0). No amplitude scaffold lines.
+    // Grid = front edge + back edge + 6 depth connectors.
+    // The back edge / connectors are clamped to the front edge's max-x so
+    // depth rails don't overshoot past the right boundary.
+    let (front_x1, _) = oblique_project(1.0, 0.0, 0.0, width, height);
+    let max_sx = front_x1; // right-edge clamp
+
+    ctx.set_global_alpha(0.40);
+    ctx.set_stroke_style_str("#005566");
     ctx.set_line_width(1.0);
     ctx.begin_path();
 
-    let vp_x = width / 2.0;
-    let vp_y = 0.0;
+    // Front floor edge (z=0): perfectly horizontal
+    let (x0, y0) = oblique_project(0.0, 0.0, 0.0, width, height);
+    let (x1, y1) = oblique_project(1.0, 0.0, 0.0, width, height);
+    ctx.move_to(x0, y0);
+    ctx.line_to(x1, y1);
 
-    for i in 0..GRID_COLS {
-        let x = (i as f64 / (GRID_COLS - 1) as f64) * width;
-        let jitter = libm::sin(time_ms * 0.05 + i as f64) * MAX_JITTER_PX;
-        ctx.move_to(vp_x, vp_y);
-        ctx.line_to(x + jitter, height);
-    }
+    // Back floor edge (z=1): clamped to max_sx on the right
+    let (bx0, by0) = oblique_project(0.0, 0.0, 1.0, width, height);
+    let (bx1, by1) = oblique_project(1.0, 0.0, 1.0, width, height);
+    ctx.move_to(bx0, by0);
+    ctx.line_to(bx1.min(max_sx), by1);
 
-    for i in 0..GRID_ROWS {
-        let y = (i as f64 / (GRID_ROWS - 1) as f64) * height;
-        ctx.move_to(0.0, y);
-        ctx.line_to(width, y);
+    // 6 diagonal depth connectors from front floor to back floor
+    for i in 0..=5_u32 {
+        let x = i as f64 / 5.0;
+        let (fx, fy) = oblique_project(x, 0.0, 0.0, width, height);
+        let (mut bx, by) = oblique_project(x, 0.0, 1.0, width, height);
+        bx = bx.min(max_sx); // clamp so right-side connectors don't overshoot
+        ctx.move_to(fx, fy);
+        ctx.line_to(bx, by);
     }
 
     ctx.stroke();
@@ -239,53 +302,36 @@ fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms:
 }
 
 // ── Ghost line (spectrum_before — pre-mastering / raw PCM) ───────────────────
-// Step (a): Z-skew applied at GHOST_Z so Ghost sits on the grid's back plane.
+// Drawn at z=1.0 (back plane). Uses oblique_project — same space as the grid.
 
 fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum: &[f32]) {
-    // [DEBUG] fallback stroke when spectrum empty — confirms canvas/RAF is alive
     if spectrum.is_empty() {
-        ctx.set_global_alpha(0.25);
-        ctx.set_stroke_style_str("#ffffff");
+        // Fallback: flat line on Ghost's back plane so RAF is confirmed alive.
+        ctx.set_global_alpha(0.30);
+        ctx.set_stroke_style_str("#667788");
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        ctx.move_to(0.0, height * 0.45);
-        ctx.line_to(width, height * 0.45);
+        let (x0, y0) = oblique_project(0.0, 0.0, 1.0, width, height);
+        let (x1, y1) = oblique_project(1.0, 0.0, 1.0, width, height);
+        ctx.move_to(x0, y0);
+        ctx.line_to(x1, y1);
         ctx.stroke();
         ctx.set_global_alpha(1.0);
         return;
     }
 
-    // [SKEW-CHECK] one-shot: print actual projected coords to browser console.
-    // Remove after confirming lines are on-screen.
-    {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        static SC: AtomicBool = AtomicBool::new(false);
-        if !SC.swap(true, Ordering::Relaxed) {
-            let bands = [0usize, 20, 63];
-            let mut msg = format!("[SKEW-CHECK] canvas={}x{}  z_ghost={} z_core={} SKEW_H={} SKEW_V={}",
-                width as u32, height as u32, GHOST_Z, CORE_Z, SKEW_H, SKEW_V);
-            for &idx in &bands {
-                if let Some(&db) = spectrum.get(idx) {
-                    let bx = (idx as f64 / spectrum.len() as f64) * width;
-                    let by = height - ((db.clamp(-60.0,0.0)+60.0) as f64/60.0*height*0.8);
-                    let (rx, ry) = project(bx, by, GHOST_Z, width, height);
-                    msg.push_str(&format!("  | ghost[{}] base=({:.0},{:.0}) proj=({:.0},{:.0})", idx, bx, by, rx, ry));
-                }
-            }
-            web_sys::console::log_1(&msg.into());
-        }
-    }
-
-    ctx.set_global_alpha(0.45);
-    ctx.set_stroke_style_str("#aabbcc");
+    // Blueprint wireframe — faint, no glow, recedes behind Core.
+    ctx.set_global_alpha(0.60);
+    ctx.set_stroke_style_str("#667788");
     ctx.set_line_width(1.0);
     ctx.begin_path();
 
+    let n = spectrum.len() as f64;
     for (i, &db) in spectrum.iter().enumerate() {
-        let base_x = (i as f64 / spectrum.len() as f64) * width;
-        let base_y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
-        let (rx, ry) = project(base_x, base_y, GHOST_Z, width, height);
-        if i == 0 { ctx.move_to(rx, ry); } else { ctx.line_to(rx, ry); }
+        let x = i as f64 / n;
+        let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
+        let (sx, sy) = oblique_project(x, y, 1.0, width, height);
+        if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
     }
 
     ctx.stroke();
@@ -293,50 +339,53 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
 }
 
 // ── Core line (spectrum_after — post-mastering / mastered PCM) ───────────────
-// Step (a): Z-skew applied at CORE_Z (0.0 = no transform — Core stays front).
+// Drawn at z=0.0 (front plane). Uses oblique_project — same space as Ghost/grid.
 
 fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum: &[f32]) {
     if spectrum.is_empty() { return; }
 
-    let avg = spectrum.iter().sum::<f32>() / spectrum.len() as f32;
-    let color = if avg > -12.0 { "#ff2a7f" } else { "#00d1ff" };
-
-    ctx.set_stroke_style_str(color);
-    ctx.set_line_width(2.0);
+    // Neon cyan, front plane, with glow.
+    // Shadow MUST be reset to 0 after drawing — otherwise it bleeds onto the grid.
+    ctx.set_stroke_style_str("#00d1ff");
+    ctx.set_line_width(2.5);
+    ctx.set_shadow_color("#00d1ff");
+    ctx.set_shadow_blur(15.0);
     ctx.begin_path();
 
+    let n = spectrum.len() as f64;
     for (i, &db) in spectrum.iter().enumerate() {
-        let base_x = (i as f64 / spectrum.len() as f64) * width;
-        let base_y = height - ((db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0 * height * 0.8);
-        let (rx, ry) = project(base_x, base_y, CORE_Z, width, height);
-        if i == 0 { ctx.move_to(rx, ry); } else { ctx.line_to(rx, ry); }
+        let x = i as f64 / n;
+        let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
+        let (sx, sy) = oblique_project(x, y, 0.0, width, height);
+        if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
     }
 
     ctx.stroke();
+
+    // Reset shadow — must not bleed onto subsequent grid/ghost draws.
+    ctx.set_shadow_blur(0.0);
+    ctx.set_shadow_color("transparent");
 }
 
 // ── Laser overlay (legacy single-line mode only) ──────────────────────────────
 
 fn render_lasers(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms: f64, bpm: f32, spectrum: &[f32]) {
     if spectrum.is_empty() { return; }
-
     let pulse_ms = if bpm > 0.0 { 60000.0 / bpm as f64 } else { FALLBACK_PULSE_MS };
-    let phase = (time_ms % pulse_ms) / pulse_ms;
-    let opacity = 0.4 + 0.6 * libm::sin(phase * PI * 2.0).abs();
-
+    let phase    = (time_ms % pulse_ms) / pulse_ms;
+    let opacity  = 0.4 + 0.6 * libm::sin(phase * PI * 2.0).abs();
     ctx.set_global_alpha(opacity);
     ctx.set_stroke_style_str("#c8a832");
     ctx.set_line_width(1.0);
     ctx.begin_path();
-
+    let n = spectrum.len() as f64;
     for (i, &db) in spectrum.iter().enumerate() {
         if db > -6.0 {
-            let x = (i as f64 / spectrum.len() as f64) * width;
+            let x = (i as f64 / n) * width;
             ctx.move_to(x, height);
             ctx.line_to(x, 0.0);
         }
     }
-
     ctx.stroke();
     ctx.set_global_alpha(1.0);
 }
