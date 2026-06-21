@@ -21,7 +21,9 @@ async fn test_agent_pipeline_executes_mastering() {
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
     let db = m0d::db::init_test().await.expect("test db");
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx);
+    let (progress_tx, _) = tokio::sync::broadcast::channel(16);
+    let progress_map = Arc::new(dashmap::DashMap::new());
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx, progress_tx, progress_map);
 
     // Allow agents to start
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -80,7 +82,9 @@ async fn test_conductor_rejects_concurrent_mastering() {
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
     let db = m0d::db::init_test().await.expect("test db");
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx);
+    let (progress_tx, _) = tokio::sync::broadcast::channel(16);
+    let progress_map = Arc::new(dashmap::DashMap::new());
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx, progress_tx, progress_map);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Send two concurrent mastering requests
@@ -157,7 +161,9 @@ async fn test_schema_agent_validates_and_queries() {
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
     let db = m0d::db::init_test().await.expect("test db");
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
-    let operator = m0d::agents::operator::spawn_agents(audit, dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx);
+    let (progress_tx, _) = tokio::sync::broadcast::channel(16);
+    let progress_map = Arc::new(dashmap::DashMap::new());
+    let operator = m0d::agents::operator::spawn_agents(audit, dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx, progress_tx, progress_map);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Test 1: valid patch accepted

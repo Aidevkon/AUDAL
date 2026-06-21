@@ -19,7 +19,9 @@ async fn test_album_sse_pipeline_emits_bpm() {
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
     let mut rx = album_tx.subscribe();
     
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx);
+    let (progress_tx, _) = tokio::sync::broadcast::channel(16);
+    let progress_map = Arc::new(dashmap::DashMap::new());
+    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx, progress_tx, progress_map);
 
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 

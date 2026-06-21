@@ -31,7 +31,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     let start = Instant::now();
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-        run_dsp(&req, start, dummy_head_state)
+        run_dsp(&req, start, dummy_head_state, None, None, "".to_string())
     })
     .await;
 
@@ -42,7 +42,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     // Must succeed
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
 
-    let (blob, _chunk_original, _target_lufs) = dsp_result.unwrap();
+    let (blob, _chunk_original, _, _) = dsp_result.unwrap();
 
     // Verify properties
     assert_eq!(

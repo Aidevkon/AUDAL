@@ -101,7 +101,7 @@ fn run_dsp_internal(
     pre_analysis.transients_ms = transients_ms;
 
     // NODE 3: SCOUT (NMF + Maestro)
-    emit_progress("Scout Pass");
+    // --- NODE 3: SCOUT PASS ---
     let scout_out = crate::domain::nodes::scout_node::run(
         &chunk.left,
         &chunk.right,

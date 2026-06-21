@@ -26,11 +26,7 @@ pub fn run(
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
 
-    // True Scout Window — seek 30% to chorus
-    let scout_window_len = (2.0 * sample_rate as f32) as usize;
-    let scout_start = (mono.len() as f32 * 0.30) as usize;
-    let scout_end = (scout_start + scout_window_len).min(mono.len());
-    let scout_slice = &mono[scout_start..scout_end];
+    let scout_slice = &mono;
 
     let mut engine = TwoPassEngine::new();
     let scout = engine.scout(scout_slice, sample_rate);

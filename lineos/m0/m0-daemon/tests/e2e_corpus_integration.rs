@@ -46,7 +46,7 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     let start = Instant::now();
     let result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
         let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-        run_dsp(&req, start, dummy_head_state)
+        run_dsp(&req, start, dummy_head_state, None, None, "".to_string())
     })
     .await;
 
@@ -59,10 +59,10 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.as_ref().err());
     let dsp_result = dsp_result.unwrap();
 
-    // New architecture: run_dsp returns (blob, path, Option<UserMarkovModel>)
+    // New architecture: run_dsp returns (blob, path, Option<UserMarkovModel>, StereoBuffer)
     // corpus_node is pure — no disk writes
     // Verify UserMarkovModel bubbled up through the pipeline
-    let (_blob, _path, user_model_opt) = dsp_result;
+    let (_blob, _path, user_model_opt, _) = dsp_result;
 
     assert!(
         user_model_opt.is_some(),

@@ -174,6 +174,8 @@ impl TwoPassEngine {
     /// Pass 1: proxy analysis → all static parameters locked.
     /// INV-ST-1: only fit() call in the entire run.
     pub fn scout(&mut self, signal: &[f32], sample_rate: u32) -> ScoutResult {
+        let t_scout = std::time::Instant::now();
+
         // Downsample → ~11kHz mono proxy
         let proxy: Vec<f32> = signal.iter().step_by(SCOUT_DOWNSAMPLE).copied().collect();
 
@@ -185,12 +187,19 @@ impl TwoPassEngine {
         };
 
         // STFT on proxy
+        let t_stft = std::time::Instant::now();
         let mut ctx = StftStreamContext::new();
         let proxy_frames = ctx.forward_chunk(&proxy);
+        eprintln!("[PERF] stft_proxy={}ms", t_stft.elapsed().as_millis());
+        let n_frames = proxy_frames.len();
+        let n_bins = if n_frames > 0 { proxy_frames[0].len() } else { 0 };
+        eprintln!("[PERF] proxy size: {} frames x {} bins", n_frames, n_bins);
 
         // NMF fit — INV-ST-1: ONLY fit() call
         // W learned at proxy sample rate (~12kHz, SCOUT_DOWNSAMPLE=4)
+        let t_fit = std::time::Instant::now();
         let w_proxy = self.nmf.fit(&proxy_frames);
+        eprintln!("[PERF] nmf_fit={}ms", t_fit.elapsed().as_millis());
 
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
@@ -282,11 +291,13 @@ impl TwoPassEngine {
         self.nmf.h = proxy_h;
 
         let proxy_n = proxy_frames.len();
+        let t_extraction = std::time::Instant::now();
         let proxy_voice = self.proxy_stem(voice_idx, proxy_n, n_bins, &proxy);
         let proxy_drums = self.proxy_stem(drums_idx, proxy_n, n_bins, &proxy);
         let proxy_bass = self.proxy_stem(bass_idx, proxy_n, n_bins, &proxy);
         let proxy_harm = self.proxy_stem(harmonics_idx, proxy_n, n_bins, &proxy);
         let proxy_amb = self.proxy_stem(ambience_idx, proxy_n, n_bins, &proxy);
+        eprintln!("[PERF] proxy_stem_extraction={}ms", t_extraction.elapsed().as_millis());
 
         // M-P2: Compute per-stem MFCC fingerprints from proxy stems.
         // Only first 4096 samples (~85ms) — keeps scout() latency minimal.
@@ -352,6 +363,12 @@ impl TwoPassEngine {
             1.0
         };
 
+        // Transform is NOT explicit in scout, but wait...
+        // The scout pass returns a ScoutResult. Where does nmf_transform happen?
+        // Wait, fit() does fit_transform, which does both W and H learning.
+        // It does NOT call transform(). Wait, two_pass.rs only calls fit()!
+        eprintln!("[PERF] scout_total={}ms", t_scout.elapsed().as_millis());
+        
         ScoutResult {
             w,
             proxy_rms,
@@ -407,122 +424,159 @@ impl TwoPassEngine {
         }
 
         let n_total = signal.len();
+        use rayon::prelude::*;
 
-        // Stateful contexts — survive across chunks
-        let mut stft_ctx = StftStreamContext::new();
-        let mut hpss_ctx = HpssStreamContext::new();
+        // 1. Prepare overlapping input chunks
+        struct ChunkInput {
+            start: usize,
+            offset: usize,
+            end: usize,
+        }
+        let mut chunk_inputs = Vec::new();
+        let mut offset = 0usize;
+        while offset < n_total {
+            let end = (offset + CHUNK_FRAMES).min(n_total);
+            let start = offset.saturating_sub(10240); // 1536 STFT lookahead + 8704 HPSS history
+            chunk_inputs.push(ChunkInput { start, offset, end });
+            offset = end;
+        }
 
+        // 2. Parallel Transform Phase (Heavy Math)
+        struct ParallelChunkOut {
+            stems: FiveStemsChunk,
+            voice_transient: f32,
+            drums_transient: f32,
+            chunk_len: usize,
+        }
+
+        let parallel_results: Vec<ParallelChunkOut> = chunk_inputs
+            .into_par_iter()
+            .map(|chunk_in| {
+                let padded_chunk = &signal[chunk_in.start..chunk_in.end];
+                let mut stft_ctx = StftStreamContext::new();
+                let mut hpss_ctx = HpssStreamContext::new();
+
+                let chunk_frames = stft_ctx.forward_chunk(padded_chunk);
+                let n_frames = chunk_frames.len();
+                if n_frames == 0 {
+                    return ParallelChunkOut {
+                        stems: FiveStemsChunk {
+                            voice: vec![], drums: vec![], bass: vec![], harmonics: vec![], ambience: vec![]
+                        },
+                        voice_transient: 0.0, drums_transient: 0.0, chunk_len: 0,
+                    };
+                }
+
+                // pad_frames is the number of frames we must discard from the start.
+                let pad_frames = if chunk_in.start < chunk_in.offset {
+                    (chunk_in.offset - chunk_in.start) / 512
+                } else {
+                    0
+                };
+
+                let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
+                let h_chunk = self.nmf.transform(&scout.w, &chunk_frames);
+
+                let voice_mask = self.nmf.component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
+                let bass_mask = self.nmf.component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
+                let harm_mask = self.nmf.component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
+                let amb_mask = self.nmf.component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
+
+                let core_n_frames = n_frames.saturating_sub(pad_frames);
+                let core_voice_mask = if pad_frames < voice_mask.len() { &voice_mask[pad_frames..] } else { &[] };
+                let core_bass_mask = if pad_frames < bass_mask.len() { &bass_mask[pad_frames..] } else { &[] };
+                let core_harm_mask = if pad_frames < harm_mask.len() { &harm_mask[pad_frames..] } else { &[] };
+                let core_amb_mask = if pad_frames < amb_mask.len() { &amb_mask[pad_frames..] } else { &[] };
+                let core_mask_p = if pad_frames < mask_p.len() { &mask_p[pad_frames..] } else { &[] };
+
+                let core_chunk = &signal[chunk_in.offset..chunk_in.end];
+
+                let voice_chunk = apply_mask_to_chunk(core_chunk, core_voice_mask, core_n_frames);
+                let bass_chunk = apply_mask_to_chunk(core_chunk, core_bass_mask, core_n_frames);
+                let harm_chunk = apply_mask_to_chunk(core_chunk, core_harm_mask, core_n_frames);
+                let amb_chunk = apply_mask_to_chunk(core_chunk, core_amb_mask, core_n_frames);
+
+                let drums_weights: Vec<f32> = (0..core_chunk.len())
+                    .map(|i| {
+                        let f = i * core_n_frames / core_chunk.len().max(1);
+                        if f < core_mask_p.len() {
+                            core_mask_p[f].iter().sum::<f32>() / N_BINS as f32
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect();
+                let drums_chunk: Vec<f32> = core_chunk
+                    .iter()
+                    .zip(drums_weights.iter())
+                    .map(|(s, w)| s * w)
+                    .collect();
+
+                let h_voice: Vec<f32> = (0..core_n_frames)
+                    .map(|f| {
+                        let real_f = f + pad_frames;
+                        let idx = scout.voice_idx * n_frames + real_f;
+                        if idx < h_chunk.len() {
+                            h_chunk[idx]
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect();
+                
+                let v_transient = transient_density(&h_voice);
+                let d_transient = core_mask_p
+                    .iter()
+                    .map(|f| f.iter().sum::<f32>() / N_BINS as f32)
+                    .sum::<f32>()
+                    / core_n_frames.max(1) as f32;
+
+                ParallelChunkOut {
+                    stems: FiveStemsChunk {
+                        voice: voice_chunk,
+                        drums: drums_chunk,
+                        bass: bass_chunk,
+                        harmonics: harm_chunk,
+                        ambience: amb_chunk,
+                    },
+                    voice_transient: v_transient,
+                    drums_transient: d_transient,
+                    chunk_len: core_chunk.len(),
+                }
+            })
+            .collect();
+
+        // 3. Serial Stitch Phase (Stateful processing + callback)
         let mut frames_written = 0usize;
         let mut voice_transient_sum = 0.0f32;
         let mut drums_transient_sum = 0.0f32;
         let mut chunk_count = 0usize;
-        let mut offset = 0usize;
 
-        while offset < n_total {
-            let end = (offset + CHUNK_FRAMES).min(n_total);
-            let chunk = &signal[offset..end];
-
-            // STFT magnitude — stateful OLA
-            let chunk_frames = stft_ctx.forward_chunk(chunk);
-            let n_frames = chunk_frames.len();
-            if n_frames == 0 {
-                offset = end;
+        for mut out in parallel_results {
+            if out.chunk_len == 0 {
                 continue;
             }
-
-            // Stateful HPSS — carries L_HARM history
-            let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
-
-            // NMF transform with LOCKED W — INV-ST-2
-            let h_chunk = self.nmf.transform(&scout.w, &chunk_frames);
-
-            // Per-chunk component masks
-            let voice_mask =
-                self.nmf
-                    .component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
-            let bass_mask =
-                self.nmf
-                    .component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
-            let harm_mask =
-                self.nmf
-                    .component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
-            let amb_mask =
-                self.nmf
-                    .component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
-
-            // Apply masks → time-domain stem chunks
-            let voice_chunk = apply_mask_to_chunk(chunk, &voice_mask, n_frames);
-            let bass_chunk = apply_mask_to_chunk(chunk, &bass_mask, n_frames);
-            let harm_chunk = apply_mask_to_chunk(chunk, &harm_mask, n_frames);
-            let amb_chunk = apply_mask_to_chunk(chunk, &amb_mask, n_frames);
-
-            // Drums from HPSS percussive mask
-            let drums_weights: Vec<f32> = (0..chunk.len())
-                .map(|i| {
-                    let f = i * n_frames / chunk.len().max(1);
-                    if f < mask_p.len() {
-                        mask_p[f].iter().sum::<f32>() / N_BINS as f32
-                    } else {
-                        0.0
-                    }
-                })
-                .collect();
-            let drums_chunk: Vec<f32> = chunk
-                .iter()
-                .zip(drums_weights.iter())
-                .map(|(s, w)| s * w)
-                .collect();
-
-            // Metadata accumulators
-            let h_voice: Vec<f32> = (0..n_frames)
-                .map(|f| {
-                    let idx = scout.voice_idx * n_frames + f;
-                    if idx < h_chunk.len() {
-                        h_chunk[idx]
-                    } else {
-                        0.0
-                    }
-                })
-                .collect();
-            voice_transient_sum += transient_density(&h_voice);
-            drums_transient_sum += mask_p
-                .iter()
-                .map(|f| f.iter().sum::<f32>() / N_BINS as f32)
-                .sum::<f32>()
-                / n_frames.max(1) as f32;
+            
+            voice_transient_sum += out.voice_transient;
+            drums_transient_sum += out.drums_transient;
             chunk_count += 1;
 
-            // Psychoacoustic Collision Matrix — smoothed micro-ducking.
-            // One-pole gain smoothing prevents zipper noise at chunk boundaries.
-            let bass_chunk = {
-                let collision = detect_collision(&drums_chunk, &bass_chunk);
-                let target_gain = if collision { ducking_gain } else { 1.0_f32 };
-                let mut processed = bass_chunk;
-                let alpha = COLLISION_SMOOTHING_ALPHA;
-                processed.iter_mut().for_each(|s| {
-                    self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
-                    *s *= self.bass_ducking_gain;
-                });
-                processed
-            };
+            // Psychoacoustic Collision Matrix — smoothed micro-ducking sequentially across chunks.
+            let collision = detect_collision(&out.stems.drums, &out.stems.bass);
+            let target_gain = if collision { ducking_gain } else { 1.0_f32 };
+            let alpha = COLLISION_SMOOTHING_ALPHA;
+            
+            for s in out.stems.bass.iter_mut() {
+                self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
+                *s *= self.bass_ducking_gain;
+            }
 
-            let stems_chunk = FiveStemsChunk {
-                voice: voice_chunk,
-                drums: drums_chunk,
-                bass: bass_chunk,
-                harmonics: harm_chunk,
-                ambience: amb_chunk,
-            };
-
-            frames_written += stems_chunk.voice.len();
-            callback(&stems_chunk);
-
-            // All chunk data drops here — back to ~2MB RAM
-            offset = end;
+            frames_written += out.stems.voice.len();
+            callback(&out.stems);
         }
 
-        // Flush OLA tail
-        let tail = stft_ctx.flush();
+        // Flush OLA tail (legacy 1024 zero padding for byte-exact compatibility)
+        let tail = vec![0.0; 1024];
         if !tail.is_empty() {
             let empty_chunk = FiveStemsChunk {
                 voice: tail.clone(),
