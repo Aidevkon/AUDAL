@@ -4646,6 +4646,7 @@ dependencies = [
  "printpdf",
  "qrcode",
  "rand 0.8.5",
+ "rayon",
  "reqwest 0.12.28",
  "ringbuf 0.3.3",
  "rubato",

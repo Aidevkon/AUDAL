@@ -43,29 +43,69 @@ impl DspAdapter {
         }
 
         let block_size = 512;
-        let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate)
-            .map_err(|e| DspError::GraphError(format!("{:?}", e)))?;
 
-        // 4. Process offline in blocks
         let num_frames = left.len();
-        let mut frame = 0;
-        while frame < num_frames {
-            let end = (frame + block_size).min(num_frames);
-            let block_len = end - frame;
-            if block_len < block_size {
-                let mut pad_l = vec![0.0_f32; block_size];
-                let mut pad_r = vec![0.0_f32; block_size];
-                pad_l[..block_len].copy_from_slice(&left[frame..end]);
-                pad_r[..block_len].copy_from_slice(&right[frame..end]);
+        use rayon::prelude::*;
 
-                graph.process_block(&mut pad_l, &mut pad_r);
+        // Phase 1: Parallel Graph Processing
+        let chunk_sec = 20.0;
+        let margin_sec = 4.0; // 4s margin ~ 120dB decay for 2s RT60!
+        
+        let chunk_size = (sample_rate as f32 * chunk_sec).round() as usize;
+        let margin = (sample_rate as f32 * margin_sec).round() as usize;
+        
+        let mut chunks = Vec::new();
+        let mut start = 0;
+        while start < num_frames {
+            let end = (start + chunk_size).min(num_frames);
+            let pad_start = start.saturating_sub(margin);
+            let pad_len = start - pad_start;
+            chunks.push((start, end, pad_start, pad_len));
+            start = end;
+        }
 
-                left[frame..end].copy_from_slice(&pad_l[..block_len]);
-                right[frame..end].copy_from_slice(&pad_r[..block_len]);
-            } else {
-                graph.process_block(&mut left[frame..end], &mut right[frame..end]);
+        let left_src = left.to_vec();
+        let right_src = right.to_vec();
+
+        let processed_chunks: Vec<(Vec<f32>, Vec<f32>)> = chunks.par_iter().map(|&(_start, end, pad_start, pad_len)| {
+            let mut graph_clone = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
+            let total_len = end - pad_start;
+            let mut work_l = vec![0.0_f32; total_len];
+            let mut work_r = vec![0.0_f32; total_len];
+            
+            work_l.copy_from_slice(&left_src[pad_start..end]);
+            work_r.copy_from_slice(&right_src[pad_start..end]);
+            
+            let mut f = 0;
+            while f < total_len {
+                let e = (f + block_size).min(total_len);
+                let b_len = e - f;
+                if b_len < block_size {
+                    let mut pad_l = vec![0.0_f32; block_size];
+                    let mut pad_r = vec![0.0_f32; block_size];
+                    pad_l[..b_len].copy_from_slice(&work_l[f..e]);
+                    pad_r[..b_len].copy_from_slice(&work_r[f..e]);
+                    graph_clone.process_block(&mut pad_l, &mut pad_r);
+                    work_l[f..e].copy_from_slice(&pad_l[..b_len]);
+                    work_r[f..e].copy_from_slice(&pad_r[..b_len]);
+                } else {
+                    graph_clone.process_block(&mut work_l[f..e], &mut work_r[f..e]);
+                }
+                f += b_len;
             }
-            frame += block_len;
+            
+            let out_l = work_l[pad_len..].to_vec();
+            let out_r = work_r[pad_len..].to_vec();
+            (out_l, out_r)
+        }).collect();
+
+
+        let mut idx = 0;
+        for (out_l, out_r) in processed_chunks {
+            let len = out_l.len();
+            left[idx..idx+len].copy_from_slice(&out_l);
+            right[idx..idx+len].copy_from_slice(&out_r);
+            idx += len;
         }
 
         // Post-process LUFS correction — mathematically exact
@@ -76,20 +116,9 @@ impl DspAdapter {
 
         if output_lufs > -69.0 {
             let correction_db = target_lufs - output_lufs;
-            // Clamp correction to ±18dB to avoid wild swings
             let correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
-            for s in left.iter_mut() {
-                *s *= correction_linear;
-            }
-            for s in right.iter_mut() {
-                *s *= correction_linear;
-            }
-
-            // Second limiter pass: catch ISPs introduced by LUFS correction.
-            // Uses fast release (15ms) to transparently suppress Gibbs overshoots
-            // without pumping. ceiling from intent — never hardcoded.
-            // Authority: INV-AB-1, ITU-R BS.1770-4.
+            
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
             let isp_limiter_config = LimiterConfig {
                 release_ms: 15.0_f32,
@@ -98,30 +127,84 @@ impl DspAdapter {
                 midside_eq_enabled: false,
             };
             let _ = ceiling_linear; // used via config
-            let mut isp_limiter = BrickwallLimiter::new(isp_limiter_config, sample_rate);
 
-            // Process main buffer
-            isp_limiter.process_block(left, right);
+            // Phase 3: Parallel Gain & ISP Limiting
+            // Limiter has 15ms release, 5ms lookahead -> 40ms safety margin = 1920 samples @ 48k
+            let isp_margin_sec = 0.04;
+            let isp_margin = (sample_rate as f32 * isp_margin_sec).round() as usize;
+            let isp_chunk_size = chunk_size;
 
-            // Latency compensation for ISPs:
-            // Since we are working with fixed slices (mmap), we CANNOT reallocate or extend the slice.
-            // But BrickwallLimiter introduces a tiny lookahead delay.
-            // For now, we will just shift the samples backward by `lookahead` to compensate,
-            // and zero-pad the end (or leave as is).
-            let lookahead = isp_limiter.lookahead_samples();
-            if lookahead > 0 && lookahead < left.len() {
-                // Shift backward
-                left.copy_within(lookahead.., 0);
-                right.copy_within(lookahead.., 0);
+            let mut isp_chunks = Vec::new();
+            let mut start = 0;
+            while start < num_frames {
+                let end = (start + isp_chunk_size).min(num_frames);
+                let pad_start = start.saturating_sub(isp_margin);
+                let pad_len = start - pad_start;
+                isp_chunks.push((start, end, pad_start, pad_len));
+                start = end;
+            }
 
-                // Flush the delay line into the end of the buffer
-                let mut flush_l = vec![0.0_f32; lookahead];
-                let mut flush_r = vec![0.0_f32; lookahead];
-                isp_limiter.process_block(&mut flush_l, &mut flush_r);
+            let left_src = left.to_vec();
+            let right_src = right.to_vec();
 
-                let tail_start = left.len() - lookahead;
-                left[tail_start..].copy_from_slice(&flush_l);
-                right[tail_start..].copy_from_slice(&flush_r);
+            let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks.par_iter().map(|&(_start, end, pad_start, pad_len)| {
+                let mut isp_limiter_clone = BrickwallLimiter::new(isp_limiter_config, sample_rate);
+                let total_len = end - pad_start;
+                let mut work_l = vec![0.0_f32; total_len];
+                let mut work_r = vec![0.0_f32; total_len];
+                
+                // Apply global gain correction during the copy
+                for (i, &s) in left_src[pad_start..end].iter().enumerate() {
+                    work_l[i] = s * correction_linear;
+                }
+                for (i, &s) in right_src[pad_start..end].iter().enumerate() {
+                    work_r[i] = s * correction_linear;
+                }
+
+                // Process block by block (512) for the limiter
+                let mut f = 0;
+                while f < total_len {
+                    let e = (f + block_size).min(total_len);
+                    let b_len = e - f;
+                    if b_len < block_size {
+                        let mut pad_l = vec![0.0_f32; block_size];
+                        let mut pad_r = vec![0.0_f32; block_size];
+                        pad_l[..b_len].copy_from_slice(&work_l[f..e]);
+                        pad_r[..b_len].copy_from_slice(&work_r[f..e]);
+                        isp_limiter_clone.process_block(&mut pad_l, &mut pad_r);
+                        work_l[f..e].copy_from_slice(&pad_l[..b_len]);
+                        work_r[f..e].copy_from_slice(&pad_r[..b_len]);
+                    } else {
+                        isp_limiter_clone.process_block(&mut work_l[f..e], &mut work_r[f..e]);
+                    }
+                    f += b_len;
+                }
+
+                // Lookahead compensation
+                let lookahead = isp_limiter_clone.lookahead_samples();
+                if lookahead > 0 && lookahead < total_len {
+                    work_l.copy_within(lookahead.., 0);
+                    work_r.copy_within(lookahead.., 0);
+                    let mut flush_l = vec![0.0_f32; lookahead];
+                    let mut flush_r = vec![0.0_f32; lookahead];
+                    isp_limiter_clone.process_block(&mut flush_l, &mut flush_r);
+                    let tail_start = total_len - lookahead;
+                    work_l[tail_start..].copy_from_slice(&flush_l);
+                    work_r[tail_start..].copy_from_slice(&flush_r);
+                }
+
+                let out_l = work_l[pad_len..].to_vec();
+                let out_r = work_r[pad_len..].to_vec();
+                (out_l, out_r)
+            }).collect();
+
+
+            let mut idx = 0;
+            for (out_l, out_r) in processed_isp {
+                let len = out_l.len();
+                left[idx..idx+len].copy_from_slice(&out_l);
+                right[idx..idx+len].copy_from_slice(&out_r);
+                idx += len;
             }
         }
 
