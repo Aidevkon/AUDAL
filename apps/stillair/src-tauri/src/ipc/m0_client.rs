@@ -359,6 +359,9 @@ pub struct GoldenBlobJson {
     pub loudness: LoudnessMetricsJson,
     /// Objective quality measurements.
     pub quality: QualityMetricsJson,
+    /// Spatial telemetry
+    #[serde(default)]
+    pub spatial: Option<StoredSpatialJson>,
     /// Full audit trail.
     pub provenance: ProvenanceJson,
     #[serde(default = "default_schema_v1_gc")]
@@ -444,6 +447,21 @@ pub struct QualityMetricsJson {
     // Clipping
     pub clips_detected: u32,
     pub clip_free: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BandSpatialJson {
+    pub pan_mean: f32,
+    pub pan_width: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StoredSpatialJson {
+    pub low: BandSpatialJson,
+    pub low_mid: BandSpatialJson,
+    pub mid: BandSpatialJson,
+    pub high_mid: BandSpatialJson,
+    pub high: BandSpatialJson,
 }
 
 /// Full audit trail — every blob knows exactly how it was produced.

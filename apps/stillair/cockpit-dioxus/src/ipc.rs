@@ -373,6 +373,10 @@ fn adapt_response(command: &str, val: JsValue) -> Result<JsValue, String> {
                 js_sys::JSON::parse(&compliance.to_string()).unwrap_or(JsValue::UNDEFINED);
             Reflect::set(&session, &"compliance".into(), &compliance_js).ok();
 
+            let spatial =
+                Reflect::get(&val, &JsValue::from_str("spatial")).unwrap_or(JsValue::UNDEFINED);
+            Reflect::set(&session, &"spatial".into(), &spatial).ok();
+
             let findings_js =
                 js_sys::JSON::parse(&findings.to_string()).unwrap_or(JsValue::UNDEFINED);
             Reflect::set(&session, &"findings".into(), &findings_js).ok();

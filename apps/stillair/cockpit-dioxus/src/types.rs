@@ -49,6 +49,21 @@ pub struct QualityMetricsJson {
     pub clip_free: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BandSpatialJson {
+    pub pan_mean: f32,
+    pub pan_width: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredSpatialJson {
+    pub low: BandSpatialJson,
+    pub low_mid: BandSpatialJson,
+    pub mid: BandSpatialJson,
+    pub high_mid: BandSpatialJson,
+    pub high: BandSpatialJson,
+}
+
 // ── VisualizationDataJson (Phase 14 — §2 IPC type) ───────────────────────────
 
 /// Precomputed visualization data from backend (get_visualization_data command).
@@ -169,6 +184,8 @@ pub struct SessionStateJson {
     pub quality: QualityMetricsJson,
     pub compliance: ComplianceJson,
     pub findings: CoachFindingsJson,
+    #[serde(default)]
+    pub spatial: Option<StoredSpatialJson>,
     pub narrative: Option<CoachNarrativeJson>,
     #[serde(default)]
     pub aether_cert: Option<String>,
