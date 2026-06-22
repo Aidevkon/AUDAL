@@ -20,7 +20,7 @@ pub fn run(
     original_right: &[f32],
     left_slice: &mut [f32],
     right_slice: &mut [f32],
-) -> Result<StemFingerprints, String> {
+) -> Result<(StemFingerprints, sp314_dsp::stft::two_pass::RenderMetadata), String> {
     let mut h_voice = Sha256::new();
     let mut h_drums = Sha256::new();
     let mut h_bass = Sha256::new();
@@ -143,12 +143,12 @@ pub fn run(
         right_slice[i] *= gain;
     }
 
-    Ok(StemFingerprints {
+    Ok((StemFingerprints {
         voice: voice_hex,
         drums: drums_hex,
         bass: bass_hex,
         harmonics: harm_hex,
         ambience: amb_hex,
         pipeline: pipeline_hex,
-    })
+    }, _metadata))
 }
