@@ -166,11 +166,10 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             // Ghost FIRST (drawn under Core), Core on top.
             if props_clone.is_delta_mode {
                 render_ghost(&ctx, width, height, &spectrum_before);
-
-                render_core(&ctx, width, height, &spectrum_after);
+                render_core(&ctx, width, height, &spectrum_before, &spectrum_after);
             } else {
                 // Legacy single-line fallback (non-delta callers).
-                render_core(&ctx, width, height, &spectrum_after);
+                render_core(&ctx, width, height, &spectrum_after, &spectrum_after);
                 render_lasers(&ctx, width, height, time_ms, props_clone.bpm, &spectrum_after);
             }
 
@@ -384,25 +383,65 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
 // ── Core line (spectrum_after — post-mastering / mastered PCM) ───────────────
 // Drawn at z=0.0 (front plane). Uses oblique_project — same space as Ghost/grid.
 
-fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum: &[f32]) {
-    if spectrum.is_empty() { return; }
+fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum_before: &[f32], spectrum_after: &[f32]) {
+    if spectrum_after.is_empty() { return; }
 
-    // Neon cyan, front plane, with glow.
-    // Shadow MUST be reset to 0 after drawing — otherwise it bleeds onto the grid.
-    ctx.set_stroke_style_str("#00d1ff");
+    let n = spectrum_after.len() as f64;
+    
+    // Pre-calculate all projected points and deltas
+    let mut points = Vec::with_capacity(spectrum_after.len());
+    let mut deltas = Vec::with_capacity(spectrum_after.len());
+    
+    for (i, &db_after) in spectrum_after.iter().enumerate() {
+        let x = i as f64 / n;
+        let y = (db_after.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
+        let (sx, sy) = perspective_project(x, y, 0.0, width, height);
+        points.push((sx, sy));
+        
+        let db_before = spectrum_before.get(i).copied().unwrap_or(db_after);
+        deltas.push(db_after - db_before);
+    }
+
     ctx.set_line_width(2.5);
+
+    // 1. Boost segments (Δ > +1dB) — Teal
+    ctx.set_stroke_style_str("#00d1ff");
     ctx.set_shadow_color("#00d1ff");
     ctx.set_shadow_blur(15.0);
     ctx.begin_path();
-
-    let n = spectrum.len() as f64;
-    for (i, &db) in spectrum.iter().enumerate() {
-        let x = i as f64 / n;
-        let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
-        let (sx, sy) = perspective_project(x, y, 0.0, width, height);
-        if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
+    for i in 1..points.len() {
+        if deltas[i] > 1.0 {
+            ctx.move_to(points[i-1].0, points[i-1].1);
+            ctx.line_to(points[i].0, points[i].1);
+        }
     }
+    ctx.stroke();
 
+    // 2. Cut segments (Δ < -1dB) — Indigo
+    ctx.set_stroke_style_str("#5c33ff");
+    ctx.set_shadow_color("#5c33ff");
+    ctx.set_shadow_blur(15.0);
+    ctx.begin_path();
+    for i in 1..points.len() {
+        if deltas[i] < -1.0 {
+            ctx.move_to(points[i-1].0, points[i-1].1);
+            ctx.line_to(points[i].0, points[i].1);
+        }
+    }
+    ctx.stroke();
+
+    // 3. Neutral segments (else) — Dim cyan, no glow
+    ctx.set_stroke_style_str("rgba(0, 209, 255, 0.4)");
+    ctx.set_shadow_blur(0.0);
+    ctx.set_shadow_color("transparent");
+    ctx.begin_path();
+    for i in 1..points.len() {
+        let d = deltas[i];
+        if d >= -1.0 && d <= 1.0 {
+            ctx.move_to(points[i-1].0, points[i-1].1);
+            ctx.line_to(points[i].0, points[i].1);
+        }
+    }
     ctx.stroke();
 
     // Reset shadow — must not bleed onto subsequent grid/ghost draws.
