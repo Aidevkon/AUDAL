@@ -242,16 +242,26 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
 //   Z_OFFY    — depth offset UP per z unit
 
 #[inline]
-fn oblique_project(x: f64, y: f64, z: f64, w: f64, h: f64) -> (f64, f64) {
-    let margin_l = w * 0.08;
-    let plot_w   = w * 0.78;
-    let floor_y  = h * 0.80;
-    let amp_h    = h * 0.45;
-    let z_offx   = w * 0.14;
-    let z_offy   = h * 0.28;
-
-    let sx = margin_l + x * plot_w + z * z_offx;
-    let sy = floor_y  - y * amp_h  - z * z_offy;
+fn perspective_project(x: f64, y: f64, z: f64, w: f64, h: f64) -> (f64, f64) {
+    let center_x = w * 0.5;
+    let horizon_y = h * 0.25; 
+    
+    // Base width at front plane (z=0)
+    let plot_w = w * 0.85; 
+    let base_x = center_x + (x - 0.5) * plot_w;
+    
+    // Y axis (amplitude) mapped to floor
+    let floor_y = h * 0.85;
+    let amp_h = h * 0.45;
+    let base_y = floor_y - y * amp_h;
+    
+    // Perspective scaling (z=1 is back plane)
+    let depth_strength = 1.5; 
+    let scale = 1.0 / (1.0 + z * depth_strength);
+    
+    let sx = center_x + (base_x - center_x) * scale;
+    let sy = horizon_y + (base_y - horizon_y) * scale;
+    
     (sx, sy)
 }
 
@@ -263,41 +273,74 @@ fn oblique_project(x: f64, y: f64, z: f64, w: f64, h: f64) -> (f64, f64) {
 // Sparse: ~6 amplitude bands, ~5 depth connectors.
 
 fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, _time_ms: f64) {
-    // Floor plane only (y=0). No amplitude scaffold lines.
-    // Grid = front edge + back edge + 6 depth connectors.
-    // The back edge / connectors are clamped to the front edge's max-x so
-    // depth rails don't overshoot past the right boundary.
-    let (front_x1, _) = oblique_project(1.0, 0.0, 0.0, width, height);
-    let max_sx = front_x1; // right-edge clamp
-
-    ctx.set_global_alpha(0.40);
-    ctx.set_stroke_style_str("#005566");
+    // ── Grid Lines ──
+    ctx.set_global_alpha(0.25);
+    ctx.set_stroke_style_str("#00d1ff");
     ctx.set_line_width(1.0);
     ctx.begin_path();
 
-    // Front floor edge (z=0): perfectly horizontal
-    let (x0, y0) = oblique_project(0.0, 0.0, 0.0, width, height);
-    let (x1, y1) = oblique_project(1.0, 0.0, 0.0, width, height);
-    ctx.move_to(x0, y0);
-    ctx.line_to(x1, y1);
-
-    // Back floor edge (z=1): clamped to max_sx on the right
-    let (bx0, by0) = oblique_project(0.0, 0.0, 1.0, width, height);
-    let (bx1, by1) = oblique_project(1.0, 0.0, 1.0, width, height);
-    ctx.move_to(bx0, by0);
-    ctx.line_to(bx1.min(max_sx), by1);
-
-    // 6 diagonal depth connectors from front floor to back floor
-    for i in 0..=5_u32 {
-        let x = i as f64 / 5.0;
-        let (fx, fy) = oblique_project(x, 0.0, 0.0, width, height);
-        let (mut bx, by) = oblique_project(x, 0.0, 1.0, width, height);
-        bx = bx.min(max_sx); // clamp so right-side connectors don't overshoot
+    // Depth lines (Z axis)
+    for i in 0..=10 {
+        let x = i as f64 / 10.0;
+        let (fx, fy) = perspective_project(x, 0.0, 0.0, width, height);
+        let (bx, by) = perspective_project(x, 0.0, 1.0, width, height);
         ctx.move_to(fx, fy);
         ctx.line_to(bx, by);
     }
 
+    // Horizontal frequency lines (X axis) at depth intervals
+    for i in 0..=5 {
+        let z = i as f64 / 5.0;
+        let (x0, y0) = perspective_project(0.0, 0.0, z, width, height);
+        let (x1, y1) = perspective_project(1.0, 0.0, z, width, height);
+        ctx.move_to(x0, y0);
+        ctx.line_to(x1, y1);
+    }
     ctx.stroke();
+
+    // ── Concentric Rings ──
+    ctx.set_global_alpha(0.15);
+    ctx.set_stroke_style_str("#00d1ff");
+    for r in 1..=4 {
+        let radius = (r as f64) * 0.12;
+        ctx.begin_path();
+        for angle_deg in (0..=360).step_by(5) {
+            let angle = (angle_deg as f64) * std::f64::consts::PI / 180.0;
+            let cx = 0.5 + radius * angle.cos();
+            let cz = 0.5 + radius * angle.sin();
+            let (px, py) = perspective_project(cx, 0.0, cz, width, height);
+            if angle_deg == 0 {
+                ctx.move_to(px, py);
+            } else {
+                ctx.line_to(px, py);
+            }
+        }
+        ctx.stroke();
+    }
+
+    // ── Band Markers ──
+    ctx.set_global_alpha(0.60);
+    ctx.set_fill_style_str("#00d1ff");
+    ctx.set_font("10px 'Inter', monospace");
+    ctx.set_text_align("center");
+    
+    let bands = [
+        (0.1, "Low"),
+        (0.3, "Low-Mid"),
+        (0.5, "Mid"),
+        (0.7, "High-Mid"),
+        (0.9, "High"),
+    ];
+    
+    ctx.begin_path();
+    for &(x, label) in &bands {
+        let (fx, fy) = perspective_project(x, 0.0, 0.0, width, height);
+        ctx.fill_text(label, fx, fy + 16.0).unwrap();
+        ctx.move_to(fx, fy);
+        ctx.line_to(fx, fy + 4.0);
+    }
+    ctx.stroke();
+
     ctx.set_global_alpha(1.0);
 }
 
@@ -311,8 +354,8 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
         ctx.set_stroke_style_str("#667788");
         ctx.set_line_width(1.0);
         ctx.begin_path();
-        let (x0, y0) = oblique_project(0.0, 0.0, 1.0, width, height);
-        let (x1, y1) = oblique_project(1.0, 0.0, 1.0, width, height);
+        let (x0, y0) = perspective_project(0.0, 0.0, 1.0, width, height);
+        let (x1, y1) = perspective_project(1.0, 0.0, 1.0, width, height);
         ctx.move_to(x0, y0);
         ctx.line_to(x1, y1);
         ctx.stroke();
@@ -330,7 +373,7 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
     for (i, &db) in spectrum.iter().enumerate() {
         let x = i as f64 / n;
         let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
-        let (sx, sy) = oblique_project(x, y, 1.0, width, height);
+        let (sx, sy) = perspective_project(x, y, 1.0, width, height);
         if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
     }
 
@@ -356,7 +399,7 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
     for (i, &db) in spectrum.iter().enumerate() {
         let x = i as f64 / n;
         let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
-        let (sx, sy) = oblique_project(x, y, 0.0, width, height);
+        let (sx, sy) = perspective_project(x, y, 0.0, width, height);
         if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
     }
 
