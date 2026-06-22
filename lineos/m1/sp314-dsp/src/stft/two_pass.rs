@@ -125,11 +125,18 @@ impl core::fmt::Display for StreamError {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BandSpatialMetrics {
+    pub pan_mean: f32,
+    pub pan_width: f32,
+}
+
 /// Metadata returned after render — audio on disk, no audio Vec.
 pub struct RenderMetadata {
     pub frames_written: usize,
     pub voice_transient_density: f32,
     pub drums_transient_density: f32,
+    pub spatial: [BandSpatialMetrics; 5],
 }
 
 pub struct TwoPassEngine {
@@ -412,6 +419,8 @@ impl TwoPassEngine {
     pub fn process_chunks_with_params<F>(
         &mut self,
         signal: &[f32],
+        left: &[f32],
+        right: &[f32],
         scout: &ScoutResult,
         ducking_gain: f32,
         mut callback: F,
@@ -447,16 +456,35 @@ impl TwoPassEngine {
             voice_transient: f32,
             drums_transient: f32,
             chunk_len: usize,
+            spatial_sums: [(f32, f32, f32); 5], // [(pan_num, width_num, den); 5]
         }
 
         let parallel_results: Vec<ParallelChunkOut> = chunk_inputs
             .into_par_iter()
             .map(|chunk_in| {
                 let padded_chunk = &signal[chunk_in.start..chunk_in.end];
+                let padded_left = if chunk_in.start < left.len() {
+                    let end = chunk_in.end.min(left.len());
+                    &left[chunk_in.start..end]
+                } else {
+                    &[]
+                };
+                let padded_right = if chunk_in.start < right.len() {
+                    let end = chunk_in.end.min(right.len());
+                    &right[chunk_in.start..end]
+                } else {
+                    &[]
+                };
+
                 let mut stft_ctx = StftStreamContext::new();
                 let mut hpss_ctx = HpssStreamContext::new();
+                let mut stft_l = StftStreamContext::new();
+                let mut stft_r = StftStreamContext::new();
 
                 let chunk_frames = stft_ctx.forward_chunk(padded_chunk);
+                let core_frames_l = stft_l.forward_chunk(padded_left);
+                let core_frames_r = stft_r.forward_chunk(padded_right);
+
                 let n_frames = chunk_frames.len();
                 if n_frames == 0 {
                     return ParallelChunkOut {
@@ -464,6 +492,7 @@ impl TwoPassEngine {
                             voice: vec![], drums: vec![], bass: vec![], harmonics: vec![], ambience: vec![]
                         },
                         voice_transient: 0.0, drums_transient: 0.0, chunk_len: 0,
+                        spatial_sums: [(0.0, 0.0, 0.0); 5],
                     };
                 }
 
@@ -488,6 +517,9 @@ impl TwoPassEngine {
                 let core_harm_mask = if pad_frames < harm_mask.len() { &harm_mask[pad_frames..] } else { &[] };
                 let core_amb_mask = if pad_frames < amb_mask.len() { &amb_mask[pad_frames..] } else { &[] };
                 let core_mask_p = if pad_frames < mask_p.len() { &mask_p[pad_frames..] } else { &[] };
+
+                let core_frames_l = if pad_frames < core_frames_l.len() { &core_frames_l[pad_frames..] } else { &[] };
+                let core_frames_r = if pad_frames < core_frames_r.len() { &core_frames_r[pad_frames..] } else { &[] };
 
                 let core_chunk = &signal[chunk_in.offset..chunk_in.end];
 
@@ -531,6 +563,37 @@ impl TwoPassEngine {
                     .sum::<f32>()
                     / core_n_frames.max(1) as f32;
 
+                let mut spatial_sums = [(0.0, 0.0, 0.0); 5]; // [(pan_num, width_num, den); 5]
+                for f in 0..core_n_frames {
+                    if f >= core_frames_l.len() || f >= core_frames_r.len() { continue; }
+                    for b in 0..N_BINS {
+                        let x_l = core_frames_l[f][b];
+                        let x_r = core_frames_r[f][b];
+                        let amp = x_l + x_r;
+                        if amp < 1e-6 {
+                            continue;
+                        }
+                        let p = (x_r - x_l) / (amp + 1e-10_f32);
+                        let p_abs = p.abs();
+
+                        let band_idx = if b <= 10 {
+                            0 // Lows (0 - 250 Hz)
+                        } else if b <= 42 {
+                            1 // Low-Mids (250 - 1000 Hz)
+                        } else if b <= 170 {
+                            2 // Mids (1000 - 4000 Hz)
+                        } else if b <= 341 {
+                            3 // High-Mids (4000 - 8000 Hz)
+                        } else {
+                            4 // Highs (8000+ Hz)
+                        };
+
+                        spatial_sums[band_idx].0 += p * amp;
+                        spatial_sums[band_idx].1 += p_abs * amp;
+                        spatial_sums[band_idx].2 += amp;
+                    }
+                }
+
                 ParallelChunkOut {
                     stems: FiveStemsChunk {
                         voice: voice_chunk,
@@ -542,6 +605,7 @@ impl TwoPassEngine {
                     voice_transient: v_transient,
                     drums_transient: d_transient,
                     chunk_len: core_chunk.len(),
+                    spatial_sums,
                 }
             })
             .collect();
@@ -552,6 +616,8 @@ impl TwoPassEngine {
         let mut drums_transient_sum = 0.0f32;
         let mut chunk_count = 0usize;
 
+        let mut global_spatial_sums = [(0.0, 0.0, 0.0); 5];
+
         for mut out in parallel_results {
             if out.chunk_len == 0 {
                 continue;
@@ -560,6 +626,12 @@ impl TwoPassEngine {
             voice_transient_sum += out.voice_transient;
             drums_transient_sum += out.drums_transient;
             chunk_count += 1;
+
+            for i in 0..5 {
+                global_spatial_sums[i].0 += out.spatial_sums[i].0;
+                global_spatial_sums[i].1 += out.spatial_sums[i].1;
+                global_spatial_sums[i].2 += out.spatial_sums[i].2;
+            }
 
             // Psychoacoustic Collision Matrix — smoothed micro-ducking sequentially across chunks.
             let collision = detect_collision(&out.stems.drums, &out.stems.bass);
@@ -590,10 +662,23 @@ impl TwoPassEngine {
         }
 
         let avg = chunk_count.max(1) as f32;
+        let mut final_spatial = [BandSpatialMetrics::default(); 5];
+        for i in 0..5 {
+            let den = global_spatial_sums[i].2.max(1e-10);
+            final_spatial[i].pan_mean = global_spatial_sums[i].0 / den;
+            final_spatial[i].pan_width = global_spatial_sums[i].1 / den;
+        }
+
+        eprintln!("[BAND-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_width, final_spatial[1].pan_width, final_spatial[2].pan_width, final_spatial[3].pan_width, final_spatial[4].pan_width);
+        eprintln!("[BAND-MEAN] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_mean, final_spatial[1].pan_mean, final_spatial[2].pan_mean, final_spatial[3].pan_mean, final_spatial[4].pan_mean);
+
         Ok(RenderMetadata {
             frames_written,
             voice_transient_density: voice_transient_sum / avg,
             drums_transient_density: drums_transient_sum / avg,
+            spatial: final_spatial,
         })
     }
 
@@ -608,7 +693,7 @@ impl TwoPassEngine {
     where
         F: FnMut(&FiveStemsChunk),
     {
-        self.process_chunks_with_params(signal, scout, COLLISION_DUCKING_GAIN, callback)
+        self.process_chunks_with_params(signal, signal, signal, scout, COLLISION_DUCKING_GAIN, callback)
     }
 }
 
