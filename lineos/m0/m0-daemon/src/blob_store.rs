@@ -50,6 +50,10 @@ pub struct StoredBlob {
     // Provenance — golden-blob-spec.md §Provenance
     pub provenance: StoredProvenance,
 
+    // Spatial telemetry
+    #[serde(default)]
+    pub spatial: StoredSpatial,
+
     // Mirror GoldenBlob v2 fields
     #[serde(default = "default_schema_v1")]
     pub schema_version: u32,
@@ -136,6 +140,21 @@ pub struct StemFingerprints {
     pub harmonics: String,
     pub ambience: String,
     pub pipeline: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BandSpatial {
+    pub pan_mean: f32,
+    pub pan_width: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StoredSpatial {
+    pub low: BandSpatial,
+    pub low_mid: BandSpatial,
+    pub mid: BandSpatial,
+    pub high_mid: BandSpatial,
+    pub high: BandSpatial,
 }
 
 /// Thread-safe in-memory blob store.

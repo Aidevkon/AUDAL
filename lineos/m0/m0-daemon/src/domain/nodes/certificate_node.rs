@@ -2,7 +2,7 @@
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P5
 
 use crate::blob_store::{
-    StageRecord, StemFingerprints, StoredBlob, StoredLoudness, StoredProvenance, StoredQuality,
+    StageRecord, StemFingerprints, StoredBlob, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial, BandSpatial,
 };
 use chrono::Utc;
 use lineos_telemetry::lra::LraCalculator;
@@ -21,6 +21,7 @@ pub fn run(
     true_peak: f32,
     _pre_analysis: &PreAnalysisData,
     fingerprints: &StemFingerprints,
+    spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
     proof_log: &integration::proof_log::ProofLog,
     persona_config: &aether::personas::config::PersonaConfig,
     aether_req: &aether_bridge::AetherRequest,
@@ -140,6 +141,28 @@ pub fn run(
             spectral_flatness: 0.12,
             clips_detected: 0,
             clip_free: true_peak <= -1.0,
+        },
+        spatial: StoredSpatial {
+            low: BandSpatial {
+                pan_mean: spatial_metadata.spatial[0].pan_mean,
+                pan_width: spatial_metadata.spatial[0].pan_width,
+            },
+            low_mid: BandSpatial {
+                pan_mean: spatial_metadata.spatial[1].pan_mean,
+                pan_width: spatial_metadata.spatial[1].pan_width,
+            },
+            mid: BandSpatial {
+                pan_mean: spatial_metadata.spatial[2].pan_mean,
+                pan_width: spatial_metadata.spatial[2].pan_width,
+            },
+            high_mid: BandSpatial {
+                pan_mean: spatial_metadata.spatial[3].pan_mean,
+                pan_width: spatial_metadata.spatial[3].pan_width,
+            },
+            high: BandSpatial {
+                pan_mean: spatial_metadata.spatial[4].pan_mean,
+                pan_width: spatial_metadata.spatial[4].pan_width,
+            },
         },
         provenance: StoredProvenance {
             engine_id: "E11".into(),

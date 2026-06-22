@@ -157,7 +157,7 @@ fn run_dsp_internal(
     let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
 
     emit_progress("Stem Engine");
-    let fingerprints = crate::domain::nodes::render_node::run(
+    let (fingerprints, spatial_metadata) = crate::domain::nodes::render_node::run(
         &mut two_pass,
         &mono,
         &scout,
@@ -234,6 +234,7 @@ fn run_dsp_internal(
         tp,
         &pre_analysis,
         &fingerprints,
+        &spatial_metadata,
         &proof_log,
         &persona_config,
         &aether_req,
