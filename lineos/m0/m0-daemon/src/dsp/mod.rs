@@ -47,65 +47,26 @@ impl DspAdapter {
         let num_frames = left.len();
         use rayon::prelude::*;
 
-        // Phase 1: Parallel Graph Processing
-        let chunk_sec = 20.0;
-        let margin_sec = 4.0; // 4s margin ~ 120dB decay for 2s RT60!
-        
-        let chunk_size = (sample_rate as f32 * chunk_sec).round() as usize;
-        let margin = (sample_rate as f32 * margin_sec).round() as usize;
-        
-        let mut chunks = Vec::new();
-        let mut start = 0;
-        while start < num_frames {
-            let end = (start + chunk_size).min(num_frames);
-            let pad_start = start.saturating_sub(margin);
-            let pad_len = start - pad_start;
-            chunks.push((start, end, pad_start, pad_len));
-            start = end;
-        }
-
-        let left_src = left.to_vec();
-        let right_src = right.to_vec();
-
-        let processed_chunks: Vec<(Vec<f32>, Vec<f32>)> = chunks.par_iter().map(|&(_start, end, pad_start, pad_len)| {
-            let mut graph_clone = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
-            let total_len = end - pad_start;
-            let mut work_l = vec![0.0_f32; total_len];
-            let mut work_r = vec![0.0_f32; total_len];
-            
-            work_l.copy_from_slice(&left_src[pad_start..end]);
-            work_r.copy_from_slice(&right_src[pad_start..end]);
-            
-            let mut f = 0;
-            while f < total_len {
-                let e = (f + block_size).min(total_len);
-                let b_len = e - f;
-                if b_len < block_size {
-                    let mut pad_l = vec![0.0_f32; block_size];
-                    let mut pad_r = vec![0.0_f32; block_size];
-                    pad_l[..b_len].copy_from_slice(&work_l[f..e]);
-                    pad_r[..b_len].copy_from_slice(&work_r[f..e]);
-                    graph_clone.process_block(&mut pad_l, &mut pad_r);
-                    work_l[f..e].copy_from_slice(&pad_l[..b_len]);
-                    work_r[f..e].copy_from_slice(&pad_r[..b_len]);
-                } else {
-                    graph_clone.process_block(&mut work_l[f..e], &mut work_r[f..e]);
-                }
-                f += b_len;
+        // Phase 1: Serial Graph Processing
+        // The DspGraph contains heavily stateful nodes (Compressor, Reverb) 
+        // that cannot be cleanly parallelized without massive margins.
+        let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
+        let mut f = 0;
+        while f < num_frames {
+            let e = (f + block_size).min(num_frames);
+            let b_len = e - f;
+            if b_len < block_size {
+                let mut pad_l = vec![0.0_f32; block_size];
+                let mut pad_r = vec![0.0_f32; block_size];
+                pad_l[..b_len].copy_from_slice(&left[f..e]);
+                pad_r[..b_len].copy_from_slice(&right[f..e]);
+                graph.process_block(&mut pad_l, &mut pad_r);
+                left[f..e].copy_from_slice(&pad_l[..b_len]);
+                right[f..e].copy_from_slice(&pad_r[..b_len]);
+            } else {
+                graph.process_block(&mut left[f..e], &mut right[f..e]);
             }
-            
-            let out_l = work_l[pad_len..].to_vec();
-            let out_r = work_r[pad_len..].to_vec();
-            (out_l, out_r)
-        }).collect();
-
-
-        let mut idx = 0;
-        for (out_l, out_r) in processed_chunks {
-            let len = out_l.len();
-            left[idx..idx+len].copy_from_slice(&out_l);
-            right[idx..idx+len].copy_from_slice(&out_r);
-            idx += len;
+            f += b_len;
         }
 
         // Post-process LUFS correction — mathematically exact
@@ -129,35 +90,44 @@ impl DspAdapter {
             let _ = ceiling_linear; // used via config
 
             // Phase 3: Parallel Gain & ISP Limiting
-            // Limiter has 15ms release, 5ms lookahead -> 40ms safety margin = 1920 samples @ 48k
-            let isp_margin_sec = 0.04;
+            // Limiter has 15ms fast release, but 100ms slow blend release.
+            // To reach float-exact (1e-7) convergence on a 100ms tau,
+            // we need ~16 time constants. 16 * 100ms = 1.6s.
+            let isp_margin_sec = 1.6;
             let isp_margin = (sample_rate as f32 * isp_margin_sec).round() as usize;
-            let isp_chunk_size = chunk_size;
+            let isp_chunk_sec = 10.0;
+            let isp_chunk_size = (sample_rate as f32 * isp_chunk_sec).round() as usize;
+            let lookahead = (sample_rate as f32 * 0.005).round() as usize;
 
             let mut isp_chunks = Vec::new();
             let mut start = 0;
             while start < num_frames {
                 let end = (start + isp_chunk_size).min(num_frames);
                 let pad_start = start.saturating_sub(isp_margin);
+                let pad_end = (end + lookahead).min(num_frames);
                 let pad_len = start - pad_start;
-                isp_chunks.push((start, end, pad_start, pad_len));
+                isp_chunks.push((start, end, pad_start, pad_end, pad_len));
                 start = end;
             }
 
             let left_src = left.to_vec();
             let right_src = right.to_vec();
 
-            let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks.par_iter().map(|&(_start, end, pad_start, pad_len)| {
+            let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks.par_iter().map(|&(_start, end, pad_start, pad_end, pad_len)| {
                 let mut isp_limiter_clone = BrickwallLimiter::new(isp_limiter_config, sample_rate);
-                let total_len = end - pad_start;
+                
+                let is_last_chunk = pad_end == num_frames;
+                let flush_len = if is_last_chunk { lookahead } else { 0 };
+                let total_len = pad_end - pad_start + flush_len;
+                
                 let mut work_l = vec![0.0_f32; total_len];
                 let mut work_r = vec![0.0_f32; total_len];
                 
                 // Apply global gain correction during the copy
-                for (i, &s) in left_src[pad_start..end].iter().enumerate() {
+                for (i, &s) in left_src[pad_start..pad_end].iter().enumerate() {
                     work_l[i] = s * correction_linear;
                 }
-                for (i, &s) in right_src[pad_start..end].iter().enumerate() {
+                for (i, &s) in right_src[pad_start..pad_end].iter().enumerate() {
                     work_r[i] = s * correction_linear;
                 }
 
@@ -180,22 +150,22 @@ impl DspAdapter {
                     f += b_len;
                 }
 
-                // Lookahead compensation
-                let lookahead = isp_limiter_clone.lookahead_samples();
-                if lookahead > 0 && lookahead < total_len {
-                    work_l.copy_within(lookahead.., 0);
-                    work_r.copy_within(lookahead.., 0);
-                    let mut flush_l = vec![0.0_f32; lookahead];
-                    let mut flush_r = vec![0.0_f32; lookahead];
-                    isp_limiter_clone.process_block(&mut flush_l, &mut flush_r);
-                    let tail_start = total_len - lookahead;
-                    work_l[tail_start..].copy_from_slice(&flush_l);
-                    work_r[tail_start..].copy_from_slice(&flush_r);
-                }
+                // The limiter delays audio by exactly `lookahead` samples.
+                // Output for input `i` is at `i + lookahead`.
+                // The true start of our chunk in `work` is `pad_len`.
+                // So the true start of output is `pad_len + lookahead`.
+                let out_start = pad_len + lookahead;
+                let target_len = end - _start;
+                let out_end = (out_start + target_len).min(total_len);
+                
+                let mut final_l = vec![0.0_f32; target_len];
+                let mut final_r = vec![0.0_f32; target_len];
+                
+                let available = out_end - out_start;
+                final_l[..available].copy_from_slice(&work_l[out_start..out_end]);
+                final_r[..available].copy_from_slice(&work_r[out_start..out_end]);
 
-                let out_l = work_l[pad_len..].to_vec();
-                let out_r = work_r[pad_len..].to_vec();
-                (out_l, out_r)
+                (final_l, final_r)
             }).collect();
 
 
