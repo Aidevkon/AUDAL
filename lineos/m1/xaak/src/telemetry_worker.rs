@@ -29,11 +29,11 @@ where
         let mut analyzer_before = crate::spectrum::SpectrumAnalyzer::new();
 
         let ch = channels.max(1);
-        // chunk_size: 1024 frames × channels (2048 samples for stereo).
-        let chunk_size = 1024 * ch;
+        // chunk_size: 4096 frames × channels (8192 samples for stereo).
+        let chunk_size = 4096 * ch;
         // Fixed stack buffers — zero heap allocation per iteration.
-        let mut buffer     = [0.0f32; 2048];
-        let mut raw_buffer = [0.0f32; 2048];
+        let mut buffer     = [0.0f32; 8192];
+        let mut raw_buffer = [0.0f32; 8192];
 
         loop {
             // Wait until a full chunk is available in the mastered ring buffer.
@@ -52,6 +52,10 @@ where
 
             // Compute spectrum_before from raw (pre-mastering) PCM if available.
             let mut spectrum_before = [-120.0f32; 64];
+            eprintln!("[RAW-TELEM] computing before? cons_some={} occupied={} chunk_size={}", 
+                      raw_consumer.is_some(), 
+                      raw_consumer.as_ref().map(|c| c.occupied_len()).unwrap_or(0), 
+                      chunk_size);
             if let Some(ref mut raw_cons) = raw_consumer {
                 if raw_cons.occupied_len() >= chunk_size {
                     let mut raw_read = 0;
@@ -68,6 +72,14 @@ where
             let spectrum_after = analyzer_after.compute(&buffer[..chunk_size], ch);
 
             let position_ms = *pos_mutex.lock().unwrap_or_else(|e| e.into_inner());
+
+            // Temporary [BIN-DUMP] trap
+            if position_ms % 2000 < 50 {
+                let fmt = |v: &[f32]| -> String {
+                    v.iter().take(10).map(|x| format!("{:.1}", x)).collect::<Vec<_>>().join(",")
+                };
+                eprintln!("[BIN-DUMP] before[0..10]=[{}]", fmt(&spectrum_before));
+            }
 
             let frame = lineos_types::telemetry::RealtimeFrame {
                 spectrum_before,

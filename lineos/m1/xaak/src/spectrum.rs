@@ -9,7 +9,7 @@ use realfft::{RealFftPlanner, RealToComplex};
 use rustfft::num_complex::Complex;
 use std::sync::Arc;
 
-const FFT_SIZE: usize = 1024;
+const FFT_SIZE: usize = 4096;
 const N_BANDS: usize = 64;
 
 pub struct SpectrumAnalyzer {
