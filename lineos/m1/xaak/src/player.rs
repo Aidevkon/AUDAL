@@ -48,6 +48,7 @@ impl CpalPlayer {
         sample_rate: u32,
         channels: u16,
         position_ms: Arc<Mutex<u64>>,
+        tx_eof: std::sync::mpsc::Sender<crate::engine::PlaybackCmd>,
     ) -> Result<(), String>
     where
         C: Consumer<Item = f32> + Send + 'static,
@@ -133,6 +134,7 @@ impl CpalPlayer {
                             && !stream_ended_cb.load(Ordering::Relaxed)
                         {
                             stream_ended_cb.store(true, Ordering::Release);
+                            let _ = tx_eof.send(crate::engine::PlaybackCmd::EofReached);
                         }
                     } else {
                         zero_read_streak = 0;

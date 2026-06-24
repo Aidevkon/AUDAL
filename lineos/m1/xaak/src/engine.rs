@@ -38,6 +38,8 @@ pub enum PlaybackCmd {
     },
     /// Caller sends a SyncSender; worker replies with Option<PlaybackState>.
     GetState(SyncSender<Option<PlaybackState>>),
+    /// Emitted by the cpal callback when the stream underruns (natural EOF).
+    EofReached,
 }
 
 // ── PlaybackHandle — the Send/Sync token held by AppState ────────────────────
@@ -53,9 +55,10 @@ impl PlaybackHandle {
     /// Spawn the playback worker thread and return a handle.
     pub fn spawn() -> Self {
         let (tx, rx) = mpsc::channel::<PlaybackCmd>();
+        let tx_clone = tx.clone();
         thread::Builder::new()
             .name("xaak-playback".into())
-            .spawn(move || PlaybackWorker::run(rx))
+            .spawn(move || PlaybackWorker::run(rx, tx_clone))
             .expect("xaak: failed to spawn playback worker thread");
         Self { tx }
     }
@@ -111,10 +114,11 @@ struct PlaybackWorker {
     player: CpalPlayer,
     position: Arc<Mutex<u64>>,
     playing: bool,
+    self_tx: Sender<PlaybackCmd>,
 }
 
 impl PlaybackWorker {
-    fn new() -> Self {
+    fn new(tx: Sender<PlaybackCmd>) -> Self {
         Self {
             kernel: None,
             kernel_b: None,
@@ -124,12 +128,13 @@ impl PlaybackWorker {
             player: CpalPlayer::new(),
             position: Arc::new(Mutex::new(0)),
             playing: false,
+            self_tx: tx,
         }
     }
 
     /// Drive the command loop — blocks the dedicated thread.
-    fn run(rx: Receiver<PlaybackCmd>) {
-        let mut worker = Self::new();
+    fn run(rx: Receiver<PlaybackCmd>, tx: Sender<PlaybackCmd>) {
+        let mut worker = Self::new(tx);
         for cmd in rx {
             match cmd {
                 PlaybackCmd::Load(transfer) => worker.load(transfer),
@@ -146,6 +151,9 @@ impl PlaybackWorker {
                 }
                 PlaybackCmd::GetState(resp_tx) => {
                     let _ = resp_tx.send(worker.state());
+                }
+                PlaybackCmd::EofReached => {
+                    worker.playing = false;
                 }
             }
         }
@@ -194,6 +202,7 @@ impl PlaybackWorker {
             kernel.sample_rate(),
             kernel.channels(),
             self.position.clone(),
+            self.self_tx.clone(),
         )?;
         self.playing = true;
         tracing::info!(blob_id = %kernel.blob_id(), pos_ms, "xaak: play");
