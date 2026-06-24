@@ -1,3 +1,4 @@
+use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use std::fs;
 
@@ -51,13 +52,7 @@ fn crossover3_sum_is_flat() {
             20.0 * peak_sum.log10()
         };
 
-        assert!(
-            (sum_db - 0.0_f32).abs() < tol,
-            "freq={}Hz: sum={:.3}dB expected 0.0dB ±{}dB",
-            freq_hz,
-            sum_db,
-            tol
-        );
+        assert_abs_diff_eq!(sum_db, 0.0_f32, epsilon = tol);
     }
 }
 
@@ -88,12 +83,7 @@ fn crossover3_split_at_crossover_freqs() {
             }
         }
         let low_db = 20.0 * peak_low.log10();
-        assert!(
-            (low_db - (-6.0)).abs() < 0.2,
-            "At f_low={}: low band={:.3}dB expected -6.0dB ±0.2dB",
-            f_low,
-            low_db
-        );
+        assert_abs_diff_eq!(low_db, -6.0, epsilon = 0.2);
     }
 
     // At f_high: high band should be -6dB
@@ -112,12 +102,7 @@ fn crossover3_split_at_crossover_freqs() {
             }
         }
         let high_db = 20.0 * peak_high.log10();
-        assert!(
-            (high_db - (-6.0)).abs() < 0.2,
-            "At f_high={}: high band={:.3}dB expected -6.0dB ±0.2dB",
-            f_high,
-            high_db
-        );
+        assert_abs_diff_eq!(high_db, -6.0, epsilon = 0.2);
     }
 }
 

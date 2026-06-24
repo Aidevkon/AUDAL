@@ -1,3 +1,4 @@
+use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use sp314_dsp::masking_eq::{MaskingAwareEQ, MaskingEQConfig};
 use sp314_dsp::pipeline::gain::HeadroomManager;
@@ -41,12 +42,7 @@ fn phase_aligner_magnitude_is_flat() {
         }
 
         let mag_db = 20.0 * (peak_out / in_peak).log10();
-        assert!(
-            mag_db.abs() < 0.1,
-            "Magnitude not flat at {}Hz: {}dB",
-            f,
-            mag_db
-        );
+        assert_abs_diff_eq!(mag_db, 0.0, epsilon = 0.1);
     }
 }
 
@@ -230,8 +226,8 @@ fn headroom_input_pad_is_minus_6db() {
     let hm = HeadroomManager::new(-6.0, 6.0);
     hm.apply_input_pad(&mut left, &mut right);
     let expected_pad = 10.0_f32.powf(-6.0 / 20.0);
-    assert!((left[0] - expected_pad).abs() < 1e-6);
-    assert!((right[0] - expected_pad).abs() < 1e-6);
+    assert_abs_diff_eq!(left[0], expected_pad, epsilon = 1e-6);
+    assert_abs_diff_eq!(right[0], expected_pad, epsilon = 1e-6);
 }
 
 #[test]
@@ -241,8 +237,8 @@ fn headroom_output_makeup_is_plus_6db() {
     let hm = HeadroomManager::new(-6.0, 6.0);
     hm.apply_output_makeup(&mut left, &mut right);
     let expected_makeup = 0.5 * 10.0_f32.powf(6.0 / 20.0);
-    assert!((left[0] - expected_makeup).abs() < 1e-6);
-    assert!((right[0] - expected_makeup).abs() < 1e-6);
+    assert_abs_diff_eq!(left[0], expected_makeup, epsilon = 1e-6);
+    assert_abs_diff_eq!(right[0], expected_makeup, epsilon = 1e-6);
 }
 
 #[test]
