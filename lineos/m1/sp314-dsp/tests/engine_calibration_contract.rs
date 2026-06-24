@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 
+use approx::assert_abs_diff_eq;
 use sp314_dsp::pipeline::autotune::{autotune, measure_clipping_ratio_post_process};
 use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
 use sp314_dsp::pipeline::presets::MasteringTarget;
@@ -51,11 +52,7 @@ fn test_engine_null_state_is_transparent() {
     let telemetry_out = analyze_offline_pre_pass(&left, &right);
     let output_rms = telemetry_out.rms_db;
 
-    assert!(
-        (output_rms - input_rms).abs() < 0.1,
-        "Transparent preset must not change loudness. Delta: {} dB",
-        (output_rms - input_rms).abs()
-    );
+    assert_abs_diff_eq!(output_rms, input_rms, epsilon = 0.1);
 }
 
 #[test]

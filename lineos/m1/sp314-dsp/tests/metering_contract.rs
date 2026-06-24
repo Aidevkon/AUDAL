@@ -1,4 +1,5 @@
 // tests/metering_contract.rs
+use approx::assert_abs_diff_eq;
 use std::f32::consts::PI;
 use std::fs;
 
@@ -123,11 +124,7 @@ fn lufs_relative_gate_removes_quiet_blocks() {
     // -30 LUFS is below -27 LUFS, so it is gated out!
     // Surviving blocks: the 10 loud blocks.
     // Final mean = loud_ms. Final LUFS = -14.0 LUFS.
-    assert!(
-        (lufs - -14.0).abs() < 0.1,
-        "Relative gate failed, got {} LUFS",
-        lufs
-    );
+    assert_abs_diff_eq!(lufs, -14.0, epsilon = 0.1);
 }
 
 #[test]
@@ -144,12 +141,7 @@ fn lufs_1khz_sine_matches_reference() {
     let lufs = measure_integrated_lufs(&left, &right);
     let expected = load_lufs_reference();
 
-    assert!(
-        (lufs - expected).abs() <= 0.5,
-        "Expected approx {}, got {}",
-        expected,
-        lufs
-    );
+    assert_abs_diff_eq!(lufs, expected, epsilon = 0.5);
 }
 
 #[test]

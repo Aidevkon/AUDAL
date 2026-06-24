@@ -1,3 +1,4 @@
+use approx::assert_abs_diff_eq;
 use sp314_dsp::masking_eq::{
     biquad::{process_biquad, rbj_peaking_coeffs},
     MaskingAwareEQ, MaskingEQConfig, EQ_BANDS, HOP_SIZE,
@@ -40,10 +41,7 @@ fn cold_start_no_silence() {
             i
         );
     }
-    assert!(
-        (block[511] - 1.0).abs() < 0.1,
-        "Cold start muted at hop boundary"
-    );
+    assert_abs_diff_eq!(block[511], 1.0, epsilon = 0.1);
 }
 
 // ==========================================

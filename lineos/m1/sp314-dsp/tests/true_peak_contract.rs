@@ -1,3 +1,5 @@
+use approx::assert_abs_diff_eq;
+
 const DIGITAL_PEAK: f32 = 0.9;
 
 #[test]
@@ -30,11 +32,7 @@ fn true_peak_exceeds_digital_peak() {
     println!("Difference:    {:.6}", max_true_peak - max_digital_peak);
 
     // Digital peak must be exactly 0.9
-    assert!(
-        (max_digital_peak - DIGITAL_PEAK).abs() < 1e-6,
-        "Digital peak should be 0.9, got {}",
-        max_digital_peak
-    );
+    assert_abs_diff_eq!(max_digital_peak, DIGITAL_PEAK, epsilon = 1e-6);
 
     // True peak must be meaningfully higher than digital peak
     // It should jump to ~1.27 for this sequence!

@@ -1,3 +1,5 @@
+use approx::assert_abs_diff_eq;
+
 #[test]
 fn harmonic_no_aliasing_at_high_freq() {
     use sp314_dsp::harmonic::{HarmonicConfig, HarmonicEngine};
@@ -71,6 +73,6 @@ fn harmonic_unity_gain_on_silence() {
 
     let mut engine = HarmonicEngine::new(HarmonicConfig::default());
     let (m, s) = engine.process_frame(0.0, 0.0);
-    assert!(m.abs() < 1e-6_f32, "Silence not preserved: {}", m);
-    assert!(s.abs() < 1e-6_f32, "Silence not preserved: {}", s);
+    assert_abs_diff_eq!(m, 0.0_f32, epsilon = 1e-6_f32);
+    assert_abs_diff_eq!(s, 0.0_f32, epsilon = 1e-6_f32);
 }

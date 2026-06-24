@@ -1,6 +1,7 @@
 // tests/restoration_contract.rs
 // Dev-time rules apply — std::f32 permitted for test signal generation.
 
+use approx::assert_abs_diff_eq;
 use sp314_dsp::restoration::RestorationChain;
 
 #[test]
@@ -150,11 +151,7 @@ fn noise_gate_closes_on_silence() {
 
     // Now pass a small signal and see if it's muted
     let (out_l, _) = gate.process_stereo(1e-6, 1e-6);
-    assert!(
-        out_l.abs() < 1e-8,
-        "Gate did not close on silence (out: {})",
-        out_l
-    );
+    assert_abs_diff_eq!(out_l, 0.0_f32, epsilon = 1e-8);
 }
 
 #[test]
