@@ -1,5 +1,6 @@
 // tests/limiter_contract.rs
 
+use approx::assert_abs_diff_eq;
 use sp314_dsp::limiter::delay::RingBuffer;
 use sp314_dsp::limiter::{BrickwallLimiter, LimiterConfig, PeakFollower, DEFAULT_CEILING_LINEAR};
 
@@ -52,10 +53,7 @@ fn limiter_peak_follower_linear_attack_ramp() {
         follower.process(1.0);
     }
     let gr_final = follower.process(1.0);
-    assert!(
-        (gr_final - DEFAULT_CEILING_LINEAR).abs() < 1e-4,
-        "Must reach full reduction after lookahead window"
-    );
+    assert_abs_diff_eq!(gr_final, DEFAULT_CEILING_LINEAR, epsilon = 1e-4);
 }
 
 #[test]
@@ -75,11 +73,7 @@ fn limiter_peak_follower_stereo_linked() {
     }
     // At exactly 240, the impulse (0, 1) exits.
     assert_eq!(out_l, 0.0);
-    assert!(
-        (out_r - DEFAULT_CEILING_LINEAR).abs() < 1e-4,
-        "Right channel should be limited to ceiling, was {}",
-        out_r
-    );
+    assert_abs_diff_eq!(out_r, DEFAULT_CEILING_LINEAR, epsilon = 1e-4);
 
     // Now test stereo link: left channel has a smaller signal, but should be reduced by the same amount.
     limiter.reset();
@@ -93,10 +87,7 @@ fn limiter_peak_follower_stereo_linked() {
     }
     // The gain reduction is determined by the max (which is 1.0).
     // The GR is 0.9441. So left should be 0.5 * 0.9441.
-    assert!(
-        (out_l - 0.5 * DEFAULT_CEILING_LINEAR).abs() < 1e-4,
-        "Left channel should be reduced by linked GR"
-    );
+    assert_abs_diff_eq!(out_l, 0.5 * DEFAULT_CEILING_LINEAR, epsilon = 1e-4);
 }
 
 #[test]
@@ -139,7 +130,7 @@ fn limiter_decay_floor_prevents_pumping() {
             break;
         }
     }
-    assert!((gr - 1.0).abs() < 1e-7, "Decay floor did not snap to 1.0");
+    assert_abs_diff_eq!(gr, 1.0, epsilon = 1e-7);
 }
 
 #[test]
@@ -234,8 +225,5 @@ fn limiter_lookahead_alignment() {
     // The output here is the sample from 240 samples ago, which was 0.5.
     // Because the TRUE PEAK is now 2.0, the gain reduction ramps up linearly.
     // The initial ducking should be very small or zero, avoiding pre-clicks.
-    assert!(
-        (l - 0.5).abs() < 1e-4,
-        "Lookahead gain reduction ramps smoothly, avoiding pre-clicks"
-    );
+    assert_abs_diff_eq!(l, 0.5, epsilon = 1e-4);
 }
