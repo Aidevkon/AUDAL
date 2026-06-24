@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlCanvasElement, CanvasRenderingContext2d};
+use web_sys::{HtmlCanvasElement, CanvasRenderingContext2d, ResizeObserver};
 use dioxus::prelude::*;
 use crate::types::{RealtimeFrameJson, SessionStateJson};
 use libm;
@@ -59,6 +59,15 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
     let mut canvas_ref = use_signal(|| None::<Rc<HtmlCanvasElement>>);
     let mut raf_id = use_signal(|| None::<i32>);
 
+    // Persistent ResizeObserver + its Closure — stored as a tuple so both
+    // live and die together. No .forget() needed: the Rc owns the Closure,
+    // and use_drop calls .disconnect() then drops the tuple (Closure included).
+    type RoBundle = (ResizeObserver, Closure<dyn FnMut(js_sys::Array, ResizeObserver)>);
+    let ro_store: Rc<RefCell<Option<RoBundle>>> =
+        use_hook(|| Rc::new(RefCell::new(None)));
+    let ro_for_effect = ro_store.clone();
+    let ro_for_drop   = ro_store.clone();
+
     let props_for_effect = props.clone();
     use_effect(move || {
         let Some(canvas_el) = canvas_ref.read().clone() else {
@@ -73,6 +82,60 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
 
         let window = web_sys::window().unwrap();
 
+        // ── ResizeObserver — event-driven draw buffer update ───────────────
+        // Replaces the previous per-frame client_width/height poll inside RAF.
+        // Fires only when the canvas CSS size actually changes; updates the
+        // draw buffer (canvas.width/height) then, not every frame.
+        // Guard (!=) prevents the infinite-loop pattern:
+        //   resize → set canvas.width → browser re-layout → resize → ...
+
+        // Disconnect any previous observer (and drop its Closure) if use_effect re-runs.
+        if let Some((old_ro, _old_cb)) = ro_for_effect.borrow_mut().take() {
+            old_ro.disconnect();
+            // _old_cb drops here — Closure is properly freed.
+        }
+
+        let canvas_for_ro = canvas_el.clone();
+        let ro_cb = Closure::wrap(Box::new(
+            move |_entries: js_sys::Array, _obs: ResizeObserver| {
+                let cw = canvas_for_ro.client_width()  as u32;
+                let ch = canvas_for_ro.client_height() as u32;
+                if cw > 0 && ch > 0 {
+                    // Guard: only mutate when size genuinely changed to
+                    // prevent ResizeObserver feedback-loop notifications.
+                    if canvas_for_ro.width()  != cw { canvas_for_ro.set_width(cw);  }
+                    if canvas_for_ro.height() != ch { canvas_for_ro.set_height(ch); }
+                }
+                // [SIZE-TRAP] — moved from RAF (per-frame) to here (per-resize-event).
+                // Now shows WHEN an actual resize event fires, not just every frame.
+                // REMOVE after ResizeObserver phase is verified.
+                web_sys::console::log_1(&format!(
+                    "[SIZE-TRAP] ResizeObserver fired: clientW={} clientH={} bufW={} bufH={}",
+                    cw, ch,
+                    canvas_for_ro.width(), canvas_for_ro.height()
+                ).into());
+            }
+        ) as Box<dyn FnMut(js_sys::Array, ResizeObserver)>);
+
+        let ro = ResizeObserver::new(ro_cb.as_ref().unchecked_ref()).unwrap();
+        // Observe the canvas element itself (not a parent container).
+        let canvas_as_el: &web_sys::Element = canvas_el.as_ref();
+        ro.observe(canvas_as_el);
+        // Store both — no .forget(). Rc owns the Closure; it lives until
+        // use_drop takes the bundle and drops it.
+        *ro_for_effect.borrow_mut() = Some((ro, ro_cb));
+
+        // Initial one-shot sync so the first RAF frame draws at correct size
+        // (ResizeObserver may fire asynchronously after the first paint).
+        {
+            let cw = canvas_el.client_width()  as u32;
+            let ch = canvas_el.client_height() as u32;
+            if cw > 0 && ch > 0 {
+                if canvas_el.width()  != cw { canvas_el.set_width(cw);  }
+                if canvas_el.height() != ch { canvas_el.set_height(ch); }
+            }
+        }
+
         // ── RAF closure storage: Rc<RefCell<Option<Closure>>> ─────────────────
         // The closure holds a clone of `f` so it can re-schedule itself each
         // frame.  No forget() — the Rc keeps it alive as long as the component
@@ -81,41 +144,14 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             Rc::new(RefCell::new(None));
         let g = f.clone();
 
-        // Clone the canvas element handle so the RAF closure can read its
-        // dimensions live every frame. This makes the canvas resilient to
-        // container resizes (e.g. intent-reveal-zone expanding/collapsing).
+        // The RAF closure no longer reads clientWidth/clientHeight —
+        // ResizeObserver keeps canvas.width/canvas.height up to date.
         let canvas_for_raf = canvas_el.clone();
 
         let props_clone = props_for_effect.clone();
         let f_clone = f.clone();
 
         *g.borrow_mut() = Some(wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-            // Sync draw buffer to CSS display size each frame.
-            // canvas.width/height (the draw buffer) must equal clientWidth/clientHeight
-            // (the CSS display size) or coordinates distort. We do this lazily — only
-            // when the size actually changes — to avoid thrashing the GPU texture.
-            let cw = canvas_for_raf.client_width()  as u32;
-            let ch = canvas_for_raf.client_height() as u32;
-            if cw > 0 && ch > 0 {
-                if canvas_for_raf.width()  != cw { canvas_for_raf.set_width(cw);  }
-                if canvas_for_raf.height() != ch { canvas_for_raf.set_height(ch); }
-            }
-
-            // [SIZE-TRAP] throttled — fires every ~60 frames (~1s at 60fps).
-            // Verifies the CSS height chain is non-zero after cockpit.css fix.
-            // REMOVE after verification.
-            {
-                use std::sync::atomic::{AtomicU32, Ordering};
-                static ST: AtomicU32 = AtomicU32::new(0);
-                let n = ST.fetch_add(1, Ordering::Relaxed);
-                if n % 60 == 0 {
-                    web_sys::console::log_1(&format!(
-                        "[SIZE-TRAP] frame={} clientW={} clientH={} bufW={} bufH={}",
-                        n, cw, ch,
-                        canvas_for_raf.width(), canvas_for_raf.height()
-                    ).into());
-                }
-            }
 
             // Read the now-correct draw-buffer dimensions for all coordinate math.
             let width  = canvas_for_raf.width()  as f64;
@@ -207,11 +243,18 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
     });
 
     use_drop(move || {
+        // Cancel pending RAF.
         let id_opt = raf_id.read().clone();
         if let Some(id) = id_opt {
             if let Some(window) = web_sys::window() {
                 window.cancel_animation_frame(id).ok();
             }
+        }
+        // Disconnect ResizeObserver and drop its Closure — both stored as
+        // a tuple; .take() empties the RefCell and drops the tuple.
+        if let Some((ro, _cb)) = ro_for_drop.borrow_mut().take() {
+            ro.disconnect();
+            // _cb drops here: Closure properly freed, no leak.
         }
     });
 
