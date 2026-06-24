@@ -557,6 +557,7 @@ mod tests {
                 aether_enriched: false,
                 aether_devices: vec![],
             },
+            spatial: None,
             schema_version: 1,
             aether_cert: None,
             aether_persona: None,

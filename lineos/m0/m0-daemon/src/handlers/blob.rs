@@ -79,6 +79,7 @@ mod tests {
                 aether_enriched: false,
                 aether_devices: vec![],
             },
+            spatial: crate::blob_store::StoredSpatial::default(),
             schema_version: 1,
             aether_cert: None,
             aether_persona: None,

@@ -242,6 +242,7 @@ mod tests {
             }),
             jini: None,
             dsp_chain: None,
+            spatial: None,
         }
     }
 
