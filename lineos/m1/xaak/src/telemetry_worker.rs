@@ -73,6 +73,7 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
             }) = active_stream.take() {
                 let ch = channels.max(1);
                 let chunk_size = 4096 * ch;
+                let hop_size = 2048 * ch;
 
                 let occupied = mastered_cons.occupied_len();
 
@@ -110,16 +111,24 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                     }
                 }
 
-                // Drain: full chunk_size normally, or just `occupied` for EOF tail.
-                let to_read = if do_eof_flush { occupied } else { chunk_size };
-                let mut read = 0;
-                while read < to_read {
-                    let n = mastered_cons.pop_slice(&mut buffer[read..to_read]);
-                    if n == 0 { break; }
-                    read += n;
-                }
-                if do_eof_flush {
-                    // Zero-pad remainder to chunk_size so FFT receives a full window.
+                if !do_eof_flush {
+                    // OLA steady-state: peek 4096 samples, then skip hop size.
+                    let (left, right) = mastered_cons.as_slices();
+                    let left_len = left.len().min(chunk_size);
+                    buffer[..left_len].copy_from_slice(&left[..left_len]);
+                    if left_len < chunk_size {
+                        let right_len = chunk_size - left_len;
+                        buffer[left_len..chunk_size].copy_from_slice(&right[..right_len]);
+                    }
+                    mastered_cons.skip(hop_size);
+                } else {
+                    // EOF flush tail: pop whatever is left (no overlap possible) and zero-pad.
+                    let mut read = 0;
+                    while read < occupied {
+                        let n = mastered_cons.pop_slice(&mut buffer[read..occupied]);
+                        if n == 0 { break; }
+                        read += n;
+                    }
                     for s in &mut buffer[read..chunk_size] { *s = 0.0; }
                     already_flushed = true;
                 }
@@ -145,12 +154,14 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                     }
 
                     if raw_occupied >= chunk_size {
-                        let mut raw_read = 0;
-                        while raw_read < chunk_size {
-                            let n = raw_c.pop_slice(&mut raw_buffer[raw_read..chunk_size]);
-                            if n == 0 { break; }
-                            raw_read += n;
+                        let (left, right) = raw_c.as_slices();
+                        let left_len = left.len().min(chunk_size);
+                        raw_buffer[..left_len].copy_from_slice(&left[..left_len]);
+                        if left_len < chunk_size {
+                            let right_len = chunk_size - left_len;
+                            raw_buffer[left_len..chunk_size].copy_from_slice(&right[..right_len]);
                         }
+                        raw_c.skip(hop_size);
                         spectrum_before = analyzer_before.compute(&raw_buffer[..chunk_size], ch);
                     } else if do_eof_flush_raw {
                         let mut raw_read = 0;
