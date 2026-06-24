@@ -128,15 +128,11 @@ fn full_pipeline_wav_to_wav() {
     let target = MasteringTarget::SpotifyV3;
     let base_config = target.engine_config(decoded.sample_rate);
 
-    let autotune_result = autotune(
-        &decoded.left,
-        &decoded.right,
-        base_config.clone(),
-        target,
-        decoded.sample_rate,
-    );
+    let target_lufs = target.target_lufs().unwrap_or(input_lufs);
+    let autotune_result = autotune(input_lufs, target_lufs);
+
     let mut tuned_config = base_config;
-    tuned_config.target_makeup_db = autotune_result.makeup_db;
+    tuned_config.target_makeup_db = autotune_result.pre_gain_db;
 
     let mut engine = Sp314MasteringEngine::new(tuned_config, decoded.sample_rate).unwrap();
     engine.process_offline(&mut decoded.left, &mut decoded.right);
@@ -166,7 +162,6 @@ fn full_pipeline_wav_to_wav() {
 
     assert!(out_peak <= sp314_dsp::limiter::DEFAULT_CEILING_LINEAR);
 
-    let target_lufs = target.target_lufs().unwrap();
     assert!((output_lufs - target_lufs).abs() < (input_lufs - target_lufs).abs());
 }
 
