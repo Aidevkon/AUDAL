@@ -144,15 +144,13 @@ fn run_dsp_internal(
         .truncate(true)
         .open(&file_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
-    file.set_len((n_total_with_tail * 2 * 4) as u64)
+    file.set_len((n_total * 2 * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut mmap =
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
     // Allocate in-memory arrays for DSP (sp314-dsp requires planar arrays)
     let mut left_vec = vec![0.0_f32; n_total_with_tail];
     let mut right_vec = vec![0.0_f32; n_total_with_tail];
-    let left_slice = &mut left_vec[..];
-    let right_slice = &mut right_vec[..];
 
     let repo_state = head_state.load_full();
     let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
@@ -168,10 +166,17 @@ fn run_dsp_internal(
         chunk.sample_rate,
         &chunk.left,
         &chunk.right,
-        left_slice,
-        right_slice,
+        &mut left_vec[..],
+        &mut right_vec[..],
     )?;
-    profiler.mark_stage("Stem Engine", left_slice);
+
+    // Latency compensation: left-shift by STFT_FLUSH_TAIL to discard silence, then truncate.
+    left_vec.copy_within(STFT_FLUSH_TAIL.., 0);
+    left_vec.truncate(n_total);
+    right_vec.copy_within(STFT_FLUSH_TAIL.., 0);
+    right_vec.truncate(n_total);
+
+    profiler.mark_stage("Stem Engine", &left_vec[..]);
 
     // Markov spatial modulation (simplified — full in Phase 8)
     emit_progress("Spatial");
@@ -188,8 +193,8 @@ fn run_dsp_internal(
     let dsp_out = crate::domain::nodes::dsp_node::run(
         &mut chunk.left,
         &mut chunk.right,
-        left_slice,
-        right_slice,
+        &mut left_vec[..],
+        &mut right_vec[..],
         chunk.sample_rate,
         preset_id,
         target_lufs,
@@ -210,18 +215,18 @@ fn run_dsp_internal(
     let aether_req = dsp_out.aether_req;
     let lufs = dsp_out.lufs;
     let tp = dsp_out.true_peak;
-    profiler.mark_stage("Mastering", left_slice);
+    profiler.mark_stage("Mastering", &left_vec[..]);
     let _dr = 10.0; // dynamic range proxy for v3
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
 
     // Interleave planar slices into mmap for playback (xaak/cpal expect interleaved)
     let mmap_f32: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total_with_tail * 2)
+        std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2)
     };
-    for i in 0..n_total_with_tail {
-        mmap_f32[i * 2] = left_slice[i];
-        mmap_f32[i * 2 + 1] = right_slice[i];
+    for i in 0..n_total {
+        mmap_f32[i * 2] = left_vec[i];
+        mmap_f32[i * 2 + 1] = right_vec[i];
     }
 
     // Sync mapped file to disk before returning path
@@ -240,8 +245,8 @@ fn run_dsp_internal(
         &persona_config,
         &aether_req,
         &dsp_config,
-        left_slice,
-        right_slice,
+        &left_vec[..],
+        &right_vec[..],
         file_path,
         &input_hash_hex,
         chunk.sample_rate,
