@@ -1,4 +1,3 @@
-
 //! P9-008 — Session State Unification.
 //! Authority: Phase 9, Still Air state-machine.md §4
 //!
@@ -58,18 +57,19 @@ fn resolve_narration(
 
     let content = match std::fs::read_to_string(&asset_path) {
         Ok(c) => c,
-        Err(_) => include_str!("../../../../../lineos/m0/m0-daemon/src/assets/jini_matrix.json").to_string(),
+        Err(_) => include_str!("../../../../../lineos/m0/m0-daemon/src/assets/jini_matrix.json")
+            .to_string(),
     };
-    
+
     let matrix: JiniMatrix = serde_json::from_str(&content).ok()?;
-    
+
     let variations = match zone {
         "zone_a" => matrix.zone_a.get(stage)?.get(persona)?,
         "zone_b" => matrix.zone_b.get(finding)?.get(flavour)?.get(persona)?,
         "zone_c" => matrix.zone_c.get(platform)?.get(persona)?,
         _ => return None,
     };
-    
+
     if variations.is_empty() {
         return None;
     }
@@ -263,7 +263,7 @@ pub async fn get_session_state(
         )
         .await;
     });
-    
+
     let narrative = None; // Unblock UI immediately so export buttons appear
 
     // Step 4: Compose compliance summary from pre-computed loudness flags
@@ -403,11 +403,16 @@ fn build_jini_suggestion(
         "Quiet"
     } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
         "Harsh"
-    } else if behaviour.spectral == SpectralBehaviour::Muddy || behaviour.spectral == SpectralBehaviour::Boxy || behaviour.spectral == SpectralBehaviour::Thin {
+    } else if behaviour.spectral == SpectralBehaviour::Muddy
+        || behaviour.spectral == SpectralBehaviour::Boxy
+        || behaviour.spectral == SpectralBehaviour::Thin
+    {
         "Muddy"
     } else if behaviour.spectral == SpectralBehaviour::Harsh {
         "Harsh"
-    } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
+    } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed
+        || behaviour.dynamics == DynamicsBehaviour::OverCompressed
+    {
         "Flat"
     } else {
         "Perfect"
@@ -435,17 +440,37 @@ fn build_jini_suggestion(
         correlation: quality.stereo_correlation,
     };
 
-    let narrative_opt = resolve_narration("zone_b", "", finding_key, flavour_str, platform_str, persona_str, &live);
-    
+    let narrative_opt = resolve_narration(
+        "zone_b",
+        "",
+        finding_key,
+        flavour_str,
+        platform_str,
+        persona_str,
+        &live,
+    );
+
     // Fallback if matrix resolving fails
     let (narrative, action, confidence) = if let Some(n) = narrative_opt {
         // Derive action using the existing if/else logic but without strings
         let act = if behaviour.quality == QualityBehaviour::Clipping {
-            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.2, reason: "Clipping detected".to_string() })
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: -0.2,
+                reason: "Clipping detected".to_string(),
+            })
         } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
-            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.15, reason: "Loudness exceeds target range".to_string() })
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: -0.15,
+                reason: "Loudness exceeds target range".to_string(),
+            })
         } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
-            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: 0.15, reason: "Loudness below target range".to_string() })
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Loudness,
+                delta: 0.15,
+                reason: "Loudness below target range".to_string(),
+            })
         } else if behaviour.spectral != SpectralBehaviour::Neutral {
             let (to, reason) = match behaviour.spectral {
                 SpectralBehaviour::Muddy => (FlavourId::Clean, "Muddy low-end"),
@@ -454,22 +479,52 @@ fn build_jini_suggestion(
                 SpectralBehaviour::Boxy => (FlavourId::Clean, "Boxy lower-mids"),
                 _ => (FlavourId::Clean, "Spectral imbalance"),
             };
-            Some(JiniAction::SuggestFlavourSwitch { to, reason: reason.to_string() })
-        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
-            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Dynamics, delta: -0.1, reason: "Over-compressed dynamic range".to_string() })
+            Some(JiniAction::SuggestFlavourSwitch {
+                to,
+                reason: reason.to_string(),
+            })
+        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed
+            || behaviour.dynamics == DynamicsBehaviour::OverCompressed
+        {
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Dynamics,
+                delta: -0.1,
+                reason: "Over-compressed dynamic range".to_string(),
+            })
         } else if behaviour.stereo == StereoBehaviour::Unstable {
-            Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Width, delta: -0.1, reason: "Low stereo correlation".to_string() })
+            Some(JiniAction::SuggestMacroChange {
+                handle: MacroHandle::Width,
+                delta: -0.1,
+                reason: "Low stereo correlation".to_string(),
+            })
         } else {
             Some(JiniAction::SuggestNothing)
         };
         (n, act, 0.95)
     } else {
         if behaviour.quality == QualityBehaviour::Clipping {
-            ("Clipping detected - consider reducing input gain before mastering.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.2, reason: "Clipping detected".to_string() }), 0.95)
+            (
+                "Clipping detected - consider reducing input gain before mastering.".to_string(),
+                Some(JiniAction::SuggestMacroChange {
+                    handle: MacroHandle::Loudness,
+                    delta: -0.2,
+                    reason: "Clipping detected".to_string(),
+                }),
+                0.95,
+            )
         } else if behaviour.loudness == LoudnessBehaviour::TooLoud {
             ("The mix is quite hot - you might want to bring the loudness down for better dynamics.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: -0.15, reason: "Loudness exceeds target range".to_string() }), 0.85)
         } else if behaviour.loudness == LoudnessBehaviour::TooQuiet {
-            ("The track is very quiet - a small loudness boost would help it compete.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Loudness, delta: 0.15, reason: "Loudness below target range".to_string() }), 0.80)
+            (
+                "The track is very quiet - a small loudness boost would help it compete."
+                    .to_string(),
+                Some(JiniAction::SuggestMacroChange {
+                    handle: MacroHandle::Loudness,
+                    delta: 0.15,
+                    reason: "Loudness below target range".to_string(),
+                }),
+                0.80,
+            )
         } else if behaviour.spectral != SpectralBehaviour::Neutral {
             let (to, reason) = match behaviour.spectral {
                 SpectralBehaviour::Muddy => (FlavourId::Clean, "Muddy low-end"),
@@ -478,13 +533,42 @@ fn build_jini_suggestion(
                 SpectralBehaviour::Boxy => (FlavourId::Clean, "Boxy lower-mids"),
                 _ => (FlavourId::Clean, "Spectral imbalance"),
             };
-            (format!("{} detected - switching to {:?} flavour.", reason, to), Some(JiniAction::SuggestFlavourSwitch { to, reason: reason.to_string() }), 0.75)
-        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed || behaviour.dynamics == DynamicsBehaviour::OverCompressed {
-            ("The track sounds over-compressed - let's restore some dynamics.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Dynamics, delta: -0.1, reason: "Over-compressed dynamic range".to_string() }), 0.70)
+            (
+                format!("{} detected - switching to {:?} flavour.", reason, to),
+                Some(JiniAction::SuggestFlavourSwitch {
+                    to,
+                    reason: reason.to_string(),
+                }),
+                0.75,
+            )
+        } else if behaviour.dynamics == DynamicsBehaviour::Overcompressed
+            || behaviour.dynamics == DynamicsBehaviour::OverCompressed
+        {
+            (
+                "The track sounds over-compressed - let's restore some dynamics.".to_string(),
+                Some(JiniAction::SuggestMacroChange {
+                    handle: MacroHandle::Dynamics,
+                    delta: -0.1,
+                    reason: "Over-compressed dynamic range".to_string(),
+                }),
+                0.70,
+            )
         } else if behaviour.stereo == StereoBehaviour::Unstable {
-            ("Stereo correlation is low - check for phase issues.".to_string(), Some(JiniAction::SuggestMacroChange { handle: MacroHandle::Width, delta: -0.1, reason: "Low stereo correlation".to_string() }), 0.65)
+            (
+                "Stereo correlation is low - check for phase issues.".to_string(),
+                Some(JiniAction::SuggestMacroChange {
+                    handle: MacroHandle::Width,
+                    delta: -0.1,
+                    reason: "Low stereo correlation".to_string(),
+                }),
+                0.65,
+            )
         } else {
-            ("Everything looks good - the mix is well-balanced.".to_string(), Some(JiniAction::SuggestNothing), 0.90)
+            (
+                "Everything looks good - the mix is well-balanced.".to_string(),
+                Some(JiniAction::SuggestNothing),
+                0.90,
+            )
         }
     };
 

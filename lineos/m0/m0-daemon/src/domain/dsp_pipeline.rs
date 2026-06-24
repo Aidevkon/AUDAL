@@ -1,8 +1,8 @@
 use crate::blob_store::StoredBlob;
 use crate::handlers::master::MasterRequest;
-use std::time::Instant;
-use std::sync::Arc;
 use arc_swap::ArcSwap;
+use std::sync::Arc;
+use std::time::Instant;
 use xaak::repo::DspState;
 // Per-stem SHA-256 fingerprints (Dev Protocol §13.3)
 // Computed on raw stems before mix — tamper-proof certificate
@@ -18,7 +18,15 @@ pub fn run_dsp(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>, lineos_types::AudioChunk), String> {
+) -> Result<
+    (
+        StoredBlob,
+        std::path::PathBuf,
+        Option<lineos_corpus::store::UserMarkovModel>,
+        lineos_types::AudioChunk,
+    ),
+    String,
+> {
     run_dsp_internal(req, start, head_state, progress_tx, progress_map, job_id)
 }
 
@@ -43,7 +51,15 @@ fn run_dsp_internal(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
-) -> Result<(StoredBlob, std::path::PathBuf, Option<lineos_corpus::store::UserMarkovModel>, lineos_types::AudioChunk), String> {
+) -> Result<
+    (
+        StoredBlob,
+        std::path::PathBuf,
+        Option<lineos_corpus::store::UserMarkovModel>,
+        lineos_types::AudioChunk,
+    ),
+    String,
+> {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
@@ -87,14 +103,20 @@ fn run_dsp_internal(
     // Pre-Analysis and Rhythm Detection
     use sp314_dsp::analysis::PreAnalyzer;
     let mut pre_analysis = PreAnalyzer::run(&chunk.left, &chunk.right, chunk.sample_rate);
-    let mono_samples: Vec<f32> = chunk.left
+    let mono_samples: Vec<f32> = chunk
+        .left
         .iter()
         .zip(chunk.right.iter())
         .map(|(l, r)| (*l + *r) * 0.5)
         .collect();
     let detector = crate::dsp::beat_detector::BeatDetector::new(chunk.sample_rate);
     let (bpm, beats_ms, downbeats_ms, transients_ms) = detector.analyze(&mono_samples);
-    tracing::info!("Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats", bpm, transients_ms.len(), downbeats_ms.len());
+    tracing::info!(
+        "Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats",
+        bpm,
+        transients_ms.len(),
+        downbeats_ms.len()
+    );
     pre_analysis.bpm = bpm;
     pre_analysis.beats_ms = beats_ms;
     pre_analysis.downbeats_ms = downbeats_ms;
@@ -153,7 +175,8 @@ fn run_dsp_internal(
     let mut right_vec = vec![0.0_f32; n_total_with_tail];
 
     let repo_state = head_state.load_full();
-    let final_ducking = (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
+    let final_ducking =
+        (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
 
     emit_progress("Stem Engine");
     let (fingerprints, spatial_metadata) = crate::domain::nodes::render_node::run(
@@ -221,9 +244,8 @@ fn run_dsp_internal(
     let elapsed = start.elapsed().as_millis() as u64;
 
     // Interleave planar slices into mmap for playback (xaak/cpal expect interleaved)
-    let mmap_f32: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2)
-    };
+    let mmap_f32: &mut [f32] =
+        unsafe { std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2) };
     for i in 0..n_total {
         mmap_f32[i * 2] = left_vec[i];
         mmap_f32[i * 2 + 1] = right_vec[i];
@@ -262,7 +284,12 @@ fn run_dsp_internal(
         processing_timeline,
     )?;
 
-    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model, chunk_original))
+    Ok((
+        cert_out.blob,
+        cert_out.file_path,
+        dsp_out.user_model,
+        chunk_original,
+    ))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

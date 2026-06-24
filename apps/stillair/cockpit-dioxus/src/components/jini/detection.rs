@@ -11,10 +11,14 @@ pub struct JiniDetectionProps {
 #[component]
 pub fn JiniDetection(props: JiniDetectionProps) -> Element {
     use_effect(move || {
-        web_sys::console::log_1(&wasm_bindgen::JsValue::from_str("[DET-TIMER] Detection timer started"));
+        web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(
+            "[DET-TIMER] Detection timer started",
+        ));
         spawn_local(async move {
             TimeoutFuture::new(1200).await;
-            web_sys::console::log_1(&wasm_bindgen::JsValue::from_str("[DET-TIMER] Detection timeout fired -> dispatching"));
+            web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(
+                "[DET-TIMER] Detection timeout fired -> dispatching",
+            ));
             props.on_timeout.call(());
         });
     });

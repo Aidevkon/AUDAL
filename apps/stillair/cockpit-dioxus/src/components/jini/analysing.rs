@@ -8,13 +8,13 @@ pub struct JiniAnalysingProps {
 #[component]
 pub fn JiniAnalysing(props: JiniAnalysingProps) -> Element {
     let text = match props.stage.as_str() {
-        "Ingest"      => "Decoding raw audio data.",
-        "Scout Pass"  => "Reading the color of your sound.",
+        "Ingest" => "Decoding raw audio data.",
+        "Scout Pass" => "Reading the color of your sound.",
         "Stem Engine" => "Isolating structural stems.",
-        "Spatial"     => "Mapping the stereo field.",
-        "Mastering"   => "Calibrating dynamics. Securing ceiling.",
-        "CERTIFIED"   => "Certified.",
-        _             => "Analysing.",
+        "Spatial" => "Mapping the stereo field.",
+        "Mastering" => "Calibrating dynamics. Securing ceiling.",
+        "CERTIFIED" => "Certified.",
+        _ => "Analysing.",
     };
 
     rsx! {

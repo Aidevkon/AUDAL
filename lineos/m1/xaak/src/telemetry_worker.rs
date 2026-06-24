@@ -8,11 +8,11 @@
 //! This thread MUST NOT be joined or awaited from the audio thread.
 
 use ringbuf::traits::*;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
 use ringbuf::wrap::caching::Caching;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub type TelemCons = Caching<Arc<ringbuf::SharedRb<ringbuf::storage::Heap<f32>>>, false, true>;
 
@@ -33,19 +33,19 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
         tracing::debug!("xaak: telemetry actor thread started");
 
         let sender = crate::telemetry::UdpTelemetrySender::new();
-        let mut analyzer_after  = crate::spectrum::SpectrumAnalyzer::new();
+        let mut analyzer_after = crate::spectrum::SpectrumAnalyzer::new();
         let mut analyzer_before = crate::spectrum::SpectrumAnalyzer::new();
 
         let mut active_stream: Option<TelemetryCommand> = None;
-        let mut already_flushed     = false;
+        let mut already_flushed = false;
         let mut already_flushed_raw = false;
-        
-        let mut buffer     = [0.0f32; 8192];
+
+        let mut buffer = [0.0f32; 8192];
         let mut raw_buffer = [0.0f32; 8192];
 
         loop {
             // Fast path check: instantly check if a new stream arrived without adding latency.
-            // Trade-off evaluation: If we used recv_timeout(2ms) here, we would inject a 
+            // Trade-off evaluation: If we used recv_timeout(2ms) here, we would inject a
             // constant +2ms latency to EVERY telemetry frame, even when the buffer is full.
             // By using try_recv() here, the fast path is 0ms. We only use recv_timeout(2ms)
             // when we actually need to wait for more audio data (in the 'not enough data' branch).
@@ -70,7 +70,8 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 channels,
                 position_ms,
                 stream_ended,
-            }) = active_stream.take() {
+            }) = active_stream.take()
+            {
                 let ch = channels.max(1);
                 let chunk_size = 4096 * ch;
                 let hop_size = 2048 * ch;
@@ -100,11 +101,18 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                             already_flushed_raw = false;
                             continue;
                         }
-                        Ok(TelemetryCommand::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
+                        Ok(TelemetryCommand::Shutdown) | Err(RecvTimeoutError::Disconnected) => {
+                            break
+                        }
                         Err(RecvTimeoutError::Timeout) => {
                             // Put stream back and continue to re-evaluate occupied
                             active_stream = Some(TelemetryCommand::StartStream {
-                                mastered_cons, raw_cons, sample_rate, channels, position_ms, stream_ended
+                                mastered_cons,
+                                raw_cons,
+                                sample_rate,
+                                channels,
+                                position_ms,
+                                stream_ended,
                             });
                             continue;
                         }
@@ -126,19 +134,25 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                     let mut read = 0;
                     while read < occupied {
                         let n = mastered_cons.pop_slice(&mut buffer[read..occupied]);
-                        if n == 0 { break; }
+                        if n == 0 {
+                            break;
+                        }
                         read += n;
                     }
-                    for s in &mut buffer[read..chunk_size] { *s = 0.0; }
+                    for s in &mut buffer[read..chunk_size] {
+                        *s = 0.0;
+                    }
                     already_flushed = true;
                 }
 
                 // Compute spectrum_before from raw (pre-mastering) PCM if available.
                 let mut spectrum_before = [-120.0f32; 64];
-                eprintln!("[RAW-TELEM] computing before? cons_some={} occupied={} chunk_size={}", 
-                          raw_cons.is_some(), 
-                          raw_cons.as_ref().map(|c| c.occupied_len()).unwrap_or(0), 
-                          chunk_size);
+                eprintln!(
+                    "[RAW-TELEM] computing before? cons_some={} occupied={} chunk_size={}",
+                    raw_cons.is_some(),
+                    raw_cons.as_ref().map(|c| c.occupied_len()).unwrap_or(0),
+                    chunk_size
+                );
                 if let Some(ref mut raw_c) = raw_cons {
                     let raw_occupied = raw_c.occupied_len();
 
@@ -167,10 +181,14 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                         let mut raw_read = 0;
                         while raw_read < raw_occupied {
                             let n = raw_c.pop_slice(&mut raw_buffer[raw_read..raw_occupied]);
-                            if n == 0 { break; }
+                            if n == 0 {
+                                break;
+                            }
                             raw_read += n;
                         }
-                        for s in &mut raw_buffer[raw_read..chunk_size] { *s = 0.0; }
+                        for s in &mut raw_buffer[raw_read..chunk_size] {
+                            *s = 0.0;
+                        }
                         spectrum_before = analyzer_before.compute(&raw_buffer[..chunk_size], ch);
                         already_flushed_raw = true;
                     }
@@ -184,7 +202,11 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 // Temporary [BIN-DUMP] trap
                 if pos_val % 2000 < 50 {
                     let fmt = |v: &[f32]| -> String {
-                        v.iter().take(10).map(|x| format!("{:.1}", x)).collect::<Vec<_>>().join(",")
+                        v.iter()
+                            .take(10)
+                            .map(|x| format!("{:.1}", x))
+                            .collect::<Vec<_>>()
+                            .join(",")
                     };
                     eprintln!("[BIN-DUMP] before[0..10]=[{}]", fmt(&spectrum_before));
                 }
@@ -207,9 +229,13 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
 
                 // Put stream back for next iteration
                 active_stream = Some(TelemetryCommand::StartStream {
-                    mastered_cons, raw_cons, sample_rate, channels, position_ms, stream_ended
+                    mastered_cons,
+                    raw_cons,
+                    sample_rate,
+                    channels,
+                    position_ms,
+                    stream_ended,
                 });
-
             } else {
                 // IDLE STATE
                 eprintln!("[ACTOR-IDLE] waiting for command");

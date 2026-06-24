@@ -2,8 +2,8 @@
 //! Validates BPM thresholds (<100, <=130, >130) for ducking gain.
 //! Authority: maestro-controller-spec-v1_0.md
 
-use m0d::dsp::maestro::AutoTuningController;
 use lineos_types::pre_analysis::PreAnalysisData;
+use m0d::dsp::maestro::AutoTuningController;
 
 #[test]
 fn maestro_calibration_bpm_thresholds() {

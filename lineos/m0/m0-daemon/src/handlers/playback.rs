@@ -1,10 +1,8 @@
+use crate::app_state::AppState;
 use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::app_state::AppState;
 use xaak::playback::ScrubState;
-
-
 
 #[derive(Deserialize)]
 pub struct PlaybackControlRequest {
@@ -21,23 +19,26 @@ pub struct ControlResp {
 
 pub async fn post_control(
     State(app): State<AppState>,
-    Json(req):  Json<PlaybackControlRequest>,
+    Json(req): Json<PlaybackControlRequest>,
 ) -> Json<ControlResp> {
     // 1. Send command to xaak engine
     match req.action.as_str() {
         "play" => {
             app.playback.play();
             if let Some(pos) = req.position_ms {
-                app.playback_state.store(Arc::new(ScrubState::playing_at(pos)));
+                app.playback_state
+                    .store(Arc::new(ScrubState::playing_at(pos)));
             } else {
                 let current = app.playback_state.load_full().position_ms;
-                app.playback_state.store(Arc::new(ScrubState::playing_at(current)));
+                app.playback_state
+                    .store(Arc::new(ScrubState::playing_at(current)));
             }
         }
         "pause" => {
             app.playback.pause();
             let current = app.playback_state.load_full().position_ms;
-            app.playback_state.store(Arc::new(ScrubState::paused_at(current)));
+            app.playback_state
+                .store(Arc::new(ScrubState::paused_at(current)));
         }
         "stop" => {
             app.playback.stop();
@@ -48,9 +49,11 @@ pub async fn post_control(
                 app.playback.seek(pos);
                 let current_state = app.playback_state.load_full();
                 if current_state.playing {
-                    app.playback_state.store(Arc::new(ScrubState::playing_at(pos)));
+                    app.playback_state
+                        .store(Arc::new(ScrubState::playing_at(pos)));
                 } else {
-                    app.playback_state.store(Arc::new(ScrubState::paused_at(pos)));
+                    app.playback_state
+                        .store(Arc::new(ScrubState::paused_at(pos)));
                 }
             }
         }

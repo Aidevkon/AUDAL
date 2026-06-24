@@ -173,8 +173,14 @@ fn strip_meta(mut v: Value) -> Value {
         if !obj.contains_key("bpm") {
             obj.insert("bpm".to_string(), serde_json::json!(0.0));
             obj.insert("beats_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
-            obj.insert("downbeats_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
-            obj.insert("transients_ms".to_string(), serde_json::json!(Vec::<u32>::new()));
+            obj.insert(
+                "downbeats_ms".to_string(),
+                serde_json::json!(Vec::<u32>::new()),
+            );
+            obj.insert(
+                "transients_ms".to_string(),
+                serde_json::json!(Vec::<u32>::new()),
+            );
         }
     }
     v

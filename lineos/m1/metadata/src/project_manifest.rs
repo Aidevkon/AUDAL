@@ -25,7 +25,11 @@ pub struct ProjectManifest {
 }
 
 impl ProjectManifest {
-    pub fn generate(blob: &GoldenBlob, measurement: &Ebu128Measurement, pre_analysis: &lineos_types::PreAnalysisData) -> Self {
+    pub fn generate(
+        blob: &GoldenBlob,
+        measurement: &Ebu128Measurement,
+        pre_analysis: &lineos_types::PreAnalysisData,
+    ) -> Self {
         Self {
             version: "1.0".to_string(),
             input_hash: blob.sha256.clone(),
@@ -101,7 +105,8 @@ mod tests {
     fn test_manifest_json() {
         let blob = fake_blob();
         let m = test_measurement();
-        let manifest = ProjectManifest::generate(&blob, &m, &lineos_types::PreAnalysisData::silent());
+        let manifest =
+            ProjectManifest::generate(&blob, &m, &lineos_types::PreAnalysisData::silent());
         let json = manifest.to_json().unwrap();
         assert!(json.contains("input_hash"));
         assert!(json.contains("seed"));

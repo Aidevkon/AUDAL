@@ -6,7 +6,7 @@
 //! Never calls DPS code. Never re-measures audio.
 
 use lineos_metadata::bmr128::Bmr128Report;
-use lineos_types::{Ebu128Measurement, PreAnalysisData, LoudnessTarget};
+use lineos_types::{Ebu128Measurement, LoudnessTarget, PreAnalysisData};
 use serde::{Deserialize, Serialize};
 
 /// Evaluation result for a single platform preset.
@@ -31,7 +31,10 @@ pub struct InsightsReport {
 /// Evaluate compliance across all presets from bmr-128.schema.json.
 ///
 /// All threshold values come from `schema.presets` — never hardcoded.
-pub fn evaluate_all(measurement: &Ebu128Measurement, pre_analysis: &PreAnalysisData) -> InsightsReport {
+pub fn evaluate_all(
+    measurement: &Ebu128Measurement,
+    pre_analysis: &PreAnalysisData,
+) -> InsightsReport {
     let mut results: Vec<PresetResult> = Vec::new();
 
     let presets = vec![
@@ -61,14 +64,16 @@ pub fn evaluate_all(measurement: &Ebu128Measurement, pre_analysis: &PreAnalysisD
     // (most negative target_lufs that still passes).
     // Presets with no target_lufs (raw) use +INFINITY as a sort sentinel
     // so they are always "least strict" and only recommended if nothing else passes.
-    let recommended = results.iter()
+    let recommended = results
+        .iter()
         .filter(|r| r.passes)
         .min_by(|a, b| {
             // Treat None (raw) as +INF → sorts last (least strict recommendation)
             let a_lufs = a.report.target_lufs.unwrap_or(f32::INFINITY);
             let b_lufs = b.report.target_lufs.unwrap_or(f32::INFINITY);
-            a_lufs.partial_cmp(&b_lufs)
-                  .unwrap_or(core::cmp::Ordering::Equal)
+            a_lufs
+                .partial_cmp(&b_lufs)
+                .unwrap_or(core::cmp::Ordering::Equal)
         })
         .map(|r| r.preset.clone());
 
@@ -82,7 +87,11 @@ pub fn evaluate_all(measurement: &Ebu128Measurement, pre_analysis: &PreAnalysisD
 }
 
 /// Generate actionable hints for the rule engine (Phase 4 input).
-fn generate_hints(m: &Ebu128Measurement, pre_analysis: &PreAnalysisData, results: &[PresetResult]) -> Vec<String> {
+fn generate_hints(
+    m: &Ebu128Measurement,
+    pre_analysis: &PreAnalysisData,
+    results: &[PresetResult],
+) -> Vec<String> {
     let mut hints: Vec<String> = Vec::new();
     let passing = results.iter().filter(|r| r.passes).count();
 
@@ -137,11 +146,15 @@ mod tests {
         let m = test_measurement();
         let pre = PreAnalysisData::silent();
         let report = evaluate_all(&m, &pre);
-        
+
         // At -14.0 LUFS, Spotify & YouTube (-14.0) should pass.
         // Broadcast (-23.0) and Podcast (-16.0) will fail (too loud).
         assert!(!report.preset_results.is_empty());
-        let spotify_res = report.preset_results.iter().find(|r| r.preset == "Spotify").unwrap();
+        let spotify_res = report
+            .preset_results
+            .iter()
+            .find(|r| r.preset == "Spotify")
+            .unwrap();
         assert!(spotify_res.passes);
     }
 

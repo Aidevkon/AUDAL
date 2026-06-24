@@ -9,18 +9,18 @@ use lineos_types::pre_analysis::PreAnalysisData;
 use lineos_types::StemFeatures;
 
 pub struct CorpusOutput {
-    pub envelope:   CorpusEnvelope,
+    pub envelope: CorpusEnvelope,
     pub user_model: UserMarkovModel,
 }
 
 pub fn run(
     streaming_features: &StemFeatures,
-    left_slice:         &[f32],
-    pre_analysis:       &PreAnalysisData,
-    blob_id:            &str,
-    sample_rate:        u32,
-    flavour_id:         &str,
-    mut user_model:     UserMarkovModel,
+    left_slice: &[f32],
+    pre_analysis: &PreAnalysisData,
+    blob_id: &str,
+    sample_rate: u32,
+    flavour_id: &str,
+    mut user_model: UserMarkovModel,
 ) -> CorpusOutput {
     use lineos_corpus::builder::build_timeline;
 
@@ -41,7 +41,7 @@ pub fn run(
     user_model.update(flavour_id, &corpus_envelope);
 
     CorpusOutput {
-        envelope:   corpus_envelope,
+        envelope: corpus_envelope,
         user_model,
     }
 }

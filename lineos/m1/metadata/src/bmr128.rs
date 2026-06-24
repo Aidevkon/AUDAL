@@ -82,8 +82,6 @@ impl Bmr128Report {
             ));
         }
 
-
-
         Bmr128Report {
             version: "1.0".to_string(),
             preset: preset.to_string(),
@@ -146,7 +144,13 @@ mod tests {
     fn test_bmr128_fails_lufs_out_of_tolerance() {
         let mut m = test_measurement();
         m.integrated_lufs = -12.0; // delta = +2.0 → exceeds ±0.5
-        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(
+            &m,
+            &lineos_types::PreAnalysisData::silent(),
+            "spotify",
+            Some(-14.0),
+            -1.0,
+        );
         assert!(!report.compliance.passes);
         assert!(!report.compliance.violations.is_empty());
     }
@@ -155,7 +159,13 @@ mod tests {
     fn test_bmr128_fails_true_peak_exceeded() {
         let mut m = test_measurement();
         m.true_peak_dbfs = -0.5; // exceeds -1.0 ceiling
-        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(
+            &m,
+            &lineos_types::PreAnalysisData::silent(),
+            "spotify",
+            Some(-14.0),
+            -1.0,
+        );
         assert!(!report.compliance.passes);
         assert!(report.compliance.peak_headroom < 0.0);
     }
@@ -163,7 +173,13 @@ mod tests {
     #[test]
     fn test_bmr128_raw_preset_no_lufs_check() {
         let m = test_measurement();
-        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "raw", None, -0.1);
+        let report = Bmr128Report::generate(
+            &m,
+            &lineos_types::PreAnalysisData::silent(),
+            "raw",
+            None,
+            -0.1,
+        );
         // Raw preset has no LUFS target → no LUFS violation possible
         assert!(report.compliance.lufs_delta.is_none());
     }
@@ -171,7 +187,13 @@ mod tests {
     #[test]
     fn test_bmr128_serializes_to_json() {
         let m = test_measurement();
-        let report = Bmr128Report::generate(&m, &lineos_types::PreAnalysisData::silent(), "spotify", Some(-14.0), -1.0);
+        let report = Bmr128Report::generate(
+            &m,
+            &lineos_types::PreAnalysisData::silent(),
+            "spotify",
+            Some(-14.0),
+            -1.0,
+        );
         let json = report.to_json().unwrap();
         assert!(json.contains("spotify"));
         assert!(json.contains("compliance"));

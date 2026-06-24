@@ -9,40 +9,22 @@
 //! No forget(). use_drop cancels the RAF id on component teardown.
 //! DO NOT change the RAF setup without careful memory-safety review.
 
-use std::rc::Rc;
+use crate::types::{RealtimeFrameJson, SessionStateJson};
+use dioxus::prelude::*;
+#[allow(dead_code)]
+type AnimationFrameClosure = Option<wasm_bindgen::closure::Closure<dyn FnMut()>>;
+
+use libm;
 use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlCanvasElement, CanvasRenderingContext2d, ResizeObserver};
-use dioxus::prelude::*;
-use crate::types::{RealtimeFrameJson, SessionStateJson};
-use libm;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ResizeObserver};
 
 const FALLBACK_PULSE_MS: f64 = 500.0;
-const GRID_COLS: u32         = 8;
-const GRID_ROWS: u32         = 5;
-const MAX_JITTER_PX: f64     = 2.0;  // reduced — iso lines are already dynamic enough
-const PI: f64                = core::f64::consts::PI;
-
-// ── Isometric projection constants ───────────────────────────────────────────
-// One shared projection for grid, Ghost, and Core.
-// iso_project(x, y, z) maps:
-//   x → frequency axis  (goes lower-right as x increases)
-//   y → amplitude axis  (goes straight up as y increases)
-//   z → depth axis      (goes upper-left as z increases = Ghost sits behind Core)
-//
-// Tuning:
-//   ISO_ANGLE    — angle of x/z axes from horizontal (30° = classic iso)
-//   Z_DEPTH_SCALE — pixels of separation per z unit; set high enough that
-//                   Ghost (z=1) is clearly above/behind Core (z=0).
-//   X_FREQ_SCALE  — fraction of canvas width used for the frequency axis;
-//                   keeps the projected floor inside the canvas at ISO_ANGLE=30°.
-const ISO_ANGLE:     f64 = PI / 6.0;   // 30°
-const Z_DEPTH_SCALE: f64 = 80.0;       // px depth per z unit
-const X_FREQ_SCALE:  f64 = 0.55;       // frequency axis uses 55% of canvas width
-const GHOST_Z:       f64 = 1.0;        // Ghost = back plane
-const CORE_Z:        f64 = 0.0;        // Core  = front plane
+const PI: f64 = core::f64::consts::PI;
+// Projection constants have been removed to pass strict clippy checks.
 
 #[derive(Props, Clone, PartialEq)]
 pub struct NeonCanvasProps {
@@ -63,11 +45,13 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
     // Persistent ResizeObserver + its Closure — stored as a tuple so both
     // live and die together. No .forget() needed: the Rc owns the Closure,
     // and use_drop calls .disconnect() then drops the tuple (Closure included).
-    type RoBundle = (ResizeObserver, Closure<dyn FnMut(js_sys::Array, ResizeObserver)>);
-    let ro_store: Rc<RefCell<Option<RoBundle>>> =
-        use_hook(|| Rc::new(RefCell::new(None)));
+    type RoBundle = (
+        ResizeObserver,
+        Closure<dyn FnMut(js_sys::Array, ResizeObserver)>,
+    );
+    let ro_store: Rc<RefCell<Option<RoBundle>>> = use_hook(|| Rc::new(RefCell::new(None)));
     let ro_for_effect = ro_store.clone();
-    let ro_for_drop   = ro_store.clone();
+    let ro_for_drop = ro_store.clone();
 
     let props_for_effect = props.clone();
     use_effect(move || {
@@ -97,30 +81,40 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
         }
 
         let canvas_for_ro = canvas_el.clone();
-        let ro_cb = Closure::wrap(Box::new(
-            move |_entries: js_sys::Array, _obs: ResizeObserver| {
-                let cw = canvas_for_ro.client_width()  as u32;
+        let ro_cb = Closure::wrap(
+            Box::new(move |_entries: js_sys::Array, _obs: ResizeObserver| {
+                let cw = canvas_for_ro.client_width() as u32;
                 let ch = canvas_for_ro.client_height() as u32;
                 if cw > 0 && ch > 0 {
                     // Guard: only mutate when size genuinely changed to
                     // prevent ResizeObserver feedback-loop notifications.
-                    if canvas_for_ro.width()  != cw { canvas_for_ro.set_width(cw);  }
-                    if canvas_for_ro.height() != ch { canvas_for_ro.set_height(ch); }
+                    if canvas_for_ro.width() != cw {
+                        canvas_for_ro.set_width(cw);
+                    }
+                    if canvas_for_ro.height() != ch {
+                        canvas_for_ro.set_height(ch);
+                    }
                 }
                 // [SIZE-TRAP] — moved from RAF (per-frame) to here (per-resize-event).
                 // Now shows WHEN an actual resize event fires, not just every frame.
                 // REMOVE after ResizeObserver phase is verified.
                 let msg = format!(
                     "[SIZE-TRAP] ResizeObserver fired: clientW={} clientH={} bufW={} bufH={}",
-                    cw, ch,
-                    canvas_for_ro.width(), canvas_for_ro.height()
+                    cw,
+                    ch,
+                    canvas_for_ro.width(),
+                    canvas_for_ro.height()
                 );
                 web_sys::console::log_1(&msg.clone().into());
                 spawn_local(async move {
-                    let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg })).await;
+                    let _ = crate::ipc::invoke::<(), _>(
+                        "frontend_log",
+                        serde_json::json!({ "msg": msg }),
+                    )
+                    .await;
                 });
-            }
-        ) as Box<dyn FnMut(js_sys::Array, ResizeObserver)>);
+            }) as Box<dyn FnMut(js_sys::Array, ResizeObserver)>,
+        );
 
         let ro = ResizeObserver::new(ro_cb.as_ref().unchecked_ref()).unwrap();
         // Observe the canvas element itself (not a parent container).
@@ -133,11 +127,15 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
         // Initial one-shot sync so the first RAF frame draws at correct size
         // (ResizeObserver may fire asynchronously after the first paint).
         {
-            let cw = canvas_el.client_width()  as u32;
+            let cw = canvas_el.client_width() as u32;
             let ch = canvas_el.client_height() as u32;
             if cw > 0 && ch > 0 {
-                if canvas_el.width()  != cw { canvas_el.set_width(cw);  }
-                if canvas_el.height() != ch { canvas_el.set_height(ch); }
+                if canvas_el.width() != cw {
+                    canvas_el.set_width(cw);
+                }
+                if canvas_el.height() != ch {
+                    canvas_el.set_height(ch);
+                }
             }
         }
 
@@ -145,6 +143,7 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
         // The closure holds a clone of `f` so it can re-schedule itself each
         // frame.  No forget() — the Rc keeps it alive as long as the component
         // lives, and use_drop below cancels the pending RAF on teardown.
+        #[allow(clippy::type_complexity)]
         let f: Rc<RefCell<Option<wasm_bindgen::closure::Closure<dyn FnMut()>>>> =
             Rc::new(RefCell::new(None));
         let g = f.clone();
@@ -157,9 +156,8 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
         let f_clone = f.clone();
 
         *g.borrow_mut() = Some(wasm_bindgen::closure::Closure::wrap(Box::new(move || {
-
             // Read the now-correct draw-buffer dimensions for all coordinate math.
-            let width  = canvas_for_raf.width()  as f64;
+            let width = canvas_for_raf.width() as f64;
             let height = canvas_for_raf.height() as f64;
             ctx.clear_rect(0.0, 0.0, width, height);
 
@@ -167,11 +165,11 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
 
             // ── Read both spectra from the telemetry signal ────────────────
             let mut spectrum_before: Vec<f32> = vec![];
-            let mut spectrum_after:  Vec<f32> = vec![];
+            let mut spectrum_after: Vec<f32> = vec![];
             if let Some(telemetry_signal) = &props_clone.telemetry {
                 if let Some(frame) = telemetry_signal.read().clone() {
                     spectrum_before = frame.spectrum_before;
-                    spectrum_after  = frame.spectrum_after;
+                    spectrum_after = frame.spectrum_after;
                 }
             }
 
@@ -183,10 +181,13 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 use std::sync::atomic::{AtomicBool, Ordering};
                 static CN: AtomicBool = AtomicBool::new(false);
                 if !CN.swap(true, Ordering::Relaxed) {
-                    web_sys::console::log_1(&format!(
-                        "[CANVAS-NEW] instance active — is_delta_mode={} buf={}x{}",
-                        props_clone.is_delta_mode, width as u32, height as u32
-                    ).into());
+                    web_sys::console::log_1(
+                        &format!(
+                            "[CANVAS-NEW] instance active — is_delta_mode={} buf={}x{}",
+                            props_clone.is_delta_mode, width as u32, height as u32
+                        )
+                        .into(),
+                    );
                 }
             }
 
@@ -195,7 +196,7 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 use std::sync::atomic::{AtomicU32, Ordering};
                 static FC: AtomicU32 = AtomicU32::new(0);
                 let n = FC.fetch_add(1, Ordering::Relaxed);
-                if n % 60 == 0 {
+                if n.is_multiple_of(60) {
                     let b20 = spectrum_before.get(20).copied().unwrap_or(f32::NAN);
                     let a20 = spectrum_after.get(20).copied().unwrap_or(f32::NAN);
                     let msg = format!(
@@ -206,12 +207,17 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                     );
                     web_sys::console::log_1(&msg.clone().into());
                     spawn_local(async move {
-                        let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg })).await;
+                        let _ = crate::ipc::invoke::<(), _>(
+                            "frontend_log",
+                            serde_json::json!({ "msg": msg }),
+                        )
+                        .await;
                     });
 
                     // [BIN-DUMP] raw bins 0..10 — same block, guaranteed to fire.
                     let fmt = |v: &[f32]| -> String {
-                        v.iter().take(10)
+                        v.iter()
+                            .take(10)
                             .map(|&x| format!("{:.1}", x))
                             .collect::<Vec<_>>()
                             .join(",")
@@ -223,7 +229,11 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                     );
                     web_sys::console::log_1(&msg2.clone().into());
                     spawn_local(async move {
-                        let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg2 })).await;
+                        let _ = crate::ipc::invoke::<(), _>(
+                            "frontend_log",
+                            serde_json::json!({ "msg": msg2 }),
+                        )
+                        .await;
                     });
                 }
             }
@@ -235,29 +245,44 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
             } else {
                 // Legacy single-line fallback (non-delta callers).
                 render_core(&ctx, width, height, &spectrum_after, &spectrum_after);
-                render_lasers(&ctx, width, height, time_ms, props_clone.bpm, &spectrum_after);
+                render_lasers(
+                    &ctx,
+                    width,
+                    height,
+                    time_ms,
+                    props_clone.bpm,
+                    &spectrum_after,
+                );
             }
 
             // Re-schedule next frame (same Rc — no new allocation).
             let window = web_sys::window().unwrap();
             let cb = f_clone.borrow();
             let closure_ref: &wasm_bindgen::closure::Closure<dyn FnMut()> = cb.as_ref().unwrap();
-            let js_val: &JsValue = <wasm_bindgen::closure::Closure<dyn FnMut()> as AsRef<JsValue>>::as_ref(closure_ref);
-            let id = window.request_animation_frame(js_val.unchecked_ref()).unwrap();
+            let js_val: &JsValue = <wasm_bindgen::closure::Closure<dyn FnMut()> as AsRef<
+                JsValue,
+            >>::as_ref(closure_ref);
+            let id = window
+                .request_animation_frame(js_val.unchecked_ref())
+                .unwrap();
             raf_id.set(Some(id));
-        }) as Box<dyn FnMut()>));
+        })
+            as Box<dyn FnMut()>));
 
         // Fire the first frame.
         let cb = g.borrow();
         let closure_ref: &wasm_bindgen::closure::Closure<dyn FnMut()> = cb.as_ref().unwrap();
-        let js_val: &JsValue = <wasm_bindgen::closure::Closure<dyn FnMut()> as AsRef<JsValue>>::as_ref(closure_ref);
-        let id = window.request_animation_frame(js_val.unchecked_ref()).unwrap();
+        let js_val: &JsValue =
+            <wasm_bindgen::closure::Closure<dyn FnMut()> as AsRef<JsValue>>::as_ref(closure_ref);
+        let id = window
+            .request_animation_frame(js_val.unchecked_ref())
+            .unwrap();
         raf_id.set(Some(id));
     });
 
     use_drop(move || {
         // Cancel pending RAF.
-        let id_opt = raf_id.read().clone();
+        let id_opt = *raf_id.read();
         if let Some(id) = id_opt {
             if let Some(window) = web_sys::window() {
                 window.cancel_animation_frame(id).ok();
@@ -315,24 +340,24 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
 #[inline]
 fn perspective_project(x: f64, y: f64, z: f64, w: f64, h: f64) -> (f64, f64) {
     let center_x = w * 0.5;
-    let horizon_y = h * 0.25; 
-    
+    let horizon_y = h * 0.25;
+
     // Base width at front plane (z=0)
-    let plot_w = w * 0.85; 
+    let plot_w = w * 0.85;
     let base_x = center_x + (x - 0.5) * plot_w;
-    
+
     // Y axis (amplitude) mapped to floor
     let floor_y = h * 0.85;
     let amp_h = h * 0.45;
     let base_y = floor_y - y * amp_h;
-    
+
     // Perspective scaling (z=1 is back plane)
-    let depth_strength = 1.5; 
+    let depth_strength = 1.5;
     let scale = 1.0 / (1.0 + z * depth_strength);
-    
+
     let sx = center_x + (base_x - center_x) * scale;
     let sy = horizon_y + (base_y - horizon_y) * scale;
-    
+
     (sx, sy)
 }
 
@@ -394,7 +419,7 @@ fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, _time_ms
     ctx.set_fill_style_str("#00d1ff");
     ctx.set_font("10px 'Inter', monospace");
     ctx.set_text_align("center");
-    
+
     let bands = [
         (0.1, "Low"),
         (0.3, "Low-Mid"),
@@ -402,7 +427,7 @@ fn render_grid(ctx: &CanvasRenderingContext2d, width: f64, height: f64, _time_ms
         (0.7, "High-Mid"),
         (0.9, "High"),
     ];
-    
+
     ctx.begin_path();
     for &(x, label) in &bands {
         let (fx, fy) = perspective_project(x, 0.0, 0.0, width, height);
@@ -445,7 +470,11 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
         let x = i as f64 / n;
         let y = (db.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
         let (sx, sy) = perspective_project(x, y, 1.0, width, height);
-        if i == 0 { ctx.move_to(sx, sy); } else { ctx.line_to(sx, sy); }
+        if i == 0 {
+            ctx.move_to(sx, sy);
+        } else {
+            ctx.line_to(sx, sy);
+        }
     }
 
     ctx.stroke();
@@ -455,21 +484,29 @@ fn render_ghost(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectru
 // ── Core line (spectrum_after — post-mastering / mastered PCM) ───────────────
 // Drawn at z=0.0 (front plane). Uses oblique_project — same space as Ghost/grid.
 
-fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum_before: &[f32], spectrum_after: &[f32]) {
-    if spectrum_after.is_empty() { return; }
+fn render_core(
+    ctx: &CanvasRenderingContext2d,
+    width: f64,
+    height: f64,
+    spectrum_before: &[f32],
+    spectrum_after: &[f32],
+) {
+    if spectrum_after.is_empty() {
+        return;
+    }
 
     let n = spectrum_after.len() as f64;
-    
+
     // Pre-calculate all projected points and deltas
     let mut points = Vec::with_capacity(spectrum_after.len());
     let mut deltas = Vec::with_capacity(spectrum_after.len());
-    
+
     for (i, &db_after) in spectrum_after.iter().enumerate() {
         let x = i as f64 / n;
         let y = (db_after.clamp(-60.0, 0.0) + 60.0) as f64 / 60.0;
         let (sx, sy) = perspective_project(x, y, 0.0, width, height);
         points.push((sx, sy));
-        
+
         let db_before = spectrum_before.get(i).copied().unwrap_or(db_after);
         deltas.push(db_after - db_before);
     }
@@ -483,7 +520,7 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
     ctx.begin_path();
     for i in 1..points.len() {
         if deltas[i] > 1.0 {
-            ctx.move_to(points[i-1].0, points[i-1].1);
+            ctx.move_to(points[i - 1].0, points[i - 1].1);
             ctx.line_to(points[i].0, points[i].1);
         }
     }
@@ -496,7 +533,7 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
     ctx.begin_path();
     for i in 1..points.len() {
         if deltas[i] < -1.0 {
-            ctx.move_to(points[i-1].0, points[i-1].1);
+            ctx.move_to(points[i - 1].0, points[i - 1].1);
             ctx.line_to(points[i].0, points[i].1);
         }
     }
@@ -509,8 +546,8 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
     ctx.begin_path();
     for i in 1..points.len() {
         let d = deltas[i];
-        if d >= -1.0 && d <= 1.0 {
-            ctx.move_to(points[i-1].0, points[i-1].1);
+        if (-1.0..=1.0).contains(&d) {
+            ctx.move_to(points[i - 1].0, points[i - 1].1);
             ctx.line_to(points[i].0, points[i].1);
         }
     }
@@ -523,11 +560,24 @@ fn render_core(ctx: &CanvasRenderingContext2d, width: f64, height: f64, spectrum
 
 // ── Laser overlay (legacy single-line mode only) ──────────────────────────────
 
-fn render_lasers(ctx: &CanvasRenderingContext2d, width: f64, height: f64, time_ms: f64, bpm: f32, spectrum: &[f32]) {
-    if spectrum.is_empty() { return; }
-    let pulse_ms = if bpm > 0.0 { 60000.0 / bpm as f64 } else { FALLBACK_PULSE_MS };
-    let phase    = (time_ms % pulse_ms) / pulse_ms;
-    let opacity  = 0.4 + 0.6 * libm::sin(phase * PI * 2.0).abs();
+fn render_lasers(
+    ctx: &CanvasRenderingContext2d,
+    width: f64,
+    height: f64,
+    time_ms: f64,
+    bpm: f32,
+    spectrum: &[f32],
+) {
+    if spectrum.is_empty() {
+        return;
+    }
+    let pulse_ms = if bpm > 0.0 {
+        60000.0 / bpm as f64
+    } else {
+        FALLBACK_PULSE_MS
+    };
+    let phase = (time_ms % pulse_ms) / pulse_ms;
+    let opacity = 0.4 + 0.6 * libm::sin(phase * PI * 2.0).abs();
     ctx.set_global_alpha(opacity);
     ctx.set_stroke_style_str("#c8a832");
     ctx.set_line_width(1.0);

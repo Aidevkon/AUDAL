@@ -109,11 +109,9 @@ impl BeatDetector {
         for bucket in 1..histogram.len() {
             let count = histogram[bucket];
             let bpm = 60000.0 / (bucket * 10) as f32;
-            if bpm >= 60.0 && bpm <= 200.0 {
-                if count > best_count {
-                    best_count = count;
-                    best_bucket = bucket;
-                }
+            if (60.0..=200.0).contains(&bpm) && count > best_count {
+                best_count = count;
+                best_bucket = bucket;
             }
         }
 

@@ -8,9 +8,9 @@
 //! spawn_blocking and returns DspOutput to Conductor.
 
 use super::operator::{DspOutput, ExecutorError, Intent};
-use tokio::sync::mpsc;
-use std::sync::Arc;
 use arc_swap::ArcSwap;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 use xaak::repo::DspState;
 
 pub async fn run(
@@ -59,7 +59,14 @@ pub async fn run(
                 let p_map = progress_map.clone();
                 let j_id = plan.session_id.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    crate::domain::dsp_pipeline::run_dsp(&req, start, head_state, Some(p_tx), Some(p_map), j_id)
+                    crate::domain::dsp_pipeline::run_dsp(
+                        &req,
+                        start,
+                        head_state,
+                        Some(p_tx),
+                        Some(p_map),
+                        j_id,
+                    )
                 })
                 .await;
 
@@ -78,8 +85,10 @@ pub async fn run(
                         let n = chunk_original.num_frames;
                         let mut raw_interleaved = Vec::with_capacity(n * 2);
                         for i in 0..n {
-                            raw_interleaved.push(chunk_original.left.get(i).copied().unwrap_or(0.0));
-                            raw_interleaved.push(chunk_original.right.get(i).copied().unwrap_or(0.0));
+                            raw_interleaved
+                                .push(chunk_original.left.get(i).copied().unwrap_or(0.0));
+                            raw_interleaved
+                                .push(chunk_original.right.get(i).copied().unwrap_or(0.0));
                         }
                         let raw_bytes: &[u8] = unsafe {
                             std::slice::from_raw_parts(
@@ -88,7 +97,11 @@ pub async fn run(
                             )
                         };
                         if std::fs::write(&raw_path, raw_bytes).is_ok() {
-                            eprintln!("[RAW-SAVE] wrote raw PCM {} bytes to {}", raw_bytes.len(), raw_path);
+                            eprintln!(
+                                "[RAW-SAVE] wrote raw PCM {} bytes to {}",
+                                raw_bytes.len(),
+                                raw_path
+                            );
                         }
 
                         // Executor: persist UserMarkovModel to ~/.creator_os/state/
@@ -101,20 +114,17 @@ pub async fn run(
                             );
                             let _ = std::fs::create_dir_all(&state_dir);
                             if let Ok(json) = model.to_json() {
-                                let model_path = format!(
-                                    "{}/user_model_corpus.json", state_dir
-                                );
+                                let model_path = format!("{}/user_model_corpus.json", state_dir);
                                 let _ = std::fs::write(&model_path, json);
                             }
                         }
 
                         // Persist Track to SurrealDB
-                        let track_lufs  = blob.loudness.integrated_lufs;
-                        let track_tp    = blob.loudness.true_peak_dbtp;
-                        let track_blob  = blob.id.clone();
-                        let track_path  = blob.audio_path
-                            .to_string_lossy().to_string();
-                        let db_clone    = db.clone();
+                        let track_lufs = blob.loudness.integrated_lufs;
+                        let track_tp = blob.loudness.true_peak_dbtp;
+                        let track_blob = blob.id.clone();
+                        let track_path = blob.audio_path.to_string_lossy().to_string();
+                        let db_clone = db.clone();
                         tokio::spawn(async move {
                             let created_at = chrono::Utc::now().to_rfc3339();
                             let aql = format!(
@@ -150,10 +160,10 @@ pub async fn run(
                         let _ = progress_tx.send(p);
 
                         let output = DspOutput {
-                            blob_id:   blob.id.clone(),
-                            lufs:      blob.loudness.integrated_lufs,
+                            blob_id: blob.id.clone(),
+                            lufs: blob.loudness.integrated_lufs,
                             true_peak: blob.loudness.true_peak_dbtp,
-                            pcm_data:  Some(mastered_path),
+                            pcm_data: Some(mastered_path),
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,
                         };

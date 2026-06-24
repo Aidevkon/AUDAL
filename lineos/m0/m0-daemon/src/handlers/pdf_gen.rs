@@ -174,7 +174,10 @@ use crate::domain::nodes::album_certificate_node::AlbumCertificate;
 pub fn generate_album_certificate_pdf(cert: &AlbumCertificate, output_path: &str) {
     let result = std::panic::catch_unwind(|| _generate_album(cert, output_path));
     if result.is_err() {
-        eprintln!("[cert] Album PDF generation failed for {}", &cert.album_id[..cert.album_id.len().min(8)]);
+        eprintln!(
+            "[cert] Album PDF generation failed for {}",
+            &cert.album_id[..cert.album_id.len().min(8)]
+        );
     }
 }
 
@@ -185,15 +188,23 @@ fn _generate_album(cert: &AlbumCertificate, output_path: &str) {
 
     let (doc, page1, layer1) = PdfDocument::new(
         "CreatorOS Album Certificate",
-        Mm(210.0), Mm(297.0), "Layer 1",
+        Mm(210.0),
+        Mm(297.0),
+        "Layer 1",
     );
-    let layer    = doc.get_page(page1).get_layer(layer1);
-    let font     = doc.add_builtin_font(BuiltinFont::Courier).unwrap();
+    let layer = doc.get_page(page1).get_layer(layer1);
+    let font = doc.add_builtin_font(BuiltinFont::Courier).unwrap();
     let font_bold = doc.add_builtin_font(BuiltinFont::CourierBold).unwrap();
 
     // Header
     layer.use_text("CREATOR OS", 20.0, Mm(20.0), Mm(277.0), &font_bold);
-    layer.use_text("ALBUM MASTERING CERTIFICATE", 14.0, Mm(20.0), Mm(268.0), &font);
+    layer.use_text(
+        "ALBUM MASTERING CERTIFICATE",
+        14.0,
+        Mm(20.0),
+        Mm(268.0),
+        &font,
+    );
 
     let line = Line {
         points: vec![
@@ -209,42 +220,73 @@ fn _generate_album(cert: &AlbumCertificate, output_path: &str) {
     layer.use_text(&cert.album_id, 9.0, Mm(20.0), Mm(251.0), &font);
 
     layer.use_text(
-        format!("Tracks: {}   Anchor: Track {}   Anchor LUFS: {:.2}",
-            cert.track_count, cert.anchor_track_idx + 1, cert.anchor_lufs),
-        9.0, Mm(20.0), Mm(243.0), &font,
+        format!(
+            "Tracks: {}   Anchor: Track {}   Anchor LUFS: {:.2}",
+            cert.track_count,
+            cert.anchor_track_idx + 1,
+            cert.anchor_lufs
+        ),
+        9.0,
+        Mm(20.0),
+        Mm(243.0),
+        &font,
     );
 
     // Cryptographic proof
     layer.use_text("CRYPTOGRAPHIC PROOF", 11.0, Mm(20.0), Mm(233.0), &font_bold);
     layer.use_text(
         format!("Album Hash (SHA-256): {}", cert.album_hash),
-        8.0, Mm(20.0), Mm(226.0), &font,
+        8.0,
+        Mm(20.0),
+        Mm(226.0),
+        &font,
     );
 
     // Track summary
     layer.use_text("TRACK SUMMARY", 11.0, Mm(20.0), Mm(216.0), &font_bold);
     let mut y = 209.0f32;
     for i in 0..cert.track_count {
-        let lufs    = cert.track_lufs.get(i).copied().unwrap_or(-14.0);
+        let lufs = cert.track_lufs.get(i).copied().unwrap_or(-14.0);
         let fatigue = cert.ear_fatigue_applied.get(i).copied().unwrap_or(false);
-        let blob_id = cert.track_blob_ids.get(i).map(|s| &s[..s.len().min(8)]).unwrap_or("?");
+        let blob_id = cert
+            .track_blob_ids
+            .get(i)
+            .map(|s| &s[..s.len().min(8)])
+            .unwrap_or("?");
         layer.use_text(
-            format!("  Track {:2}  {:.2} LUFS  {}  [{}]",
-                i + 1, lufs,
-                if fatigue { "EarFatigue:YES" } else { "EarFatigue:NO " },
+            format!(
+                "  Track {:2}  {:.2} LUFS  {}  [{}]",
+                i + 1,
+                lufs,
+                if fatigue {
+                    "EarFatigue:YES"
+                } else {
+                    "EarFatigue:NO "
+                },
                 blob_id,
             ),
-            8.0, Mm(20.0), Mm(y), &font,
+            8.0,
+            Mm(20.0),
+            Mm(y),
+            &font,
         );
         y -= 6.0;
-        if y < 30.0 { break; }
+        if y < 30.0 {
+            break;
+        }
     }
 
     // Footer
     layer.use_text(
-        &format!("Pipeline v{}  |  {}  |  CreatorOS",
-            cert.pipeline_version, &cert.created_at[..10]),
-        8.0, Mm(20.0), Mm(20.0), &font,
+        format!(
+            "Pipeline v{}  |  {}  |  CreatorOS",
+            cert.pipeline_version,
+            &cert.created_at[..10]
+        ),
+        8.0,
+        Mm(20.0),
+        Mm(20.0),
+        &font,
     );
 
     if let Ok(file) = File::create(output_path) {
@@ -253,9 +295,12 @@ fn _generate_album(cert: &AlbumCertificate, output_path: &str) {
     }
 }
 
-use axum::{extract::{State, Path}, response::Response};
-use axum::http::{header, StatusCode};
 use crate::app_state::AppState;
+use axum::http::{header, StatusCode};
+use axum::{
+    extract::{Path, State},
+    response::Response,
+};
 
 /// GET /blob/:id/certificate.pdf
 /// Returns the pre-generated per-track certificate PDF.
@@ -289,17 +334,18 @@ pub async fn get_album_certificate_pdf(
     State(_app): State<AppState>,
     Path(batch_id): Path<String>,
 ) -> Response {
-    let short_id  = &batch_id[..batch_id.len().min(8)];
+    let short_id = &batch_id[..batch_id.len().min(8)];
     let json_path = format!("album_{}.certificate.json", short_id);
-    let pdf_path  = format!("album_{}_certificate.pdf", short_id);
+    let pdf_path = format!("album_{}_certificate.pdf", short_id);
 
     // Generate PDF from JSON if not already exists
     if !std::path::Path::new(&pdf_path).exists() {
         match std::fs::read_to_string(&json_path) {
             Ok(json) => {
                 if let Ok(cert) = serde_json::from_str::<
-                    crate::domain::nodes::album_certificate_node::AlbumCertificate
-                >(&json) {
+                    crate::domain::nodes::album_certificate_node::AlbumCertificate,
+                >(&json)
+                {
                     generate_album_certificate_pdf(&cert, &pdf_path);
                 }
             }
@@ -318,7 +364,10 @@ pub async fn get_album_certificate_pdf(
             .header(header::CONTENT_TYPE, "application/pdf")
             .header(
                 header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"album_certificate_{}.pdf\"", short_id),
+                format!(
+                    "attachment; filename=\"album_certificate_{}.pdf\"",
+                    short_id
+                ),
             )
             .body(axum::body::Body::from(bytes))
             .unwrap(),

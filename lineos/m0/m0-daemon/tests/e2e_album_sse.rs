@@ -1,10 +1,10 @@
 //! E2E test: Verify Album SSE Pipeline emissions.
 //! Sends an Intent::ExecuteBatchMastering and waits for AlbumEvent::PreAnalysis.
 
-use std::sync::Arc;
 use arc_swap::ArcSwap;
-use xaak::repo::DspState;
+use std::sync::Arc;
 use tokio::sync::oneshot;
+use xaak::repo::DspState;
 
 #[tokio::test]
 async fn test_album_sse_pipeline_emits_bpm() {
@@ -14,14 +14,22 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
     let db = m0d::db::init_test().await.expect("test db");
-    
+
     // 1. Create the SSE channel and subscribe
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
     let mut rx = album_tx.subscribe();
-    
+
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
-    let operator = m0d::agents::operator::spawn_agents(audit.clone(), dummy_head_state, db, m0d::blob_store::BlobStore::new(), album_tx, progress_tx, progress_map);
+    let operator = m0d::agents::operator::spawn_agents(
+        audit.clone(),
+        dummy_head_state,
+        db,
+        m0d::blob_store::BlobStore::new(),
+        album_tx,
+        progress_tx,
+        progress_map,
+    );
 
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -55,14 +63,21 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     // 4. Assert the event is PreAnalysis and contains BPM
     match event {
-        m0d::app_state::AlbumEvent::PreAnalysis { track, bpm, ducking_gain } => {
+        m0d::app_state::AlbumEvent::PreAnalysis {
+            track,
+            bpm,
+            ducking_gain,
+        } => {
             println!("✅ Received PreAnalysis SSE Event!");
             println!("   Track: {}", track);
             println!("   BPM: {}", bpm);
             println!("   Ducking Gain: {}", ducking_gain);
             assert_eq!(track, 1, "Should be track 1");
             assert!(bpm >= 0.0, "BPM should be valid");
-            assert!(ducking_gain > 0.0 && ducking_gain <= 1.0, "Ducking gain should be in [0.3, 1.0]");
+            assert!(
+                ducking_gain > 0.0 && ducking_gain <= 1.0,
+                "Ducking gain should be in [0.3, 1.0]"
+            );
         }
     }
 }

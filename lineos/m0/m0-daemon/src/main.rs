@@ -187,8 +187,10 @@ fn mastering_router(state: AppState) -> axum::Router {
             get(handlers::preview::get_preview_stem),
         )
         .route("/blob/:id", get(handlers::blob::get_blob))
-        .route("/blob/:id/certificate.pdf",
-            get(handlers::pdf_gen::get_track_certificate_pdf))
+        .route(
+            "/blob/:id/certificate.pdf",
+            get(handlers::pdf_gen::get_track_certificate_pdf),
+        )
         .route(
             "/album/:batch_id/certificate.pdf",
             get(handlers::pdf_gen::get_album_certificate_pdf),
@@ -196,37 +198,35 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route(
             "/album/:batch_id/events/stream",
             get(handlers::album::stream_album_events),
-        ).route("/export", post(handlers::export::export_audio))
+        )
+        .route("/export", post(handlers::export::export_audio))
         .route("/progress/:job_id", get(handlers::progress::get_progress))
         .route(
             "/progress/:job_id/stream",
             get(handlers::progress::stream_progress),
         )
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
-        .route("/playback/state",
-            get(handlers::playback::get_state))
-        .route("/playback/control",
-            post(handlers::playback::post_control))
+        .route("/playback/state", get(handlers::playback::get_state))
+        .route("/playback/control", post(handlers::playback::post_control))
         .route(
             "/cert/:blob_id/png",
             post(handlers::png_gen::export_cert_png),
         )
-        .route("/projects",
-            post(handlers::projects::create_project)
-            .get(handlers::projects::list_projects))
-        .route("/projects/:id",
-            get(handlers::projects::get_project))
-        .route("/projects/:id/tracks",
-            get(handlers::projects::list_tracks))
-        .route("/mix/state",    get(handlers::mix::get_state))
-        .route("/mix/commit",   post(handlers::mix::post_commit))
+        .route(
+            "/projects",
+            post(handlers::projects::create_project).get(handlers::projects::list_projects),
+        )
+        .route("/projects/:id", get(handlers::projects::get_project))
+        .route("/projects/:id/tracks", get(handlers::projects::list_tracks))
+        .route("/mix/state", get(handlers::mix::get_state))
+        .route("/mix/commit", post(handlers::mix::post_commit))
         .route("/mix/checkout", post(handlers::mix::post_checkout))
-        .route("/mix/branch",   post(handlers::mix::post_branch))
-        .route("/mix/revert",   post(handlers::mix::post_revert))
+        .route("/mix/branch", post(handlers::mix::post_branch))
+        .route("/mix/revert", post(handlers::mix::post_revert))
         .route("/mix/flavours", get(handlers::mix::get_flavours))
-        .route("/mix/flavour",  post(handlers::mix::post_flavour))
+        .route("/mix/flavour", post(handlers::mix::post_flavour))
         .route("/tinder/variations", get(handlers::tinder::get_variations))
-        .route("/tinder/like",       post(handlers::tinder::post_like))
-        .route("/tinder/result",     post(handlers::tinder::post_result))
+        .route("/tinder/like", post(handlers::tinder::post_like))
+        .route("/tinder/result", post(handlers::tinder::post_result))
         .with_state(state)
 }

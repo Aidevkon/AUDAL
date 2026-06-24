@@ -22,7 +22,9 @@ pub fn spawn_udp_listener(latest: Arc<Mutex<Option<RealtimeFrame>>>) {
             match socket.recv(&mut buffer) {
                 Ok(size) => {
                     // On success: bincode::decode_from_slice -> overwrite Mutex (INV-TB-3)
-                    if let Ok((frame, _)) = bincode::decode_from_slice::<RealtimeFrame, _>(&buffer[..size], config) {
+                    if let Ok((frame, _)) =
+                        bincode::decode_from_slice::<RealtimeFrame, _>(&buffer[..size], config)
+                    {
                         if let Ok(mut lock) = latest.lock() {
                             *lock = Some(frame);
                         }

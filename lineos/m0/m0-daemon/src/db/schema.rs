@@ -6,37 +6,37 @@ use serde::{Deserialize, Serialize};
 /// A mastering project (album or single).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
-    pub id:          Option<String>,
-    pub name:        String,
-    pub created_at:  String,
-    pub flavour_id:  String,
+    pub id: Option<String>,
+    pub name: String,
+    pub created_at: String,
+    pub flavour_id: String,
     pub track_count: usize,
 }
 
 /// A single mastered track within a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
-    pub id:          Option<String>,
-    pub project_id:  String,
-    pub audio_path:  String,
-    pub blob_id:     String,
-    pub lufs:        f32,
-    pub true_peak:   f32,
-    pub flavour_id:  String,
-    pub created_at:  String,
+    pub id: Option<String>,
+    pub project_id: String,
+    pub audio_path: String,
+    pub blob_id: String,
+    pub lufs: f32,
+    pub true_peak: f32,
+    pub flavour_id: String,
+    pub created_at: String,
     pub duration_ms: u64,
 }
 
 /// A mastering session (single run of the pipeline).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
-    pub id:          Option<String>,
-    pub project_id:  String,
-    pub track_id:    String,
-    pub blob_id:     String,
-    pub preset_id:   String,
-    pub lufs:        f32,
-    pub created_at:  String,
+    pub id: Option<String>,
+    pub project_id: String,
+    pub track_id: String,
+    pub blob_id: String,
+    pub preset_id: String,
+    pub lufs: f32,
+    pub created_at: String,
     pub duration_ms: u64,
 }
 

@@ -6,14 +6,13 @@
 //! Motto: "I build the plan. I do not execute it."
 
 use super::operator::{ConductorError, ExecutionPlan, ExecutorError, Intent, MasteringOutput};
-use std::sync::atomic::{AtomicBool, Ordering};
 use crate::domain::nodes::album_certificate_node::AlbumCertificate;
-use std::sync::Arc;
 use arc_swap::ArcSwap;
-use xaak::repo::DspState;
-use tokio::sync::{mpsc, oneshot};
 use sp314_dsp::analysis::ear_fatigue::EarFatigueModel;
-
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::sync::{mpsc, oneshot};
+use xaak::repo::DspState;
 
 pub async fn run(
     mut rx: mpsc::Receiver<Intent>,
@@ -31,7 +30,14 @@ pub async fn run(
     // Conductor holds its own channel to Executor
     // Created once at startup — persists for the lifetime of the agent
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(4);
-    tokio::spawn(super::executor::run(executor_rx, head_state_ptr.clone(), db.clone(), blob_store.clone(), progress_tx, progress_map.clone()));
+    tokio::spawn(super::executor::run(
+        executor_rx,
+        head_state_ptr.clone(),
+        db.clone(),
+        blob_store.clone(),
+        progress_tx,
+        progress_map.clone(),
+    ));
 
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -133,7 +139,8 @@ pub async fn run(
                     let global_target = items.first().map(|p| p.target_lufs).unwrap_or(-14.0_f32);
 
                     let mut track_lufs: Vec<f32> = Vec::with_capacity(total);
-                    let mut track_analyses: Vec<super::operator::AnalysisResult> = Vec::with_capacity(total);
+                    let mut track_analyses: Vec<super::operator::AnalysisResult> =
+                        Vec::with_capacity(total);
 
                     for params in &items {
                         let (tx, rx) = oneshot::channel();
@@ -220,12 +227,13 @@ pub async fn run(
                     let ear_model = EarFatigueModel::default();
                     // Build proxy analyses from track_lufs for EarFatigue
                     let proxy_analyses: Vec<lineos_types::pre_analysis::PreAnalysisData> =
-                        track_lufs.iter().map(|&lufs| {
-                            lineos_types::pre_analysis::PreAnalysisData {
+                        track_lufs
+                            .iter()
+                            .map(|&lufs| lineos_types::pre_analysis::PreAnalysisData {
                                 integrated_lufs: lufs,
                                 ..lineos_types::pre_analysis::PreAnalysisData::silent()
-                            }
-                        }).collect();
+                            })
+                            .collect();
 
                     for (index, params) in items.into_iter().enumerate() {
                         let cohesion_target = per_track_targets
@@ -239,7 +247,8 @@ pub async fn run(
                         );
 
                         let ear_delta = if index > 0 {
-                            proxy_analyses.get(index - 1)
+                            proxy_analyses
+                                .get(index - 1)
                                 .map(|prev| ear_model.compute_delta(prev))
                                 .unwrap_or_default()
                         } else {
@@ -259,12 +268,13 @@ pub async fn run(
                         if ear_delta.fatigue_detected {
                             let current = head_state_ptr.load_full();
                             let adjusted = DspState {
-                                ducking_depth:  (current.ducking_depth
-                                    * ear_delta.ducking_multiplier).clamp(0.3, 1.0),
-                                ms_width:       (current.ms_width
-                                    * ear_delta.width_multiplier).clamp(0.5, 2.0),
+                                ducking_depth: (current.ducking_depth
+                                    * ear_delta.ducking_multiplier)
+                                    .clamp(0.3, 1.0),
+                                ms_width: (current.ms_width * ear_delta.width_multiplier)
+                                    .clamp(0.5, 2.0),
                                 sidechain_hold: current.sidechain_hold,
-                                lfe_gain:       current.lfe_gain,
+                                lfe_gain: current.lfe_gain,
                             };
                             head_state_ptr.store(std::sync::Arc::new(adjusted));
                             tracing::info!(
@@ -354,9 +364,11 @@ pub async fn run(
 
                     // AB-P7: Generate AlbumCertificate from batch results
                     // Build minimal StoredBlob proxies from outputs
-                    let fatigue_map: Vec<bool> = proxy_analyses.windows(2)
+                    let fatigue_map: Vec<bool> = proxy_analyses
+                        .windows(2)
                         .map(|w| {
-                            let model = sp314_dsp::analysis::ear_fatigue::EarFatigueModel::default();
+                            let model =
+                                sp314_dsp::analysis::ear_fatigue::EarFatigueModel::default();
                             model.compute_delta(&w[0]).fatigue_detected
                         })
                         .chain(std::iter::once(false))
@@ -364,11 +376,12 @@ pub async fn run(
 
                     let album_cert_path = {
                         // Build proxy blobs from track_lufs + blob_ids
-                        let proxy_blobs: Vec<crate::blob_store::StoredBlob> = outputs.iter()
+                        let proxy_blobs: Vec<crate::blob_store::StoredBlob> = outputs
+                            .iter()
                             .zip(track_lufs.iter())
                             .map(|(o, &lufs)| crate::blob_store::StoredBlob {
-                                id:          o.blob_id.clone(),
-                                input_hash:  o.session_id.clone(),
+                                id: o.blob_id.clone(),
+                                input_hash: o.session_id.clone(),
                                 loudness: crate::blob_store::StoredLoudness {
                                     integrated_lufs: lufs,
                                     ..Default::default()
@@ -377,10 +390,12 @@ pub async fn run(
                             })
                             .collect();
 
-                        let anchor_idx = proxy_analyses.iter()
+                        let anchor_idx = proxy_analyses
+                            .iter()
                             .enumerate()
-                            .max_by(|(_, a), (_, b)|
-                                a.integrated_lufs.partial_cmp(&b.integrated_lufs).unwrap())
+                            .max_by(|(_, a), (_, b)| {
+                                a.integrated_lufs.partial_cmp(&b.integrated_lufs).unwrap()
+                            })
                             .map(|(i, _)| i)
                             .unwrap_or(0);
 

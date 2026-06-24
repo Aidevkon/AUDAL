@@ -26,7 +26,10 @@ pub struct EbuReport {
 
 impl EbuReport {
     /// Build from an Ebu128Measurement (produced by lineos-telemetry).
-    pub fn from_measurement(m: &Ebu128Measurement, pre_analysis: &lineos_types::PreAnalysisData) -> Self {
+    pub fn from_measurement(
+        m: &Ebu128Measurement,
+        pre_analysis: &lineos_types::PreAnalysisData,
+    ) -> Self {
         Self {
             version: "1.0".to_string(),
             schema: "lineos/shared/schema/ebu-r128.schema.json".to_string(),

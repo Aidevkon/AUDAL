@@ -3,14 +3,13 @@
 //! The same DspState that the Conductor commits is what
 //! the audio thread reads via ArcSwap.
 
-
 use xaak::repo::{AudioRepo, DspState};
 
 #[test]
 fn test_e2e_gapless_ear_fatigue_transition() {
     // 1. Initialize repo with flavours
     let initial_state = DspState::default();
-    let mut repo      = AudioRepo::new_with_flavours(initial_state);
+    let mut repo = AudioRepo::new_with_flavours(initial_state);
 
     // Clone the hot pointer BEFORE any commits
     // Simulates audio thread holding its own Arc reference
@@ -24,10 +23,10 @@ fn test_e2e_gapless_ear_fatigue_transition() {
 
     // Track 2: Soft acoustic — base state
     let mut track_2_dsp = DspState {
-        ducking_depth:  0.9,
+        ducking_depth: 0.9,
         sidechain_hold: 2,
-        ms_width:       1.0,
-        lfe_gain:       -1.0,
+        ms_width: 1.0,
+        lfe_gain: -1.0,
     };
 
     // 3. Psychoacoustic Ears Model
@@ -37,7 +36,7 @@ fn test_e2e_gapless_ear_fatigue_transition() {
     if track_1_integrated_lufs > fatigue_threshold_lufs {
         // Recovery adjustments for Track 2 opening (~15 seconds)
         track_2_dsp.ducking_depth = 0.6; // softer transients
-        track_2_dsp.ms_width      = 0.8; // narrower stereo field
+        track_2_dsp.ms_width = 0.8; // narrower stereo field
     }
 
     // 4. Conductor commits adjusted state via AudioRepo
@@ -74,8 +73,16 @@ fn test_e2e_gapless_ear_fatigue_transition() {
     );
 
     println!("✅ INV-ALB-2 proven: Conductor commit = Audio thread read");
-    println!("   ducking_depth: {} (fatigue recovery active)", active_dsp.ducking_depth);
-    println!("   ms_width:      {} (stereo narrowed)", active_dsp.ms_width);
-    println!("   Track 1 LUFS:  {} (above fatigue threshold {})",
-        track_1_integrated_lufs, fatigue_threshold_lufs);
+    println!(
+        "   ducking_depth: {} (fatigue recovery active)",
+        active_dsp.ducking_depth
+    );
+    println!(
+        "   ms_width:      {} (stereo narrowed)",
+        active_dsp.ms_width
+    );
+    println!(
+        "   Track 1 LUFS:  {} (above fatigue threshold {})",
+        track_1_integrated_lufs, fatigue_threshold_lufs
+    );
 }

@@ -41,19 +41,27 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
         tele_generation.set(my_gen);
         spawn_local(async move {
             loop {
-                if *tele_generation.peek() != my_gen { break; }
+                if *tele_generation.peek() != my_gen {
+                    break;
+                }
 
                 let m = props.mode.read().clone();
                 // Poll whenever audio could be playing. CoachReady is the state
                 // where the certified master plays — it MUST be included.
                 // Idle: no file loaded. Exporting: I/O locked. Fault: broken.
-                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::Exporting { .. } | CockpitMode::Fault { .. });
+                let is_active = !matches!(
+                    m,
+                    CockpitMode::Idle | CockpitMode::Exporting { .. } | CockpitMode::Fault { .. }
+                );
 
                 if is_active {
-                    web_sys::console::log_1(&format!(
-                        "[TELE-TRAP] polling, mode={:?}", m
-                    ).into());
-                    if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
+                    web_sys::console::log_1(&format!("[TELE-TRAP] polling, mode={:?}", m).into());
+                    if let Ok(Some(frame)) =
+                        crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>(
+                            "get_live_telemetry_realtime",
+                        )
+                        .await
+                    {
                         realtime.set(Some(frame));
                     }
                     gloo_timers::future::TimeoutFuture::new(200).await;
@@ -119,10 +127,10 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                     dyn_angle: props.dyn_angle,
                     space_angle: props.space_angle,
                     loud_angle: props.loud_angle,
-                    on_down_tone: props.on_down_tone.clone(),
-                    on_down_dyn: props.on_down_dyn.clone(),
-                    on_down_space: props.on_down_space.clone(),
-                    on_down_loud: props.on_down_loud.clone(),
+                    on_down_tone: props.on_down_tone,
+                    on_down_dyn: props.on_down_dyn,
+                    on_down_space: props.on_down_space,
+                    on_down_loud: props.on_down_loud,
                 }
                 crate::components::hud_overlay::MfdHud {
                     findings: props.wizard_findings.read().clone(),

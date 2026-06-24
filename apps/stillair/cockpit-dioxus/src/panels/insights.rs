@@ -13,15 +13,14 @@
 //! Laws: ❌ No SVG path computation  ❌ No inline hex  ❌ No std::f32 methods
 //! M/S fields: demo until backend amendment.
 
+use crate::components::intent_bay::IntentBay;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::neon_canvas::NeonCanvas;
-use crate::components::intent_bay::IntentBay;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson, RealtimeFrameJson};
+use crate::types::{PlaybackStateJson, RealtimeFrameJson, SessionStateJson, VisualizationDataJson};
 use dioxus::prelude::*;
 
 // ── Demo Lissajous paths (FM0 idle) ───────────────────────────────────────────
-
 
 // Demo M/S — pending backend amendment
 const DEMO_MID_PCT: f32 = 62.0;
@@ -55,7 +54,7 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
 
     // Removed lissajous code to fix unused variable warnings since StereoScope is gone
 
-    let (correlation, width, phase_coh) = match state.as_ref() {
+    let (_correlation, width, phase_coh) = match state.as_ref() {
         Some(s) => (
             s.quality.stereo_correlation,
             s.quality.stereo_width,
@@ -98,10 +97,10 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                             dyn_angle: props.dyn_angle,
                             space_angle: props.space_angle,
                             loud_angle: props.loud_angle,
-                            on_down_tone: props.on_down_tone.clone(),
-                            on_down_dyn: props.on_down_dyn.clone(),
-                            on_down_space: props.on_down_space.clone(),
-                            on_down_loud: props.on_down_loud.clone(),
+                            on_down_tone: props.on_down_tone,
+                            on_down_dyn: props.on_down_dyn,
+                            on_down_space: props.on_down_space,
+                            on_down_loud: props.on_down_loud,
                         }
                     }
                 }
@@ -283,7 +282,7 @@ fn CorrelationMeter(correlation: f32) -> Element {
 #[component]
 fn SpectrumBars(spectrum: Option<Vec<f32>>) -> Element {
     let bars = spectrum.unwrap_or_else(|| vec![-40.0; 64]);
-    
+
     rsx! {
         svg {
             view_box: "0 0 640 120",
@@ -297,7 +296,7 @@ fn SpectrumBars(spectrum: Option<Vec<f32>>) -> Element {
                     let y = 120.0 - h;
                     let x = i as f32 * 10.0;
                     let opacity = 0.3 + (pct * 0.7);
-                    
+
                     rsx! {
                         rect {
                             key: "{i}",
@@ -312,4 +311,3 @@ fn SpectrumBars(spectrum: Option<Vec<f32>>) -> Element {
         }
     }
 }
-

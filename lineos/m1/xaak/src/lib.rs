@@ -19,9 +19,9 @@ pub mod spectrum;
 pub mod telemetry;
 pub mod telemetry_worker;
 pub mod tinder;
+pub use flavours::{from_name as flavour_from_name, ALL as FLAVOURS};
 pub use repo::{AudioRepo, DspState, MixCommit};
 pub use tinder::{generate_variations, weighted_centroid};
-pub use flavours::{from_name as flavour_from_name, ALL as FLAVOURS};
 
 pub mod playback;
 pub use playback::ScrubState;
@@ -190,8 +190,6 @@ impl XaakKernel {
         // self.pcm dropped here — exclusive ownership ensures no use-after-free
     }
 }
-
-
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 

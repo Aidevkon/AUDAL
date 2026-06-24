@@ -15,23 +15,14 @@ pub struct ActiveGates {
     pub gate4: bool,
 }
 
-pub async fn increment_session_counter(
-    _db: &DbConn,
-    _user_id: &str,
-) -> Result<u32, String> {
+pub async fn increment_session_counter(_db: &DbConn, _user_id: &str) -> Result<u32, String> {
     todo!("increment_session_counter")
 }
 
-pub async fn get_last_flavour(
-    _db: &DbConn,
-    _user_id: &str,
-) -> Result<Option<String>, String> {
+pub async fn get_last_flavour(_db: &DbConn, _user_id: &str) -> Result<Option<String>, String> {
     todo!("get_last_flavour")
 }
 
-pub async fn get_progressive_gate(
-    _db: &DbConn,
-    _user_id: &str,
-) -> Result<ActiveGates, String> {
+pub async fn get_progressive_gate(_db: &DbConn, _user_id: &str) -> Result<ActiveGates, String> {
     todo!("get_progressive_gate")
 }

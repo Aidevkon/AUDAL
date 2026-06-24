@@ -1,6 +1,6 @@
 use crate::telemetry_listener::LatestFrame;
-use tauri::State;
 use serde::Serialize;
+use tauri::State;
 
 #[derive(Serialize)]
 pub struct RealtimeFrameJson {
@@ -17,9 +17,9 @@ pub fn get_live_telemetry_realtime(latest: State<'_, LatestFrame>) -> Option<Rea
         let mut lock = latest.0.lock().ok()?;
         lock.take()
     };
-    
+
     let frame = frame_opt?;
-    
+
     // Explicit conversion
     Some(RealtimeFrameJson {
         spectrum_before: frame.spectrum_before.to_vec(),

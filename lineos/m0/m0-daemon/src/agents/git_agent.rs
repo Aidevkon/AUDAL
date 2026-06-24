@@ -28,7 +28,7 @@ pub async fn create_commit(
 ) -> Result<MixCommit, String> {
     let ts = now_unix_ms();
     let hash = generate_hash(project_id, ts, dsp_state);
-    
+
     Ok(MixCommit {
         id: None,
         project_id: project_id.to_string(),
@@ -51,11 +51,7 @@ pub async fn checkout(
     todo!("checkout")
 }
 
-pub async fn create_branch(
-    _db: &DbConn,
-    project_id: &str,
-    name: &str,
-) -> Result<Branch, String> {
+pub async fn create_branch(_db: &DbConn, project_id: &str, name: &str) -> Result<Branch, String> {
     Ok(Branch {
         id: None,
         project_id: project_id.to_string(),
@@ -66,9 +62,6 @@ pub async fn create_branch(
     })
 }
 
-pub async fn get_history(
-    _db: &DbConn,
-    _project_id: &str,
-) -> Result<Vec<MixCommit>, String> {
+pub async fn get_history(_db: &DbConn, _project_id: &str) -> Result<Vec<MixCommit>, String> {
     todo!("get_history")
 }

@@ -14,14 +14,14 @@ pub enum CurveType {
 
 pub struct MorphCurve {
     pub duration_ms: u32,
-    pub curve:       CurveType,
+    pub curve: CurveType,
 }
 
 impl Default for MorphCurve {
     fn default() -> Self {
         Self {
             duration_ms: 3000, // 3 second transition
-            curve:       CurveType::EaseInOut,
+            curve: CurveType::EaseInOut,
         }
     }
 }
@@ -39,9 +39,9 @@ impl MorphCurve {
         let shaped = self.apply_curve(t);
 
         DspState {
-            ducking_depth:  lerp(from.ducking_depth,  to.ducking_depth,  shaped),
-            ms_width:       lerp(from.ms_width,        to.ms_width,        shaped),
-            lfe_gain:       lerp(from.lfe_gain,         to.lfe_gain,         shaped),
+            ducking_depth: lerp(from.ducking_depth, to.ducking_depth, shaped),
+            ms_width: lerp(from.ms_width, to.ms_width, shaped),
+            lfe_gain: lerp(from.lfe_gain, to.lfe_gain, shaped),
             sidechain_hold: lerp_usize(from.sidechain_hold, to.sidechain_hold, shaped),
         }
     }
@@ -49,18 +49,24 @@ impl MorphCurve {
     /// Generate N evenly-spaced DspState snapshots for the transition.
     /// Used by AlbumConductor to pre-compute ArcSwap commit timeline.
     pub fn generate_frames(&self, from: &DspState, to: &DspState, n: usize) -> Vec<DspState> {
-        if n == 0 { return vec![]; }
-        if n == 1 { return vec![*to]; }
-        (0..n).map(|i| {
-            let t = i as f32 / (n - 1) as f32;
-            self.interpolate(from, to, t)
-        }).collect()
+        if n == 0 {
+            return vec![];
+        }
+        if n == 1 {
+            return vec![*to];
+        }
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / (n - 1) as f32;
+                self.interpolate(from, to, t)
+            })
+            .collect()
     }
 
     fn apply_curve(&self, t: f32) -> f32 {
         match self.curve {
-            CurveType::Linear      => t,
-            CurveType::EaseInOut   => ease_in_out(t),
+            CurveType::Linear => t,
+            CurveType::EaseInOut => ease_in_out(t),
             CurveType::Exponential => exponential(t),
         }
     }
@@ -95,13 +101,21 @@ mod tests {
     use super::*;
 
     fn neutral() -> DspState {
-        DspState { ducking_depth: 1.0, ms_width: 1.0,
-                   sidechain_hold: 3, lfe_gain: 0.0 }
+        DspState {
+            ducking_depth: 1.0,
+            ms_width: 1.0,
+            sidechain_hold: 3,
+            lfe_gain: 0.0,
+        }
     }
 
     fn club() -> DspState {
-        DspState { ducking_depth: 1.5, ms_width: 1.0,
-                   sidechain_hold: 5, lfe_gain: 2.0 }
+        DspState {
+            ducking_depth: 1.5,
+            ms_width: 1.0,
+            sidechain_hold: 5,
+            lfe_gain: 2.0,
+        }
     }
 
     #[test]
@@ -132,8 +146,12 @@ mod tests {
     fn ease_in_out_is_symmetric() {
         let a = ease_in_out(0.25);
         let b = ease_in_out(0.75);
-        assert!((a - (1.0 - b)).abs() < 0.001,
-            "EaseInOut should be symmetric: f(0.25)={:.3}, 1-f(0.75)={:.3}", a, 1.0-b);
+        assert!(
+            (a - (1.0 - b)).abs() < 0.001,
+            "EaseInOut should be symmetric: f(0.25)={:.3}, 1-f(0.75)={:.3}",
+            a,
+            1.0 - b
+        );
     }
 
     #[test]

@@ -1,9 +1,9 @@
-use m0d::domain::dsp_pipeline::run_dsp;
-use std::sync::Arc;
 use arc_swap::ArcSwap;
-use xaak::repo::DspState;
+use m0d::domain::dsp_pipeline::run_dsp;
 use m0d::handlers::master::MasterRequest;
+use std::sync::Arc;
 use std::time::Instant;
+use xaak::repo::DspState;
 
 #[tokio::test]
 async fn test_e2e_golden_pathway_aether_pipeline() {

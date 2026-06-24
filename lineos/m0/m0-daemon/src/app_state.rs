@@ -10,16 +10,16 @@
 use crate::agents::operator::Operator;
 use crate::audit::AuditLog;
 use crate::blob_store::BlobStore;
+use crate::db::DbConn;
 use crate::handlers::preview::PreviewStore;
 use crate::realtime_bridge::RealtimeBridge;
-use dashmap::DashMap;
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use xaak::engine::PlaybackHandle;
-use xaak::repo::{AudioRepo, DspState};
-use crate::db::DbConn;
 use xaak::playback::ScrubState;
+use xaak::repo::{AudioRepo, DspState};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MasteringProgress {
@@ -75,7 +75,7 @@ impl AppState {
         let (progress_tx, _) = broadcast::channel(128);
         let (album_tx, _) = broadcast::channel(64);
         let initial_dsp_state = DspState::default();
-        let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state.clone());
+        let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state);
         let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
         let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
 
@@ -85,12 +85,13 @@ impl AppState {
             "{}/.creator_os/db",
             std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
         );
-        let db_path = std::env::var("CREATOR_OS_DB_PATH")
-            .unwrap_or(fallback_path);
+        let db_path = std::env::var("CREATOR_OS_DB_PATH").unwrap_or(fallback_path);
         std::fs::create_dir_all(&db_path).unwrap_or_default();
-        let db = crate::db::init(&db_path).await
+        let db = crate::db::init(&db_path)
+            .await
             .expect("Failed to initialize SurrealDB");
-        crate::db::schema::migrate(&db).await
+        crate::db::schema::migrate(&db)
+            .await
             .unwrap_or_else(|e| tracing::warn!("DB migrate: {}", e));
 
         let blob_store = BlobStore::new();

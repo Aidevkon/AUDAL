@@ -2,9 +2,9 @@
 //! Privacy moat: 100% local, zero cloud.
 //! kv-surrealkv: pure Rust, persistent on disk.
 
-use surrealdb::Surreal;
-use surrealdb::engine::local::Db;
 use std::sync::Arc;
+use surrealdb::engine::local::Db;
+use surrealdb::Surreal;
 
 pub type DbConn = Arc<Surreal<Db>>;
 
@@ -25,4 +25,4 @@ pub async fn init_test() -> Result<DbConn, surrealdb::Error> {
 }
 
 pub mod schema;
-pub use schema::{Project, Track, Session};
+pub use schema::{Project, Session, Track};

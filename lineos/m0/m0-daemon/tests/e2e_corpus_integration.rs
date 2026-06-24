@@ -1,12 +1,12 @@
 //! E2E test: proves corpus + UserMarkovModel written after mastering.
 //! Authority: corpus-learning-spec-v1_2.md CB-P11
 
-use m0d::domain::dsp_pipeline::run_dsp;
-use std::sync::Arc;
 use arc_swap::ArcSwap;
-use xaak::repo::DspState;
+use m0d::domain::dsp_pipeline::run_dsp;
 use m0d::handlers::master::MasterRequest;
+use std::sync::Arc;
 use std::time::Instant;
+use xaak::repo::DspState;
 
 #[tokio::test]
 async fn e2e_corpus_integration_writes_model_to_disk() {
@@ -56,7 +56,11 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     // Must not timeout
     assert!(result.is_ok(), "Test timed out");
     let dsp_result = result.unwrap();
-    assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.as_ref().err());
+    assert!(
+        dsp_result.is_ok(),
+        "run_dsp failed: {:?}",
+        dsp_result.as_ref().err()
+    );
     let dsp_result = dsp_result.unwrap();
 
     // New architecture: run_dsp returns (blob, path, Option<UserMarkovModel>, StereoBuffer)
@@ -77,9 +81,11 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     );
 
     // Validate model has the correct preset
-    let json = user_model.to_json().expect("Failed to serialize user model");
-    let model: serde_json::Value = serde_json::from_str(&json)
-        .expect("UserMarkovModel is not valid JSON");
+    let json = user_model
+        .to_json()
+        .expect("Failed to serialize user model");
+    let model: serde_json::Value =
+        serde_json::from_str(&json).expect("UserMarkovModel is not valid JSON");
     assert!(model["presets"].is_object(), "presets must be an object");
     assert!(
         model["presets"]["e2e_preset"].is_object(),

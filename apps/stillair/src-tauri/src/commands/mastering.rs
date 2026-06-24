@@ -208,7 +208,11 @@ pub async fn trigger_mastering(
                     }
                 };
 
-                eprintln!("[SSE-TRAP] stage={} (emitting={})", progress.stage, progress.stage != last_stage);
+                eprintln!(
+                    "[SSE-TRAP] stage={} (emitting={})",
+                    progress.stage,
+                    progress.stage != last_stage
+                );
 
                 if progress.stage != last_stage {
                     last_stage = progress.stage.clone();
@@ -239,7 +243,10 @@ pub async fn trigger_mastering(
             }
             Err(e) => {
                 eprintln!("[SSE-ERROR] stream error: {}", e);
-                eprintln!("[SSE-CLOSE] stream disconnected prematurely for job {}", job_id);
+                eprintln!(
+                    "[SSE-CLOSE] stream disconnected prematurely for job {}",
+                    job_id
+                );
                 es.close();
                 return Err("SSE Stream disconnected prematurely".into());
             }

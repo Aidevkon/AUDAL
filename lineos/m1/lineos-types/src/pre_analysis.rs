@@ -94,10 +94,10 @@ pub struct PreAnalysisData {
     pub zone_flags: ZoneActivationFlags,
 
     // ── Rhythm Analysis ──
-    pub bpm: f32,                    // 0.0 if not detected
-    pub beats_ms: Vec<u32>,          // beat timestamps in ms
-    pub downbeats_ms: Vec<u32>,      // downbeat timestamps in ms
-    pub transients_ms: Vec<u32>,     // onset timestamps in ms
+    pub bpm: f32,                // 0.0 if not detected
+    pub beats_ms: Vec<u32>,      // beat timestamps in ms
+    pub downbeats_ms: Vec<u32>,  // downbeat timestamps in ms
+    pub transients_ms: Vec<u32>, // onset timestamps in ms
 }
 
 impl PreAnalysisData {

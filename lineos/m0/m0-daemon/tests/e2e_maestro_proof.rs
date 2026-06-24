@@ -2,8 +2,8 @@
 //! Proves: low BPM track gets more aggressive ducking than fast track.
 //! Authority: maestro-controller-spec-v1_0.md
 
-use m0d::dsp::maestro::AutoTuningController;
 use lineos_types::pre_analysis::PreAnalysisData;
+use m0d::dsp::maestro::AutoTuningController;
 
 /// Proof: Maestro applies more aggressive ducking to low BPM tracks.
 #[test]

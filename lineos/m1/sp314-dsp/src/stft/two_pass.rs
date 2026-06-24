@@ -199,7 +199,11 @@ impl TwoPassEngine {
         let proxy_frames = ctx.forward_chunk(&proxy);
         eprintln!("[PERF] stft_proxy={}ms", t_stft.elapsed().as_millis());
         let n_frames = proxy_frames.len();
-        let n_bins = if n_frames > 0 { proxy_frames[0].len() } else { 0 };
+        let n_bins = if n_frames > 0 {
+            proxy_frames[0].len()
+        } else {
+            0
+        };
         eprintln!("[PERF] proxy size: {} frames x {} bins", n_frames, n_bins);
 
         // NMF fit — INV-ST-1: ONLY fit() call
@@ -304,7 +308,10 @@ impl TwoPassEngine {
         let proxy_bass = self.proxy_stem(bass_idx, proxy_n, n_bins, &proxy);
         let proxy_harm = self.proxy_stem(harmonics_idx, proxy_n, n_bins, &proxy);
         let proxy_amb = self.proxy_stem(ambience_idx, proxy_n, n_bins, &proxy);
-        eprintln!("[PERF] proxy_stem_extraction={}ms", t_extraction.elapsed().as_millis());
+        eprintln!(
+            "[PERF] proxy_stem_extraction={}ms",
+            t_extraction.elapsed().as_millis()
+        );
 
         // M-P2: Compute per-stem MFCC fingerprints from proxy stems.
         // Only first 4096 samples (~85ms) — keeps scout() latency minimal.
@@ -375,7 +382,7 @@ impl TwoPassEngine {
         // Wait, fit() does fit_transform, which does both W and H learning.
         // It does NOT call transform(). Wait, two_pass.rs only calls fit()!
         eprintln!("[PERF] scout_total={}ms", t_scout.elapsed().as_millis());
-        
+
         ScoutResult {
             w,
             proxy_rms,
@@ -489,9 +496,15 @@ impl TwoPassEngine {
                 if n_frames == 0 {
                     return ParallelChunkOut {
                         stems: FiveStemsChunk {
-                            voice: vec![], drums: vec![], bass: vec![], harmonics: vec![], ambience: vec![]
+                            voice: vec![],
+                            drums: vec![],
+                            bass: vec![],
+                            harmonics: vec![],
+                            ambience: vec![],
                         },
-                        voice_transient: 0.0, drums_transient: 0.0, chunk_len: 0,
+                        voice_transient: 0.0,
+                        drums_transient: 0.0,
+                        chunk_len: 0,
                         spatial_sums: [(0.0, 0.0, 0.0); 5],
                     };
                 }
@@ -506,20 +519,56 @@ impl TwoPassEngine {
                 let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
                 let h_chunk = self.nmf.transform(&scout.w, &chunk_frames);
 
-                let voice_mask = self.nmf.component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
-                let bass_mask = self.nmf.component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
-                let harm_mask = self.nmf.component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
-                let amb_mask = self.nmf.component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
+                let voice_mask =
+                    self.nmf
+                        .component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
+                let bass_mask =
+                    self.nmf
+                        .component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
+                let harm_mask =
+                    self.nmf
+                        .component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
+                let amb_mask =
+                    self.nmf
+                        .component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
 
                 let core_n_frames = n_frames.saturating_sub(pad_frames);
-                let core_voice_mask = if pad_frames < voice_mask.len() { &voice_mask[pad_frames..] } else { &[] };
-                let core_bass_mask = if pad_frames < bass_mask.len() { &bass_mask[pad_frames..] } else { &[] };
-                let core_harm_mask = if pad_frames < harm_mask.len() { &harm_mask[pad_frames..] } else { &[] };
-                let core_amb_mask = if pad_frames < amb_mask.len() { &amb_mask[pad_frames..] } else { &[] };
-                let core_mask_p = if pad_frames < mask_p.len() { &mask_p[pad_frames..] } else { &[] };
+                let core_voice_mask = if pad_frames < voice_mask.len() {
+                    &voice_mask[pad_frames..]
+                } else {
+                    &[]
+                };
+                let core_bass_mask = if pad_frames < bass_mask.len() {
+                    &bass_mask[pad_frames..]
+                } else {
+                    &[]
+                };
+                let core_harm_mask = if pad_frames < harm_mask.len() {
+                    &harm_mask[pad_frames..]
+                } else {
+                    &[]
+                };
+                let core_amb_mask = if pad_frames < amb_mask.len() {
+                    &amb_mask[pad_frames..]
+                } else {
+                    &[]
+                };
+                let core_mask_p = if pad_frames < mask_p.len() {
+                    &mask_p[pad_frames..]
+                } else {
+                    &[]
+                };
 
-                let core_frames_l = if pad_frames < core_frames_l.len() { &core_frames_l[pad_frames..] } else { &[] };
-                let core_frames_r = if pad_frames < core_frames_r.len() { &core_frames_r[pad_frames..] } else { &[] };
+                let core_frames_l = if pad_frames < core_frames_l.len() {
+                    &core_frames_l[pad_frames..]
+                } else {
+                    &[]
+                };
+                let core_frames_r = if pad_frames < core_frames_r.len() {
+                    &core_frames_r[pad_frames..]
+                } else {
+                    &[]
+                };
 
                 let core_chunk = &signal[chunk_in.offset..chunk_in.end];
 
@@ -555,7 +604,7 @@ impl TwoPassEngine {
                         }
                     })
                     .collect();
-                
+
                 let v_transient = transient_density(&h_voice);
                 let d_transient = core_mask_p
                     .iter()
@@ -565,7 +614,9 @@ impl TwoPassEngine {
 
                 let mut spatial_sums = [(0.0, 0.0, 0.0); 5]; // [(pan_num, width_num, den); 5]
                 for f in 0..core_n_frames {
-                    if f >= core_frames_l.len() || f >= core_frames_r.len() { continue; }
+                    if f >= core_frames_l.len() || f >= core_frames_r.len() {
+                        continue;
+                    }
                     for b in 0..N_BINS {
                         let x_l = core_frames_l[f][b];
                         let x_r = core_frames_r[f][b];
@@ -622,7 +673,7 @@ impl TwoPassEngine {
             if out.chunk_len == 0 {
                 continue;
             }
-            
+
             voice_transient_sum += out.voice_transient;
             drums_transient_sum += out.drums_transient;
             chunk_count += 1;
@@ -637,7 +688,7 @@ impl TwoPassEngine {
             let collision = detect_collision(&out.stems.drums, &out.stems.bass);
             let target_gain = if collision { ducking_gain } else { 1.0_f32 };
             let alpha = COLLISION_SMOOTHING_ALPHA;
-            
+
             for s in out.stems.bass.iter_mut() {
                 self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
                 *s *= self.bass_ducking_gain;
@@ -669,10 +720,22 @@ impl TwoPassEngine {
             final_spatial[i].pan_width = global_spatial_sums[i].1 / den;
         }
 
-        eprintln!("[BAND-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
-            final_spatial[0].pan_width, final_spatial[1].pan_width, final_spatial[2].pan_width, final_spatial[3].pan_width, final_spatial[4].pan_width);
-        eprintln!("[BAND-MEAN] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
-            final_spatial[0].pan_mean, final_spatial[1].pan_mean, final_spatial[2].pan_mean, final_spatial[3].pan_mean, final_spatial[4].pan_mean);
+        eprintln!(
+            "[BAND-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_width,
+            final_spatial[1].pan_width,
+            final_spatial[2].pan_width,
+            final_spatial[3].pan_width,
+            final_spatial[4].pan_width
+        );
+        eprintln!(
+            "[BAND-MEAN] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_mean,
+            final_spatial[1].pan_mean,
+            final_spatial[2].pan_mean,
+            final_spatial[3].pan_mean,
+            final_spatial[4].pan_mean
+        );
 
         Ok(RenderMetadata {
             frames_written,
@@ -693,7 +756,14 @@ impl TwoPassEngine {
     where
         F: FnMut(&FiveStemsChunk),
     {
-        self.process_chunks_with_params(signal, signal, signal, scout, COLLISION_DUCKING_GAIN, callback)
+        self.process_chunks_with_params(
+            signal,
+            signal,
+            signal,
+            scout,
+            COLLISION_DUCKING_GAIN,
+            callback,
+        )
     }
 }
 

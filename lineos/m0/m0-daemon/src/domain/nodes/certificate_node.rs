@@ -2,7 +2,8 @@
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P5
 
 use crate::blob_store::{
-    StageRecord, StemFingerprints, StoredBlob, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial, BandSpatial,
+    BandSpatial, StageRecord, StemFingerprints, StoredBlob, StoredLoudness, StoredProvenance,
+    StoredQuality, StoredSpatial,
 };
 use chrono::Utc;
 use lineos_telemetry::lra::LraCalculator;
@@ -184,8 +185,7 @@ pub fn run(
     };
 
     // Generate PDF certificate — silent, never blocks pipeline
-    let pdf_path = format!("{}_certificate.pdf",
-        &blob.id[..blob.id.len().min(8)]);
+    let pdf_path = format!("{}_certificate.pdf", &blob.id[..blob.id.len().min(8)]);
     crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path);
 
     Ok(CertificateOutput { blob, file_path })

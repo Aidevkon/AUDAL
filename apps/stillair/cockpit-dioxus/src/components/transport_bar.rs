@@ -11,10 +11,10 @@ use crate::components::{
     transport_button::{LedColor, SkipActuator, TransportActuator},
 };
 use crate::state::cockpit_event::CockpitEvent;
-use crate::state::reducer::dispatch;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson, JiniPersonaState};
 use crate::state::hangar_interview::HangarInterviewState;
+use crate::state::reducer::dispatch;
+use crate::types::{JiniPersonaState, PlaybackStateJson, SessionStateJson};
 use dioxus::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -83,8 +83,8 @@ pub struct TransportBarProps {
 
 #[component]
 pub fn TransportBar(mut props: TransportBarProps) -> Element {
-    let mut mode = props.mode;
-    let mut session_state = props.session_state;
+    let mode = props.mode;
+    let session_state = props.session_state;
     let tier = props.tier;
     let mut intent_open = props.intent_open;
     let presentation = &props.presentation;
@@ -113,13 +113,22 @@ pub fn TransportBar(mut props: TransportBarProps) -> Element {
                         continue;
                     }
 
-                    match crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>("get_playback_state").await {
+                    match crate::ipc::invoke_no_args::<Option<PlaybackStateJson>>(
+                        "get_playback_state",
+                    )
+                    .await
+                    {
                         Ok(Some(state)) => {
                             playback_state.clone().set(Some(state));
                         }
                         Ok(None) => {}
                         Err(e) => {
-                            web_sys::console::error_1(&format!("[TransportBar] get_playback_state error: {e}. Stopping poll.").into());
+                            web_sys::console::error_1(
+                                &format!(
+                                    "[TransportBar] get_playback_state error: {e}. Stopping poll."
+                                )
+                                .into(),
+                            );
                             break;
                         }
                     }
@@ -498,7 +507,7 @@ pub fn TransportBar(mut props: TransportBarProps) -> Element {
                                         props.dropped_path.set(None);
                                         props.last_platform.set(None);
                                         props.last_flavour.set(None);
-                                        
+
                                         // Reset persona to default
                                         props.jini_persona.set(JiniPersonaState::Intermediate);
 

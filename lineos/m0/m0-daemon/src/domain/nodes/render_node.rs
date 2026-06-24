@@ -44,64 +44,77 @@ pub fn run(
     let mut write_offset = 0;
 
     let mut _metadata = two_pass
-        .process_chunks_with_params(mono, original_left, original_right, scout, ducking_gain, |stems_chunk| {
-            let chunk_len = stems_chunk.voice.len();
+        .process_chunks_with_params(
+            mono,
+            original_left,
+            original_right,
+            scout,
+            ducking_gain,
+            |stems_chunk| {
+                let chunk_len = stems_chunk.voice.len();
 
-            let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();
-            let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
-            let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
-            let mh: Vec<f32> = stems_chunk
-                .harmonics
-                .iter()
-                .map(|s| s * mix.harmonics)
-                .collect();
-            let ma: Vec<f32> = stems_chunk
-                .ambience
-                .iter()
-                .map(|s| s * mix.ambience)
-                .collect();
+                let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();
+                let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
+                let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
+                let mh: Vec<f32> = stems_chunk
+                    .harmonics
+                    .iter()
+                    .map(|s| s * mix.harmonics)
+                    .collect();
+                let ma: Vec<f32> = stems_chunk
+                    .ambience
+                    .iter()
+                    .map(|s| s * mix.ambience)
+                    .collect();
 
-            h_voice.update(unsafe {
-                std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4)
-            });
-            h_drums.update(unsafe {
-                std::slice::from_raw_parts(md.as_ptr() as *const u8, md.len() * 4)
-            });
-            h_bass.update(unsafe {
-                std::slice::from_raw_parts(mb.as_ptr() as *const u8, mb.len() * 4)
-            });
-            h_harmonics.update(unsafe {
-                std::slice::from_raw_parts(mh.as_ptr() as *const u8, mh.len() * 4)
-            });
-            h_ambience.update(unsafe {
-                std::slice::from_raw_parts(ma.as_ptr() as *const u8, ma.len() * 4)
-            });
+                h_voice.update(unsafe {
+                    std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4)
+                });
+                h_drums.update(unsafe {
+                    std::slice::from_raw_parts(md.as_ptr() as *const u8, md.len() * 4)
+                });
+                h_bass.update(unsafe {
+                    std::slice::from_raw_parts(mb.as_ptr() as *const u8, mb.len() * 4)
+                });
+                h_harmonics.update(unsafe {
+                    std::slice::from_raw_parts(mh.as_ptr() as *const u8, mh.len() * 4)
+                });
+                h_ambience.update(unsafe {
+                    std::slice::from_raw_parts(ma.as_ptr() as *const u8, ma.len() * 4)
+                });
 
-            let mut clean_voice = mv.clone();
-            if let Some(ref mut vg) = voice_graph_opt {
-                let mut v_right = clean_voice.clone();
-                let mut frame = 0;
-                while frame < chunk_len {
-                    let end = (frame + 512).min(chunk_len);
-                    vg.process_block(&mut clean_voice[frame..end], &mut v_right[frame..end]);
-                    frame = end;
+                let mut clean_voice = mv.clone();
+                if let Some(ref mut vg) = voice_graph_opt {
+                    let mut v_right = clean_voice.clone();
+                    let mut frame = 0;
+                    while frame < chunk_len {
+                        let end = (frame + 512).min(chunk_len);
+                        vg.process_block(&mut clean_voice[frame..end], &mut v_right[frame..end]);
+                        frame = end;
+                    }
+                    for i in 0..chunk_len {
+                        clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
+                    }
                 }
-                for i in 0..chunk_len {
-                    clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
-                }
-            }
 
-            let stage =
-                FiveDotOneStage::render_chunk(&clean_voice, &md, &mb, &mh, &ma, &scout.assignments);
-            let mut stage = stage;
-            stage.apply_scales(scout.rear_scale, scout.lfe_scale);
-            let (sp_l, sp_r) = StereoRenderer::render(&stage);
+                let stage = FiveDotOneStage::render_chunk(
+                    &clean_voice,
+                    &md,
+                    &mb,
+                    &mh,
+                    &ma,
+                    &scout.assignments,
+                );
+                let mut stage = stage;
+                stage.apply_scales(scout.rear_scale, scout.lfe_scale);
+                let (sp_l, sp_r) = StereoRenderer::render(&stage);
 
-            let end_offset = write_offset + sp_l.len();
-            left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
-            right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
-            write_offset = end_offset;
-        })
+                let end_offset = write_offset + sp_l.len();
+                left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
+                right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
+                write_offset = end_offset;
+            },
+        )
         .map_err(|e| format!("TwoPassEngine error: {e}"))?;
 
     let voice_hex = format!("{:x}", h_voice.finalize());
@@ -143,12 +156,15 @@ pub fn run(
         right_slice[i] *= gain;
     }
 
-    Ok((StemFingerprints {
-        voice: voice_hex,
-        drums: drums_hex,
-        bass: bass_hex,
-        harmonics: harm_hex,
-        ambience: amb_hex,
-        pipeline: pipeline_hex,
-    }, _metadata))
+    Ok((
+        StemFingerprints {
+            voice: voice_hex,
+            drums: drums_hex,
+            bass: bass_hex,
+            harmonics: harm_hex,
+            ambience: amb_hex,
+            pipeline: pipeline_hex,
+        },
+        _metadata,
+    ))
 }

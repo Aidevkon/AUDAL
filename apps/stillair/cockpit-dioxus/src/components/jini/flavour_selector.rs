@@ -1,5 +1,5 @@
-use dioxus::prelude::*;
 use crate::state::presets::FLAVOURS;
+use dioxus::prelude::*;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct JiniFlavourSelectorProps {
@@ -16,7 +16,7 @@ pub fn JiniFlavourSelector(props: JiniFlavourSelectorProps) -> Element {
                 for f in FLAVOURS {
                     {
                         let id = f.id;
-                        let on_select = props.on_select.clone();
+                        let on_select = props.on_select;
                         rsx! {
                             button {
                                 onclick: move |_| on_select.call(id.to_string()),

@@ -53,26 +53,49 @@ pub fn JiniPanel(
             let window = web_sys::window().expect("no window");
             let window_val: wasm_bindgen::JsValue = window.into();
 
-            if let Ok(tauri) = js_sys::Reflect::get(&window_val, &wasm_bindgen::JsValue::from_str("__TAURI__")) {
+            if let Ok(tauri) =
+                js_sys::Reflect::get(&window_val, &wasm_bindgen::JsValue::from_str("__TAURI__"))
+            {
                 if !tauri.is_undefined() {
-                    if let Ok(event_api) = js_sys::Reflect::get(&tauri, &wasm_bindgen::JsValue::from_str("event")) {
-                        if let Ok(listen_val) = js_sys::Reflect::get(&event_api, &wasm_bindgen::JsValue::from_str("listen")) {
+                    if let Ok(event_api) =
+                        js_sys::Reflect::get(&tauri, &wasm_bindgen::JsValue::from_str("event"))
+                    {
+                        if let Ok(listen_val) = js_sys::Reflect::get(
+                            &event_api,
+                            &wasm_bindgen::JsValue::from_str("listen"),
+                        ) {
                             if let Ok(listen_fn) = listen_val.dyn_into::<js_sys::Function>() {
-                                
-                                let cb = wasm_bindgen::closure::Closure::<dyn FnMut(wasm_bindgen::JsValue)>::wrap(Box::new(move |ev: wasm_bindgen::JsValue| {
-                                    if let Ok(payload) = js_sys::Reflect::get(&ev, &wasm_bindgen::JsValue::from_str("payload")) {
-                                        if let Ok(json_str) = js_sys::JSON::stringify(&payload) {
-                                            if let Some(stringified) = json_str.as_string() {
-                                                if let Ok(suggestion) = serde_json::from_str::<JiniSuggestionJson>(&stringified) {
-                                                    let mut sig = jini_suggestion;
-                                                    sig.set(Some(suggestion));
+                                let cb = wasm_bindgen::closure::Closure::<
+                                    dyn FnMut(wasm_bindgen::JsValue),
+                                >::wrap(Box::new(
+                                    move |ev: wasm_bindgen::JsValue| {
+                                        if let Ok(payload) = js_sys::Reflect::get(
+                                            &ev,
+                                            &wasm_bindgen::JsValue::from_str("payload"),
+                                        ) {
+                                            if let Ok(json_str) = js_sys::JSON::stringify(&payload)
+                                            {
+                                                if let Some(stringified) = json_str.as_string() {
+                                                    if let Ok(suggestion) =
+                                                        serde_json::from_str::<JiniSuggestionJson>(
+                                                            &stringified,
+                                                        )
+                                                    {
+                                                        let mut sig = jini_suggestion;
+                                                        sig.set(Some(suggestion));
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                }) as Box<dyn FnMut(wasm_bindgen::JsValue)>);
-                                
-                                let _ = listen_fn.call2(&event_api, &wasm_bindgen::JsValue::from_str("jini://album_fatigue"), cb.as_ref().unchecked_ref());
+                                    },
+                                )
+                                    as Box<dyn FnMut(wasm_bindgen::JsValue)>);
+
+                                let _ = listen_fn.call2(
+                                    &event_api,
+                                    &wasm_bindgen::JsValue::from_str("jini://album_fatigue"),
+                                    cb.as_ref().unchecked_ref(),
+                                );
                                 cb.forget();
                             }
                         }

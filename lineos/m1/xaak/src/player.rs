@@ -7,8 +7,8 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Split};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// cpal-backed audio output driver.
 /// Does not own PCM — receives a ring buffer consumer from XaakKernel.
@@ -100,15 +100,21 @@ impl CpalPlayer {
         let mut telem_prod_raw = telem_prod_raw;
 
         // Send StartStream to the persistent telemetry actor
-        if let Err(e) = self.telem_tx.send(crate::telemetry_worker::TelemetryCommand::StartStream {
-            mastered_cons: telem_cons,
-            raw_cons: Some(telem_cons_raw),
-            sample_rate,
-            channels: channels as usize,
-            position_ms: position_ms.clone(),
-            stream_ended: new_stream_ended.clone(),
-        }) {
-            tracing::warn!("xaak: failed to send StartStream to telemetry worker: {}", e);
+        if let Err(e) = self
+            .telem_tx
+            .send(crate::telemetry_worker::TelemetryCommand::StartStream {
+                mastered_cons: telem_cons,
+                raw_cons: Some(telem_cons_raw),
+                sample_rate,
+                channels: channels as usize,
+                position_ms: position_ms.clone(),
+                stream_ended: new_stream_ended.clone(),
+            })
+        {
+            tracing::warn!(
+                "xaak: failed to send StartStream to telemetry worker: {}",
+                e
+            );
         }
 
         // Scratch buffer for raw tap (avoids heap allocation in callback).
@@ -122,7 +128,9 @@ impl CpalPlayer {
                     let mut filled = 0;
                     while filled < data.len() {
                         let n = consumer.pop_slice(&mut data[filled..]);
-                        if n == 0 { break; }
+                        if n == 0 {
+                            break;
+                        }
                         filled += n;
                     }
 
@@ -147,7 +155,9 @@ impl CpalPlayer {
                         let mut raw_filled = 0;
                         while raw_filled < to_read {
                             let n = raw_cons.pop_slice(&mut raw_scratch[raw_filled..to_read]);
-                            if n == 0 { break; }
+                            if n == 0 {
+                                break;
+                            }
                             raw_filled += n;
                         }
                         let mut pushed = 0;
@@ -156,7 +166,9 @@ impl CpalPlayer {
                                 &mut telem_prod_raw,
                                 &raw_scratch[pushed..raw_filled],
                             );
-                            if n == 0 { break; }
+                            if n == 0 {
+                                break;
+                            }
                             pushed += n;
                         }
                     }
@@ -177,11 +189,11 @@ impl CpalPlayer {
                     // Lock-free — never blocks audio thread.
                     let mut pushed = 0;
                     while pushed < data.len() {
-                        let n = ringbuf::traits::Producer::push_slice(
-                            &mut telem_prod,
-                            &data[pushed..],
-                        );
-                        if n == 0 { break; }
+                        let n =
+                            ringbuf::traits::Producer::push_slice(&mut telem_prod, &data[pushed..]);
+                        if n == 0 {
+                            break;
+                        }
                         pushed += n;
                     }
                 },
@@ -229,7 +241,9 @@ impl CpalPlayer {
 
 impl Drop for CpalPlayer {
     fn drop(&mut self) {
-        let _ = self.telem_tx.send(crate::telemetry_worker::TelemetryCommand::Shutdown);
+        let _ = self
+            .telem_tx
+            .send(crate::telemetry_worker::TelemetryCommand::Shutdown);
     }
 }
 

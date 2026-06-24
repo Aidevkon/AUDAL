@@ -16,29 +16,30 @@
 //! Amendment A-002 §3: no core imports.
 //! Amendment A-003 §5: no PCM — PlaybackStateJson only.
 
-
-use crate::ipc::invoke;
+use crate::components::jini::analysing::JiniAnalysing;
+use crate::components::jini::awaiting_more::JiniAwaitingMore;
+use crate::components::jini::detection::JiniDetection;
+use crate::components::jini::drop_zone::JiniDropZone;
+use crate::components::jini::flavour_selector::JiniFlavourSelector;
+use crate::components::jini::platform_selector::JiniPlatformSelector;
 use crate::components::module_frame::ModuleFrame;
 use crate::components::sampling_siamese::SamplingSiamese;
 use crate::components::transport_bar::TransportBar;
-use crate::components::jini::drop_zone::JiniDropZone;
-use crate::components::jini::detection::JiniDetection;
-use crate::components::jini::platform_selector::JiniPlatformSelector;
-use crate::components::jini::flavour_selector::JiniFlavourSelector;
-use crate::components::jini::analysing::JiniAnalysing;
-use crate::components::jini::awaiting_more::JiniAwaitingMore;
-use crate::panels::{jini_panel::JiniPanel, mastered::MasteredView};
+use crate::ipc::invoke;
+use crate::panels::mastered::MasteredView;
 use crate::state::cockpit_mode::CockpitMode;
 
+use crate::state::cockpit_event::CockpitEvent;
+use crate::state::hangar_event::HangarEvent;
 use crate::state::hangar_interview::HangarInterviewState;
 use crate::state::hangar_reducer::dispatch_hangar;
-use crate::state::hangar_event::HangarEvent;
 use crate::state::reducer::dispatch;
-use crate::state::cockpit_event::CockpitEvent;
 use crate::types::{
     CockpitTier, JiniPersonaState, JiniSuggestionJson, SessionStateJson, VisualizationDataJson,
 };
 use dioxus::prelude::*;
+type PendingMasterReq = Option<(String, String, String, f32, f32)>;
+
 use gloo_timers::future::TimeoutFuture;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -66,18 +67,18 @@ pub fn App() -> Element {
     let space_angle: Signal<f32> = use_signal(|| 0.0_f32);
     let loud_angle: Signal<f32> = use_signal(|| 0.0_f32);
     // ── JINI signals (J-P5) ──────────────────────────────────────────────────
-    let jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
+    let _jini_suggestion: Signal<Option<JiniSuggestionJson>> = use_signal(|| None);
     let jini_persona: Signal<JiniPersonaState> = use_signal(|| JiniPersonaState::Intermediate);
     let mut is_journey_active: Signal<bool> = use_signal(|| false);
     let mut journey_stage: Signal<String> = use_signal(|| "INITIALIZING".to_string());
     let mut stage_queue: Signal<std::collections::VecDeque<String>> =
-        use_signal(|| std::collections::VecDeque::new());
+        use_signal(std::collections::VecDeque::new);
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
     let last_platform: Signal<Option<String>> = use_signal(|| None);
-    let last_flavour: Signal<Option<String>>  = use_signal(|| None);
-    let mut pending_master_req: Signal<Option<(String, String, String, f32, f32)>> = use_signal(|| None);
+    let last_flavour: Signal<Option<String>> = use_signal(|| None);
+    let mut pending_master_req: Signal<PendingMasterReq> = use_signal(|| None);
     // TODO: When file drop is implemented (OB-P2 full),
     // wire Ignition → CockpitMode::FileLoaded { path, name, format }
     // and Analysing → drive AnalysisStage LEDs in Left MFD
@@ -99,9 +100,9 @@ pub fn App() -> Element {
         let req = pending_master_req.read().clone();
         if let Some((path, pr, fl, tone, dynval)) = req {
             pending_master_req.write().take(); // clear before spawn — prevents double-fire
-            
-            let mut m_mode = mode;
-            let mut hs = hangar_state;
+
+            let m_mode = mode;
+            let hs = hangar_state;
             let mut lp = last_platform;
             let mut lf = last_flavour;
             let mut viz_data_sig = viz_data;
@@ -109,7 +110,7 @@ pub fn App() -> Element {
             let mut wizard_findings_sig = wizard_findings;
             let jini_persona_sig = jini_persona;
             let mut is_journey_active_sig = is_journey_active;
-            
+
             spawn_local(async move {
                 lp.set(Some(pr.clone()));
                 lf.set(Some(fl.clone()));
@@ -124,13 +125,18 @@ pub fn App() -> Element {
                 // Step 1: load file metadata
                 let meta = match crate::ipc::invoke::<crate::types::AudioMeta, _>(
                     "load_audio_file",
-                    serde_json::json!({ "path": path.clone() })
-                ).await {
+                    serde_json::json!({ "path": path.clone() }),
+                )
+                .await
+                {
                     Ok(m) => m,
                     Err(e) => {
-                        dispatch(m_mode, CockpitEvent::MasteringFailed {
-                            message: format!("Load failed: {e}")
-                        });
+                        dispatch(
+                            m_mode,
+                            CockpitEvent::MasteringFailed {
+                                message: format!("Load failed: {e}"),
+                            },
+                        );
                         dispatch_hangar(hs, HangarEvent::Reset);
                         return;
                     }
@@ -145,14 +151,20 @@ pub fn App() -> Element {
                 let mut journey_stage_sig = journey_stage;
                 journey_stage_sig.set("INITIALIZING".into());
 
-                dispatch(m_mode, CockpitEvent::FileDropped {
-                    path: path.clone(),
-                    name: meta.name.clone(),
-                    format: meta.format.clone(),
-                });
-                dispatch(m_mode, CockpitEvent::PresetSelected {
-                    preset_id: pr.clone(),
-                });
+                dispatch(
+                    m_mode,
+                    CockpitEvent::FileDropped {
+                        path: path.clone(),
+                        name: meta.name.clone(),
+                        format: meta.format.clone(),
+                    },
+                );
+                dispatch(
+                    m_mode,
+                    CockpitEvent::PresetSelected {
+                        preset_id: pr.clone(),
+                    },
+                );
                 dispatch(m_mode, CockpitEvent::MasterTriggered);
                 is_journey_active_sig.set(true);
                 dispatch_hangar(hs, HangarEvent::AnalysisStarted);
@@ -166,13 +178,18 @@ pub fn App() -> Element {
                         "flavourId":      fl,
                         "intentTone":     tone,
                         "intentDynamics": dynval,
-                    })
-                ).await {
+                    }),
+                )
+                .await
+                {
                     Ok(id) => id,
                     Err(e) => {
-                        dispatch(m_mode, CockpitEvent::MasteringFailed {
-                            message: format!("Mastering failed: {e}")
-                        });
+                        dispatch(
+                            m_mode,
+                            CockpitEvent::MasteringFailed {
+                                message: format!("Mastering failed: {e}"),
+                            },
+                        );
                         dispatch_hangar(hs, HangarEvent::Reset);
                         return;
                     }
@@ -201,8 +218,10 @@ pub fn App() -> Element {
                 // Step 4: get_visualization_data
                 if let Ok(viz) = crate::ipc::invoke::<crate::types::VisualizationDataJson, _>(
                     "get_visualization_data",
-                    serde_json::json!({ "blobId": blob_id.clone() })
-                ).await {
+                    serde_json::json!({ "blobId": blob_id.clone() }),
+                )
+                .await
+                {
                     viz_data_sig.set(Some(viz));
                 }
 
@@ -214,19 +233,30 @@ pub fn App() -> Element {
                 session_state_sig.set(Some(state));
 
                 // wait for visual queue to drain
-                web_sys::console::error_1(&format!("[TRAP] ENTERING DRAIN LOOP. is_journey_active={}", *is_journey_active_sig.read()).into());
-                
+                web_sys::console::error_1(
+                    &format!(
+                        "[TRAP] ENTERING DRAIN LOOP. is_journey_active={}",
+                        *is_journey_active_sig.read()
+                    )
+                    .into(),
+                );
+
                 loop {
                     let empty = stage_queue.read().is_empty();
                     let active = *is_journey_active_sig.read();
-                    
-                    web_sys::console::error_1(&format!(
-                        "[TRAP] WAIT LOOP PING: queue_empty={}, journey_active={}", 
-                        empty, active
-                    ).into());
+
+                    web_sys::console::error_1(
+                        &format!(
+                            "[TRAP] WAIT LOOP PING: queue_empty={}, journey_active={}",
+                            empty, active
+                        )
+                        .into(),
+                    );
 
                     if empty && !active {
-                        web_sys::console::error_1(&format!("[TRAP] LOOP BREAK CONDITION MET!").into());
+                        web_sys::console::error_1(
+                            &"[TRAP] LOOP BREAK CONDITION MET!".to_string().into(),
+                        );
                         break;
                     }
                     gloo_timers::future::TimeoutFuture::new(500).await;
@@ -234,27 +264,40 @@ pub fn App() -> Element {
 
                 // Step 7: complete
                 // Step 7: complete
-                web_sys::console::log_1(&format!(
-                    "[FSM-TRAP] queue drained, journey_active={}, mode={:?}",
-                    *is_journey_active_sig.read(), *m_mode.read()
-                ).into());
+                web_sys::console::log_1(
+                    &format!(
+                        "[FSM-TRAP] queue drained, journey_active={}, mode={:?}",
+                        *is_journey_active_sig.read(),
+                        *m_mode.read()
+                    )
+                    .into(),
+                );
 
-                dispatch(m_mode, CockpitEvent::MasteringComplete { blob_id: blob_id.clone() });
+                dispatch(
+                    m_mode,
+                    CockpitEvent::MasteringComplete {
+                        blob_id: blob_id.clone(),
+                    },
+                );
 
-                web_sys::console::log_1(&format!(
-                    "[FSM-TRAP] after MasteringComplete dispatch, mode={:?}",
-                    *m_mode.read()
-                ).into());
+                web_sys::console::log_1(
+                    &format!(
+                        "[FSM-TRAP] after MasteringComplete dispatch, mode={:?}",
+                        *m_mode.read()
+                    )
+                    .into(),
+                );
 
                 dispatch_hangar(hs, HangarEvent::AnalysisComplete);
 
-                web_sys::console::error_1(&format!(
-                    "[TRAP] FSM: after AnalysisComplete. hangar should be Ready now"
-                ).into());
+                web_sys::console::error_1(
+                    &"[TRAP] FSM: after AnalysisComplete. hangar should be Ready now"
+                        .to_string()
+                        .into(),
+                );
             });
         }
     });
-
 
     // ── Tauri Event Listener for mastering://progress ────────────────────────
     use_effect(move || {
@@ -281,7 +324,9 @@ pub fn App() -> Element {
                                                 &JsValue::from_str("stage"),
                                             ) {
                                                 if let Some(s) = stage_val.as_string() {
-                                                    if s == "DISPATCHED" { return; }
+                                                    if s == "DISPATCHED" {
+                                                        return;
+                                                    }
                                                     let mut q = stage_queue.write();
                                                     if q.back() != Some(&s) {
                                                         q.push_back(s.clone());
@@ -319,12 +364,15 @@ pub fn App() -> Element {
                                             ) {
                                                 if let Some(b) = bpm_val.as_f64() {
                                                     bpm_signal.set(b as f32);
-                                                    web_sys::console::log_1(&JsValue::from_str(&format!("BPM: {}", b)));
+                                                    web_sys::console::log_1(&JsValue::from_str(
+                                                        &format!("BPM: {}", b),
+                                                    ));
                                                 }
                                             }
                                         }
                                     },
-                                ) as Box<dyn FnMut(JsValue)>);
+                                )
+                                    as Box<dyn FnMut(JsValue)>);
 
                                 let _ = listen_fn.call2(
                                     &event_api,
@@ -342,13 +390,15 @@ pub fn App() -> Element {
                                                 &payload,
                                                 &JsValue::from_str("type"),
                                             ) {
-                                                if ev_type.as_string().unwrap_or_default() == "drop" {
+                                                if ev_type.as_string().unwrap_or_default() == "drop"
+                                                {
                                                     if let Ok(paths) = js_sys::Reflect::get(
                                                         &payload,
                                                         &JsValue::from_str("paths"),
                                                     ) {
-                                                        let paths_array = js_sys::Array::from(&paths);
-                                                        let count = paths_array.length() as u32;
+                                                        let paths_array =
+                                                            js_sys::Array::from(&paths);
+                                                        let count = paths_array.length();
 
                                                         if count > 0 {
                                                             let first_path = paths_array
@@ -358,14 +408,20 @@ pub fn App() -> Element {
 
                                                             dropped_path.set(Some(first_path));
 
-                                                            dispatch_hangar(hangar_state, HangarEvent::FilesDropped { count: count as usize });
+                                                            dispatch_hangar(
+                                                                hangar_state,
+                                                                HangarEvent::FilesDropped {
+                                                                    count: count as usize,
+                                                                },
+                                                            );
                                                         }
                                                     }
                                                 }
                                             }
                                         }
                                     },
-                                ) as Box<dyn FnMut(JsValue)>);
+                                )
+                                    as Box<dyn FnMut(JsValue)>);
 
                                 let _ = listen_fn.call2(
                                     &event_api,
@@ -388,14 +444,24 @@ pub fn App() -> Element {
                 gloo_timers::future::TimeoutFuture::new(500).await;
                 let next = stage_queue.write().pop_front();
                 if let Some(stage) = next {
-                    web_sys::console::error_1(&format!("[TRAP] TIMER POPPED STAGE: {}", stage).into());
+                    web_sys::console::error_1(
+                        &format!("[TRAP] TIMER POPPED STAGE: {}", stage).into(),
+                    );
                     journey_stage.set(stage.clone());
                     if stage == "CERTIFIED" || stage == "ERROR" {
                         // let it display, then tear down journey
-                        web_sys::console::error_1(&format!("[TRAP] TIMER: reached CERTIFIED/ERROR. Waiting 800ms to teardown").into());
+                        web_sys::console::error_1(
+                            &"[TRAP] TIMER: reached CERTIFIED/ERROR. Waiting 800ms to teardown"
+                                .to_string()
+                                .into(),
+                        );
                         gloo_timers::future::TimeoutFuture::new(800).await;
                         is_journey_active.set(false);
-                        web_sys::console::error_1(&format!("[TRAP] TIMER: is_journey_active SET TO FALSE").into());
+                        web_sys::console::error_1(
+                            &"[TRAP] TIMER: is_journey_active SET TO FALSE"
+                                .to_string()
+                                .into(),
+                        );
                     }
                 }
             }
@@ -561,19 +627,19 @@ pub fn App() -> Element {
                         HangarInterviewState::FlavourCard { platform, track_count: _ } => {
                             let platform_clone = platform.clone();
                             let current_path = dropped_path.read().clone();
-                            
+
                             let m_mode = mode;
                             let hs = hangar_state;
-                            let mut lp = last_platform;
-                            let mut lf = last_flavour;
-                            
+                            let _lp = last_platform;
+                            let _lf = last_flavour;
+
                             let tone = (*tone_angle.read() / 135.0 + 1.0) / 2.0;
                             let dynval = (*dyn_angle.read() / 135.0 + 1.0) / 2.0;
-                            
-                            let mut viz_data_sig = viz_data;
-                            let mut session_state_sig = session_state;
-                            let mut wizard_findings_sig = wizard_findings;
-                            let jini_persona_sig = jini_persona;
+
+                            let _viz_data_sig = viz_data;
+                            let _session_state_sig = session_state;
+                            let _wizard_findings_sig = wizard_findings;
+                            let _jini_persona_sig = jini_persona;
 
                             rsx! {
                                 JiniFlavourSelector {
@@ -582,7 +648,7 @@ pub fn App() -> Element {
                                             "[NEW-SESSION] starting, current mode={:?}", *m_mode.read()
                                         ).into());
                                         dispatch_hangar(hs, HangarEvent::FlavourChosen { flavour: flavour.clone() });
-                                        
+
                                         if let Some(path) = current_path.clone() {
                                             let pr = platform_clone.clone();
                                             let fl = flavour;

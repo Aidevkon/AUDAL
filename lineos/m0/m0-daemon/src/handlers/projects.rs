@@ -2,48 +2,54 @@
 //! Persistent via SurrealDB (kv-surrealkv).
 //! Bypasses v3 SDK Trait Bounds using Universal JSON Adapter.
 
-use axum::{extract::State, Json};
-use axum::extract::Path;
-use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
 use crate::db::schema::{Project, Track};
+use axum::extract::Path;
+use axum::{extract::State, Json};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct CreateProjectRequest {
-    pub name:       String,
+    pub name: String,
     pub flavour_id: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct ProjectResponse {
-    pub ok:      bool,
-    pub id:      String,
+    pub ok: bool,
+    pub id: String,
     pub message: String,
 }
 
 /// POST /projects — create new project
 pub async fn create_project(
     State(app): State<AppState>,
-    Json(req):  Json<CreateProjectRequest>,
+    Json(req): Json<CreateProjectRequest>,
 ) -> Json<ProjectResponse> {
     let aql = "CREATE projects SET name = $name, created_at = $created_at, flavour_id = $flavour_id, track_count = 0 RETURN *;";
     let created_at = chrono::Utc::now().to_rfc3339();
-    let flavour_id = req.flavour_id.clone().unwrap_or_else(|| "neutral".to_string());
+    let flavour_id = req
+        .flavour_id
+        .clone()
+        .unwrap_or_else(|| "neutral".to_string());
 
     // Fix 1: Pass Owned Strings or &str, NOT &String
-    let mut response = match app.db
+    let mut response = match app
+        .db
         .query(aql)
         .bind(("name", req.name.clone()))
         .bind(("created_at", created_at))
         .bind(("flavour_id", flavour_id))
-        .await 
+        .await
     {
         Ok(res) => res,
-        Err(e) => return Json(ProjectResponse {
-            ok: false,
-            id: String::new(),
-            message: format!("DB Query Failed: {}", e),
-        }),
+        Err(e) => {
+            return Json(ProjectResponse {
+                ok: false,
+                id: String::new(),
+                message: format!("DB Query Failed: {}", e),
+            })
+        }
     };
 
     // Fix 2: Fetch as generic serde_json::Value to bypass SurrealValue trait bounds
@@ -55,8 +61,8 @@ pub async fn create_project(
             if let Ok(proj) = serde_json::from_value::<Project>(val) {
                 let proj_id = proj.id.unwrap_or_default();
                 Json(ProjectResponse {
-                    ok:      true,
-                    id:      proj_id,
+                    ok: true,
+                    id: proj_id,
                     message: format!("Project '{}' created", req.name),
                 })
             } else {
@@ -76,9 +82,7 @@ pub async fn create_project(
 }
 
 /// GET /projects — list all projects
-pub async fn list_projects(
-    State(app): State<AppState>,
-) -> Json<Vec<Project>> {
+pub async fn list_projects(State(app): State<AppState>) -> Json<Vec<Project>> {
     if let Ok(mut response) = app.db.query("SELECT * FROM projects").await {
         let raw_results: Vec<serde_json::Value> = response.take(0).unwrap_or_default();
         let projects: Vec<Project> = raw_results
@@ -93,9 +97,14 @@ pub async fn list_projects(
 /// GET /projects/:id — get single project
 pub async fn get_project(
     State(app): State<AppState>,
-    Path(id):   Path<String>,
+    Path(id): Path<String>,
 ) -> Json<Option<Project>> {
-    if let Ok(mut response) = app.db.query("SELECT * FROM type::thing('projects', $id)").bind(("id", id.clone())).await {
+    if let Ok(mut response) = app
+        .db
+        .query("SELECT * FROM type::thing('projects', $id)")
+        .bind(("id", id.clone()))
+        .await
+    {
         let raw_result: Option<serde_json::Value> = response.take(0).unwrap_or(None);
         if let Some(val) = raw_result {
             return Json(serde_json::from_value(val).ok());
@@ -105,11 +114,13 @@ pub async fn get_project(
 }
 
 /// GET /projects/:id/tracks — list tracks for project
-pub async fn list_tracks(
-    State(app): State<AppState>,
-    Path(id):   Path<String>,
-) -> Json<Vec<Track>> {
-    if let Ok(mut response) = app.db.query("SELECT * FROM tracks WHERE project_id = $id").bind(("id", id.clone())).await {
+pub async fn list_tracks(State(app): State<AppState>, Path(id): Path<String>) -> Json<Vec<Track>> {
+    if let Ok(mut response) = app
+        .db
+        .query("SELECT * FROM tracks WHERE project_id = $id")
+        .bind(("id", id.clone()))
+        .await
+    {
         let raw_results: Vec<serde_json::Value> = response.take(0).unwrap_or_default();
         let tracks: Vec<Track> = raw_results
             .into_iter()

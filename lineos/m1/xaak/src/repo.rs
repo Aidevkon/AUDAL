@@ -69,8 +69,7 @@ impl AudioRepo {
     pub fn new_with_flavours(initial_state: DspState) -> Self {
         let mut repo = Self::new(initial_state);
         for (name, state) in crate::flavours::ALL {
-            repo.create_branch(name)
-                .unwrap_or(());  // ignore if already exists
+            repo.create_branch(name).unwrap_or(()); // ignore if already exists
             let current = repo.active_branch.clone();
             repo.checkout(name).unwrap_or(());
             repo.commit(*state, &format!("{} preset", name));
@@ -240,13 +239,19 @@ mod tests {
         let mut repo = repo;
         repo.checkout("club_punch").unwrap();
         let state = repo.head_state();
-        assert!((state.ducking_depth - 1.5).abs() < 0.001,
-            "Club Punch ducking_depth should be 1.5, got {}", state.ducking_depth);
+        assert!(
+            (state.ducking_depth - 1.5).abs() < 0.001,
+            "Club Punch ducking_depth should be 1.5, got {}",
+            state.ducking_depth
+        );
     }
 
     #[test]
     fn test_flavour_main_preserved() {
-        let custom = DspState { ducking_depth: 1.23, ..DspState::default() };
+        let custom = DspState {
+            ducking_depth: 1.23,
+            ..DspState::default()
+        };
         let mut repo = AudioRepo::new_with_flavours(DspState::default());
         // commit custom state to main
         repo.commit(custom, "my custom mix");
@@ -255,8 +260,10 @@ mod tests {
         assert!((repo.head_state().ducking_depth - 1.5).abs() < 0.001);
         // return to main — custom mix preserved
         repo.checkout("main").unwrap();
-        assert!((repo.head_state().ducking_depth - 1.23).abs() < 0.001,
-            "Main branch custom mix should be preserved");
+        assert!(
+            (repo.head_state().ducking_depth - 1.23).abs() < 0.001,
+            "Main branch custom mix should be preserved"
+        );
     }
 
     #[test]

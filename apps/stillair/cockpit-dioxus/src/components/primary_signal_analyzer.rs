@@ -14,24 +14,30 @@
 //!   │ Cell 5: LOUDNESS TRACE (Loudness history over 120s rolling window)   │
 //!   └──────────────────────────────────────────────────────────────────────┘
 
-use dioxus::prelude::*;
 use crate::components::neon_canvas::NeonCanvas;
 use crate::types::RealtimeFrameJson;
+use dioxus::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum AnalysisStage {
-    Idle, Ingest, Scout, Stems, Spatial, Master, Certified
+    Idle,
+    Ingest,
+    Scout,
+    Stems,
+    Spatial,
+    Master,
+    Certified,
 }
 
 pub fn stage_from_str(s: &str) -> AnalysisStage {
     match s {
-        "Ingest"      => AnalysisStage::Ingest,
-        "Scout Pass"  => AnalysisStage::Scout,
+        "Ingest" => AnalysisStage::Ingest,
+        "Scout Pass" => AnalysisStage::Scout,
         "Stem Engine" => AnalysisStage::Stems,
-        "Spatial"     => AnalysisStage::Spatial,
-        "Mastering"   => AnalysisStage::Master,
-        "CERTIFIED"   => AnalysisStage::Certified,
-        _             => AnalysisStage::Idle,
+        "Spatial" => AnalysisStage::Spatial,
+        "Mastering" => AnalysisStage::Master,
+        "CERTIFIED" => AnalysisStage::Certified,
+        _ => AnalysisStage::Idle,
     }
 }
 

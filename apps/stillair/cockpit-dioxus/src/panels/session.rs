@@ -19,11 +19,9 @@ use wasm_bindgen_futures::spawn_local;
 use crate::ipc::invoke;
 use crate::state::cockpit_event::CockpitEvent;
 use crate::state::cockpit_mode::{AscCode, CockpitMode};
+use crate::state::presets::PLATFORMS;
 use crate::state::reducer::dispatch;
 use crate::types::{SessionStateJson, VisualizationDataJson};
-use crate::state::presets::PLATFORMS;
-
-
 
 #[component]
 pub fn SessionPanel(
@@ -282,8 +280,6 @@ fn MasterButton(
         }
     }
 }
-
-
 
 #[component]
 pub fn GoldenBlobBadge() -> Element {

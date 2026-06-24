@@ -120,6 +120,12 @@ pub struct OlaRingBuffer {
     overlap: Vec<f32>,
 }
 
+impl Default for OlaRingBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OlaRingBuffer {
     pub fn new() -> Self {
         Self {
@@ -173,6 +179,12 @@ pub struct StftStreamContext {
     /// Lookahead buffer: holds last FFT_SIZE - HOP_SIZE samples
     /// from previous chunk for correct frame boundaries.
     lookahead: Vec<f32>,
+}
+
+impl Default for StftStreamContext {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StftStreamContext {

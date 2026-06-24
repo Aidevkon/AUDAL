@@ -85,16 +85,15 @@ impl WavChunkReader {
     /// O(1) disk seek — zero RAM allocation.
     /// INV-ST-3: peak RAM ≤ 5MB regardless of seek position.
     pub fn seek_ms(&mut self, position_ms: u64) -> Result<(), String> {
-        let sample_offset = (position_ms as f64
-            * self.sample_rate as f64
-            * self.channels as f64
-            / 1000.0) as u32;
+        let sample_offset =
+            (position_ms as f64 * self.sample_rate as f64 * self.channels as f64 / 1000.0) as u32;
         self.seek_samples(sample_offset)
     }
 
     /// Seek to absolute sample position (all channels).
     pub fn seek_samples(&mut self, sample_pos: u32) -> Result<(), String> {
-        self.reader.seek(sample_pos)
+        self.reader
+            .seek(sample_pos)
             .map_err(|e| format!("WavChunkReader seek failed: {e}"))
     }
 }
@@ -141,9 +140,7 @@ mod tests {
     fn test_seek_ms_positions_correctly() {
         let path = "/tmp/test_stream_seek.wav";
         // 2 seconds stereo @ 48kHz = 192000 samples
-        let samples: Vec<f32> = (0..192000)
-            .map(|i| i as f32 / 192000.0)
-            .collect();
+        let samples: Vec<f32> = (0..192000).map(|i| i as f32 / 192000.0).collect();
         let mut writer = WavChunkWriter::create(path, 48000, 2).unwrap();
         writer.write_chunk(&samples).unwrap();
         writer.finalize().unwrap();
@@ -156,7 +153,9 @@ mod tests {
         let expected = 96000.0f32 / 192000.0;
         assert!(
             (chunk[0] - expected).abs() < 0.01,
-            "seek_ms(1000): expected ~{:.3}, got {:.3}", expected, chunk[0]
+            "seek_ms(1000): expected ~{:.3}, got {:.3}",
+            expected,
+            chunk[0]
         );
         std::fs::remove_file(path).ok();
     }
@@ -171,7 +170,7 @@ mod tests {
 
         let mut reader = WavChunkReader::open(path).unwrap();
         let _ = reader.next_chunk(24000); // read halfway
-        reader.seek_samples(0).unwrap();  // seek back to start
+        reader.seek_samples(0).unwrap(); // seek back to start
         let chunk = reader.next_chunk(1).unwrap();
         assert!((chunk[0] - 0.1).abs() < 0.001);
         std::fs::remove_file(path).ok();

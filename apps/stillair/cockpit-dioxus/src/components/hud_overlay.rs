@@ -71,17 +71,19 @@ fn spatial_style(id: &str) -> &'static str {
         // MFD1 (PSA)
         "true_peak_clip" => "position: absolute; top: 32px; right: 16px;",
         "lufs_deviation" => "position: absolute; top: 72px; right: 16px;",
-        "dynamic_crush"  => "position: absolute; bottom: 32px; right: 16px;",
-        "cymbal_harsh"   => "position: absolute; top: 30%; right: 25%;",
-        "boxiness"       => "position: absolute; bottom: 30%; left: 25%;",
-        "harsh_resonance"=> "position: absolute; top: 45%; left: 45%;",
-        "verification_failed" => "position: absolute; top: 12px; left: 50%; transform: translateX(-50%);",
-        
+        "dynamic_crush" => "position: absolute; bottom: 32px; right: 16px;",
+        "cymbal_harsh" => "position: absolute; top: 30%; right: 25%;",
+        "boxiness" => "position: absolute; bottom: 30%; left: 25%;",
+        "harsh_resonance" => "position: absolute; top: 45%; left: 45%;",
+        "verification_failed" => {
+            "position: absolute; top: 12px; left: 50%; transform: translateX(-50%);"
+        }
+
         // MFD2 (Spatial)
-        "phase_issue"     => "position: absolute; bottom: 32px; right: 16px;",
+        "phase_issue" => "position: absolute; bottom: 32px; right: 16px;",
         "stereo_collapse" => "position: absolute; top: 32px; left: 16px;",
-        "sub_rumble"      => "position: absolute; bottom: 32px; left: 16px;",
-        
+        "sub_rumble" => "position: absolute; bottom: 32px; left: 16px;",
+
         // Fallback
         _ => "position: absolute; bottom: 16px; left: 16px;",
     }

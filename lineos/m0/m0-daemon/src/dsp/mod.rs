@@ -48,7 +48,7 @@ impl DspAdapter {
         use rayon::prelude::*;
 
         // Phase 1: Serial Graph Processing
-        // The DspGraph contains heavily stateful nodes (Compressor, Reverb) 
+        // The DspGraph contains heavily stateful nodes (Compressor, Reverb)
         // that cannot be cleanly parallelized without massive margins.
         let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
         let mut f = 0;
@@ -79,7 +79,7 @@ impl DspAdapter {
             let correction_db = target_lufs - output_lufs;
             let correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
-            
+
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
             let isp_limiter_config = LimiterConfig {
                 release_ms: 15.0_f32,
@@ -113,67 +113,70 @@ impl DspAdapter {
             let left_src = left.to_vec();
             let right_src = right.to_vec();
 
-            let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks.par_iter().map(|&(_start, end, pad_start, pad_end, pad_len)| {
-                let mut isp_limiter_clone = BrickwallLimiter::new(isp_limiter_config, sample_rate);
-                
-                let is_last_chunk = pad_end == num_frames;
-                let flush_len = if is_last_chunk { lookahead } else { 0 };
-                let total_len = pad_end - pad_start + flush_len;
-                
-                let mut work_l = vec![0.0_f32; total_len];
-                let mut work_r = vec![0.0_f32; total_len];
-                
-                // Apply global gain correction during the copy
-                for (i, &s) in left_src[pad_start..pad_end].iter().enumerate() {
-                    work_l[i] = s * correction_linear;
-                }
-                for (i, &s) in right_src[pad_start..pad_end].iter().enumerate() {
-                    work_r[i] = s * correction_linear;
-                }
+            let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks
+                .par_iter()
+                .map(|&(_start, end, pad_start, pad_end, pad_len)| {
+                    let mut isp_limiter_clone =
+                        BrickwallLimiter::new(isp_limiter_config, sample_rate);
 
-                // Process block by block (512) for the limiter
-                let mut f = 0;
-                while f < total_len {
-                    let e = (f + block_size).min(total_len);
-                    let b_len = e - f;
-                    if b_len < block_size {
-                        let mut pad_l = vec![0.0_f32; block_size];
-                        let mut pad_r = vec![0.0_f32; block_size];
-                        pad_l[..b_len].copy_from_slice(&work_l[f..e]);
-                        pad_r[..b_len].copy_from_slice(&work_r[f..e]);
-                        isp_limiter_clone.process_block(&mut pad_l, &mut pad_r);
-                        work_l[f..e].copy_from_slice(&pad_l[..b_len]);
-                        work_r[f..e].copy_from_slice(&pad_r[..b_len]);
-                    } else {
-                        isp_limiter_clone.process_block(&mut work_l[f..e], &mut work_r[f..e]);
+                    let is_last_chunk = pad_end == num_frames;
+                    let flush_len = if is_last_chunk { lookahead } else { 0 };
+                    let total_len = pad_end - pad_start + flush_len;
+
+                    let mut work_l = vec![0.0_f32; total_len];
+                    let mut work_r = vec![0.0_f32; total_len];
+
+                    // Apply global gain correction during the copy
+                    for (i, &s) in left_src[pad_start..pad_end].iter().enumerate() {
+                        work_l[i] = s * correction_linear;
                     }
-                    f += b_len;
-                }
+                    for (i, &s) in right_src[pad_start..pad_end].iter().enumerate() {
+                        work_r[i] = s * correction_linear;
+                    }
 
-                // The limiter delays audio by exactly `lookahead` samples.
-                // Output for input `i` is at `i + lookahead`.
-                // The true start of our chunk in `work` is `pad_len`.
-                // So the true start of output is `pad_len + lookahead`.
-                let out_start = pad_len + lookahead;
-                let target_len = end - _start;
-                let out_end = (out_start + target_len).min(total_len);
-                
-                let mut final_l = vec![0.0_f32; target_len];
-                let mut final_r = vec![0.0_f32; target_len];
-                
-                let available = out_end - out_start;
-                final_l[..available].copy_from_slice(&work_l[out_start..out_end]);
-                final_r[..available].copy_from_slice(&work_r[out_start..out_end]);
+                    // Process block by block (512) for the limiter
+                    let mut f = 0;
+                    while f < total_len {
+                        let e = (f + block_size).min(total_len);
+                        let b_len = e - f;
+                        if b_len < block_size {
+                            let mut pad_l = vec![0.0_f32; block_size];
+                            let mut pad_r = vec![0.0_f32; block_size];
+                            pad_l[..b_len].copy_from_slice(&work_l[f..e]);
+                            pad_r[..b_len].copy_from_slice(&work_r[f..e]);
+                            isp_limiter_clone.process_block(&mut pad_l, &mut pad_r);
+                            work_l[f..e].copy_from_slice(&pad_l[..b_len]);
+                            work_r[f..e].copy_from_slice(&pad_r[..b_len]);
+                        } else {
+                            isp_limiter_clone.process_block(&mut work_l[f..e], &mut work_r[f..e]);
+                        }
+                        f += b_len;
+                    }
 
-                (final_l, final_r)
-            }).collect();
+                    // The limiter delays audio by exactly `lookahead` samples.
+                    // Output for input `i` is at `i + lookahead`.
+                    // The true start of our chunk in `work` is `pad_len`.
+                    // So the true start of output is `pad_len + lookahead`.
+                    let out_start = pad_len + lookahead;
+                    let target_len = end - _start;
+                    let out_end = (out_start + target_len).min(total_len);
 
+                    let mut final_l = vec![0.0_f32; target_len];
+                    let mut final_r = vec![0.0_f32; target_len];
+
+                    let available = out_end - out_start;
+                    final_l[..available].copy_from_slice(&work_l[out_start..out_end]);
+                    final_r[..available].copy_from_slice(&work_r[out_start..out_end]);
+
+                    (final_l, final_r)
+                })
+                .collect();
 
             let mut idx = 0;
             for (out_l, out_r) in processed_isp {
                 let len = out_l.len();
-                left[idx..idx+len].copy_from_slice(&out_l);
-                right[idx..idx+len].copy_from_slice(&out_r);
+                left[idx..idx + len].copy_from_slice(&out_l);
+                right[idx..idx + len].copy_from_slice(&out_r);
                 idx += len;
             }
         }
