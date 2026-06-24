@@ -24,6 +24,10 @@ pub enum MasteringTarget {
     BroadcastVideo,
     /// Target RMS -24.0 dB — US broadcast standard (ATSC A/85)
     AtscA85,
+    /// Apple Digital Masters (-16.0 LUFS, -1.0 dBTP ceiling)
+    AppleDigitalMasters,
+    /// Apple Podcasts (-16.0 LUFS, -1.0 dBTP ceiling)
+    ApplePodcast,
 }
 
 impl MasteringTarget {
@@ -40,6 +44,8 @@ impl MasteringTarget {
             MasteringTarget::AggressiveEDM => Some(-7.0),
             MasteringTarget::BroadcastVideo => Some(-23.0),
             MasteringTarget::AtscA85 => Some(-24.0),
+            MasteringTarget::AppleDigitalMasters => Some(-16.0),
+            MasteringTarget::ApplePodcast => Some(-16.0),
         }
     }
 
@@ -54,6 +60,8 @@ impl MasteringTarget {
             MasteringTarget::AggressiveEDM => "Club & EDM",
             MasteringTarget::BroadcastVideo => "Broadcast & Film (EBU R128)",
             MasteringTarget::AtscA85 => "US Broadcast (ATSC A/85)",
+            MasteringTarget::AppleDigitalMasters => "Apple Digital Masters",
+            MasteringTarget::ApplePodcast => "Apple Podcasts",
         }
     }
 
@@ -68,6 +76,8 @@ impl MasteringTarget {
             MasteringTarget::AggressiveEDM => aggressive_edm_config(sample_rate),
             MasteringTarget::BroadcastVideo => broadcast_video_config(sample_rate),
             MasteringTarget::AtscA85 => atsc_a85_config(sample_rate),
+            MasteringTarget::AppleDigitalMasters => apple_digital_masters_config(sample_rate),
+            MasteringTarget::ApplePodcast => apple_podcast_config(sample_rate),
         }
     }
 }
@@ -260,6 +270,59 @@ fn atsc_a85_config(_sample_rate: u32) -> EngineConfig {
         parallel_mix: 0.1,
         target_makeup_db: 0.0,
         limiter_config: LimiterConfig::default(),
+        restoration_config: RestorationConfig::voice(),
+        harmonic_config: None,
+        clipper_enabled: false,
+    }
+}
+
+/// Apple Digital Masters: streaming-optimized, -1.0 dBTP ceiling to prevent AAC intersample clipping.
+/// Target LUFS is -16.0 (Apple Music recommendation, lower than Spotify's -14.0).
+fn apple_digital_masters_config(_sample_rate: u32) -> EngineConfig {
+    EngineConfig {
+        eq_config: MaskingEQConfig {
+            target_db: [1.0, 0.5, 0.0, 0.0, 0.5, 1.0, 1.5, 1.0],
+            mask_margin_db: 3.0,
+            max_boost_db: 4.0,
+            target_phon: 80.0,
+        },
+        comp_config: CompressorV3Config {
+            mid_config: default_band_config(-18.0, 2.5, 10.0, 150.0, 1.0),
+            side_config: default_band_config(-24.0, 1.8, 20.0, 200.0, 0.0),
+        },
+        parallel_mix: 0.5,
+        target_makeup_db: 0.0,
+        limiter_config: LimiterConfig {
+            ceiling_db: -1.0,
+            ..LimiterConfig::default()
+        },
+        restoration_config: RestorationConfig::music(),
+        harmonic_config: None,
+        clipper_enabled: false,
+    }
+}
+
+/// Apple Podcast: clarity-focused, low density.
+/// Target LUFS is -16.0 (standard podcast target, same as generic PodcastVoice),
+/// but with a -1.0 dBTP ceiling explicitly required for Apple Podcasts compliance.
+fn apple_podcast_config(_sample_rate: u32) -> EngineConfig {
+    EngineConfig {
+        eq_config: MaskingEQConfig {
+            target_db: [0.0, 0.5, 1.0, 1.5, 1.0, 0.5, 0.0, 0.0],
+            mask_margin_db: 4.0,
+            max_boost_db: 3.0,
+            target_phon: 80.0,
+        },
+        comp_config: CompressorV3Config {
+            mid_config: default_band_config(-20.0, 3.0, 5.0, 100.0, 0.5),
+            side_config: default_band_config(-28.0, 1.5, 10.0, 150.0, 0.0),
+        },
+        parallel_mix: 0.1, // serial compression preferred for voice
+        target_makeup_db: 0.0,
+        limiter_config: LimiterConfig {
+            ceiling_db: -1.0,
+            ..LimiterConfig::default()
+        },
         restoration_config: RestorationConfig::voice(),
         harmonic_config: None,
         clipper_enabled: false,

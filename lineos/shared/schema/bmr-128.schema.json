@@ -7,6 +7,7 @@
     "spotify":     { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
     "youtube":     { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
     "apple_music": { "target_lufs": -16.0, "true_peak_ceiling_dbfs": -1.0 },
+    "apple_podcast": { "target_lufs": -16.0, "true_peak_ceiling_dbfs": -1.0 },
     "tidal":       { "target_lufs": -14.0, "true_peak_ceiling_dbfs": -1.0 },
     "broadcast":   { "target_lufs": -23.0, "true_peak_ceiling_dbfs": -1.0 },
     "raw":         { "target_lufs": null,   "true_peak_ceiling_dbfs": -0.1 }

@@ -39,8 +39,13 @@ pub const FLAVOURS: &[FlavourDef] = &[
 pub const PLATFORMS: &[PlatformDef] = &[
     PlatformDef {
         id: "spotify",
-        label: "Spotify / Apple",
+        label: "Spotify",
         lufs: -14.0,
+    },
+    PlatformDef {
+        id: "apple_music",
+        label: "Apple Digital Masters",
+        lufs: -16.0,
     },
     PlatformDef {
         id: "apple_podcast",
