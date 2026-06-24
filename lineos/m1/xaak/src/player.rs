@@ -90,7 +90,14 @@ impl CpalPlayer {
         let (telem_prod_raw, telem_cons_raw) = telem_rb_raw.split();
         let mut telem_prod_raw = telem_prod_raw;
 
-        // Spawn telemetry worker — FFT + UDP off audio thread.
+        // TODO(telemetry-leak): each play() spawns a new telemetry_worker thread. If stop()
+        // is called before natural EOF, the underrun-based stream_ended trigger never fires
+        // (no more zero-read callbacks happen — the stream is gone), so the old worker thread
+        // has no producer and no exit condition: it becomes a zombie that lives forever.
+        // Repeated play/stop cycles (e.g. frequent seeking) will leak threads unconditionally.
+        // Fix candidates: detect producer-dropped on the consumer side (ringbuf::Observer
+        // doesn't expose this in v0.4), or have stop() send an explicit shutdown signal that
+        // the worker polls for even when it has no data to flush.
         crate::telemetry_worker::spawn(
             telem_cons,
             Some(telem_cons_raw),
