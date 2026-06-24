@@ -1,3 +1,4 @@
+use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use sp314_dsp::compressor::{
     core::{CompressorBand, CompressorBandConfig},
@@ -51,12 +52,7 @@ fn crossover_lr4_sum_is_flat() {
         }
 
         let sum_db = 20.0 * peak_sum.log10();
-        assert!(
-            (sum_db - expected_sum_db).abs() < tol,
-            "Expected sum {} dB, got {} dB",
-            expected_sum_db,
-            sum_db
-        );
+        assert_abs_diff_eq!(sum_db, expected_sum_db, epsilon = tol);
     }
 }
 
@@ -97,18 +93,8 @@ fn crossover_lr4_split_at_crossover_freq() {
     let low_db = 20.0 * peak_low.log10();
     let high_db = 20.0 * peak_high.log10();
 
-    assert!(
-        (low_db - exp_low).abs() < tol,
-        "Expected low {} dB, got {} dB",
-        exp_low,
-        low_db
-    );
-    assert!(
-        (high_db - exp_high).abs() < tol,
-        "Expected high {} dB, got {} dB",
-        exp_high,
-        high_db
-    );
+    assert_abs_diff_eq!(low_db, exp_low, epsilon = tol);
+    assert_abs_diff_eq!(high_db, exp_high, epsilon = tol);
 }
 
 #[test]
@@ -200,7 +186,7 @@ fn envelope_rc_coeff_matches_reference() {
         let tol = case["tolerance"].as_f64().unwrap() as f32;
 
         let coeff = std::f32::consts::E.powf(-2.2 / (time_ms * 0.001 * sr as f32));
-        assert!((coeff - exp).abs() < tol, "Expected {}, got {}", exp, coeff);
+        assert_abs_diff_eq!(coeff, exp, epsilon = tol);
     }
 }
 
@@ -254,7 +240,7 @@ fn envelope_output_is_db() {
     }
     let out = env.process(0.5);
     // 0.5 linear is -6.02 dB
-    assert!((out - -6.0206).abs() < 0.1);
+    assert_abs_diff_eq!(out, -6.0206, epsilon = 0.1);
 }
 
 // =========================================
@@ -275,13 +261,7 @@ fn gain_computer_matches_reference() {
         let exp_gr = case["expected_gr"].as_f64().unwrap() as f32;
 
         let gr = compute_gain_reduction(env_db, threshold, ratio, knee);
-        assert!(
-            (gr - exp_gr).abs() < 1e-4,
-            "Env {}, Expected GR {}, got {}",
-            env_db,
-            exp_gr,
-            gr
-        );
+        assert_abs_diff_eq!(gr, exp_gr, epsilon = 1e-4);
     }
 }
 
@@ -307,10 +287,7 @@ fn gain_computer_c1_continuous() {
 
     let slope_below = (gr2 - gr1) / eps;
     let slope_above = (gr3 - gr2) / eps;
-    assert!(
-        (slope_below - slope_above).abs() < 0.01,
-        "Discontinuity at lower boundary"
-    );
+    assert_abs_diff_eq!(slope_below, slope_above, epsilon = 0.01);
 
     // Upper boundary slope
     let gr1 = compute_gain_reduction(-17.0 - eps, threshold, ratio, knee);
@@ -319,10 +296,7 @@ fn gain_computer_c1_continuous() {
 
     let slope_below = (gr2 - gr1) / eps;
     let slope_above = (gr3 - gr2) / eps;
-    assert!(
-        (slope_below - slope_above).abs() < 0.01,
-        "Discontinuity at upper boundary"
-    );
+    assert_abs_diff_eq!(slope_below, slope_above, epsilon = 0.01);
 }
 
 #[test]
@@ -391,12 +365,7 @@ fn compressor_band_passes_quiet_signal() {
         }
     }
     // Should be exactly in_val
-    assert!(
-        (peak - in_val).abs() < 1e-4,
-        "Expected {}, got {}",
-        in_val,
-        peak
-    );
+    assert_abs_diff_eq!(peak, in_val, epsilon = 1e-4);
 }
 
 #[test]
@@ -484,8 +453,8 @@ fn compressor_v3_identity_no_gain_reduction() {
     let mut right = in_r;
     comp.process_stereo(&mut left, &mut right);
 
-    assert!((left - in_l).abs() < 1e-4);
-    assert!((right - in_r).abs() < 1e-4);
+    assert_abs_diff_eq!(left, in_l, epsilon = 1e-4);
+    assert_abs_diff_eq!(right, in_r, epsilon = 1e-4);
 }
 
 #[test]
@@ -528,8 +497,8 @@ fn compressor_v3_ms_encode_decode_roundtrip() {
     let mut right = in_r;
     comp.process_stereo(&mut left, &mut right);
 
-    assert!((left - in_l).abs() < 1e-4);
-    assert!((right - in_r).abs() < 1e-4);
+    assert_abs_diff_eq!(left, in_l, epsilon = 1e-4);
+    assert_abs_diff_eq!(right, in_r, epsilon = 1e-4);
 }
 
 #[test]
@@ -559,8 +528,8 @@ fn compressor_v3_mid_independent_of_side() {
     let mut r = -0.01;
     comp.process_stereo(&mut l, &mut r);
 
-    assert!((l - 0.01).abs() < 1e-4);
-    assert!((r - -0.01).abs() < 1e-4);
+    assert_abs_diff_eq!(l, 0.01, epsilon = 1e-4);
+    assert_abs_diff_eq!(r, -0.01, epsilon = 1e-4);
 }
 
 #[test]
