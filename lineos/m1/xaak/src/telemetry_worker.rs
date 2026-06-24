@@ -51,6 +51,12 @@ where
                 && stream_ended.load(Ordering::Acquire)
                 && !already_flushed;
 
+            if stream_ended.load(Ordering::Acquire) && occupied == 0 {
+                // Stream ended and buffer is completely dry. Nothing more will ever arrive.
+                // Exit cleanly to prevent zombie thread lock.
+                break;
+            }
+
             if occupied < chunk_size && !do_eof_flush {
                 std::thread::sleep(Duration::from_millis(2));
                 continue;
@@ -83,6 +89,13 @@ where
                     && raw_occupied < chunk_size
                     && stream_ended.load(Ordering::Acquire)
                     && !already_flushed_raw;
+
+                if stream_ended.load(Ordering::Acquire) && raw_occupied == 0 {
+                    // Stream ended and raw buffer is completely dry.
+                    // Instead of a 'break' (which would discard the already-computed mastered frame above),
+                    // we mark it as flushed so the normal exit condition at the bottom can trigger.
+                    already_flushed_raw = true;
+                }
 
                 if raw_occupied >= chunk_size {
                     // Normal path: full chunk available.
