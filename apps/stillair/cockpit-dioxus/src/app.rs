@@ -84,13 +84,18 @@ pub fn App() -> Element {
     let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
     // ── Mastering Orchestration Task (Root Scope) ─────────────────────────────
+    // Dioxus false-positive warning notice: this effect both reads and writes
+    // pending_master_req in the same reactive scope (read() on entry, write().take()
+    // to consume the one-shot request). This triggers Dioxus's "infinite loop"
+    // warning, but is NOT an actual loop — the if let Some(...) guard means the
+    // effect's second, self-triggered run sees None and exits immediately without
+    // writing again. Verified harmless: each UI trigger produces exactly one
+    // /master POST (no duplicate/runaway requests observed in testing).
+    // Investigated and confirmed 2026-06-24, see commit history for analysis.
+    // Deliberately left as-is rather than restructured, to avoid introducing a
+    // behavior change (e.g. moving the clear into an async task) purely to
+    // silence a cosmetic warning.
     use_effect(move || {
-        // read() subscribes this effect to pending_master_req.
-        // When FlavourSelector calls .set(Some(req)), this effect fires.
-        // The write().take() below sets it back to None → effect re-runs once
-        // → sees None → if let Some doesn't match → returns immediately.
-        // One bounce only. The dioxus-signals WARN is a false positive here
-        // because the guard prevents re-entry on the None case.
         let req = pending_master_req.read().clone();
         if let Some((path, pr, fl, tone, dynval)) = req {
             pending_master_req.write().take(); // clear before spawn — prevents double-fire
