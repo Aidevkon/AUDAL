@@ -621,6 +621,22 @@ body {
   flex-direction: column !important;
 }
 
+/* canvas height chain — these two containers had no CSS rules, causing
+   canvas.clientHeight=0 and a blank RAF draw buffer.
+   .spatial-body (height:100%) → .center-mfd-stack → .canvas-reactive-zone → canvas */
+.center-mfd-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-reactive-zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 
 /* --- MONOBLOC CHASSIS --- */
 

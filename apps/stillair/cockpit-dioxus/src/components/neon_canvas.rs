@@ -101,6 +101,22 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 if canvas_for_raf.height() != ch { canvas_for_raf.set_height(ch); }
             }
 
+            // [SIZE-TRAP] throttled — fires every ~60 frames (~1s at 60fps).
+            // Verifies the CSS height chain is non-zero after cockpit.css fix.
+            // REMOVE after verification.
+            {
+                use std::sync::atomic::{AtomicU32, Ordering};
+                static ST: AtomicU32 = AtomicU32::new(0);
+                let n = ST.fetch_add(1, Ordering::Relaxed);
+                if n % 60 == 0 {
+                    web_sys::console::log_1(&format!(
+                        "[SIZE-TRAP] frame={} clientW={} clientH={} bufW={} bufH={}",
+                        n, cw, ch,
+                        canvas_for_raf.width(), canvas_for_raf.height()
+                    ).into());
+                }
+            }
+
             // Read the now-correct draw-buffer dimensions for all coordinate math.
             let width  = canvas_for_raf.width()  as f64;
             let height = canvas_for_raf.height() as f64;

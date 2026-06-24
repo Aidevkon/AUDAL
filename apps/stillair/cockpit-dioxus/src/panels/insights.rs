@@ -142,34 +142,38 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                 }
 
                 if !*spatial_collapsed.read() {
-                    // ── TOP ROW: Metrics stack ─────────
-                    div { class: "spatial-top-row",
+                    // TEMPORARILY DISABLED — freeing vertical space for canvas live-test.
+                    // WIDTH/VECTOR are real data (session_state.quality), MID/SIDE are demo placeholders.
+                    // Re-enable + redesign placement after live telemetry test confirms canvas works.
+                    if false {
+                        div { class: "spatial-top-row",
 
-                        // Right: 4 stacked metric readouts
-                        div { class: "spatial-metrics-col",
-                            MetricRow {
-                                label: "MID",
-                                value: format!("{:.0}%", DEMO_MID_PCT),
-                                color: "var(--accent-insights)",
-                                bar_pct: DEMO_MID_PCT,
-                            }
-                            MetricRow {
-                                label: "SIDE",
-                                value: format!("{:.0}%", DEMO_SIDE_PCT),
-                                color: "var(--accent-magenta)",
-                                bar_pct: DEMO_SIDE_PCT,
-                            }
-                            MetricRow {
-                                label: "WIDTH",
-                                value: width_str,
-                                color: "var(--accent-insights)",
-                                bar_pct: width * 100.0,
-                            }
-                            MetricRow {
-                                label: "VECTOR",
-                                value: angle_str,
-                                color: "var(--accent-amber)",
-                                bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                            // Right: 4 stacked metric readouts
+                            div { class: "spatial-metrics-col",
+                                MetricRow {
+                                    label: "MID",
+                                    value: format!("{:.0}%", DEMO_MID_PCT),
+                                    color: "var(--accent-insights)",
+                                    bar_pct: DEMO_MID_PCT,
+                                }
+                                MetricRow {
+                                    label: "SIDE",
+                                    value: format!("{:.0}%", DEMO_SIDE_PCT),
+                                    color: "var(--accent-magenta)",
+                                    bar_pct: DEMO_SIDE_PCT,
+                                }
+                                MetricRow {
+                                    label: "WIDTH",
+                                    value: width_str,
+                                    color: "var(--accent-insights)",
+                                    bar_pct: width * 100.0,
+                                }
+                                MetricRow {
+                                    label: "VECTOR",
+                                    value: angle_str,
+                                    color: "var(--accent-amber)",
+                                    bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                                }
                             }
                         }
                     }
@@ -181,10 +185,6 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                     //     CorrelationMeter { correlation }
                     // }
 
-                    // ── SPATIAL HEAT MAP: full-width, flex:1 ─────────────────────
-                    div { class: "spatial-heatmap-cell oled-screen",
-                        SpatialHeatMap {}
-                    }
                 }
             }
         }
@@ -304,58 +304,6 @@ fn CorrelationMeter(correlation: f32) -> Element {
                     div { class: "corr-pip",
                           style: "left: {fill_pct:.1}%; background: {pip_color};" }
                 }
-            }
-        }
-    }
-}
-
-// ── SpatialHeatMap ────────────────────────────────────────────────────────────
-
-#[component]
-fn SpatialHeatMap() -> Element {
-    rsx! {
-        div { class: "heatmap-wrap",
-            div { class: "heatmap-header",
-                span { class: "heatmap-ch-label", "L" }
-                span { class: "heatmap-title", "SPATIAL HEAT MAP" }
-                span { class: "heatmap-ch-label heatmap-ch-label--r", "R" }
-            }
-            div { class: "heatmap-canvas",
-                svg {
-                    view_box: "0 0 400 54",
-                    xmlns: "http://www.w3.org/2000/svg",
-                    preserve_aspect_ratio: "none",
-                    style: "width:100%; height:100%; display:block;",
-
-                    defs {
-                        linearGradient {
-                            id: "hm-grad", x1: "0", y1: "0", x2: "1", y2: "0",
-                            stop { offset: "0%",   stop_color: "var(--accent-insights)", stop_opacity: "0.85" }
-                            stop { offset: "20%",  stop_color: "var(--accent-insights)", stop_opacity: "0.55" }
-                            stop { offset: "45%",  stop_color: "var(--accent-amber)",    stop_opacity: "0.35" }
-                            stop { offset: "65%",  stop_color: "var(--accent-amber)",    stop_opacity: "0.20" }
-                            stop { offset: "82%",  stop_color: "var(--accent-magenta)",  stop_opacity: "0.35" }
-                            stop { offset: "100%", stop_color: "var(--accent-magenta)",  stop_opacity: "0.75" }
-                        }
-                    }
-
-                    rect { x: "0", y: "4",  width: "400", height: "16", fill: "url(#hm-grad)" }
-                    rect { x: "0", y: "22", width: "400", height: "11", fill: "url(#hm-grad)", opacity: "0.55" }
-                    rect { x: "0", y: "35", width: "400", height: "7",  fill: "url(#hm-grad)", opacity: "0.28" }
-
-                    // L hotspot: 3.2kHz ≈ x=265
-                    line { x1: "265", y1: "2", x2: "265", y2: "48",
-                           stroke: "var(--accent-amber)", stroke_width: "1.2",
-                           stroke_dasharray: "2,2", opacity: "0.75" }
-                    // R hotspot: 180Hz ≈ x=330
-                    line { x1: "330", y1: "2", x2: "330", y2: "48",
-                           stroke: "var(--accent-magenta)", stroke_width: "1.2",
-                           stroke_dasharray: "2,2", opacity: "0.75" }
-                }
-            }
-            div { class: "heatmap-footer",
-                span { class: "heatmap-hotspot heatmap-hotspot--l", "▲ L  3.2 kHz  harsh" }
-                span { class: "heatmap-hotspot heatmap-hotspot--r", "▲ R  180 Hz  mud" }
             }
         }
     }
