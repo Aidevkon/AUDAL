@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 
+use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use std::fs;
 
@@ -76,16 +77,8 @@ fn engine_telemetry_matches_reference() {
 
         let tel = analyze_offline_pre_pass(&left, &right);
 
-        assert!(
-            (tel.peak_db - expected_peak).abs() <= tol,
-            "Peak DB mismatch for {}",
-            name
-        );
-        assert!(
-            (tel.rms_db - expected_rms).abs() <= tol,
-            "RMS DB mismatch for {}",
-            name
-        );
+        assert_abs_diff_eq!(tel.peak_db, expected_peak, epsilon = tol);
+        assert_abs_diff_eq!(tel.rms_db, expected_rms, epsilon = tol);
     }
 }
 
@@ -144,12 +137,8 @@ fn engine_parallel_blend_at_zero_percent_bypasses_compressor() {
     let mut right = vec![0.5; 1024];
     engine.process_offline(&mut left, &mut right);
 
-    assert!(
-        (left[1023] - 0.5).abs() < 1e-3,
-        "Expected 0.5, got {}",
-        left[1023]
-    );
-    assert!((right[1023] - 0.5).abs() < 1e-3);
+    assert_abs_diff_eq!(left[1023], 0.5, epsilon = 1e-3);
+    assert_abs_diff_eq!(right[1023], 0.5, epsilon = 1e-3);
 }
 
 #[test]
@@ -260,12 +249,7 @@ fn engine_limiter_is_transparent_on_quiet_signal() {
     let rms_in_db = 10.0 * (sum_sq_in / 46000.0).log10();
     let rms_out_db = 10.0 * (sum_sq_out / 46000.0).log10();
 
-    assert!(
-        (rms_out_db - rms_in_db).abs() < 0.1,
-        "Quiet signal altered! In RMS: {}, Out RMS: {}",
-        rms_in_db,
-        rms_out_db
-    );
+    assert_abs_diff_eq!(rms_out_db, rms_in_db, epsilon = 0.1);
 }
 
 #[test]
@@ -321,12 +305,7 @@ fn engine_harmonic_pipeline_end_to_end() {
         / (left.len() - 2 * margin) as f32;
     let rms_in_db = 10.0_f32 * rms_in.max(1e-20).log10();
     let rms_out_db = 10.0_f32 * rms_out.max(1e-20).log10();
-    assert!(
-        (rms_out_db - rms_in_db).abs() < 6.0_f32,
-        "RMS drift too large: in={:.2} dB, out={:.2} dB",
-        rms_in_db,
-        rms_out_db
-    );
+    assert_abs_diff_eq!(rms_out_db, rms_in_db, epsilon = 6.0_f32);
 
     // 3. Output is not identical to input (harmonics actually processed)
     let mut diff_sum = 0.0_f32;
@@ -406,10 +385,5 @@ fn engine_process_block_harmonic_no_overcook() {
         left[margin..n - margin].iter().map(|s| s * s).sum::<f32>() / (n - 2 * margin) as f32;
     let rms_in_db = 10.0_f32 * rms_in.max(1e-20).log10();
     let rms_out_db = 10.0_f32 * rms_out.max(1e-20).log10();
-    assert!(
-        (rms_out_db - rms_in_db).abs() < 3.0_f32,
-        "process_block RMS drift too large (overcook?): in={:.2} dB, out={:.2} dB",
-        rms_in_db,
-        rms_out_db
-    );
+    assert_abs_diff_eq!(rms_out_db, rms_in_db, epsilon = 3.0_f32);
 }
