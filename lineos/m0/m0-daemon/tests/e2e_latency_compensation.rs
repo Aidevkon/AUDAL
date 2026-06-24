@@ -10,10 +10,7 @@ async fn test_e2e_latency_compensation() {
     let wav_path = "../../m1/sp314-dsp/tests/fixtures/sine_1khz_3s.wav";
 
     // We expect the fixture to exist
-    assert!(
-        std::path::Path::new(wav_path).exists(),
-        "Fixture missing!"
-    );
+    assert!(std::path::Path::new(wav_path).exists(), "Fixture missing!");
 
     let req = MasterRequest {
         audio_path: wav_path.to_string(),
@@ -34,14 +31,7 @@ async fn test_e2e_latency_compensation() {
     let start = Instant::now();
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-        run_dsp(
-            &req,
-            start,
-            dummy_head_state,
-            None,
-            None,
-            "".to_string(),
-        )
+        run_dsp(&req, start, dummy_head_state, None, None, "".to_string())
     })
     .await;
 
@@ -63,7 +53,7 @@ async fn test_e2e_latency_compensation() {
 
     // --- 1. Frame count guard ---
     let frames = data.len() / 2; // Stereo interleaved
-    // Regression guard: catches if STFT_FLUSH_TAIL trim (commit 9039dac) is ever reverted or an upstream node's tail size changes without updating the trim.
+                                 // Regression guard: catches if STFT_FLUSH_TAIL trim (commit 9039dac) is ever reverted or an upstream node's tail size changes without updating the trim.
     assert_eq!(
         frames, 144000,
         "Exported frame count must be EXACTLY the input frame count (144000) with no STFT tail."
