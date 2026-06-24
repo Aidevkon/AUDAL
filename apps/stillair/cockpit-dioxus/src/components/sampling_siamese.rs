@@ -1,8 +1,9 @@
 use crate::panels::insights::InsightsPanel;
 use crate::panels::session::SessionPanel;
 use crate::state::cockpit_mode::CockpitMode;
-use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson};
+use crate::types::{PlaybackStateJson, RealtimeFrameJson, SessionStateJson, VisualizationDataJson};
 use dioxus::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct SamplingSiameseProps {
@@ -28,6 +29,41 @@ pub struct SamplingSiameseProps {
 
 #[component]
 pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
+    // ── Telemetry lift: single polling source for all child panels ────────
+    // Previously owned by InsightsPanel; moved here so the signal can be
+    // shared with future consumers (e.g. Master Strip column) without
+    // spawning redundant polling loops per child.
+    let mut realtime: Signal<Option<RealtimeFrameJson>> = use_signal(|| None);
+    let mut tele_generation = use_signal(|| 0u64);
+
+    use_effect(move || {
+        let my_gen = *tele_generation.peek() + 1;
+        tele_generation.set(my_gen);
+        spawn_local(async move {
+            loop {
+                if *tele_generation.peek() != my_gen { break; }
+
+                let m = props.mode.read().clone();
+                // Poll whenever audio could be playing. CoachReady is the state
+                // where the certified master plays — it MUST be included.
+                // Idle: no file loaded. Exporting: I/O locked. Fault: broken.
+                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::Exporting { .. } | CockpitMode::Fault { .. });
+
+                if is_active {
+                    web_sys::console::log_1(&format!(
+                        "[TELE-TRAP] polling, mode={:?}", m
+                    ).into());
+                    if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
+                        realtime.set(Some(frame));
+                    }
+                    gloo_timers::future::TimeoutFuture::new(200).await;
+                } else {
+                    gloo_timers::future::TimeoutFuture::new(200).await;
+                }
+            }
+        });
+    });
+
     let mfd1_active = props
         .wizard_findings
         .read()
@@ -78,6 +114,7 @@ pub fn SamplingSiamese(mut props: SamplingSiameseProps) -> Element {
                     session_state: props.session_state,
                     playback_state: props.playback_state,
                     viz_data: props.viz_data,
+                    telemetry: realtime,
                     tone_angle: props.tone_angle,
                     dyn_angle: props.dyn_angle,
                     space_angle: props.space_angle,

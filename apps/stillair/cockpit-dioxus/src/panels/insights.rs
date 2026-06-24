@@ -19,7 +19,6 @@ use crate::components::intent_bay::IntentBay;
 use crate::state::cockpit_mode::CockpitMode;
 use crate::types::{PlaybackStateJson, SessionStateJson, VisualizationDataJson, RealtimeFrameJson};
 use dioxus::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 // ── Demo Lissajous paths (FM0 idle) ───────────────────────────────────────────
 
@@ -36,6 +35,7 @@ pub struct InsightsPanelProps {
     pub session_state: Signal<Option<SessionStateJson>>,
     pub playback_state: Signal<Option<PlaybackStateJson>>,
     pub viz_data: Signal<Option<VisualizationDataJson>>,
+    pub telemetry: Signal<Option<RealtimeFrameJson>>,
     pub tone_angle: Signal<f32>,
     pub dyn_angle: Signal<f32>,
     pub space_angle: Signal<f32>,
@@ -50,39 +50,8 @@ pub struct InsightsPanelProps {
 pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
     let state = props.session_state.read();
 
-    let mut realtime: Signal<Option<RealtimeFrameJson>> = use_signal(|| None);
     let mut intents_active = use_signal(|| false);
     let mut spatial_collapsed = use_signal(|| false);
-
-    let mut tele_generation = use_signal(|| 0u64);
-
-    use_effect(move || {
-        let my_gen = *tele_generation.peek() + 1;
-        tele_generation.set(my_gen);
-        spawn_local(async move {
-            loop {
-                if *tele_generation.peek() != my_gen { break; }
-
-                let m = props.mode.read().clone();
-                // Poll whenever audio could be playing. CoachReady is the state
-                // where the certified master plays — it MUST be included.
-                // Idle: no file loaded. Exporting: I/O locked. Fault: broken.
-                let is_active = !matches!(m, CockpitMode::Idle | CockpitMode::Exporting { .. } | CockpitMode::Fault { .. });
-                
-                if is_active {
-                    web_sys::console::log_1(&format!(
-                        "[TELE-TRAP] polling, mode={:?}", m
-                    ).into());
-                    if let Ok(Some(frame)) = crate::ipc::invoke_no_args::<Option<RealtimeFrameJson>>("get_live_telemetry_realtime").await {
-                        realtime.set(Some(frame));
-                    }
-                    gloo_timers::future::TimeoutFuture::new(200).await;
-                } else {
-                    gloo_timers::future::TimeoutFuture::new(200).await;
-                }
-            }
-        });
-    });
 
     // Removed lissajous code to fix unused variable warnings since StereoScope is gone
 
@@ -110,7 +79,7 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                 div { class: "center-mfd-stack",
                     div { class: "canvas-reactive-zone",
                         NeonCanvas {
-                            telemetry: Some(realtime),
+                            telemetry: Some(props.telemetry),
                             session_state: Some(props.session_state),
                             bpm: 0.0,
                             width: 800,

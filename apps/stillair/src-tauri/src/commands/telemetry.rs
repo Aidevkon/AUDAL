@@ -28,3 +28,8 @@ pub fn get_live_telemetry_realtime(latest: State<'_, LatestFrame>) -> Option<Rea
         position_ms: frame.position_ms,
     })
 }
+
+#[tauri::command]
+pub fn frontend_log(msg: String) {
+    eprintln!("[FRONTEND] {}", msg);
+}

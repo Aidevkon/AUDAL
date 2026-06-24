@@ -17,6 +17,7 @@ use web_sys::{HtmlCanvasElement, CanvasRenderingContext2d, ResizeObserver};
 use dioxus::prelude::*;
 use crate::types::{RealtimeFrameJson, SessionStateJson};
 use libm;
+use wasm_bindgen_futures::spawn_local;
 
 const FALLBACK_PULSE_MS: f64 = 500.0;
 const GRID_COLS: u32         = 8;
@@ -109,11 +110,15 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 // [SIZE-TRAP] — moved from RAF (per-frame) to here (per-resize-event).
                 // Now shows WHEN an actual resize event fires, not just every frame.
                 // REMOVE after ResizeObserver phase is verified.
-                web_sys::console::log_1(&format!(
+                let msg = format!(
                     "[SIZE-TRAP] ResizeObserver fired: clientW={} clientH={} bufW={} bufH={}",
                     cw, ch,
                     canvas_for_ro.width(), canvas_for_ro.height()
-                ).into());
+                );
+                web_sys::console::log_1(&msg.clone().into());
+                spawn_local(async move {
+                    let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg })).await;
+                });
             }
         ) as Box<dyn FnMut(js_sys::Array, ResizeObserver)>);
 
@@ -193,12 +198,16 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                 if n % 60 == 0 {
                     let b20 = spectrum_before.get(20).copied().unwrap_or(f32::NAN);
                     let a20 = spectrum_after.get(20).copied().unwrap_or(f32::NAN);
-                    web_sys::console::log_1(&format!(
+                    let msg = format!(
                         "[DRAW-CHECK] frame={} delta={} before.len={} after.len={} before[20]={:.1} after[20]={:.1}",
                         n, props_clone.is_delta_mode,
                         spectrum_before.len(), spectrum_after.len(),
                         b20, a20
-                    ).into());
+                    );
+                    web_sys::console::log_1(&msg.clone().into());
+                    spawn_local(async move {
+                        let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg })).await;
+                    });
 
                     // [BIN-DUMP] raw bins 0..10 — same block, guaranteed to fire.
                     let fmt = |v: &[f32]| -> String {
@@ -207,11 +216,15 @@ pub fn NeonCanvas(props: NeonCanvasProps) -> Element {
                             .collect::<Vec<_>>()
                             .join(",")
                     };
-                    web_sys::console::log_1(&format!(
+                    let msg2 = format!(
                         "[BIN-DUMP] after[0..10]=[{}] before[0..10]=[{}]",
                         fmt(&spectrum_after),
                         fmt(&spectrum_before),
-                    ).into());
+                    );
+                    web_sys::console::log_1(&msg2.clone().into());
+                    spawn_local(async move {
+                        let _ = crate::ipc::invoke::<(), _>("frontend_log", serde_json::json!({ "msg": msg2 })).await;
+                    });
                 }
             }
 
