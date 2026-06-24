@@ -5,6 +5,9 @@
 check:
     cargo check --workspace
 
+check-cli:
+    cargo check --workspace --features cli
+
 fmt:
     cargo fmt --check
 
@@ -16,6 +19,7 @@ test-unit:
 
 test-quality:
     cargo test -p sp314-dsp --test four_stem_contract
+    cargo test -p sp314-dsp --test io_contract --features cli
     cargo test -p sp314-dsp --test stress
     cargo test -p m0d --test e2e_golden_pathway
     cargo test -p m0d --test e2e_corpus_integration
@@ -25,7 +29,7 @@ test-quality:
 test-all:
     cargo test --workspace
 
-ci: check fmt clippy test-unit test-quality test-all
+ci: check check-cli fmt clippy test-unit test-quality test-all
     @echo "✅ All CI gates passed"
 
 quick: check test-unit
