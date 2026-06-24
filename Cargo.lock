@@ -7975,6 +7975,7 @@ dependencies = [
 name = "sp314-dsp"
 version = "3.0.0"
 dependencies = [
+ "approx",
  "claxon",
  "cpal",
  "ctrlc",
