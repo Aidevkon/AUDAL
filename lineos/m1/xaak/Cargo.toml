@@ -6,6 +6,9 @@ license = "MIT"
 # Amendment A-003 §1: Internal PCM Kernel — Phase 12 activation
 # Authority: Creator OS Amendment A-003 · LineOS Constitution v2.0
 
+[features]
+debug-telem = []
+
 [dependencies]
 ringbuf  = "0.4"                          # lock-free SPMC ring buffer — MIT
 cpal     = "0.15"                         # audio I/O backend — Apache-2.0

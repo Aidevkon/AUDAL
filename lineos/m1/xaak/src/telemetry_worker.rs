@@ -147,6 +147,7 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
 
                 // Compute spectrum_before from raw (pre-mastering) PCM if available.
                 let mut spectrum_before = [-120.0f32; 64];
+                #[cfg(feature = "debug-telem")]
                 eprintln!(
                     "[RAW-TELEM] computing before? cons_some={} occupied={} chunk_size={}",
                     raw_cons.is_some(),
@@ -200,15 +201,18 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 let pos_val = *position_ms.lock().unwrap_or_else(|e| e.into_inner());
 
                 // Temporary [BIN-DUMP] trap
-                if pos_val % 2000 < 50 {
-                    let fmt = |v: &[f32]| -> String {
-                        v.iter()
-                            .take(10)
-                            .map(|x| format!("{:.1}", x))
-                            .collect::<Vec<_>>()
-                            .join(",")
-                    };
-                    eprintln!("[BIN-DUMP] before[0..10]=[{}]", fmt(&spectrum_before));
+                #[cfg(feature = "debug-telem")]
+                {
+                    if pos_val % 2000 < 50 {
+                        let fmt = |v: &[f32]| -> String {
+                            v.iter()
+                                .take(10)
+                                .map(|x| format!("{:.1}", x))
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        };
+                        eprintln!("[BIN-DUMP] before[0..10]=[{}]", fmt(&spectrum_before));
+                    }
                 }
 
                 let frame = lineos_types::telemetry::RealtimeFrame {
