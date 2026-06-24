@@ -9,6 +9,7 @@
 
 use ringbuf::traits::*;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 pub fn spawn<C>(
@@ -17,6 +18,7 @@ pub fn spawn<C>(
     sample_rate: u32,
     channels: usize,
     pos_mutex: Arc<Mutex<u64>>,
+    stream_ended: Arc<AtomicBool>,
 )
 where
     C: Consumer<Item = f32> + Observer + Send + 'static,
@@ -29,25 +31,43 @@ where
         let mut analyzer_before = crate::spectrum::SpectrumAnalyzer::new();
 
         let ch = channels.max(1);
-        // chunk_size: 4096 frames × channels (8192 samples for stereo).
+        // chunk_size: 4096 frames × channels (8192 samples for stereo). UNCHANGED.
         let chunk_size = 4096 * ch;
         // Fixed stack buffers — zero heap allocation per iteration.
         let mut buffer     = [0.0f32; 8192];
         let mut raw_buffer = [0.0f32; 8192];
+        // EOF tail flush state: true after we've zero-padded and sent the tail FFT once.
+        let mut already_flushed     = false; // mastered buffer
+        let mut already_flushed_raw = false; // raw buffer (independent)
 
         loop {
-            // Wait until a full chunk is available in the mastered ring buffer.
-            if consumer.occupied_len() < chunk_size {
+            let occupied = consumer.occupied_len();
+
+            // EOF tail flush: if the stream has ended, there are leftover samples
+            // (0 < occupied < chunk_size), and we haven't flushed yet — drain them,
+            // zero-pad to chunk_size, and let the normal compute path run ONCE.
+            let do_eof_flush = occupied > 0
+                && occupied < chunk_size
+                && stream_ended.load(Ordering::Acquire)
+                && !already_flushed;
+
+            if occupied < chunk_size && !do_eof_flush {
                 std::thread::sleep(Duration::from_millis(2));
                 continue;
             }
 
-            // Drain exactly chunk_size samples from the mastered tap.
+            // Drain: full chunk_size normally, or just `occupied` for EOF tail.
+            let to_read = if do_eof_flush { occupied } else { chunk_size };
             let mut read = 0;
-            while read < chunk_size {
-                let n = consumer.pop_slice(&mut buffer[read..chunk_size]);
+            while read < to_read {
+                let n = consumer.pop_slice(&mut buffer[read..to_read]);
                 if n == 0 { break; }
                 read += n;
+            }
+            if do_eof_flush {
+                // Zero-pad remainder to chunk_size so FFT receives a full window.
+                for s in &mut buffer[read..chunk_size] { *s = 0.0; }
+                already_flushed = true;
             }
 
             // Compute spectrum_before from raw (pre-mastering) PCM if available.
@@ -57,7 +77,15 @@ where
                       raw_consumer.as_ref().map(|c| c.occupied_len()).unwrap_or(0), 
                       chunk_size);
             if let Some(ref mut raw_cons) = raw_consumer {
-                if raw_cons.occupied_len() >= chunk_size {
+                let raw_occupied = raw_cons.occupied_len();
+
+                let do_eof_flush_raw = raw_occupied > 0
+                    && raw_occupied < chunk_size
+                    && stream_ended.load(Ordering::Acquire)
+                    && !already_flushed_raw;
+
+                if raw_occupied >= chunk_size {
+                    // Normal path: full chunk available.
                     let mut raw_read = 0;
                     while raw_read < chunk_size {
                         let n = raw_cons.pop_slice(&mut raw_buffer[raw_read..chunk_size]);
@@ -65,6 +93,17 @@ where
                         raw_read += n;
                     }
                     spectrum_before = analyzer_before.compute(&raw_buffer[..chunk_size], ch);
+                } else if do_eof_flush_raw {
+                    // EOF tail: drain leftover, zero-pad, compute ONCE.
+                    let mut raw_read = 0;
+                    while raw_read < raw_occupied {
+                        let n = raw_cons.pop_slice(&mut raw_buffer[raw_read..raw_occupied]);
+                        if n == 0 { break; }
+                        raw_read += n;
+                    }
+                    for s in &mut raw_buffer[raw_read..chunk_size] { *s = 0.0; }
+                    spectrum_before = analyzer_before.compute(&raw_buffer[..chunk_size], ch);
+                    already_flushed_raw = true;
                 }
             }
 
@@ -89,6 +128,13 @@ where
             };
 
             sender.send_frame(&frame);
+
+            // Exit the loop once both buffers have been flushed.
+            // raw_done is true when there is no raw consumer, or it has already been flushed.
+            let raw_done = raw_consumer.is_none() || already_flushed_raw;
+            if already_flushed && raw_done {
+                break;
+            }
         }
     });
 }

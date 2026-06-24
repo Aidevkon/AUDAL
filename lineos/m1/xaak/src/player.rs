@@ -8,12 +8,16 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Split};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// cpal-backed audio output driver.
 /// Does not own PCM — receives a ring buffer consumer from XaakKernel.
 pub struct CpalPlayer {
     stream: Option<cpal::Stream>,
     position_ms: Arc<Mutex<u64>>,
+    /// Set to true by stop(), reset to false by play().
+    /// Signals the telemetry worker that the stream has ended.
+    stream_ended: Arc<AtomicBool>,
 }
 
 impl CpalPlayer {
@@ -21,6 +25,7 @@ impl CpalPlayer {
         Self {
             stream: None,
             position_ms: Arc::new(Mutex::new(0)),
+            stream_ended: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -61,9 +66,19 @@ impl CpalPlayer {
             buffer_size: cpal::BufferSize::Default,
         };
 
+        // Reset stream_ended for the new play session.
+        self.stream_ended.store(false, Ordering::Release);
+
         let pos = position_ms.clone();
         let sr = sample_rate as u64;
         let ch = channels as u64;
+        // Clone stream_ended for capture into the cpal callback closure.
+        let stream_ended_cb = self.stream_ended.clone();
+        // Consecutive callbacks where mastered consumer returned 0 samples.
+        // When this reaches UNDERRUN_STREAK_N, natural EOF is declared.
+        // N=5: ≈53ms at 512-frame buffer (10.7ms/cb), ≈106ms at 1024-frame buffer.
+        let mut zero_read_streak: u32 = 0;
+        const UNDERRUN_STREAK_N: u32 = 5;
 
         // TB-P6: ring buffers for telemetry worker (mastered + raw).
         // Audio callback only pushes raw samples — no math, no syscalls.
@@ -82,6 +97,7 @@ impl CpalPlayer {
             sample_rate,
             channels as usize,
             position_ms.clone(),
+            self.stream_ended.clone(),
         );
 
         // Scratch buffer for raw tap (avoids heap allocation in callback).
@@ -97,6 +113,19 @@ impl CpalPlayer {
                         let n = consumer.pop_slice(&mut data[filled..]);
                         if n == 0 { break; }
                         filled += n;
+                    }
+
+                    // Underrun detection: track consecutive callbacks with zero PCM read.
+                    // filled==0 means the XaakKernel ring buffer is exhausted (natural EOF).
+                    if filled == 0 {
+                        zero_read_streak += 1;
+                        if zero_read_streak >= UNDERRUN_STREAK_N
+                            && !stream_ended_cb.load(Ordering::Relaxed)
+                        {
+                            stream_ended_cb.store(true, Ordering::Release);
+                        }
+                    } else {
+                        zero_read_streak = 0;
                     }
 
                     // Parallel raw tap — mirror the same number of samples from
@@ -174,6 +203,7 @@ impl CpalPlayer {
     /// Stop and drop the stream. Position reset handled by PlaybackEngine.
     pub fn stop(&mut self) {
         self.stream = None;
+        self.stream_ended.store(true, Ordering::Release);
         tracing::debug!("cpal: stopped");
     }
 

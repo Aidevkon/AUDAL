@@ -102,6 +102,7 @@ fn run_dsp_internal(
 
     // NODE 3: SCOUT (NMF + Maestro)
     // --- NODE 3: SCOUT PASS ---
+    emit_progress("Scout Pass");
     let scout_out = crate::domain::nodes::scout_node::run(
         &chunk.left,
         &chunk.right,
