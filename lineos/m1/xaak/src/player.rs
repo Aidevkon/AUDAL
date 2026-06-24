@@ -15,17 +15,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub struct CpalPlayer {
     stream: Option<cpal::Stream>,
     position_ms: Arc<Mutex<u64>>,
-    /// Set to true by stop(), reset to false by play().
-    /// Signals the telemetry worker that the stream has ended.
-    stream_ended: Arc<AtomicBool>,
+    /// Set to true by stop().
+    /// Signals the telemetry worker that this specific stream has ended.
+    stream_ended: Option<Arc<AtomicBool>>,
+    telem_tx: std::sync::mpsc::Sender<crate::telemetry_worker::TelemetryCommand>,
 }
 
 impl CpalPlayer {
     pub fn new() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        crate::telemetry_worker::spawn(rx);
         Self {
             stream: None,
             position_ms: Arc::new(Mutex::new(0)),
-            stream_ended: Arc::new(AtomicBool::new(false)),
+            stream_ended: None,
+            telem_tx: tx,
         }
     }
 
@@ -48,6 +52,9 @@ impl CpalPlayer {
     where
         C: Consumer<Item = f32> + Send + 'static,
     {
+        // Explicitly stop any active stream before doing anything else.
+        self.stop();
+
         let host = cpal::default_host();
         let device = host
             .default_output_device()
@@ -66,14 +73,15 @@ impl CpalPlayer {
             buffer_size: cpal::BufferSize::Default,
         };
 
-        // Reset stream_ended for the new play session.
-        self.stream_ended.store(false, Ordering::Release);
+        // Create a BRAND NEW stream_ended flag for this specific playback instance
+        let new_stream_ended = Arc::new(AtomicBool::new(false));
+        self.stream_ended = Some(new_stream_ended.clone());
 
         let pos = position_ms.clone();
         let sr = sample_rate as u64;
         let ch = channels as u64;
-        // Clone stream_ended for capture into the cpal callback closure.
-        let stream_ended_cb = self.stream_ended.clone();
+        // Clone new flag for capture into the cpal callback closure.
+        let stream_ended_cb = new_stream_ended.clone();
         // Consecutive callbacks where mastered consumer returned 0 samples.
         // When this reaches UNDERRUN_STREAK_N, natural EOF is declared.
         // N=5: ≈53ms at 512-frame buffer (10.7ms/cb), ≈106ms at 1024-frame buffer.
@@ -90,22 +98,17 @@ impl CpalPlayer {
         let (telem_prod_raw, telem_cons_raw) = telem_rb_raw.split();
         let mut telem_prod_raw = telem_prod_raw;
 
-        // TODO(telemetry-leak): each play() spawns a new telemetry_worker thread. If stop()
-        // is called before natural EOF, the underrun-based stream_ended trigger never fires
-        // (no more zero-read callbacks happen — the stream is gone), so the old worker thread
-        // has no producer and no exit condition: it becomes a zombie that lives forever.
-        // Repeated play/stop cycles (e.g. frequent seeking) will leak threads unconditionally.
-        // Fix candidates: detect producer-dropped on the consumer side (ringbuf::Observer
-        // doesn't expose this in v0.4), or have stop() send an explicit shutdown signal that
-        // the worker polls for even when it has no data to flush.
-        crate::telemetry_worker::spawn(
-            telem_cons,
-            Some(telem_cons_raw),
+        // Send StartStream to the persistent telemetry actor
+        if let Err(e) = self.telem_tx.send(crate::telemetry_worker::TelemetryCommand::StartStream {
+            mastered_cons: telem_cons,
+            raw_cons: Some(telem_cons_raw),
             sample_rate,
-            channels as usize,
-            position_ms.clone(),
-            self.stream_ended.clone(),
-        );
+            channels: channels as usize,
+            position_ms: position_ms.clone(),
+            stream_ended: new_stream_ended.clone(),
+        }) {
+            tracing::warn!("xaak: failed to send StartStream to telemetry worker: {}", e);
+        }
 
         // Scratch buffer for raw tap (avoids heap allocation in callback).
         let mut raw_scratch = vec![0.0f32; 16384];
@@ -210,13 +213,21 @@ impl CpalPlayer {
     /// Stop and drop the stream. Position reset handled by PlaybackEngine.
     pub fn stop(&mut self) {
         self.stream = None;
-        self.stream_ended.store(true, Ordering::Release);
+        if let Some(flag) = self.stream_ended.take() {
+            flag.store(true, Ordering::Release);
+        }
         tracing::debug!("cpal: stopped");
     }
 
     /// Current playback position in milliseconds.
     pub fn position_ms(&self) -> u64 {
         self.position_ms.lock().map(|p| *p).unwrap_or(0)
+    }
+}
+
+impl Drop for CpalPlayer {
+    fn drop(&mut self) {
+        let _ = self.telem_tx.send(crate::telemetry_worker::TelemetryCommand::Shutdown);
     }
 }
 
