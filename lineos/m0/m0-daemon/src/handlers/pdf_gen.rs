@@ -335,8 +335,16 @@ pub async fn get_album_certificate_pdf(
     Path(batch_id): Path<String>,
 ) -> Response {
     let short_id = &batch_id[..batch_id.len().min(8)];
-    let json_path = format!("album_{}.certificate.json", short_id);
-    let pdf_path = format!("album_{}_certificate.pdf", short_id);
+
+    let base_dir = format!(
+        "{}/.creator_os/certificates",
+        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    );
+    let certs_dir = std::env::var("CREATOR_OS_CERTS_PATH").unwrap_or(base_dir);
+    std::fs::create_dir_all(&certs_dir).unwrap_or_default();
+
+    let json_path = format!("{}/album_{}.certificate.json", certs_dir, short_id);
+    let pdf_path = format!("{}/album_{}_certificate.pdf", certs_dir, short_id);
 
     // Generate PDF from JSON if not already exists
     if !std::path::Path::new(&pdf_path).exists() {

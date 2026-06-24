@@ -66,8 +66,16 @@ impl AlbumCertificate {
 
     /// Write album certificate to disk as JSON.
     pub fn write_to_disk(&self, album_id: &str) -> Option<String> {
+        let base_dir = format!(
+            "{}/.creator_os/certificates",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
+        let certs_dir = std::env::var("CREATOR_OS_CERTS_PATH").unwrap_or(base_dir);
+        std::fs::create_dir_all(&certs_dir).unwrap_or_default();
+
         let path = format!(
-            "album_{}.certificate.json",
+            "{}/album_{}.certificate.json",
+            certs_dir,
             &album_id[..album_id.len().min(8)]
         );
         if let Ok(json) = serde_json::to_string_pretty(self) {

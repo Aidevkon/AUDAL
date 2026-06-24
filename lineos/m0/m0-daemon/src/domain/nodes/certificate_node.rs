@@ -185,8 +185,10 @@ pub fn run(
     };
 
     // Generate PDF certificate — silent, never blocks pipeline
-    let pdf_path = format!("{}_certificate.pdf", &blob.id[..blob.id.len().min(8)]);
-    crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path);
+    let pdf_path =
+        std::env::temp_dir().join(format!("m0d-cert-{}.pdf", &blob.id[..blob.id.len().min(8)]));
+    let pdf_path_str = pdf_path.to_string_lossy();
+    crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path_str);
 
     Ok(CertificateOutput { blob, file_path })
 }
