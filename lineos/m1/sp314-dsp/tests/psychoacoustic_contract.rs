@@ -1,3 +1,4 @@
+use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use sp314_dsp::psychoacoustic::{
     bark::{bin_to_bark_band, calculate_mask_per_bin, spreading_attenuation_db, MPEG1_BARK_BANDS},
@@ -30,20 +31,8 @@ fn iso226_returns_exact_value_at_reference_points() {
         let res80 = interpolate_iso226_correction(f, 80.0);
         let res90 = interpolate_iso226_correction(f, 90.0);
 
-        assert!(
-            (res80 - c80).abs() < 1e-4,
-            "f={} expected {} got {}",
-            f,
-            c80,
-            res80
-        );
-        assert!(
-            (res90 - c90).abs() < 1e-4,
-            "f={} expected {} got {}",
-            f,
-            c90,
-            res90
-        );
+        assert_abs_diff_eq!(res80, c80, epsilon = 1e-4);
+        assert_abs_diff_eq!(res90, c90, epsilon = 1e-4);
     }
 }
 
@@ -65,13 +54,7 @@ fn iso226_c1_continuity_at_interior_points() {
         let deriv_left = (val_at_f - val_below) / 0.5;
         let deriv_right = (val_above - val_at_f) / 0.5;
 
-        assert!(
-            (deriv_left - deriv_right).abs() < tol,
-            "C1 discontinuity at {} Hz: left {} right {}",
-            f,
-            deriv_left,
-            deriv_right
-        );
+        assert_abs_diff_eq!(deriv_left, deriv_right, epsilon = tol);
     }
 }
 
@@ -87,14 +70,7 @@ fn iso226_phon_interpolation_valid_range() {
         let tol = check["tolerance"].as_f64().unwrap() as f32;
 
         let res = interpolate_iso226_correction(f, p);
-        assert!(
-            (res - exp).abs() < tol,
-            "Interpolation error at f={} p={}: expected {} got {}",
-            f,
-            p,
-            exp,
-            res
-        );
+        assert_abs_diff_eq!(res, exp, epsilon = tol);
     }
 }
 
@@ -194,13 +170,7 @@ fn spreading_spot_checks() {
         let tol = check["tolerance"].as_f64().unwrap() as f32;
 
         let res = spreading_attenuation_db(dz);
-        assert!(
-            (res - exp).abs() < tol,
-            "Spreading error at dz={}: expected {} got {}",
-            dz,
-            exp,
-            res
-        );
+        assert_abs_diff_eq!(res, exp, epsilon = tol);
     }
 }
 
@@ -232,7 +202,7 @@ fn spreading_monotonic_increasing() {
 fn spreading_capped_at_noise_floor() {
     // dz=24 -> 87.0
     let res = spreading_attenuation_db(24.0);
-    assert!((res - 87.0).abs() < 1e-4);
+    assert_abs_diff_eq!(res, 87.0, epsilon = 1e-4);
 }
 
 // ==========================================

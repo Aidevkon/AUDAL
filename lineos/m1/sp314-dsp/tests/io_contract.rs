@@ -1,6 +1,7 @@
 #![cfg(feature = "cli")]
 // tests/io_contract.rs
 
+use approx::assert_abs_diff_eq;
 use hound;
 use sp314_dsp::io::{WavReader, WavWriter};
 use std::fs;
@@ -25,8 +26,8 @@ fn wav_roundtrip_preserves_samples() {
 
     assert_eq!(decoded.left.len(), len);
     for i in 0..len {
-        assert!((decoded.left[i] - left[i]).abs() < 1e-6);
-        assert!((decoded.right[i] - right[i]).abs() < 1e-6);
+        assert_abs_diff_eq!(decoded.left[i], left[i], epsilon = 1e-6);
+        assert_abs_diff_eq!(decoded.right[i], right[i], epsilon = 1e-6);
     }
 
     let _ = fs::remove_file(path);
@@ -54,7 +55,7 @@ fn wav_reader_handles_mono() {
     assert_eq!(decoded.num_channels, 1);
     assert_eq!(decoded.left, decoded.right);
     assert_eq!(decoded.left.len(), 100);
-    assert!((decoded.left[0] - 0.5).abs() < 1e-6);
+    assert_abs_diff_eq!(decoded.left[0], 0.5, epsilon = 1e-6);
 
     let _ = fs::remove_file(path);
 }
@@ -76,7 +77,7 @@ fn wav_reader_handles_16bit_pcm() {
 
     let decoded = WavReader::read(path).unwrap();
 
-    assert!((decoded.left[0] - 0.5).abs() < 1e-4);
+    assert_abs_diff_eq!(decoded.left[0], 0.5, epsilon = 1e-4);
 
     let _ = fs::remove_file(path);
 }
@@ -203,18 +204,8 @@ fn flac_roundtrip_preserves_samples() {
         let r_f32 = r_i32 as f32 / 8388607.0_f32;
 
         let tol = 1.0 / 8388608.0 * 2.0;
-        assert!(
-            (l_f32 - left[i]).abs() < tol,
-            "Left channel mismatch: {} vs {}",
-            l_f32,
-            left[i]
-        );
-        assert!(
-            (r_f32 - right[i]).abs() < tol,
-            "Right channel mismatch: {} vs {}",
-            r_f32,
-            right[i]
-        );
+        assert_abs_diff_eq!(l_f32, left[i], epsilon = tol);
+        assert_abs_diff_eq!(r_f32, right[i], epsilon = tol);
     }
 
     let _ = fs::remove_file(path);
