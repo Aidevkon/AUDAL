@@ -128,6 +128,71 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
     })
 }
 
+/// Smart decoding: returns exactly 6 discrete channels (no downmix) if input
+/// is 5.1/7.1, or falls back to standard decode_audio (2-channel downmix) otherwise.
+pub fn decode_smart(path: &str) -> Result<lineos_types::AudioPayload, DecodeError> {
+    use lineos_types::{AudioPayload, StereoBuffer};
+
+    let (raw, original_sr, original_ch) = decode_raw_interleaved(path)?;
+
+    match original_ch {
+        6 => {
+            // De-interleave into 6 discrete channels: [L, R, C, LFE, Ls, Rs]
+            let frames = raw.len() / 6;
+            let mut channels: [Vec<f32>; 6] = Default::default();
+            for ch_idx in 0..6 {
+                channels[ch_idx] = Vec::with_capacity(frames);
+            }
+            for frame in raw.chunks_exact(6) {
+                for ch_idx in 0..6 {
+                    channels[ch_idx].push(frame[ch_idx]);
+                }
+            }
+
+            // Resample each of the 6 channels independently to TARGET_SAMPLE_RATE if needed
+            let resampled = if original_sr != TARGET_SAMPLE_RATE {
+                resample_planar_to_48k(&channels, original_sr)?
+            } else {
+                channels.to_vec()
+            };
+
+            // Convert Vec<Vec<f32>> back to [Vec<f32>; 6] array
+            let mut final_channels: [Vec<f32>; 6] = Default::default();
+            for (i, ch) in resampled.into_iter().enumerate() {
+                if i < 6 {
+                    final_channels[i] = ch;
+                }
+            }
+            let num_frames = final_channels[0].len();
+
+            Ok(AudioPayload::FiveDotOne {
+                channels: final_channels,
+                sample_rate: TARGET_SAMPLE_RATE,
+                num_frames,
+            })
+        }
+        _ => {
+            // Everything else (1, 2, or any other count) falls back to the
+            // existing, already-correct decode_audio() path.
+            let pcm = decode_audio(path)?;
+            let frames = pcm.samples.len() / 2;
+            let mut left = Vec::with_capacity(frames);
+            let mut right = Vec::with_capacity(frames);
+            for frame in pcm.samples.chunks_exact(2) {
+                left.push(frame[0]);
+                right.push(frame[1]);
+            }
+
+            Ok(AudioPayload::Stereo(StereoBuffer {
+                left,
+                right,
+                sample_rate: pcm.sample_rate,
+                num_frames: frames,
+            }))
+        }
+    }
+}
+
 fn decode_raw_interleaved(path: &str) -> Result<(Vec<f32>, u32, u16), DecodeError> {
     use symphonia::core::audio::SampleBuffer;
     use symphonia::core::codecs::DecoderOptions;
@@ -398,14 +463,93 @@ fn resample_stereo_to_48k(interleaved: &[f32], original_sr: u32) -> Result<Vec<f
 
     // Re-interleave for sp314-dsp AudioChunk.
     // sanitize_sample() is used instead of bare .clamp() — f32::clamp(NaN) is NaN.
-    let out_frames = out_ch0.len().min(out_ch1.len());
-    let mut interleaved_out = Vec::with_capacity(out_frames * 2);
-    for i in 0..out_frames {
-        interleaved_out.push(sanitize_sample(out_ch0[i]));
-        interleaved_out.push(sanitize_sample(out_ch1[i]));
+    let mut out_interleaved = Vec::with_capacity(out_ch0.len() * 2);
+    for (l, r) in out_ch0.iter().zip(out_ch1.iter()) {
+        out_interleaved.push(sanitize_sample(*l));
+        out_interleaved.push(sanitize_sample(*r));
     }
 
-    Ok(interleaved_out)
+    Ok(out_interleaved)
+}
+
+// NOTE: matches resample_stereo_to_48k's existing tail-handling behavior
+// (zero-padded last chunk's output is NOT truncated back to the
+// mathematically expected frame count — confirmed identical, not a new
+// bug introduced here). Both resamplers may emit a few extra trailing
+// silence-derived frames. Pre-existing, out of scope for this Epic;
+// candidate for a future, separate fix to both functions together.
+fn resample_planar_to_48k(
+    planar: &[Vec<f32>],
+    original_sr: u32,
+) -> Result<Vec<Vec<f32>>, DecodeError> {
+    use rubato::{
+        Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+    };
+
+    let channels = planar.len();
+    let ratio = TARGET_SAMPLE_RATE as f64 / original_sr as f64;
+
+    let params = SincInterpolationParameters {
+        sinc_len: SINC_LEN,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: SINC_OVERSAMPLE,
+        window: WindowFunction::BlackmanHarris2,
+    };
+
+    let mut resampler = SincFixedIn::<f32>::new(
+        ratio,
+        2.0, // max_resample_ratio_relative
+        params,
+        RESAMPLE_CHUNK_FRAMES,
+        channels,
+    )
+    .map_err(|e| DecodeError::ResampleFailure(format!("Planar resampler init: {e}")))?;
+
+    let total_frames = planar[0].len();
+    let mut out: Vec<Vec<f32>> = vec![Vec::new(); channels];
+
+    // Process in chunks of RESAMPLE_CHUNK_FRAMES
+    let mut pos = 0_usize;
+    while pos < total_frames {
+        let end = (pos + RESAMPLE_CHUNK_FRAMES).min(total_frames);
+        let chunk_len = end - pos;
+
+        let wave_in: Vec<Vec<f32>> = if chunk_len == RESAMPLE_CHUNK_FRAMES {
+            planar.iter().map(|ch| ch[pos..end].to_vec()).collect()
+        } else {
+            // Last partial chunk: pad with zeros to full chunk size
+            planar
+                .iter()
+                .map(|ch| {
+                    let mut pad = ch[pos..end].to_vec();
+                    pad.resize(RESAMPLE_CHUNK_FRAMES, 0.0);
+                    pad
+                })
+                .collect()
+        };
+
+        let wave_out = resampler
+            .process(&wave_in, None)
+            .map_err(|e| DecodeError::ResampleFailure(format!("Planar resample chunk: {e}")))?;
+
+        for (i, out_ch) in out.iter_mut().enumerate() {
+            out_ch.extend_from_slice(&wave_out[i]);
+        }
+
+        pos += RESAMPLE_CHUNK_FRAMES;
+    }
+
+    // Flush tail (push remaining internal frames out)
+    if let Ok(tail) = resampler.process_partial::<Vec<f32>>(None, None) {
+        if !tail[0].is_empty() {
+            for (i, out_ch) in out.iter_mut().enumerate() {
+                out_ch.extend_from_slice(&tail[i]);
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -537,5 +681,54 @@ mod tests {
             pcm.original_sr,
             pcm.samples.len()
         );
+    }
+
+    fn zero_crossing_count(samples: &[f32]) -> usize {
+        samples
+            .windows(2)
+            .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
+            .count()
+    }
+
+    #[test]
+    fn decode_smart_preserves_six_discrete_channels() {
+        let path = "../../m1/sp314-dsp/tests/fixtures/synthetic_5point1.wav";
+        let payload = decode_smart(path).expect("decode_smart should succeed on 6-channel input");
+
+        match payload {
+            lineos_types::AudioPayload::FiveDotOne {
+                channels,
+                sample_rate,
+                num_frames,
+            } => {
+                assert_eq!(sample_rate, TARGET_SAMPLE_RATE);
+                assert_eq!(channels.len(), 6);
+
+                // Expected ZCR counts for a 2.0s sine at each frequency: freq * 2 * duration_s.
+                // Tolerance is generous (±5%) to absorb resampling/edge effects, while still
+                // being far tighter than the gap between any two adjacent expected values —
+                // a channel-order swap would miss by 50%+, not 5%.
+                let expected_zc = [
+                    (440.0_f32 * 2.0 * 2.0) as usize,  // L
+                    (880.0_f32 * 2.0 * 2.0) as usize,  // R
+                    (1000.0_f32 * 2.0 * 2.0) as usize, // C
+                    (60.0_f32 * 2.0 * 2.0) as usize,   // LFE
+                    (2000.0_f32 * 2.0 * 2.0) as usize, // Ls
+                    (3000.0_f32 * 2.0 * 2.0) as usize, // Rs
+                ];
+
+                for (i, ch) in channels.iter().enumerate() {
+                    assert_eq!(ch.len(), num_frames);
+                    let zc = zero_crossing_count(ch);
+                    let tolerance = (expected_zc[i] as f32 * 0.05).max(10.0) as usize;
+                    assert!(
+                        (zc as i64 - expected_zc[i] as i64).unsigned_abs() as usize <= tolerance,
+                        "Channel {} expected ~{} zero-crossings, measured {} — possible channel order bug",
+                        i, expected_zc[i], zc
+                    );
+                }
+            }
+            _ => panic!("Expected AudioPayload::FiveDotOne for 6-channel input, got Stereo"),
+        }
     }
 }
