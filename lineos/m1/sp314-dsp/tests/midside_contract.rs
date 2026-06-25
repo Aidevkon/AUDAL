@@ -35,16 +35,16 @@ fn test_midside_matrix_null_roundtrip() {
     // A diverse, realistic interleaved stereo buffer (L, R, L, R, ...)
     // Includes: exact 0, extreme values (1.0, -1.0), asymmetric panning, pure mono, phase inversion.
     let original_interleaved = vec![
-        0.0_f32, 0.0_f32,       // Digital silence
-        1.0, -1.0,              // Hard out-of-phase DC
-        0.5, 0.5,               // Pure Mono
-        0.12345, -0.67890,      // Complex asymmetric decimals
-        -1.0, 1.0,              // Inverse out-of-phase DC
-        0.99999, 0.00001,       // Hard pan Left
-        0.00001, 0.99999,       // Hard pan Right
-        -0.5, -0.5,             // Negative Mono
-        -0.8765, 0.1234,        // Another complex asymmetric
-        1.0, 1.0,               // Max positive Mono
+        0.0_f32, 0.0_f32, // Digital silence
+        1.0, -1.0, // Hard out-of-phase DC
+        0.5, 0.5, // Pure Mono
+        0.12345, -0.67890, // Complex asymmetric decimals
+        -1.0, 1.0, // Inverse out-of-phase DC
+        0.99999, 0.00001, // Hard pan Left
+        0.00001, 0.99999, // Hard pan Right
+        -0.5, -0.5, // Negative Mono
+        -0.8765, 0.1234, // Another complex asymmetric
+        1.0, 1.0, // Max positive Mono
     ];
 
     // Encode interleaved -> (Mid, Side)
@@ -61,11 +61,18 @@ fn test_midside_matrix_null_roundtrip() {
 
     // Check each sample individually with a robust tolerance (1e-6)
     // Avoids f32::EPSILON edge cases with repeated math ops.
-    for (i, (orig, recon)) in original_interleaved.iter().zip(reconstructed_interleaved.iter()).enumerate() {
+    for (i, (orig, recon)) in original_interleaved
+        .iter()
+        .zip(reconstructed_interleaved.iter())
+        .enumerate()
+    {
         assert!(
             (orig - recon).abs() < 1e-6,
             "Sample {} mismatch: original={}, reconstructed={}, diff={}",
-            i, orig, recon, (orig - recon).abs()
+            i,
+            orig,
+            recon,
+            (orig - recon).abs()
         );
     }
 }

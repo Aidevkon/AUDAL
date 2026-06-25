@@ -8,15 +8,15 @@ use std::time::Instant;
 use xaak::repo::DspState;
 
 /// REAL-WORLD LUFS REGRESSION GUARD
-/// 
-/// This test complements the manual EBU oracle verification (which relies on 
-/// uncommitted, strict sine-wave EBU test signals due to licensing restrictions) 
-/// by running a committed, licensing-clean, real-world music track ("simban") 
-/// automatically in every CI run. 
-/// 
-/// It guarantees that the production `m0-daemon` pipeline correctly hits the 
-/// target LUFS for the "apple_music" preset (-16.0 LUFS) within a real-world 
-/// dynamic tolerance (±1.0 LU), ensuring no silent fallback bugs or gain-staging 
+///
+/// This test complements the manual EBU oracle verification (which relies on
+/// uncommitted, strict sine-wave EBU test signals due to licensing restrictions)
+/// by running a committed, licensing-clean, real-world music track ("simban")
+/// automatically in every CI run.
+///
+/// It guarantees that the production `m0-daemon` pipeline correctly hits the
+/// target LUFS for the "apple_music" preset (-16.0 LUFS) within a real-world
+/// dynamic tolerance (±1.0 LU), ensuring no silent fallback bugs or gain-staging
 /// regressions occur in the DSP engine.
 #[tokio::test]
 async fn test_e2e_real_world_loudness() {

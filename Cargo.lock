@@ -4621,6 +4621,7 @@ dependencies = [
  "aether",
  "aether-bridge",
  "anyhow",
+ "approx",
  "arc-swap",
  "async-stream",
  "axum 0.7.9",
