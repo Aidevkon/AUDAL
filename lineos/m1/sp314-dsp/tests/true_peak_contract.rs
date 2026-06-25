@@ -79,3 +79,37 @@ fn true_peak_silence_is_zero() {
         assert!(tp < 1e-6, "True peak on silence should be ~0, got {}", tp);
     }
 }
+
+#[test]
+fn test_itu_bs1770_4_nyquist_trap_reconstruction() {
+    use sp314_dsp::limiter::true_peak::TruePeakDetector;
+
+    let mut detector = TruePeakDetector::new();
+    let mut max_true_peak = 0.0_f32;
+
+    // fs/4 sine wave sampled exactly at 45 degrees:
+    // sin(45), sin(135), sin(225), sin(315) -> 0.7071, 0.7071, -0.7071, -0.7071
+    // The true continuous peak is exactly 1.0 (0 dBFS).
+    let val = std::f32::consts::FRAC_PI_4.sin();
+    let sequence = [val, val, -val, -val];
+
+    for i in 0..100 {
+        let sample = sequence[i % 4];
+        let tp = detector.process(sample, sample);
+        if tp > max_true_peak {
+            max_true_peak = tp;
+        }
+    }
+
+    println!("[NYQUIST-TRAP] measured max_true_peak = {:.6} (linear), {:.3} dBFS", max_true_peak, 20.0 * max_true_peak.log10());
+    assert!(
+        max_true_peak >= 1.0 && max_true_peak < 1.05,
+        "True peak reconstruction should land in [1.0, 1.05): theoretical analog peak is exactly 1.0 \
+         (0 dBFS) for this -45°-phase quarter-Nyquist tone; measured {:.6} (empirically confirmed \
+         2026-06-25 at 1.012591 with our 18-tap FIR oversampler — small overshoot above 1.0 is \
+         expected and acceptable FIR filter behavior, but a result BELOW 1.0 would mean the \
+         oversampler is under-reading the true peak, which is the actual compliance failure mode \
+         this test exists to catch.",
+        max_true_peak
+    );
+}
