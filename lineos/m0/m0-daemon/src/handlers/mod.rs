@@ -2,6 +2,7 @@ pub mod album;
 pub mod blob;
 pub mod certificate;
 pub mod decode; // P7-002: symphonia audio decode
+pub mod decode_actor;
 pub mod export;
 pub mod master;
 pub mod mix;
