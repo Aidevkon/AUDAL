@@ -96,6 +96,9 @@ pub struct RealtimeFrameJson {
     pub spectrum_after: Vec<f32>,
     pub energy_mid: f32,
     pub energy_side: f32,
+    pub band_mid_db: [f32; 5],
+    pub band_side_db: [f32; 5],
+    pub band_pan: [f32; 5],
     pub gonio_path: Vec<[f32; 2]>,
     pub position_ms: u64,
 }

@@ -18,6 +18,13 @@ pub struct RealtimeFrame {
     pub energy_mid: f32,
     /// Side energy (RMS, dBFS) for spatial visualizer.
     pub energy_side: f32,
+    /// 5-band Mid/Side/Pan energy for the Kepler spatial visualizer.
+    /// Bands: [Low(20-112Hz), LowMid(112-332Hz), Mid(332-1500Hz), HighMid(1500-6777Hz), High(6777-20kHz)].
+    /// Crossover boundaries derived from SpectrumAnalyzer's existing 64-bin log
+    /// spacing (bins 16/26/40/54) — matches the visual spectrogram band labels.
+    pub band_mid_db: [f32; 5],
+    pub band_side_db: [f32; 5],
+    pub band_pan: [f32; 5],
     /// 32 (L, R) pairs for Lissajous goniometer path.
     pub gonio_path: [(f32, f32); 32],
     /// Playback position ms.
@@ -31,6 +38,9 @@ impl RealtimeFrame {
             spectrum_after: [-120.0f32; 64],
             energy_mid: -120.0,
             energy_side: -120.0,
+            band_mid_db: [-120.0; 5],
+            band_side_db: [-120.0; 5],
+            band_pan: [0.0; 5],
             gonio_path: [(0.0f32, 0.0f32); 32],
             position_ms,
         }

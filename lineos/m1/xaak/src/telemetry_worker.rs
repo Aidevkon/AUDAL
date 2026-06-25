@@ -7,12 +7,15 @@
 //!
 //! This thread MUST NOT be joined or awaited from the audio thread.
 
+use crate::crossover::CrossoverLR4;
 use ringbuf::traits::*;
 use ringbuf::wrap::caching::Caching;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+const KEPLER_CROSSOVER_HZ: [f32; 4] = [112.0, 332.0, 1500.0, 6777.0];
 
 pub type TelemCons = Caching<Arc<ringbuf::SharedRb<ringbuf::storage::Heap<f32>>>, false, true>;
 
@@ -35,6 +38,10 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
         let sender = crate::telemetry::UdpTelemetrySender::new();
         let mut analyzer_after = crate::spectrum::SpectrumAnalyzer::new();
         let mut analyzer_before = crate::spectrum::SpectrumAnalyzer::new();
+
+        let mut current_sr = 0;
+        let mut xover_l: Option<[CrossoverLR4; 4]> = None;
+        let mut xover_r: Option<[CrossoverLR4; 4]> = None;
 
         let mut active_stream: Option<TelemetryCommand> = None;
         let mut already_flushed = false;
@@ -72,6 +79,20 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 stream_ended,
             }) = active_stream.take()
             {
+                if current_sr != sample_rate || xover_l.is_none() {
+                    let make_xovers = || -> [CrossoverLR4; 4] {
+                        [
+                            CrossoverLR4::new(KEPLER_CROSSOVER_HZ[0], sample_rate),
+                            CrossoverLR4::new(KEPLER_CROSSOVER_HZ[1], sample_rate),
+                            CrossoverLR4::new(KEPLER_CROSSOVER_HZ[2], sample_rate),
+                            CrossoverLR4::new(KEPLER_CROSSOVER_HZ[3], sample_rate),
+                        ]
+                    };
+                    xover_l = Some(make_xovers());
+                    xover_r = Some(make_xovers());
+                    current_sr = sample_rate;
+                }
+
                 let ch = channels.max(1);
                 let chunk_size = 4096 * ch;
                 let hop_size = 2048 * ch;
@@ -206,17 +227,58 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 // commit 7b9f6a4). Computed inline here (not via MidSideMatrix::encode())
                 // to avoid two heap allocations per telemetry frame on this hot path —
                 // we only need the RMS reduction, not the full M/S sample arrays.
-                let (energy_mid, energy_side) = if ch == 2 {
-                    let frames = chunk_size / 2;
-                    let (mut sum_m, mut sum_s) = (0.0_f32, 0.0_f32);
-                    for i in 0..frames {
-                        let m = (buffer[i * 2] + buffer[i * 2 + 1]) * 0.5;
-                        let s = (buffer[i * 2] - buffer[i * 2 + 1]) * 0.5;
-                        sum_m += m * m;
-                        sum_s += s * s;
+                let (energy_mid, energy_side, band_mid_db, band_side_db, band_pan) = if ch == 2 {
+                    let xl = xover_l.as_mut().unwrap();
+                    let xr = xover_r.as_mut().unwrap();
+
+                    let hop_slice = &buffer[hop_size..chunk_size];
+                    let frames = hop_slice.len() / 2;
+
+                    let mut band_sum_m = [0.0_f32; 5];
+                    let mut band_sum_s = [0.0_f32; 5];
+                    let mut band_sum_l = [0.0_f32; 5];
+                    let mut band_sum_r = [0.0_f32; 5];
+
+                    // energy_mid/energy_side remain full-spectrum RMS (unchanged from this morning's commit),
+                    // separate from the new per-band split — NOT band_mid_db[0], which would silently narrow
+                    // the existing metric to only the Low band.
+                    let mut sum_m_total = 0.0_f32;
+                    let mut sum_s_total = 0.0_f32;
+
+                    for frame in hop_slice.chunks_exact(2) {
+                        let l = frame[0];
+                        let r = frame[1];
+
+                        let m_full = (l + r) * 0.5;
+                        let s_full = (l - r) * 0.5;
+                        sum_m_total += m_full * m_full;
+                        sum_s_total += s_full * s_full;
+
+                        let (l_low, l_rem1) = xl[0].process(l);
+                        let (l_low_mid, l_rem2) = xl[1].process(l_rem1);
+                        let (l_mid, l_rem3) = xl[2].process(l_rem2);
+                        let (l_high_mid, l_high) = xl[3].process(l_rem3);
+                        let bands_l = [l_low, l_low_mid, l_mid, l_high_mid, l_high];
+
+                        let (r_low, r_rem1) = xr[0].process(r);
+                        let (r_low_mid, r_rem2) = xr[1].process(r_rem1);
+                        let (r_mid, r_rem3) = xr[2].process(r_rem2);
+                        let (r_high_mid, r_high) = xr[3].process(r_rem3);
+                        let bands_r = [r_low, r_low_mid, r_mid, r_high_mid, r_high];
+
+                        for i in 0..5 {
+                            let b_l = bands_l[i];
+                            let b_r = bands_r[i];
+                            band_sum_l[i] += b_l * b_l;
+                            band_sum_r[i] += b_r * b_r;
+
+                            let m = (b_l + b_r) * 0.5;
+                            let s = (b_l - b_r) * 0.5;
+                            band_sum_m[i] += m * m;
+                            band_sum_s[i] += s * s;
+                        }
                     }
-                    let rms_m = (sum_m / frames as f32).sqrt();
-                    let rms_s = (sum_s / frames as f32).sqrt();
+
                     let to_db = |amp: f32| {
                         if amp > 1e-6 {
                             20.0 * amp.log10()
@@ -224,9 +286,30 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                             -120.0
                         }
                     };
-                    (to_db(rms_m), to_db(rms_s))
+
+                    let mut final_m_db = [0.0_f32; 5];
+                    let mut final_s_db = [0.0_f32; 5];
+                    let mut final_pan = [0.0_f32; 5];
+
+                    let inv_frames = 1.0 / frames as f32;
+                    for i in 0..5 {
+                        let rms_m = (band_sum_m[i] * inv_frames).sqrt();
+                        let rms_s = (band_sum_s[i] * inv_frames).sqrt();
+
+                        final_m_db[i] = to_db(rms_m);
+                        final_s_db[i] = to_db(rms_s);
+
+                        let e_l = band_sum_l[i];
+                        let e_r = band_sum_r[i];
+                        final_pan[i] = (e_r - e_l) / (e_r + e_l + 1e-9);
+                    }
+
+                    let total_m_db = to_db((sum_m_total * inv_frames).sqrt());
+                    let total_s_db = to_db((sum_s_total * inv_frames).sqrt());
+
+                    (total_m_db, total_s_db, final_m_db, final_s_db, final_pan)
                 } else {
-                    (-120.0, -120.0) // Mono: no spatial information, Side is silent by definition.
+                    (-120.0, -120.0, [-120.0; 5], [-120.0; 5], [0.0; 5]) // Mono: no spatial information, Side is silent by definition.
                 };
 
                 // Temporary [BIN-DUMP] trap
@@ -249,6 +332,9 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                     spectrum_after,
                     energy_mid,
                     energy_side,
+                    band_mid_db,
+                    band_side_db,
+                    band_pan,
                     gonio_path: crate::player::decimate_gonio(&buffer[..chunk_size], ch),
                     position_ms: pos_val,
                 };

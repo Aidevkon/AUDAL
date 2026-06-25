@@ -8,6 +8,9 @@ pub struct RealtimeFrameJson {
     pub spectrum_after: Vec<f32>,  // converted from [f32; 64]
     pub energy_mid: f32,
     pub energy_side: f32,
+    pub band_mid_db: [f32; 5],
+    pub band_side_db: [f32; 5],
+    pub band_pan: [f32; 5],
     pub gonio_path: Vec<[f32; 2]>, // converted from [(f32,f32); 32]
     pub position_ms: u64,
 }
@@ -28,6 +31,9 @@ pub fn get_live_telemetry_realtime(latest: State<'_, LatestFrame>) -> Option<Rea
         spectrum_after: frame.spectrum_after.to_vec(),
         energy_mid: frame.energy_mid,
         energy_side: frame.energy_side,
+        band_mid_db: frame.band_mid_db,
+        band_side_db: frame.band_side_db,
+        band_pan: frame.band_pan,
         gonio_path: frame.gonio_path.iter().map(|(l, r)| [*l, *r]).collect(),
         position_ms: frame.position_ms,
     })
