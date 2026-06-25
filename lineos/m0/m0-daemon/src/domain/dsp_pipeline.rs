@@ -96,7 +96,8 @@ fn run_dsp_internal(
     let _original_sr = decoded.original_sr;
     let _original_ch = decoded.original_ch;
     let _duration_ms = decoded.duration_ms;
-    let _pcm_samples_for_telemetry = decoded.pcm_samples;
+    let input_blake3_hex = decoded.input_blake3_hex;
+    let input_sha256_hex = decoded.input_sha256_hex;
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let mut chunk = decoded.chunk;
@@ -108,7 +109,7 @@ fn run_dsp_internal(
         rms(&chunk.right) / rms(&chunk.left).max(1e-9)
     );
 
-    profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
+    profiler.mark_stage_with_hash("Ingest", input_blake3_hex);
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
@@ -302,16 +303,12 @@ fn run_dsp_internal(
         elapsed,
         seed,
         preset_id,
-        &_pcm_samples_for_telemetry,
+        input_sha256_hex,
         n_total,
         processing_timeline,
     )?;
 
-    Ok((
-        cert_out.blob,
-        cert_out.file_path,
-        dsp_out.user_model,
-    ))
+    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

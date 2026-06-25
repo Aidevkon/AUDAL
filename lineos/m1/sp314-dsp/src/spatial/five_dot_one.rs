@@ -441,16 +441,24 @@ mod tests {
         let sr = 48000;
         let n = 4800;
         let peak_linear = 10.0_f32.powf(-1.0 / 20.0); // ≈ 0.891
-        let left: Vec<f32> = (0..n).map(|i| (i as f32 * 0.3).sin() * peak_linear).collect();
+        let left: Vec<f32> = (0..n)
+            .map(|i| (i as f32 * 0.3).sin() * peak_linear)
+            .collect();
         let right: Vec<f32> = left.iter().map(|&l| -l).collect(); // hard anti-phase: L = -R
 
-        let stage = FiveDotOneStage::deterministic_upmix(&left, &right, sr, &SpatialFirewall::default());
+        let stage =
+            FiveDotOneStage::deterministic_upmix(&left, &right, sr, &SpatialFirewall::default());
 
         // Use the EXISTING TruePeakDetector (4x oversampled, the same one verified
         // earlier this session) on each derived channel, not just raw sample peak —
         // since the concern is specifically about intersample/filter-transient
         // overshoot, not steady-state magnitude.
-        for (name, channel) in [("C", &stage.c), ("LFE", &stage.lfe), ("Ls", &stage.ls), ("Rs", &stage.rs)] {
+        for (name, channel) in [
+            ("C", &stage.c),
+            ("LFE", &stage.lfe),
+            ("Ls", &stage.ls),
+            ("Rs", &stage.rs),
+        ] {
             let mut detector = crate::limiter::true_peak::TruePeakDetector::new();
             let mut max_tp = 0.0_f32;
             for &s in channel {
@@ -458,7 +466,10 @@ mod tests {
                 max_tp = max_tp.max(tp);
             }
             let max_tp_db = 20.0 * max_tp.max(1e-9).log10();
-            println!("[UPMIX-TP-CHECK] channel={} max_true_peak={:.4} ({:.2} dBTP)", name, max_tp, max_tp_db);
+            println!(
+                "[UPMIX-TP-CHECK] channel={} max_true_peak={:.4} ({:.2} dBTP)",
+                name, max_tp, max_tp_db
+            );
             assert!(max_tp_db <= -1.0 + 0.5, // small margin for measurement, not the actual safety budget
                 "{} channel true peak {:.2} dBTP exceeds the -1.0 dBTP budget the stereo master was certified at — derived channel needs its own limiting stage before export",
                 name, max_tp_db);

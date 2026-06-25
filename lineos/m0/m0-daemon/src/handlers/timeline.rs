@@ -40,6 +40,21 @@ impl TimelineProfiler {
         self.last_mark = Instant::now();
     }
 
+    /// Mark a stage completion using a precomputed hash.
+    /// Used for stages where the hash is computed incrementally (e.g. Ingest).
+    pub fn mark_stage_with_hash(&mut self, stage_name: &str, stage_hash: String) {
+        let duration_ms = self.last_mark.elapsed().as_millis() as u64;
+
+        self.records.push(StageRecord {
+            stage: stage_name.to_string(),
+            duration_ms,
+            stage_hash,
+        });
+
+        // Reset the mark for the next stage
+        self.last_mark = Instant::now();
+    }
+
     /// Return the accumulated forensic timeline.
     pub fn finalize(self) -> Vec<StageRecord> {
         self.records

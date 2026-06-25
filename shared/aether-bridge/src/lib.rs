@@ -209,7 +209,7 @@ pub fn build_dsp_config(
 /// Run AFTER DSP render with actual input + output PCM.
 /// Cryptographically binds audio to DspConfig (S-010).
 pub fn generate_certificate(
-    input_pcm: &[f32],
+    input_pcm_hash: String,
     output_pcm: &[f32],
     persona: &PersonaConfig,
     dsp_config: &DspConfig,
@@ -218,7 +218,7 @@ pub fn generate_certificate(
     system_version: &str,
 ) -> ExecutionCertificate {
     ExecutionProof::generate(
-        input_pcm,
+        input_pcm_hash,
         output_pcm,
         persona,
         dsp_config,
@@ -317,10 +317,11 @@ mod tests {
         let features = test_features();
         let (cfg, log, persona) = build_dsp_config(&req, &features, None).unwrap();
 
-        let input = vec![0.1_f32; 1000];
+        let input_hash =
+            "0000000000000000000000000000000000000000000000000000000000000000".to_string();
         let output = vec![0.05_f32; 1000];
 
-        let cert = generate_certificate(&input, &output, &persona, &cfg, &log, &req, "1.0.0");
+        let cert = generate_certificate(input_hash, &output, &persona, &cfg, &log, &req, "1.0.0");
         assert_eq!(cert.persona_id, "warm_analog");
         assert_eq!(cert.preset_name, "spotify");
         assert_eq!(cert.version, "1.0");
@@ -337,13 +338,22 @@ mod tests {
         let features = test_features();
         let (cfg, log, persona) = build_dsp_config(&req, &features, None).unwrap();
 
-        let input = vec![0.1_f32; 100];
+        let input_hash =
+            "0000000000000000000000000000000000000000000000000000000000000000".to_string();
         let output1 = vec![0.05_f32; 100];
         let mut output2 = output1.clone();
         output2[0] += 0.001;
 
-        let c1 = generate_certificate(&input, &output1, &persona, &cfg, &log, &req, "1.0.0");
-        let c2 = generate_certificate(&input, &output2, &persona, &cfg, &log, &req, "1.0.0");
+        let c1 = generate_certificate(
+            input_hash.clone(),
+            &output1,
+            &persona,
+            &cfg,
+            &log,
+            &req,
+            "1.0.0",
+        );
+        let c2 = generate_certificate(input_hash, &output2, &persona, &cfg, &log, &req, "1.0.0");
 
         assert_ne!(c1.output_pcm_hash, c2.output_pcm_hash);
     }

@@ -4,13 +4,15 @@
 
 use crate::handlers::decode;
 use lineos_types::AudioChunk;
+use sha2::Digest;
 
 /// Output of decode_node — everything downstream needs.
 pub struct DecodedAudio {
     pub chunk: AudioChunk,
-    pub pcm_samples: Vec<f32>,      // Needed for Phase 9 Telemetry
-    pub pcm_channels: u16,          // Needed for Phase 9 Telemetry
-    pub pcm_sample_rate: u32,       // Needed for Phase 9 Telemetry
+    pub input_blake3_hex: String,
+    pub input_sha256_hex: String,
+    pub pcm_channels: u16,    // Needed for Phase 9 Telemetry
+    pub pcm_sample_rate: u32, // Needed for Phase 9 Telemetry
     pub target_lufs: Option<f32>,
     pub input_hash_hex: String,
     pub seed: u64, // derive_seed returns u64
@@ -50,19 +52,27 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
     // matches the byte layout the old executor.rs dump already used (verified
     // byte-for-byte equivalent before this change, not assumed).
     let raw_bytes: &[u8] = unsafe {
-        std::slice::from_raw_parts(
-            pcm.samples.as_ptr() as *const u8,
-            pcm.samples.len() * 4,
-        )
+        std::slice::from_raw_parts(pcm.samples.as_ptr() as *const u8, pcm.samples.len() * 4)
     };
     std::fs::write(&raw_path, raw_bytes).map_err(|e| format!("Failed to write raw dump: {e}"))?;
-    eprintln!("[RAW-SAVE] wrote raw PCM {} bytes to {}", raw_bytes.len(), raw_path);
+    eprintln!(
+        "[RAW-SAVE] wrote raw PCM {} bytes to {}",
+        raw_bytes.len(),
+        raw_path
+    );
+
+    let mut blake3_hasher = blake3::Hasher::new();
+    let mut sha256_hasher = sha2::Sha256::new();
+    for &sample in &pcm.samples {
+        blake3_hasher.update(&sample.to_le_bytes());
+        sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+    }
+    let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
+    let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
 
     let original_sr = pcm.original_sr;
     let original_ch = pcm.original_ch;
     let duration_ms = pcm.duration_ms as f64;
-
-    let pcm_samples_for_telemetry = pcm.samples.clone();
     let pcm_channels_for_telemetry = pcm.channels;
     let pcm_sr_for_telemetry = pcm.sample_rate;
 
@@ -99,7 +109,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
     Ok(DecodedAudio {
         chunk,
-        pcm_samples: pcm_samples_for_telemetry,
+        input_blake3_hex,
+        input_sha256_hex,
         pcm_channels: pcm_channels_for_telemetry,
         pcm_sample_rate: pcm_sr_for_telemetry,
         target_lufs,
@@ -109,4 +120,47 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         original_ch,
         duration_ms,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::Digest;
+
+    #[test]
+    fn streaming_hash_matches_batch_hash() {
+        let samples: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.01).sin()).collect();
+
+        // Batch (old way)
+        let batch_le_bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let batch_blake3 = blake3::hash(&batch_le_bytes).to_hex().to_string();
+
+        let batch_be_bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_be_bytes()).collect();
+        let mut batch_sha256 = sha2::Sha256::new();
+        sha2::Digest::update(&mut batch_sha256, &batch_be_bytes);
+        let batch_sha256_hex = format!("{:x}", sha2::Digest::finalize(batch_sha256));
+
+        // Streaming (new way) — feed in small chunks, not all at once, to prove
+        // chunking doesn't change the result
+        let mut stream_blake3 = blake3::Hasher::new();
+        let mut stream_sha256 = sha2::Sha256::new();
+        for chunk in samples.chunks(7) {
+            // deliberately odd chunk size, not aligned to anything
+            for &s in chunk {
+                stream_blake3.update(&s.to_le_bytes());
+                sha2::Digest::update(&mut stream_sha256, &s.to_be_bytes());
+            }
+        }
+        let stream_blake3_hex = stream_blake3.finalize().to_hex().to_string();
+        let stream_sha256_hex = format!("{:x}", sha2::Digest::finalize(stream_sha256));
+
+        assert_eq!(
+            batch_blake3, stream_blake3_hex,
+            "BLAKE3 streaming hash must match batch hash"
+        );
+        assert_eq!(
+            batch_sha256_hex, stream_sha256_hex,
+            "SHA-256 streaming hash must match batch hash"
+        );
+    }
 }

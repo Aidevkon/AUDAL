@@ -39,7 +39,7 @@ pub fn run(
     elapsed_ms: u64,
     seed: u64,
     preset_id: &str,
-    pcm_samples_for_telemetry: &[f32],
+    input_pcm_hash: String,
     n_total: usize,
     processing_timeline: Vec<StageRecord>,
 ) -> Result<CertificateOutput, String> {
@@ -72,7 +72,7 @@ pub fn run(
 
     // Certificate generation
     let cert = aether_bridge::generate_certificate(
-        pcm_samples_for_telemetry,
+        input_pcm_hash,
         &post_master_samples,
         persona_config,
         dsp_config,

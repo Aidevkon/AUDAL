@@ -32,7 +32,7 @@ struct ParamEdge {
 }
 
 pub struct DspGraph {
-    execution_order: Vec<String>,
+    pub execution_order: Vec<String>,
     nodes: HashMap<String, Box<dyn DspNode>>,
     param_edges: Vec<ParamEdge>,
 
@@ -41,6 +41,9 @@ pub struct DspGraph {
     buffers: HashMap<String, (Vec<f32>, Vec<f32>)>,
     acc_left: Vec<f32>,
     acc_right: Vec<f32>,
+    pub debug_sq_l: HashMap<String, f64>,
+    pub debug_sq_r: HashMap<String, f64>,
+    pub debug_frames: usize,
     block_size: usize,
     sample_rate: u32,
     topology: DspTopology,
@@ -289,6 +292,9 @@ impl DspGraph {
             buffers,
             acc_left: vec![0.0; block_size],
             acc_right: vec![0.0; block_size],
+            debug_sq_l: HashMap::new(),
+            debug_sq_r: HashMap::new(),
+            debug_frames: 0,
             block_size,
             sample_rate,
             topology: topology.clone(), // IDE refresh: topology does implement Clone
@@ -357,12 +363,24 @@ impl DspGraph {
                 .unwrap()
                 .process_stereo(buf_l, buf_r);
 
+            let sq_l: f64 = buf_l[..self.block_size]
+                .iter()
+                .map(|&x| (x as f64) * (x as f64))
+                .sum();
+            let sq_r: f64 = buf_r[..self.block_size]
+                .iter()
+                .map(|&x| (x as f64) * (x as f64))
+                .sum();
+            *self.debug_sq_l.entry(node_id.clone()).or_insert(0.0) += sq_l;
+            *self.debug_sq_r.entry(node_id.clone()).or_insert(0.0) += sq_r;
+
             if node_type == "Output" {
                 let len = left.len();
                 left.copy_from_slice(&buf_l[..len]);
                 right.copy_from_slice(&buf_r[..len]);
             }
         }
+        self.debug_frames += self.block_size;
     }
 
     pub fn reset(&mut self) {

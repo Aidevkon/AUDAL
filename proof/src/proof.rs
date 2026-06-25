@@ -19,7 +19,7 @@ impl ExecutionProof {
     /// project_id, track_id: provided by caller (session context).
     /// TODO: obtain from SessionContext in v2.0.
     pub fn generate(
-        input_pcm: &[f32],
+        input_pcm_hash: String,
         output_pcm: &[f32],
         persona: &PersonaConfig,
         dsp_config: &DspConfig,
@@ -37,7 +37,7 @@ impl ExecutionProof {
 
         ExecutionCertificate {
             version: "1.0".into(),
-            input_pcm_hash: Self::hash_pcm(input_pcm),
+            input_pcm_hash,
             persona_hash: Self::hash_json(persona),
             intent_hash: proof_log
                 .intent
@@ -190,8 +190,9 @@ mod tests {
     #[test]
     fn proof_generate_deterministic() {
         let (i, o, p, cfg, log) = test_proof_inputs();
+        let input_hash = ExecutionProof::hash_pcm(&i);
         let c1 = ExecutionProof::generate(
-            &i,
+            input_hash.clone(),
             &o,
             &p,
             &cfg,
@@ -203,7 +204,7 @@ mod tests {
             "spotify",
         );
         let c2 = ExecutionProof::generate(
-            &i,
+            input_hash,
             &o,
             &p,
             &cfg,
@@ -225,8 +226,9 @@ mod tests {
         let (i, o, p, cfg, log) = test_proof_inputs();
         let mut o2 = o.clone();
         o2[0] += 0.001;
+        let input_hash = ExecutionProof::hash_pcm(&i);
         let c1 = ExecutionProof::generate(
-            &i,
+            input_hash.clone(),
             &o,
             &p,
             &cfg,
@@ -238,7 +240,7 @@ mod tests {
             "spotify",
         );
         let c2 = ExecutionProof::generate(
-            &i,
+            input_hash,
             &o2,
             &p,
             &cfg,
@@ -255,8 +257,9 @@ mod tests {
     #[test]
     fn proof_verify_correct_ok() {
         let (i, o, p, cfg, log) = test_proof_inputs();
+        let input_hash = ExecutionProof::hash_pcm(&i);
         let cert = ExecutionProof::generate(
-            &i,
+            input_hash,
             &o,
             &p,
             &cfg,
@@ -273,8 +276,9 @@ mod tests {
     #[test]
     fn proof_verify_wrong_output_fails() {
         let (i, o, p, cfg, log) = test_proof_inputs();
+        let input_hash = ExecutionProof::hash_pcm(&i);
         let cert = ExecutionProof::generate(
-            &i,
+            input_hash,
             &o,
             &p,
             &cfg,
@@ -303,8 +307,9 @@ mod tests {
     #[test]
     fn proof_certificate_serializable() {
         let (i, o, p, cfg, log) = test_proof_inputs();
+        let input_hash = ExecutionProof::hash_pcm(&i);
         let cert = ExecutionProof::generate(
-            &i,
+            input_hash,
             &o,
             &p,
             &cfg,

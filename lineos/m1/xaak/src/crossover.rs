@@ -92,15 +92,19 @@ mod tests {
             let t = i as f32 / sr as f32;
             let x = (2.0 * std::f32::consts::PI * freq * t).sin();
             let (low, high) = xover.process(x);
-            if i > 1000 { // skip transient
+            if i > 1000 {
+                // skip transient
                 sum_low_sq += low * low;
                 sum_high_sq += high * high;
             }
         }
         // Low-frequency signal should dominate the low output, be negligible in high
-        assert!(sum_low_sq > sum_high_sq * 10.0,
+        assert!(
+            sum_low_sq > sum_high_sq * 10.0,
             "100Hz tone (crossover=1000Hz): low_energy={} should dominate high_energy={}",
-            sum_low_sq, sum_high_sq);
+            sum_low_sq,
+            sum_high_sq
+        );
     }
 
     #[test]
@@ -121,8 +125,11 @@ mod tests {
                 sum_high_sq += high * high;
             }
         }
-        assert!(sum_high_sq > sum_low_sq * 10.0,
+        assert!(
+            sum_high_sq > sum_low_sq * 10.0,
             "10kHz tone (crossover=1000Hz): high_energy={} should dominate low_energy={}",
-            sum_high_sq, sum_low_sq);
+            sum_high_sq,
+            sum_low_sq
+        );
     }
 }

@@ -42,7 +42,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     // Must succeed
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
 
-    let (blob, _chunk_original, _, _) = dsp_result.unwrap();
+    let (blob, _, _) = dsp_result.unwrap();
 
     // Verify properties
     assert_eq!(
