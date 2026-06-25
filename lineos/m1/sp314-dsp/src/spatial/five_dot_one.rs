@@ -74,6 +74,53 @@ pub struct FiveDotOneStage {
 }
 
 impl FiveDotOneStage {
+    pub fn deterministic_upmix(
+        left: &[f32],
+        right: &[f32],
+        sample_rate: u32,
+        firewall: &SpatialFirewall,
+    ) -> Self {
+        use crate::compressor::crossover::CrossoverLR4;
+        use crate::spatial::all_pass::AllPassFilter;
+
+        let n = left.len();
+        let mut c = Vec::with_capacity(n);
+        let mut ls = Vec::with_capacity(n);
+        let mut rs = Vec::with_capacity(n);
+        let mut lfe = Vec::with_capacity(n);
+
+        let mut side_xover = CrossoverLR4::new(200.0, sample_rate);
+        let mut mid_xover = CrossoverLR4::new(80.0, sample_rate);
+        let mut rs_allpass = AllPassFilter::new(1000.0, 0.707, sample_rate);
+
+        for i in 0..n {
+            // Inline M/S — avoids interleave/de-interleave overhead that calling
+            // MidSideMatrix::encode() (which expects one interleaved buffer) would
+            // require here; same choice made in xaak's telemetry_worker this morning.
+            let mid = (left[i] + right[i]) * 0.5;
+            let side = (left[i] - right[i]) * 0.5;
+
+            let (_side_low, side_high) = side_xover.process(side);
+            let (mid_low, _mid_high) = mid_xover.process(mid);
+
+            c.push(mid * 0.707);
+            ls.push(side_high);
+            rs.push(rs_allpass.process(-side_high));
+            lfe.push(mid_low * 0.5);
+        }
+
+        let mut stage = Self {
+            l: left.to_vec(),
+            r: right.to_vec(),
+            c,
+            ls,
+            rs,
+            lfe,
+        };
+        firewall.apply(&mut stage);
+        stage
+    }
+
     /// Mix FiveStems into 6 channels using StemChannelAssignments.
     /// INV-SP-1: deterministic
     /// INV-SP-5: always active regardless of renderer
@@ -332,5 +379,57 @@ mod tests {
         let stage1 = FiveDotOneStage::render(&stems, &a, &fw);
         let stage2 = FiveDotOneStage::render(&stems, &a, &fw);
         assert_eq!(stage1.c, stage2.c);
+    }
+
+    #[test]
+    fn deterministic_upmix_preserves_l_r_exactly() {
+        let sr = 48000;
+        let n = 4800;
+        let left: Vec<f32> = (0..n).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
+        let right: Vec<f32> = (0..n).map(|i| (i as f32 * 0.013).sin() * 0.5).collect();
+        let stage =
+            FiveDotOneStage::deterministic_upmix(&left, &right, sr, &SpatialFirewall::default());
+
+        // The core marketing/architectural promise: L/R must be bit-identical to input.
+        assert_eq!(stage.l, left, "L channel must be untouched");
+        assert_eq!(stage.r, right, "R channel must be untouched");
+    }
+
+    #[test]
+    fn deterministic_upmix_centered_signal_goes_to_center() {
+        let sr = 48000;
+        let n = 4800;
+        // Fully centered (mono-compatible) content: L == R.
+        let mono: Vec<f32> = (0..n).map(|i| (i as f32 * 0.05).sin() * 0.3).collect();
+        let stage =
+            FiveDotOneStage::deterministic_upmix(&mono, &mono, sr, &SpatialFirewall::default());
+
+        // Side should be ~zero (L==R means side=(L-R)*0.5=0), so Center should carry
+        // most of the energy, Ls/Rs should be near-silent.
+        let c_energy: f32 = stage.c.iter().map(|v| v * v).sum();
+        let ls_energy: f32 = stage.ls.iter().map(|v| v * v).sum();
+        assert!(
+            c_energy > 0.0,
+            "Center should carry energy from centered content"
+        );
+        assert!(
+            ls_energy < c_energy * 0.01,
+            "Ls should be near-silent for fully centered input, got ls_energy={} vs c_energy={}",
+            ls_energy,
+            c_energy
+        );
+    }
+
+    #[test]
+    fn deterministic_upmix_is_deterministic() {
+        let sr = 48000;
+        let left: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.02).sin()).collect();
+        let right: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.021).sin()).collect();
+        let fw = SpatialFirewall::default();
+        let stage1 = FiveDotOneStage::deterministic_upmix(&left, &right, sr, &fw);
+        let stage2 = FiveDotOneStage::deterministic_upmix(&left, &right, sr, &fw);
+        assert_eq!(stage1.c, stage2.c);
+        assert_eq!(stage1.ls, stage2.ls);
+        assert_eq!(stage1.rs, stage2.rs);
     }
 }
