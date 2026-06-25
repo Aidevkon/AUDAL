@@ -270,9 +270,17 @@ pub fn mono_to_stereo(mono: &[f32]) -> Vec<f32> {
     out
 }
 
-/// N-channel interleaved → stereo interleaved.
-/// Takes average of channels 0 & 1 for L, channels 2 & 3 for R (or repeats if fewer).
-/// Clamps to [-1.0, 1.0] after mix.
+/// Naive odd/even channel averaging downmix — NOT a correct ITU-standard
+/// downmix (it has no knowledge of which input channel is LFE, Center,
+/// Surround, etc.; it simply averages channels at even indices into Right
+/// and odd indices into Left). Used today as the fallback path for any
+/// channel count other than 1 (mono) or 2 (stereo) — including real 5.1/7.1
+/// material, which this function silently and incorrectly treats as if it
+/// were an arbitrary multi-mic recording with no spatial meaning.
+/// Documented here as a known limitation, not fixed in this pass.
+/// See 5.1-apple-ready-epic-scoping.md for the planned proper fix (a
+/// dedicated 6-channel decode path that preserves discrete channels
+/// instead of downmixing them at all).
 pub fn downmix_to_stereo(interleaved: &[f32], channels: usize) -> Vec<f32> {
     if channels == 0 {
         return Vec::new();
