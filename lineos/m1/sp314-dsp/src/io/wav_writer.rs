@@ -132,3 +132,69 @@ mod tests {
         assert_eq!(&buf[32..48], &expected_guid[..]);
     }
 }
+
+pub struct StreamingWavWriter {
+    writer: hound::WavWriter<std::io::BufWriter<std::fs::File>>,
+}
+
+impl StreamingWavWriter {
+    pub fn new(path: &str, sample_rate: u32) -> Result<Self, Box<dyn std::error::Error>> {
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let writer = hound::WavWriter::create(path, spec)?;
+        Ok(Self { writer })
+    }
+
+    pub fn write_chunk(
+        &mut self,
+        left: &[f32],
+        right: &[f32],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if left.len() != right.len() {
+            return Err("Left and right channels must have the same length".into());
+        }
+        for i in 0..left.len() {
+            self.writer.write_sample(left[i])?;
+            self.writer.write_sample(right[i])?;
+        }
+        Ok(())
+    }
+
+    pub fn finalize(self) -> Result<(), Box<dyn std::error::Error>> {
+        self.writer.finalize()?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests_streaming {
+    use super::*;
+
+    #[test]
+    fn streaming_writer_chunked_matches_batch_writer() {
+        let sr = 48000;
+        let left: Vec<f32> = (0..500).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
+        let right: Vec<f32> = (0..500).map(|i| (i as f32 * 0.013).sin() * 0.5).collect();
+
+        let batch_path = "/tmp/test_batch_writer.wav";
+        WavWriter::write(batch_path, &left, &right, sr).unwrap();
+
+        let stream_path = "/tmp/test_streaming_writer.wav";
+        let mut sw = StreamingWavWriter::new(stream_path, sr).unwrap();
+        sw.write_chunk(&left[0..100], &right[0..100]).unwrap();
+        sw.write_chunk(&left[100..350], &right[100..350]).unwrap();
+        sw.write_chunk(&left[350..500], &right[350..500]).unwrap();
+        sw.finalize().unwrap();
+
+        let batch_bytes = std::fs::read(batch_path).unwrap();
+        let stream_bytes = std::fs::read(stream_path).unwrap();
+        assert_eq!(
+            batch_bytes, stream_bytes,
+            "Streaming chunks should produce exact same file as batch"
+        );
+    }
+}
