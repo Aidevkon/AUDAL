@@ -1,3 +1,4 @@
+pub mod all_pass;
 pub mod channel_assign;
 pub mod five_dot_one;
 pub mod mid_side;
