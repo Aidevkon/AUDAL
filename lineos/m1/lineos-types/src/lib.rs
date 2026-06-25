@@ -28,7 +28,7 @@ pub use telemetry::RealtimeFrame;
 
 // Convenience re-exports for migration
 pub use analysis::{MixMetrics, StemFeatures, StemMetrics};
-pub use audio::{AudioChunk, StereoBuffer};
+pub use audio::{AudioChunk, AudioPayload, StereoBuffer};
 pub use config::{Bmr128Schema, LoudnessTarget, PipelineConstants, PresetThresholds};
 pub use golden_blob::{BlobType, GoldenBlob, GoldenInputProfile};
 pub use jini::{
