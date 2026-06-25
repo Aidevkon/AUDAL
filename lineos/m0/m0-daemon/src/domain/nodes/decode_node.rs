@@ -8,7 +8,6 @@ use lineos_types::AudioChunk;
 /// Output of decode_node — everything downstream needs.
 pub struct DecodedAudio {
     pub chunk: AudioChunk,
-    pub chunk_original: AudioChunk, // Needed for A/B processing
     pub pcm_samples: Vec<f32>,      // Needed for Phase 9 Telemetry
     pub pcm_channels: u16,          // Needed for Phase 9 Telemetry
     pub pcm_sample_rate: u32,       // Needed for Phase 9 Telemetry
@@ -20,7 +19,7 @@ pub struct DecodedAudio {
     pub duration_ms: f64,
 }
 
-pub fn run(audio_path: &str, preset_id: &str) -> Result<DecodedAudio, String> {
+pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAudio, String> {
     use crate::domain::dsp_pipeline::{
         compute_rms, compute_sha256_bytes, derive_seed, rms_to_lufs,
     };
@@ -43,6 +42,21 @@ pub fn run(audio_path: &str, preset_id: &str) -> Result<DecodedAudio, String> {
     let seed = derive_seed(&path_hash);
 
     let pcm = decode::decode_audio(audio_path).map_err(|e| format!("Decode error: {e}"))?;
+
+    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+    // SAFETY: pcm.samples is a Vec<f32>, reinterpreted as raw bytes for direct
+    // disk write. Native-endian, in-process only (same architecture as the
+    // reader, xaak's PcmTransfer) — not a portable serialization format,
+    // matches the byte layout the old executor.rs dump already used (verified
+    // byte-for-byte equivalent before this change, not assumed).
+    let raw_bytes: &[u8] = unsafe {
+        std::slice::from_raw_parts(
+            pcm.samples.as_ptr() as *const u8,
+            pcm.samples.len() * 4,
+        )
+    };
+    std::fs::write(&raw_path, raw_bytes).map_err(|e| format!("Failed to write raw dump: {e}"))?;
+    eprintln!("[RAW-SAVE] wrote raw PCM {} bytes to {}", raw_bytes.len(), raw_path);
 
     let original_sr = pcm.original_sr;
     let original_ch = pcm.original_ch;
@@ -83,11 +97,8 @@ pub fn run(audio_path: &str, preset_id: &str) -> Result<DecodedAudio, String> {
         num_frames: pcm.samples.len() / 2,
     };
 
-    let chunk_original = chunk.clone();
-
     Ok(DecodedAudio {
         chunk,
-        chunk_original,
         pcm_samples: pcm_samples_for_telemetry,
         pcm_channels: pcm_channels_for_telemetry,
         pcm_sample_rate: pcm_sr_for_telemetry,

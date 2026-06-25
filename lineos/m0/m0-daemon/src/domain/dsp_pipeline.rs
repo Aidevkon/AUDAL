@@ -23,7 +23,6 @@ pub fn run_dsp(
         StoredBlob,
         std::path::PathBuf,
         Option<lineos_corpus::store::UserMarkovModel>,
-        lineos_types::AudioChunk,
     ),
     String,
 > {
@@ -56,13 +55,16 @@ fn run_dsp_internal(
         StoredBlob,
         std::path::PathBuf,
         Option<lineos_corpus::store::UserMarkovModel>,
-        lineos_types::AudioChunk,
     ),
     String,
 > {
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
+
+    fn rms(buf: &[f32]) -> f32 {
+        (buf.iter().map(|x| x * x).sum::<f32>() / buf.len().max(1) as f32).sqrt()
+    }
 
     let emit_progress = |stage_name: &str| {
         let p = crate::app_state::MasteringProgress {
@@ -80,9 +82,14 @@ fn run_dsp_internal(
         }
     };
 
+    let blob_id = req
+        .track_id
+        .clone()
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
     // NODE 1: DECODE
     emit_progress("Ingest");
-    let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id)?;
+    let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id, &blob_id)?;
     let target_lufs = decoded.target_lufs;
     let input_hash_hex = decoded.input_hash_hex;
     let seed = decoded.seed;
@@ -93,7 +100,13 @@ fn run_dsp_internal(
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let mut chunk = decoded.chunk;
-    let chunk_original = decoded.chunk_original;
+
+    eprintln!(
+        "[BISECT-1-DECODE] L_rms={:.6} R_rms={:.6} ratio={:.4}",
+        rms(&chunk.left),
+        rms(&chunk.right),
+        rms(&chunk.right) / rms(&chunk.left).max(1e-9)
+    );
 
     profiler.mark_stage("Ingest", &_pcm_samples_for_telemetry);
 
@@ -154,10 +167,6 @@ fn run_dsp_internal(
     let n_total = mono.len();
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
-    let blob_id = req
-        .track_id
-        .clone()
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
     let file = std::fs::OpenOptions::new()
         .read(true)
@@ -193,11 +202,25 @@ fn run_dsp_internal(
         &mut right_vec[..],
     )?;
 
+    eprintln!(
+        "[BISECT-3-RENDER] L_rms={:.6} R_rms={:.6} ratio={:.4}",
+        rms(&left_vec),
+        rms(&right_vec),
+        rms(&right_vec) / rms(&left_vec).max(1e-9)
+    );
+
     // Latency compensation: left-shift by STFT_FLUSH_TAIL to discard silence, then truncate.
     left_vec.copy_within(STFT_FLUSH_TAIL.., 0);
     left_vec.truncate(n_total);
     right_vec.copy_within(STFT_FLUSH_TAIL.., 0);
     right_vec.truncate(n_total);
+
+    eprintln!(
+        "[BISECT-4-TRIM] L_rms={:.6} R_rms={:.6} ratio={:.4}",
+        rms(&left_vec),
+        rms(&right_vec),
+        rms(&right_vec) / rms(&left_vec).max(1e-9)
+    );
 
     profiler.mark_stage("Stem Engine", &left_vec[..]);
 
@@ -288,7 +311,6 @@ fn run_dsp_internal(
         cert_out.blob,
         cert_out.file_path,
         dsp_out.user_model,
-        chunk_original,
     ))
 }
 
