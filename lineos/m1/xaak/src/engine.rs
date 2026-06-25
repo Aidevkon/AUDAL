@@ -193,9 +193,28 @@ impl PlaybackWorker {
             AbTarget::B => self.kernel_b.as_mut(),
         }
         .ok_or_else(|| "xaak: play() — no PCM loaded".to_string())?;
-        let pos_ms = *self.position.lock().unwrap();
-        let consumer = kernel.stream_from(pos_ms);
-        let raw_consumer = self.kernel_raw.as_mut().map(|kr| kr.stream_from(pos_ms));
+        let mut pos_guard = self.position.lock().unwrap();
+        let pos_ms = *pos_guard;
+        let duration_ms = kernel.duration_ms();
+
+        // Defensive auto-rewind: if we're at or near the end of the track (within one
+        // audio callback block's worth of time, ~20ms), treat this play() as a replay
+        // from the start rather than attempting to stream from an exhausted position.
+        // Covers both natural-EOF-then-replay (EofReached only clears `playing`, never
+        // resets position) and manual-seek-to-end-then-play. The 20ms window absorbs
+        // integer-division rounding in the position accumulator (delta_ms truncates
+        // per callback), which means position_ms at EOF rarely lands exactly on
+        // duration_ms.
+        let start_pos = if pos_ms + 20 >= duration_ms {
+            *pos_guard = 0;
+            0
+        } else {
+            pos_ms
+        };
+        drop(pos_guard);
+
+        let consumer = kernel.stream_from(start_pos);
+        let raw_consumer = self.kernel_raw.as_mut().map(|kr| kr.stream_from(start_pos));
         self.player.play(
             consumer,
             raw_consumer,

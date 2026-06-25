@@ -81,6 +81,9 @@ impl CpalPlayer {
         let pos = position_ms.clone();
         let sr = sample_rate as u64;
         let ch = channels as u64;
+
+        let start_pos_ms = *pos.lock().unwrap_or_else(|e| e.into_inner());
+        let mut local_frames_played: u64 = 0;
         // Clone new flag for capture into the cpal callback closure.
         let stream_ended_cb = new_stream_ended.clone();
         // Consecutive callbacks where mastered consumer returned 0 samples.
@@ -180,9 +183,12 @@ impl CpalPlayer {
 
                     // Advance playback position.
                     let frames = filled as u64 / ch.max(1);
-                    let delta_ms = frames.saturating_mul(1000) / sr.max(1);
+                    local_frames_played += frames;
+                    // Exact calculation without cumulative integer truncation error.
+                    // u64 capacity is ~1.8e19, which takes millions of years to overflow at 48kHz.
+                    let elapsed_ms = local_frames_played.saturating_mul(1000) / sr.max(1);
                     if let Ok(mut p) = pos.lock() {
-                        *p = p.saturating_add(delta_ms);
+                        *p = start_pos_ms.saturating_add(elapsed_ms);
                     }
 
                     // TB-P6: push mastered samples to telemetry ring buffer.
