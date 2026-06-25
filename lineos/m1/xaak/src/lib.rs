@@ -12,6 +12,7 @@
 //!   - cpal sits UNDER xaak, not above it (A-003 §8)
 
 pub mod crossover;
+pub mod downmix_bs775;
 pub mod engine;
 pub mod flavours;
 pub mod player;
