@@ -91,6 +91,44 @@ impl fmt::Display for DecodeError {
 /// This function is synchronous and CPU-bound; callers must wrap in
 /// `tokio::task::spawn_blocking`.
 pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
+    let (raw_samples, original_sr, original_ch) = decode_raw_interleaved(path)?;
+
+    // ── 4. Channel normalization → stereo ─────────────────────────────────────
+    let stereo_interleaved: Vec<f32> = match original_ch {
+        1 => mono_to_stereo(&raw_samples),
+        2 => raw_samples,
+        n => downmix_to_stereo(&raw_samples, n as usize),
+    };
+
+    // ── 5. Resample → 48000 Hz (skip if already correct) ─────────────────────
+    let resampled = if original_sr != TARGET_SAMPLE_RATE {
+        resample_stereo_to_48k(&stereo_interleaved, original_sr)?
+    } else {
+        stereo_interleaved
+    };
+
+    // ── 6. Assemble AudioPcm ──────────────────────────────────────────────────
+    let duration_ms = (resampled.len() as u64 / 2) * 1000 / TARGET_SAMPLE_RATE as u64;
+
+    // Final sanitization: NaN/Inf → 0.0, then clamp to [-1.0, 1.0].
+    // Must run AFTER resampling — rubato can produce NaN in head/tail frames.
+    // f32::clamp(NaN) returns NaN, so is_nan check must come first.
+    let mut resampled = resampled;
+    for s in resampled.iter_mut() {
+        *s = sanitize_sample(*s);
+    }
+
+    Ok(AudioPcm {
+        samples: resampled,
+        sample_rate: TARGET_SAMPLE_RATE,
+        channels: TARGET_CHANNELS,
+        duration_ms,
+        original_sr,
+        original_ch,
+    })
+}
+
+fn decode_raw_interleaved(path: &str) -> Result<(Vec<f32>, u32, u16), DecodeError> {
     use symphonia::core::audio::SampleBuffer;
     use symphonia::core::codecs::DecoderOptions;
     use symphonia::core::formats::FormatOptions;
@@ -205,39 +243,7 @@ pub fn decode_audio(path: &str) -> Result<AudioPcm, DecodeError> {
         return Err(DecodeError::DurationExceeded(duration_secs));
     }
 
-    // ── 4. Channel normalization → stereo ─────────────────────────────────────
-    let stereo_interleaved: Vec<f32> = match original_ch {
-        1 => mono_to_stereo(&raw_samples),
-        2 => raw_samples,
-        n => downmix_to_stereo(&raw_samples, n as usize),
-    };
-
-    // ── 5. Resample → 48000 Hz (skip if already correct) ─────────────────────
-    let resampled = if original_sr != TARGET_SAMPLE_RATE {
-        resample_stereo_to_48k(&stereo_interleaved, original_sr)?
-    } else {
-        stereo_interleaved
-    };
-
-    // ── 6. Assemble AudioPcm ──────────────────────────────────────────────────
-    let duration_ms = (resampled.len() as u64 / 2) * 1000 / TARGET_SAMPLE_RATE as u64;
-
-    // Final sanitization: NaN/Inf → 0.0, then clamp to [-1.0, 1.0].
-    // Must run AFTER resampling — rubato can produce NaN in head/tail frames.
-    // f32::clamp(NaN) returns NaN, so is_nan check must come first.
-    let mut resampled = resampled;
-    for s in resampled.iter_mut() {
-        *s = sanitize_sample(*s);
-    }
-
-    Ok(AudioPcm {
-        samples: resampled,
-        sample_rate: TARGET_SAMPLE_RATE,
-        channels: TARGET_CHANNELS,
-        duration_ms,
-        original_sr,
-        original_ch,
-    })
+    Ok((raw_samples, original_sr, original_ch))
 }
 
 // Sample sanitization
