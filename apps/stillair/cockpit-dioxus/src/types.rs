@@ -94,6 +94,8 @@ pub struct RealtimeFrameJson {
     pub spectrum_before: Vec<f32>,
     /// Post-mastering spectrum (Core — after DSP). 64 log-spaced dBFS bands.
     pub spectrum_after: Vec<f32>,
+    pub energy_mid: f32,
+    pub energy_side: f32,
     pub gonio_path: Vec<[f32; 2]>,
     pub position_ms: u64,
 }

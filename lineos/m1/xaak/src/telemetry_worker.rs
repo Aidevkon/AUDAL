@@ -200,6 +200,35 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
 
                 let pos_val = *position_ms.lock().unwrap_or_else(|e| e.into_inner());
 
+                // Mid/Side energy (RMS, dBFS) for the spatial "Kepler" visualizer.
+                // Same M=(L+R)*0.5, S=(L-R)*0.5 definition proven correct by the null-test
+                // in sp314-dsp/tests/midside_contract.rs (test_midside_matrix_null_roundtrip,
+                // commit 7b9f6a4). Computed inline here (not via MidSideMatrix::encode())
+                // to avoid two heap allocations per telemetry frame on this hot path —
+                // we only need the RMS reduction, not the full M/S sample arrays.
+                let (energy_mid, energy_side) = if ch == 2 {
+                    let frames = chunk_size / 2;
+                    let (mut sum_m, mut sum_s) = (0.0_f32, 0.0_f32);
+                    for i in 0..frames {
+                        let m = (buffer[i * 2] + buffer[i * 2 + 1]) * 0.5;
+                        let s = (buffer[i * 2] - buffer[i * 2 + 1]) * 0.5;
+                        sum_m += m * m;
+                        sum_s += s * s;
+                    }
+                    let rms_m = (sum_m / frames as f32).sqrt();
+                    let rms_s = (sum_s / frames as f32).sqrt();
+                    let to_db = |amp: f32| {
+                        if amp > 1e-6 {
+                            20.0 * amp.log10()
+                        } else {
+                            -120.0
+                        }
+                    };
+                    (to_db(rms_m), to_db(rms_s))
+                } else {
+                    (-120.0, -120.0) // Mono: no spatial information, Side is silent by definition.
+                };
+
                 // Temporary [BIN-DUMP] trap
                 #[cfg(feature = "debug-telem")]
                 {
@@ -218,6 +247,8 @@ pub fn spawn(rx: Receiver<TelemetryCommand>) {
                 let frame = lineos_types::telemetry::RealtimeFrame {
                     spectrum_before,
                     spectrum_after,
+                    energy_mid,
+                    energy_side,
                     gonio_path: crate::player::decimate_gonio(&buffer[..chunk_size], ch),
                     position_ms: pos_val,
                 };
