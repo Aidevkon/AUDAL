@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 // src/bin/sp314_master.rs
 
 use sp314_dsp::io::{FlacWriter, WavReader, WavWriter};

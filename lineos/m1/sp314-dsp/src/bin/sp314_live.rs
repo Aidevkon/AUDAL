@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 // src/bin/sp314_live.rs
 // Real-time mastering — microphone in → engine → speakers out.
 //

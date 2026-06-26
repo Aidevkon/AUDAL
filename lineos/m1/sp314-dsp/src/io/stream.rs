@@ -9,7 +9,7 @@
 
 use hound::{SampleFormat, WavReader, WavSpec, WavWriter};
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Seek};
+use std::io::{BufReader, BufWriter};
 
 /// Reads a WAV file in fixed-size chunks.
 /// Never loads the full file into RAM.
@@ -85,15 +85,14 @@ impl WavChunkReader {
     /// O(1) disk seek — zero RAM allocation.
     /// INV-ST-3: peak RAM ≤ 5MB regardless of seek position.
     pub fn seek_ms(&mut self, position_ms: u64) -> Result<(), String> {
-        let sample_offset =
-            (position_ms as f64 * self.sample_rate as f64 * self.channels as f64 / 1000.0) as u32;
-        self.seek_samples(sample_offset)
+        let frame_offset = (position_ms as f64 * self.sample_rate as f64 / 1000.0) as u32;
+        self.seek_frames(frame_offset)
     }
 
-    /// Seek to absolute sample position (all channels).
-    pub fn seek_samples(&mut self, sample_pos: u32) -> Result<(), String> {
+    /// Seek to absolute frame position (independent of channels).
+    pub fn seek_frames(&mut self, frame_pos: u32) -> Result<(), String> {
         self.reader
-            .seek(sample_pos)
+            .seek(frame_pos)
             .map_err(|e| format!("WavChunkReader seek failed: {e}"))
     }
 }
@@ -170,7 +169,7 @@ mod tests {
 
         let mut reader = WavChunkReader::open(path).unwrap();
         let _ = reader.next_chunk(24000); // read halfway
-        reader.seek_samples(0).unwrap(); // seek back to start
+        reader.seek_frames(0).unwrap(); // seek back to start
         let chunk = reader.next_chunk(1).unwrap();
         assert!((chunk[0] - 0.1).abs() < 0.001);
         std::fs::remove_file(path).ok();

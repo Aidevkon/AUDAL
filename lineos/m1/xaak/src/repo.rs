@@ -1,3 +1,4 @@
+#![allow(clippy::bool_assert_comparison)]
 //! AudioRepo — Git-style version control for DSP state.
 //! Authority: lineos/docs/audio-git-spec-v1_0.md v1.2
 //! INV-GIT-1..6

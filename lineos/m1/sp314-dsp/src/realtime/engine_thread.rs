@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 // src/realtime/engine_thread.rs
 // Engine processing loop — runs on a dedicated thread.
 // Reads from input ring buffer, processes blocks, writes to output ring buffer.

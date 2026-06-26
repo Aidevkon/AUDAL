@@ -1,3 +1,4 @@
+#![allow(clippy::new_without_default)]
 //! engine.rs — PlaybackEngine: unified play/pause/stop/seek API.
 //! Authority: Amendment A-003 §1, §4, Phase 12A P12A-004
 //!

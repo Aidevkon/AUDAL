@@ -1,4 +1,5 @@
 #![cfg(feature = "cli")]
+#![allow(deprecated)]
 // tests/io_contract.rs
 
 use approx::assert_abs_diff_eq;
