@@ -18,8 +18,8 @@ fn process_block_matches_process_offline() {
     let mut engine_offline = Sp314MasteringEngine::new(config2, 48000).unwrap();
 
     let len = 512;
-    use sp314_dsp::limiter::LOOKAHEAD_SAMPLES;
-    let block_len = len + LOOKAHEAD_SAMPLES;
+    let lookahead_samples = 240; // 5ms at 48000Hz
+    let block_len = len + lookahead_samples;
     let mut left_block = vec![0.0_f32; block_len];
     let mut right_block = vec![0.0_f32; block_len];
     let mut left_offline = vec![0.0_f32; len];
@@ -42,16 +42,16 @@ fn process_block_matches_process_offline() {
     // whereas process_block processes the trailing zeros through the entire chain.
     // Therefore, they are only bit-identical for the frames where they process the exact same inputs
     // and have the exact same lookahead context.
-    let valid_len = len - sp314_dsp::limiter::LOOKAHEAD_SAMPLES;
+    let valid_len = len - lookahead_samples;
     for i in 0..valid_len {
         assert_eq!(
-            left_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES],
+            left_block[i + lookahead_samples],
             left_offline[i],
             "Left channel mismatch at frame {}",
             i
         );
         assert_eq!(
-            right_block[i + sp314_dsp::limiter::LOOKAHEAD_SAMPLES],
+            right_block[i + lookahead_samples],
             right_offline[i],
             "Right channel mismatch at frame {}",
             i
