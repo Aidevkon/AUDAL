@@ -25,7 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow       = "1"
 chrono       = { version = "0.4", features = ["serde"] }
 uuid         = { version = "1", features = ["v4"] }
-sp314-dsp    = { path = "../../m1/sp314-dsp" }
+sp314-dsp    = { path = "../../m1/sp314-dsp", features = ["cli"] }
 lineos-types = { path = "../../m1/lineos-types" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
 openclaw      = { path = "../../../apps/runtime/openclaw" }

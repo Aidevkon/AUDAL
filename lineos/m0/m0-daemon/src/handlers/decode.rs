@@ -59,6 +59,7 @@ pub enum DecodeError {
     UnsupportedFormat(String),
     DecodeFailure(String),
     ResampleFailure(String),
+    ConsumerError(String),
 }
 
 impl fmt::Display for DecodeError {
@@ -72,6 +73,7 @@ impl fmt::Display for DecodeError {
             DecodeError::UnsupportedFormat(e) => write!(f, "Unsupported format: {e}"),
             DecodeError::DecodeFailure(e) => write!(f, "Decode failure: {e}"),
             DecodeError::ResampleFailure(e) => write!(f, "Resample failure: {e}"),
+            DecodeError::ConsumerError(e) => write!(f, "Consumer error: {e}"),
         }
     }
 }

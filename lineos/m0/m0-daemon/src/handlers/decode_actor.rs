@@ -23,10 +23,11 @@ pub enum DecodeChunk<'a> {
 /// Returns (original_sample_rate, original_channels) once decoding completes —
 /// callers needing duration_ms can derive it from frame count tracked in
 /// their own on_chunk callback if needed.
-pub fn decode_streaming<F: FnMut(DecodeChunk<'_>)>(
-    path: &str,
-    mut on_chunk: F,
-) -> Result<(u32, u16), DecodeError> {
+pub fn decode_streaming<E, F>(path: &str, mut on_chunk: F) -> Result<(u32, u16), DecodeError>
+where
+    E: ToString,
+    F: FnMut(DecodeChunk<'_>) -> Result<(), E>,
+{
     // ── 1. File size check ────────────────────────────────────────────────────
     let meta = std::fs::metadata(path).map_err(|_| DecodeError::FileNotFound(path.to_string()))?;
 
@@ -123,14 +124,15 @@ pub fn decode_streaming<F: FnMut(DecodeChunk<'_>)>(
                     ));
                 }
 
-                on_chunk(DecodeChunk::Samples(sb.samples()));
+                on_chunk(DecodeChunk::Samples(sb.samples()))
+                    .map_err(|e| DecodeError::ConsumerError(e.to_string()))?;
             }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
             Err(e) => return Err(DecodeError::DecodeFailure(e.to_string())),
         }
     }
 
-    on_chunk(DecodeChunk::EndOfStream);
+    on_chunk(DecodeChunk::EndOfStream).map_err(|e| DecodeError::ConsumerError(e.to_string()))?;
     Ok((original_sr, original_ch))
 }
 
@@ -148,12 +150,14 @@ mod tests {
 
         // Streaming (new way) — accumulate chunks to compare
         let mut streamed_samples: Vec<f32> = Vec::new();
-        let (stream_sr, stream_ch) = decode_streaming(path, |chunk| {
-            if let DecodeChunk::Samples(s) = chunk {
-                streamed_samples.extend_from_slice(s);
-            }
-        })
-        .unwrap();
+        let (stream_sr, stream_ch) =
+            decode_streaming(path, |chunk| -> Result<(), Box<dyn std::error::Error>> {
+                if let DecodeChunk::Samples(s) = chunk {
+                    streamed_samples.extend_from_slice(s);
+                }
+                Ok(())
+            })
+            .unwrap();
 
         assert_eq!(batch_sr, stream_sr, "sample rate must match");
         assert_eq!(batch_ch, stream_ch, "channel count must match");

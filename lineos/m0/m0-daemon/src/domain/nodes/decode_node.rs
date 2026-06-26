@@ -124,7 +124,6 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use sha2::Digest;
 
     #[test]
