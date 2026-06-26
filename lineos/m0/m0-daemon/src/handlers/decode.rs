@@ -195,7 +195,7 @@ pub fn decode_smart(path: &str) -> Result<lineos_types::AudioPayload, DecodeErro
     }
 }
 
-pub(crate) fn decode_raw_interleaved(path: &str) -> Result<(Vec<f32>, u32, u16), DecodeError> {
+pub fn decode_raw_interleaved(path: &str) -> Result<(Vec<f32>, u32, u16), DecodeError> {
     use symphonia::core::audio::SampleBuffer;
     use symphonia::core::codecs::DecoderOptions;
     use symphonia::core::formats::FormatOptions;

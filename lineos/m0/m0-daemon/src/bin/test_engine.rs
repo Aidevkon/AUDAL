@@ -18,8 +18,13 @@ fn assert_signal_integrity(signal: &[f32], node: &'static str) {
 }
 
 fn main() {
-    let input_path = "/home/aidevcon/Music/test.wav";
-    let output_path = "/home/aidevcon/Music/test_mastered.wav";
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() != 3 {
+        eprintln!("Usage: {} <input.wav> <output.wav>", args[0]);
+        std::process::exit(1);
+    }
+    let input_path = &args[1];
+    let output_path = &args[2];
 
     // --- Read WAV ---
     let mut reader = hound::WavReader::open(input_path).expect("Failed to open input WAV");
