@@ -1,67 +1,44 @@
-# PROJECT MEMORY MAP
+# Project Memory Map
 
-*How to use this doc: Before starting work on a "new" feature (especially data modeling, algorithms, or infrastructure), check this map first. This document catalogs things that ALREADY exist in the codebase but are easily forgotten because they aren't fully wired into the main production path yet, or are duplicated for migration reasons. Stop reinventing the wheel.*
+**Σκοπός:** Ευρετήριο πραγμάτων που ΗΔΗ υπάρχουν στο codebase αλλά είναι εύκολο να ξεχαστούν/ξανανακαλυφθούν. Δημιουργήθηκε αφού απόψε ξαναβρέθηκε (μετά από ρητή, στενή ερώτηση) ένα ήδη-υπάρχον git-like versioning model (MixCommit/Branch) ενώ δουλεύαμε ακριβώς στο σχετικό A/B feature, χωρίς κανείς να το θυμάται.
 
----
+## 1. Live vs Deprecated engines
 
-## 1. Live vs Deprecated/Legacy Engines
+- **`Sp314MasteringEngine`** (lineos/m1/sp314-dsp/src/pipeline/engine.rs) — ρητά #[deprecated], σχόλιο: "This monolith is Phase 6 legacy". Καλείται ΜΟΝΟ από CLI tools (test_engine, sp314_master, sp314_live) και tests (realtime_contract.rs). ΔΕΝ είναι στο production HTTP path.
+- **Live production path:** DspGraph (sp314-nodes) μέσω DspAdapter, και η νέα streaming_pipeline.rs (m0-daemon/src/dsp/). Αυτό είναι το source of truth για νέα features.
+- two_pass.rs έχει ένα "legacy 1024 zero padding" comment — pure compatibility code, όχι deprecated engine, μόνο σημείωση.
 
-The codebase is in the middle of a major architectural migration (Batch to Streaming).
+## 2. Duplicated primitives across crates
 
-*   **DEPRECATED (Legacy Batch Path):**
-    *   `Sp314MasteringEngine` (in `lineos/m1/sp314-dsp/src/pipeline/engine.rs`). This is the old monolithic processor. It requires loading the entire audio file into memory.
-    *   `DspAdapter::master()` (in `lineos/m0/m0-daemon/src/dsp/maestro.rs` or similar). This wraps the old engine for the daemon.
-    *   *Usage:* These are still in the codebase, but they are considered **legacy**. They are primarily kept alive in older CLI tools (`test_engine`, `sp314_master`) and legacy tests.
+| Primitive | sp314-dsp location | xaak location | Γιατί duplicated |
+|---|---|---|---|
+| CrossoverLR4 | compressor/crossover.rs | xaak/src/crossover.rs | xaak δεν έχει dependency στο sp314-dsp by design |
+| (M/S logic) | spatial/mid_side.rs | telemetry_worker.rs (inline) | ίδιος λόγος |
 
-*   **LIVE (Target Production Path):**
-    *   `DspGraph` & `StreamingWavWriter` (in `lineos/m1/sp314-nodes/src/graph.rs` and `lineos/m1/sp314-dsp/src/io/stream.rs`).
-    *   `run_streaming_pipeline_with_scout()` (in `lineos/m0/m0-daemon/src/dsp/streaming_pipeline.rs`).
-    *   *Usage:* This is the true, memory-efficient, chunk-based streaming architecture (Phase 2). This is what the HTTP/Tauri endpoints in `m0-daemon` should be calling moving forward.
+Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτότυπο). Αν διορθωθεί bug εκεί, ΔΕΝ μεταφέρεται αυτόματα στο xaak copy — χρειάζεται χειροκίνητος συγχρονισμός, κανείς δεν θα το θυμηθεί αυτόματα.
 
----
+## 3. Schema structs: wired vs unwired (db/schema.rs, 11 structs συνολικά)
 
-## 2. Duplicated DSP Primitives Across Crates
+| Struct | Status |
+|---|---|
+| Project | ✅ WIRED |
+| Track | ✅ WIRED |
+| Branch | ✅ WIRED |
+| Session | ❌ UNWIRED |
+| FindingPatchJson | ❌ UNWIRED |
+| MasteringParamsJson | ❌ UNWIRED |
+| DspStateJson | ❌ UNWIRED |
+| **MixCommit** | ❌ UNWIRED (git-like versioning model, ready for A/B/C/D feature) |
+| UserProfile | ❌ UNWIRED |
+| UserFindingFeedback | ❌ UNWIRED (graph RELATION edge, ready to use) |
+| UserFlavourPreference | ❌ UNWIRED (graph RELATION edge, ready to use) |
 
-You will find multiple versions of the exact same DSP math (e.g., Biquads, Compressors) in different crates. **This is intentional.**
+**8 από τα 11 structs (73%) είναι ήδη σχεδιασμένα στο schema αλλά δεν έχουν κανέναν production consumer ακόμα.** Πριν σχεδιάσεις νέο data model για κάτι, έλεγξε εδώ πρώτα — μπορεί να υπάρχει ήδη.
 
-*   **Examples:**
-    *   `Biquad` exists in `sp314-dsp/src/masking_eq/biquad.rs` AND `sp314-nodes/src/nodes/biquad.rs`.
-    *   `Compressor` exists in `sp314-dsp/src/compressor/core.rs` AND `sp314-nodes/src/nodes/compressor.rs`.
+## 4. CI feature-flag visibility gaps (επιβεβαιωμένα αρχεία)
 
-*   **Why is it duplicated?**
-    `sp314-dsp` is the legacy monolith. `sp314-nodes` is the new modular graph-based architecture. To avoid breaking the legacy tests and CLI tools while we build the new streaming graph, the math was isolated and re-implemented natively for the `DspNode` trait in `sp314-nodes`.
-*   **Source of Truth:** If you are building a new feature or fixing a bug in the production mastering pipeline, the source of truth is **`sp314-nodes`**.
+- io_contract.rs, realtime_contract.rs (sp314-dsp/tests/) — και τα δύο ήδη βρέθηκαν/διορθώθηκαν σήμερα/χθες (#18-20, commit 8339704).
+- telemetry_worker.rs (xaak) — feature-gated, ΔΕΝ έχει ακόμα επιβεβαιωθεί αν τρέχει σε routine CI ή όχι· αξίζει έλεγχος.
 
----
-
-## 3. Data Models/Schema (Unwired but Ready)
-
-The SurrealDB schema (`lineos/m0/m0-daemon/src/db/schema.rs`) is significantly ahead of the actual API endpoints. Several advanced concepts are fully modeled in the database but have **no production consumers** yet.
-
-*   **Active (Wired):** `Project`, `Track`, `Session`, `Blob`.
-*   **Inactive (Waiting to be used):**
-    *   **The Git-like Versioning Model:** `MixCommit` and `Branch`. This is the exact schema needed for A/B/C/D mastering comparisons and version histories. It already has `parent_hash`, `branch_name`, and `head_hash`. Do not invent a new flat-table versioning system; use this.
-    *   **Graph Relations:** `user_finding_feedback` and `user_flavour_preference`. These are defined as SurrealDB `RELATION` edges (Graph links) between Users and Commits/Projects. The schema supports graph traversals, even though core entities currently use flat foreign-key IDs.
-
----
-
-## 4. CI/Test Visibility Gaps (Feature-Gated Blind Spots)
-
-We have a recurring pattern where files hidden behind `#[cfg(feature = "...")]` do not compile or run during a standard `cargo check` or `cargo test`, leading to silently broken code.
-
-*   **Known Blind Spots:**
-    *   `lineos/m1/xaak/src/telemetry_worker.rs`
-    *   `lineos/m1/sp314-dsp/tests/realtime_contract.rs`
-    *   `lineos/m1/sp314-dsp/tests/io_contract.rs`
-*   **The Problem:** These require the `cli` or `realtime` features to be activated. If a core API changes, these files will quietly break, and CI won't catch it unless the specific feature flag happens to be triggered.
-*   **Actionable Advice:** If you change a core struct (like `hound::WavReader` usage or `Sp314MasteringEngine` signatures), explicitly run `cargo check --all-features` to ensure you didn't break these hidden files.
-
----
-
-## 5. The 5-Layer Architecture Vision vs Reality
-
-The `ARCHITECTURE.md` describes a grand 5-layer vision: Creator OS → LineOS → Aether → Apps → Marketplace, with the assumption of multiple independent apps running on the OS.
-
-**The Reality Today:** We only have ONE application product built on this stack right now: **Stillair** (Tauri/Dioxus). Furthermore, Stillair is currently heavily coupled with the `m0-daemon` backend. 
-
-*This is completely normal and expected at this stage of the startup.* We are building the engine while flying the plane. Do not over-engineer generic "App Store" plugin loaders right now when we only need to ship Stillair. The architecture provides the *seams* for future apps, but we do not need to flesh out the empty rooms yet.
+## How to use this doc
+Πριν ξεκινήσεις νέο feature, ψάξε εδώ πρώτα: μπορεί να υπάρχει ήδη σχετικό schema/struct/primitive. Ενημέρωσε αυτό το doc όποτε βρίσκεις κάτι αντίστοιχο.
