@@ -72,13 +72,6 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(audit: Arc<AuditLog>) -> Self {
-        let (progress_tx, _) = broadcast::channel(128);
-        let (album_tx, _) = broadcast::channel(64);
-        let initial_dsp_state = DspState::default();
-        let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state);
-        let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
-        let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
-
         // Initialize SurrealDB — persistent local storage
         // ~/.creator_os/db survives reboots (Privacy Moat)
         let fallback_path = format!(
@@ -90,6 +83,25 @@ impl AppState {
         let db = crate::db::init(&db_path)
             .await
             .expect("Failed to initialize SurrealDB");
+
+        Self::from_db(audit, db).await
+    }
+
+    pub async fn new_for_test(audit: Arc<AuditLog>) -> Self {
+        let db = crate::db::init_test()
+            .await
+            .expect("Failed to initialize in-memory test DB");
+        Self::from_db(audit, db).await
+    }
+
+    async fn from_db(audit: Arc<AuditLog>, db: DbConn) -> Self {
+        let (progress_tx, _) = broadcast::channel(128);
+        let (album_tx, _) = broadcast::channel(64);
+        let initial_dsp_state = DspState::default();
+        let audio_repo = AudioRepo::new_with_flavours(initial_dsp_state);
+        let head_state_ptr = Arc::new(ArcSwap::from_pointee(initial_dsp_state));
+        let audio_repo_arc = Arc::new(RwLock::new(audio_repo));
+
         crate::db::schema::migrate(&db)
             .await
             .unwrap_or_else(|e| tracing::warn!("DB migrate: {}", e));

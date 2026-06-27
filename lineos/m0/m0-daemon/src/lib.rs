@@ -231,3 +231,11 @@ fn mastering_router(state: AppState) -> axum::Router {
         )
         .with_state(state)
 }
+
+/// Test-only entry point for in-memory router testing (tower::oneshot).
+/// Exposes the same router the production daemon serves, without
+/// widening visibility of the internal mastering_router builder.
+#[doc(hidden)]
+pub fn build_router_for_test(state: AppState) -> axum::Router {
+    mastering_router(state)
+}
