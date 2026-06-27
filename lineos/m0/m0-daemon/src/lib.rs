@@ -166,6 +166,19 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
+/// Max simultaneous mastering jobs. Defaults to (physical cores - 1),
+/// leaving headroom for UI/OS. Override via M0_MAX_CONCURRENT_JOBS.
+fn max_concurrent_jobs() -> usize {
+    std::env::var("M0_MAX_CONCURRENT_JOBS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get().saturating_sub(1).max(1))
+                .unwrap_or(1)
+        })
+}
+
 /// Build the mastering API Axum router.
 /// Phase 12A adds: POST /playback/control, GET /playback/state
 /// Authority: Phase 6 task-decomposition P6-003 · Phase 12A P12A-007
@@ -229,6 +242,7 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/dev/snapshot",
             post(handlers::dev_snapshot::post_snapshot).get(handlers::dev_snapshot::get_snapshot),
         )
+        .layer(tower::limit::ConcurrencyLimitLayer::new(max_concurrent_jobs()))
         .with_state(state)
 }
 
