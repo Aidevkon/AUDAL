@@ -242,6 +242,7 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/dev/snapshot",
             post(handlers::dev_snapshot::post_snapshot).get(handlers::dev_snapshot::get_snapshot),
         )
+        .route("/dev/wait", post(handlers::dev_wait::post_wait))
         .layer(tower::limit::ConcurrencyLimitLayer::new(max_concurrent_jobs()))
         .with_state(state)
 }
