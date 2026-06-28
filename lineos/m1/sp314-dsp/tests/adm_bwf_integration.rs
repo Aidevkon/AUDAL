@@ -9,8 +9,7 @@ fn adm_bwf_riff_header_is_valid() {
             .map(|i| {
                 if ch == 0 {
                     // 440Hz sine on L only
-                    (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sample_rate as f32).sin()
-                        * 0.5
+                    (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sample_rate as f32).sin() * 0.5
                 } else {
                     0.0
                 }
@@ -78,7 +77,10 @@ fn adm_bwf_riff_header_is_valid() {
     );
     let chna_size =
         u32::from_le_bytes(bytes[chna_offset + 4..chna_offset + 8].try_into().unwrap()) as usize;
-    assert_eq!(chna_size, 244, "chna chunk size should be 244 bytes (4 + 6*40)");
+    assert_eq!(
+        chna_size, 244,
+        "chna chunk size should be 244 bytes (4 + 6*40)"
+    );
 
     // axml chunk immediately after chna
     let axml_offset = chna_offset + 8 + chna_size;
@@ -89,13 +91,23 @@ fn adm_bwf_riff_header_is_valid() {
     );
     let axml_size =
         u32::from_le_bytes(bytes[axml_offset + 4..axml_offset + 8].try_into().unwrap()) as usize;
-    assert!(axml_size > 100, "axml chunk should contain ADM XML (got {} bytes)", axml_size);
+    assert!(
+        axml_size > 100,
+        "axml chunk should contain ADM XML (got {} bytes)",
+        axml_size
+    );
 
     // Verify axml contains key ADM identifiers
     let axml_data = &bytes[axml_offset + 8..axml_offset + 8 + axml_size];
     let axml_str = std::str::from_utf8(axml_data).expect("axml should be valid UTF-8");
-    assert!(axml_str.contains("AP_00010009"), "axml must reference 5.1 audioPackFormat");
-    assert!(axml_str.contains("DirectSpeakers"), "axml must specify DirectSpeakers type");
+    assert!(
+        axml_str.contains("AP_00010009"),
+        "axml must reference 5.1 audioPackFormat"
+    );
+    assert!(
+        axml_str.contains("DirectSpeakers"),
+        "axml must specify DirectSpeakers type"
+    );
 
     // data chunk after axml (accounting for even-byte padding)
     let axml_padded = axml_size + (axml_size % 2);

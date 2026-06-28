@@ -257,14 +257,13 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         ));
     }
 
-    let raw_bytes = std::fs::read(&blob.audio_path)
-        .map_err(|e| format!("Failed to read blob PCM: {e}"))?;
+    let raw_bytes =
+        std::fs::read(&blob.audio_path).map_err(|e| format!("Failed to read blob PCM: {e}"))?;
     let samples = pcm_bytes_to_f32(&raw_bytes);
 
     // De-interleave: L R C LFE Ls Rs
     let num_frames = samples.len() / 6;
-    let mut channels: [Vec<f32>; 6] =
-        std::array::from_fn(|_| Vec::with_capacity(num_frames));
+    let mut channels: [Vec<f32>; 6] = std::array::from_fn(|_| Vec::with_capacity(num_frames));
     for frame in 0..num_frames {
         for ch in 0..6 {
             channels[ch].push(samples[frame * 6 + ch]);

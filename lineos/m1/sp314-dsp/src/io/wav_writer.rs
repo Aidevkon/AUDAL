@@ -248,14 +248,12 @@ pub fn write_chna_chunk<W: std::io::Write>(w: &mut W) -> Result<(), String> {
         let uid_bytes = uid.as_bytes();
         let mut uid_padded = [0u8; 12];
         uid_padded[..uid_bytes.len()].copy_from_slice(uid_bytes);
-        w.write_all(&uid_padded)
-            .map_err(|e| e.to_string())?;
+        w.write_all(&uid_padded).map_err(|e| e.to_string())?;
         // audioTrackFormatID (14 bytes)
         w.write_all(track_format_ids[i as usize])
             .map_err(|e| e.to_string())?;
         // audioPackFormatID (11 bytes)
-        w.write_all(pack_format_id)
-            .map_err(|e| e.to_string())?;
+        w.write_all(pack_format_id).map_err(|e| e.to_string())?;
         // pad to 40 bytes: 2+12+14+11 = 39, +1 pad = 40
         w.write_all(&[0u8]).map_err(|e| e.to_string())?;
     }
@@ -298,7 +296,7 @@ typeLabel="0001" typeDefinition="DirectSpeakers"/>
     w.write_all(&padded.to_le_bytes())
         .map_err(|e| e.to_string())?;
     w.write_all(xml).map_err(|e| e.to_string())?;
-    if chunk_size % 2 != 0 {
+    if !chunk_size.is_multiple_of(2) {
         w.write_all(&[0u8]).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -396,10 +394,10 @@ pub fn write_adm_bwf(
         .map_err(|e| e.to_string())?; // wValidBitsPerSample
     w.write_all(&0x3F_u32.to_le_bytes())
         .map_err(|e| e.to_string())?; // dwChannelMask (FL|FR|FC|LFE|BL|BR)
-    // KSDATAFORMAT_SUBTYPE_PCM GUID {00000001-0000-0010-8000-00AA00389B71}
+                                      // KSDATAFORMAT_SUBTYPE_PCM GUID {00000001-0000-0010-8000-00AA00389B71}
     w.write_all(&[
-        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38,
-        0x9B, 0x71,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B,
+        0x71,
     ])
     .map_err(|e| e.to_string())?;
 
@@ -413,20 +411,17 @@ pub fn write_adm_bwf(
     let mut desc_padded = [0u8; 256];
     let len = desc.len().min(256);
     desc_padded[..len].copy_from_slice(&desc[..len]);
-    w.write_all(&desc_padded)
-        .map_err(|e| e.to_string())?;
+    w.write_all(&desc_padded).map_err(|e| e.to_string())?;
     // Originator (32 bytes)
     let orig = b"Creator OS M0 Daemon";
     let mut orig_padded = [0u8; 32];
     let olen = orig.len().min(32);
     orig_padded[..olen].copy_from_slice(&orig[..olen]);
-    w.write_all(&orig_padded)
-        .map_err(|e| e.to_string())?;
+    w.write_all(&orig_padded).map_err(|e| e.to_string())?;
     // OriginatorReference (32 bytes, null)
     w.write_all(&[0u8; 32]).map_err(|e| e.to_string())?;
     // OriginationDate (10 bytes "YYYY-MM-DD")
-    w.write_all(b"2025-01-01")
-        .map_err(|e| e.to_string())?;
+    w.write_all(b"2025-01-01").map_err(|e| e.to_string())?;
     // OriginationTime (8 bytes "HH:MM:SS")
     w.write_all(b"00:00:00").map_err(|e| e.to_string())?;
     // TimeReference low + high (8 bytes total, = 0 — no FFOA for music)
@@ -460,7 +455,7 @@ pub fn write_adm_bwf(
     w.write_all(&pcm_24bit).map_err(|e| e.to_string())?;
 
     // Pad to even byte boundary if needed
-    if data_chunk_size % 2 != 0 {
+    if !data_chunk_size.is_multiple_of(2) {
         w.write_all(&[0u8]).map_err(|e| e.to_string())?;
     }
 
@@ -475,8 +470,11 @@ mod tests_adm_bwf {
     fn adm_bwf_produces_valid_riff_header() {
         let path = "/tmp/test_adm_bwf_header.wav";
         let num_frames = 100;
-        let channels: [Vec<f32>; 6] =
-            std::array::from_fn(|ch| (0..num_frames).map(|i| (i as f32 * 0.01 * (ch as f32 + 1.0)).sin() * 0.5).collect());
+        let channels: [Vec<f32>; 6] = std::array::from_fn(|ch| {
+            (0..num_frames)
+                .map(|i| (i as f32 * 0.01 * (ch as f32 + 1.0)).sin() * 0.5)
+                .collect()
+        });
 
         write_adm_bwf(path, &channels, 48000, num_frames).unwrap();
 
@@ -488,7 +486,10 @@ mod tests_adm_bwf {
         assert_eq!(&bytes[12..16], b"fmt ");
         assert_eq!(u32::from_le_bytes(bytes[16..20].try_into().unwrap()), 40);
         // WAVE_FORMAT_EXTENSIBLE tag
-        assert_eq!(u16::from_le_bytes(bytes[20..22].try_into().unwrap()), 0xFFFE);
+        assert_eq!(
+            u16::from_le_bytes(bytes[20..22].try_into().unwrap()),
+            0xFFFE
+        );
         // 6 channels
         assert_eq!(u16::from_le_bytes(bytes[22..24].try_into().unwrap()), 6);
         // 48kHz
@@ -498,8 +499,22 @@ mod tests_adm_bwf {
         // bext chunk present
         assert_eq!(&bytes[60..64], b"bext");
         assert_eq!(u32::from_le_bytes(bytes[64..68].try_into().unwrap()), 602);
-        // data chunk present
-        let data_offset = 60 + 8 + 602; // bext header(8) + bext data(602)
+        // chna chunk after bext
+        let chna_offset = 60 + 8 + 602;
+        assert_eq!(&bytes[chna_offset..chna_offset + 4], b"chna");
+        let chna_size =
+            u32::from_le_bytes(bytes[chna_offset + 4..chna_offset + 8].try_into().unwrap())
+                as usize;
+        assert_eq!(chna_size, 244);
+        // axml chunk after chna
+        let axml_offset = chna_offset + 8 + chna_size;
+        assert_eq!(&bytes[axml_offset..axml_offset + 4], b"axml");
+        let axml_size =
+            u32::from_le_bytes(bytes[axml_offset + 4..axml_offset + 8].try_into().unwrap())
+                as usize;
+        // data chunk after axml (with even-byte padding)
+        let axml_padded = axml_size + (axml_size % 2);
+        let data_offset = axml_offset + 8 + axml_padded;
         assert_eq!(&bytes[data_offset..data_offset + 4], b"data");
         // Data size = num_frames * 6 channels * 3 bytes
         let expected_data_size = (num_frames * 6 * 3) as u32;

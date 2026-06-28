@@ -87,14 +87,19 @@ impl AppState {
         Self::from_db(audit, db).await
     }
 
-    pub async fn new_for_test(audit: Arc<AuditLog>) -> (Self, crate::agents::operator::AgentHandles) {
+    pub async fn new_for_test(
+        audit: Arc<AuditLog>,
+    ) -> (Self, crate::agents::operator::AgentHandles) {
         let db = crate::db::init_test()
             .await
             .expect("Failed to initialize in-memory test DB");
         Self::from_db(audit, db).await
     }
 
-    async fn from_db(audit: Arc<AuditLog>, db: DbConn) -> (Self, crate::agents::operator::AgentHandles) {
+    async fn from_db(
+        audit: Arc<AuditLog>,
+        db: DbConn,
+    ) -> (Self, crate::agents::operator::AgentHandles) {
         let (progress_tx, _) = broadcast::channel(128);
         let (album_tx, _) = broadcast::channel(64);
         let initial_dsp_state = DspState::default();
@@ -133,7 +138,7 @@ impl AppState {
             playback_state: Arc::new(ArcSwap::from_pointee(ScrubState::new())),
             album_tx,
         };
-        
+
         (state, handles)
     }
 }

@@ -62,7 +62,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             let raw_bytes: &[u8] = unsafe {
                 std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
             };
-            std::fs::write(&raw_path, raw_bytes).map_err(|e| format!("Failed to write raw dump: {e}"))?;
+            std::fs::write(&raw_path, raw_bytes)
+                .map_err(|e| format!("Failed to write raw dump: {e}"))?;
             eprintln!(
                 "[RAW-SAVE] wrote raw PCM {} bytes to {}",
                 raw_bytes.len(),

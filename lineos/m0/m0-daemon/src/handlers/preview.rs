@@ -203,7 +203,12 @@ fn generate_preview_stems(
     let sample_rate = pcm.sample_rate;
 
     // Stereo → mono
-    let mono: Vec<f32> = pcm.left.iter().zip(pcm.right.iter()).map(|(l, r)| (*l + *r) * 0.5).collect();
+    let mono: Vec<f32> = pcm
+        .left
+        .iter()
+        .zip(pcm.right.iter())
+        .map(|(l, r)| (*l + *r) * 0.5)
+        .collect();
 
     // Find most diverse 15s window
     let (start, end) = find_most_diverse_window(&mono, sample_rate, 15.0);

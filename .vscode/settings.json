@@ -27,9 +27,9 @@
         "spec/locked/**/*",
         "contracts/**/*"
     ],
-    "antigravity.agent.context.maxFiles": 150,
-    "antigravity.agent.context.maxTokens": 60000,
-    "antigravity.agent.context.followImports": true,
-    "antigravity.agent.context.includeTests": true,
+    "antigravity.agent.context.maxFiles": 50,
+    "antigravity.agent.context.maxTokens": 128000,
+    "antigravity.agent.context.followImports": false,
+    "antigravity.agent.context.includeTests": false,
     "antigravity.agent.context.preferLocalSymbols": true
 }

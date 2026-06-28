@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::Instant;
-use tower::{limit::ConcurrencyLimitLayer, ServiceBuilder, Service, ServiceExt};
+use tower::{limit::ConcurrencyLimitLayer, Service, ServiceBuilder, ServiceExt};
 
 #[derive(Clone)]
 struct MockSlowService {
@@ -12,9 +12,14 @@ struct MockSlowService {
 impl Service<()> for MockSlowService {
     type Response = ();
     type Error = std::convert::Infallible;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         std::task::Poll::Ready(Ok(()))
     }
 
@@ -56,7 +61,7 @@ async fn test_concurrency_limit_blocks_excess_requests() {
     };
 
     // Wrap the service in a ConcurrencyLimitLayer (limit 2)
-    // Then wrap it in a BufferLayer (capacity 10) so we can spawn multiple requests 
+    // Then wrap it in a BufferLayer (capacity 10) so we can spawn multiple requests
     // without the caller immediately blocking awaiting capacity.
     let svc = ServiceBuilder::new()
         .layer(tower::buffer::BufferLayer::new(10))
@@ -86,10 +91,17 @@ async fn test_concurrency_limit_blocks_excess_requests() {
     println!("elapsed: {:?}", elapsed);
 
     // Verify limit was respected
-    assert!(max <= 2, "Observed concurrency exceeded the limit of 2 (was {})", max);
-    
-    // Verify timing: 
-    // 4 tasks / 2 concurrency = 2 batches. 
+    assert!(
+        max <= 2,
+        "Observed concurrency exceeded the limit of 2 (was {})",
+        max
+    );
+
+    // Verify timing:
+    // 4 tasks / 2 concurrency = 2 batches.
     // Each batch takes 50ms, so total time must be >= 100ms.
-    assert!(elapsed >= Duration::from_millis(100), "Tasks completed too fast, limit wasn't enforced");
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "Tasks completed too fast, limit wasn't enforced"
+    );
 }

@@ -28,7 +28,9 @@ use app_state::AppState;
 use health::HealthGate;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer};
+use tower_http::request_id::{
+    MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer,
+};
 use tower_http::trace::TraceLayer;
 
 // Environment variable defaults
@@ -124,7 +126,7 @@ pub async fn run() -> Result<()> {
 
     // ── Graceful Shutdown Signal Hook ─────────────────────────────────────────
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-    
+
     tokio::spawn(async move {
         let ctrl_c = async {
             tokio::signal::ctrl_c().await.unwrap_or(());
@@ -132,7 +134,9 @@ pub async fn run() -> Result<()> {
 
         #[cfg(unix)]
         let sigterm = async {
-            if let Ok(mut stream) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            if let Ok(mut stream) =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            {
                 stream.recv().await;
             } else {
                 std::future::pending::<()>().await;
@@ -148,7 +152,7 @@ pub async fn run() -> Result<()> {
         tracing::info!("Received termination signal. Initiating graceful shutdown...");
         let _ = shutdown_tx.send(true);
     });
-    
+
     let operator_for_shutdown = app_state.operator.clone();
 
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
@@ -185,8 +189,8 @@ pub async fn run() -> Result<()> {
     let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;
 
     let mut rx_health = shutdown_rx.clone();
-    let health_server = axum::serve(health_listener, health_app)
-        .with_graceful_shutdown(async move {
+    let health_server =
+        axum::serve(health_listener, health_app).with_graceful_shutdown(async move {
             let _ = rx_health.changed().await;
         });
 
@@ -199,20 +203,28 @@ pub async fn run() -> Result<()> {
     tokio::try_join!(health_server, mastering_server)?;
 
     tracing::info!("HTTP routers shut down. Dispatching Intent::Shutdown to Agents...");
-    let _ = operator_for_shutdown.dispatch(crate::agents::operator::Intent::Shutdown).await;
+    let _ = operator_for_shutdown
+        .dispatch(crate::agents::operator::Intent::Shutdown)
+        .await;
 
     // RISK 1: Long-running DSP tasks (spawn_blocking) do not check for cancellation
     // and will not break early. They will keep running.
-    // RISK 2: If the 5-second timeout is hit and the daemon process exits forcibly, 
+    // RISK 2: If the 5-second timeout is hit and the daemon process exits forcibly,
     // the DSP task and the DB won't drop properly, and the LOCK file might remain locked.
     match tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let _ = tokio::join!(
-            agent_handles.schema, agent_handles.conductor, 
-            agent_handles.executor, agent_handles.wizard
+            agent_handles.schema,
+            agent_handles.conductor,
+            agent_handles.executor,
+            agent_handles.wizard
         );
-    }).await {
+    })
+    .await
+    {
         Ok(_) => tracing::info!("All agents shut down cleanly."),
-        Err(_) => tracing::warn!("Timeout waiting for agents (long-running DSP tasks). DB LOCK may remain!"),
+        Err(_) => tracing::warn!(
+            "Timeout waiting for agents (long-running DSP tasks). DB LOCK may remain!"
+        ),
     }
 
     audit_arc.write(audit::entry_shutdown())?;
@@ -234,7 +246,8 @@ fn max_concurrent_jobs() -> usize {
 
 fn make_dsp_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
     let path = req.uri().path().to_string();
-    let request_id = req.extensions()
+    let request_id = req
+        .extensions()
         .get::<RequestId>()
         .and_then(|id| id.header_value().to_str().ok())
         .unwrap_or("unknown")
@@ -244,7 +257,8 @@ fn make_dsp_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
 
 fn make_obs_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
     let path = req.uri().path().to_string();
-    let request_id = req.extensions()
+    let request_id = req
+        .extensions()
         .get::<RequestId>()
         .and_then(|id| id.header_value().to_str().ok())
         .unwrap_or("unknown")
@@ -272,12 +286,22 @@ fn mastering_router(state: AppState) -> axum::Router {
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(make_obs_span)
-                .on_request(|_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
-                    tracing::debug!("started processing request");
-                })
-                .on_response(|res: &axum::response::Response, latency: std::time::Duration, _span: &tracing::Span| {
-                    tracing::debug!(latency_ms = latency.as_millis(), status = res.status().as_u16(), "finished processing request");
-                }),
+                .on_request(
+                    |_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
+                        tracing::debug!("started processing request");
+                    },
+                )
+                .on_response(
+                    |res: &axum::response::Response,
+                     latency: std::time::Duration,
+                     _span: &tracing::Span| {
+                        tracing::debug!(
+                            latency_ms = latency.as_millis(),
+                            status = res.status().as_u16(),
+                            "finished processing request"
+                        );
+                    },
+                ),
         );
 
     let dsp_router = axum::Router::new()
@@ -328,19 +352,31 @@ fn mastering_router(state: AppState) -> axum::Router {
             post(handlers::dev_snapshot::post_snapshot).get(handlers::dev_snapshot::get_snapshot),
         )
         .route("/dev/wait", post(handlers::dev_wait::post_wait))
-        .layer(tower::limit::ConcurrencyLimitLayer::new(max_concurrent_jobs()))
+        .layer(tower::limit::ConcurrencyLimitLayer::new(
+            max_concurrent_jobs(),
+        ))
         // TraceLayer after ConcurrencyLimitLayer = Trace is outer (Router::layer
         // composition: last call wraps first) = measures total client latency
         // including queue wait, same verified pattern as 76f597b.
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(make_dsp_span)
-                .on_request(|_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
-                    tracing::info!("started processing request");
-                })
-                .on_response(|res: &axum::response::Response, latency: std::time::Duration, _span: &tracing::Span| {
-                    tracing::info!(latency_ms = latency.as_millis(), status = res.status().as_u16(), "finished processing request");
-                }),
+                .on_request(
+                    |_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
+                        tracing::info!("started processing request");
+                    },
+                )
+                .on_response(
+                    |res: &axum::response::Response,
+                     latency: std::time::Duration,
+                     _span: &tracing::Span| {
+                        tracing::info!(
+                            latency_ms = latency.as_millis(),
+                            status = res.status().as_u16(),
+                            "finished processing request"
+                        );
+                    },
+                ),
         );
 
     axum::Router::new()

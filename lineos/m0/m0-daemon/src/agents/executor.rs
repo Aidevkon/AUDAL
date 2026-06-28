@@ -155,12 +155,14 @@ pub async fn run(
             } => {
                 // R3: decode + PreAnalyzer only. No DSP. No decisions.
                 let result = tokio::task::spawn_blocking(move || {
-                    let payload = crate::handlers::decode::decode_smart(&audio_path).map_err(|e| {
-                        super::operator::ExecutorError::DspFailed(format!("Decode error: {e}"))
-                    })?;
+                    let payload =
+                        crate::handlers::decode::decode_smart(&audio_path).map_err(|e| {
+                            super::operator::ExecutorError::DspFailed(format!("Decode error: {e}"))
+                        })?;
                     let stereo = payload.to_stereo_for_telemetry();
                     use sp314_dsp::analysis::PreAnalyzer;
-                    let analysis = PreAnalyzer::run(&stereo.left, &stereo.right, stereo.sample_rate);
+                    let analysis =
+                        PreAnalyzer::run(&stereo.left, &stereo.right, stereo.sample_rate);
 
                     // TODO: Auto input-trim based on pre-analysis loudness.
                     // Replaces manual INPUT TRIM removed from UI.

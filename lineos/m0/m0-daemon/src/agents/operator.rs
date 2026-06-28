@@ -331,6 +331,6 @@ pub fn spawn_agents(
         executor,
         wizard,
     };
-    
+
     (operator, handles)
 }

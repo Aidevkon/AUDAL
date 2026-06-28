@@ -3,6 +3,8 @@ pub mod blob;
 pub mod certificate;
 pub mod decode; // P7-002: symphonia audio decode
 pub mod decode_actor;
+pub mod dev_snapshot;
+pub mod dev_wait;
 pub mod export;
 pub mod master;
 pub mod mix;
@@ -14,5 +16,3 @@ pub mod progress;
 pub mod projects;
 pub mod timeline;
 pub mod tinder;
-pub mod dev_snapshot;
-pub mod dev_wait;

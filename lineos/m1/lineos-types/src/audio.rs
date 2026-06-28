@@ -76,18 +76,10 @@ impl AudioPayload {
                 // index:     0  1  2   3   4   5
                 const C: f32 = 0.707;
                 let left: Vec<f32> = (0..*num_frames)
-                    .map(|i| {
-                        channels[0][i]
-                            + C * channels[2][i]
-                            + C * channels[4][i]
-                    })
+                    .map(|i| channels[0][i] + C * channels[2][i] + C * channels[4][i])
                     .collect();
                 let right: Vec<f32> = (0..*num_frames)
-                    .map(|i| {
-                        channels[1][i]
-                            + C * channels[2][i]
-                            + C * channels[5][i]
-                    })
+                    .map(|i| channels[1][i] + C * channels[2][i] + C * channels[5][i])
                     .collect();
                 StereoBuffer {
                     left,
@@ -106,18 +98,10 @@ impl AudioPayload {
                 // Master bus sum for telemetry.
                 // Stems are already L/R so we sum them.
                 let left: Vec<f32> = (0..*num_frames)
-                    .map(|i| {
-                        drums.left[i]
-                            + harmonics.left[i]
-                            + vocals.left[i]
-                    })
+                    .map(|i| drums.left[i] + harmonics.left[i] + vocals.left[i])
                     .collect();
                 let right: Vec<f32> = (0..*num_frames)
-                    .map(|i| {
-                        drums.right[i]
-                            + harmonics.right[i]
-                            + vocals.right[i]
-                    })
+                    .map(|i| drums.right[i] + harmonics.right[i] + vocals.right[i])
                     .collect();
                 StereoBuffer {
                     left,

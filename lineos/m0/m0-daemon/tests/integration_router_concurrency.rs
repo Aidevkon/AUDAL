@@ -11,7 +11,7 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
     // 2. Setup the test router (requires audit log directory)
     let audit_dir = TempDir::new().unwrap();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir.path().to_str().unwrap()).unwrap());
-    
+
     let (state, _handles) = m0d::app_state::AppState::new_for_test(audit).await;
     let app = m0d::build_router_for_test(state);
 
@@ -66,7 +66,7 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
         "MEASUREMENT FAILED: Expected elapsed time >= 200ms due to concurrency limit, but took {:?}",
         elapsed
     );
-    
+
     // Check it's not absurdly slow (e.g. fully sequential taking 400ms+)
     assert!(
         elapsed < Duration::from_millis(350),

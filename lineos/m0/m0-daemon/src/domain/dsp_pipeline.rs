@@ -102,9 +102,12 @@ fn run_dsp_internal(
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let mut chunk = match decoded.payload {
         lineos_types::AudioPayload::Stereo(buf) => buf,
-        _ => return Err("dsp_pipeline: non-stereo payload \
+        _ => {
+            return Err("dsp_pipeline: non-stereo payload \
                          reached DSP — spatial path not yet \
-                         wired here".into()),
+                         wired here"
+                .into())
+        }
     };
 
     eprintln!(
