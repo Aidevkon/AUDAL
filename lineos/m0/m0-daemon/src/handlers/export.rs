@@ -57,6 +57,9 @@ pub enum ExportFormat {
     /// AIFF — Logic Pro native, uncompressed 32-bit float BE PCM.
     /// Pure Rust, no new crate. P13-003b.
     Aiff,
+    /// ADM BWF — Apple Spatial Audio, 6-channel 24-bit LPCM.
+    /// RIFF container with bext + WAVE_FORMAT_EXTENSIBLE. Spatial-4a.
+    AdmBwf,
 }
 
 impl ExportFormat {
@@ -70,8 +73,9 @@ impl ExportFormat {
             "mp3" => Ok(Self::Mp3),
             // AIFF — Logic Pro native, uncompressed 32-bit float big-endian
             "aiff" | "aif" => Ok(Self::Aiff),
+            "adm_bwf" | "admbwf" | "bwf" => Ok(Self::AdmBwf),
             other => Err(format!(
-                "Unsupported format: {other}. Use wav/flac/opus/mp3/aiff"
+                "Unsupported format: {other}. Use wav/flac/opus/mp3/aiff/adm_bwf"
             )),
         }
     }
@@ -84,6 +88,7 @@ impl ExportFormat {
             Self::Opus => "opus",
             Self::Mp3 => "mp3",
             Self::Aiff => "aiff",
+            Self::AdmBwf => "wav",
         }
     }
 }
@@ -189,6 +194,8 @@ fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(
         ExportFormat::Mp3 => export_mp3(blob, path),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
         ExportFormat::Aiff => export_aiff(blob, path),
+        // ADM BWF: Apple Spatial Audio, 6-channel 24-bit LPCM (Spatial-4a)
+        ExportFormat::AdmBwf => export_adm_bwf(blob, path),
     }
 }
 
@@ -233,6 +240,43 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     writer
         .finalize()
         .map_err(|e| format!("WAV finalize failed: {e}"))
+}
+
+/// ADM BWF: Apple Spatial Audio export.
+///
+/// Reads 6-channel interleaved f32 LE PCM from Golden Blob, de-interleaves
+/// to planar [L, R, C, LFE, Ls, Rs], writes RIFF + WAVE_FORMAT_EXTENSIBLE
+/// fmt + bext + data chunks via sp314_dsp::io::wav_writer::write_adm_bwf.
+fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
+    // ADM BWF requires exactly 6 channels
+    if blob.channels != 6 {
+        return Err(format!(
+            "ADM BWF export requires 6-channel audio, got {} channels. \
+             Use ExportFormat::Wav for stereo.",
+            blob.channels
+        ));
+    }
+
+    let raw_bytes = std::fs::read(&blob.audio_path)
+        .map_err(|e| format!("Failed to read blob PCM: {e}"))?;
+    let samples = pcm_bytes_to_f32(&raw_bytes);
+
+    // De-interleave: L R C LFE Ls Rs
+    let num_frames = samples.len() / 6;
+    let mut channels: [Vec<f32>; 6] =
+        std::array::from_fn(|_| Vec::with_capacity(num_frames));
+    for frame in 0..num_frames {
+        for ch in 0..6 {
+            channels[ch].push(samples[frame * 6 + ch]);
+        }
+    }
+
+    sp314_dsp::io::wav_writer::write_adm_bwf(
+        &path.to_string_lossy(),
+        &channels,
+        blob.sample_rate,
+        num_frames,
+    )
 }
 
 /// Opus: stub — requires libopus-dev system library (Phase 11).

@@ -198,3 +198,193 @@ mod tests_streaming {
         );
     }
 }
+
+/// Writes a complete ADM BWF file for Apple Spatial Audio.
+///
+/// Format: RIFF container with chunks in this order:
+///   fmt  (48 bytes, WAVE_FORMAT_EXTENSIBLE)
+///   bext (BWF broadcast extension, 602 bytes minimum)
+///   data (raw 24-bit LPCM samples, interleaved)
+///
+/// Apple requirements:
+///   - 48kHz / 24-bit LPCM
+///   - Channel order: L R C LFE Ls Rs (mask 0x3F)
+///   - bext.TimeReference at 24fps
+///   - chna + axml (Dolby ADM metadata) added in Spatial-4b
+///
+/// `channels` must be in planar format: [L, R, C, LFE, Ls, Rs]
+/// each Vec<f32> has `num_frames` samples normalized -1.0..1.0
+pub fn write_adm_bwf(
+    path: &str,
+    channels: &[Vec<f32>; 6],
+    sample_rate: u32,
+    num_frames: usize,
+) -> Result<(), String> {
+    use std::io::Write;
+
+    // Convert f32 planar → interleaved 24-bit signed integers
+    // L[0] R[0] C[0] LFE[0] Ls[0] Rs[0] L[1] R[1] ...
+    let mut pcm_24bit: Vec<u8> = Vec::with_capacity(num_frames * 6 * 3);
+    for i in 0..num_frames {
+        for ch in 0..6 {
+            // Clamp, scale to i24 range, write 3 bytes LE
+            let sample = channels[ch][i].clamp(-1.0, 1.0);
+            let as_i32 = (sample * 8_388_607.0_f32) as i32;
+            pcm_24bit.push((as_i32 & 0xFF) as u8);
+            pcm_24bit.push(((as_i32 >> 8) & 0xFF) as u8);
+            pcm_24bit.push(((as_i32 >> 16) & 0xFF) as u8);
+        }
+    }
+
+    // --- RIFF chunk sizes ---
+    let fmt_chunk_size: u32 = 40; // WAVE_FORMAT_EXTENSIBLE
+    let bext_chunk_size: u32 = 602; // minimum BWF bext (EBU Tech 3285)
+    let data_chunk_size: u32 = pcm_24bit.len() as u32;
+
+    // RIFF size = 4 (WAVE) + 8+fmt + 8+bext + 8+data
+    let riff_size: u32 = 4
+        + (8 + fmt_chunk_size)
+        + (8 + bext_chunk_size)
+        + (8 + data_chunk_size);
+
+    let mut file =
+        std::fs::File::create(path).map_err(|e| format!("ADM BWF create failed: {e}"))?;
+    let w = &mut file;
+
+    // --- RIFF header ---
+    w.write_all(b"RIFF").map_err(|e| e.to_string())?;
+    w.write_all(&riff_size.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    w.write_all(b"WAVE").map_err(|e| e.to_string())?;
+
+    // --- fmt chunk (WAVE_FORMAT_EXTENSIBLE, 24-bit LPCM) ---
+    w.write_all(b"fmt ").map_err(|e| e.to_string())?;
+    w.write_all(&fmt_chunk_size.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    let n_block_align: u16 = 6 * 3; // 6ch * 3 bytes
+    let n_avg_bytes: u32 = sample_rate * n_block_align as u32;
+    w.write_all(&0xFFFE_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?; // wFormatTag = WAVE_FORMAT_EXTENSIBLE
+    w.write_all(&6_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?; // nChannels
+    w.write_all(&sample_rate.to_le_bytes())
+        .map_err(|e| e.to_string())?; // nSamplesPerSec
+    w.write_all(&n_avg_bytes.to_le_bytes())
+        .map_err(|e| e.to_string())?; // nAvgBytesPerSec
+    w.write_all(&n_block_align.to_le_bytes())
+        .map_err(|e| e.to_string())?; // nBlockAlign
+    w.write_all(&24_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?; // wBitsPerSample
+    w.write_all(&22_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?; // cbSize
+    w.write_all(&24_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?; // wValidBitsPerSample
+    w.write_all(&0x3F_u32.to_le_bytes())
+        .map_err(|e| e.to_string())?; // dwChannelMask (FL|FR|FC|LFE|BL|BR)
+    // KSDATAFORMAT_SUBTYPE_PCM GUID {00000001-0000-0010-8000-00AA00389B71}
+    w.write_all(&[
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38,
+        0x9B, 0x71,
+    ])
+    .map_err(|e| e.to_string())?;
+
+    // --- bext chunk (BWF Broadcast Extension, EBU Tech 3285 v2) ---
+    // Minimum 602 bytes: 256+32+32+10+8+8+2+64+10+180 = 602
+    w.write_all(b"bext").map_err(|e| e.to_string())?;
+    w.write_all(&bext_chunk_size.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    // Description (256 bytes, null-padded)
+    let desc = b"Creator OS \xe2\x80\x94 Apple Spatial Audio";
+    let mut desc_padded = [0u8; 256];
+    let len = desc.len().min(256);
+    desc_padded[..len].copy_from_slice(&desc[..len]);
+    w.write_all(&desc_padded)
+        .map_err(|e| e.to_string())?;
+    // Originator (32 bytes)
+    let orig = b"Creator OS M0 Daemon";
+    let mut orig_padded = [0u8; 32];
+    let olen = orig.len().min(32);
+    orig_padded[..olen].copy_from_slice(&orig[..olen]);
+    w.write_all(&orig_padded)
+        .map_err(|e| e.to_string())?;
+    // OriginatorReference (32 bytes, null)
+    w.write_all(&[0u8; 32]).map_err(|e| e.to_string())?;
+    // OriginationDate (10 bytes "YYYY-MM-DD")
+    w.write_all(b"2025-01-01")
+        .map_err(|e| e.to_string())?;
+    // OriginationTime (8 bytes "HH:MM:SS")
+    w.write_all(b"00:00:00").map_err(|e| e.to_string())?;
+    // TimeReference low + high (8 bytes total, = 0 — no FFOA for music)
+    w.write_all(&0_u64.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    // Version (2 bytes, = 2 for BWF v2)
+    w.write_all(&2_u16.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    // UMID (64 bytes, null — filled by distributor)
+    w.write_all(&[0u8; 64]).map_err(|e| e.to_string())?;
+    // LoudnessValue, LoudnessRange, MaxTruePeakLevel,
+    // MaxMomentaryLoudness, MaxShortTermLoudness
+    // (10 bytes total, 5 × i16 — 0x7FFF = "not specified")
+    for _ in 0..5 {
+        w.write_all(&0x7FFF_i16.to_le_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    // Reserved (180 bytes, null)
+    w.write_all(&[0u8; 180]).map_err(|e| e.to_string())?;
+
+    // --- data chunk ---
+    w.write_all(b"data").map_err(|e| e.to_string())?;
+    w.write_all(&data_chunk_size.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    w.write_all(&pcm_24bit).map_err(|e| e.to_string())?;
+
+    // Pad to even byte boundary if needed
+    if data_chunk_size % 2 != 0 {
+        w.write_all(&[0u8]).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests_adm_bwf {
+    use super::*;
+
+    #[test]
+    fn adm_bwf_produces_valid_riff_header() {
+        let path = "/tmp/test_adm_bwf_header.wav";
+        let num_frames = 100;
+        let channels: [Vec<f32>; 6] =
+            std::array::from_fn(|ch| (0..num_frames).map(|i| (i as f32 * 0.01 * (ch as f32 + 1.0)).sin() * 0.5).collect());
+
+        write_adm_bwf(path, &channels, 48000, num_frames).unwrap();
+
+        let bytes = std::fs::read(path).unwrap();
+        // RIFF header
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        // fmt chunk
+        assert_eq!(&bytes[12..16], b"fmt ");
+        assert_eq!(u32::from_le_bytes(bytes[16..20].try_into().unwrap()), 40);
+        // WAVE_FORMAT_EXTENSIBLE tag
+        assert_eq!(u16::from_le_bytes(bytes[20..22].try_into().unwrap()), 0xFFFE);
+        // 6 channels
+        assert_eq!(u16::from_le_bytes(bytes[22..24].try_into().unwrap()), 6);
+        // 48kHz
+        assert_eq!(u32::from_le_bytes(bytes[24..28].try_into().unwrap()), 48000);
+        // 24-bit
+        assert_eq!(u16::from_le_bytes(bytes[34..36].try_into().unwrap()), 24);
+        // bext chunk present
+        assert_eq!(&bytes[60..64], b"bext");
+        assert_eq!(u32::from_le_bytes(bytes[64..68].try_into().unwrap()), 602);
+        // data chunk present
+        let data_offset = 60 + 8 + 602; // bext header(8) + bext data(602)
+        assert_eq!(&bytes[data_offset..data_offset + 4], b"data");
+        // Data size = num_frames * 6 channels * 3 bytes
+        let expected_data_size = (num_frames * 6 * 3) as u32;
+        assert_eq!(
+            u32::from_le_bytes(bytes[data_offset + 4..data_offset + 8].try_into().unwrap()),
+            expected_data_size
+        );
+    }
+}
