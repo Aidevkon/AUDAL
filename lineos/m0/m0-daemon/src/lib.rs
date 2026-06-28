@@ -181,18 +181,24 @@ fn max_concurrent_jobs() -> usize {
         })
 }
 
-fn make_request_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
+fn make_dsp_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
     let path = req.uri().path().to_string();
     let request_id = req.extensions()
         .get::<RequestId>()
         .and_then(|id| id.header_value().to_str().ok())
         .unwrap_or("unknown")
         .to_string();
-    if path.starts_with("/health") || path.starts_with("/progress") {
-        tracing::debug_span!("http_request", method = %req.method(), %path, %request_id)
-    } else {
-        tracing::info_span!("http_request", method = %req.method(), %path, %request_id)
-    }
+    tracing::info_span!("http_request", method = %req.method(), %path, %request_id)
+}
+
+fn make_obs_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
+    let path = req.uri().path().to_string();
+    let request_id = req.extensions()
+        .get::<RequestId>()
+        .and_then(|id| id.header_value().to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+    tracing::debug_span!("http_request", method = %req.method(), %path, %request_id)
 }
 
 /// Build the mastering API Axum router.
@@ -201,7 +207,29 @@ fn make_request_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Sp
 fn mastering_router(state: AppState) -> axum::Router {
     use axum::routing::{get, post};
 
-    axum::Router::new()
+    let observability_router = axum::Router::new()
+        .route("/progress/:job_id", get(handlers::progress::get_progress))
+        .route(
+            "/progress/:job_id/stream",
+            get(handlers::progress::stream_progress),
+        )
+        .route(
+            "/album/:batch_id/events/stream",
+            get(handlers::album::stream_album_events),
+        )
+        .route("/blob/:id", get(handlers::blob::get_blob))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(make_obs_span)
+                .on_request(|_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
+                    tracing::debug!("started processing request");
+                })
+                .on_response(|res: &axum::response::Response, latency: std::time::Duration, _span: &tracing::Span| {
+                    tracing::debug!(latency_ms = latency.as_millis(), status = res.status().as_u16(), "finished processing request");
+                }),
+        );
+
+    let dsp_router = axum::Router::new()
         .route("/master", post(handlers::master::trigger_mastering))
         .route(
             "/master/batch",
@@ -212,7 +240,6 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/preview/:id/:stem",
             get(handlers::preview::get_preview_stem),
         )
-        .route("/blob/:id", get(handlers::blob::get_blob))
         .route(
             "/blob/:id/certificate.pdf",
             get(handlers::pdf_gen::get_track_certificate_pdf),
@@ -221,16 +248,7 @@ fn mastering_router(state: AppState) -> axum::Router {
             "/album/:batch_id/certificate.pdf",
             get(handlers::pdf_gen::get_album_certificate_pdf),
         )
-        .route(
-            "/album/:batch_id/events/stream",
-            get(handlers::album::stream_album_events),
-        )
         .route("/export", post(handlers::export::export_audio))
-        .route("/progress/:job_id", get(handlers::progress::get_progress))
-        .route(
-            "/progress/:job_id/stream",
-            get(handlers::progress::stream_progress),
-        )
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
         .route("/playback/state", get(handlers::playback::get_state))
         .route("/playback/control", post(handlers::playback::post_control))
@@ -260,15 +278,23 @@ fn mastering_router(state: AppState) -> axum::Router {
         )
         .route("/dev/wait", post(handlers::dev_wait::post_wait))
         .layer(tower::limit::ConcurrencyLimitLayer::new(max_concurrent_jobs()))
-        // Outer-wrapping order below is deliberate (Router::layer composition:
-        // last .layer() call = outermost = sees request first):
-        // 1) TraceLayer wraps ConcurrencyLimitLayer -> measures TOTAL client
-        //    latency including queue wait, not just handler execution time.
-        // 2) PropagateRequestIdLayer wraps TraceLayer -> copies the request's
-        //    x-request-id onto the outgoing response, after Trace has read it.
-        // 3) SetRequestIdLayer is outermost -> generates the UUID first,
-        //    before anything else sees the request.
-        .layer(TraceLayer::new_for_http().make_span_with(make_request_span))
+        // TraceLayer after ConcurrencyLimitLayer = Trace is outer (Router::layer
+        // composition: last call wraps first) = measures total client latency
+        // including queue wait, same verified pattern as 76f597b.
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(make_dsp_span)
+                .on_request(|_req: &axum::http::Request<axum::body::Body>, _span: &tracing::Span| {
+                    tracing::info!("started processing request");
+                })
+                .on_response(|res: &axum::response::Response, latency: std::time::Duration, _span: &tracing::Span| {
+                    tracing::info!(latency_ms = latency.as_millis(), status = res.status().as_u16(), "finished processing request");
+                }),
+        );
+
+    axum::Router::new()
+        .merge(dsp_router)
+        .merge(observability_router)
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .with_state(state)
