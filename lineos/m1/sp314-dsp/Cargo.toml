@@ -56,3 +56,7 @@ required-features = ["cli"]
 [[test]]
 name = "stress"
 path = "tests/stress/mod.rs"
+
+[[test]]
+name = "adm_bwf_integration"
+required-features = ["cli"]
