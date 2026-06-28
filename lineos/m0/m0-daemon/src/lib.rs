@@ -28,6 +28,8 @@ use app_state::AppState;
 use health::HealthGate;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
 
 // Environment variable defaults
 #[allow(dead_code)]
@@ -179,6 +181,20 @@ fn max_concurrent_jobs() -> usize {
         })
 }
 
+fn make_request_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
+    let path = req.uri().path().to_string();
+    let request_id = req.extensions()
+        .get::<RequestId>()
+        .and_then(|id| id.header_value().to_str().ok())
+        .unwrap_or("unknown")
+        .to_string();
+    if path.starts_with("/health") || path.starts_with("/progress") {
+        tracing::debug_span!("http_request", method = %req.method(), %path, %request_id)
+    } else {
+        tracing::info_span!("http_request", method = %req.method(), %path, %request_id)
+    }
+}
+
 /// Build the mastering API Axum router.
 /// Phase 12A adds: POST /playback/control, GET /playback/state
 /// Authority: Phase 6 task-decomposition P6-003 · Phase 12A P12A-007
@@ -244,6 +260,17 @@ fn mastering_router(state: AppState) -> axum::Router {
         )
         .route("/dev/wait", post(handlers::dev_wait::post_wait))
         .layer(tower::limit::ConcurrencyLimitLayer::new(max_concurrent_jobs()))
+        // Outer-wrapping order below is deliberate (Router::layer composition:
+        // last .layer() call = outermost = sees request first):
+        // 1) TraceLayer wraps ConcurrencyLimitLayer -> measures TOTAL client
+        //    latency including queue wait, not just handler execution time.
+        // 2) PropagateRequestIdLayer wraps TraceLayer -> copies the request's
+        //    x-request-id onto the outgoing response, after Trace has read it.
+        // 3) SetRequestIdLayer is outermost -> generates the UUID first,
+        //    before anything else sees the request.
+        .layer(TraceLayer::new_for_http().make_span_with(make_request_span))
+        .layer(PropagateRequestIdLayer::x_request_id())
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .with_state(state)
 }
 
