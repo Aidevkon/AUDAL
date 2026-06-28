@@ -69,12 +69,41 @@ fn adm_bwf_riff_header_is_valid() {
         u32::from_le_bytes(bytes[bext_offset + 4..bext_offset + 8].try_into().unwrap()) as usize;
     assert_eq!(bext_size, 602, "bext chunk size should be 602 bytes");
 
-    // data chunk must exist after bext
-    let data_offset = bext_offset + 8 + bext_size;
+    // chna chunk immediately after bext
+    let chna_offset = bext_offset + 8 + bext_size;
+    assert_eq!(
+        &bytes[chna_offset..chna_offset + 4],
+        b"chna",
+        "Missing chna chunk after bext"
+    );
+    let chna_size =
+        u32::from_le_bytes(bytes[chna_offset + 4..chna_offset + 8].try_into().unwrap()) as usize;
+    assert_eq!(chna_size, 244, "chna chunk size should be 244 bytes (4 + 6*40)");
+
+    // axml chunk immediately after chna
+    let axml_offset = chna_offset + 8 + chna_size;
+    assert_eq!(
+        &bytes[axml_offset..axml_offset + 4],
+        b"axml",
+        "Missing axml chunk after chna"
+    );
+    let axml_size =
+        u32::from_le_bytes(bytes[axml_offset + 4..axml_offset + 8].try_into().unwrap()) as usize;
+    assert!(axml_size > 100, "axml chunk should contain ADM XML (got {} bytes)", axml_size);
+
+    // Verify axml contains key ADM identifiers
+    let axml_data = &bytes[axml_offset + 8..axml_offset + 8 + axml_size];
+    let axml_str = std::str::from_utf8(axml_data).expect("axml should be valid UTF-8");
+    assert!(axml_str.contains("AP_00010009"), "axml must reference 5.1 audioPackFormat");
+    assert!(axml_str.contains("DirectSpeakers"), "axml must specify DirectSpeakers type");
+
+    // data chunk after axml (accounting for even-byte padding)
+    let axml_padded = axml_size + (axml_size % 2);
+    let data_offset = axml_offset + 8 + axml_padded;
     assert_eq!(
         &bytes[data_offset..data_offset + 4],
         b"data",
-        "Missing data chunk after bext"
+        "Missing data chunk after axml"
     );
 
     // data size = num_frames * 6 channels * 3 bytes (24-bit)
@@ -86,8 +115,10 @@ fn adm_bwf_riff_header_is_valid() {
         "Data chunk size mismatch"
     );
 
-    println!("ADM BWF header verified OK");
+    println!("ADM BWF header verified OK (with chna + axml)");
     println!("File size: {} bytes", bytes.len());
     println!("bext size: {} bytes", bext_size);
+    println!("chna size: {} bytes", chna_size);
+    println!("axml size: {} bytes", axml_size);
     println!("data size: {} bytes", actual_data_size);
 }

@@ -1,9 +1,8 @@
-//! decode_node — audio ingestion, validation, AudioChunk build.
+//! decode_node — audio ingestion, validation, AudioPayload build.
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P1
 //! Extracted from dsp_pipeline.rs with zero behavior change.
 
 use crate::handlers::decode;
-use lineos_types::AudioChunk;
 use sha2::Digest;
 
 /// Output of decode_node — everything downstream needs.

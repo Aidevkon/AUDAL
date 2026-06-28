@@ -199,18 +199,125 @@ mod tests_streaming {
     }
 }
 
+/// Writes the `chna` chunk (Channel Audio Definition) required by ADM BWF.
+///
+/// The chna chunk maps audio tracks to ADM audioTrackUIDs.
+/// For a 5.1 bed with 6 channels, we define 6 tracks mapped to
+/// 1 audioPackFormat (AP_00010009 = 5.1).
+///
+/// Format per EBU Tech 3364 / Dolby spec:
+///   numTracks (u16) + numUIDs (u16)
+///   then per-UID: trackIndex(u16) + audioTrackUID(12 bytes) +
+///   audioTrackFormatID(14 bytes) + audioPackFormatID(11 bytes) + pad(1)
+pub fn write_chna_chunk<W: std::io::Write>(w: &mut W) -> Result<(), String> {
+    // 5.1 bed: 6 tracks, 6 UIDs
+    let num_tracks: u16 = 6;
+    let num_uids: u16 = 6;
+
+    // Per-UID record = 40 bytes
+    // Total chunk data = 4 + 6*40 = 244 bytes
+    let chunk_size: u32 = 4 + (6 * 40);
+
+    w.write_all(b"chna").map_err(|e| e.to_string())?;
+    w.write_all(&chunk_size.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    w.write_all(&num_tracks.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    w.write_all(&num_uids.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+
+    // Channel order: L R C LFE Ls Rs
+    // audioTrackFormatIDs for 5.1 bed
+    let track_format_ids: [&[u8; 14]; 6] = [
+        b"AT_00010001_01", // L
+        b"AT_00010002_01", // R
+        b"AT_00010003_01", // C
+        b"AT_00010004_01", // LFE
+        b"AT_00010005_01", // Ls
+        b"AT_00010006_01", // Rs
+    ];
+
+    let pack_format_id = b"AP_00010009";
+
+    for i in 0..6u16 {
+        // trackIndex (1-based)
+        w.write_all(&(i + 1).to_le_bytes())
+            .map_err(|e| e.to_string())?;
+        // audioTrackUID (12 bytes): ATU_xxxxxxxx format, zero-padded
+        let uid = format!("ATU_{:08}", i + 1);
+        let uid_bytes = uid.as_bytes();
+        let mut uid_padded = [0u8; 12];
+        uid_padded[..uid_bytes.len()].copy_from_slice(uid_bytes);
+        w.write_all(&uid_padded)
+            .map_err(|e| e.to_string())?;
+        // audioTrackFormatID (14 bytes)
+        w.write_all(track_format_ids[i as usize])
+            .map_err(|e| e.to_string())?;
+        // audioPackFormatID (11 bytes)
+        w.write_all(pack_format_id)
+            .map_err(|e| e.to_string())?;
+        // pad to 40 bytes: 2+12+14+11 = 39, +1 pad = 40
+        w.write_all(&[0u8]).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Writes minimal `axml` chunk with ADM XML for a 5.1 bed.
+///
+/// The axml chunk contains an ITU-R BS.2076 compliant XML document
+/// identifying the audioPackFormat as a 5.1 bed (AP_00010009).
+/// Apple requires this for Spatial Audio recognition.
+pub fn write_axml_chunk<W: std::io::Write>(w: &mut W) -> Result<(), String> {
+    let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+<ebuCoreMain xmlns="urn:ebu:metadata-schema:ebuCore_2014"
+xmlns:dc="http://purl.org/dc/elements/1.1/"
+xsi:schemaLocation="urn:ebu:metadata-schema:ebuCore_2014 EBU_CORE_20140201.xsd"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<coreMetadata>
+<format>
+<audioFormatExtended>
+<audioTrack trackID="1" formatLabel="Left"/>
+<audioTrack trackID="2" formatLabel="Right"/>
+<audioTrack trackID="3" formatLabel="Centre"/>
+<audioTrack trackID="4" formatLabel="LFE"/>
+<audioTrack trackID="5" formatLabel="Left Surround"/>
+<audioTrack trackID="6" formatLabel="Right Surround"/>
+<audioPackFormat audioPackFormatID="AP_00010009"
+audioPackFormatName="DolbyAtmos_5.1"
+typeLabel="0001" typeDefinition="DirectSpeakers"/>
+</audioFormatExtended>
+</format>
+</coreMetadata>
+</ebuCoreMain>"#;
+
+    let chunk_size = xml.len() as u32;
+    // Pad to even boundary
+    let padded = chunk_size + (chunk_size % 2);
+
+    w.write_all(b"axml").map_err(|e| e.to_string())?;
+    w.write_all(&padded.to_le_bytes())
+        .map_err(|e| e.to_string())?;
+    w.write_all(xml).map_err(|e| e.to_string())?;
+    if chunk_size % 2 != 0 {
+        w.write_all(&[0u8]).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Writes a complete ADM BWF file for Apple Spatial Audio.
 ///
 /// Format: RIFF container with chunks in this order:
-///   fmt  (48 bytes, WAVE_FORMAT_EXTENSIBLE)
-///   bext (BWF broadcast extension, 602 bytes minimum)
-///   data (raw 24-bit LPCM samples, interleaved)
+///   fmt  (WAVE_FORMAT_EXTENSIBLE, 24-bit LPCM)
+///   bext (BWF broadcast extension, EBU Tech 3285 v2)
+///   chna (channel audio definition, EBU Tech 3364)
+///   axml (ADM XML metadata, ITU-R BS.2076)
+///   data (interleaved 24-bit LPCM samples)
 ///
 /// Apple requirements:
 ///   - 48kHz / 24-bit LPCM
 ///   - Channel order: L R C LFE Ls Rs (mask 0x3F)
 ///   - bext.TimeReference at 24fps
-///   - chna + axml (Dolby ADM metadata) added in Spatial-4b
+///   - chna + axml required for Spatial Audio recognition
 ///
 /// `channels` must be in planar format: [L, R, C, LFE, Ls, Rs]
 /// each Vec<f32> has `num_frames` samples normalized -1.0..1.0
@@ -236,15 +343,23 @@ pub fn write_adm_bwf(
         }
     }
 
+    // --- Pre-render chna + axml to buffers for size calculation ---
+    let mut chna_buf: Vec<u8> = Vec::new();
+    write_chna_chunk(&mut chna_buf)?;
+    let mut axml_buf: Vec<u8> = Vec::new();
+    write_axml_chunk(&mut axml_buf)?;
+
     // --- RIFF chunk sizes ---
     let fmt_chunk_size: u32 = 40; // WAVE_FORMAT_EXTENSIBLE
     let bext_chunk_size: u32 = 602; // minimum BWF bext (EBU Tech 3285)
     let data_chunk_size: u32 = pcm_24bit.len() as u32;
 
-    // RIFF size = 4 (WAVE) + 8+fmt + 8+bext + 8+data
+    // RIFF size = 4 (WAVE) + 8+fmt + 8+bext + chna_buf + axml_buf + 8+data
     let riff_size: u32 = 4
         + (8 + fmt_chunk_size)
         + (8 + bext_chunk_size)
+        + chna_buf.len() as u32
+        + axml_buf.len() as u32
         + (8 + data_chunk_size);
 
     let mut file =
@@ -331,6 +446,12 @@ pub fn write_adm_bwf(
     }
     // Reserved (180 bytes, null)
     w.write_all(&[0u8; 180]).map_err(|e| e.to_string())?;
+
+    // --- chna chunk (pre-rendered) ---
+    w.write_all(&chna_buf).map_err(|e| e.to_string())?;
+
+    // --- axml chunk (pre-rendered) ---
+    w.write_all(&axml_buf).map_err(|e| e.to_string())?;
 
     // --- data chunk ---
     w.write_all(b"data").map_err(|e| e.to_string())?;
