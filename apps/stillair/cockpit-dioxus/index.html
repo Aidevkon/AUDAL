@@ -30,5 +30,90 @@
 </head>
 <body>
   <div id="main"></div>
+<script>
+(function() {
+  const ENDPOINT = '/m0/dev/snapshot';
+  const DEBOUNCE_MS = 400;
+  const MAX_NODES = 500; // safety cap — αν το tree είναι πιο μεγάλο, κόβουμε εκεί (καλύτερο partial snapshot παρά freeze)
+  const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'svg', 'path']); // svg/path: skip children, καμία αξία για debugging, μπορεί να είναι βαθύ tree σε icons
+
+  let debounceTimer = null;
+  let nodeCount = 0;
+
+  function serializeNode(el) {
+    if (nodeCount >= MAX_NODES) return null;
+    if (SKIP_TAGS.has(el.tagName)) return null;
+    nodeCount++;
+
+    const rect = el.getBoundingClientRect();
+    const attrs = {};
+    for (const attr of el.attributes || []) {
+      if (attr.name.startsWith('data-') || attr.name === 'id' || attr.name === 'class' || attr.name.startsWith('aria-')) {
+        attrs[attr.name] = attr.value;
+      }
+    }
+
+    const node = {
+      tag: el.tagName.toLowerCase(),
+      attrs,
+      rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
+      visible: rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none',
+    };
+
+    if (el.value !== undefined && el.tagName === 'INPUT') node.value = el.value;
+    if (el.checked !== undefined && el.tagName === 'INPUT') node.checked = el.checked;
+    if (el.disabled !== undefined) node.disabled = el.disabled;
+
+    // Direct text content only (not aggregated from children) — avoids
+    // duplicating the same text at every ancestor level.
+    let ownText = '';
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        ownText += child.textContent;
+      }
+    }
+    ownText = ownText.trim();
+    if (ownText) node.text = ownText;
+
+    if (el.tagName === 'IMG' || el.tagName === 'AUDIO' || el.tagName === 'VIDEO') {
+      if (el.src) node.src = el.src;
+    }
+
+    const children = [];
+    for (const child of el.children) {
+      const serialized = serializeNode(child);
+      if (serialized) children.push(serialized);
+      if (nodeCount >= MAX_NODES) break;
+    }
+    if (children.length) node.children = children;
+
+    return node;
+  }
+
+  function sendSnapshot() {
+    nodeCount = 0;
+    const root = document.getElementById('main');
+    if (!root) return;
+    const snapshot = serializeNode(root);
+    fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+    }).catch(() => {}); // silent fail — debug tool, ΔΕΝ πρέπει ποτέ να σπάσει το UI αν το backend δεν τρέχει
+  }
+
+  function scheduleSnapshot() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(sendSnapshot, DEBOUNCE_MS);
+  }
+
+  const observer = new MutationObserver(scheduleSnapshot);
+  const root = document.getElementById('main');
+  if (root) {
+    observer.observe(root, { childList: true, subtree: true, attributes: true });
+    scheduleSnapshot(); // αρχικό snapshot, μην περιμένουμε την πρώτη αλλαγή
+  }
+})();
+</script>
 </body>
 </html>
