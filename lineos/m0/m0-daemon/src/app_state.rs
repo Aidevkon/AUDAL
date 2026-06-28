@@ -71,7 +71,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(audit: Arc<AuditLog>) -> Self {
+    pub async fn new(audit: Arc<AuditLog>) -> (Self, crate::agents::operator::AgentHandles) {
         // Initialize SurrealDB — persistent local storage
         // ~/.creator_os/db survives reboots (Privacy Moat)
         let fallback_path = format!(
@@ -87,14 +87,14 @@ impl AppState {
         Self::from_db(audit, db).await
     }
 
-    pub async fn new_for_test(audit: Arc<AuditLog>) -> Self {
+    pub async fn new_for_test(audit: Arc<AuditLog>) -> (Self, crate::agents::operator::AgentHandles) {
         let db = crate::db::init_test()
             .await
             .expect("Failed to initialize in-memory test DB");
         Self::from_db(audit, db).await
     }
 
-    async fn from_db(audit: Arc<AuditLog>, db: DbConn) -> Self {
+    async fn from_db(audit: Arc<AuditLog>, db: DbConn) -> (Self, crate::agents::operator::AgentHandles) {
         let (progress_tx, _) = broadcast::channel(128);
         let (album_tx, _) = broadcast::channel(64);
         let initial_dsp_state = DspState::default();
@@ -108,7 +108,7 @@ impl AppState {
 
         let blob_store = BlobStore::new();
         let progress_map = Arc::new(DashMap::new());
-        let operator = crate::agents::operator::spawn_agents(
+        let (operator, handles) = crate::agents::operator::spawn_agents(
             audit.clone(),
             head_state_ptr.clone(),
             db.clone(),
@@ -118,7 +118,7 @@ impl AppState {
             progress_map.clone(),
         );
 
-        Self {
+        let state = Self {
             audit,
             blob_store,
             playback: PlaybackHandle::spawn(),
@@ -132,6 +132,8 @@ impl AppState {
             db,
             playback_state: Arc::new(ArcSwap::from_pointee(ScrubState::new())),
             album_tx,
-        }
+        };
+        
+        (state, handles)
     }
 }

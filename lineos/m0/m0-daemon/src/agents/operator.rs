@@ -281,8 +281,15 @@ impl Operator {
     }
 }
 
+pub struct AgentHandles {
+    pub schema: tokio::task::JoinHandle<()>,
+    pub conductor: tokio::task::JoinHandle<()>,
+    pub executor: tokio::task::JoinHandle<()>,
+    pub wizard: tokio::task::JoinHandle<()>,
+}
+
 /// Spawn all four agent tasks. Call once from main().
-/// Returns Operator — wire into AppState.
+/// Returns (Operator, AgentHandles) — wire into AppState and Graceful Shutdown.
 pub fn spawn_agents(
     audit: Arc<AuditLog>,
     head_state_ptr: Arc<ArcSwap<DspState>>,
@@ -291,14 +298,14 @@ pub fn spawn_agents(
     album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
     progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
     progress_map: Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>,
-) -> Operator {
+) -> (Operator, AgentHandles) {
     let (schema_tx, schema_rx) = mpsc::channel::<Intent>(32);
     let (conductor_tx, conductor_rx) = mpsc::channel::<Intent>(32);
     let (executor_tx, executor_rx) = mpsc::channel::<Intent>(32);
     let (wizard_tx, wizard_rx) = mpsc::channel::<Intent>(32);
 
-    tokio::spawn(crate::agents::schema::run(schema_rx));
-    tokio::spawn(crate::agents::conductor::run(
+    let schema = tokio::spawn(crate::agents::schema::run(schema_rx));
+    let conductor = tokio::spawn(crate::agents::conductor::run(
         conductor_rx,
         head_state_ptr.clone(),
         db.clone(),
@@ -307,7 +314,7 @@ pub fn spawn_agents(
         progress_tx.clone(),
         progress_map.clone(),
     ));
-    tokio::spawn(crate::agents::executor::run(
+    let executor = tokio::spawn(crate::agents::executor::run(
         executor_rx,
         head_state_ptr,
         db.clone(),
@@ -315,7 +322,15 @@ pub fn spawn_agents(
         progress_tx,
         progress_map,
     ));
-    tokio::spawn(crate::agents::wizard::run(wizard_rx));
+    let wizard = tokio::spawn(crate::agents::wizard::run(wizard_rx));
 
-    Operator::new(schema_tx, conductor_tx, executor_tx, wizard_tx, audit)
+    let operator = Operator::new(schema_tx, conductor_tx, executor_tx, wizard_tx, audit);
+    let handles = AgentHandles {
+        schema,
+        conductor,
+        executor,
+        wizard,
+    };
+    
+    (operator, handles)
 }

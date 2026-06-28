@@ -120,7 +120,36 @@ pub async fn run() -> Result<()> {
 
     // ── Step 7: Build AppState for mastering API ──────────────────────────────
     let audit_arc = Arc::new(audit);
-    let app_state = AppState::new(audit_arc.clone()).await;
+    let (app_state, agent_handles) = AppState::new(audit_arc.clone()).await;
+
+    // ── Graceful Shutdown Signal Hook ─────────────────────────────────────────
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+    
+    tokio::spawn(async move {
+        let ctrl_c = async {
+            tokio::signal::ctrl_c().await.unwrap_or(());
+        };
+
+        #[cfg(unix)]
+        let sigterm = async {
+            if let Ok(mut stream) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                stream.recv().await;
+            } else {
+                std::future::pending::<()>().await;
+            }
+        };
+        #[cfg(not(unix))]
+        let sigterm = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = sigterm => {},
+        }
+        tracing::info!("Received termination signal. Initiating graceful shutdown...");
+        let _ = shutdown_tx.send(true);
+    });
+    
+    let operator_for_shutdown = app_state.operator.clone();
 
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
     // Phase 6: mastering router binds directly to 7402.
@@ -155,13 +184,35 @@ pub async fn run() -> Result<()> {
     let health_listener = tokio::net::TcpListener::bind(health_addr).await?;
     let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;
 
-    tokio::select! {
-        res = axum::serve(health_listener, health_app) => {
-            tracing::error!("Health router exited: {:?}", res);
-        }
-        res = axum::serve(mastering_listener, mastering_router) => {
-            tracing::error!("Mastering router exited: {:?}", res);
-        }
+    let mut rx_health = shutdown_rx.clone();
+    let health_server = axum::serve(health_listener, health_app)
+        .with_graceful_shutdown(async move {
+            let _ = rx_health.changed().await;
+        });
+
+    let mut rx_mastering = shutdown_rx.clone();
+    let mastering_server = axum::serve(mastering_listener, mastering_router)
+        .with_graceful_shutdown(async move {
+            let _ = rx_mastering.changed().await;
+        });
+
+    tokio::try_join!(health_server, mastering_server)?;
+
+    tracing::info!("HTTP routers shut down. Dispatching Intent::Shutdown to Agents...");
+    let _ = operator_for_shutdown.dispatch(crate::agents::operator::Intent::Shutdown).await;
+
+    // RISK 1: Long-running DSP tasks (spawn_blocking) do not check for cancellation
+    // and will not break early. They will keep running.
+    // RISK 2: If the 5-second timeout is hit and the daemon process exits forcibly, 
+    // the DSP task and the DB won't drop properly, and the LOCK file might remain locked.
+    match tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let _ = tokio::join!(
+            agent_handles.schema, agent_handles.conductor, 
+            agent_handles.executor, agent_handles.wizard
+        );
+    }).await {
+        Ok(_) => tracing::info!("All agents shut down cleanly."),
+        Err(_) => tracing::warn!("Timeout waiting for agents (long-running DSP tasks). DB LOCK may remain!"),
     }
 
     audit_arc.write(audit::entry_shutdown())?;

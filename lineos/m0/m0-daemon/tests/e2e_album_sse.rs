@@ -21,7 +21,7 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
-    let operator = m0d::agents::operator::spawn_agents(
+    let (operator, _handles) = m0d::agents::operator::spawn_agents(
         audit.clone(),
         dummy_head_state,
         db,
