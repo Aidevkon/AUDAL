@@ -100,7 +100,12 @@ fn run_dsp_internal(
     let input_sha256_hex = decoded.input_sha256_hex;
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
-    let mut chunk = decoded.chunk;
+    let mut chunk = match decoded.payload {
+        lineos_types::AudioPayload::Stereo(buf) => buf,
+        _ => return Err("dsp_pipeline: non-stereo payload \
+                         reached DSP — spatial path not yet \
+                         wired here".into()),
+    };
 
     eprintln!(
         "[BISECT-1-DECODE] L_rms={:.6} R_rms={:.6} ratio={:.4}",

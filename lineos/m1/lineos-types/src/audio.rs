@@ -44,4 +44,13 @@ pub enum AudioPayload {
         sample_rate: u32,
         num_frames: usize,
     },
+    /// UseCase B: stem_to_spatial — NMF HPSS output.
+    /// Wired to Micro Control UI in Sprint Spatial-2.
+    Stems {
+        drums: StereoBuffer,
+        harmonics: StereoBuffer,
+        vocals: StereoBuffer,
+        sample_rate: u32,
+        num_frames: usize,
+    },
 }

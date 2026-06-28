@@ -8,7 +8,7 @@ use sha2::Digest;
 
 /// Output of decode_node — everything downstream needs.
 pub struct DecodedAudio {
-    pub chunk: AudioChunk,
+    pub payload: lineos_types::AudioPayload,
     pub input_blake3_hex: String,
     pub input_sha256_hex: String,
     pub pcm_channels: u16,    // Needed for Phase 9 Telemetry
@@ -43,83 +43,94 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
     let input_hash_hex = hex::encode(path_hash);
     let seed = derive_seed(&path_hash);
 
-    let pcm = decode::decode_audio(audio_path).map_err(|e| format!("Decode error: {e}"))?;
+    let payload = decode::decode_smart(audio_path).map_err(|e| format!("Decode error: {e}"))?;
 
-    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-    // SAFETY: pcm.samples is a Vec<f32>, reinterpreted as raw bytes for direct
-    // disk write. Native-endian, in-process only (same architecture as the
-    // reader, xaak's PcmTransfer) — not a portable serialization format,
-    // matches the byte layout the old executor.rs dump already used (verified
-    // byte-for-byte equivalent before this change, not assumed).
-    let raw_bytes: &[u8] = unsafe {
-        std::slice::from_raw_parts(pcm.samples.as_ptr() as *const u8, pcm.samples.len() * 4)
-    };
-    std::fs::write(&raw_path, raw_bytes).map_err(|e| format!("Failed to write raw dump: {e}"))?;
-    eprintln!(
-        "[RAW-SAVE] wrote raw PCM {} bytes to {}",
-        raw_bytes.len(),
-        raw_path
-    );
+    match payload {
+        lineos_types::AudioPayload::Stereo(buf) => {
+            // Manually re-interleave to preserve exact byte-for-byte hashes and disk dumps
+            let mut interleaved = Vec::with_capacity(buf.num_frames * 2);
+            for i in 0..buf.num_frames {
+                interleaved.push(buf.left[i]);
+                interleaved.push(buf.right[i]);
+            }
 
-    let mut blake3_hasher = blake3::Hasher::new();
-    let mut sha256_hasher = sha2::Sha256::new();
-    for &sample in &pcm.samples {
-        blake3_hasher.update(&sample.to_le_bytes());
-        sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+            // SAFETY: pcm.samples is a Vec<f32>, reinterpreted as raw bytes for direct
+            // disk write. Native-endian, in-process only (same architecture as the
+            // reader, xaak's PcmTransfer) — not a portable serialization format,
+            // matches the byte layout the old executor.rs dump already used (verified
+            // byte-for-byte equivalent before this change, not assumed).
+            let raw_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
+            };
+            std::fs::write(&raw_path, raw_bytes).map_err(|e| format!("Failed to write raw dump: {e}"))?;
+            eprintln!(
+                "[RAW-SAVE] wrote raw PCM {} bytes to {}",
+                raw_bytes.len(),
+                raw_path
+            );
+
+            let mut blake3_hasher = blake3::Hasher::new();
+            let mut sha256_hasher = sha2::Sha256::new();
+            for &sample in &interleaved {
+                blake3_hasher.update(&sample.to_le_bytes());
+                sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+            }
+            let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
+            let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
+
+            // In AudioPayload we dropped the "original" metadata, so we use the validated ones
+            let original_sr = buf.sample_rate;
+            let original_ch = 2;
+            let duration_ms = (buf.num_frames as f64 / buf.sample_rate as f64) * 1000.0;
+            let pcm_channels_for_telemetry = 2;
+            let pcm_sr_for_telemetry = buf.sample_rate;
+
+            // Silence guard
+            let rms = compute_rms(&interleaved);
+            let rms_dbfs = if rms > 0.0 {
+                20.0 * (rms as f64).log10() as f32
+            } else {
+                f32::NEG_INFINITY
+            };
+            if rms_dbfs < -60.0 {
+                return Err(format!(
+                    "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
+                ));
+            }
+
+            // Normalization overflow guard
+            let rough_lufs = rms_to_lufs(rms);
+            let rough_gain_db = -14.0_f32 - rough_lufs;
+            if rough_gain_db > 30.0 {
+                return Err(format!(
+                    "DSP arithmetic error — normalization gain would exceed 32× \
+                     (input RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB). \
+                     Track too quiet or too short (< 400ms) for loudness normalization."
+                ));
+            }
+
+            Ok(DecodedAudio {
+                payload: lineos_types::AudioPayload::Stereo(buf),
+                input_blake3_hex,
+                input_sha256_hex,
+                pcm_channels: pcm_channels_for_telemetry,
+                pcm_sample_rate: pcm_sr_for_telemetry,
+                target_lufs,
+                input_hash_hex,
+                seed,
+                original_sr,
+                original_ch,
+                duration_ms,
+            })
+        }
+        lineos_types::AudioPayload::FiveDotOne { .. } => {
+            Err("spatial::passthrough — not yet wired in decode_node".into())
+        }
+        lineos_types::AudioPayload::Stems { .. } => {
+            Err("spatial::stems — not yet wired in decode_node".into())
+        }
     }
-    let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
-    let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
-
-    let original_sr = pcm.original_sr;
-    let original_ch = pcm.original_ch;
-    let duration_ms = pcm.duration_ms as f64;
-    let pcm_channels_for_telemetry = pcm.channels;
-    let pcm_sr_for_telemetry = pcm.sample_rate;
-
-    // Silence guard
-    let rms = compute_rms(&pcm.samples);
-    let rms_dbfs = if rms > 0.0 {
-        20.0 * (rms as f64).log10() as f32
-    } else {
-        f32::NEG_INFINITY
-    };
-    if rms_dbfs < -60.0 {
-        return Err(format!(
-            "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
-        ));
-    }
-
-    // Normalization overflow guard
-    let rough_lufs = rms_to_lufs(rms);
-    let rough_gain_db = -14.0_f32 - rough_lufs;
-    if rough_gain_db > 30.0 {
-        return Err(format!(
-            "DSP arithmetic error — normalization gain would exceed 32× \
-             (input RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB). \
-             Track too quiet or too short (< 400ms) for loudness normalization."
-        ));
-    }
-
-    let chunk = AudioChunk {
-        left: pcm.samples.iter().step_by(2).copied().collect(),
-        right: pcm.samples.iter().skip(1).step_by(2).copied().collect(),
-        sample_rate: pcm.sample_rate,
-        num_frames: pcm.samples.len() / 2,
-    };
-
-    Ok(DecodedAudio {
-        chunk,
-        input_blake3_hex,
-        input_sha256_hex,
-        pcm_channels: pcm_channels_for_telemetry,
-        pcm_sample_rate: pcm_sr_for_telemetry,
-        target_lufs,
-        input_hash_hex,
-        seed,
-        original_sr,
-        original_ch,
-        duration_ms,
-    })
 }
 
 #[cfg(test)]
