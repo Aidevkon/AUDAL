@@ -54,3 +54,78 @@ pub enum AudioPayload {
         num_frames: usize,
     },
 }
+
+impl AudioPayload {
+    /// Downmix to stereo for telemetry/analysis only.
+    /// Does NOT modify the original payload.
+    /// Uses ITU-R BS.775 coefficients for 5.1 → stereo.
+    ///
+    /// BS.775 matrix (standard coefficients):
+    ///   L_out  = L + 0.707*C + 0.707*Ls
+    ///   R_out  = R + 0.707*C + 0.707*Rs
+    ///   (LFE excluded — not part of loudness measurement)
+    pub fn to_stereo_for_telemetry(&self) -> StereoBuffer {
+        match self {
+            AudioPayload::Stereo(buf) => buf.clone(),
+            AudioPayload::FiveDotOne {
+                channels,
+                sample_rate,
+                num_frames,
+            } => {
+                // channels: [L, R, C, LFE, Ls, Rs]
+                // index:     0  1  2   3   4   5
+                const C: f32 = 0.707;
+                let left: Vec<f32> = (0..*num_frames)
+                    .map(|i| {
+                        channels[0][i]
+                            + C * channels[2][i]
+                            + C * channels[4][i]
+                    })
+                    .collect();
+                let right: Vec<f32> = (0..*num_frames)
+                    .map(|i| {
+                        channels[1][i]
+                            + C * channels[2][i]
+                            + C * channels[5][i]
+                    })
+                    .collect();
+                StereoBuffer {
+                    left,
+                    right,
+                    sample_rate: *sample_rate,
+                    num_frames: *num_frames,
+                }
+            }
+            AudioPayload::Stems {
+                drums,
+                harmonics,
+                vocals,
+                sample_rate,
+                num_frames,
+            } => {
+                // Master bus sum for telemetry.
+                // Stems are already L/R so we sum them.
+                let left: Vec<f32> = (0..*num_frames)
+                    .map(|i| {
+                        drums.left[i]
+                            + harmonics.left[i]
+                            + vocals.left[i]
+                    })
+                    .collect();
+                let right: Vec<f32> = (0..*num_frames)
+                    .map(|i| {
+                        drums.right[i]
+                            + harmonics.right[i]
+                            + vocals.right[i]
+                    })
+                    .collect();
+                StereoBuffer {
+                    left,
+                    right,
+                    sample_rate: *sample_rate,
+                    num_frames: *num_frames,
+                }
+            }
+        }
+    }
+}

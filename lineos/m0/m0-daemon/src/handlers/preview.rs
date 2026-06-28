@@ -197,12 +197,13 @@ fn generate_preview_stems(
     use sp314_dsp::stft::two_pass::TwoPassEngine;
 
     // Decode audio
-    let pcm = decode::decode_audio(audio_path).map_err(|e| format!("Decode error: {e}"))?;
+    let payload = decode::decode_smart(audio_path).map_err(|e| format!("Decode error: {e}"))?;
+    let pcm = payload.to_stereo_for_telemetry();
 
     let sample_rate = pcm.sample_rate;
 
     // Stereo → mono
-    let mono: Vec<f32> = pcm.samples.iter().step_by(2).copied().collect();
+    let mono: Vec<f32> = pcm.left.iter().zip(pcm.right.iter()).map(|(l, r)| (*l + *r) * 0.5).collect();
 
     // Find most diverse 15s window
     let (start, end) = find_most_diverse_window(&mono, sample_rate, 15.0);
