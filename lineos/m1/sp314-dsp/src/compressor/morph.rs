@@ -1,3 +1,19 @@
+//! Ratio morphing for CompressorV3.
+//!
+//! STATUS: Orphaned stub — not included in
+//! compressor/mod.rs, not compiled.
+//!
+//! INTENT: Interpolate compression ratio
+//! between preset base value and 1.0 (bypass)
+//! based on user intent_dynamics (0.0..1.0).
+//! intent=0.0 → full ratio (aggressive)
+//! intent=1.0 → ratio 1.0 (transparent)
+//!
+//! TODO(DSP-Tuning): Wire into CompressorV3
+//! after BrickwallLimiter lookahead is fixed.
+//! Add to compressor/mod.rs:
+//!   pub mod morph;
+
 // src/compressor/morph.rs
 
 pub fn morphed_ratio() {

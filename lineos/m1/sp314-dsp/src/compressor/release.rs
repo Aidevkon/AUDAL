@@ -1,3 +1,19 @@
+//! Auto-Release envelope for CompressorV3.
+//!
+//! STATUS: Orphaned stub — not included in
+//! compressor/mod.rs, not compiled.
+//!
+//! INTENT: Compute dynamic release_ms based
+//! on signal transient density and user
+//! intent_dynamics (0.0..1.0).
+//! Fast transients → short release (punch).
+//! Dense material → long release (smooth).
+//!
+//! TODO(DSP-Tuning): Wire into CompressorV3
+//! after BrickwallLimiter lookahead is fixed.
+//! Add to compressor/mod.rs:
+//!   pub mod release;
+
 // src/compressor/release.rs
 
 pub struct RingBuffer1024 {}

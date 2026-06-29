@@ -1,3 +1,22 @@
+//! Headroom enforcement for ISP Limiter.
+//!
+//! STATUS: Orphaned stub — not included in
+//! pipeline/mod.rs, not compiled.
+//!
+//! INTENT: Lookahead-based gain reduction
+//! before BrickwallLimiter to preserve
+//! transient punch (crest factor survival).
+//! Measured problem: Transparent+SpotifyV3
+//! both give CF 9.3→4.8dB — limiter is
+//! the bottleneck, not the compressor.
+//! (See INV-QA-2 in e2e_mastering_quality.rs)
+//!
+//! TODO(fix/limiter-transient-headroom):
+//! Implement and wire into pipeline after
+//! BrickwallLimiter core recon.
+//! Add to pipeline/mod.rs:
+//!   pub mod headroom;
+
 // src/pipeline/headroom.rs
 
 pub fn enforce_headroom() {
