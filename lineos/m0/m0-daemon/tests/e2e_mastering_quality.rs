@@ -477,3 +477,74 @@ fn inv_qa_8_true_peak_ceiling() {
         );
     }
 }
+
+/// INV-QA-7: Stereo Phase Coherence.
+/// Inter-channel correlation must be >= 0.0.
+/// Negative correlation = phase cancellation
+/// in mono playback (smartphone, club PA).
+///
+/// Pearson correlation: sum(L*R) / sqrt(sum(L²)*sum(R²))
+/// Range: -1.0 (full cancel) to +1.0 (mono)
+/// Commercial masters: typically +0.2 to +0.7
+#[test]
+fn inv_qa_7_stereo_phase_coherence() {
+    let sr = 48000u32;
+    let input = generate_chaos_mix(sr, 4.0);
+    let path = "/tmp/qa_phase.wav";
+    write_wav(&input, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None, None,
+        "qa-7".to_string(),
+    );
+    assert!(result.is_ok(),
+        "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    let out_l =
+        read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
+    let out_r =
+        read_raw_pcm_right(&std::path::PathBuf::from(&blob.audio_path));
+
+    assert!(
+        !out_l.is_empty() && !out_r.is_empty(),
+        "Output buffers empty"
+    );
+
+    // Pearson correlation
+    let n = out_l.len().min(out_r.len());
+    let sum_lr: f32 = out_l[..n].iter()
+        .zip(out_r[..n].iter())
+        .map(|(l, r)| l * r)
+        .sum();
+    let sum_l2: f32 = out_l[..n].iter()
+        .map(|l| l * l).sum();
+    let sum_r2: f32 = out_r[..n].iter()
+        .map(|r| r * r).sum();
+
+    let correlation = if sum_l2 > 1e-10
+        && sum_r2 > 1e-10
+    {
+        sum_lr / (sum_l2.sqrt() * sum_r2.sqrt())
+    } else {
+        1.0 // silence = perfect correlation
+    };
+
+    println!(
+        "INV-QA-7: correlation={:.3} \
+         (range -1.0..+1.0, \
+         target >= 0.0)",
+        correlation
+    );
+
+    assert!(
+        correlation >= 0.0,
+        "Phase cancellation detected: \
+         correlation={:.3} < 0.0 \
+         (mono playback will suffer)",
+        correlation
+    );
+}
