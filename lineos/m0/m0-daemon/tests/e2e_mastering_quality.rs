@@ -56,7 +56,7 @@ fn read_raw_pcm_left(path: &std::path::Path) -> Vec<f32> {
 fn make_req(path: &str) -> MasterRequest {
     MasterRequest {
         audio_path: path.to_string(),
-        preset_id: "stereo_master".to_string(),
+        preset_id: "Transparent".to_string(),
         flavour_id: None,
         intent_tone: None,
         intent_dynamics: None,
@@ -207,5 +207,74 @@ fn inv_qa_3_spectral_balance() {
         shift_pct,
         input_centroid,
         output_centroid
+    );
+}
+
+/// INV-QA-4: Compressor activity check.
+/// Verifies the compressor IS working
+/// on an active preset (SpotifyV3).
+/// CF should be LOWER than input (compression
+/// happened) but not catastrophically so.
+#[test]
+fn inv_qa_4_compressor_is_active() {
+    let sr = 48000u32;
+    let input = generate_chaos_mix(sr, 4.0);
+    let input_l: Vec<f32> = input.iter().step_by(2).copied().collect();
+    let input_crest = crest_factor_db(&input_l);
+
+    let path = "/tmp/qa_compressor.wav";
+    write_wav(&input, sr, path);
+
+    // SpotifyV3: ratio 2.5:1, parallel 0.5
+    // Should compress but not destroy punch
+    let req = MasterRequest {
+        audio_path: path.to_string(),
+        preset_id: "SpotifyV3".to_string(),
+        flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
+        persona_id: None,
+        tone: None,
+        dynamics: None,
+        chaos_seed: None,
+        project_id: None,
+        track_id: None,
+        mix_levels: None,
+        preview_id: None,
+    };
+    let result = run_dsp(
+        &req,
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-4".to_string(),
+    );
+    assert!(result.is_ok());
+    let (blob, _, _, _) = result.unwrap();
+    let output_l = read_raw_pcm_left(&blob.audio_path);
+    let output_crest = crest_factor_db(&output_l);
+
+    println!(
+        "INV-QA-4: compressor active \
+         in={:.1}dB out={:.1}dB",
+        input_crest, output_crest
+    );
+
+    // Compressor should reduce CF (it worked)
+    // but not below 40% (not brick-wall)
+    assert!(
+        output_crest < input_crest,
+        "SpotifyV3 compressor not active: \
+         CF unchanged in={:.1}dB out={:.1}dB",
+        input_crest,
+        output_crest
+    );
+    assert!(
+        output_crest >= input_crest * 0.40,
+        "SpotifyV3 over-compressed: \
+         in={:.1}dB out={:.1}dB",
+        input_crest,
+        output_crest
     );
 }
