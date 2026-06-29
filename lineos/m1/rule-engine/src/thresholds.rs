@@ -46,7 +46,6 @@ impl Thresholds {
     /// `preset` — the key into schema.presets (e.g. "spotify", "broadcast", "raw").
     /// All values come from the schema; fallbacks are documented.
     pub fn from_schema_with_preset(schema: &Bmr128Schema, preset: &'static str) -> Self {
-        // TODO: 3b — Bmr128Schema (LoudnessTarget) no longer has presets map
         let target_lufs = Some(schema.target_lufs);
         let true_peak_max = schema.max_true_peak_db;
 
@@ -73,64 +72,14 @@ impl Thresholds {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-
-    // use std::collections::BTreeMap;
-
-    /* TODO: 3b — restore tests
-    fn make_schema() -> Bmr128Schema {
+    use super::*;
+    use lineos_types::config::LoudnessTarget;
 
     #[test]
-    fn test_thresholds_spotify_loaded_from_schema() {
-        let schema = make_schema();
-        let t = Thresholds::from_schema_with_preset(&schema, "spotify");
-        assert_eq!(t.preset_name, "spotify");
-        assert_eq!(t.target_lufs, Some(-14.0));
-        assert_eq!(t.true_peak_max, -1.0);
-    }
-
-    #[test]
-    fn test_thresholds_apple_music_loaded_from_schema() {
-        let schema = make_schema();
-        let t = Thresholds::from_schema_with_preset(&schema, "apple_music");
-        assert_eq!(t.preset_name, "apple_music");
-        assert_eq!(t.target_lufs, Some(-16.0));
-    }
-
-    #[test]
-    fn test_thresholds_broadcast_loaded_from_schema() {
-        let schema = make_schema();
-        let t = Thresholds::from_schema_with_preset(&schema, "broadcast");
-        assert_eq!(t.preset_name, "broadcast");
-        assert_eq!(t.target_lufs, Some(-23.0));
-    }
-
-    #[test]
-    fn test_thresholds_raw_preset_no_lufs_target() {
-        let schema = make_schema();
-        let t = Thresholds::from_schema_with_preset(&schema, "raw");
-        assert_eq!(t.preset_name, "raw");
-        assert_eq!(t.target_lufs, None);
-    }
-
-    #[test]
-    fn test_thresholds_missing_preset_uses_fallback() {
-        let schema = Bmr128Schema {
-            presets: BTreeMap::new(),
-            pipeline: make_schema().pipeline,
-        };
-        let t = Thresholds::from_schema_with_preset(&schema, "spotify");
-        // Missing preset → None for target_lufs, -1.0 fallback for true_peak_max
-        assert_eq!(t.target_lufs, None);
-        assert_eq!(t.true_peak_max, -1.0);
-    }
-
-    #[test]
-    fn test_from_schema_shorthand_is_spotify() {
-        let schema = make_schema();
+    fn thresholds_read_from_schema() {
+        let schema = LoudnessTarget::spotify();
         let t = Thresholds::from_schema(&schema);
-        assert_eq!(t.preset_name, "spotify");
         assert_eq!(t.target_lufs, Some(-14.0));
+        assert!((t.true_peak_max - (-1.0)).abs() < 0.001);
     }
-    */
 }

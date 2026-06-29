@@ -14,5 +14,5 @@
 extern crate alloc;
 
 pub mod lra;
-pub mod report;
+
 pub mod windows;

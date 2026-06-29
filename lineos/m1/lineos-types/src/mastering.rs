@@ -51,26 +51,3 @@ impl MasteringIntent {
         }
     }
 }
-
-/// v2.9 MasteringPipeline is replaced by DspGraph in v3.
-/// This stub exists only for migration — do not use for new code.
-/// TODO: remove after all callers migrate to pipelineforge + openclaw.
-#[deprecated(note = "Use pipelineforge::Pipelineforge + openclaw::OpenClawEngine instead")]
-pub struct MasteringPipeline;
-
-#[allow(deprecated)]
-impl MasteringPipeline {
-    pub fn new(_constants: crate::config::PipelineConstants) -> Self {
-        Self
-    }
-
-    pub fn master(
-        &mut self,
-        _intent: &MasteringIntent,
-        _chunks: &[crate::audio::AudioChunk],
-        _seed: [u8; 32],
-    ) -> Result<crate::golden_blob::GoldenBlob, String> {
-        // Stub implementation
-        Err("MasteringPipeline::master() is deprecated and not implemented in lineos-types".into())
-    }
-}
