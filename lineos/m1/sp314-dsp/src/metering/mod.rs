@@ -2,6 +2,7 @@
 
 mod filter;
 mod gating;
+pub mod lra;
 pub mod lufs;
 
 pub use filter::KWeightingFilter;

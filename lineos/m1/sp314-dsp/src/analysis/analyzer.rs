@@ -6,6 +6,8 @@ use super::dynamics::{crest_factor_db, dynamic_range_db, rms_db};
 use super::features::{MixMetrics, StemFeatures, StemMetrics, ENERGY_RATIO_EPSILON};
 use super::spectral::{spectral_centroid_hz, spectral_crest_factor_db, spectral_flatness};
 use super::stereo::{stereo_correlation, stereo_width};
+use crate::limiter::true_peak::measure_true_peak_dbtp;
+use crate::metering::lra::measure_loudness_range;
 use crate::metering::measure_integrated_lufs;
 use crate::stft::stem_renderer::FiveStems;
 
@@ -86,8 +88,8 @@ impl StemFeatureAnalyzer {
 
         let mix = MixMetrics {
             integrated_lufs: measure_integrated_lufs(&mix_l, &mix_r),
-            true_peak_dbtp: -1.0, // simplified for v1.0
-            loudness_range: 0.0,  // simplified for v1.0
+            true_peak_dbtp: measure_true_peak_dbtp(&mix_l, &mix_r),
+            loudness_range: measure_loudness_range(&mix_l, &mix_r, sample_rate),
             stereo_correlation: stereo_correlation(&mix_stereo),
             stereo_width: stereo_width(&mix_stereo),
             dynamic_range_db: dynamic_range_db(&mix_l, sample_rate),
@@ -151,8 +153,8 @@ impl StemFeatureAnalyzer {
             spectral_flatness: flatness,
             spectral_crest_factor: spec_crest,
             integrated_lufs: lufs,
-            true_peak_dbtp: -1.0, // simplified v1.0
-            loudness_range: 0.0,  // simplified v1.0
+            true_peak_dbtp: measure_true_peak_dbtp(&l, &r),
+            loudness_range: measure_loudness_range(&l, &r, sample_rate),
             rms_db: rms,
             stereo_correlation: corr,
             stereo_width: width,
@@ -225,18 +227,17 @@ impl StemFeatureAnalyzer {
         let corr = stereo_correlation(&stereo);
         let width = stereo_width(&stereo);
 
-        // Energy ratios: all equal (no stem separation)
-        // TODO v2.0: use real NMF stem energies
-        let equal_ratio = 0.2_f32;
-
         let mix = MixMetrics {
             integrated_lufs: lufs,
-            true_peak_dbtp: -1.0, // TODO v2.0: real true peak
-            loudness_range: 0.0,  // TODO v2.0: LraCalculator
+            true_peak_dbtp: measure_true_peak_dbtp(left, right),
+            loudness_range: measure_loudness_range(left, right, sample_rate),
             stereo_correlation: corr,
             stereo_width: width,
             dynamic_range_db: dyn_range,
-            stem_energy_ratios: [equal_ratio; 5],
+            // Unavailable: analyze_stereo() skips
+            // NMF/STFT — no stem separation.
+            // Use analyze() for real ratios.
+            stem_energy_ratios: [0.0; 5],
             spectral_centroid_hz: centroid,
         };
 
@@ -265,7 +266,27 @@ mod tests {
         let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
         assert!(result.mix.spectral_centroid_hz > 0.0);
         assert!(result.mix.stereo_correlation > 0.99); // L==R
-        assert_eq!(result.mix.stem_energy_ratios, [0.2; 5]);
+        assert_eq!(result.mix.stem_energy_ratios, [0.0; 5]);
+    }
+
+    #[test]
+    fn test_analyze_stereo_true_peak() {
+        let gain = libm::powf(10.0, -1.0 / 20.0);
+        let signal: Vec<f32> = (0..4800)
+            .map(|i| gain * libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
+            .collect();
+
+        let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
+
+        assert!(
+            result.mix.true_peak_dbtp >= -2.0 && result.mix.true_peak_dbtp <= 0.0,
+            "True peak was {}",
+            result.mix.true_peak_dbtp
+        );
+
+        let silence = vec![0.0_f32; 100];
+        let silence_result = StemFeatureAnalyzer::analyze_stereo(&silence, &silence, 48000);
+        assert!(silence_result.mix.true_peak_dbtp <= -100.0);
     }
 
     #[test]

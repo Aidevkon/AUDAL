@@ -147,3 +147,47 @@ impl TruePeakDetector {
         self.write_pos = 0;
     }
 }
+
+/// One-shot integrated True Peak measurement
+/// over an entire stereo buffer.
+/// Returns dBTP (decibels relative to full
+/// scale, true peak). Returns -144.0 for
+/// silence.
+///
+/// Uses the same 4x oversampled polyphase
+/// detector as the limiter — measurement
+/// matches what the limiter enforces.
+pub fn measure_true_peak_dbtp(left: &[f32], right: &[f32]) -> f32 {
+    let mut detector = TruePeakDetector::new();
+    let mut max_tp = 0.0_f32;
+    let n = left.len().min(right.len());
+    for i in 0..n {
+        let tp = detector.process(left[i], right[i]);
+        if tp > max_tp {
+            max_tp = tp;
+        }
+    }
+    if max_tp > 1e-10 {
+        20.0 * libm::log10f(max_tp)
+    } else {
+        -144.0
+    }
+}
+
+/// Mono variant — feeds the same sample to
+/// both detector channels.
+pub fn measure_true_peak_dbtp_mono(signal: &[f32]) -> f32 {
+    let mut detector = TruePeakDetector::new();
+    let mut max_tp = 0.0_f32;
+    for &s in signal {
+        let tp = detector.process(s, s);
+        if tp > max_tp {
+            max_tp = tp;
+        }
+    }
+    if max_tp > 1e-10 {
+        20.0 * libm::log10f(max_tp)
+    } else {
+        -144.0
+    }
+}
