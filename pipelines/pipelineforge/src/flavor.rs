@@ -56,7 +56,6 @@ impl Flavor {
                     { "node_id": "compressor_wet", "node_type": "Compressor", "parameters": { "threshold_db": -18.0, "ratio": 4.0 } },
                     { "node_id": "gain_dry", "node_type": "Gain", "parameters": { "gain": 1.0 } },
                     { "node_id": "gain_blend", "node_type": "Gain", "parameters": { "gain": 0.5 } },
-                    { "node_id": "limiter_out", "node_type": "Limiter", "parameters": { "ceiling_db": -0.5 } },
                     { "node_id": "Output", "node_type": "Output", "parameters": {} }
                 ],
                 "edges": [
@@ -64,8 +63,7 @@ impl Flavor {
                     { "source": "Input", "target": "gain_dry", "modulation_type": "audio" },
                     { "source": "compressor_wet", "target": "gain_blend", "modulation_type": "audio" },
                     { "source": "gain_dry", "target": "gain_blend", "modulation_type": "audio" },
-                    { "source": "gain_blend", "target": "limiter_out", "modulation_type": "audio" },
-                    { "source": "limiter_out", "target": "Output", "modulation_type": "audio" }
+                    { "source": "gain_blend", "target": "Output", "modulation_type": "audio" }
                 ]
             }),
             Flavor::MonoSafeMaster => json!({
