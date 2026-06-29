@@ -1,0 +1,51 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/runtime/openclaw/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/aidevcon/Documents/creator-os/apps/stillair/cockpit-dioxus/Cargo.toml
+workspace: /home/aidevcon/Documents/creator-os/Cargo.toml
+   Compiling m0d v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.82s
+     Running `target/debug/m0d`
+[2m2026-06-28T20:07:52.185176Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m m0d starting — LineOS M0 v0.1.0
+[2m2026-06-28T20:07:52.185259Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Authority: M0 Constitution v2.0
+[2m2026-06-28T20:07:52.185945Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Audit log ready: lineos/m0/logs/audit
+[2m2026-06-28T20:07:52.186908Z[0m [32m INFO[0m [2mm0d::registry[0m[2m:[0m Registry loaded: 4 wasm_modules, 1 engines, 0 revoked_keys
+[2m2026-06-28T20:07:52.186940Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Registry loaded OK
+[2m2026-06-28T20:07:52.187041Z[0m [32m INFO[0m [2mm0d::cdn[0m[2m:[0m CDN loaded: 4 registered assets (root=lineos/m0/assets/wasm)
+[2m2026-06-28T20:07:52.187779Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m CDN verified OK
+[2m2026-06-28T20:07:52.188797Z[0m [32m INFO[0m [2mm0d::policy[0m[2m:[0m Policy engine loaded: 0 allowed destinations (deny-by-default)
+[2m2026-06-28T20:07:52.188844Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Policy engine loaded OK (deny-by-default active)
+[2m2026-06-28T20:07:52.188859Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Caddy integration: Phase 1 stub (process management in Phase 2)
+[2m2026-06-28T20:07:52.188954Z[0m [33m WARN[0m [2mm0d[0m[2m:[0m Could not create /run/lineos: Permission denied (os error 13) (normal in dev)
+[2m2026-06-28T20:07:52.188975Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m ✅ All health criteria passed — M0 is healthy
+[2m2026-06-28T20:07:52.192160Z[0m [32m INFO[0m [2msurrealdb::core::kvs::ds[0m[2m:[0m Starting kvs store at absolute path surrealkv:/home/aidevcon/.creator_os/db
+[2m2026-06-28T20:07:52.194965Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Enabling value log separation: true
+[2m2026-06-28T20:07:52.195021Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting value log max file size: 134217728
+[2m2026-06-28T20:07:52.195037Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting value log threshold: 4096
+[2m2026-06-28T20:07:52.195052Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Versioning enabled: false with retention period: 0ns
+[2m2026-06-28T20:07:52.195067Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Versioning with versioned_index: false
+[2m2026-06-28T20:07:52.195082Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting max memtable size: 268435456
+[2m2026-06-28T20:07:52.195112Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting block cache capacity: 6193446912
+[2m2026-06-28T20:07:52.195148Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Setting block size: 65536
+[2m2026-06-28T20:07:52.195721Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m === Starting LSM tree initialization ===
+[2m2026-06-28T20:07:52.195752Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Database path: "/home/aidevcon/.creator_os/db"
+[2m2026-06-28T20:07:52.196154Z[0m [32m INFO[0m [2msurrealkv::levels[0m[2m:[0m Loading manifest from "/home/aidevcon/.creator_os/db/manifest/00000000000000000000.manifest"
+[2m2026-06-28T20:07:52.196736Z[0m [32m INFO[0m [2msurrealkv::levels[0m[2m:[0m Manifest loaded successfully: version=1, log_number=0, last_sequence=0, tables=0, levels=6
+[2m2026-06-28T20:07:52.197461Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Manifest state: log_number=0, last_sequence=0
+[2m2026-06-28T20:07:52.197736Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Starting WAL recovery from directory: "/home/aidevcon/.creator_os/db/wal"
+[2m2026-06-28T20:07:52.197824Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Replaying WAL segments #00000000000000000000 to #00000000000000000000
+[2m2026-06-28T20:07:52.416639Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m Replayed 236044 batches from WAL segment #00000000000000000000
+[2m2026-06-28T20:07:52.416689Z[0m [32m INFO[0m [2msurrealkv::wal::recovery[0m[2m:[0m WAL recovery complete: 236044 batches across 1 segments, 1 memtables created, max_seq_num=Some(236111)
+[2m2026-06-28T20:07:52.435150Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m Recovery: setting last memtable (wal=0) as active with 236112 entries
+[2m2026-06-28T20:07:52.435775Z[0m [32m INFO[0m [2msurrealkv::lsm[0m[2m:[0m === LSM tree initialization complete ===
+[2m2026-06-28T20:07:52.437429Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Sync mode: every transaction commit
+[2m2026-06-28T20:07:52.437466Z[0m [32m INFO[0m [2msurrealdb::core::kvs::surrealkv[0m[2m:[0m Grouped commit: enabled (timeout=5000000ns, wait_threshold=12, max_batch_size=4096)
+[2m2026-06-28T20:07:52.437609Z[0m [32m INFO[0m [2msurrealdb::core::kvs::ds[0m[2m:[0m Started surrealkv kvs store
+[2m2026-06-28T20:07:52.750090Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Health endpoint:    http://127.0.0.1:7401
+[2m2026-06-28T20:07:52.750134Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Mastering endpoint: http://127.0.0.1:7402
+[2m2026-06-28T20:07:52.750201Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m [m0d] pre-warming llama3.2:1b...
+[ACTOR-IDLE] waiting for command
+[2m2026-06-28T20:07:58.177600Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m Received termination signal. Initiating graceful shutdown...
+[2m2026-06-28T20:07:58.178361Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m HTTP routers shut down. Dispatching Intent::Shutdown to Agents...
+[2m2026-06-28T20:07:58.179259Z[0m [32m INFO[0m [2mm0d[0m[2m:[0m All agents shut down cleanly.
