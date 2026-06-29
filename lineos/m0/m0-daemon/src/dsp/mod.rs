@@ -100,7 +100,7 @@ impl DspAdapter {
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
 
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
-            
+
             // TODO(AetherBridge-Sprint):
             // Wire intent_dynamics (0.0..1.0)
             // to blend_release_ms via lerp:
