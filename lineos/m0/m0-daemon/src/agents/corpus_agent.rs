@@ -26,5 +26,8 @@ pub async fn get_finding_score(
     _finding_type: &str,
 ) -> Result<f32, String> {
     // apply=+2.0, ignore=-1.0, cancelled=0.0, reverted=-1.0
-    todo!("get_finding_score")
+    Err(
+        "corpus_agent::get_finding_score not yet implemented (dormant — wired in Corpus Phase)"
+            .into(),
+    )
 }

@@ -16,13 +16,16 @@ pub struct ActiveGates {
 }
 
 pub async fn increment_session_counter(_db: &DbConn, _user_id: &str) -> Result<u32, String> {
-    todo!("increment_session_counter")
+    Err("session_agent::increment_session_counter not yet implemented (dormant — wired in Session Phase)".into())
 }
 
 pub async fn get_last_flavour(_db: &DbConn, _user_id: &str) -> Result<Option<String>, String> {
-    todo!("get_last_flavour")
+    Err(
+        "session_agent::get_last_flavour not yet implemented (dormant — wired in Session Phase)"
+            .into(),
+    )
 }
 
 pub async fn get_progressive_gate(_db: &DbConn, _user_id: &str) -> Result<ActiveGates, String> {
-    todo!("get_progressive_gate")
+    Err("session_agent::get_progressive_gate not yet implemented (dormant — wired in Session Phase)".into())
 }

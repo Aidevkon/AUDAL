@@ -48,7 +48,7 @@ pub async fn checkout(
     _commit_hash: &str,
 ) -> Result<DspStateJson, String> {
     // Fetch DspStateJson from DB only — no ArcSwap yet (Phase 4)
-    todo!("checkout")
+    Err("git_agent::checkout not yet implemented (dormant — wired in Git Phase)".into())
 }
 
 pub async fn create_branch(_db: &DbConn, project_id: &str, name: &str) -> Result<Branch, String> {
@@ -63,5 +63,5 @@ pub async fn create_branch(_db: &DbConn, project_id: &str, name: &str) -> Result
 }
 
 pub async fn get_history(_db: &DbConn, _project_id: &str) -> Result<Vec<MixCommit>, String> {
-    todo!("get_history")
+    Err("git_agent::get_history not yet implemented (dormant — wired in Git Phase)".into())
 }
