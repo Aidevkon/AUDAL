@@ -548,3 +548,189 @@ fn inv_qa_7_stereo_phase_coherence() {
         correlation
     );
 }
+
+// ── Genre fixture generators ──────────────
+
+fn generate_acoustic_fixture(
+    sr: u32, dur: f32
+) -> Vec<f32> {
+    // Acoustic: high frequencies dominant,
+    // large CF (piano/guitar transients),
+    // minimal sub-bass
+    let n = (sr as f32 * dur) as usize;
+    let mut out = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let piano =
+            (2.0 * std::f32::consts::PI
+                * 880.0 * t).sin() * 0.3;
+        let guitar =
+            (2.0 * std::f32::consts::PI
+                * 1320.0 * t).sin() * 0.2;
+        let transient =
+            if i % (sr as usize) < 3 {
+                0.8
+            } else { 0.0 };
+        let mix = (piano + guitar + transient)
+            .clamp(-1.0, 1.0);
+        out.push(mix);
+        out.push(mix * 0.95); // slight stereo
+    }
+    out
+}
+
+fn generate_club_fixture(
+    sr: u32, dur: f32
+) -> Vec<f32> {
+    // Club: heavy sub-bass (40Hz),
+    // compressed mids, repetitive kick
+    let n = (sr as f32 * dur) as usize;
+    let mut out = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let sub =
+            (2.0 * std::f32::consts::PI
+                * 40.0 * t).sin() * 0.6;
+        let mid =
+            (2.0 * std::f32::consts::PI
+                * 300.0 * t).sin() * 0.3;
+        let kick =
+            if i % (sr as usize / 2) < 5 {
+                0.9
+            } else { 0.0 };
+        let mix = (sub + mid + kick)
+            .clamp(-1.0, 1.0);
+        out.push(mix);
+        out.push(mix);
+    }
+    out
+}
+
+fn generate_podcast_fixture(
+    sr: u32, dur: f32
+) -> Vec<f32> {
+    // Podcast: mono voice (speech range
+    // 300Hz-3kHz), minimal dynamics
+    let n = (sr as f32 * dur) as usize;
+    let mut out = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let voice =
+            (2.0 * std::f32::consts::PI
+                * 600.0 * t).sin() * 0.3
+            + (2.0 * std::f32::consts::PI
+                * 1200.0 * t).sin() * 0.15
+            + (2.0 * std::f32::consts::PI
+                * 2400.0 * t).sin() * 0.1;
+        let mix = voice.clamp(-1.0, 1.0);
+        // Mono content — same L and R
+        out.push(mix);
+        out.push(mix);
+    }
+    out
+}
+
+/// INV-QA-9: Multi-Genre Fixture Suite.
+/// Runs core quality assertions across three
+/// genre archetypes: acoustic, club, podcast.
+/// Proves pipeline handles diverse content
+/// without catastrophic failure.
+///
+/// Per genre, asserts:
+/// - Output integrity (no NaN, RMS > 0)
+/// - True Peak <= -0.5dBTP
+/// - Phase correlation >= 0.0
+#[test]
+fn inv_qa_9_multi_genre() {
+    let sr = 48000u32;
+
+    let genres: &[(&str, Vec<f32>)] = &[
+        ("acoustic",
+         generate_acoustic_fixture(sr, 3.0)),
+        ("club",
+         generate_club_fixture(sr, 3.0)),
+        ("podcast",
+         generate_podcast_fixture(sr, 3.0)),
+    ];
+
+    for (name, signal) in genres {
+        let path = format!(
+            "/tmp/qa_genre_{}.wav", name
+        );
+        write_wav(signal, sr, &path);
+
+        let result = run_dsp(
+            &make_req(&path),
+            Instant::now(),
+            make_head(),
+            None, None,
+            format!("qa-9-{}", name),
+        );
+        assert!(
+            result.is_ok(),
+            "run_dsp failed for {}: {:?}",
+            name, result.err()
+        );
+        let (blob, _, _, _) =
+            result.unwrap();
+
+        let out_l = read_raw_pcm_left(
+            &std::path::PathBuf::from(&blob.audio_path)
+        );
+        let out_r = read_raw_pcm_right(
+            &std::path::PathBuf::from(&blob.audio_path)
+        );
+
+        // 1. Integrity
+        assert!(
+            !out_l.is_empty(),
+            "{}: output empty", name
+        );
+        assert!(
+            out_l.iter().all(|s| s.is_finite()),
+            "{}: NaN/Inf in output", name
+        );
+        let rms = (out_l.iter()
+            .map(|s| s * s).sum::<f32>()
+            / out_l.len() as f32).sqrt();
+        assert!(
+            rms > 0.001,
+            "{}: output is silence \
+             rms={:.4}",
+            name, rms
+        );
+
+        // 2. True Peak
+        let tp_dbtp = measure_true_peak_dbtp(&out_l, &out_r);
+        assert!(
+            tp_dbtp <= -0.5,
+            "{}: True Peak exceeds limiter ceiling: {:.2}dBTP",
+            name, tp_dbtp
+        );
+
+        // 3. Phase correlation
+        let n = out_l.len().min(out_r.len());
+        let sum_lr: f32 = out_l[..n].iter()
+            .zip(out_r[..n].iter())
+            .map(|(l, r)| l * r)
+            .sum();
+        let sum_l2: f32 = out_l[..n].iter()
+            .map(|l| l * l).sum();
+        let sum_r2: f32 = out_r[..n].iter()
+            .map(|r| r * r).sum();
+
+        let correlation = if sum_l2 > 1e-10 && sum_r2 > 1e-10 {
+            sum_lr / (sum_l2.sqrt() * sum_r2.sqrt())
+        } else {
+            1.0
+        };
+
+        println!("{}: rms={:.4}, tp={:.2}dBTP, corr={:.3}", name, rms, tp_dbtp, correlation);
+
+        assert!(
+            correlation >= 0.0,
+            "{}: Phase cancellation detected: correlation={:.3} < 0.0",
+            name, correlation
+        );
+    }
+}
