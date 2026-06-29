@@ -3,6 +3,7 @@ use m0d::domain::dsp_pipeline::run_dsp;
 use m0d::handlers::master::MasterRequest;
 use sp314_dsp::analysis::dynamics::crest_factor_db;
 use sp314_dsp::analysis::spectral::spectral_centroid_hz;
+use sp314_dsp::limiter::true_peak::measure_true_peak_dbtp;
 use std::sync::Arc;
 use std::time::Instant;
 use xaak::repo::DspState;
@@ -49,6 +50,16 @@ fn read_raw_pcm_left(path: &std::path::Path) -> Vec<f32> {
     bytes
         .chunks_exact(4)
         .step_by(2) // L channel (interleaved LR)
+        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+        .collect()
+}
+
+fn read_raw_pcm_right(path: &std::path::Path) -> Vec<f32> {
+    let bytes = std::fs::read(path).unwrap();
+    bytes
+        .chunks_exact(4)
+        .skip(1)
+        .step_by(2) // R channel (interleaved LR)
         .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
         .collect()
 }
@@ -367,4 +378,102 @@ fn inv_qa_5_headroom_enforcement() {
         input_crest,
         output_crest
     );
+}
+
+/// INV-QA-8: True Peak Ceiling Compliance.
+/// Output must not exceed -1.0 dBTP after
+/// mastering — universal streaming requirement
+/// (Apple Music, Spotify, YouTube).
+///
+/// Uses 4x oversampled True Peak detector
+/// (same as the ISP Limiter internals).
+/// Tests both a normal mix and a hot mix
+/// (input clipping to verify limiter catches it).
+#[test]
+fn inv_qa_8_true_peak_ceiling() {
+    let sr = 48000u32;
+
+    // Test A: Normal chaos mix
+    {
+        let input = generate_chaos_mix(sr, 3.0);
+        let path = "/tmp/qa_tp_normal.wav";
+        write_wav(&input, sr, path);
+
+        let result = run_dsp(
+            &make_req(path),
+            Instant::now(),
+            make_head(),
+            None,
+            None,
+            "qa-8a".to_string(),
+        );
+        assert!(result.is_ok());
+        let (blob, _, _, _) = result.unwrap();
+
+        let out_l = read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
+        let out_r = read_raw_pcm_right(&std::path::PathBuf::from(&blob.audio_path));
+
+        let tp_dbtp = measure_true_peak_dbtp(&out_l, &out_r);
+
+        println!(
+            "INV-QA-8A (normal): \
+             true_peak={:.2}dBTP \
+             ceiling=-1.0dBTP",
+            tp_dbtp
+        );
+
+        assert!(
+            tp_dbtp <= -0.5,
+            "True Peak exceeds limiter \
+             ceiling: {:.2}dBTP \
+             (ceiling is -0.5dBFS)",
+            tp_dbtp
+        );
+    }
+
+    // Test B: Hot mix (near-clipping input)
+    {
+        let sr_usize = sr as usize;
+        let n = sr_usize * 3;
+        let mut hot = Vec::with_capacity(n * 2);
+        for i in 0..n {
+            let t = i as f32 / sr as f32;
+            let s = (2.0 * std::f32::consts::PI * 440.0 * t).sin() * 0.98;
+            hot.push(s);
+            hot.push(s);
+        }
+        let path = "/tmp/qa_tp_hot.wav";
+        write_wav(&hot, sr, path);
+
+        let result = run_dsp(
+            &make_req(path),
+            Instant::now(),
+            make_head(),
+            None,
+            None,
+            "qa-8b".to_string(),
+        );
+        assert!(result.is_ok());
+        let (blob, _, _, _) = result.unwrap();
+
+        let out_l = read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
+        let out_r = read_raw_pcm_right(&std::path::PathBuf::from(&blob.audio_path));
+
+        let tp_dbtp = measure_true_peak_dbtp(&out_l, &out_r);
+
+        println!(
+            "INV-QA-8B (hot mix): \
+             true_peak={:.2}dBTP \
+             ceiling=-1.0dBTP",
+            tp_dbtp
+        );
+
+        assert!(
+            tp_dbtp <= -0.5,
+            "True Peak exceeds limiter \
+             ceiling: {:.2}dBTP \
+             (ceiling is -0.5dBFS)",
+            tp_dbtp
+        );
+    }
 }
