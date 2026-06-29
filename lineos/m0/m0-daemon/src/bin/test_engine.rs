@@ -94,6 +94,8 @@ fn main() {
         &mut audio.left,
         &mut audio.right,
         audio.sample_rate,
+        &pre_analysis,
+        &[0.0; 5],
         None,
     )
     .expect("Mastering failed");

@@ -86,14 +86,16 @@ impl Flavor {
                 "topology_id": "lufs_norm",
                 "nodes": [
                     { "node_id": "Input", "node_type": "Input", "parameters": {} },
+                    { "node_id": "eq_mud", "node_type": "MaskingEQ", "parameters": {} },
                     { "node_id": "gain_makeup", "node_type": "Gain", "parameters": { "gain": 1.0 } },
                     { "node_id": "ambience_reverb", "node_type": "Reverb", "parameters": {"rt60": 0.0, "hf_damping": 0.5, "diffusion": 0.5, "mix": 0.0} },
                     { "node_id": "ambience_width", "node_type": "Width", "parameters": {"decorrelation": 0.0, "side_gain_db": 0.0, "phase_variance": 0.0, "mono_comp_shelf_db": 0.0} },
                     { "node_id": "Output", "node_type": "Output", "parameters": {} }
                 ],
                 "edges": [
-                    { "source": "Input", "target": "gain_makeup", "modulation_type": "audio" },
-                    { "source": "Input", "target": "ambience_reverb", "modulation_type": "audio" },
+                    { "source": "Input", "target": "eq_mud", "modulation_type": "audio" },
+                    { "source": "eq_mud", "target": "gain_makeup", "modulation_type": "audio" },
+                    { "source": "eq_mud", "target": "ambience_reverb", "modulation_type": "audio" },
                     { "source": "ambience_reverb", "target": "ambience_width", "modulation_type": "audio" },
                     { "source": "ambience_width", "target": "Output", "modulation_type": "audio" },
                     { "source": "gain_makeup", "target": "Output", "modulation_type": "audio" }

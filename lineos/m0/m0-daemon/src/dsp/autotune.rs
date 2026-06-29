@@ -86,6 +86,8 @@ pub fn autotune_dsp(audio: &StereoBuffer, intent: &MasteringIntent) -> AutotuneR
             &mut test_audio.left,
             &mut test_audio.right,
             test_audio.sample_rate,
+            &lineos_types::pre_analysis::PreAnalysisData::silent(),
+            &[0.0; 5],
             None,
         );
 

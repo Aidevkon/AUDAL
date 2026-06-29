@@ -9,6 +9,13 @@ pub trait DspNode: Send {
     /// Called by DspGraph for every audio block. Zero allocation.
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]);
 
+    /// Update context features (e.g. NMF
+    /// stem energy ratios) before processing.
+    /// Nodes needing context (MaskingEQ)
+    /// override this. Default: no-op so the
+    /// existing 16 nodes are unaffected.
+    fn update_features(&mut self, _stem_ratios: &[f32; 5]) {}
+
     /// Set a named parameter on this node.
     /// Called by parameter modulation edges between blocks.
     /// Unknown parameter names are silently ignored.

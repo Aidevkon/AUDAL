@@ -7,6 +7,7 @@ use crate::nodes::dehum::DeHumNode;
 use crate::nodes::gain::GainNode;
 use crate::nodes::input::InputNode;
 use crate::nodes::limiter::LimiterNode;
+use crate::nodes::masking_eq::MaskingEqNode;
 use crate::nodes::ms::{InverseMsMatrixNode, MsMatrixNode};
 use crate::nodes::noisegate::NoiseGateNode;
 use crate::nodes::output::OutputNode;
@@ -14,6 +15,7 @@ use crate::nodes::reverb::ReverbNode;
 use crate::nodes::rms::RmsDetectorNode;
 use crate::nodes::width::WidthNode;
 use crate::topology::DspTopology;
+use sp314_dsp::masking_eq::MaskingEQConfig;
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug)]
@@ -207,6 +209,43 @@ impl DspGraph {
                     Box::new(l)
                 }
                 "Reverb" => Box::new(ReverbNode::new(sample_rate)),
+                "MaskingEQ" => {
+                    // Read target_db from params if
+                    // present; else flat. Mud
+                    // correction is dynamic via NMF
+                    // stems regardless of flat config.
+                    let mut target_db = [0.0_f32; 8];
+                    if let Some(arr) = t_node
+                        .parameters
+                        .get("target_db")
+                        .and_then(|v| v.as_array())
+                    {
+                        for (i, v) in arr.iter().take(8).enumerate() {
+                            if let Some(f) = v.as_f64() {
+                                target_db[i] = f as f32;
+                            }
+                        }
+                    }
+                    let read_f = |key: &str, def: f32| {
+                        t_node
+                            .parameters
+                            .get(key)
+                            .and_then(|v| v.as_f64())
+                            .map(|f| f as f32)
+                            .unwrap_or(def)
+                    };
+                    let cfg = MaskingEQConfig {
+                        target_db,
+                        mask_margin_db: read_f("mask_margin_db", 3.0),
+                        // Default 0.0: no upward
+                        // expansion. EQ only cuts
+                        // (mud correction) unless a
+                        // preset explicitly allows boost.
+                        max_boost_db: read_f("max_boost_db", 0.0),
+                        target_phon: read_f("target_phon", 80.0),
+                    };
+                    Box::new(MaskingEqNode::new(cfg, sample_rate))
+                }
                 "Width" => Box::new(WidthNode::new(sample_rate)),
                 "NoiseGate" => Box::new(NoiseGateNode::new(sample_rate)),
                 "DeEsser" => Box::new(DeEsserNode::new(sample_rate)),
@@ -299,6 +338,16 @@ impl DspGraph {
             sample_rate,
             topology: topology.clone(), // IDE refresh: topology does implement Clone
         })
+    }
+
+    /// Forward NMF stem energy ratios to
+    /// all nodes. Nodes that don't need
+    /// context ignore it (default no-op).
+    /// Call before process_block.
+    pub fn update_features(&mut self, stem_ratios: &[f32; 5]) {
+        for node in self.nodes.values_mut() {
+            node.update_features(stem_ratios);
+        }
     }
 
     pub fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {

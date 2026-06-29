@@ -112,7 +112,7 @@ impl MaskingAwareEQ {
         })
     }
 
-    pub fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
+    pub fn process_block(&mut self, left: &mut [f32], right: &mut [f32], stem_ratios: &[f32; 5]) {
         debug_assert_eq!(left.len(), right.len());
 
         for i in 0..left.len() {
@@ -124,7 +124,7 @@ impl MaskingAwareEQ {
 
             if self.samples_in_hop == HOP_SIZE {
                 self.current_gain_db = self.target_gain_db;
-                self.run_analysis();
+                self.run_analysis(stem_ratios);
                 self.samples_in_hop = 0;
             }
 
@@ -157,7 +157,7 @@ impl MaskingAwareEQ {
         }
     }
 
-    fn run_analysis(&mut self) {
+    fn run_analysis(&mut self, stem_ratios: &[f32; 5]) {
         for i in 0..FFT_SIZE {
             let buf_idx = (self.write_pos + i) & (FFT_SIZE - 1);
             self.fft_io[i] = Complex::new(self.analysis_buffer[buf_idx] * self.hann_window[i], 0.0);
@@ -193,7 +193,20 @@ impl MaskingAwareEQ {
             bin = bin.min(FFT_SIZE / 2);
 
             let mask = mask_buf[bin];
-            let target_db = self.config.target_db[b];
+            let mut target_db = self.config.target_db[b];
+            // Stem-aware mud correction (INV-QA-6):
+            // Band 2 = 320Hz (mud/boxiness).
+            // Harmonics[1] + Ambience[4] = fillers
+            // Voice[2] + Drums[3] = clarity anchors
+            // Fail-safe: if stems = [0.0;5] (no NMF),
+            // mud = 0.0 → no correction applied.
+            if b == 2 && target_db <= 0.0 {
+                let mud = stem_ratios[1] + stem_ratios[4];
+                if mud > 0.40 {
+                    let penalty = ((mud - 0.40) * 5.0).clamp(0.0, 3.0);
+                    target_db -= penalty;
+                }
+            }
 
             let allowed_boost = if target_db < 0.0 {
                 target_db

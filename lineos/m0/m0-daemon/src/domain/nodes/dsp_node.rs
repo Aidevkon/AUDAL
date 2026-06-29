@@ -118,6 +118,8 @@ pub fn run(
         left_slice,
         right_slice,
         sample_rate,
+        &pre_analysis,
+        &streaming_features.mix.stem_energy_ratios,
         Some(&dsp_config),
     )
     .map_err(|e| format!("DSP pipeline error: {:?}", e))?;

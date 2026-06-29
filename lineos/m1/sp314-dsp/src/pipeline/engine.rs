@@ -109,7 +109,12 @@ impl Sp314MasteringEngine {
 
         self.restoration.process(left, right);
 
-        self.eq.process_block(left, right);
+        self.eq.process_block(
+            left, right,
+            &[0.0; 5], // TODO: wire real
+                      // stem_ratios from
+                      // two_pass scout
+        );
 
         self.process_stereo_block_internal(left, right);
 
@@ -183,7 +188,12 @@ impl Sp314MasteringEngine {
 
         self.restoration.process(left, right);
 
-        self.eq.process_block(left, right);
+        self.eq.process_block(
+            left, right,
+            &[0.0; 5], // TODO: wire real
+                      // stem_ratios from
+                      // two_pass scout
+        );
 
         self.process_stereo_block_internal(left, right);
 

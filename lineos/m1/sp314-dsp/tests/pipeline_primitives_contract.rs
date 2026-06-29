@@ -270,7 +270,7 @@ fn stereo_eq_linked_analysis_preserves_center_image() {
     }
     let mut right = left.clone(); // pure mono
 
-    eq.process_block(&mut left, &mut right);
+    eq.process_block(&mut left, &mut right, &[0.0; 5]);
 
     for i in 0..1024 {
         assert_eq!(left[i], right[i], "Stereo image drifted at sample {}", i);
@@ -296,13 +296,13 @@ fn stereo_eq_process_block_deterministic() {
     let mut eq1 = MaskingAwareEQ::new(config.clone(), 48000).unwrap();
     let mut l1 = left_in.clone();
     let mut r1 = right_in.clone();
-    eq1.process_block(&mut l1, &mut r1);
+    eq1.process_block(&mut l1, &mut r1, &[0.0; 5]);
 
     for _ in 0..10 {
         let mut eq2 = MaskingAwareEQ::new(config.clone(), 48000).unwrap();
         let mut l2 = left_in.clone();
         let mut r2 = right_in.clone();
-        eq2.process_block(&mut l2, &mut r2);
+        eq2.process_block(&mut l2, &mut r2, &[0.0; 5]);
 
         for i in 0..512 {
             assert_eq!(l1[i], l2[i]);
@@ -330,13 +330,13 @@ fn stereo_eq_reset_restores_identity() {
     let mut eq = MaskingAwareEQ::new(config, 48000).unwrap();
     let mut l1 = left_in.clone();
     let mut r1 = right_in.clone();
-    eq.process_block(&mut l1, &mut r1);
+    eq.process_block(&mut l1, &mut r1, &[0.0; 5]);
 
     eq.reset();
 
     let mut l2 = left_in.clone();
     let mut r2 = right_in.clone();
-    eq.process_block(&mut l2, &mut r2);
+    eq.process_block(&mut l2, &mut r2, &[0.0; 5]);
 
     // After reset, it should behave exactly as if it was newly created,
     // which means l2 should match l1.

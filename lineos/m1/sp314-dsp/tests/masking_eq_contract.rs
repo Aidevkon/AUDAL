@@ -31,7 +31,7 @@ fn cold_start_no_silence() {
     let mut eq = MaskingAwareEQ::new(config, 48000).unwrap();
     let mut block = vec![1.0; 512]; // DC offset of 1.0
     let mut right = block.to_vec();
-    eq.process_block(&mut block, &mut right);
+    eq.process_block(&mut block, &mut right, &[0.0; 5]);
 
     // With identity filter at start, output should be exactly input for first 511 samples
     for i in 0..511 {
@@ -78,14 +78,14 @@ fn coeff_transition_linear_step() {
 
     // First hop processes
     let mut right1 = block[0..HOP_SIZE].to_vec();
-    eq.process_block(&mut block[0..HOP_SIZE], &mut right1);
+    eq.process_block(&mut block[0..HOP_SIZE], &mut right1, &[0.0; 5]);
     // It should now have run run_analysis() at the end, setting new targets and coeff_steps.
     // It's hard to verify coeff_steps directly as they are private, but we can trust the process_block_deterministic_100_runs test for structural integrity.
     // However, we can use the struct accessor if we make it accessible in tests, or we just rely on behavior.
     // To strictly test it, we should maybe make it pub or just check the output envelope.
     // Given contract testing, we will just process another block.
     let mut right2 = block[HOP_SIZE..].to_vec();
-    eq.process_block(&mut block[HOP_SIZE..], &mut right2);
+    eq.process_block(&mut block[HOP_SIZE..], &mut right2, &[0.0; 5]);
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn coeff_hard_clamp_at_hop_boundary() {
     let mut block = vec![0.0; HOP_SIZE];
     for _ in 0..10 {
         let mut right = block.to_vec();
-        eq.process_block(&mut block, &mut right);
+        eq.process_block(&mut block, &mut right, &[0.0; 5]);
     }
 }
 
@@ -120,7 +120,7 @@ fn process_block_no_allocation() {
     let mut eq = MaskingAwareEQ::new(config, 48000).unwrap();
     let mut block = vec![0.0; 1024];
     let mut right = block.to_vec();
-    eq.process_block(&mut block, &mut right); // Should not panic
+    eq.process_block(&mut block, &mut right, &[0.0; 5]); // Should not panic
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn process_block_deterministic_100_runs() {
     let mut out1 = block_in.clone();
     for _ in 0..10 {
         let mut out1_r = out1.to_vec();
-        eq1.process_block(&mut out1, &mut out1_r);
+        eq1.process_block(&mut out1, &mut out1_r, &[0.0; 5]);
     }
 
     for _ in 0..100 {
@@ -150,7 +150,7 @@ fn process_block_deterministic_100_runs() {
         let mut out_n = block_in.clone();
         for _ in 0..10 {
             let mut out_n_r = out_n.to_vec();
-            eq_n.process_block(&mut out_n, &mut out_n_r);
+            eq_n.process_block(&mut out_n, &mut out_n_r, &[0.0; 5]);
         }
 
         for i in 0..HOP_SIZE {
@@ -174,7 +174,7 @@ fn process_block_no_nan_no_inf() {
     }
 
     let mut right = block.to_vec();
-    eq.process_block(&mut block, &mut right);
+    eq.process_block(&mut block, &mut right, &[0.0; 5]);
     for x in block {
         assert!(x.is_finite());
     }

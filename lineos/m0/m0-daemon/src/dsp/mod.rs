@@ -26,6 +26,8 @@ impl DspAdapter {
         left: &mut [f32],
         right: &mut [f32],
         sample_rate: u32,
+        _pre_analysis: &lineos_types::pre_analysis::PreAnalysisData,
+        stem_ratios: &[f32; 5],
         aether_config: Option<&integration::config::DspConfig>,
     ) -> Result<MasteringResult, DspError> {
         // 1. Build EngineerConditions from intent
@@ -52,6 +54,12 @@ impl DspAdapter {
         // The DspGraph contains heavily stateful nodes (Compressor, Reverb)
         // that cannot be cleanly parallelized without massive margins.
         let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
+
+        // Feed NMF stem energy ratios to the
+        // graph so MaskingEQ can do dynamic
+        // mud correction. Nodes that don't
+        // need them ignore (default no-op).
+        graph.update_features(stem_ratios);
         let mut f = 0;
         while f < num_frames {
             let e = (f + block_size).min(num_frames);
