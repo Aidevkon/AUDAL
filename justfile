@@ -27,6 +27,7 @@ test-quality:
     cargo test -p m0d --test e2e_maestro_ducking
     cargo test -p m0d --test e2e_mastering_quality
     cargo test -p m0d --test e2e_spatial_conformance
+    cargo test -p m0d --test e2e_decoupled_fork
 
 test-all:
     cargo test --workspace

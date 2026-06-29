@@ -21,6 +21,7 @@ pub fn run_dsp(
 ) -> Result<
     (
         StoredBlob,
+        Option<StoredBlob>,
         std::path::PathBuf,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
@@ -154,6 +155,7 @@ fn run_dsp_internal(
 ) -> Result<
     (
         StoredBlob,
+        Option<StoredBlob>,
         std::path::PathBuf,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
@@ -208,7 +210,7 @@ fn run_dsp_internal(
             sample_rate,
             num_frames,
         } => {
-            return spatial_conformance_path(
+            let (blob, path, model) = spatial_conformance_path(
                 channels,
                 sample_rate,
                 num_frames,
@@ -218,7 +220,8 @@ fn run_dsp_internal(
                 seed,
                 &input_blake3_hex,
                 &input_sha256_hex,
-            );
+            )?;
+            return Ok((blob, None, path, model));
         }
         lineos_types::AudioPayload::Stems {
             voice,
@@ -284,7 +287,7 @@ fn run_dsp_internal(
             let stage = FiveDotOneStage::render(&five_stems, &assignments, &firewall);
             let channels = FiveDotOneRenderer::render(stage);
 
-            return spatial_conformance_path(
+            let (blob, path, model) = spatial_conformance_path(
                 channels,
                 sample_rate,
                 num_frames,
@@ -294,7 +297,8 @@ fn run_dsp_internal(
                 seed,
                 &input_blake3_hex,
                 &input_sha256_hex,
-            );
+            )?;
+            return Ok((blob, None, path, model));
         }
     };
 
@@ -418,6 +422,8 @@ fn run_dsp_internal(
         vec![]
     };
 
+    let mut spatial_blob_out: Option<StoredBlob> = None;
+
     emit_progress("Stem Engine");
 
     let mut spatial_slices = if needs_spatial {
@@ -451,7 +457,7 @@ fn run_dsp_internal(
     if needs_spatial && !sp_l.is_empty() {
         let spatial_channels: [Vec<f32>; 6] = [sp_l, sp_r, sp_c, sp_lfe, sp_ls, sp_rs];
         // Τρέξε conformance + export
-        let _spatial_blob = spatial_conformance_path(
+        let spatial_blob = spatial_conformance_path(
             spatial_channels,
             chunk.sample_rate,
             n_total_with_tail,
@@ -462,7 +468,7 @@ fn run_dsp_internal(
             &input_blake3_hex,
             &input_sha256_hex,
         )?;
-        // TODO Spatial-6b: persist spatial blob
+        spatial_blob_out = Some(spatial_blob.0);
     }
 
     eprintln!(
@@ -570,7 +576,12 @@ fn run_dsp_internal(
         processing_timeline,
     )?;
 
-    Ok((cert_out.blob, cert_out.file_path, dsp_out.user_model))
+    Ok((
+        cert_out.blob,
+        spatial_blob_out,
+        cert_out.file_path,
+        dsp_out.user_model,
+    ))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
