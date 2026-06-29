@@ -133,7 +133,6 @@ impl WavChunkWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     #[test]
     fn test_seek_ms_positions_correctly() {

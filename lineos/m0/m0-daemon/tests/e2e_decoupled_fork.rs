@@ -129,3 +129,69 @@ fn e2e_stereo_master_preset_no_spatial_blob() {
         "stereo_master preset must NOT produce a spatial blob"
     );
 }
+
+#[test]
+fn e2e_pro_bundle_both_produces_both_blobs() {
+    let input_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/test_stereo_input.wav"
+    );
+    assert!(
+        std::path::Path::new(input_path).exists(),
+        "Stereo fixture missing"
+    );
+
+    let req = MasterRequest {
+        audio_path: input_path.to_string(),
+        preset_id: "pro_bundle_both".to_string(),
+        flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
+        persona_id: None,
+        tone: None,
+        dynamics: None,
+        chaos_seed: None,
+        project_id: None,
+        track_id: Some("test-session-decoupled-003".to_string()),
+        mix_levels: None,
+        preview_id: None,
+    };
+
+    let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+
+    let result = run_dsp(
+        &req,
+        Instant::now(),
+        head_state,
+        None, // progress_tx
+        None, // progress_map
+        "job-decoupled-test-pro-bundle".to_string(),
+    );
+    assert!(result.is_ok());
+
+    let (stereo_blob, spatial_blob_opt, _path, _model) = result.unwrap();
+
+    // Fork A: stereo master
+    assert_eq!(stereo_blob.channels, 2);
+
+    // Fork B: spatial — pro_bundle_both ενεργοποιεί ΚΑΙ τα δύο
+    assert!(
+        spatial_blob_opt.is_some(),
+        "pro_bundle_both must produce both stereo AND spatial blobs"
+    );
+    let spatial = spatial_blob_opt.unwrap();
+    assert_eq!(spatial.channels, 6);
+    assert_eq!(spatial.blob_type, "spatial_bed");
+
+    // Επιβεβαίωσε ότι είναι ΔΙΑΦΟΡΕΤΙΚΑ blobs με ξεχωριστά IDs
+    assert_ne!(
+        stereo_blob.id, spatial.id,
+        "Stereo and spatial must have distinct ids"
+    );
+    assert!(spatial.id.ends_with("-spatial"));
+
+    println!(
+        "pro_bundle_both: stereo={} spatial={}",
+        stereo_blob.id, spatial.id
+    );
+}
