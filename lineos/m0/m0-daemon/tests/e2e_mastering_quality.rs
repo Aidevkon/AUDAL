@@ -3,6 +3,7 @@ use m0d::domain::dsp_pipeline::run_dsp;
 use m0d::handlers::master::MasterRequest;
 use sp314_dsp::analysis::dynamics::crest_factor_db;
 use sp314_dsp::analysis::spectral::spectral_centroid_hz;
+use sp314_dsp::analysis::spectral::measure_band_energy_hz;
 use sp314_dsp::limiter::true_peak::measure_true_peak_dbtp;
 use std::sync::Arc;
 use std::time::Instant;
@@ -733,4 +734,111 @@ fn inv_qa_9_multi_genre() {
             name, correlation
         );
     }
+}
+
+/// INV-QA-6: Mud Correction.
+/// Mix with dominant 250Hz energy must not
+/// have mud/clarity ratio worsen by > 10%.
+///
+/// Mud: 200-400Hz | Clarity: 2kHz-8kHz
+/// Uses Hann-windowed FFT band energy.
+///
+/// Signal design:
+/// - mud amplitude 0.5 (not 0.7) to avoid
+///   Limiter harmonic distortion polluting
+///   the clarity band with fake harmonics
+/// - GLSL pseudo-random noise (not sawtooth)
+///   for FFT stability without spectral bias
+#[test]
+fn inv_qa_6_mud_correction() {
+    let sr = 48000u32;
+    let n = (sr as usize) * 4;
+
+    let mut signal = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let mud =
+            (2.0 * std::f32::consts::PI
+                * 250.0 * t).sin() * 0.5;
+        let clarity =
+            (2.0 * std::f32::consts::PI
+                * 4000.0 * t).sin() * 0.1;
+        // GLSL pseudo-random noise —
+        // no harmonics unlike sawtooth
+        let noise =
+            ((i as f32 * 12.9898).sin()
+                * 43758.5453).fract() * 0.01;
+        let mix = (mud + clarity + noise)
+            .clamp(-1.0, 1.0);
+        signal.push(mix);
+        signal.push(mix);
+    }
+
+    let input_l: Vec<f32> = signal
+        .iter().step_by(2).copied()
+        .collect();
+    let in_mud = measure_band_energy_hz(
+        &input_l, sr, 200.0, 400.0
+    );
+    let in_clarity = measure_band_energy_hz(
+        &input_l, sr, 2000.0, 8000.0
+    );
+    let in_ratio = if in_clarity > 1e-10 {
+        in_mud / in_clarity
+    } else { f32::MAX };
+
+    let path = "/tmp/qa_mud.wav";
+    write_wav(&signal, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None, None,
+        "qa-6".to_string(),
+    );
+    assert!(
+        result.is_ok(),
+        "run_dsp failed: {:?}", result.err()
+    );
+    let (blob, _, _, _) = result.unwrap();
+
+    let out_l =
+        read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
+
+    let out_mud = measure_band_energy_hz(
+        &out_l, sr, 200.0, 400.0
+    );
+    let out_clarity = measure_band_energy_hz(
+        &out_l, sr, 2000.0, 8000.0
+    );
+    let out_ratio = if out_clarity > 1e-10 {
+        out_mud / out_clarity
+    } else { f32::MAX };
+
+    let delta_pct =
+        (1.0 - out_ratio / in_ratio) * 100.0;
+    let status = if delta_pct > 0.0 {
+        "Corrected"
+    } else {
+        "Worsened/Unchanged"
+    };
+
+    println!(
+        "INV-QA-6: mud/clarity \
+         in={:.2} out={:.2} \
+         delta={:+.1}% {}",
+        in_ratio, out_ratio,
+        delta_pct, status
+    );
+
+    // TODO(DSP-Tuning): tighten to 0.85
+    // once Masking EQ uses real NMF stem
+    // energies (stub [0.0;5] currently).
+    assert!(
+        out_ratio < in_ratio * 1.10,
+        "Mud ratio worsened severely: \
+         in={:.2} out={:.2}",
+        in_ratio, out_ratio
+    );
 }

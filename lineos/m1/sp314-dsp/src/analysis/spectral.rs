@@ -5,6 +5,9 @@
 use crate::stft::StftEngine;
 use crate::stft::N_BINS;
 
+use rustfft::{FftPlanner,
+    num_complex::Complex};
+
 /// Compute spectral centroid in Hz from a mono signal.
 /// Averaged across all STFT frames.
 pub fn spectral_centroid_hz(signal: &[f32], sample_rate: u32) -> f32 {
@@ -132,3 +135,91 @@ pub fn spectral_crest_factor_db(signal: &[f32]) -> f32 {
 }
 
 use super::features::ANALYSIS_FFT_SIZE;
+
+/// Measure total energy in a frequency band.
+/// Returns sqrt of sum of squared magnitudes
+/// across bins in [low_hz, high_hz].
+///
+/// Applies Hann window to reduce spectral
+/// leakage. Normalizes by N to correct for
+/// rustfft's unscaled output.
+/// Returns total band energy (not per-bin avg).
+pub fn measure_band_energy_hz(
+    signal: &[f32],
+    sample_rate: u32,
+    low_hz: f32,
+    high_hz: f32,
+) -> f32 {
+    let n = signal.len();
+    if n == 0 { return 0.0; }
+
+    let mut planner = FftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(n);
+
+    // Hann window — reduces spectral leakage
+    let mut buffer: Vec<Complex<f32>> = signal
+        .iter()
+        .enumerate()
+        .map(|(i, &s)| {
+            let w = 0.5 * (1.0
+                - (2.0 * std::f32::consts::PI
+                    * i as f32
+                    / (n - 1) as f32).cos());
+            Complex { re: s * w, im: 0.0 }
+        })
+        .collect();
+
+    fft.process(&mut buffer);
+
+    // Normalize by N (rustfft is unscaled)
+    let n_f = n as f32;
+    let bin_hz = sample_rate as f32 / n_f;
+    let low_bin = (low_hz / bin_hz)
+        .floor() as usize;
+    let high_bin = (high_hz / bin_hz)
+        .ceil() as usize;
+    let high_bin = high_bin.min(n / 2);
+
+    if low_bin >= high_bin { return 0.0; }
+
+    // Total band energy, normalized by N²
+    let energy: f32 = buffer[low_bin..high_bin]
+        .iter()
+        .map(|c| c.norm_sqr() / (n_f * n_f))
+        .sum();
+
+    energy.sqrt()
+}
+
+#[cfg(test)]
+mod band_energy_tests {
+    use super::*;
+
+    #[test]
+    fn band_energy_sine_in_band() {
+        // 250Hz sine should have high energy
+        // in 200-300Hz band
+        let sr = 48000u32;
+        let n = sr as usize;
+        let signal: Vec<f32> = (0..n)
+            .map(|i| {
+                (2.0 * std::f32::consts::PI
+                    * 250.0 * i as f32
+                    / sr as f32).sin()
+            })
+            .collect();
+        let in_band = measure_band_energy_hz(
+            &signal, sr, 200.0, 300.0
+        );
+        let out_band = measure_band_energy_hz(
+            &signal, sr, 500.0, 2000.0
+        );
+        assert!(
+            in_band > out_band * 10.0,
+            "250Hz sine energy should be \
+             dominant in 200-300Hz band: \
+             in={:.6} out={:.6}",
+            in_band, out_band
+        );
+    }
+}
