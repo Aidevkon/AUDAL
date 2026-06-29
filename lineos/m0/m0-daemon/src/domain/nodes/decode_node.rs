@@ -202,8 +202,73 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 duration_ms,
             })
         }
-        lineos_types::AudioPayload::Stems { .. } => {
-            Err("spatial::stems — not yet wired in decode_node".into())
+        lineos_types::AudioPayload::Stems {
+            voice,
+            drums,
+            bass,
+            harmonics,
+            ambience,
+            sample_rate,
+            num_frames,
+        } => {
+            // Interleave 5 stems (L+R each)
+            // = 10 channels για hashing
+            let mut interleaved = Vec::with_capacity(num_frames * 10);
+            for i in 0..num_frames {
+                interleaved.push(voice.left[i]);
+                interleaved.push(voice.right[i]);
+                interleaved.push(drums.left[i]);
+                interleaved.push(drums.right[i]);
+                interleaved.push(bass.left[i]);
+                interleaved.push(bass.right[i]);
+                interleaved.push(harmonics.left[i]);
+                interleaved.push(harmonics.right[i]);
+                interleaved.push(ambience.left[i]);
+                interleaved.push(ambience.right[i]);
+            }
+            let mut blake3_hasher = blake3::Hasher::new();
+            let mut sha256_hasher = sha2::Sha256::new();
+            for &sample in &interleaved {
+                blake3_hasher.update(&sample.to_le_bytes());
+                sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+            }
+            let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
+            let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
+            let duration_ms = (num_frames as f64 / sample_rate as f64) * 1000.0;
+            let rms = compute_rms(&interleaved);
+            let rms_dbfs = if rms > 0.0 {
+                20.0 * (rms as f64).log10() as f32
+            } else {
+                f32::NEG_INFINITY
+            };
+            if rms_dbfs < -60.0 {
+                return Err(format!(
+                    "Input validation failed: \
+                     stems audio is silence \
+                     (RMS = {rms_dbfs:.1} dBFS)"
+                ));
+            }
+            Ok(DecodedAudio {
+                payload: lineos_types::AudioPayload::Stems {
+                    voice,
+                    drums,
+                    bass,
+                    harmonics,
+                    ambience,
+                    sample_rate,
+                    num_frames,
+                },
+                input_blake3_hex,
+                input_sha256_hex,
+                pcm_channels: 10,
+                pcm_sample_rate: sample_rate,
+                target_lufs,
+                input_hash_hex,
+                seed,
+                original_sr: sample_rate,
+                original_ch: 10,
+                duration_ms,
+            })
         }
     }
 }

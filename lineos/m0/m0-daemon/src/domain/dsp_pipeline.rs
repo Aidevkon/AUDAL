@@ -221,30 +221,68 @@ fn run_dsp_internal(
             );
         }
         lineos_types::AudioPayload::Stems {
+            voice,
             drums,
+            bass,
             harmonics,
-            vocals,
+            ambience,
             sample_rate,
             num_frames,
         } => {
-            use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
+            use sp314_dsp::analysis::StemFeatureAnalyzer;
+            use sp314_dsp::spatial::channel_assign::StemChannelAssignments;
+            use sp314_dsp::spatial::five_dot_one::{FiveDotOneStage, SpatialFirewall};
             use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
+            use sp314_dsp::spatial::SpatialPreAnalysis;
+            use sp314_dsp::stft::stem_renderer::FiveStems;
 
             let n = num_frames;
-            let stage = FiveDotOneStage {
-                l: (0..n).map(|i| drums.left[i] + harmonics.left[i]).collect(),
-                r: (0..n)
-                    .map(|i| drums.right[i] + harmonics.right[i])
-                    .collect(),
-                c: (0..n)
-                    .map(|i| (vocals.left[i] + vocals.right[i]) * 0.5)
-                    .collect(),
-                ls: (0..n).map(|i| harmonics.left[i] * 0.5).collect(),
-                rs: (0..n).map(|i| harmonics.right[i] * 0.5).collect(),
-                lfe: vec![0.0_f32; n],
+
+            // Mono fold per stem (L+R)*0.5
+            let to_mono = |l: &[f32], r: &[f32]| -> Vec<f32> {
+                (0..n).map(|i| (l[i] + r[i]) * 0.5).collect()
             };
 
-            let channels: [Vec<f32>; 6] = FiveDotOneRenderer::render(stage);
+            let five_stems = FiveStems {
+                voice: to_mono(&voice.left, &voice.right),
+                drums: to_mono(&drums.left, &drums.right),
+                bass: to_mono(&bass.left, &bass.right),
+                harmonics: to_mono(&harmonics.left, &harmonics.right),
+                ambience: to_mono(&ambience.left, &ambience.right),
+                voice_transient_density: 0.0,
+                drums_transient_density: 0.0,
+                bass_transient_density: 0.0,
+                harmonics_transient_density: 0.0,
+                ambience_transient_density: 0.0,
+            };
+
+            // Master bus για SpatialPreAnalysis
+            // (όλα τα stems L+R αθροισμένα)
+            let master_l: Vec<f32> = (0..n)
+                .map(|i| {
+                    voice.left[i]
+                        + drums.left[i]
+                        + bass.left[i]
+                        + harmonics.left[i]
+                        + ambience.left[i]
+                })
+                .collect();
+            let master_r: Vec<f32> = (0..n)
+                .map(|i| {
+                    voice.right[i]
+                        + drums.right[i]
+                        + bass.right[i]
+                        + harmonics.right[i]
+                        + ambience.right[i]
+                })
+                .collect();
+
+            let spatial = SpatialPreAnalysis::analyze(&master_l, &master_r, sample_rate);
+            let features = StemFeatureAnalyzer::analyze(&five_stems, sample_rate);
+            let assignments = StemChannelAssignments::compute(&features, &spatial);
+            let firewall = SpatialFirewall::default();
+            let stage = FiveDotOneStage::render(&five_stems, &assignments, &firewall);
+            let channels = FiveDotOneRenderer::render(stage);
 
             return spatial_conformance_path(
                 channels,

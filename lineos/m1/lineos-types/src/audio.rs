@@ -44,12 +44,20 @@ pub enum AudioPayload {
         sample_rate: u32,
         num_frames: usize,
     },
-    /// UseCase B: stem_to_spatial — NMF HPSS output.
-    /// Wired to Micro Control UI in Sprint Spatial-2.
+    /// 5-stem payload for intelligent spatial
+    /// upmix via StemChannelAssignments.
+    /// Produced by NMF HPSS pipeline.
+    /// voice = isolated vocals/lead
+    /// drums = percussive transients
+    /// bass = low-frequency content
+    /// harmonics = melodic/harmonic content
+    /// ambience = reverb tails / room
     Stems {
+        voice: StereoBuffer,
         drums: StereoBuffer,
+        bass: StereoBuffer,
         harmonics: StereoBuffer,
-        vocals: StereoBuffer,
+        ambience: StereoBuffer,
         sample_rate: u32,
         num_frames: usize,
     },
@@ -89,19 +97,33 @@ impl AudioPayload {
                 }
             }
             AudioPayload::Stems {
+                voice,
                 drums,
+                bass,
                 harmonics,
-                vocals,
+                ambience,
                 sample_rate,
                 num_frames,
             } => {
-                // Master bus sum for telemetry.
-                // Stems are already L/R so we sum them.
+                // Master bus sum: όλα τα stems
+                // για telemetry downmix
                 let left: Vec<f32> = (0..*num_frames)
-                    .map(|i| drums.left[i] + harmonics.left[i] + vocals.left[i])
+                    .map(|i| {
+                        voice.left[i]
+                            + drums.left[i]
+                            + bass.left[i]
+                            + harmonics.left[i]
+                            + ambience.left[i]
+                    })
                     .collect();
                 let right: Vec<f32> = (0..*num_frames)
-                    .map(|i| drums.right[i] + harmonics.right[i] + vocals.right[i])
+                    .map(|i| {
+                        voice.right[i]
+                            + drums.right[i]
+                            + bass.right[i]
+                            + harmonics.right[i]
+                            + ambience.right[i]
+                    })
                     .collect();
                 StereoBuffer {
                     left,
