@@ -43,6 +43,107 @@ pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 }
 
 #[inline(always)]
+fn spatial_conformance_path(
+    mut channels: [Vec<f32>; 6],
+    sample_rate: u32,
+    num_frames: usize,
+    blob_id: &str,
+    preset_id: &str,
+    input_hash_hex: &str,
+    seed: u64,
+    input_blake3_hex: &str,
+    _input_sha256_hex: &str,
+) -> Result<
+    (
+        crate::blob_store::StoredBlob,
+        std::path::PathBuf,
+        Option<lineos_corpus::store::UserMarkovModel>,
+    ),
+    String,
+> {
+    use sp314_dsp::limiter::true_peak::TruePeakDetector;
+    use sp314_dsp::metering::lufs::measure_integrated_lufs;
+
+    // 1. BS.775 downmix για LUFS measurement
+    const CSURR: f32 = 0.707;
+    let stereo_l: Vec<f32> = (0..num_frames)
+        .map(|i| channels[0][i] + CSURR * channels[2][i] + CSURR * channels[4][i])
+        .collect();
+    let stereo_r: Vec<f32> = (0..num_frames)
+        .map(|i| channels[1][i] + CSURR * channels[2][i] + CSURR * channels[5][i])
+        .collect();
+
+    let measured_lufs = measure_integrated_lufs(&stereo_l, &stereo_r);
+
+    // 2. Gain offset για Apple -18 LKFS target
+    let gain_db = -18.0_f32 - measured_lufs;
+    let gain_linear = 10.0_f32.powf(gain_db / 20.0);
+
+    if gain_db.abs() > 30.0 {
+        return Err(format!(
+            "spatial_conformance: gain offset {gain_db:.1} dB exceeds ±30 dB limit (measured LUFS: {measured_lufs:.1})"
+        ));
+    }
+
+    for ch in channels.iter_mut() {
+        for s in ch.iter_mut() {
+            *s *= gain_linear;
+        }
+    }
+
+    // 3. True Peak limiter per channel (-1 dBTP)
+    let ceiling = 10.0_f32.powf(-1.0 / 20.0);
+    for ch in channels.iter_mut() {
+        let mut detector = TruePeakDetector::new();
+        let mut max_tp = 0.0_f32;
+        for &s in ch.iter() {
+            let tp = detector.process(s, s);
+            max_tp = max_tp.max(tp);
+        }
+        if max_tp > ceiling {
+            let scale = ceiling / max_tp;
+            for s in ch.iter_mut() {
+                *s *= scale;
+            }
+        }
+    }
+
+    // 4. Interleave 6ch και γράψε raw PCM dump
+    let mut interleaved = Vec::with_capacity(num_frames * 6);
+    for i in 0..num_frames {
+        for ch in 0..6 {
+            interleaved.push(channels[ch][i]);
+        }
+    }
+    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+    let raw_bytes: &[u8] = unsafe {
+        std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
+    };
+    std::fs::write(&raw_path, raw_bytes)
+        .map_err(|e| format!("spatial: failed to write PCM dump: {e}"))?;
+
+    // 5. Φτιάξε StoredBlob
+    let blob = crate::blob_store::StoredBlob {
+        id: blob_id.to_string(),
+        version: "1.0".to_string(),
+        blob_type: "spatial_bed".to_string(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        input_hash: input_hash_hex.to_string(),
+        seed,
+        pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
+        preset_id: preset_id.to_string(),
+        channels: 6,
+        sample_rate,
+        audio_path: raw_path.clone().into(),
+        num_frames,
+        pcm_blake3: Some(input_blake3_hex.to_string()),
+        ..Default::default()
+    };
+
+    Ok((blob, std::path::PathBuf::from(raw_path), None))
+}
+
+#[inline(always)]
 fn run_dsp_internal(
     req: &MasterRequest,
     start: Instant,
@@ -102,11 +203,60 @@ fn run_dsp_internal(
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let mut chunk = match decoded.payload {
         lineos_types::AudioPayload::Stereo(buf) => buf,
-        _ => {
-            return Err("dsp_pipeline: non-stereo payload \
-                         reached DSP — spatial path not yet \
-                         wired here"
-                .into())
+        lineos_types::AudioPayload::FiveDotOne {
+            channels,
+            sample_rate,
+            num_frames,
+        } => {
+            return spatial_conformance_path(
+                channels,
+                sample_rate,
+                num_frames,
+                &blob_id,
+                preset_id,
+                &input_hash_hex,
+                seed,
+                &input_blake3_hex,
+                &input_sha256_hex,
+            );
+        }
+        lineos_types::AudioPayload::Stems {
+            drums,
+            harmonics,
+            vocals,
+            sample_rate,
+            num_frames,
+        } => {
+            use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
+            use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
+
+            let n = num_frames;
+            let stage = FiveDotOneStage {
+                l: (0..n).map(|i| drums.left[i] + harmonics.left[i]).collect(),
+                r: (0..n)
+                    .map(|i| drums.right[i] + harmonics.right[i])
+                    .collect(),
+                c: (0..n)
+                    .map(|i| (vocals.left[i] + vocals.right[i]) * 0.5)
+                    .collect(),
+                ls: (0..n).map(|i| harmonics.left[i] * 0.5).collect(),
+                rs: (0..n).map(|i| harmonics.right[i] * 0.5).collect(),
+                lfe: vec![0.0_f32; n],
+            };
+
+            let channels: [Vec<f32>; 6] = FiveDotOneRenderer::render(stage);
+
+            return spatial_conformance_path(
+                channels,
+                sample_rate,
+                num_frames,
+                &blob_id,
+                preset_id,
+                &input_hash_hex,
+                seed,
+                &input_blake3_hex,
+                &input_sha256_hex,
+            );
         }
     };
 

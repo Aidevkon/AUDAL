@@ -124,8 +124,83 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 duration_ms,
             })
         }
-        lineos_types::AudioPayload::FiveDotOne { .. } => {
-            Err("spatial::passthrough — not yet wired in decode_node".into())
+        lineos_types::AudioPayload::FiveDotOne {
+            channels,
+            sample_rate,
+            num_frames,
+        } => {
+            // Interleave 6ch: L R C LFE Ls Rs
+            // per frame — ίδια λογική με το
+            // Stereo arm αλλά για 6 κανάλια.
+            let mut interleaved = Vec::with_capacity(num_frames * 6);
+            for i in 0..num_frames {
+                for ch in 0..6 {
+                    interleaved.push(channels[ch][i]);
+                }
+            }
+
+            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+            let raw_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
+            };
+            std::fs::write(&raw_path, raw_bytes)
+                .map_err(|e| format!("Failed to write raw dump: {e}"))?;
+
+            let mut blake3_hasher = blake3::Hasher::new();
+            let mut sha256_hasher = sha2::Sha256::new();
+            for &sample in &interleaved {
+                blake3_hasher.update(&sample.to_le_bytes());
+                sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+            }
+            let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
+            let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
+
+            let duration_ms = (num_frames as f64 / sample_rate as f64) * 1000.0;
+
+            // Silence guard (ίδιο threshold
+            // με Stereo arm: -60 dBFS)
+            let rms = compute_rms(&interleaved);
+            let rms_dbfs = if rms > 0.0 {
+                20.0 * (rms as f64).log10() as f32
+            } else {
+                f32::NEG_INFINITY
+            };
+            if rms_dbfs < -60.0 {
+                return Err(format!(
+                    "Input validation failed: 5.1 audio is silence (RMS = {rms_dbfs:.1} dBFS)"
+                ));
+            }
+
+            // Normalization guard — για 5.1
+            // δεν κάνουμε LUFS normalization
+            // στο decode_node (γίνεται στο
+            // BS.775 telemetry path). Ελέγχουμε
+            // μόνο για extreme overflow.
+            let rough_lufs = rms_to_lufs(rms);
+            let rough_gain_db = -18.0_f32 - rough_lufs;
+            if rough_gain_db > 30.0 {
+                return Err(format!(
+                    "DSP arithmetic error — 5.1 normalization gain would exceed 32× (RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB)."
+                ));
+            }
+
+            Ok(DecodedAudio {
+                payload: lineos_types::AudioPayload::FiveDotOne {
+                    channels,
+                    sample_rate,
+                    num_frames,
+                },
+                input_blake3_hex,
+                input_sha256_hex,
+                pcm_channels: 6,
+                pcm_sample_rate: sample_rate,
+                target_lufs,
+                input_hash_hex,
+                seed,
+                original_sr: sample_rate,
+                original_ch: 6,
+                duration_ms,
+            })
         }
         lineos_types::AudioPayload::Stems { .. } => {
             Err("spatial::stems — not yet wired in decode_node".into())
