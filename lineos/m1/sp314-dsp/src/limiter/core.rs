@@ -19,7 +19,11 @@ pub struct BrickwallLimiter {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LimiterConfig {
-    pub release_ms: f32,          // default: 100.0
+    pub release_ms: f32, // default: 100.0
+    /// Slow blend release ms.
+    /// Lower = more transient punch.
+    /// Default 30ms (was hardcoded 100ms).
+    pub blend_release_ms: f32,
     pub ceiling_db: f32,          // default: -0.5
     pub midside_eq_enabled: bool, // default: false
     pub true_peak_enabled: bool,  // default: true
@@ -29,6 +33,7 @@ impl Default for LimiterConfig {
     fn default() -> Self {
         Self {
             release_ms: 100.0_f32,
+            blend_release_ms: 30.0,
             ceiling_db: -0.5_f32,
             midside_eq_enabled: false,
             true_peak_enabled: true,
@@ -43,7 +48,13 @@ impl BrickwallLimiter {
         Self {
             delay_l: RingBuffer::new(lookahead),
             delay_r: RingBuffer::new(lookahead),
-            follower: PeakFollower::new(config.release_ms, ceiling_linear, sample_rate, lookahead),
+            follower: PeakFollower::new(
+                config.release_ms,
+                config.blend_release_ms,
+                ceiling_linear,
+                sample_rate,
+                lookahead,
+            ),
             lookahead,
             midside: MidSideProcessor::new(),
             midside_eq_enabled: config.midside_eq_enabled,

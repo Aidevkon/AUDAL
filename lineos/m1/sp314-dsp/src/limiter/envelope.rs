@@ -21,6 +21,7 @@ pub const DECAY_FLOOR_DB: f32 = 0.01_f32; // snap to 1.0 below this
 impl PeakFollower {
     pub fn new(
         release_ms: f32,
+        blend_release_ms: f32,
         ceiling_linear: f32,
         sample_rate: u32,
         lookahead_samples: usize,
@@ -35,7 +36,7 @@ impl PeakFollower {
             slow_coeff: ema(release_ms),
             blend: 0.0_f32,
             blend_attack: ema(1.0_f32),
-            blend_release: ema(100.0_f32),
+            blend_release: ema(blend_release_ms),
             ceiling: ceiling_linear,
             lookahead_samples: lookahead_samples.max(1),
             ramp_step: 0.0_f32,

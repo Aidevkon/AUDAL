@@ -12,6 +12,7 @@ impl LimiterNode {
         let ceiling_db = -0.5;
         let config = LimiterConfig {
             release_ms: 100.0,
+            blend_release_ms: 30.0,
             ceiling_db,
             midside_eq_enabled: false,
             true_peak_enabled: true,
@@ -34,6 +35,7 @@ impl DspNode for LimiterNode {
             self.ceiling_db = value;
             let config = LimiterConfig {
                 release_ms: 100.0,
+                blend_release_ms: 30.0,
                 ceiling_db: self.ceiling_db,
                 midside_eq_enabled: false,
                 true_peak_enabled: true,

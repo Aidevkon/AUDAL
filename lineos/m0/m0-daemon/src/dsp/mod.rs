@@ -102,6 +102,7 @@ impl DspAdapter {
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
             let isp_limiter_config = LimiterConfig {
                 release_ms: 15.0_f32,
+                blend_release_ms: 30.0,
                 ceiling_db: intent.target.max_true_peak_db,
                 true_peak_enabled: true,
                 midside_eq_enabled: false,

@@ -41,7 +41,7 @@ fn limiter_ring_buffer_wraps_correctly() {
 
 #[test]
 fn limiter_peak_follower_linear_attack_ramp() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
+    let mut follower = PeakFollower::new(100.0, 100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
     // Feed 1.0 peak
     let gr = follower.process(1.0);
     // Because it ramps over 240 samples, the first sample's envelope is 1.0/240
@@ -118,7 +118,7 @@ fn limiter_ceiling_never_exceeded() {
 
 #[test]
 fn limiter_decay_floor_prevents_pumping() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
+    let mut follower = PeakFollower::new(100.0, 100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
     follower.process(1.0); // loud transient
 
     let mut gr = 0.0;
@@ -135,7 +135,7 @@ fn limiter_decay_floor_prevents_pumping() {
 
 #[test]
 fn limiter_no_denormals_after_silence() {
-    let mut follower = PeakFollower::new(100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
+    let mut follower = PeakFollower::new(100.0, 100.0, DEFAULT_CEILING_LINEAR, 48000, 240);
     follower.process(1.0);
     for _ in 0..100000 {
         follower.process(0.0);
