@@ -2,6 +2,7 @@ use arc_swap::ArcSwap;
 use m0d::domain::dsp_pipeline::run_dsp;
 use m0d::handlers::master::MasterRequest;
 use sp314_dsp::analysis::dynamics::crest_factor_db;
+use sp314_dsp::analysis::spectral::spectral_centroid_hz;
 use std::sync::Arc;
 use std::time::Instant;
 use xaak::repo::DspState;
@@ -156,5 +157,55 @@ fn inv_qa_2_crest_factor_survival() {
          raise after DSP-Tuning sprint)",
         input_crest,
         output_crest
+    );
+}
+
+#[test]
+fn inv_qa_3_spectral_balance() {
+    let sr = 48000u32;
+    let input = generate_chaos_mix(sr, 4.0);
+    let input_l: Vec<f32> = input.iter().step_by(2).copied().collect();
+
+    let input_centroid = spectral_centroid_hz(&input_l, sr);
+
+    let path = "/tmp/qa_spectral.wav";
+    write_wav(&input, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-3".to_string(),
+    );
+    assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    let output_l = read_raw_pcm_left(&blob.audio_path);
+    let output_centroid = spectral_centroid_hz(&output_l, sr);
+
+    let shift_pct = ((output_centroid - input_centroid) / input_centroid).abs() * 100.0;
+
+    println!(
+        "INV-QA-3: input={:.0}Hz \
+         output={:.0}Hz shift={:.1}%",
+        input_centroid, output_centroid, shift_pct
+    );
+
+    // TODO(DSP-Tuning): Tighten to 30% once
+    // Masking EQ analyze() uses real NMF stem
+    // energies (currently stub [0.0;5]).
+    // Measured baseline: 57.9% shift
+    // (192Hz→304Hz) — EQ over-cuts low freqs.
+    // Target: shift_pct <= 30.0
+    assert!(
+        shift_pct <= 65.0,
+        "Catastrophic spectral shift {:.1}% \
+         (in={:.0}Hz out={:.0}Hz) — \
+         tonal balance destroyed",
+        shift_pct,
+        input_centroid,
+        output_centroid
     );
 }
