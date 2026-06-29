@@ -58,6 +58,15 @@ pub fn run(
         preset_name: preset_id.to_string(),
         stem_mode: false,
         target_makeup_db: 0.0,
+        limiter_blend_release_ms: {
+            // Control Plane: lerp here,
+            // NOT in DSP engine.
+            // 0.0 (Smooth) -> 200ms
+            // 0.5 (default) -> 95ms
+            // 1.0 (Punchy) -> 10ms
+            let d = req_dynamics.unwrap_or(0.5).clamp(0.0, 1.0);
+            200.0 - (d * 190.0)
+        },
     };
 
     // AetherBridge

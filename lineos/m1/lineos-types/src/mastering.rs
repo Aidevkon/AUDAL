@@ -15,6 +15,12 @@ pub struct MasteringIntent {
     pub preset_name: String,
     pub stem_mode: bool,
     pub target_makeup_db: f32,
+    /// Pre-computed blend release in ms.
+    /// Computed by Control Plane (dsp_node)
+    /// from intent_dynamics (0.0..1.0).
+    /// DSP reads this directly — no math.
+    /// Default: 95ms (neutral, intent=0.5)
+    pub limiter_blend_release_ms: f32,
 }
 
 impl MasteringIntent {
@@ -24,6 +30,7 @@ impl MasteringIntent {
             preset_name: "SpotifyV3".into(),
             stem_mode: false,
             target_makeup_db: 0.0,
+            limiter_blend_release_ms: 95.0,
         }
     }
     pub fn podcast() -> Self {
@@ -32,6 +39,7 @@ impl MasteringIntent {
             preset_name: "Podcast".into(),
             stem_mode: false,
             target_makeup_db: 0.0,
+            limiter_blend_release_ms: 95.0,
         }
     }
 }

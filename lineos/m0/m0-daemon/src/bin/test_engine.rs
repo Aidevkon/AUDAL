@@ -67,6 +67,7 @@ fn main() {
         preset_name: "spotify".to_string(),
         stem_mode: false,
         target_makeup_db: 0.0,
+        limiter_blend_release_ms: 95.0,
     };
 
     // --- Autotune ---

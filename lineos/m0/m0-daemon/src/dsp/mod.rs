@@ -101,20 +101,11 @@ impl DspAdapter {
 
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
 
-            // TODO(AetherBridge-Sprint):
-            // Wire intent_dynamics (0.0..1.0)
-            // to blend_release_ms via lerp:
-            //   0.0 (Smooth) -> 200ms
-            //   1.0 (Punchy) -> 10ms
-            // intent_dynamics is lost in AetherBridge
-            // (dsp_node.rs) before reaching here.
-            // Fix: add intent_dynamics to MasteringIntent
-            // so it survives the AetherBridge translation.
-            // Measured baseline: 30ms hardcoded.
-            // See: feat/dynamic-limiter-intent branch.
             let isp_limiter_config = LimiterConfig {
                 release_ms: 15.0_f32,
-                blend_release_ms: 30.0,
+                // DSP reads pre-computed value.
+                // No math here — Separation of Concerns.
+                blend_release_ms: intent.limiter_blend_release_ms,
                 ceiling_db: intent.target.max_true_peak_db,
                 true_peak_enabled: true,
                 midside_eq_enabled: false,
