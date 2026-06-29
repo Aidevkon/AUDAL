@@ -32,6 +32,34 @@ impl FiveDotOneRenderer {
     pub fn render(stage: FiveDotOneStage) -> [Vec<f32>; 6] {
         [stage.l, stage.r, stage.c, stage.ls, stage.rs, stage.lfe]
     }
+
+    /// Write 6-channel stage output directly
+    /// into pre-allocated mutable slices.
+    /// Zero heap allocation — no intermediate Vec.
+    ///
+    /// offset: frame offset within the output
+    ///         buffers (chunk write position)
+    /// Each out_* slice must have length >=
+    ///   offset + stage.l.len()
+    pub fn render_into(
+        stage: &FiveDotOneStage,
+        out_l: &mut [f32],
+        out_r: &mut [f32],
+        out_c: &mut [f32],
+        out_lfe: &mut [f32],
+        out_ls: &mut [f32],
+        out_rs: &mut [f32],
+        offset: usize,
+    ) {
+        let n = stage.l.len();
+        let end = offset + n;
+        out_l[offset..end].copy_from_slice(&stage.l);
+        out_r[offset..end].copy_from_slice(&stage.r);
+        out_c[offset..end].copy_from_slice(&stage.c);
+        out_lfe[offset..end].copy_from_slice(&stage.lfe);
+        out_ls[offset..end].copy_from_slice(&stage.ls);
+        out_rs[offset..end].copy_from_slice(&stage.rs);
+    }
 }
 
 #[cfg(test)]

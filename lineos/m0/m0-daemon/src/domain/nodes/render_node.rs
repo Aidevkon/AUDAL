@@ -8,6 +8,19 @@ use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
 use sp314_dsp::spatial::renderer::StereoRenderer;
 use sp314_dsp::stft::two_pass::{ScoutResult, TwoPassEngine};
 
+/// Mutable output slices for 6-channel
+/// spatial rendering. Passed by the caller
+/// (dsp_pipeline) which owns the allocations.
+/// Lifetime 'a tied to the output buffers.
+pub struct SpatialSlicesMut<'a> {
+    pub l: &'a mut [f32],
+    pub r: &'a mut [f32],
+    pub c: &'a mut [f32],
+    pub lfe: &'a mut [f32],
+    pub ls: &'a mut [f32],
+    pub rs: &'a mut [f32],
+}
+
 pub fn run(
     two_pass: &mut TwoPassEngine,
     mono: &[f32],
@@ -20,6 +33,7 @@ pub fn run(
     original_right: &[f32],
     left_slice: &mut [f32],
     right_slice: &mut [f32],
+    mut spatial: Option<&mut SpatialSlicesMut<'_>>,
 ) -> Result<(StemFingerprints, sp314_dsp::stft::two_pass::RenderMetadata), String> {
     let mut h_voice = Sha256::new();
     let mut h_drums = Sha256::new();
@@ -107,6 +121,21 @@ pub fn run(
                 );
                 let mut stage = stage;
                 stage.apply_scales(scout.rear_scale, scout.lfe_scale);
+
+                if let Some(ref mut sp) = spatial {
+                    use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
+                    FiveDotOneRenderer::render_into(
+                        &stage,
+                        sp.l,
+                        sp.r,
+                        sp.c,
+                        sp.lfe,
+                        sp.ls,
+                        sp.rs,
+                        write_offset,
+                    );
+                }
+
                 let (sp_l, sp_r) = StereoRenderer::render(&stage);
 
                 let end_offset = write_offset + sp_l.len();

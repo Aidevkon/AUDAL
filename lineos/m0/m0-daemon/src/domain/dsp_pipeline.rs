@@ -305,7 +305,7 @@ fn run_dsp_internal(
         rms(&chunk.right) / rms(&chunk.left).max(1e-9)
     );
 
-    profiler.mark_stage_with_hash("Ingest", input_blake3_hex);
+    profiler.mark_stage_with_hash("Ingest", input_blake3_hex.clone());
 
     // ── ST-P5: TwoPassEngine stem separation via MPSC streaming ─────
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
@@ -384,7 +384,55 @@ fn run_dsp_internal(
     let final_ducking =
         (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
 
+    // Spatial output buffers —
+    // allocated only if preset needs spatial
+    let needs_spatial = matches!(preset_id.as_str(), "spatial_upmix" | "pro_bundle_both");
+    let mut sp_l = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+    let mut sp_r = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+    let mut sp_c = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+    let mut sp_lfe = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+    let mut sp_ls = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+    let mut sp_rs = if needs_spatial {
+        vec![0.0_f32; n_total_with_tail]
+    } else {
+        vec![]
+    };
+
     emit_progress("Stem Engine");
+
+    let mut spatial_slices = if needs_spatial {
+        Some(crate::domain::nodes::render_node::SpatialSlicesMut {
+            l: &mut sp_l,
+            r: &mut sp_r,
+            c: &mut sp_c,
+            lfe: &mut sp_lfe,
+            ls: &mut sp_ls,
+            rs: &mut sp_rs,
+        })
+    } else {
+        None
+    };
+
     let (fingerprints, spatial_metadata) = crate::domain::nodes::render_node::run(
         &mut two_pass,
         &mono,
@@ -397,7 +445,25 @@ fn run_dsp_internal(
         &chunk.right,
         &mut left_vec[..],
         &mut right_vec[..],
+        spatial_slices.as_mut(),
     )?;
+
+    if needs_spatial && !sp_l.is_empty() {
+        let spatial_channels: [Vec<f32>; 6] = [sp_l, sp_r, sp_c, sp_lfe, sp_ls, sp_rs];
+        // Τρέξε conformance + export
+        let _spatial_blob = spatial_conformance_path(
+            spatial_channels,
+            chunk.sample_rate,
+            n_total_with_tail,
+            &format!("{blob_id}-spatial"),
+            preset_id,
+            &input_hash_hex,
+            seed,
+            &input_blake3_hex,
+            &input_sha256_hex,
+        )?;
+        // TODO Spatial-6b: persist spatial blob
+    }
 
     eprintln!(
         "[BISECT-3-RENDER] L_rms={:.6} R_rms={:.6} ratio={:.4}",
