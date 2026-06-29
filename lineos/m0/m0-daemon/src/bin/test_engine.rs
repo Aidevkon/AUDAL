@@ -68,6 +68,7 @@ fn main() {
         stem_mode: false,
         target_makeup_db: 0.0,
         limiter_blend_release_ms: 95.0,
+        max_limiter_gr_db: 6.0,
     };
 
     // --- Autotune ---

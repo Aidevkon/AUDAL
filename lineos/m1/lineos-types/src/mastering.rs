@@ -21,6 +21,12 @@ pub struct MasteringIntent {
     /// DSP reads this directly — no math.
     /// Default: 95ms (neutral, intent=0.5)
     pub limiter_blend_release_ms: f32,
+    /// Max limiter gain reduction allowed (dB).
+    /// If projected peak > ceiling + this value,
+    /// LUFS makeup is capped to preserve transients.
+    /// Computed by Control Plane. DSP reads blindly.
+    /// Default: 6.0dB (balanced headroom)
+    pub max_limiter_gr_db: f32,
 }
 
 impl MasteringIntent {
@@ -31,6 +37,7 @@ impl MasteringIntent {
             stem_mode: false,
             target_makeup_db: 0.0,
             limiter_blend_release_ms: 95.0,
+            max_limiter_gr_db: 6.0,
         }
     }
     pub fn podcast() -> Self {
@@ -40,6 +47,7 @@ impl MasteringIntent {
             stem_mode: false,
             target_makeup_db: 0.0,
             limiter_blend_release_ms: 95.0,
+            max_limiter_gr_db: 6.0,
         }
     }
 }

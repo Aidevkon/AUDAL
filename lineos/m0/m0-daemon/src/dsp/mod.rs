@@ -96,7 +96,31 @@ impl DspAdapter {
 
         if output_lufs > -69.0 {
             let correction_db = target_lufs - output_lufs;
-            let correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
+            let mut correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
+
+            // Headroom-Aware LUFS Makeup.
+            // If projected peak would force the ISP
+            // Limiter to do GR > max_limiter_gr_db,
+            // cap correction_db to preserve transients.
+            // Trades LUFS accuracy for punch quality.
+            // max_limiter_gr_db set by Control Plane —
+            // DSP reads blindly (Separation of Concerns).
+            let peak_raw_db = {
+                let max_l = left.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
+                let max_r = right.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
+                let p = max_l.max(max_r);
+                if p > 1e-9 {
+                    20.0 * libm::log10f(p)
+                } else {
+                    -144.0
+                }
+            };
+            let projected_peak = peak_raw_db + correction_db;
+            let ceiling_db = intent.target.max_true_peak_db;
+            if projected_peak > ceiling_db + intent.max_limiter_gr_db {
+                correction_db = ceiling_db + intent.max_limiter_gr_db - peak_raw_db;
+            }
+
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
 
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);

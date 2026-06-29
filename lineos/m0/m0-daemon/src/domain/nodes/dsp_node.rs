@@ -67,6 +67,7 @@ pub fn run(
             let d = req_dynamics.unwrap_or(0.5).clamp(0.0, 1.0);
             200.0 - (d * 190.0)
         },
+        max_limiter_gr_db: 6.0,
     };
 
     // AetherBridge

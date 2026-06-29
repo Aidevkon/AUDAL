@@ -291,3 +291,80 @@ fn inv_qa_4_compressor_is_active() {
         output_rms
     );
 }
+
+/// INV-QA-5: Headroom-Aware LUFS Makeup.
+/// Input: very quiet signal (-30 LUFS)
+/// with high dynamic range (large peaks).
+/// System should NOT give full +16dB makeup
+/// if it would force the limiter to crush
+/// peaks > 6dB. Trade LUFS accuracy for
+/// transient preservation.
+///
+/// Assert: CF of output >= CF of input * 0.70
+/// (transients survive even on quiet tracks)
+#[test]
+fn inv_qa_5_headroom_enforcement() {
+    let sr = 48000u32;
+    // Very quiet track with big transients:
+    // sustained sine at -30dBFS + spikes at 0dBFS
+    let n = (sr as usize) * 4;
+    let mut signal = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let sustained = (2.0 * std::f32::consts::PI * 220.0 * t).sin() * 0.032; // -30dBFS
+        let spike = if i % ((sr / 2) as usize) < 5 {
+            0.95
+        } else {
+            0.0
+        };
+        let mix = (sustained + spike).clamp(-1.0, 1.0);
+        signal.push(mix);
+        signal.push(mix);
+    }
+
+    let input_l: Vec<f32> = signal.iter().step_by(2).copied().collect();
+    let input_crest = crest_factor_db(&input_l);
+
+    let path = "/tmp/qa_headroom.wav";
+    write_wav(&signal, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-5".to_string(),
+    );
+    assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    let output_l = read_raw_pcm_left(&blob.audio_path);
+    let output_crest = crest_factor_db(&output_l);
+
+    println!(
+        "INV-QA-5: in_cf={:.1}dB \
+         out_cf={:.1}dB \
+         threshold={:.1}dB",
+        input_crest,
+        output_crest,
+        input_crest * 0.70
+    );
+
+    // TODO(enforce_headroom): This test
+    // should FAIL until Headroom-Aware LUFS
+    // Makeup is implemented in mod.rs.
+    // Math: if projected_peak > ceiling + 6dB,
+    // cap correction_db to preserve transients.
+    // Expected failure: quiet+spiky input gets
+    // +16dB makeup -> limiter crushes spikes.
+    assert!(
+        output_crest >= input_crest * 0.70,
+        "Headroom enforcement needed: \
+         transients crushed on quiet track. \
+         in_cf={:.1}dB out_cf={:.1}dB \
+         (implement enforce_headroom in mod.rs)",
+        input_crest,
+        output_crest
+    );
+}
