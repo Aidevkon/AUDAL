@@ -315,8 +315,22 @@ fn run_dsp_internal(
     use sp314_dsp::spatial::user_profile::UserSpatialProfile;
 
     // Pre-Analysis and Rhythm Detection
+    // Scout uses 30s mid-section sample.
+    // File is already in RAM — O(1) slice.
+    // Avoids running NMF on full 5min track.
+    // If track < 30s, use full buffer.
+    let scout_frames = (chunk.sample_rate as usize) * 30;
+    let total_frames = chunk.left.len();
+    let (scout_left, scout_right) = if total_frames > scout_frames {
+        let start = (total_frames - scout_frames) / 2;
+        let end = start + scout_frames;
+        (&chunk.left[start..end], &chunk.right[start..end])
+    } else {
+        (&chunk.left[..], &chunk.right[..])
+    };
+
     use sp314_dsp::analysis::PreAnalyzer;
-    let mut pre_analysis = PreAnalyzer::run(&chunk.left, &chunk.right, chunk.sample_rate);
+    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, chunk.sample_rate);
     let mono_samples: Vec<f32> = chunk
         .left
         .iter()
@@ -340,8 +354,8 @@ fn run_dsp_internal(
     // --- NODE 3: SCOUT PASS ---
     emit_progress("Scout Pass");
     let scout_out = crate::domain::nodes::scout_node::run(
-        &chunk.left,
-        &chunk.right,
+        scout_left,
+        scout_right,
         chunk.sample_rate,
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
