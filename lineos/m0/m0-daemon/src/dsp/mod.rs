@@ -94,10 +94,16 @@ impl DspAdapter {
         let output_lufs = measure_integrated_lufs(left, right);
         let target_lufs = intent.target.target_lufs;
 
+        // [TELEM] Track peak through pipeline
+        let peak_raw_dsp = left.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
+
         if output_lufs > -69.0 {
             let correction_db = target_lufs - output_lufs;
             let correction_db = correction_db.clamp(-18.0_f32, 18.0_f32);
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
+
+            let peak_pre_limiter =
+                left.iter().map(|s| s.abs()).fold(0.0_f32, f32::max) * correction_linear;
 
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
             let isp_limiter_config = LimiterConfig {
@@ -199,6 +205,26 @@ impl DspAdapter {
                 right[idx..idx + len].copy_from_slice(&out_r);
                 idx += len;
             }
+
+            let peak_post_limiter = left.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
+            eprintln!(
+                "[TELEM] peak_raw_dsp={:.4} \
+                 ({:+.1}dBFS) | \
+                 peak_pre_lim={:.4} \
+                 ({:+.1}dBFS) | \
+                 peak_post_lim={:.4} \
+                 ({:+.1}dBFS) | \
+                 correction={:+.2}dB | \
+                 lufs_in={:.1}",
+                peak_raw_dsp,
+                20.0 * libm::log10f(peak_raw_dsp.max(1e-9)),
+                peak_pre_limiter,
+                20.0 * libm::log10f(peak_pre_limiter.max(1e-9)),
+                peak_post_limiter,
+                20.0 * libm::log10f(peak_post_limiter.max(1e-9)),
+                correction_db,
+                output_lufs,
+            );
         }
 
         // 5. Measure output LUFS
