@@ -347,11 +347,6 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/tinder/variations", get(handlers::tinder::get_variations))
         .route("/tinder/like", post(handlers::tinder::post_like))
         .route("/tinder/result", post(handlers::tinder::post_result))
-        .route(
-            "/dev/snapshot",
-            post(handlers::dev_snapshot::post_snapshot).get(handlers::dev_snapshot::get_snapshot),
-        )
-        .route("/dev/wait", post(handlers::dev_wait::post_wait))
         .layer(tower::limit::ConcurrencyLimitLayer::new(
             max_concurrent_jobs(),
         ))
@@ -379,10 +374,26 @@ fn mastering_router(state: AppState) -> axum::Router {
                 ),
         );
 
-    axum::Router::new()
+    let base = axum::Router::new()
         .merge(dsp_router)
-        .merge(observability_router)
-        .layer(PropagateRequestIdLayer::x_request_id())
+        .merge(observability_router);
+
+    // Dev-only diagnostic routes — stripped
+    // entirely in release builds. Not behind
+    // the DSP ConcurrencyLimit, so they answer
+    // even while the mastering queue is full.
+    #[cfg(debug_assertions)]
+    let base = base.merge(
+        axum::Router::new()
+            .route(
+                "/dev/snapshot",
+                post(handlers::dev_snapshot::post_snapshot)
+                    .get(handlers::dev_snapshot::get_snapshot),
+            )
+            .route("/dev/wait", post(handlers::dev_wait::post_wait)),
+    );
+
+    base.layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .with_state(state)
 }
