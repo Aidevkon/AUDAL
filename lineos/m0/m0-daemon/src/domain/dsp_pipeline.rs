@@ -316,18 +316,50 @@ fn run_dsp_internal(
 
     // Pre-Analysis and Rhythm Detection
     // Scout uses 30s mid-section sample.
-    // File is already in RAM — O(1) slice.
-    // Avoids running NMF on full 5min track.
-    // If track < 30s, use full buffer.
+    //
+    // Phase 8.2: try lazy disk seek first
+    // (reads only ~30s from disk via
+    // n_frames metadata + seek_exact_frame,
+    // parity-verified against the old
+    // in-memory path — max_diff=0.000000
+    // in tests). Falls back to the original
+    // O(1) in-memory slice if the format
+    // lacks upfront duration metadata.
+    //
+    // NOTE: decode_node::run() above still
+    // fully decodes the file into RAM at
+    // this point — Phase 8.2 only changes
+    // HOW the scout sample is obtained, not
+    // whether the full file is loaded. The
+    // actual memory/OOM fix is Phase 8.3
+    // (streaming render), which will remove
+    // the full upstream decode entirely for
+    // large files.
     let scout_frames = (chunk.sample_rate as usize) * 30;
     let total_frames = chunk.left.len();
-    let (scout_left, scout_right) = if total_frames > scout_frames {
-        let start = (total_frames - scout_frames) / 2;
-        let end = start + scout_frames;
-        (&chunk.left[start..end], &chunk.right[start..end])
-    } else {
-        (&chunk.left[..], &chunk.right[..])
-    };
+
+    let lazy_scout = crate::dsp::lazy_reader
+        ::read_scout_sample(
+            std::path::Path::new(audio_path),
+            30.0,
+        );
+
+    let (scout_left_owned, scout_right_owned):
+        (Vec<f32>, Vec<f32>) =
+        if let Some((l, r, _sr)) = lazy_scout {
+            (l, r)
+        } else if total_frames > scout_frames {
+            let start = (total_frames - scout_frames) / 2;
+            let end = start + scout_frames;
+            (
+                chunk.left[start..end].to_vec(),
+                chunk.right[start..end].to_vec(),
+            )
+        } else {
+            (chunk.left.clone(), chunk.right.clone())
+        };
+    let scout_left = &scout_left_owned[..];
+    let scout_right = &scout_right_owned[..];
 
     use sp314_dsp::analysis::PreAnalyzer;
     let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, chunk.sample_rate);
