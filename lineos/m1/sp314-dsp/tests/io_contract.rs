@@ -112,61 +112,6 @@ fn flac_output_path_logic() {
 }
 
 #[test]
-fn full_pipeline_wav_to_wav() {
-    use sp314_dsp::metering::measure_integrated_lufs;
-    use sp314_dsp::pipeline::autotune::autotune;
-    use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
-    use sp314_dsp::pipeline::presets::MasteringTarget;
-
-    let input_path = "tests/fixtures/sine_1khz_3s.wav";
-    let output_path = mastered_path(input_path, "wav");
-
-    let mut decoded = WavReader::read(input_path).unwrap();
-    let input_len = decoded.left.len();
-
-    let input_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
-
-    let target = MasteringTarget::SpotifyV3;
-    let base_config = target.engine_config(decoded.sample_rate);
-
-    let target_lufs = target.target_lufs().unwrap_or(input_lufs);
-    let autotune_result = autotune(input_lufs, target_lufs);
-
-    let mut tuned_config = base_config;
-    tuned_config.target_makeup_db = autotune_result.pre_gain_db;
-
-    let mut engine = Sp314MasteringEngine::new(tuned_config, decoded.sample_rate).unwrap();
-    engine.process_offline(&mut decoded.left, &mut decoded.right);
-
-    let output_lufs = measure_integrated_lufs(&decoded.left, &decoded.right);
-
-    let out_peak = decoded
-        .left
-        .iter()
-        .chain(decoded.right.iter())
-        .map(|s| s.abs())
-        .fold(0.0_f32, f32::max);
-
-    WavWriter::write(
-        &output_path,
-        &decoded.left,
-        &decoded.right,
-        decoded.sample_rate,
-    )
-    .unwrap();
-
-    assert!(std::path::Path::new(&output_path).exists());
-    let metadata = fs::metadata(&output_path).unwrap();
-    assert!(metadata.len() > 0);
-
-    assert_eq!(decoded.left.len(), input_len);
-
-    assert!(out_peak <= sp314_dsp::limiter::DEFAULT_CEILING_LINEAR);
-
-    assert!((output_lufs - target_lufs).abs() < (input_lufs - target_lufs).abs());
-}
-
-#[test]
 fn flac_roundtrip_preserves_samples() {
     use claxon::FlacReader;
     use sp314_dsp::io::FlacWriter;

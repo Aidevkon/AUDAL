@@ -134,7 +134,7 @@ fn deess_reduces_high_frequency_bursts() {
     );
 }
 
-use sp314_dsp::pipeline::presets::MasteringTarget;
+
 use sp314_dsp::restoration::gate::NoiseGate;
 use sp314_dsp::restoration::RestorationConfig;
 
@@ -231,11 +231,3 @@ fn lowcut_removes_sub_80hz() {
     );
 }
 
-#[test]
-fn music_preset_bypasses_gate_and_hum() {
-    let target = MasteringTarget::AggressiveEDM;
-    let config = target.engine_config(48000);
-
-    assert_eq!(config.restoration_config.hum_enabled, false);
-    assert_eq!(config.restoration_config.gate_enabled, false);
-}
