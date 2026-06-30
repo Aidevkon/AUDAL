@@ -11,3 +11,5 @@ pub use gating::{
     HOP_SAMPLES, RELATIVE_GATE_LU,
 };
 pub use lufs::measure_integrated_lufs;
+pub mod lufs_meter;
+pub use lufs_meter::LufsMeter;

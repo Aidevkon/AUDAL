@@ -338,14 +338,10 @@ fn run_dsp_internal(
     let scout_frames = (chunk.sample_rate as usize) * 30;
     let total_frames = chunk.left.len();
 
-    let lazy_scout = crate::dsp::lazy_reader
-        ::read_scout_sample(
-            std::path::Path::new(audio_path),
-            30.0,
-        );
+    let lazy_scout =
+        crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0);
 
-    let (scout_left_owned, scout_right_owned):
-        (Vec<f32>, Vec<f32>) =
+    let (scout_left_owned, scout_right_owned): (Vec<f32>, Vec<f32>) =
         if let Some((l, r, _sr)) = lazy_scout {
             (l, r)
         } else if total_frames > scout_frames {
