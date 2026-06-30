@@ -9,16 +9,13 @@
 //! - No ML weights, no network calls, no external processes
 //!
 //! ## Quick Start
-//! ```rust,no_run
-//! use sp314_dsp::pipeline::presets::MasteringTarget;
-//! use sp314_dsp::pipeline::engine::Sp314MasteringEngine;
-//!
-//! let target = MasteringTarget::SpotifyV3;
-//! let mut engine = Sp314MasteringEngine::new(target.engine_config(48000), 48000).unwrap();
-//!
-//! let mut left  = vec![0.0f32; 48000];
-//! let mut right = vec![0.0f32; 48000];
-//! engine.process_offline(&mut left, &mut right);
+//! ```rust,ignore
+//! // Note: full DspGraph usage requires
+//! // m0-daemon's MasteringIntent + topology
+//! // JSON — see lineos/m0/m0-daemon for the
+//! // production entry point. This crate
+//! // (sp314-dsp) provides DSP primitives
+//! // consumed by sp314-nodes::DspGraph.
 //! ```
 //!
 //! ## Signal Chain
