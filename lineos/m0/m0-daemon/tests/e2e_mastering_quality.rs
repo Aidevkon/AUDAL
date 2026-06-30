@@ -876,7 +876,12 @@ fn inv_qa_10_overscale_stress() {
             None,
             format!("qa-10-{}", name),
         );
-        assert!(result.is_ok(), "{}: run_dsp failed: {:?}", name, result.err());
+        assert!(
+            result.is_ok(),
+            "{}: run_dsp failed: {:?}",
+            name,
+            result.err()
+        );
         let (blob, _, _, _) = result.unwrap();
 
         let out_l = read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
@@ -903,7 +908,8 @@ fn inv_qa_10_overscale_stress() {
             "{}: true peak {:.2}dBTP \
              exceeds ceiling — limiter \
              failed on over-scale input",
-            name, tp
+            name,
+            tp
         );
 
         println!("INV-QA-10 [{}]: true_peak={:.2}dBTP finite=OK", name, tp);

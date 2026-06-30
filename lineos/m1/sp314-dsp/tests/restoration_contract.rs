@@ -134,7 +134,6 @@ fn deess_reduces_high_frequency_bursts() {
     );
 }
 
-
 use sp314_dsp::restoration::gate::NoiseGate;
 use sp314_dsp::restoration::RestorationConfig;
 
@@ -230,4 +229,3 @@ fn lowcut_removes_sub_80hz() {
         "40Hz not attenuated enough by low-cut"
     );
 }
-
