@@ -184,6 +184,14 @@ impl LazyAudioReader {
         Ok(())
     }
 
+    pub fn total_frames_hint(&self) -> Option<u64> {
+        self.format
+            .tracks()
+            .iter()
+            .find(|t| t.id == self.track_id)
+            .and_then(|t| t.codec_params.n_frames)
+    }
+
     /// Fills `buffer` with interleaved samples
     /// (L,R,L,R... for stereo).
     /// `buffer.len()` MUST be a multiple of
@@ -191,7 +199,7 @@ impl LazyAudioReader {
     /// Returns frames written (NOT samples).
     /// 0 = end of stream.
     pub fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize> {
-        if buffer.len() % self.channels != 0 {
+        if !buffer.len().is_multiple_of(self.channels) {
             return Err(LazyReaderError::InvalidBufferLength {
                 len: buffer.len(),
                 channels: self.channels,
@@ -256,9 +264,86 @@ impl LazyAudioReader {
                 }
             }
         }
-
         Ok(written / self.channels)
     }
+}
+
+/// Reads a representative ~30s sample from
+/// the midpoint of an audio file using lazy
+/// disk seek, instead of decoding the whole
+/// file. Falls back gracefully: returns None
+/// if the format doesn't expose upfront
+/// frame-count metadata (n_frames), letting
+/// the caller fall back to the existing
+/// full-decode-then-slice path.
+///
+/// Uses seek_exact_frame (not approximate)
+/// deliberately: this guarantees sample-
+/// accurate parity with the existing
+/// in-memory slicing path in
+/// dsp_pipeline.rs. A packet-boundary-only
+/// seek could land a few frames off,
+/// causing a sample-by-sample comparison
+/// to mismatch wave phase even though the
+/// audio content is correct. Accuracy is
+/// prioritized over speed here since the
+/// scout runs once per file.
+///
+/// Returns (left, right, sample_rate) on
+/// success.
+pub fn read_scout_sample(
+    path: &std::path::Path,
+    sample_secs: f32,
+) -> Option<(Vec<f32>, Vec<f32>, u32)> {
+    let mut reader = LazyAudioReader::open(path).ok()?;
+
+    let total_frames = reader.total_frames_hint()?;
+    let sr = reader.sample_rate();
+    let scout_frames = (sr as f32 * sample_secs) as u64;
+
+    let (start_frame, frames_to_read) = if total_frames > scout_frames {
+        ((total_frames - scout_frames) / 2, scout_frames)
+    } else {
+        (0, total_frames)
+    };
+
+    if start_frame > 0 {
+        reader.seek_exact_frame(start_frame).ok()?;
+    }
+
+    let channels = reader.channels();
+    let mut interleaved = vec![0.0_f32; (frames_to_read as usize) * channels];
+    let mut total_written = 0usize;
+    let mut buf = vec![0.0_f32; 4096 * channels];
+
+    while total_written < frames_to_read as usize {
+        let got = reader.fill_buffer(&mut buf).ok()?;
+        if got == 0 {
+            break;
+        }
+        let remaining = frames_to_read as usize - total_written;
+        let take = got.min(remaining);
+        let src_end = take * channels;
+        let dst_start = total_written * channels;
+        interleaved[dst_start..dst_start + src_end].copy_from_slice(&buf[..src_end]);
+        total_written += take;
+    }
+
+    interleaved.truncate(total_written * channels);
+
+    let left: Vec<f32> = interleaved.iter().step_by(channels).copied().collect();
+    let right: Vec<f32> = if channels >= 2 {
+        interleaved
+            .iter()
+            .skip(1)
+            .step_by(channels)
+            .copied()
+            .collect()
+    } else {
+        left.clone()
+    };
+
+    Some((left, right, sr))
 }
 
 #[cfg(test)]
@@ -667,5 +752,123 @@ mod tests {
             total_frames,
             expected_frames
         );
+    }
+
+    #[test]
+    fn probe_duration_hint_availability() {
+        for (label, path) in [
+            ("wav", "/tmp/lazy_reader_probe.wav"),
+            ("flac", "/tmp/lazy_reader_probe.flac"),
+        ] {
+            if label == "wav" {
+                write_test_wav(std::path::Path::new(path), 48000, 3.0);
+            } else {
+                write_test_flac(path, 48000, 3.0);
+            }
+            let reader = LazyAudioReader::open(std::path::Path::new(path)).unwrap();
+            println!(
+                "{}: total_frames_hint={:?}",
+                label,
+                reader.total_frames_hint()
+            );
+            let _ = std::fs::remove_file(path);
+        }
+
+        let mp3_path = std::path::Path::new("/home/aidevcon/Music/liquid .mp3");
+        if mp3_path.exists() {
+            let reader = LazyAudioReader::open(mp3_path).unwrap();
+            println!("mp3: total_frames_hint={:?}", reader.total_frames_hint());
+        }
+    }
+
+    #[test]
+    fn read_scout_sample_matches_full_decode_slice() {
+        let path = "/tmp/lazy_reader_scout_parity.wav";
+        let sr = 48000u32;
+        let dur = 90.0_f32; // 90s file, scout
+                            // wants 30s from
+                            // middle = frames
+                            // [30s..60s]
+        write_test_wav(std::path::Path::new(path), sr, dur);
+
+        // "Old way": full decode then slice
+        // (replicate what dsp_pipeline.rs does
+        // today, using our own reader read-all
+        // as the ground truth — NOT testing
+        // decode_smart directly, just proving
+        // the lazy path matches a full read).
+        let mut full_reader = LazyAudioReader::open(std::path::Path::new(path)).unwrap();
+        let mut full_left = Vec::new();
+        let mut buf = vec![0.0_f32; 4096];
+        loop {
+            let got = full_reader.fill_buffer(&mut buf).unwrap();
+            if got == 0 {
+                break;
+            }
+            full_left.extend(buf[..got * 2].iter().step_by(2).copied());
+        }
+        let total_frames = full_left.len() as u64;
+        let scout_frames = (sr as f32 * 30.0) as u64;
+        let expected_start = (total_frames - scout_frames) / 2;
+        let expected_slice =
+            &full_left[expected_start as usize..(expected_start + scout_frames) as usize];
+
+        // "New way": lazy seek + read
+        let (lazy_left, _lazy_right, lazy_sr) = read_scout_sample(std::path::Path::new(path), 30.0)
+            .expect(
+                "lazy scout read should succeed \
+                 for WAV with n_frames metadata",
+            );
+
+        assert_eq!(lazy_sr, sr);
+        assert_eq!(lazy_left.len(), scout_frames as usize);
+
+        // Compare sample-by-sample. With
+        // seek_exact_frame this should match
+        // essentially exactly.
+        let mut max_diff = 0.0_f32;
+        let cmp_len = lazy_left.len().min(expected_slice.len());
+        for i in 0..cmp_len {
+            let d = (lazy_left[i] - expected_slice[i]).abs();
+            if d > max_diff {
+                max_diff = d;
+            }
+        }
+        println!(
+            "scout parity: max_diff={:.6} \
+             (lazy_len={} expected_len={})",
+            max_diff,
+            lazy_left.len(),
+            expected_slice.len()
+        );
+        assert!(
+            max_diff < 0.001,
+            "lazy scout sample diverges from \
+             full-decode-then-slice: \
+             max_diff={:.6}",
+            max_diff
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn read_scout_sample_short_file_returns_all() {
+        // File shorter than scout window (30s)
+        // should return the whole file, not
+        // panic or truncate weirdly.
+        let path = "/tmp/lazy_reader_scout_short.wav";
+        write_test_wav(std::path::Path::new(path), 48000, 5.0);
+        let (left, _right, _sr) = read_scout_sample(std::path::Path::new(path), 30.0).unwrap();
+        let expected = (48000.0_f32 * 5.0) as usize;
+        let diff = (left.len() as i64 - expected as i64).abs();
+        assert!(
+            diff < 10,
+            "short file scout read: got={} \
+             expected~={}",
+            left.len(),
+            expected
+        );
+        let _ = std::fs::remove_file(path);
     }
 }
