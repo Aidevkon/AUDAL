@@ -23,3 +23,5 @@ m0-audit-*.ndjson
 # Mastering Certificates (Transient/Local)
 *_certificate.pdf
 *.certificate.json
+
+pr_body.txt
