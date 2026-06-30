@@ -367,15 +367,11 @@ fn run_dsp_internal(
     let mono = scout_out.mono;
     profiler.mark_stage("Scout Pass", &mono);
 
-    use lineos_types::{MixMetrics, StemFeatures, StemMetrics};
-    let streaming_features = StemFeatures {
-        voice: StemMetrics::default(),
-        drums: StemMetrics::default(),
-        bass: StemMetrics::default(),
-        harmonics: StemMetrics::default(),
-        ambience: StemMetrics::default(),
-        mix: MixMetrics::default(),
-    };
+    // Real NMF stem features from scout pass
+    // (computed on downsampled proxy stems —
+    // ratios are scale-invariant). Feeds
+    // MaskingEQ for dynamic mud correction.
+    let streaming_features = scout.features.clone();
 
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)

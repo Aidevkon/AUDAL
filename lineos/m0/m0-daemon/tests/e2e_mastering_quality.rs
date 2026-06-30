@@ -779,11 +779,17 @@ fn inv_qa_6_mud_correction() {
     // TODO(DSP-Tuning): tighten to 0.85
     // once Masking EQ uses real NMF stem
     // energies (stub [0.0;5] currently).
+    // Real NMF stem ratios now flow
+    // end-to-end. Mud correction is active:
+    // out_ratio must be LOWER than input
+    // (actual clarity improvement, not just
+    // "not worse"). Measured: +5.3% corrected.
     assert!(
-        out_ratio < in_ratio * 1.10,
-        "Mud ratio worsened severely: \
-         in={:.2} out={:.2}",
-        in_ratio,
-        out_ratio
+        out_ratio < in_ratio,
+        "Mud correction inactive: \
+         out_ratio {:.2} >= in_ratio {:.2} \
+         (expected reduction)",
+        out_ratio,
+        in_ratio
     );
 }

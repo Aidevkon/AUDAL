@@ -16,6 +16,7 @@ use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
 use crate::stft::stem_renderer::FiveStems;
 use crate::stft::{StftStreamContext, N_BINS};
 use lineos_corpus::mfcc::MfccAnalyzer;
+use lineos_types::StemFeatures;
 
 /// Constitutional chunk size — 65536 samples = ~1.37s at 48kHz
 pub const CHUNK_FRAMES: usize = 65536;
@@ -107,6 +108,8 @@ pub struct ScoutResult {
     /// Per-stem MFCC fingerprints from scout proxy analysis.
     /// StemMfccs::zero() until M-P2 populates them.
     pub stem_mfccs: StemMfccs,
+    /// NMF stem features from proxy
+    pub features: StemFeatures,
 }
 
 /// Streaming error
@@ -396,6 +399,7 @@ impl TwoPassEngine {
             global_rms_gain,
             spatial_pre,
             stem_mfccs,
+            features,
         }
     }
 
