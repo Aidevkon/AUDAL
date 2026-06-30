@@ -84,6 +84,38 @@ pub fn App() -> Element {
     // and Analysing → drive AnalysisStage LEDs in Left MFD
     let hangar_state = use_signal(|| HangarInterviewState::AwaitingDrop);
 
+    // ── Dev Diagnostics: expose FSM state ─────────────────────────────────────
+    // Mirrors key signals into a JS global (window.__COCKPIT_STATE__) on every
+    // change, so the snapshot bridge can POST it alongside the DOM. Debug-only —
+    // stripped from release builds, matching the gated backend endpoint.
+    #[cfg(debug_assertions)]
+    use_effect(move || {
+        let state = serde_json::json!({
+            "cockpit_mode": format!("{:?}", *mode.read()),
+            "hangar_state": format!("{:?}", *hangar_state.read()),
+            "show_mastered": *show_mastered.read(),
+            "intent_open": *intent_open.read(),
+            "intent_closing": *intent_closing.read(),
+            "journey_active": *is_journey_active.read(),
+            "journey_stage": journey_stage.read().clone(),
+            "journey_elapsed_ms": *journey_elapsed_ms.read(),
+            "queue_len": stage_queue.read().len(),
+            "has_session_state": session_state.read().is_some(),
+            "dropped_path": dropped_path.read().clone(),
+            "last_platform": last_platform.read().clone(),
+            "last_flavour": last_flavour.read().clone(),
+            "bpm": *bpm_signal.read(),
+        });
+        let json = state.to_string();
+        if let Some(window) = web_sys::window() {
+            let _ = js_sys::Reflect::set(
+                &window.into(),
+                &wasm_bindgen::JsValue::from_str("__COCKPIT_STATE__"),
+                &wasm_bindgen::JsValue::from_str(&json),
+            );
+        }
+    });
+
     // ── Mastering Orchestration Task (Root Scope) ─────────────────────────────
     // Dioxus false-positive warning notice: this effect both reads and writes
     // pending_master_req in the same reactive scope (read() on entry, write().take()
