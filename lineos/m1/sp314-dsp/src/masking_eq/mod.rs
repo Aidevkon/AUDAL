@@ -196,12 +196,21 @@ impl MaskingAwareEQ {
             let mut target_db = self.config.target_db[b];
             // Stem-aware mud correction (INV-QA-6):
             // Band 2 = 320Hz (mud/boxiness).
-            // Harmonics[1] + Ambience[4] = fillers
-            // Voice[2] + Drums[3] = clarity anchors
+            // Mud = harmonics (fillers: synths,
+            // guitars, pads stacking in low-mids).
+            // Ambience EXCLUDED: it is the NMF
+            // catch-all/residual bucket and absorbs
+            // >90% of energy for simple/tonal
+            // signals (pure tones, solo voice),
+            // causing false-positive cuts. A clean
+            // 440Hz sine was being flagged 98.5%
+            // muddy. Harmonics-only keeps the cut
+            // active for genuinely dense mixes and
+            // transparent for simple material.
             // Fail-safe: if stems = [0.0;5] (no NMF),
             // mud = 0.0 → no correction applied.
             if b == 2 && target_db <= 0.0 {
-                let mud = stem_ratios[1] + stem_ratios[4];
+                let mud = stem_ratios[1];
                 if mud > 0.40 {
                     let penalty = ((mud - 0.40) * 5.0).clamp(0.0, 3.0);
                     target_db -= penalty;

@@ -91,10 +91,13 @@ fn test_masking_eq_mud_cut() {
 
     // Run B: muddy stems
     // [bass, harmonics, voice, drums, ambience]
-    // harmonics(1)+ambience(4) = 0.6 > 0.40
+    // harmonics(1) = 0.80 > 0.40 → penalty
+    // = (0.80-0.40)*5 = 2.0dB cut at 320Hz.
+    // (Ambience excluded from mud formula:
+    // it is the NMF catch-all bucket.)
     let (mut lb, mut rb) = make_signal();
     let mut eq_b = MaskingAwareEQ::new(cfg.clone(), sr).unwrap();
-    let muddy = [0.1, 0.45, 0.1, 0.1, 0.25];
+    let muddy = [0.05, 0.80, 0.05, 0.05, 0.05];
     let mut pos = 0;
     while pos < n {
         let end = (pos + block).min(n);
