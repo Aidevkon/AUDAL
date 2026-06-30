@@ -5,6 +5,7 @@
 
 pub mod autotune;
 pub mod beat_detector;
+pub mod lazy_reader;
 pub mod maestro;
 pub mod streaming_pipeline;
 pub use maestro::{AutoTuningController, RenderParams};
