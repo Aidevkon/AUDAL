@@ -824,3 +824,88 @@ fn inv_qa_6_mud_correction() {
         in_ratio
     );
 }
+
+/// INV-QA-10: Over-scale input stress.
+/// The pipeline must survive inputs at and
+/// beyond 0dBFS without producing NaN/Inf and
+/// while still enforcing the true-peak ceiling.
+///
+/// Ports the coverage previously held by the
+/// legacy stress/s1_amplitude test (which ran
+/// on the deprecated Sp314MasteringEngine).
+/// Two sub-cases:
+///   A: 0dBFS   (full-scale sine, amp=1.0)
+///   B: +12dBFS (over-scale, amp≈3.98)
+///
+/// -60dBFS excluded: the pipeline correctly
+/// rejects near-silence input (RMS < -50dBFS)
+/// at the validation gate — that is intended
+/// behavior, not a limiter concern.
+#[test]
+fn inv_qa_10_overscale_stress() {
+    let sr = 48000u32;
+
+    let make_sine = |amp_dbfs: f32, dur: f32| -> Vec<f32> {
+        let amp = 10.0_f32.powf(amp_dbfs / 20.0);
+        let n = (sr as f32 * dur) as usize;
+        let mut v = Vec::with_capacity(n * 2);
+        for i in 0..n {
+            let t = i as f32 / sr as f32;
+            let s = (2.0 * std::f32::consts::PI * 1000.0 * t).sin() * amp;
+            v.push(s);
+            v.push(s);
+        }
+        v
+    };
+
+    let cases: &[(&str, f32)] = &[("0dBFS", 0.0), ("+12dBFS", 12.0)];
+
+    for (name, dbfs) in cases {
+        let signal = make_sine(*dbfs, 2.0);
+        let path = format!(
+            "/tmp/qa_overscale_{}.wav",
+            name.replace("+", "plus").replace("-", "minus")
+        );
+        write_wav(&signal, sr, &path);
+
+        let result = run_dsp(
+            &make_req(&path),
+            Instant::now(),
+            make_head(),
+            None,
+            None,
+            format!("qa-10-{}", name),
+        );
+        assert!(result.is_ok(), "{}: run_dsp failed: {:?}", name, result.err());
+        let (blob, _, _, _) = result.unwrap();
+
+        let out_l = read_raw_pcm_left(&std::path::PathBuf::from(&blob.audio_path));
+        let out_r = read_raw_pcm_right(&std::path::PathBuf::from(&blob.audio_path));
+
+        // 1. No NaN/Inf at any scale
+        assert!(
+            out_l.iter().all(|s| s.is_finite()),
+            "{}: NaN/Inf in L output",
+            name
+        );
+        assert!(
+            out_r.iter().all(|s| s.is_finite()),
+            "{}: NaN/Inf in R output",
+            name
+        );
+
+        // 2. True peak ceiling holds even
+        //    for over-scale input (the whole
+        //    point of the limiter)
+        let tp = measure_true_peak_dbtp(&out_l, &out_r);
+        assert!(
+            tp <= -0.5,
+            "{}: true peak {:.2}dBTP \
+             exceeds ceiling — limiter \
+             failed on over-scale input",
+            name, tp
+        );
+
+        println!("INV-QA-10 [{}]: true_peak={:.2}dBTP finite=OK", name, tp);
+    }
+}
