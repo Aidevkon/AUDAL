@@ -1,3 +1,26 @@
+//! Streaming DSP pipeline — chunked
+//! processing via DspGraph::process_block.
+//!
+//! STATUS: Not yet wired to any HTTP
+//! endpoint. Built for the planned
+//! "2.5 Neon Canvas" instrument: live A/B
+//! preview + delta visualization for the
+//! Single Track Session onboarding flow
+//! (vs. the Batch/Album/Episode flow, which
+//! uses the offline path in dsp/mod.rs).
+//!
+//! Decode parity with the batch path is
+//! already proven by
+//! decode_streaming_matches_batch_decode_
+//! exactly (handlers/decode_actor.rs).
+//! DSP-graph output parity (this module vs.
+//! mod.rs, same input) has NOT yet been
+//! verified end-to-end — do that before
+//! wiring this to a real endpoint.
+//!
+//! Currently only exercised by
+//! bin/benchmark_streaming.rs.
+
 use crate::dsp::beat_detector::BeatDetector;
 use crate::handlers::decode_actor::{decode_streaming, DecodeChunk};
 use sp314_dsp::io::wav_writer::StreamingWavWriter;
