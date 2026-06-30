@@ -90,15 +90,42 @@
     return node;
   }
 
+  // DOM is expensive to serialize (up to 500 nodes). FSM state is cheap
+  // (~300 bytes) and is what we actually query. So: push state on every
+  // mutation, but only attach a fresh DOM tree at most once every
+  // DOM_INTERVAL_MS.
+  const DOM_INTERVAL_MS = 2000;
+  let lastDomTs = 0;
+
+  function readState() {
+    try {
+      const raw = window.__COCKPIT_STATE__;
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function sendSnapshot() {
-    nodeCount = 0;
-    const root = document.getElementById('main');
-    if (!root) return;
-    const snapshot = serializeNode(root);
+    const now = Date.now();
+    const state = readState();
+
+    // Decide whether to attach DOM this time
+    let dom = null;
+    if (now - lastDomTs >= DOM_INTERVAL_MS) {
+      const root = document.getElementById('main');
+      if (root) {
+        nodeCount = 0;
+        dom = serializeNode(root);
+        lastDomTs = now;
+      }
+    }
+
+    const payload = { ts: now, state, dom };
     fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(snapshot),
+      body: JSON.stringify(payload),
     }).catch(() => {}); // silent fail — debug tool, ΔΕΝ πρέπει ποτέ να σπάσει το UI αν το backend δεν τρέχει
   }
 
