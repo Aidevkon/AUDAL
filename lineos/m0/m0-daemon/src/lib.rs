@@ -346,7 +346,20 @@ fn mastering_router(state: AppState) -> axum::Router {
         .route("/mix/flavour", post(handlers::mix::post_flavour))
         .route("/tinder/variations", get(handlers::tinder::get_variations))
         .route("/tinder/like", post(handlers::tinder::post_like))
-        .route("/tinder/result", post(handlers::tinder::post_result))
+        .route("/tinder/result", post(handlers::tinder::post_result));
+
+    // Backpressure test endpoint — INSIDE the
+    // ConcurrencyLimit by design. Its sole
+    // purpose is to occupy concurrency slots so
+    // the integration test can prove the limit
+    // works, so it must sit behind the limit.
+    // (Distinct from /dev/snapshot, which is a
+    // diagnostic and lives OUTSIDE the limit so
+    // it answers even when the queue is full.)
+    #[cfg(debug_assertions)]
+    let dsp_router = dsp_router.route("/dev/wait", post(handlers::dev_wait::post_wait));
+
+    let dsp_router = dsp_router
         .layer(tower::limit::ConcurrencyLimitLayer::new(
             max_concurrent_jobs(),
         ))
@@ -378,20 +391,14 @@ fn mastering_router(state: AppState) -> axum::Router {
         .merge(dsp_router)
         .merge(observability_router);
 
-    // Dev-only diagnostic routes — stripped
-    // entirely in release builds. Not behind
-    // the DSP ConcurrencyLimit, so they answer
-    // even while the mastering queue is full.
+    // Diagnostic snapshot — OUTSIDE the
+    // ConcurrencyLimit so it answers even while
+    // the mastering queue is saturated.
     #[cfg(debug_assertions)]
-    let base = base.merge(
-        axum::Router::new()
-            .route(
-                "/dev/snapshot",
-                post(handlers::dev_snapshot::post_snapshot)
-                    .get(handlers::dev_snapshot::get_snapshot),
-            )
-            .route("/dev/wait", post(handlers::dev_wait::post_wait)),
-    );
+    let base = base.merge(axum::Router::new().route(
+        "/dev/snapshot",
+        post(handlers::dev_snapshot::post_snapshot).get(handlers::dev_snapshot::get_snapshot),
+    ));
 
     base.layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
