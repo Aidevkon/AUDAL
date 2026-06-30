@@ -153,21 +153,21 @@ fn inv_qa_2_crest_factor_survival() {
          threshold={:.1}dB",
         input_crest,
         output_crest,
-        input_crest * 0.50
+        input_crest * 0.90
     );
 
-    // TODO(DSP-Tuning): Raise to 0.60 (or 0.70)
-    // once get_release_ms() and morphed_ratio()
-    // are implemented in sp314-dsp.
-    // Current baseline: static compressor
-    // squashes transients (measured: 9.3→4.8dB).
-    // Target: output_crest >= input_crest * 0.60
+    // Crest Factor survival. After removing
+    // legacy Graph limiters (PR #15, #18) and
+    // headroom-aware makeup (PR #19), the
+    // pipeline PRESERVES transients rather than
+    // squashing them. Measured: 9.3→10.0dB
+    // (>100% survival). morph/release stubs
+    // were never needed and have been deleted.
     assert!(
-        output_crest >= input_crest * 0.50,
-        "Transient punch severely destroyed: \
+        output_crest >= input_crest * 0.90,
+        "Transient punch lost: \
          in={:.1}dB out={:.1}dB \
-         (baseline threshold 50% — \
-         raise after DSP-Tuning sprint)",
+         (expected >= 90% survival)",
         input_crest,
         output_crest
     );
