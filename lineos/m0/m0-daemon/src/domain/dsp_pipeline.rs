@@ -1,4 +1,5 @@
 use crate::blob_store::StoredBlob;
+use crate::domain::ContentType;
 use crate::handlers::master::MasterRequest;
 use arc_swap::ArcSwap;
 use std::sync::Arc;
@@ -164,6 +165,7 @@ fn run_dsp_internal(
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
+    let content_type = ContentType::from_preset(preset_id);
 
     fn rms(buf: &[f32]) -> f32 {
         (buf.iter().map(|x| x * x).sum::<f32>() / buf.len().max(1) as f32).sqrt()
@@ -193,7 +195,14 @@ fn run_dsp_internal(
     // NODE 1: DECODE
     emit_progress("Ingest");
     let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id, &blob_id)?;
-    let target_lufs = decoded.target_lufs;
+    // If the preset didn't specify a
+    // target, use the ContentType default.
+    // Episode → -16.0 (Apple Podcasts spec)
+    // Music   → -14.0 (streaming default)
+    let target_lufs = decoded.target_lufs.or_else(|| match content_type {
+        ContentType::Episode => Some(-16.0),
+        ContentType::Music => None,
+    });
     let input_hash_hex = decoded.input_hash_hex;
     let seed = decoded.seed;
     let _original_sr = decoded.original_sr;
@@ -477,20 +486,29 @@ fn run_dsp_internal(
         None
     };
 
-    let (fingerprints, spatial_metadata) = crate::domain::nodes::render_node::run(
-        &mut two_pass,
-        &mono,
-        &scout,
-        final_ducking,
-        req.mix_levels.as_ref(),
-        req.flavour_id.as_deref(),
-        chunk.sample_rate,
-        &chunk.left,
-        &chunk.right,
-        &mut left_vec[..],
-        &mut right_vec[..],
-        spatial_slices.as_mut(),
-    )?;
+    let (fingerprints, spatial_metadata) = if content_type.skip_stems() {
+        // Episode path: bypass stem
+        // separation entirely.
+        // StemFingerprints fields are
+        // None — certificate omits
+        // Stem DNA for spoken-word.
+        ContentType::bypassed_render()
+    } else {
+        crate::domain::nodes::render_node::run(
+            &mut two_pass,
+            &mono,
+            &scout,
+            final_ducking,
+            req.mix_levels.as_ref(),
+            req.flavour_id.as_deref(),
+            chunk.sample_rate,
+            &chunk.left,
+            &chunk.right,
+            &mut left_vec[..],
+            &mut right_vec[..],
+            spatial_slices.as_mut(),
+        )?
+    };
 
     if needs_spatial && !sp_l.is_empty() {
         let spatial_channels: [Vec<f32>; 6] = [sp_l, sp_r, sp_c, sp_lfe, sp_ls, sp_rs];
