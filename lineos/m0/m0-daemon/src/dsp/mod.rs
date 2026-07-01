@@ -20,6 +20,40 @@ use sp314_nodes::topology::DspTopology;
 pub struct DspAdapter;
 
 impl DspAdapter {
+    /// Build a configured DspGraph without
+    /// running the audio loop. Used by the
+    /// Episode streaming render path, which
+    /// drives process_block() chunk-by-chunk
+    /// itself.
+    ///
+    /// `left`/`right` should be the scout
+    /// sample (e.g. 30s) — used only to
+    /// derive EngineerConditions (crest,
+    /// dynamics). The returned graph is
+    /// stateful and ready for streaming.
+    pub fn build_graph_only(
+        intent: &MasteringIntent,
+        left: &[f32],
+        right: &[f32],
+        sample_rate: u32,
+        stem_ratios: &[f32; 5],
+        aether_config: Option<&integration::config::DspConfig>,
+        block_size: usize,
+    ) -> Result<sp314_nodes::graph::DspGraph, DspError> {
+        let conditions = Self::intent_to_conditions(intent, left, right, sample_rate);
+        let topology_json = Pipelineforge::forge(&conditions)
+            .map_err(|e| DspError::ForgeError(format!("{:?}", e)))?;
+        let mut topology = DspTopology::from_json(&topology_json)
+            .map_err(|e| DspError::TopologyError(format!("{:?}", e)))?;
+        if let Some(config) = aether_config {
+            Self::apply_topology_overrides(&mut topology, config);
+        }
+        let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate)
+            .map_err(|e| DspError::TopologyError(format!("graph build: {:?}", e)))?;
+        graph.update_features(stem_ratios);
+        Ok(graph)
+    }
+
     /// Master a stereo buffer using v3 engine.
     /// Replaces MasteringPipeline::master().
     pub fn master(
@@ -31,36 +65,28 @@ impl DspAdapter {
         stem_ratios: &[f32; 5],
         aether_config: Option<&integration::config::DspConfig>,
     ) -> Result<MasteringResult, DspError> {
-        // 1. Build EngineerConditions from intent
-        let conditions = Self::intent_to_conditions(intent, left, right, sample_rate);
-
-        // 2. Forge the DSP topology
-        let topology_json = Pipelineforge::forge(&conditions)
-            .map_err(|e| DspError::ForgeError(format!("{:?}", e)))?;
-
-        // 3. Build DspGraph
-        let mut topology = DspTopology::from_json(&topology_json)
-            .map_err(|e| DspError::TopologyError(format!("{:?}", e)))?;
-
-        if let Some(config) = aether_config {
-            Self::apply_topology_overrides(&mut topology, config);
-        }
-
+        // Build the configured graph.
+        // Shared with the Episode streaming
+        // path via build_graph_only() — one
+        // source of truth for construction.
         let block_size = 512;
-
         let num_frames = left.len();
         use rayon::prelude::*;
 
-        // Phase 1: Serial Graph Processing
-        // The DspGraph contains heavily stateful nodes (Compressor, Reverb)
-        // that cannot be cleanly parallelized without massive margins.
-        let mut graph = DspGraph::from_topology(&topology, block_size, sample_rate).unwrap();
-
-        // Feed NMF stem energy ratios to the
-        // graph so MaskingEQ can do dynamic
-        // mud correction. Nodes that don't
-        // need them ignore (default no-op).
-        graph.update_features(stem_ratios);
+        // Phase 1: Serial Graph Processing.
+        // The DspGraph contains heavily
+        // stateful nodes (Compressor, Reverb)
+        // that cannot be cleanly parallelized
+        // without massive margins.
+        let mut graph = Self::build_graph_only(
+            intent,
+            left,
+            right,
+            sample_rate,
+            stem_ratios,
+            aether_config,
+            block_size,
+        )?;
         let mut f = 0;
         while f < num_frames {
             let e = (f + block_size).min(num_frames);
