@@ -10,6 +10,16 @@ use crate::dsp::lazy_reader::LazyAudioReader;
 use lineos_types::pre_analysis::PreAnalysisData;
 
 const CHUNK_FRAMES: usize = 4096;
+/// The DspGraph is built with a fixed
+/// block_size of 512 (see build_graph_only).
+/// process_block() asserts input length
+/// <= block_size, so each CHUNK_FRAMES read
+/// is fed to the graph in GRAPH_BLOCK-sized
+/// sub-blocks. The graph keeps its own
+/// filter/envelope state across calls, so
+/// sub-blocking is bit-identical to one big
+/// call (proven by the determinism test).
+const GRAPH_BLOCK: usize = 512;
 /// Lookahead flush for BrickwallLimiter
 /// (5ms @ 48kHz = 240 samples).
 const LIMITER_FLUSH_FRAMES: usize = 240;
@@ -129,9 +139,16 @@ pub fn run(
                 };
             }
 
-            // DSP (stateful, maintains
-            // history between calls)
-            graph.process_block(&mut left_buf[..frames], &mut right_buf[..frames]);
+            // DSP (stateful, maintains history
+            // between calls). Fed in GRAPH_BLOCK
+            // sub-blocks because process_block()
+            // asserts len <= graph block_size.
+            let mut f = 0;
+            while f < frames {
+                let e = (f + GRAPH_BLOCK).min(frames);
+                graph.process_block(&mut left_buf[f..e], &mut right_buf[f..e]);
+                f = e;
+            }
 
             // Running LUFS + peak
             lufs_meter.process_chunk(&left_buf[..frames], &right_buf[..frames]);
