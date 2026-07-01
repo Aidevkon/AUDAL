@@ -96,6 +96,173 @@ pub fn run(
     );
 
     let pcm_blake3 = crate::handlers::certificate::blake3_pcm(left_slice);
+    assemble_blob(
+        blob_id,
+        lufs,
+        true_peak,
+        fingerprints,
+        spatial_metadata,
+        persona_config,
+        file_path,
+        input_hash_hex,
+        sample_rate,
+        2,
+        elapsed_ms,
+        seed,
+        preset_id,
+        processing_timeline,
+        n_total,
+        pcm_blake3,
+        qr_base64,
+        cert_json,
+        config_json,
+        telemetry_lra,
+        telemetry_short_term,
+        telemetry_momentary,
+    )
+}
+
+/// Precomputed certificate hashes from the
+/// Episode streaming render. Both are produced
+/// incrementally during episode_render (never
+/// holding the full buffer in RAM):
+///   - pcm_blake3:    left channel, f32 LE
+///   - output_sha256: interleaved L+R, f32 BE
+pub struct StreamingCertData {
+    pub pcm_blake3: String,
+    pub output_sha256: String,
+}
+
+/// Certificate node for the Episode streaming
+/// path. Identical output to run() for the same
+/// audio, but takes precomputed hashes instead of
+/// left/right slices — the podcast pipeline never
+/// holds the full buffer in RAM.
+///
+/// Differs from run() only in the top half (hash
+/// source + telemetry); the StoredBlob assembly is
+/// the shared assemble_blob() helper.
+///
+/// TODO(wave-2): telemetry_lra / short_term /
+///   momentary are 0.0 here. Episode gets its own
+///   dialogue_lra + noise_floor_db + apple_
+///   podcasts_compliant certificate variant in
+///   wave 2. See CREATOR_OS_DECISION_LOG.
+#[allow(clippy::too_many_arguments)]
+pub fn run_streaming(
+    blob_id: &str,
+    lufs: f32,
+    true_peak: f32,
+    fingerprints: &StemFingerprints,
+    spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
+    proof_log: &integration::proof_log::ProofLog,
+    persona_config: &aether::personas::config::PersonaConfig,
+    aether_req: &aether_bridge::AetherRequest,
+    dsp_config: &integration::config::DspConfig,
+    file_path: std::path::PathBuf,
+    input_hash_hex: &str,
+    sample_rate: u32,
+    elapsed_ms: u64,
+    seed: u64,
+    preset_id: &str,
+    input_pcm_hash: String,
+    n_total: usize,
+    processing_timeline: Vec<StageRecord>,
+    cert_data: StreamingCertData,
+) -> Result<CertificateOutput, String> {
+    // Episode: no array telemetry pass.
+    // LRA / momentary / short-term are 0.0 for
+    // wave 1 (see TODO above).
+    let telemetry_lra = 0.0_f32;
+    let telemetry_short_term = 0.0_f32;
+    let telemetry_momentary = 0.0_f32;
+
+    // Certificate from the precomputed streaming
+    // SHA-256 (identical to the batch certificate
+    // for the same audio).
+    let cert = aether_bridge::generate_certificate_from_hash(
+        input_pcm_hash,
+        cert_data.output_sha256,
+        persona_config,
+        dsp_config,
+        proof_log,
+        aether_req,
+        env!("CARGO_PKG_VERSION"),
+    );
+    let cert_json = serde_json::to_string(&cert).unwrap_or_default();
+    let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
+
+    let qr_base64 = crate::handlers::certificate::generate_qr_base64(
+        blob_id,
+        file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown"),
+        lufs,
+        true_peak,
+        telemetry_lra,
+        fingerprints,
+    );
+
+    assemble_blob(
+        blob_id,
+        lufs,
+        true_peak,
+        fingerprints,
+        spatial_metadata,
+        persona_config,
+        file_path,
+        input_hash_hex,
+        sample_rate,
+        2,
+        elapsed_ms,
+        seed,
+        preset_id,
+        processing_timeline,
+        n_total,
+        cert_data.pcm_blake3,
+        qr_base64,
+        cert_json,
+        config_json,
+        telemetry_lra,
+        telemetry_short_term,
+        telemetry_momentary,
+    )
+}
+
+/// Assemble the StoredBlob, generate the PDF,
+/// and return the CertificateOutput. Shared by
+/// run() (Music, hashes computed from arrays)
+/// and run_streaming() (Episode, hashes computed
+/// incrementally during render). One source of
+/// truth for the forensic record structure — the
+/// two paths differ only in HOW they obtain the
+/// hashes and telemetry, never in the blob shape.
+#[allow(clippy::too_many_arguments)]
+fn assemble_blob(
+    blob_id: &str,
+    lufs: f32,
+    true_peak: f32,
+    fingerprints: &StemFingerprints,
+    spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
+    persona_config: &aether::personas::config::PersonaConfig,
+    file_path: std::path::PathBuf,
+    input_hash_hex: &str,
+    sample_rate: u32,
+    channels: u16,
+    elapsed_ms: u64,
+    seed: u64,
+    preset_id: &str,
+    processing_timeline: Vec<StageRecord>,
+    n_total: usize,
+    pcm_blake3: String,
+    qr_base64: Option<String>,
+    cert_json: String,
+    config_json: String,
+    telemetry_lra: f32,
+    telemetry_short_term: f32,
+    telemetry_momentary: f32,
+) -> Result<CertificateOutput, String> {
     let cert_sig =
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, fingerprints);
 
@@ -178,8 +345,8 @@ pub fn run(
         aether_cert: Some(cert_json),
         aether_persona: Some(persona_config.id.clone()),
         aether_config: Some(config_json),
-        sample_rate: post_master_sr,
-        channels: post_master_channels,
+        sample_rate,
+        channels,
         num_frames: n_total,
         audio_path: file_path.clone(),
     };
