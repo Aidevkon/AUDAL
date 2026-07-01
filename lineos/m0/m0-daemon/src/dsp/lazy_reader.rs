@@ -346,6 +346,21 @@ pub fn read_scout_sample(
     Some((left, right, sr))
 }
 
+impl crate::dsp::audio_source::AudioSource for LazyAudioReader {
+    fn sample_rate(&self) -> u32 {
+        LazyAudioReader::sample_rate(self)
+    }
+    fn channels(&self) -> usize {
+        LazyAudioReader::channels(self)
+    }
+    fn total_frames_hint(&self) -> Option<u64> {
+        LazyAudioReader::total_frames_hint(self)
+    }
+    fn fill_buffer(&mut self, buffer: &mut [f32]) -> std::result::Result<usize, String> {
+        LazyAudioReader::fill_buffer(self, buffer).map_err(|e| e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

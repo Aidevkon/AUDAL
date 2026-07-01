@@ -134,8 +134,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             // Stereo arm αλλά για 6 κανάλια.
             let mut interleaved = Vec::with_capacity(num_frames * 6);
             for i in 0..num_frames {
-                for ch in 0..6 {
-                    interleaved.push(channels[ch][i]);
+                for channel in channels.iter() {
+                    interleaved.push(channel[i]);
                 }
             }
 

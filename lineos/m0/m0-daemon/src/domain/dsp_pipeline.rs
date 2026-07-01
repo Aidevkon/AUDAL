@@ -192,7 +192,203 @@ fn run_dsp_internal(
         .clone()
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-    // NODE 1: DECODE
+    // Deterministic identity from the file PATH
+    // (not its contents) — same value decode_node
+    // derives, computable without reading audio.
+    let path_hash = compute_sha256_bytes(audio_path.as_bytes());
+    let input_hash_hex = hex::encode(path_hash);
+    let seed = derive_seed(&path_hash);
+
+    // target_lufs from the preset schema (cheap,
+    // compile-time embedded JSON — no audio read).
+    // Falls back to the Apple Podcasts spec.
+    let episode_target_lufs = serde_json::from_str::<serde_json::Value>(include_str!(
+        "../../../../shared/schema/bmr-128.schema.json"
+    ))
+    .ok()
+    .and_then(|s| {
+        s.get("presets")
+            .and_then(|p| p.get(preset_id))
+            .and_then(|p| p.get("target_lufs"))
+            .and_then(|l| l.as_f64())
+            .map(|l| (l as f32).clamp(-40.0, 0.0))
+    })
+    .or(Some(-16.0));
+
+    // ═══ EPISODE STREAMING PATH (O(1) RAM) ═══
+    // Bounded-memory podcast mastering. The full
+    // file is NEVER decoded into RAM: a 30s scout
+    // slice drives analysis, and the audio streams
+    // through StandardizedAudioStream (on-the-fly
+    // resample→48k, channel normalize, sanitize,
+    // input hashing) into the O(1) episode_render.
+    // This early return sits BEFORE NODE 1, so the
+    // legacy full-file decode below runs only for
+    // Music.
+    if content_type == ContentType::Episode {
+        emit_progress("Ingest");
+
+        // Analysis on a bounded 30s scout slice in
+        // the file's NATIVE sample rate.
+        let (scout_left, scout_right, scout_sr) =
+            crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0)
+                .ok_or_else(|| {
+                    "episode scout: could not read \
+                 audio"
+                        .to_string()
+                })?;
+
+        let mut pre_analysis =
+            sp314_dsp::analysis::PreAnalyzer::run(&scout_left, &scout_right, scout_sr);
+        pre_analysis.bpm = 0.0; // spoken word: no tempo
+
+        emit_progress("Scout Pass");
+        let scout_out = crate::domain::nodes::scout_node::run(
+            &scout_left,
+            &scout_right,
+            scout_sr,
+            req.project_id.as_deref().unwrap_or("default"),
+            req.flavour_id.as_deref().unwrap_or("default"),
+            &pre_analysis,
+        )?;
+        let streaming_features = scout_out.scout.features.clone();
+
+        // Corpus (user model) on the scout slice.
+        let flavour = req.flavour_id.as_deref().unwrap_or("warm");
+        let proj_id = req.project_id.as_deref().unwrap_or("default");
+        let state_dir = format!(
+            "{}/.creator_os/state",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        );
+        let model_path = format!("{}/user_model_{}.json", state_dir, proj_id);
+        let user_model = std::fs::read_to_string(&model_path)
+            .ok()
+            .and_then(|j| lineos_corpus::store::UserMarkovModel::from_json(&j).ok())
+            .unwrap_or_else(|| lineos_corpus::store::UserMarkovModel::new(proj_id));
+        let _corpus_out = crate::domain::nodes::corpus_node::run(
+            &streaming_features,
+            &scout_left,
+            &pre_analysis,
+            &blob_id,
+            scout_sr,
+            flavour,
+            user_model,
+        );
+
+        let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
+            preset_id,
+            flavour,
+            req.intent_tone.or(req.tone),
+            req.intent_dynamics.or(req.dynamics),
+            None,
+            req.project_id.as_deref(),
+            req.track_id.as_deref(),
+            episode_target_lufs,
+            &streaming_features,
+            &pre_analysis,
+        )?;
+
+        // Streaming decoder: delivers 48kHz stereo
+        // regardless of input SR/channels.
+        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
+            std::path::Path::new(audio_path),
+        )?;
+        let stream_sr = {
+            use crate::dsp::audio_source::AudioSource;
+            stream.sample_rate()
+        };
+
+        // BUGFIX (SR mismatch): build the graph for
+        // stream_sr (always 48000), NOT scout_sr.
+        // The legacy path built the graph at 48k but
+        // fed it native-rate samples from a non-
+        // resampling reader, shifting every EQ
+        // frequency (a 1kHz cut landed at ~918Hz on
+        // 44.1k input). StandardizedAudioStream
+        // guarantees 48k, so graph and audio match.
+        let graph = crate::dsp::DspAdapter::build_graph_only(
+            &icfg.intent,
+            &scout_left,
+            &scout_right,
+            stream_sr,
+            &streaming_features.mix.stem_energy_ratios,
+            Some(&icfg.dsp_config),
+            512,
+        )
+        .map_err(|e| format!("episode graph build: {e:?}"))?;
+
+        emit_progress("Mastering");
+        let render_res = crate::domain::episode_render::run(
+            &mut stream,
+            &blob_id,
+            graph,
+            episode_target_lufs.unwrap_or(-16.0),
+            &pre_analysis,
+        )?;
+
+        // Full-file validation (Tier 2): silence /
+        // 32x-gain guard, parity with decode_node.
+        //
+        // NOTE(wave-2): tier1_verdict() (the early
+        // 30s digital-silence abort) is intentionally
+        // NOT wired here yet. It's a fail-fast
+        // optimization, not a correctness check —
+        // tier2 at EOF already rejects dead/too-quiet
+        // files. Wiring tier1 to fire mid-render
+        // (aborting before the whole file is streamed)
+        // needs episode_render to surface a progress
+        // hook; that's wave 2. For now the monitor
+        // still tracks the early window internally, so
+        // enabling it later is just a call site.
+        stream.tier2_verdict()?;
+
+        // Input identity hashes over the SAME 48k/
+        // stereo/sanitized samples the batch path
+        // hashes (proven bit-identical by the
+        // standardized_stream parity tests).
+        let (_input_blake3_hex, input_sha256_hex) = stream.input_hashes();
+        // Dead-air timeline events (non-fatal) —
+        // consumed here; certificate surfacing is
+        // wave 2.
+        let _dead_air = stream.into_dead_air();
+
+        let (fingerprints, spatial_metadata) = ContentType::bypassed_render();
+        profiler.mark_stage_with_hash("Mastering", render_res.output_sha256.clone());
+        let processing_timeline = profiler.finalize();
+        let elapsed = start.elapsed().as_millis() as u64;
+
+        let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
+            pcm_blake3: render_res.pcm_blake3.clone(),
+            output_sha256: render_res.output_sha256.clone(),
+        };
+
+        let cert_out = crate::domain::nodes::certificate_node::run_streaming(
+            &blob_id,
+            render_res.output_lufs,
+            render_res.true_peak_dbtp,
+            &fingerprints,
+            &spatial_metadata,
+            &icfg.proof_log,
+            &icfg.persona_config,
+            &icfg.aether_req,
+            &icfg.dsp_config,
+            render_res.pcm_path.clone(),
+            &input_hash_hex,
+            render_res.sample_rate,
+            elapsed,
+            seed,
+            preset_id,
+            input_sha256_hex,
+            render_res.frames_written,
+            processing_timeline,
+            cert_data,
+        )?;
+
+        return Ok((cert_out.blob, None, cert_out.file_path, None));
+    }
+
+    // NODE 1: DECODE (Music only — Episode returned
+    // above without a full-file decode)
     emit_progress("Ingest");
     let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id, &blob_id)?;
     // If the preset didn't specify a
@@ -419,6 +615,16 @@ fn run_dsp_internal(
     // ratios are scale-invariant). Feeds
     // MaskingEQ for dynamic mud correction.
     let streaming_features = scout.features.clone();
+
+    // ═══ EPISODE STREAMING PATH ═══════════════
+    // Bounded-RAM render for spoken-word content.
+    // Never holds the full buffer: skips stem
+    // separation, the full-file mmap interleave,
+    // and the array-based certificate. RAM stays
+    // ~O(chunk) regardless of file duration.
+    // (Episode path now returns earlier — before
+    // NODE 1 DECODE — via the streaming branch, so
+    // it never reaches this point. Music continues.)
 
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)

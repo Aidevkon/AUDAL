@@ -3,11 +3,15 @@
 // Replaces MasteringPipeline::master() from v2.9.
 // Orchestrates: pipelineforge → sp314-nodes DspGraph → process_offline
 
+pub mod audio_source;
 pub mod autotune;
 pub mod beat_detector;
 pub mod lazy_reader;
 pub mod maestro;
+pub mod signal_health;
+pub mod standardized_stream;
 pub mod streaming_pipeline;
+pub use audio_source::AudioSource;
 pub use maestro::{AutoTuningController, RenderParams};
 
 use lineos_types::{LufsReport, MasteringIntent};

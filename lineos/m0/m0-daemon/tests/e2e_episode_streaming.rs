@@ -69,7 +69,9 @@ fn render_episode(
     )
     .expect("graph build");
     let pre = lineos_types::pre_analysis::PreAnalysisData::silent();
-    m0d::domain::episode_render::run(Path::new(wav_path), blob_id, graph, -16.0, &pre)
+    let mut source =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(Path::new(wav_path)).expect("open source");
+    m0d::domain::episode_render::run(&mut source, blob_id, graph, -16.0, &pre)
         .expect("episode_render")
 }
 
@@ -188,17 +190,72 @@ fn episode_render_heap_is_scale_invariant() {
 // When decode streaming lands (Phase 8 second
 // floor), remove #[ignore] — it should pass.
 #[test]
-#[ignore = "decode_node still full-buffer; \
-pending streaming decode (second floor). \
-See CREATOR_OS_DECISION_LOG."]
 fn full_pipeline_heap_is_scale_invariant() {
-    // Intentionally empty body for now — the
-    // real E2E run_dsp scale check goes here
-    // once decode streams. Kept as a named,
-    // ignored marker so `cargo test` lists the
-    // gap explicitly.
-    panic!(
-        "not yet implemented — decode_node \
-         streaming is the second floor"
+    let sr = 48_000;
+
+    let wav_1m = "/tmp/ep_full_1m.wav";
+    let wav_2m = "/tmp/ep_full_2m.wav";
+    write_wav(&generate_podcast_fixture(sr, 60.0), sr, wav_1m);
+    write_wav(&generate_podcast_fixture(sr, 120.0), sr, wav_2m);
+
+    let run_pipeline = |path: &str, id: &str| {
+        let req = m0d::handlers::master::MasterRequest {
+            audio_path: path.to_string(),
+            preset_id: "podcast".to_string(),
+            flavour_id: None,
+            intent_tone: None,
+            intent_dynamics: None,
+            persona_id: None,
+            tone: None,
+            dynamics: None,
+            chaos_seed: None,
+            project_id: Some("default".to_string()),
+            track_id: Some(id.to_string()),
+            mix_levels: None,
+            preview_id: None,
+        };
+        let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
+            xaak::repo::DspState::default(),
+        ));
+        m0d::domain::dsp_pipeline::run_dsp(
+            &req,
+            std::time::Instant::now(),
+            state,
+            None,
+            None,
+            id.to_string(),
+        )
+        .expect("run_dsp failed")
+    };
+
+    let peak_1m = {
+        let _p = dhat::Profiler::builder().testing().build();
+        let _ = run_pipeline(wav_1m, "run-1m");
+        dhat::HeapStats::get().max_bytes
+    };
+
+    let peak_2m = {
+        let _p = dhat::Profiler::builder().testing().build();
+        let _ = run_pipeline(wav_2m, "run-2m");
+        dhat::HeapStats::get().max_bytes
+    };
+
+    let diff = peak_2m as i64 - peak_1m as i64;
+    let diff_mb = diff as f64 / 1_000_000.0;
+
+    eprintln!(
+        "full_pipeline heap: 1m={:.2}MB \
+         2m={:.2}MB diff={:.2}MB",
+        peak_1m as f64 / 1e6,
+        peak_2m as f64 / 1e6,
+        diff_mb
+    );
+
+    assert!(
+        diff_mb.abs() < 5.0,
+        "heap grew {:.2}MB when duration \
+         doubled — full pipeline is NOT \
+         scale-invariant",
+        diff_mb
     );
 }

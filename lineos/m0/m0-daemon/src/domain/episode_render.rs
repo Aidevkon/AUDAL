@@ -4,9 +4,7 @@ use sha2::{Digest, Sha256};
 use sp314_dsp::limiter::{BrickwallLimiter, LimiterConfig};
 use sp314_dsp::metering::LufsMeter;
 use std::fs::OpenOptions;
-use std::path::Path;
 
-use crate::dsp::lazy_reader::LazyAudioReader;
 use lineos_types::pre_analysis::PreAnalysisData;
 
 const CHUNK_FRAMES: usize = 4096;
@@ -69,25 +67,24 @@ pub struct EpisodeRenderResult {
 ///
 /// Peak RAM: O(CHUNK_FRAMES) ≈ 32 KB
 /// regardless of file duration.
-pub fn run(
-    audio_path: &Path,
+pub fn run<S: crate::dsp::audio_source::AudioSource>(
+    source: &mut S,
     blob_id: &str,
     mut graph: sp314_nodes::graph::DspGraph,
     target_lufs: f32,
     _pre_analysis: &PreAnalysisData,
 ) -> Result<EpisodeRenderResult, String> {
-    // ── Open lazy reader ──────────────
-    let mut reader =
-        LazyAudioReader::open(audio_path).map_err(|e| format!("episode_render open: {e}"))?;
+    // Source is any AudioSource: a raw
+    // LazyAudioReader, a resampling
+    // StandardizedAudioStream, or a test mock.
+    let sample_rate = source.sample_rate();
+    let channels = source.channels();
 
-    let sample_rate = reader.sample_rate();
-    let channels = reader.channels();
-
-    let total_frames = reader.total_frames_hint().ok_or_else(|| {
+    let total_frames = source.total_frames_hint().ok_or_else(|| {
         format!(
-            "episode_render: {}: \
+            "episode_render {}: \
              no frame count in metadata",
-            audio_path.display()
+            blob_id
         )
     })? as usize;
 
@@ -122,7 +119,7 @@ pub fn run(
         };
 
         loop {
-            let frames = reader
+            let frames = source
                 .fill_buffer(&mut interleaved)
                 .map_err(|e| format!("episode_render read: {e}"))?;
             if frames == 0 {
