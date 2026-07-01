@@ -368,14 +368,24 @@ fn run_dsp_internal(
 
     use sp314_dsp::analysis::PreAnalyzer;
     let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, chunk.sample_rate);
-    let mono_samples: Vec<f32> = chunk
-        .left
-        .iter()
-        .zip(chunk.right.iter())
-        .map(|(l, r)| (*l + *r) * 0.5)
-        .collect();
-    let detector = crate::dsp::beat_detector::BeatDetector::new(chunk.sample_rate);
-    let (bpm, beats_ms, downbeats_ms, transients_ms) = detector.analyze(&mono_samples);
+    // Episode/spoken-word: skip beat
+    // detection entirely. BPM and beat
+    // grids are meaningless for voice
+    // and require a full-file mono
+    // allocation — the single largest
+    // OOM source after decode itself.
+    let (bpm, beats_ms, downbeats_ms, transients_ms) = if content_type.skip_stems() {
+        (0.0_f32, vec![], vec![], vec![])
+    } else {
+        let mono_samples: Vec<f32> = chunk
+            .left
+            .iter()
+            .zip(chunk.right.iter())
+            .map(|(l, r)| (*l + *r) * 0.5)
+            .collect();
+        let detector = crate::dsp::beat_detector::BeatDetector::new(chunk.sample_rate);
+        detector.analyze(&mono_samples)
+    };
     tracing::info!(
         "Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats",
         bpm,
