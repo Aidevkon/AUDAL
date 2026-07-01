@@ -30,11 +30,54 @@ impl ExecutionProof {
         system_version: &str,
         preset_name: &str,
     ) -> ExecutionCertificate {
+        // Compute the output hash from the full
+        // buffer, then delegate. Streaming paths
+        // that already have the hash call
+        // generate_from_hash() directly.
+        let output_pcm_hash = Self::hash_pcm(output_pcm);
+        #[allow(clippy::too_many_arguments)]
+        Self::generate_from_hash(
+            input_pcm_hash,
+            output_pcm_hash,
+            persona,
+            dsp_config,
+            proof_log,
+            project_id,
+            track_id,
+            rendered_at,
+            system_version,
+            preset_name,
+        )
+    }
+
+    /// Build an ExecutionCertificate from an
+    /// already-computed output PCM hash. Used by
+    /// the Episode streaming path, which hashes
+    /// the output incrementally during render
+    /// (see episode_render output_sha256) rather
+    /// than holding the full buffer in RAM.
+    ///
+    /// generate() is the same thing with the hash
+    /// computed from a &[f32] buffer up front —
+    /// one source of truth for the certificate
+    /// structure.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_from_hash(
+        input_pcm_hash: String,
+        output_pcm_hash: String,
+        persona: &PersonaConfig,
+        dsp_config: &DspConfig,
+        proof_log: &ProofLog,
+        project_id: &str,
+        track_id: &str,
+        rendered_at: &str,
+        system_version: &str,
+        preset_name: &str,
+    ) -> ExecutionCertificate {
         // chaos_seed_hash: SHA-256 of compound string
         // Matches ChaosEngine::build_seed() input (S-006)
         let chaos_compound = format!("{}:{}:{}", project_id, track_id, persona.id);
         let chaos_seed_hash = Self::sha256_hex(chaos_compound.as_bytes());
-
         ExecutionCertificate {
             version: "1.0".into(),
             input_pcm_hash,
@@ -51,7 +94,7 @@ impl ExecutionProof {
                 .map(Self::hash_json)
                 .unwrap_or_else(|| "none".into()),
             final_dsp_config_hash: Self::hash_json(dsp_config),
-            output_pcm_hash: Self::hash_pcm(output_pcm),
+            output_pcm_hash,
             rendered_at: rendered_at.into(),
             system_version: system_version.into(),
             persona_id: persona.id.clone(),
