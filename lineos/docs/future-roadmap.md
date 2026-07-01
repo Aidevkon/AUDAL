@@ -1,7 +1,7 @@
 # Creator OS — Future Roadmap (R&D Backlog)
 # lineos/docs/future-roadmap.md
-# Version: 2.0
-# Date: 2026-06-11
+# Version: 2.1
+# Date: 2026-07-01
 # Status: 📋 LIVING DOCUMENT
 # Owner: Lead Architect (Anestis) / Strategist: Claude
 
@@ -133,6 +133,35 @@
 
 ---
 
+### 2.5 Streaming Architecture Wave 2
+Wave 1 shipped the O(1) podcast pipeline
+(PR #38). Wave 2 hardens it.
+- **Tier 1 early-abort mid-render** — fail fast
+  on dead/corrupt files in the first 30s instead
+  of at EOF. SignalHealthMonitor scaffold is
+  ready; needs a progress hook in episode_render
+  to stop mid-stream.
+- **Dead-air → certificate + JINI** — the
+  SignalHealthMonitor already tracks dead-air
+  gaps (start_sec, duration_sec) as non-fatal
+  events. Surface them in the certificate and in
+  JINI ("noticed a gap at 45:10 — was that
+  intentional?"). Legit narrative, already
+  computed, not yet exposed.
+- **Podcast dialogue_lra + noise_floor_db** —
+  Episode certificates currently omit LRA (the
+  generic music LRA needs a 3s window and isn't
+  the right spoken-word metric). Add dialogue-
+  specific LRA + noise floor + apple_podcasts_
+  compliant as an Episode certificate variant.
+- **Batch/album podcast verification** — batch is
+  already live (POST /master/batch) and inherits
+  streaming for free. Verify: JINI album-naming
+  has a music-producer bias for podcasts;
+  album_certificate None-handling when there are
+  no stems.
+- **Depends on:** Wave 1 streaming ✅ (PR #38)
+
 ## Section 3 — FUTURE 🔵
 
 ### 3.1 Psychoacoustic Collision Matrix
@@ -189,7 +218,38 @@
 
 ---
 
-## Backend Status (as of 2026-06-11)
+### 3.10 Streaming Music Path
+Music is still O(N) — NMF stem separation needs
+the whole track in RAM. Making Music streaming
+is the hard problem: NMF is inherently full-
+signal. Likely needs a chunked NMF approximation
+or a different separation approach. Podcasts
+don't need stems, which is why Episode streamed
+first.
+- **Depends on:** Wave 1 streaming ✅
+
+### 3.11 Certainty-Aware Voice Processing
+Deterministic voice layer: predicts the next
+speech-sound class (plosive/sibilant/vowel/
+silence), acts before it lands (proactive de-ess
+/ de-plosive lookahead), and knows how certain
+it is — propagating that certainty through DSP
+intensity, JINI narration, and the certificate.
+Stops throwing uncertainty away at the enum
+boundary.
+>80% of the foundation already exists (MFCC, FFT,
+libm determinism, Markov transition/emission
+matrices). The missing piece is a ~150-line
+in-house Viterbi decoder over the existing
+matrices — its log-likelihood IS the certainty
+signal.
+- **Full design:** see CERTAINTY_AWARE_VOICE_SPEC.md
+  (this roadmap says what/when; the spec says how)
+- **Depends on:** analysis contract returning
+  (verdict, certainty) instead of bare enums
+
+## Backend Status (as of 2026-07-01)
+✅ O(1) Streaming Podcast Pipeline (PR #38) — full pipeline scale-invariant: 1m=2m=138MB heap, decode→resample→render→cert all bounded
 ✅ DSP Pipeline (sp314-dsp)
 ✅ AudioRepo + ArcSwap (zero-latency)
 ✅ Flavour Presets FL-P1..P6
@@ -213,7 +273,7 @@ A deterministic DSP engine            ✅ done
 A zero-latency audio state machine    ✅ done
 A swipe-to-sound AI (Tinder)          ✅ done
 A holographic album orchestrator      ✅ done
-A cryptographic quality notary        🔵 future
+A cryptographic quality notary        🟡 near (podcast cert live + parity-proven)
 A proof-of-human-creation system      🔵 future
 A generative spatial audio engine     🔵 future
 A learning AI platform (corpus)       🟡 near
@@ -224,4 +284,4 @@ Foundation: mmap + BlobStore + AudioRepo + SurrealDB
 
 **Lead Architect:** Anestis
 **Strategist:** Claude
-**Last Updated:** 2026-06-11
+**Last Updated:** 2026-07-01
