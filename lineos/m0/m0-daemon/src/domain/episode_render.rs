@@ -1,5 +1,6 @@
 use blake3::Hasher as Blake3Hasher;
 use memmap2::MmapMut;
+use sha2::{Digest, Sha256};
 use sp314_dsp::limiter::{BrickwallLimiter, LimiterConfig};
 use sp314_dsp::metering::LufsMeter;
 use std::fs::OpenOptions;
@@ -15,7 +16,14 @@ const LIMITER_FLUSH_FRAMES: usize = 240;
 
 pub struct EpisodeRenderResult {
     pub pcm_path: std::path::PathBuf,
+    /// BLAKE3 of the left channel (f32 LE)
+    /// — feeds the signed .m0sig, matches
+    /// certificate::blake3_pcm().
     pub pcm_blake3: String,
+    /// SHA-256 of interleaved L+R (f32 BE)
+    /// — feeds the execution certificate,
+    /// matches ExecutionProof::hash_pcm().
+    pub output_sha256: String,
     pub frames_written: usize,
     pub sample_rate: u32,
     /// Measured output LUFS (post-DSP,
@@ -23,6 +31,17 @@ pub struct EpisodeRenderResult {
     pub output_lufs: f32,
     /// True peak after limiting (dBTP).
     pub true_peak_dbtp: f32,
+    // TODO(wave-2): dialogue_lra for the
+    //   podcast certificate. The generic
+    //   music LRA (LraCalculator) is not
+    //   streaming — it needs a 3s window
+    //   buffer — and is not the right metric
+    //   for spoken-word anyway. Episode
+    //   certificates currently omit LRA;
+    //   wave 2 adds dialogue_lra +
+    //   noise_floor_db + apple_podcasts_
+    //   compliant as an Episode certificate
+    //   variant. See CREATOR_OS_DECISION_LOG.
 }
 
 /// Stream-render an Episode/podcast file
@@ -147,6 +166,12 @@ pub fn run(
     };
     let mut limiter = BrickwallLimiter::new(limiter_config, sample_rate);
     let mut blake3 = Blake3Hasher::new();
+    // Interleaved L+R, BIG ENDIAN — matches
+    // ExecutionProof::hash_pcm() so the
+    // execution certificate verifies. This
+    // is a DIFFERENT encoding from the blake3
+    // above (left mono, LE). Both required.
+    let mut sha256 = Sha256::new();
     let mut true_peak_linear = 0f32;
 
     {
@@ -192,6 +217,14 @@ pub fn run(
                     // (left channel, LE bytes
                     //  — matches blake3_pcm())
                     blake3.update(&left_buf[i].to_le_bytes());
+                    // SHA-256 execution hash
+                    // (interleaved L+R, BE bytes
+                    //  — matches ExecutionProof::
+                    //  hash_pcm()). Order must be
+                    //  left-then-right to match
+                    //  the interleaved layout.
+                    sha256.update(left_buf[i].to_be_bytes());
+                    sha256.update(right_buf[i].to_be_bytes());
                     mmap_f32[dst * 2] = left_buf[i];
                     mmap_f32[dst * 2 + 1] = right_buf[i];
                 }
@@ -212,6 +245,10 @@ pub fn run(
     Ok(EpisodeRenderResult {
         pcm_path,
         pcm_blake3: blake3.finalize().to_hex().to_string(),
+        // Same {:x} formatting as
+        // ExecutionProof::sha256_hex() so
+        // the hex string matches byte-for-byte.
+        output_sha256: format!("{:x}", sha256.finalize()),
         frames_written,
         sample_rate,
         output_lufs,
