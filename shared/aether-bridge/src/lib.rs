@@ -231,6 +231,36 @@ pub fn generate_certificate(
     )
 }
 
+/// Same as generate_certificate() but takes an
+/// already-computed output PCM hash instead of
+/// the full buffer. Used by the Episode streaming
+/// path, which hashes its output incrementally
+/// during render and never holds the whole buffer
+/// in RAM. The certificate produced is identical
+/// to the batch path for the same audio.
+pub fn generate_certificate_from_hash(
+    input_pcm_hash: String,
+    output_pcm_hash: String,
+    persona: &PersonaConfig,
+    dsp_config: &DspConfig,
+    proof_log: &ProofLog,
+    req: &AetherRequest,
+    system_version: &str,
+) -> ExecutionCertificate {
+    ExecutionProof::generate_from_hash(
+        input_pcm_hash,
+        output_pcm_hash,
+        persona,
+        dsp_config,
+        proof_log,
+        req.project_id.as_deref().unwrap_or("default"),
+        req.track_id.as_deref().unwrap_or("default"),
+        &chrono::Utc::now().to_rfc3339(),
+        system_version,
+        req.preset_name.as_deref().unwrap_or("default"),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
