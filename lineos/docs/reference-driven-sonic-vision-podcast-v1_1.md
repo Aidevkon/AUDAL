@@ -1,6 +1,6 @@
 # SPEC: Reference-Driven Sonic Vision — Podcast Pilot
 # lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md
-# Version: 1.1
+# Version: 1.2
 # Date: 2026-07-01
 # Status: 📋 SPEC — Awaiting Lead Architect approval (§7 gate)
 # Owner: Lead Architect (Anestis) / Strategist: Claude
@@ -285,8 +285,15 @@ pub struct ReferenceProfile {
     // SOFT target — normalised SHAPE, not absolute levels.
     pub spectral_target_db: [f32; N_BANDS], // LTASS shape @ analysis band CFs
     pub spectral_tilt_db_per_oct: f32,      // ~ -4.0 (range -3..-5), >800Hz
-    pub sbr_lower_band_hz: (f32, f32),      // (250, 1000)
-    pub sbr_upper_band_hz: (f32, f32),      // (2000, 2520) — Byrne-limited
+    pub sbr_lower_band_hz: (f32, f32),      // (500, 1000)  = [3] Mid-Low
+    pub sbr_upper_band_hz: (f32, f32),      // (1000, 2000) = [4] Mid-High
+    // SBR compares the speech articulation zone
+    // (1-2kHz) against the mud zone (500-1kHz) —
+    // the delta that matters most for podcast voice.
+    // Byrne data covers both bands fully (Table III
+    // publishes up to 2520Hz). Correction 2 of
+    // spec §3.1 no longer applies to the SBR bands
+    // themselves (both within Byrne range).
     pub lra_target_lu: f32,                 // dialogue ~5-8 (measured, soft)
     pub noise_floor_dbfs: f32,              // -60.0 (internal design choice)
 }
@@ -491,6 +498,7 @@ implementation time.)*
 |---------|------|---------|
 | 1.0 | 2026-07-01 | Initial spec — ADR + method locked, awaiting §7 approval |
 | 1.1 | 2026-07-01 | Pinned primary citations (BS.1770-5=2018, Apple 893, Byrne DOI, WO patent, INRIA); numeric LTASS curve (§3.3); precise SBR definition (§3.2) + matching-EQ algorithm (§3.4); Correction 1 (SPL vs dBFS); Correction 2 (Byrne band range); LRA reclassified as measured (not hard); Spotify/YouTube de-listed as authority; noise floor flagged internal; INV-REF-7 added |
+| 1.2 | 2026-07-02 | N_BANDS upgraded 6→8 (surgical speech EQ, No Compromise decision). SBR bands updated: lower=(500,1000)=[3]Mid-Low, upper=(1000,2000)=[4]Mid-High. Both within Byrne data range — Correction 2 no longer applies to SBR bands. |
 
 ---
 
@@ -498,7 +506,7 @@ implementation time.)*
 **Strategist:** Claude
 **System:** Creator OS
 **Document:** `lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md`
-**Version:** 1.1
+**Version:** 1.2
 **Status:** 📋 SPEC — Awaiting approval
 
 ---
