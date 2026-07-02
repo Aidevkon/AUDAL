@@ -118,6 +118,7 @@ impl IntegrationFirewall {
                         proof_log,
                     ),
                     q: Self::clamp_log(b.q, CFW_EQ_Q_MIN, CFW_EQ_Q_MAX, "zone_q", proof_log),
+                    source: b.source,
                 })
                 .collect(),
         };
@@ -367,6 +368,7 @@ mod tests {
                 center_hz: 3000.0,
                 gain_db: 1.5,
                 q: 0.7,
+                source: aether::semantic::zone::EqSource::Semantic,
             }],
         };
         let mut log = ProofLog::new();

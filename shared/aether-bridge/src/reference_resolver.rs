@@ -96,10 +96,10 @@ impl ReferenceProfile {
     /// Panics at startup if the JSON is malformed
     /// (compile-time embed guarantees it is not).
     pub fn load_podcast_v1() -> Self {
-        let parsed: ProfileJson =
-            serde_json::from_str(PODCAST_V1_JSON)
-                .expect("podcast-v1.json is \
-                         malformed — check embed");
+        let parsed: ProfileJson = serde_json::from_str(PODCAST_V1_JSON).expect(
+            "podcast-v1.json is \
+                         malformed — check embed",
+        );
 
         let mut target = [0.0_f32; 8];
         for band in &parsed.spectral_target.bands {
@@ -109,35 +109,19 @@ impl ReferenceProfile {
                  out of range",
                 band.index
             );
-            target[band.index] =
-                band.target_db_relative;
+            target[band.index] = band.target_db_relative;
         }
 
         Self {
             id: parsed.id,
             spectral_target: target,
-            target_lufs:
-                parsed.hard_constraints.target_lufs,
-            true_peak_ceiling_dbtp:
-                parsed
-                    .hard_constraints
-                    .true_peak_ceiling_dbtp,
-            gate_absolute_lufs:
-                parsed
-                    .hard_constraints
-                    .gate_absolute_lufs,
-            gate_relative_lu:
-                parsed
-                    .hard_constraints
-                    .gate_relative_lu,
-            lra_target_lu:
-                parsed
-                    .hard_constraints
-                    .lra_target_lu,
-            sbr_lo:
-                parsed.sbr.lower_band_index,
-            sbr_hi:
-                parsed.sbr.upper_band_index,
+            target_lufs: parsed.hard_constraints.target_lufs,
+            true_peak_ceiling_dbtp: parsed.hard_constraints.true_peak_ceiling_dbtp,
+            gate_absolute_lufs: parsed.hard_constraints.gate_absolute_lufs,
+            gate_relative_lu: parsed.hard_constraints.gate_relative_lu,
+            lra_target_lu: parsed.hard_constraints.lra_target_lu,
+            sbr_lo: parsed.sbr.lower_band_index,
+            sbr_hi: parsed.sbr.upper_band_index,
         }
     }
 }
@@ -156,17 +140,11 @@ impl ReferenceResolver {
     ///
     /// Spec §3.4 step 3. Positive → boost,
     /// negative → cut.
-    pub fn compute_gains(
-        signal: &[f32; 8],
-        target: &[f32; 8],
-    ) -> [f32; 8] {
+    pub fn compute_gains(signal: &[f32; 8], target: &[f32; 8]) -> [f32; 8] {
         let mut gains = [0.0_f32; 8];
         for k in 0..8 {
             let raw = target[k] - signal[k];
-            gains[k] = libm::fminf(
-                G_MAX_DB,
-                libm::fmaxf(-G_MAX_DB, raw),
-            );
+            gains[k] = libm::fminf(G_MAX_DB, libm::fmaxf(-G_MAX_DB, raw));
         }
         gains
     }
@@ -181,18 +159,9 @@ impl ReferenceResolver {
     /// ΔR_dB > 0 → brighter than reference.
     /// ΔR_dB < 0 → darker (more mud than clarity).
     /// ΔR_dB ≈ 0 → tilt matches reference.
-    pub fn compute_sbr_delta(
-        signal: &[f32; 8],
-        target: &[f32; 8],
-    ) -> f32 {
-        let r_signal = Self::sbr_db(
-            signal[SBR_LO],
-            signal[SBR_HI],
-        );
-        let r_target = Self::sbr_db(
-            target[SBR_LO],
-            target[SBR_HI],
-        );
+    pub fn compute_sbr_delta(signal: &[f32; 8], target: &[f32; 8]) -> f32 {
+        let r_signal = Self::sbr_db(signal[SBR_LO], signal[SBR_HI]);
+        let r_target = Self::sbr_db(target[SBR_LO], target[SBR_HI]);
         r_signal - r_target
     }
 
@@ -211,14 +180,8 @@ impl ReferenceResolver {
     ///
     /// This is the entry point for §10.6
     /// (integration into DspConfig build path).
-    pub fn resolve(
-        signal_profile: &[f32; 8],
-        profile: &ReferenceProfile,
-    ) -> [f32; 8] {
-        Self::compute_gains(
-            signal_profile,
-            &profile.spectral_target,
-        )
+    pub fn resolve(signal_profile: &[f32; 8], profile: &ReferenceProfile) -> [f32; 8] {
+        Self::compute_gains(signal_profile, &profile.spectral_target)
     }
 }
 
@@ -240,54 +203,32 @@ mod tests {
         // All 8 bands populated (none left at 0.0
         // except where the target genuinely is 0 —
         // none in podcast-v1).
-        let zeros = p.spectral_target
-            .iter()
-            .filter(|&&v| v == 0.0)
-            .count();
-        assert_eq!(zeros, 0,
-            "unexpected zero in spectral_target");
+        let zeros = p.spectral_target.iter().filter(|&&v| v == 0.0).count();
+        assert_eq!(zeros, 0, "unexpected zero in spectral_target");
     }
 
     #[test]
     fn hard_constraints_match_spec() {
         let p = load();
         // Apple Podcasts art.893 / ITU-R BS.1770-5
-        assert!(
-            (p.target_lufs - (-16.0)).abs() < 1e-5
-        );
-        assert!(
-            (p.true_peak_ceiling_dbtp - (-1.0))
-                .abs() < 1e-5
-        );
-        assert!(
-            (p.gate_absolute_lufs - (-70.0))
-                .abs() < 1e-5
-        );
+        assert!((p.target_lufs - (-16.0)).abs() < 1e-5);
+        assert!((p.true_peak_ceiling_dbtp - (-1.0)).abs() < 1e-5);
+        assert!((p.gate_absolute_lufs - (-70.0)).abs() < 1e-5);
     }
 
     #[test]
     fn balanced_voice_zero_gains() {
         let p = load();
-        let gains = ReferenceResolver::compute_gains(
-            &p.spectral_target,
-            &p.spectral_target,
-        );
+        let gains = ReferenceResolver::compute_gains(&p.spectral_target, &p.spectral_target);
         for (k, &g) in gains.iter().enumerate() {
-            assert!(
-                g.abs() < 1e-5,
-                "band {k}: expected 0 gain, got {g}"
-            );
+            assert!(g.abs() < 1e-5, "band {k}: expected 0 gain, got {g}");
         }
     }
 
     #[test]
     fn balanced_voice_zero_sbr_delta() {
         let p = load();
-        let delta =
-            ReferenceResolver::compute_sbr_delta(
-                &p.spectral_target,
-                &p.spectral_target,
-            );
+        let delta = ReferenceResolver::compute_sbr_delta(&p.spectral_target, &p.spectral_target);
         assert!(
             delta.abs() < 1e-5,
             "ΔR_dB should be 0 for balanced input, \
@@ -301,11 +242,7 @@ mod tests {
         let mut signal = p.spectral_target;
         signal[SBR_LO] += 4.0; // too much mud
         signal[SBR_HI] -= 3.0; // too little clarity
-        let delta =
-            ReferenceResolver::compute_sbr_delta(
-                &signal,
-                &p.spectral_target,
-            );
+        let delta = ReferenceResolver::compute_sbr_delta(&signal, &p.spectral_target);
         assert!(
             delta < 0.0,
             "muddy voice should have ΔR_dB < 0, \
@@ -319,11 +256,7 @@ mod tests {
         let mut signal = p.spectral_target;
         signal[SBR_LO] -= 3.0;
         signal[SBR_HI] += 4.0;
-        let delta =
-            ReferenceResolver::compute_sbr_delta(
-                &signal,
-                &p.spectral_target,
-            );
+        let delta = ReferenceResolver::compute_sbr_delta(&signal, &p.spectral_target);
         assert!(
             delta > 0.0,
             "harsh voice should have ΔR_dB > 0, \
@@ -338,10 +271,7 @@ mod tests {
         // Extreme deviation — should clamp
         signal[3] += 20.0;
         signal[4] -= 20.0;
-        let gains = ReferenceResolver::compute_gains(
-            &signal,
-            &p.spectral_target,
-        );
+        let gains = ReferenceResolver::compute_gains(&signal, &p.spectral_target);
         for &g in &gains {
             assert!(
                 g >= -G_MAX_DB && g <= G_MAX_DB,
@@ -359,30 +289,18 @@ mod tests {
         signal[SBR_LO] += 4.0;
         signal[SBR_HI] -= 3.0;
 
-        let delta_before =
-            ReferenceResolver::compute_sbr_delta(
-                &signal,
-                &p.spectral_target,
-            );
+        let delta_before = ReferenceResolver::compute_sbr_delta(&signal, &p.spectral_target);
 
-        let gains = ReferenceResolver::compute_gains(
-            &signal,
-            &p.spectral_target,
-        );
+        let gains = ReferenceResolver::compute_gains(&signal, &p.spectral_target);
         let mut output = signal;
         for k in 0..8 {
             output[k] += gains[k];
         }
 
-        let delta_after =
-            ReferenceResolver::compute_sbr_delta(
-                &output,
-                &p.spectral_target,
-            );
+        let delta_after = ReferenceResolver::compute_sbr_delta(&output, &p.spectral_target);
 
         assert!(
-            delta_after.abs() <= delta_before.abs()
-                + 1e-5,
+            delta_after.abs() <= delta_before.abs() + 1e-5,
             "INV-REF-2 violated: SBR did not \
              converge. before={delta_before:.4}, \
              after={delta_after:.4}"

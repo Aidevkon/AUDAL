@@ -53,6 +53,12 @@ pub struct ZoneBand {
     pub center_hz: f32,
     pub gain_db: f32,
     pub q: f32,
+    /// Provenance: which subsystem produced this
+    /// band (mirrors EqSource from the semantic
+    /// layer). #[serde(default)] keeps old payloads
+    /// deserializable.
+    #[serde(default)]
+    pub source: aether::semantic::zone::EqSource,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

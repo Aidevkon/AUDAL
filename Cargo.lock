@@ -72,6 +72,7 @@ dependencies = [
  "aether",
  "chrono",
  "integration",
+ "libm",
  "lineos-types",
  "proof",
  "serde",

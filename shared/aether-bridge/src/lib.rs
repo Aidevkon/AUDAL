@@ -131,8 +131,38 @@ pub fn build_dsp_config(
         // pre_analysis is Option<&PreAnalysisData>;
         // skip reference correction if unavailable.
         if let Some(pa) = pre_analysis {
+            // ── Signal normalization (mean-center) ──
+            // The ReferenceProfile target is a relative
+            // SHAPE, mean-subtracted over the 6 SPEECH
+            // bands only (Sub..HighMid, 20 Hz–4 kHz) —
+            // the bands carrying real Byrne LTASS data.
+            // Bands 6–7 (Treble/Air) are synthetic
+            // -4 dB/oct tilt extensions (Byrne stops at
+            // 2.5 kHz) and are EXCLUDED from the mean:
+            // the 6 measured targets sum to exactly 0.00,
+            // and including the dark synthetic bands
+            // would drag the mean down and corrupt the
+            // speech normalization.
+            //
+            // The raw signal is absolute dBFS, so it must
+            // be centered with the SAME 6-band mean
+            // before comparison — otherwise absolute
+            // levels meet a relative shape and every band
+            // reads as full-boost (the bug this fixes).
+            //
+            // Verified: a pure-LTASS signal at any level
+            // round-trips to ~0 gains (balanced test).
+            //
+            // If podcast-v1.json changes which bands carry
+            // measured LTASS data, update SPEECH_BANDS.
+            const SPEECH_BANDS: usize = 6;
+            let speech_mean: f32 =
+                pa.spectral_profile_db[..SPEECH_BANDS].iter().sum::<f32>() / SPEECH_BANDS as f32;
+            let normalized_profile: [f32; 8] =
+                core::array::from_fn(|k| pa.spectral_profile_db[k] - speech_mean);
+
             let ref_gains = crate::reference_resolver::ReferenceResolver::resolve(
-                &pa.spectral_profile_db,
+                &normalized_profile,
                 &crate::reference_resolver::ReferenceProfile::load_podcast_v1(),
             );
 
@@ -145,6 +175,7 @@ pub fn build_dsp_config(
                         center_hz: REF_CFS[i],
                         gain_db: g,
                         q: REF_Q,
+                        source: aether::semantic::zone::EqSource::Reference,
                     }),
             );
         }

@@ -36,11 +36,28 @@ impl SemanticZone {
     }
 }
 
+/// Provenance of an EQ adjustment — which subsystem
+/// produced it. Enables full traceability in the
+/// ProofLog / certificate ("in dark, not hidden").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum EqSource {
+    /// Produced by the SemanticZoneResolver
+    /// (persona/flavour-driven surgical carving).
+    #[default]
+    Semantic,
+    /// Produced by the ReferenceResolver
+    /// (LTASS reference shape correction).
+    Reference,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ZoneAdjustment {
     pub center_hz: f32,
     pub gain_db: f32,
     pub q: f32,
+    /// Which subsystem produced this band.
+    #[serde(default)]
+    pub source: EqSource,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

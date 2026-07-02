@@ -107,8 +107,7 @@ const N_PHASES: usize = 4;
 ///   [5] HighMid  2000-4000Hz (presence/Byrne)
 ///   [6] Treble   4000-8000Hz
 const BAND_EDGES: [f32; 9] = [
-    20.0, 80.0, 250.0, 500.0,
-    1000.0, 2000.0, 4000.0, 8000.0, 20000.0,
+    20.0, 80.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 20000.0,
 ];
 
 // K-weight block sizes for LRA (48kHz)

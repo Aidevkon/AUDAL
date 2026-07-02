@@ -167,6 +167,7 @@ impl SemanticZoneResolver {
                 center_hz: z.center_hz,
                 gain_db: z.gain_db.clamp(ZONE_GAIN_MIN_DB, ZONE_GAIN_MAX_DB),
                 q: z.q,
+                source: crate::semantic::zone::EqSource::Semantic,
             };
         }
 
@@ -195,6 +196,7 @@ impl SemanticZoneResolver {
             center_hz,
             gain_db,
             q,
+            source: crate::semantic::zone::EqSource::Semantic,
         }
     }
 }
@@ -337,6 +339,7 @@ mod tests {
                 center_hz: 3000.0,
                 gain_db: 1.5,
                 q: 0.7,
+                source: crate::semantic::zone::EqSource::Semantic,
             }],
         };
         let adj2: ZoneAdjustments =
