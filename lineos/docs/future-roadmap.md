@@ -162,7 +162,7 @@ Wave 1 shipped the O(1) podcast pipeline
   no stems.
 - **Depends on:** Wave 1 streaming ✅ (PR #38)
 
-### 2.6 Reference-Driven Sonic Vision (Podcast Pilot)
+### 2.6 Reference-Driven Sonic Vision (Podcast Pilot) — ✅ SHIPPED (2026-07-02)
 Deterministic, non-ML preset generation: the
 Sonic Vision spectral character is defined by a
 published Reference Profile (LTASS + BS.1770/EBU
@@ -180,9 +180,16 @@ matching-EQ.
   proprietary craft layer (weights/curves/ordering)
 - Platform/content conflict resolved upstream via
   scout-driven JINI filtering (separate note)
-- **Full spec:** lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md
+- **Full spec:** lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md (v1.3, ✅ IMPLEMENTED)
 - **Depends on:** aether-bridge SemanticZoneResolver ✅,
   pre_analysis spectral profile ✅, O(1) streaming ✅ (PR #38)
+- **Shipped:** commits d9d990b→6af5f29 — podcast-v1.json
+  (LTASS/Byrne targets), Python oracle, ReferenceResolver
+  (16 unit + 5 integration tests), pre-firewall wiring,
+  mean-centering fix, EqSource provenance in ProofLog
+- **Deferred (backlog):** SBR global-bias step (§3.4.4),
+  higher band resolution for cinematic ("Road B"),
+  SBR E2E with FFmpeg (INV-QA-11)
 
 ## Section 3 — FUTURE 🔵
 
@@ -270,8 +277,9 @@ signal.
 - **Depends on:** analysis contract returning
   (verdict, certainty) instead of bare enums
 
-## Backend Status (as of 2026-07-01)
+## Backend Status (as of 2026-07-02)
 ✅ O(1) Streaming Podcast Pipeline (PR #38) — full pipeline scale-invariant: 1m=2m=138MB heap, decode→resample→render→cert all bounded
+✅ Reference-Driven Podcast Auto-Tuning (§2.6) — deterministic LTASS-based spectral correction, non-ML, EqSource-traceable in ProofLog (d9d990b→6af5f29)
 ✅ DSP Pipeline (sp314-dsp)
 ✅ AudioRepo + ArcSwap (zero-latency)
 ✅ Flavour Presets FL-P1..P6

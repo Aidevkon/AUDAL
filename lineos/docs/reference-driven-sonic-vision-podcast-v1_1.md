@@ -1,8 +1,8 @@
 # SPEC: Reference-Driven Sonic Vision — Podcast Pilot
 # lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md
-# Version: 1.2
-# Date: 2026-07-01
-# Status: 📋 SPEC — Awaiting Lead Architect approval (§7 gate)
+# Version: 1.3
+# Date: 2026-07-02
+# Status: ✅ IMPLEMENTED — v1.3 (2026-07-02)
 # Owner: Lead Architect (Anestis) / Strategist: Claude
 # Authority: Development Protocol v1.0 §7 (Spec-First), PHILOSOPHY.md v1.0
 # Roadmap: Section 2 — DSP SCOPE 🟡 NEAR (new entry: 2.6)
@@ -382,7 +382,14 @@ internally documented, Oracle-TDD-proven — simply not given away).
 
 ---
 
-## 10. Implementation Order (post-approval)
+## 10. Implementation Order — ✅ IMPLEMENTED (2026-07-02)
+
+> Shipped in commits `d9d990b` → `6af5f29` on
+> `canonical`. All steps below complete; the
+> ReferenceResolver runs live in `build_dsp_config`,
+> pre-firewall, with full contract coverage. See
+> §10.9 for the as-built notes and §10.10 for the
+> deferred refinements.
 
 1. **Recon** the exact `PreAnalysisData` band layout + `auto_carve` call site;
    lock `N_BANDS` and field names for the real contract.
@@ -396,6 +403,80 @@ internally documented, Oracle-TDD-proven — simply not given away).
 6. Wire resolver into `DspConfig` build (behind the podcast profile).
 7. Whitepaper two-tier section + roadmap entry 2.6.
 8. Each step atomic, green before commit (Dev Protocol §1, §5).
+
+### 10.8 Two-tier disclosure (as built)
+
+The implementation realises the D10 decision —
+public standards floor + proprietary craft:
+
+**Tier 1 — Public foundation (in the repo, citable).**
+The targets and their sources: LTASS shape (Byrne
+1994, podcast-v1.json), the hard constraints
+(BS.1770-5 / EBU R128 / Apple art.893), the SBR
+definition (§3.2), and the matching-EQ structure
+(§3.4). Anyone can verify the *targets* are
+legitimate and the *method* is sound.
+
+**Tier 2 — Proprietary craft ("in dark, not
+hidden").** The exact `G_MAX_DB` (6.0), the per-band
+correction curve, the SPEECH_BANDS mean definition,
+and the pass ordering are the tuned craft. They live
+as ordinary constants in this private commercial
+repo — deterministic, Oracle-TDD-tested, internally
+documented. Not obfuscated (we know exactly what
+they are); simply not published.
+
+**Provenance in the certificate.** Every EQ move now
+carries an `EqSource` tag (`Semantic` | `Reference`)
+that survives the firewall into the `ProofLog`. The
+certificate can state, per band, whether a move came
+from the user's persona/flavour or from the LTASS
+reference correction — traceability without exposing
+the recipe. This is the operational meaning of "in
+dark, not hidden".
+
+### 10.9 As-built notes (deviations from plan)
+
+- **Signal mean-centering (added).** The target is a
+  relative SHAPE (mean-subtracted over the 6 speech
+  bands); the raw `spectral_profile_db` is absolute
+  dBFS. `build_dsp_config` mean-centers the signal
+  over the same 6 speech bands (Sub..HighMid) before
+  resolving. Without this, every band read as
+  full-boost. A pure-LTASS input now round-trips to
+  ~0 gains (verified by the `balanced` contract test).
+- **EqSource provenance (added).** `ZoneAdjustment`
+  and `ZoneBand` gained a `source: EqSource` field
+  (`#[serde(default)]` for back-compat), transferred
+  through the firewall. This closed an observability
+  gap and replaced a fragile Q≈0.707 test heuristic.
+- **Band count.** Locked at 8 (spec bumped 6→8 in
+  v1.2 during recon). Analysis `spectral_profile_db`
+  is `[f32; 8]`.
+- **SBR delta is verification-only.** `compute_sbr_
+  delta` (§3.2) is used by the INV-REF-2 contract
+  tests, not in the live gain path — the per-band
+  `compute_gains` already drives SBR convergence.
+  Because SBR is a ratio (`hi − lo`), it is
+  scale-invariant and was blind to the absolute-dBFS
+  bug, which is why only the per-band path exposed it.
+
+### 10.10 Deferred refinements (backlog)
+
+- **SBR global-bias step (§3.4 step 4).** Wire
+  `compute_sbr_delta` into the live gain path as a
+  post-per-band bias, for edge cases where per-band
+  correction alone does not land the global tilt.
+  Not needed for the pilot.
+- **Higher band resolution ("Road B").** Upgrade
+  `PreAnalysisData` from 8 broad bands to a more
+  finely distributed set for surgical cinematic EQ.
+  The podcast pilot is fine at current resolution.
+- **SBR E2E with FFmpeg (INV-QA-11).** A real muddy
+  WAV fixture through the full render, cross-checked
+  by FFmpeg loudnorm (−16 LUFS, TP ≤ −1 dBTP) with
+  post-render SBR convergence. Belongs in
+  `e2e_mastering_quality.rs`, dev-time only.
 
 ---
 
@@ -499,6 +580,7 @@ implementation time.)*
 | 1.0 | 2026-07-01 | Initial spec — ADR + method locked, awaiting §7 approval |
 | 1.1 | 2026-07-01 | Pinned primary citations (BS.1770-5=2018, Apple 893, Byrne DOI, WO patent, INRIA); numeric LTASS curve (§3.3); precise SBR definition (§3.2) + matching-EQ algorithm (§3.4); Correction 1 (SPL vs dBFS); Correction 2 (Byrne band range); LRA reclassified as measured (not hard); Spotify/YouTube de-listed as authority; noise floor flagged internal; INV-REF-7 added |
 | 1.2 | 2026-07-02 | N_BANDS upgraded 6→8 (surgical speech EQ, No Compromise decision). SBR bands updated: lower=(500,1000)=[3]Mid-Low, upper=(1000,2000)=[4]Mid-High. Both within Byrne data range — Correction 2 no longer applies to SBR bands. |
+| 1.3 | 2026-07-02 | §10 IMPLEMENTED (d9d990b→6af5f29): podcast-v1.json, Python oracle, ReferenceResolver (16 unit + 5 integration tests), pre-firewall wiring. Added mean-centering (root-cause fix), EqSource provenance, as-built notes (§10.8-10.10). |
 
 ---
 
@@ -506,8 +588,8 @@ implementation time.)*
 **Strategist:** Claude
 **System:** Creator OS
 **Document:** `lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md`
-**Version:** 1.2
-**Status:** 📋 SPEC — Awaiting approval
+**Version:** 1.3
+**Status:** ✅ IMPLEMENTED — v1.3 (2026-07-02)
 
 ---
 
