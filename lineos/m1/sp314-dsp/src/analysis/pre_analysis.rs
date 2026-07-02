@@ -99,8 +99,17 @@ const TAPS_PER_PHASE: usize = 18;
 #[allow(dead_code)]
 const N_PHASES: usize = 4;
 
-// Band crossover frequencies (Constitution §4.4)
-const BAND_EDGES: [f32; 7] = [20.0, 80.0, 250.0, 500.0, 2000.0, 8000.0, 20000.0];
+/// 8-band spectral profile crossovers.
+/// Splits the old Mid (500-2000Hz) and HighMid
+/// (2-8kHz) for surgical speech correction:
+///   [3] Mid-Low  500-1000Hz (mud/honk)
+///   [4] Mid-High 1000-2000Hz (articulation)
+///   [5] HighMid  2000-4000Hz (presence/Byrne)
+///   [6] Treble   4000-8000Hz
+const BAND_EDGES: [f32; 9] = [
+    20.0, 80.0, 250.0, 500.0,
+    1000.0, 2000.0, 4000.0, 8000.0, 20000.0,
+];
 
 // K-weight block sizes for LRA (48kHz)
 const LRA_BLOCK: usize = 19200; // 400ms
@@ -141,11 +150,11 @@ impl PreAnalyzer {
         let true_peak_dbtp = true_peak_detect(left, right);
         let loudness_range = compute_lra(left, right);
         let (spectral_profile_db, band_signals_l, band_signals_r) =
-            spectral_profile_6band(left, right, sample_rate);
+            spectral_profile_8band(left, right, sample_rate);
         let spectral_rolloff_hz = spectral_rolloff_85(left, right, sample_rate);
         let transient_density = compute_transient_density(&mono, sample_rate);
         let side_mid_ratio_db = compute_side_mid_ratio(left, right);
-        let band_phase_correlation = band_phase_correlation_6(&band_signals_l, &band_signals_r);
+        let band_phase_correlation = band_phase_correlation_8(&band_signals_l, &band_signals_r);
         let resonant_peaks_hz = compute_resonant_peaks(left, right, sample_rate);
         let zone_flags = compute_zone_flags(
             &spectral_profile_db,
@@ -365,18 +374,18 @@ fn bandpass_filter(signal: &[f32], lo: f32, hi: f32, sr: f32) -> Vec<f32> {
         .collect()
 }
 
-fn spectral_profile_6band(
+fn spectral_profile_8band(
     left: &[f32],
     right: &[f32],
     sr: u32,
-) -> ([f32; 6], Vec<Vec<f32>>, Vec<Vec<f32>>) {
+) -> ([f32; 8], Vec<Vec<f32>>, Vec<Vec<f32>>) {
     let srf = sr as f32;
     let nyq = srf / 2.0;
-    let mut profile = [-144.0_f32; 6];
-    let mut bands_l = Vec::with_capacity(6);
-    let mut bands_r = Vec::with_capacity(6);
+    let mut profile = [-144.0_f32; 8];
+    let mut bands_l = Vec::with_capacity(8);
+    let mut bands_r = Vec::with_capacity(8);
 
-    for i in 0..6 {
+    for i in 0..8 {
         let lo = BAND_EDGES[i].max(1.0);
         let hi = BAND_EDGES[i + 1].min(nyq - 1.0);
         if lo >= hi {
@@ -522,9 +531,9 @@ fn phase_corr(left: &[f32], right: &[f32]) -> f32 {
     (cross / denom).clamp(-1.0, 1.0)
 }
 
-fn band_phase_correlation_6(bands_l: &[Vec<f32>], bands_r: &[Vec<f32>]) -> [f32; 6] {
-    let mut corrs = [1.0_f32; 6];
-    for i in 0..6 {
+fn band_phase_correlation_8(bands_l: &[Vec<f32>], bands_r: &[Vec<f32>]) -> [f32; 8] {
+    let mut corrs = [1.0_f32; 8];
+    for i in 0..8 {
         corrs[i] = phase_corr(&bands_l[i], &bands_r[i]);
     }
     corrs
@@ -603,14 +612,14 @@ fn compute_resonant_peaks(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<
 // ── Zone Flags ──────────────────────────────────────────────────────────────
 
 fn compute_zone_flags(
-    profile: &[f32; 6],
+    profile: &[f32; 8],
     crest: f32,
     lra: f32,
     corr: f32,
     peaks: &[f32],
 ) -> ZoneActivationFlags {
     ZoneActivationFlags {
-        zone_cymbal_harsh: profile[4] > ZONE_CYMBAL_HARSH_RMS_DB
+        zone_cymbal_harsh: profile[5] > ZONE_CYMBAL_HARSH_RMS_DB
             && crest < ZONE_CYMBAL_HARSH_CREST_DB,
         zone_sub_rumble: profile[0] > ZONE_SUB_RUMBLE_THRESHOLD_DB,
         zone_boxiness: profile[2] > ZONE_BOXINESS_RMS_DB && lra < ZONE_BOXINESS_LRA_LU,

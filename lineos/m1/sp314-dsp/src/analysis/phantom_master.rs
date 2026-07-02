@@ -15,7 +15,7 @@ pub struct PhantomMaster {
     pub crest_factor: f32,
     pub stereo_width: f32,
     pub true_peak_dbtp: f32,
-    pub spectral_profile: [f32; 6],
+    pub spectral_profile: [f32; 8],
     pub mfcc_centroid: [f32; 13],
 }
 
@@ -88,8 +88,8 @@ impl PhantomMaster {
         );
 
         // Spectral profile — weighted centroid per band
-        let mut spectral = [0.0f32; 6];
-        for band in 0..6 {
+        let mut spectral = [0.0f32; 8];
+        for band in 0..8 {
             spectral[band] = weighted_mean(
                 analyses.iter().map(|a| a.spectral_profile_db[band]),
                 &weights,
@@ -143,7 +143,7 @@ mod tests {
             true_peak_dbtp: tp,
             transient_density: 1.0,
             global_phase_correlation: 0.5,
-            spectral_profile_db: [0.0; 6],
+            spectral_profile_db: [0.0; 8],
             ..PreAnalysisData::silent()
         }
     }

@@ -71,7 +71,16 @@ pub struct PreAnalysisData {
     pub global_crest_factor_db: f32,
 
     // ── Tonal Balance (6-band RMS in dBFS) ──
-    pub spectral_profile_db: [f32; 6],
+    /// 8-band RMS in dBFS. Bands:
+    /// [0] Sub      20–80 Hz
+    /// [1] Bass     80–250 Hz
+    /// [2] LowMid   250–500 Hz
+    /// [3] Mid-Low  500–1000 Hz  (mud/honk)
+    /// [4] Mid-High 1000–2000 Hz (articulation)
+    /// [5] HighMid  2000–4000 Hz (presence)
+    /// [6] Treble   4000–8000 Hz
+    /// [7] Air      8000–20000 Hz
+    pub spectral_profile_db: [f32; 8],
 
     // ── Spectral Shape ──
     pub spectral_rolloff_hz: f32,
@@ -84,8 +93,8 @@ pub struct PreAnalysisData {
     pub side_mid_ratio_db: f32,
     pub stereo_width: f32,
 
-    // ── Per-Band Phase Correlation (same 6 bands) ──
-    pub band_phase_correlation: [f32; 6],
+    // ── Per-Band Phase Correlation (same 8 bands) ──
+    pub band_phase_correlation: [f32; 8],
 
     // ── Resonant Peak Flags (Hz, sorted ascending, max 16) ──
     pub resonant_peaks_hz: Vec<f32>,
@@ -111,13 +120,13 @@ impl PreAnalysisData {
             loudness_range: 0.0,
             dynamic_range_db: 0.0,
             global_crest_factor_db: 0.0,
-            spectral_profile_db: [-144.0; 6],
+            spectral_profile_db: [-144.0; 8],
             spectral_rolloff_hz: 0.0,
             transient_density: 0.0,
             global_phase_correlation: 1.0,
             side_mid_ratio_db: -60.0,
             stereo_width: 0.0,
-            band_phase_correlation: [1.0; 6],
+            band_phase_correlation: [1.0; 8],
             resonant_peaks_hz: vec![],
             zone_flags: ZoneActivationFlags::default(),
             bpm: 0.0,
