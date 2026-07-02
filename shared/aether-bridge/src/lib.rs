@@ -1,4 +1,5 @@
 // shared/aether-bridge/src/lib.rs
+pub mod reference_resolver;
 // Authority: RFC-005 v0.3 FINAL
 // Cross-layer orchestration bridge:
 // lineos/m0/m0-daemon → shared/aether-bridge → aether/
