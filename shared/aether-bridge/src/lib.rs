@@ -103,7 +103,52 @@ pub fn build_dsp_config(
     let chaos_delta = chaos_engine.next_delta(persona.chaos_intensity, &persona.chaos);
 
     let modulated = ChaosEngine::apply(&micro, &chaos_delta);
-    let zones = SemanticZoneResolver::auto_carve(&persona, features, pre_analysis);
+    let mut zones = SemanticZoneResolver::auto_carve(&persona, features, pre_analysis);
+
+    // ── Reference-Driven Spectral Correction ──
+    // Closes the delta between the input's spectral
+    // shape and the LTASS-sourced podcast reference
+    // profile. Merged PRE-firewall so IntegrationFirewall
+    // sees the full gain picture and can protect the
+    // True Peak ceiling (INV-REF-1). Post-firewall
+    // extend was rejected: it hides gains from the
+    // firewall's headroom calculation.
+    // spec §3.4 step 6 + §4 (resolver proposes,
+    // firewall bounds).
+    {
+        // Geometric centers of the 8 analysis bands
+        // (Sub, Bass, LowMid, MidLow, MidHigh,
+        //  HighMid, Presence, Air).
+        const REF_CFS: [f32; 8] = [50.0, 150.0, 350.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0];
+        // Q=0.707 ≈ 1 octave bandwidth — broad
+        // shape correction, not surgical (that is
+        // SemanticZoneResolver's job).
+        const REF_Q: f32 = 0.707;
+        // Threshold: ignore sub-audible corrections
+        // (< 0.1 dB) to keep the zone pool clean.
+        const MIN_GAIN_DB: f32 = 0.1;
+
+        // pre_analysis is Option<&PreAnalysisData>;
+        // skip reference correction if unavailable.
+        if let Some(pa) = pre_analysis {
+            let ref_gains = crate::reference_resolver::ReferenceResolver::resolve(
+                &pa.spectral_profile_db,
+                &crate::reference_resolver::ReferenceProfile::load_podcast_v1(),
+            );
+
+            zones.bands.extend(
+                ref_gains
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &g)| g.abs() > MIN_GAIN_DB)
+                    .map(|(i, &g)| aether::semantic::zone::ZoneAdjustment {
+                        center_hz: REF_CFS[i],
+                        gain_db: g,
+                        q: REF_Q,
+                    }),
+            );
+        }
+    }
 
     let mut proof_log = ProofLog::new();
     let mut dsp_config = IntegrationFirewall::build(
