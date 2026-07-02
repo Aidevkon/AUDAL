@@ -19,7 +19,11 @@ N_BINS = FFT_SIZE // 2 + 1
 DURATION = 3.0
 
 # Band edges (Constitution §4.4 — 6 bands)
-BAND_EDGES = [20, 80, 250, 500, 2000, 8000, 20000]
+# 8-band edges — matches Rust BAND_EDGES in
+# sp314-dsp/src/analysis/pre_analysis.rs.
+# Splits old Mid (500-2000Hz) and HighMid
+# (2-8kHz) for surgical speech correction.
+BAND_EDGES = [20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]
 
 # Zone thresholds (Constitution §5)
 ZONE_SUB_RUMBLE_DB   = -30.0
@@ -120,7 +124,7 @@ def compute_spectral_profile(left, right):
     """6-band absolute RMS in dBFS (Constitution §4.4)."""
     nyq = SR / 2.0
     bands = []
-    for i in range(6):
+    for i in range(8):
         lo = max(BAND_EDGES[i] / nyq, 0.001)
         hi = min(BAND_EDGES[i+1] / nyq, 0.999)
         if lo >= hi:
@@ -196,7 +200,7 @@ def compute_band_phase_correlation(left, right):
     """Per-band L/R correlation (Constitution §4.9)."""
     nyq = SR / 2.0
     corrs = []
-    for i in range(6):
+    for i in range(8):
         lo = max(BAND_EDGES[i] / nyq, 0.001)
         hi = min(BAND_EDGES[i+1] / nyq, 0.999)
         if lo >= hi:
@@ -240,7 +244,7 @@ def compute_resonant_peaks(left, right):
 
 def compute_zone_flags(profile, crest, lra, corr, peaks):
     return {
-        "zone_cymbal_harsh":    bool(profile[4] > ZONE_HARSH_RMS_DB and crest < ZONE_HARSH_CREST_DB),
+        "zone_cymbal_harsh":    bool(profile[5] > ZONE_HARSH_RMS_DB and crest < ZONE_HARSH_CREST_DB),
         "zone_sub_rumble":      bool(profile[0] > ZONE_SUB_RUMBLE_DB),
         "zone_boxiness":        bool(profile[2] > ZONE_BOX_RMS_DB and lra < ZONE_BOX_LRA_LU),
         "zone_phase_issue":     bool(corr < ZONE_PHASE_CORR),

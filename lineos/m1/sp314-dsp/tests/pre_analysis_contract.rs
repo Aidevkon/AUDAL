@@ -400,7 +400,7 @@ fn band_correlation_in_range() {
             .collect();
 
         let sid = case["signal_id"].as_str().unwrap();
-        assert_eq!(bpc.len(), 6, "{}: expected 6 band correlations", sid);
+        assert_eq!(bpc.len(), 8, "{}: expected 8 band correlations", sid);
 
         for (i, &c) in bpc.iter().enumerate() {
             assert!(
