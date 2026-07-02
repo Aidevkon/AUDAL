@@ -190,6 +190,12 @@ fn episode_render_heap_is_scale_invariant() {
 // When decode streaming lands (Phase 8 second
 // floor), remove #[ignore] — it should pass.
 #[test]
+#[ignore = "second-floor streaming decode not \
+yet landed (decode_node loads full file to RAM); \
+also cannot share a dhat profiler with the \
+episode_render heap test in the same binary. \
+Remove #[ignore] when streaming decode ships \
+(Phase 8 second floor) — it should then pass."]
 fn full_pipeline_heap_is_scale_invariant() {
     let sr = 48_000;
 
