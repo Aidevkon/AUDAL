@@ -40,7 +40,7 @@ use sha2::{Digest, Sha256};
 
 use crate::dsp::audio_source::AudioSource;
 use crate::dsp::lazy_reader::LazyAudioReader;
-use crate::dsp::signal_health::{DeadAirEvent, SignalHealthMonitor};
+use crate::dsp::signal_health::{DeadAirSummary, SignalHealthMonitor};
 
 // Must match decode_smart byte-for-byte.
 const TARGET_SR: u32 = 48_000;
@@ -343,7 +343,10 @@ impl StandardizedAudioStream {
         self.health.tier2_verdict()
     }
 
-    pub fn into_dead_air(self) -> Vec<DeadAirEvent> {
+    /// Consume the stream and return the bounded
+    /// dead-air summary (events capped, totals
+    /// exact — O(1) memory on any duration).
+    pub fn into_dead_air(self) -> DeadAirSummary {
         self.health.finish()
     }
 }

@@ -27,10 +27,37 @@
 
 /// A stretch of near-silence in the middle of an
 /// episode. Non-fatal — surfaced as metadata.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(
+    Debug, Clone, PartialEq,
+    serde::Serialize, serde::Deserialize,
+)]
 pub struct DeadAirEvent {
     pub start_sec: f32,
     pub duration_sec: f32,
+}
+
+/// Bounded summary of dead-air across a stream.
+/// `events` is capped at MAX_DEAD_AIR_EVENTS to
+/// preserve O(1) memory on long content (e.g. a
+/// 4-hour music set); the counters below retain
+/// the FULL picture regardless of the cap, so the
+/// certificate never lies about total silence.
+#[derive(
+    Debug, Clone, PartialEq,
+    serde::Serialize, serde::Deserialize,
+)]
+pub struct DeadAirSummary {
+    /// Detailed gaps, capped at MAX_DEAD_AIR_EVENTS.
+    pub events: Vec<DeadAirEvent>,
+    /// Total number of gaps found (uncapped count).
+    pub total_count: usize,
+    /// Sum of all gap durations in seconds (uncapped).
+    pub total_sec: f32,
+    /// Longest single gap in seconds (uncapped).
+    pub longest_sec: f32,
+    /// True if events were capped (total_count >
+    /// events.len()).
+    pub truncated: bool,
 }
 
 /// Digital-silence floor for Tier 1 early abort.
@@ -53,6 +80,13 @@ const DEAD_AIR_WINDOW_DBFS: f32 = -60.0;
 /// be reported (avoids flagging natural pauses).
 const DEAD_AIR_MIN_SECS: f32 = 3.0;
 
+/// Cap on stored detailed dead-air events. Beyond
+/// this, gaps still count toward the summary
+/// totals but are not stored individually — this
+/// is what keeps memory O(1) on arbitrarily long
+/// streams (the music-floor guarantee).
+const MAX_DEAD_AIR_EVENTS: usize = 50;
+
 pub struct SignalHealthMonitor {
     sample_rate: u32,
 
@@ -72,6 +106,9 @@ pub struct SignalHealthMonitor {
     // Current dead-air run, if any.
     dead_air_run_start: Option<f32>,
     dead_air: Vec<DeadAirEvent>,
+    dead_air_total_count: usize,
+    dead_air_total_sec: f32,
+    dead_air_longest_sec: f32,
 }
 
 impl SignalHealthMonitor {
@@ -87,6 +124,9 @@ impl SignalHealthMonitor {
             elapsed_secs: 0.0,
             dead_air_run_start: None,
             dead_air: Vec::new(),
+            dead_air_total_count: 0,
+            dead_air_total_sec: 0.0,
+            dead_air_longest_sec: 0.0,
         }
     }
 
@@ -142,10 +182,18 @@ impl SignalHealthMonitor {
             // Run ended — record if long enough.
             let dur = window_sec - start;
             if dur >= DEAD_AIR_MIN_SECS {
-                self.dead_air.push(DeadAirEvent {
-                    start_sec: start,
-                    duration_sec: dur,
-                });
+                // Always count toward the uncapped summary.
+                self.dead_air_total_count += 1;
+                self.dead_air_total_sec += dur;
+                self.dead_air_longest_sec =
+                    self.dead_air_longest_sec.max(dur);
+                // Store detail only while under the cap (O(1)).
+                if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
+                    self.dead_air.push(DeadAirEvent {
+                        start_sec: start,
+                        duration_sec: dur,
+                    });
+                }
             }
         }
 
@@ -234,18 +282,33 @@ impl SignalHealthMonitor {
 
     /// Consume the monitor and return any dead-air
     /// events found (flushing a trailing run).
-    pub fn finish(mut self) -> Vec<DeadAirEvent> {
+    pub fn finish(mut self) -> DeadAirSummary {
         // Flush a trailing silent run at EOF.
         if let Some(start) = self.dead_air_run_start.take() {
             let dur = self.elapsed_secs as f32 - start;
             if dur >= DEAD_AIR_MIN_SECS {
-                self.dead_air.push(DeadAirEvent {
-                    start_sec: start,
-                    duration_sec: dur,
-                });
+                // Always count toward the uncapped summary.
+                self.dead_air_total_count += 1;
+                self.dead_air_total_sec += dur;
+                self.dead_air_longest_sec =
+                    self.dead_air_longest_sec.max(dur);
+                // Store detail only while under the cap (O(1)).
+                if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
+                    self.dead_air.push(DeadAirEvent {
+                        start_sec: start,
+                        duration_sec: dur,
+                    });
+                }
             }
         }
-        self.dead_air
+        DeadAirSummary {
+            truncated: self.dead_air_total_count
+                > self.dead_air.len(),
+            events: self.dead_air,
+            total_count: self.dead_air_total_count,
+            total_sec: self.dead_air_total_sec,
+            longest_sec: self.dead_air_longest_sec,
+        }
     }
 }
 
@@ -316,9 +379,9 @@ mod tests {
             "a gap between speech is not fatal"
         );
         let events = m.finish();
-        assert!(!events.is_empty(), "the 5s gap should be a dead-air event");
+        assert!(!events.events.is_empty(), "the 5s gap should be a dead-air event");
         // Gap starts around 10s, lasts ~5s.
-        let e = &events[0];
+        let e = &events.events[0];
         assert!(
             (e.start_sec - 10.0).abs() < 2.0,
             "gap start ~10s, got {}",
@@ -336,6 +399,85 @@ mod tests {
         m.observe(&interleave(&tone(40.0, 0.3)));
         assert!(m.tier1_verdict().is_ok());
         assert!(m.tier2_verdict().is_ok());
-        assert!(m.finish().is_empty(), "clean tone has no dead air");
+        assert!(m.finish().events.is_empty(), "clean tone has no dead air");
+    }
+
+    /// The music-floor guarantee: many gaps must NOT
+    /// grow the stored event list past the cap, while
+    /// the summary counters stay exact. This is the
+    /// O(1) memory proof for long content (the 4-hour
+    /// DJ set that would OOM with an unbounded Vec).
+    #[test]
+    fn dead_air_is_bounded_but_summary_is_exact() {
+        let sr = 48_000;
+        let mut m = SignalHealthMonitor::new(sr);
+
+        // Each cycle = 1.5s tone (breaks any dead-air
+        // run — fills ≥1 non-silent 1s window) + 4.0s
+        // silence (≥3 silent windows ≥ DEAD_AIR_MIN_
+        // SECS, so it counts as exactly one event).
+        // 60 cycles → 60 distinct events, well over
+        // the MAX_DEAD_AIR_EVENTS cap of 50.
+        let tone = vec![0.5_f32; (sr as usize) * 3 / 2 * 2]; // 1.5s stereo
+        let gap  = vec![0.0_f32; (sr as usize) * 4 * 2];     // 4.0s stereo
+        let cycles = 60;
+
+        for _ in 0..cycles {
+            m.observe(&tone);
+            m.observe(&gap);
+        }
+
+        let summary = m.finish();
+
+        // ── O(1) storage: the detail list is capped ──
+        assert!(
+            summary.events.len() <= MAX_DEAD_AIR_EVENTS,
+            "stored events must be capped at {} (O(1) \
+             memory), got {}",
+            MAX_DEAD_AIR_EVENTS,
+            summary.events.len()
+        );
+
+        // ── Exact accounting: counters saw every gap ──
+        // Each of the 60 cycles produces exactly one
+        // dead-air event, so total_count is exact.
+        assert_eq!(
+            summary.total_count, cycles,
+            "total_count must be exact ({} cycles = {} \
+             events), got {}",
+            cycles, cycles, summary.total_count
+        );
+
+        // Sanity: we genuinely exceeded the cap, so the
+        // 'bounded but exact' property is actually
+        // exercised (not a vacuous pass).
+        assert!(
+            summary.total_count > MAX_DEAD_AIR_EVENTS,
+            "test must generate more events ({}) than \
+             the cap ({}) to prove bounding",
+            summary.total_count, MAX_DEAD_AIR_EVENTS
+        );
+
+        // ── truncated flag set when detail < total ──
+        assert!(
+            summary.truncated,
+            "truncated must be true when total_count \
+             ({}) exceeds stored events ({})",
+            summary.total_count, summary.events.len()
+        );
+
+        // ── Totals are non-degenerate & consistent ──
+        // 60 gaps × ~4s each ≈ 240s of dead air.
+        assert!(
+            summary.total_sec > 0.0,
+            "total_sec must be positive, got {}",
+            summary.total_sec
+        );
+        assert!(
+            summary.longest_sec >= DEAD_AIR_MIN_SECS,
+            "longest_sec must be ≥ the min threshold \
+             ({}), got {}",
+            DEAD_AIR_MIN_SECS, summary.longest_sec
+        );
     }
 }
