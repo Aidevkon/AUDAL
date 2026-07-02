@@ -1,0 +1,121 @@
+{
+  "_comment": "Podcast Reference Profile v1.0 — first concrete ReferenceProfile for Creator OS",
+  "_spec": "lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md",
+  "_authority": "Byrne et al. 1994 JASA DOI:10.1121/1.410152 (LTASS); ITU-R BS.1770-5 (2018); EBU R128 v5.0; Apple Podcasts art.893",
+  "_schema_version": 1,
+  "id": "podcast-v1",
+
+  "hard_constraints": {
+    "_comment": "Absolute limits — never violated by ReferenceResolver (INV-REF-1). Sources: ITU-R BS.1770-5 (2018), EBU R128 v5.0, Apple Podcasts art.893.",
+    "target_lufs": -16.0,
+    "true_peak_ceiling_dbtp": -1.0,
+    "gate_absolute_lufs": -70.0,
+    "gate_relative_lu": -10.0,
+    "lra_target_lu": 7.0,
+    "_lra_note": "Measured parameter, soft target only — not a hard spec (EBU Tech 3342). 7 LU is typical for dialogue."
+  },
+
+  "spectral_target": {
+    "_comment": "Normalised SHAPE only (mean=0, relative dB). NOT absolute dBFS levels — see spec Correction 1: Byrne values are dBSPL, used for shape only. Method: convert dBSPL to linear energy, average per band, convert back to dB, subtract mean.",
+    "_method": "linear_energy_weighted_average_then_normalize",
+    "_normalization": "mean_subtracted",
+    "bands": [
+      {
+        "index": 0,
+        "label": "Sub",
+        "range_hz": [20, 80],
+        "target_db_relative": -10.41,
+        "_byrne_cfs_hz": [79],
+        "_byrne_values_dbspl": [38.5],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT"
+      },
+      {
+        "index": 1,
+        "label": "Bass",
+        "range_hz": [80, 250],
+        "target_db_relative": 4.01,
+        "_byrne_cfs_hz": [99, 125, 157, 198],
+        "_byrne_values_dbspl": [49.4, 52.7, 51.8, 55.2],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT"
+      },
+      {
+        "index": 2,
+        "label": "LowMid",
+        "range_hz": [250, 500],
+        "target_db_relative": 6.65,
+        "_byrne_cfs_hz": [250, 315, 397],
+        "_byrne_values_dbspl": [55.3, 54.0, 57.1],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT"
+      },
+      {
+        "index": 3,
+        "label": "Mid-Low",
+        "range_hz": [500, 1000],
+        "target_db_relative": 6.22,
+        "_byrne_cfs_hz": [500, 630, 794],
+        "_byrne_values_dbspl": [57.1, 55.5, 51.8],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT",
+        "_note": "SBR lower band — mud/honk zone (500-1kHz)"
+      },
+      {
+        "index": 4,
+        "label": "Mid-High",
+        "range_hz": [1000, 2000],
+        "target_db_relative": -0.98,
+        "_byrne_cfs_hz": [1000, 1260, 1587],
+        "_byrne_values_dbspl": [48.7, 48.0, 47.0],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT",
+        "_note": "SBR upper band — articulation/clarity zone (1-2kHz)"
+      },
+      {
+        "index": 5,
+        "label": "HighMid",
+        "range_hz": [2000, 4000],
+        "target_db_relative": -5.49,
+        "_byrne_cfs_hz": [2000, 2520],
+        "_byrne_values_dbspl": [43.7, 43.1],
+        "_source": "Byrne et al. 1994 Table III (open-access: PMC11540443/table/t3)",
+        "_flag": "BYRNE_DIRECT",
+        "_note": "Upper Byrne data limit at 2520Hz — Correction 2 anchor point for tilt extrapolation"
+      },
+      {
+        "index": 6,
+        "label": "Treble",
+        "range_hz": [4000, 8000],
+        "target_db_relative": -9.49,
+        "_byrne_cfs_hz": [],
+        "_source": "Derived: Band[5] (-5.49 dB) minus 4 dB/oct spectral tilt. Tilt range -3 to -5 dB/oct above 800Hz per Byrne LTASS analyses (Spec §13). Midpoint -4 dB/oct chosen for determinism. NOT a direct Byrne measurement.",
+        "_flag": "SUPPLEMENTARY_SOURCE_DERIVED",
+        "_note": "0.0 rejected — hiss trap: resolver would boost room noise and sibilance to spectral mean"
+      },
+      {
+        "index": 7,
+        "label": "Air",
+        "range_hz": [8000, 20000],
+        "target_db_relative": -13.49,
+        "_byrne_cfs_hz": [],
+        "_source": "Derived: Band[6] (-9.49 dB) minus 4 dB/oct spectral tilt. Same tilt methodology as Band[6].",
+        "_flag": "SUPPLEMENTARY_SOURCE_DERIVED",
+        "_note": "Voice has negligible energy above 8kHz — falling target prevents destructive Air boost"
+      }
+    ]
+  },
+
+  "sbr": {
+    "_comment": "Spectral Balance Ratio bands. Both within Byrne data range — Correction 2 does not apply to SBR band selection. Measures articulation (1-2kHz) vs mud (500-1kHz): the defining delta for podcast voice quality.",
+    "lower_band_hz": [500, 1000],
+    "upper_band_hz": [1000, 2000],
+    "lower_band_index": 3,
+    "upper_band_index": 4
+  },
+
+  "noise_floor": {
+    "target_dbfs": -60.0,
+    "_source": "Internal design choice — no international standard codifies this value (Spec §3.1, INV-REF-5)"
+  }
+}
