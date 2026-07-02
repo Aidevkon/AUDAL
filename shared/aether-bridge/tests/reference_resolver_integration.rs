@@ -178,3 +178,81 @@ fn thin_input_boosts_low_end() {
         bass.gain_db
     );
 }
+
+/// TEST #5 — Firewall Direct Attack (future-proof)
+///
+/// Bypasses ALL resolvers and injects a malicious
+/// 50 dB gain straight into ZoneAdjustments, then
+/// calls IntegrationFirewall::build directly.
+///
+/// Does not depend on G_MAX, persona values, or any
+/// resolver behavior — it tests the DOOR (the
+/// firewall's constitutional clamp), not the chain
+/// leading to it. If a future bug ever sends an
+/// unbounded gain downstream, this guarantees the
+/// firewall still stops it and logs the event.
+#[test]
+fn firewall_clamps_malicious_50db_injection() {
+    use aether::chaos::delta::ChaosDelta;
+    use aether::mapping::types::MicroDelta;
+    use aether::personas::config::MacroControls;
+    use aether::semantic::zone::{EqSource, ZoneAdjustment, ZoneAdjustments};
+    use integration::config::{CFW_EQ_GAIN_MAX_DB, CFW_EQ_GAIN_MIN_DB};
+    use integration::firewall::IntegrationFirewall;
+    use integration::proof_log::ProofLog;
+
+    // Malicious payload: 50 dB is impossible from
+    // our resolvers (G_MAX=6, semantic_max=2.5).
+    let malicious = ZoneAdjustments {
+        bands: vec![
+            ZoneAdjustment {
+                center_hz: 150.0,
+                gain_db: 50.0,
+                q: 0.707,
+                source: EqSource::Reference,
+            },
+            ZoneAdjustment {
+                center_hz: 3000.0,
+                gain_db: -50.0,
+                q: 0.707,
+                source: EqSource::Reference,
+            },
+        ],
+    };
+
+    // Personas come only via the manager (no
+    // Default) — same as build_dsp_config and the
+    // existing firewall test.
+    let mgr = aether::personas::manager::PersonaManager::load();
+    let persona = mgr.default_persona().clone();
+    let macros = MacroControls::default();
+    let micro = MicroDelta::default();
+    let chaos = ChaosDelta::zero();
+    let mut proof = ProofLog::new();
+
+    let dsp_config = IntegrationFirewall::build(
+        &persona, &macros, &micro, &malicious, &chaos, 0u64, &mut proof,
+    )
+    .expect("IntegrationFirewall::build failed");
+
+    // Every band must be clamped to the
+    // constitutional limit.
+    for band in &dsp_config.eq.zone_bands {
+        assert!(
+            band.gain_db <= CFW_EQ_GAIN_MAX_DB,
+            "FIREWALL BREACH at {:.0} Hz: {:.1} dB \
+             boost survived (max {}).",
+            band.center_hz,
+            band.gain_db,
+            CFW_EQ_GAIN_MAX_DB
+        );
+        assert!(
+            band.gain_db >= CFW_EQ_GAIN_MIN_DB,
+            "FIREWALL BREACH at {:.0} Hz: {:.1} dB \
+             cut survived (min {}).",
+            band.center_hz,
+            band.gain_db,
+            CFW_EQ_GAIN_MIN_DB
+        );
+    }
+}
