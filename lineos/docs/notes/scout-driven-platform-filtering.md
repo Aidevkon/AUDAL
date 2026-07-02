@@ -1,5 +1,5 @@
 # NOTE (Additive): Scout-Driven Platform Filtering
-# creator-os/specs/notes/scout-driven-platform-filtering.md
+# lineos/docs/notes/scout-driven-platform-filtering.md
 # Status: 🟡 BACKLOG — additive note, not a full spec yet
 # Related: SPEC reference-driven-sonic-vision-podcast-v1_1.md (§3.5 conflict)
 # Domain: JINI (Hangar) + Scout + content classification — NOT the reference resolver

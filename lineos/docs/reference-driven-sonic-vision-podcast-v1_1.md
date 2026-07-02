@@ -1,5 +1,5 @@
 # SPEC: Reference-Driven Sonic Vision — Podcast Pilot
-# creator-os/specs/reference-driven-sonic-vision-podcast-v1_1.md
+# lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md
 # Version: 1.1
 # Date: 2026-07-01
 # Status: 📋 SPEC — Awaiting Lead Architect approval (§7 gate)
@@ -497,7 +497,7 @@ implementation time.)*
 **Lead Architect:** Anestis
 **Strategist:** Claude
 **System:** Creator OS
-**Document:** `creator-os/specs/reference-driven-sonic-vision-podcast-v1_1.md`
+**Document:** `lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md`
 **Version:** 1.1
 **Status:** 📋 SPEC — Awaiting approval
 
