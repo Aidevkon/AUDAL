@@ -1,7 +1,7 @@
 # Creator OS — Future Roadmap (R&D Backlog)
 # lineos/docs/future-roadmap.md
 # Version: 2.1
-# Date: 2026-07-01
+# Date: 2026-07-02
 # Status: 📋 LIVING DOCUMENT
 # Owner: Lead Architect (Anestis) / Strategist: Claude
 
@@ -162,6 +162,28 @@ Wave 1 shipped the O(1) podcast pipeline
   no stems.
 - **Depends on:** Wave 1 streaming ✅ (PR #38)
 
+### 2.6 Reference-Driven Sonic Vision (Podcast Pilot)
+Deterministic, non-ML preset generation: the
+Sonic Vision spectral character is defined by a
+published Reference Profile (LTASS + BS.1770/EBU
+targets), not hardcoded magic numbers. A new
+ReferenceResolver in aether-bridge closes the
+measured Spectral Balance Ratio (SBR) delta
+between input and reference via deterministic
+matching-EQ.
+- No ML — the differentiator: reproducible +
+  certifiable, which no neural competitor can be
+- Targets sourced from published standards (ITU-R
+  BS.1770-5, EBU R128, Byrne et al. 1994 LTASS,
+  WO2007120453 A1)
+- "In dark, not hidden": public standards floor +
+  proprietary craft layer (weights/curves/ordering)
+- Platform/content conflict resolved upstream via
+  scout-driven JINI filtering (separate note)
+- **Full spec:** lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md
+- **Depends on:** aether-bridge SemanticZoneResolver ✅,
+  pre_analysis spectral profile ✅, O(1) streaming ✅ (PR #38)
+
 ## Section 3 — FUTURE 🔵
 
 ### 3.1 Psychoacoustic Collision Matrix
@@ -284,4 +306,4 @@ Foundation: mmap + BlobStore + AudioRepo + SurrealDB
 
 **Lead Architect:** Anestis
 **Strategist:** Claude
-**Last Updated:** 2026-07-01
+**Last Updated:** 2026-07-02
