@@ -318,7 +318,7 @@ Rust Contract Test (aether-bridge)   →  ReferenceResolver reproduces the gains
                                           bit-close (libm)
 ```
 
-Independent verification (PHILOSOPHY.md — not self-validation):
+Independent verification (PHILOSOPHY.md — not self-validation; see also `lineos-dsp-pipeline-compliance-v1_0.md` for the full empirical proof of LUFS/TP/phase compliance that underpins the hard constraints here):
 - **FFmpeg loudnorm cross-check:** after a reference-tuned render, FFmpeg's
   EBU R128 meter agrees with our LUFS within ±0.2 LU; TP ≤ −1 dBTP.
 - **SBR convergence:** post-render `|ΔR_dB|` within tolerance of 0 (output
