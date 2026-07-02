@@ -477,6 +477,16 @@ dark, not hidden".
   by FFmpeg loudnorm (−16 LUFS, TP ≤ −1 dBTP) with
   post-render SBR convergence. Belongs in
   `e2e_mastering_quality.rs`, dev-time only.
+- **Voice character presets (R&D).** Named
+  aesthetic characters (Late Night Radio, News
+  Anchor, Warm Intimacy) as deviations on the
+  neutral LTASS baseline — applied AFTER LTASS
+  ("straighten first, then style"). Each a new
+  reference profile; mechanism citable (proximity
+  effect, presence, warmth), numbers are Tier 2
+  craft. Design + draft matrix:
+  `notes/voice-character-presets-rnd.md`. Needs
+  its own spec (Option A vs B) before building.
 
 ---
 
