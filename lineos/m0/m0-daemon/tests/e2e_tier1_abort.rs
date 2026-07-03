@@ -123,16 +123,20 @@ fn test_run_dsp_passes_real_mp3_podcast() {
         return;
     }
 
-    // KNOWN GAP (HONESTY NOTE):
-    // This test proves that the tier1/scout fail-fast check passes for a REAL spoken-word
-    // MP3 (ishaiaTEST.mp3) decoded via symphonia, rather than a synthetic WAV.
-    // HOWEVER, it only passes because this specific MP3 yields a `Some(frames)` from
-    // `total_frames_hint()`.
-    // BUG: If an MP3 lacks frame metadata (e.g., pure CBR without Xing, live stream),
-    // `read_scout_sample` returns `None`, causing an immediate hard Error in run_dsp
-    // ("could not read audio"). This bypassing of tier1/fallback is a known bug that
-    // MUST be fixed separately, as Wave 3 streaming (OLA) applies only to the render pass
-    // and will not fix the 30s bounded scout read.
+    // NOTE: proves the tier1/scout path passes for a REAL spoken-word MP3
+    // (ishaiaTEST.mp3) via symphonia, not a synthetic WAV.
+    //
+    // DORMANT EDGE CASE (verified 2026-07-03, not a live bug):
+    // read_scout_sample early-returns None if total_frames_hint() is None,
+    // which would abort run_dsp. But NO seekable disk file triggers this:
+    // symphonia derives n_frames from filesize even for CBR MP3 with no Xing
+    // header (probed: `ffmpeg -write_xing 0` still yielded Some). hint=None
+    // arises only for non-seekable sources (network/pipe) or corrupt
+    // containers. m0-daemon only accepts a disk path (audio_path), so this
+    // does not fire in current use. It becomes relevant only if streaming/
+    // non-seekable input is added; fix then (designed, not implemented):
+    // try_scout_from(sr*30, scout).or_else(from 0) — deterministic, avoids
+    // intro, EOF-guarded. See scout-stationarity-assumption.md.
     let result = run_dsp(
         &make_req(path, "podcast"), // Triggers streaming path
         std::time::Instant::now(),

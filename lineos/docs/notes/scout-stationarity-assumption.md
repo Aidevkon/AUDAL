@@ -48,13 +48,11 @@ intro-jingle trap (the opening is skipped). But it is only a partial fix:
 
 1. It does not solve mid/late structural changes (a DJ drop can be anywhere,
    not conveniently at the midpoint).
-2. It depends on `total_frames_hint()`. For an MP3 WITHOUT frame metadata
-   (pure CBR without Xing/LAME, live stream), the hint is `None`, and
-   `read_scout_sample` early-returns `None` → `run_dsp` hard-errors with
-   "could not read audio" on an otherwise valid file. See the related
-   known-gap below. So the "middle" behaviour is not even deterministic
-   across files: files with a hint get the middle, files without get
-   rejected outright.
+2. It depends on `total_frames_hint()` to locate the middle. If that hint
+   were `None`, `read_scout_sample` would early-return `None` and abort.
+   In practice this does NOT happen for disk files (see the related
+   known-gap below): every seekable file yields a hint, so the middle is
+   well-defined and deterministic for all current inputs.
 
 ## Why NOT fixed now
 
@@ -78,16 +76,20 @@ intro-jingle trap (the opening is skipped). But it is only a partial fix:
   static decision locked by the scout. This is a core reason the 64-band FFT
   side-chain and OLA buffers are being built.
 
-## Related known-gap (shared root cause)
+## Related edge case (dormant, verified 2026-07-03)
 
-MP3 without `total_frames_hint()` → `read_scout_sample` returns `None` →
-`run_dsp` hard error on a valid file. Documented in
-`lineos/m0/m0-daemon/tests/e2e_tier1_abort.rs`. Needs its own fix (a scout
-fallback that reads a slice without knowing total length). Wave 3 streaming
-(OLA) does NOT fix it — OLA is the render pass; the scout stays a bounded 30s
-proxy that must know where to read from (future-roadmap.md §2.2 keeps the 30s
-proxy as a distinct entity). This gap and the stationarity assumption share
-the same root: the scout's dependency on `total_frames` to locate its slice.
+If `total_frames_hint()` returned `None`, `read_scout_sample` would abort.
+Verified that NO seekable disk file triggers this: symphonia derives
+n_frames from filesize even for CBR MP3 without a Xing header (probed:
+`ffmpeg -write_xing 0` still yielded `Some`). `hint=None` arises only for
+non-seekable sources (network/pipe) or corrupt containers, and m0-daemon
+only accepts a disk path (`audio_path`) — so it does not fire in current
+use. It becomes relevant only if streaming/non-seekable input is added.
+Fix then (designed, NOT implemented): a scout fallback
+`try_scout_from(sr*30, scout).or_else(|| try_scout_from(0, scout))` —
+deterministic, avoids the intro, and EOF-guarded for short files. Wave 3
+OLA does not address this (OLA is the render pass; the scout stays a
+bounded 30s proxy per future-roadmap.md §2.2).
 
 ---
 
