@@ -148,3 +148,68 @@ fn test_run_dsp_passes_real_mp3_podcast() {
         result.err()
     );
 }
+
+fn push_tone(out: &mut Vec<f32>, dur: f32, sr: u32) {
+    let n = (sr as f32 * dur) as usize;
+    for _ in 0..n {
+        out.push(0.5);
+        out.push(0.5);
+    }
+}
+
+fn push_silence(out: &mut Vec<f32>, dur: f32, sr: u32) {
+    let n = (sr as f32 * dur) as usize;
+    for _ in 0..n {
+        out.push(0.0);
+        out.push(0.0);
+    }
+}
+
+#[test]
+fn run_dsp_counts_dead_air_gaps() {
+    let sr = 48000u32;
+    let mut samples = Vec::new();
+
+    // 10s tone -> 4s gap -> 10s tone -> 4s gap -> 10s tone -> 2s silence (NOT gap) -> 10s tone
+    push_tone(&mut samples, 10.0, sr);
+    push_silence(&mut samples, 4.0, sr);
+    push_tone(&mut samples, 10.0, sr);
+    push_silence(&mut samples, 4.0, sr);
+    push_tone(&mut samples, 10.0, sr);
+    push_silence(&mut samples, 2.0, sr);
+    push_tone(&mut samples, 10.0, sr);
+
+    let path = "/tmp/qa_dead_air_gaps.wav";
+    write_wav(&samples, sr, path);
+
+    let result = run_dsp(
+        &make_req(path, "podcast"),
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-dead-air".to_string(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "run_dsp failed for dead-air test: {:?}",
+        result.err()
+    );
+    let (blob, _, _, _) = result.unwrap();
+
+    let count = blob.dead_air.total_count;
+    let sec = blob.dead_air.total_sec;
+    let longest = blob.dead_air.longest_sec;
+
+    println!("DEAD_AIR_COUNT: {}", count);
+    println!("DEAD_AIR_SEC: {:.2}", sec);
+    println!("DEAD_AIR_LONGEST: {:.2}", longest);
+
+    assert_eq!(count, 2, "Expected exactly 2 dead air events");
+    assert!(
+        sec >= 7.0 && sec <= 9.0,
+        "Expected total_sec between 7.0 and 9.0, got {}",
+        sec
+    );
+}
