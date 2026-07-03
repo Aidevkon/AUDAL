@@ -238,6 +238,17 @@ fn run_dsp_internal(
                         .to_string()
                 })?;
 
+        // TRUE fail-fast: reject a dead file on the
+        // already-in-RAM scout slice before paying for
+        // NMF/stem in scout_node. Same silence rule as
+        // the streaming tier1 shield (one source of
+        // truth). The streaming hook remains as the
+        // universal eject button for paths without a scout.
+        crate::dsp::signal_health::SignalHealthMonitor::check_scout_silence(
+            &scout_left,
+            &scout_right,
+        )?;
+
         let mut pre_analysis =
             sp314_dsp::analysis::PreAnalyzer::run(&scout_left, &scout_right, scout_sr);
         pre_analysis.bpm = 0.0; // spoken word: no tempo
@@ -324,9 +335,7 @@ fn run_dsp_internal(
             graph,
             episode_target_lufs.unwrap_or(-16.0),
             &pre_analysis,
-            |s| {
-                s.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Progressive)
-            },
+            |s| s.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Progressive),
         )?;
 
         // Final tier checks at EOF: tier1 now also
@@ -334,9 +343,7 @@ fn run_dsp_internal(
         // all-silent file (shorter than the early
         // window, which the Progressive hook grace-
         // periods) is still caught.
-        stream.tier1_verdict(
-            crate::dsp::signal_health::VerdictTiming::Final,
-        )?;
+        stream.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Final)?;
         stream.tier2_verdict()?;
 
         // Input identity hashes over the SAME 48k/

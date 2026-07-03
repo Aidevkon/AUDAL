@@ -27,10 +27,7 @@
 
 /// A stretch of near-silence in the middle of an
 /// episode. Non-fatal — surfaced as metadata.
-#[derive(
-    Debug, Clone, PartialEq,
-    serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeadAirEvent {
     pub start_sec: f32,
     pub duration_sec: f32,
@@ -42,10 +39,7 @@ pub struct DeadAirEvent {
 /// 4-hour music set); the counters below retain
 /// the FULL picture regardless of the cap, so the
 /// certificate never lies about total silence.
-#[derive(
-    Debug, Clone, PartialEq,
-    serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeadAirSummary {
     /// Detailed gaps, capped at MAX_DEAD_AIR_EVENTS.
     pub events: Vec<DeadAirEvent>,
@@ -219,8 +213,7 @@ impl SignalHealthMonitor {
                 // Always count toward the uncapped summary.
                 self.dead_air_total_count += 1;
                 self.dead_air_total_sec += dur;
-                self.dead_air_longest_sec =
-                    self.dead_air_longest_sec.max(dur);
+                self.dead_air_longest_sec = self.dead_air_longest_sec.max(dur);
                 // Store detail only while under the cap (O(1)).
                 if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
                     self.dead_air.push(DeadAirEvent {
@@ -272,23 +265,25 @@ impl SignalHealthMonitor {
     /// Tier 1: call after the early window (or at
     /// EOF if the file is shorter). Digital silence
     /// → fatal, fail fast.
-    pub fn tier1_verdict(
-        &self,
-        timing: VerdictTiming,
-    ) -> Result<(), String> {
+    pub fn tier1_verdict(&self, timing: VerdictTiming) -> Result<(), String> {
         // Grace period: still mid-stream and the
         // early window has not filled yet — do not
         // judge (avoids aborting on a brief opening
         // pause). Final always judges what it has.
         if timing == VerdictTiming::Progressive {
-            let early_cap = (EARLY_WINDOW_SECS
-                * self.sample_rate as f64)
-                as u64;
+            let early_cap = (EARLY_WINDOW_SECS * self.sample_rate as f64) as u64;
             if self.early_frames < early_cap {
                 return Ok(());
             }
         }
-        let dbfs = Self::dbfs(self.early_rms());
+        Self::validate_tier1_dbfs(Self::dbfs(self.early_rms()))
+    }
+
+    /// The ONE rule for "these dBFS mean a dead
+    /// input". Both shields (streaming tier1_verdict
+    /// and the pre-flight scout check) call this, so
+    /// they cannot diverge on threshold or message.
+    fn validate_tier1_dbfs(dbfs: f32) -> Result<(), String> {
         if dbfs < DIGITAL_SILENCE_DBFS {
             return Err(format!(
                 "Input validation failed: first \
@@ -299,6 +294,29 @@ impl SignalHealthMonitor {
             ));
         }
         Ok(())
+    }
+
+    /// Pre-flight silence check on the already-in-RAM
+    /// scout slice, run BEFORE the expensive scout_node
+    /// (NMF/stem). Uses the identical mono-equivalent
+    /// energy (l²+r²)*0.5 and threshold as the streaming
+    /// path — a file this rejects is exactly a file
+    /// tier1_verdict would reject. No interleave alloc.
+    /// Both channels read (a right-only file must not be
+    /// mistaken for silence).
+    pub fn check_scout_silence(left: &[f32], right: &[f32]) -> Result<(), String> {
+        let frames = left.len().min(right.len());
+        if frames == 0 {
+            return Ok(());
+        }
+        let mut sum_sq = 0.0f64;
+        for i in 0..frames {
+            let l = left[i] as f64;
+            let r = right[i] as f64;
+            sum_sq += (l * l + r * r) * 0.5;
+        }
+        let rms = libm::sqrt(sum_sq / frames as f64) as f32;
+        Self::validate_tier1_dbfs(Self::dbfs(rms))
     }
 
     /// Tier 2: call at EOF. Reproduces
@@ -339,8 +357,7 @@ impl SignalHealthMonitor {
                 // Always count toward the uncapped summary.
                 self.dead_air_total_count += 1;
                 self.dead_air_total_sec += dur;
-                self.dead_air_longest_sec =
-                    self.dead_air_longest_sec.max(dur);
+                self.dead_air_longest_sec = self.dead_air_longest_sec.max(dur);
                 // Store detail only while under the cap (O(1)).
                 if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
                     self.dead_air.push(DeadAirEvent {
@@ -351,8 +368,7 @@ impl SignalHealthMonitor {
             }
         }
         DeadAirSummary {
-            truncated: self.dead_air_total_count
-                > self.dead_air.len(),
+            truncated: self.dead_air_total_count > self.dead_air.len(),
             events: self.dead_air,
             total_count: self.dead_air_total_count,
             total_sec: self.dead_air_total_sec,
@@ -418,8 +434,7 @@ mod tests {
         // must NOT abort (would kill every podcast
         // with a quiet intro).
         assert!(
-            m.tier1_verdict(super::VerdictTiming::Progressive)
-                .is_ok(),
+            m.tier1_verdict(super::VerdictTiming::Progressive).is_ok(),
             "Progressive must grant grace before the \
              early window fills"
         );
@@ -427,8 +442,7 @@ mod tests {
         // Final: EOF reached with only silence seen —
         // the short all-silent file IS caught.
         assert!(
-            m.tier1_verdict(super::VerdictTiming::Final)
-                .is_err(),
+            m.tier1_verdict(super::VerdictTiming::Final).is_err(),
             "Final must catch an all-silent short file"
         );
     }
@@ -442,7 +456,10 @@ mod tests {
         let mut sig = tone(30.0, 0.01);
         sig.extend(vec![0.0f32; SR as usize * 300]);
         m.observe(&interleave(&sig));
-        assert!(m.tier1_verdict(super::VerdictTiming::Final).is_ok(), "30s of tone should pass Tier 1");
+        assert!(
+            m.tier1_verdict(super::VerdictTiming::Final).is_ok(),
+            "30s of tone should pass Tier 1"
+        );
         assert!(
             m.tier2_verdict().is_err(),
             "mostly-silent file should fail Tier 2"
@@ -463,7 +480,10 @@ mod tests {
             "a gap between speech is not fatal"
         );
         let events = m.finish();
-        assert!(!events.events.is_empty(), "the 5s gap should be a dead-air event");
+        assert!(
+            !events.events.is_empty(),
+            "the 5s gap should be a dead-air event"
+        );
         // Gap starts around 10s, lasts ~5s.
         let e = &events.events[0];
         assert!(
@@ -503,7 +523,7 @@ mod tests {
         // 60 cycles → 60 distinct events, well over
         // the MAX_DEAD_AIR_EVENTS cap of 50.
         let tone = vec![0.5_f32; (sr as usize) * 3 / 2 * 2]; // 1.5s stereo
-        let gap  = vec![0.0_f32; (sr as usize) * 4 * 2];     // 4.0s stereo
+        let gap = vec![0.0_f32; (sr as usize) * 4 * 2]; // 4.0s stereo
         let cycles = 60;
 
         for _ in 0..cycles {
@@ -539,7 +559,8 @@ mod tests {
             summary.total_count > MAX_DEAD_AIR_EVENTS,
             "test must generate more events ({}) than \
              the cap ({}) to prove bounding",
-            summary.total_count, MAX_DEAD_AIR_EVENTS
+            summary.total_count,
+            MAX_DEAD_AIR_EVENTS
         );
 
         // ── truncated flag set when detail < total ──
@@ -547,7 +568,8 @@ mod tests {
             summary.truncated,
             "truncated must be true when total_count \
              ({}) exceeds stored events ({})",
-            summary.total_count, summary.events.len()
+            summary.total_count,
+            summary.events.len()
         );
 
         // ── Totals are non-degenerate & consistent ──
@@ -561,7 +583,8 @@ mod tests {
             summary.longest_sec >= DEAD_AIR_MIN_SECS,
             "longest_sec must be ≥ the min threshold \
              ({}), got {}",
-            DEAD_AIR_MIN_SECS, summary.longest_sec
+            DEAD_AIR_MIN_SECS,
+            summary.longest_sec
         );
     }
 }
