@@ -67,13 +67,17 @@ pub struct EpisodeRenderResult {
 ///
 /// Peak RAM: O(CHUNK_FRAMES) ≈ 32 KB
 /// regardless of file duration.
-pub fn run<S: crate::dsp::audio_source::AudioSource>(
+pub fn run<S: crate::dsp::audio_source::AudioSource, F>(
     source: &mut S,
     blob_id: &str,
     mut graph: sp314_nodes::graph::DspGraph,
     target_lufs: f32,
     _pre_analysis: &PreAnalysisData,
-) -> Result<EpisodeRenderResult, String> {
+    mut progress_hook: F,
+) -> Result<EpisodeRenderResult, String>
+where
+    F: FnMut(&S) -> Result<(), String>,
+{
     // Source is any AudioSource: a raw
     // LazyAudioReader, a resampling
     // StandardizedAudioStream, or a test mock.
@@ -125,6 +129,14 @@ pub fn run<S: crate::dsp::audio_source::AudioSource>(
             if frames == 0 {
                 break;
             }
+            // Progress hook (Wave 2 §2): fill_buffer
+            // has already fed this chunk to the health
+            // monitor, so the caller sees fresh data.
+            // If the hook returns Err (e.g. tier-1
+            // digital-silence abort once the early
+            // window has filled), fail fast — skip the
+            // remaining DSP and the rest of the file.
+            progress_hook(source)?;
 
             // De-interleave
             for i in 0..frames {

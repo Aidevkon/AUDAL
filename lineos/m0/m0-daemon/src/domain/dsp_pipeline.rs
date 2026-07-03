@@ -324,22 +324,19 @@ fn run_dsp_internal(
             graph,
             episode_target_lufs.unwrap_or(-16.0),
             &pre_analysis,
+            |s| {
+                s.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Progressive)
+            },
         )?;
 
-        // Full-file validation (Tier 2): silence /
-        // 32x-gain guard, parity with decode_node.
-        //
-        // NOTE(wave-2): tier1_verdict() (the early
-        // 30s digital-silence abort) is intentionally
-        // NOT wired here yet. It's a fail-fast
-        // optimization, not a correctness check —
-        // tier2 at EOF already rejects dead/too-quiet
-        // files. Wiring tier1 to fire mid-render
-        // (aborting before the whole file is streamed)
-        // needs episode_render to surface a progress
-        // hook; that's wave 2. For now the monitor
-        // still tracks the early window internally, so
-        // enabling it later is just a call site.
+        // Final tier checks at EOF: tier1 now also
+        // runs here (VerdictTiming::Final) so a short
+        // all-silent file (shorter than the early
+        // window, which the Progressive hook grace-
+        // periods) is still caught.
+        stream.tier1_verdict(
+            crate::dsp::signal_health::VerdictTiming::Final,
+        )?;
         stream.tier2_verdict()?;
 
         // Input identity hashes over the SAME 48k/

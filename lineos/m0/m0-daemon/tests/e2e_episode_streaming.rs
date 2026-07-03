@@ -71,7 +71,17 @@ fn render_episode(
     let pre = lineos_types::pre_analysis::PreAnalysisData::silent();
     let mut source =
         m0d::dsp::lazy_reader::LazyAudioReader::open(Path::new(wav_path)).expect("open source");
-    m0d::domain::episode_render::run(&mut source, blob_id, graph, -16.0, &pre)
+    m0d::domain::episode_render::run(
+        &mut source,
+        blob_id,
+        graph,
+        -16.0,
+        &pre,
+        // No-op health hook: this test exercises the
+        // O(1) streaming heap, not the early-abort
+        // path. The hook must not affect memory.
+        |_| Ok(()),
+    )
         .expect("episode_render")
 }
 
