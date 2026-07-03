@@ -112,3 +112,39 @@ fn test_run_dsp_passes_healthy_podcast() {
         result.err()
     );
 }
+
+#[test]
+fn test_run_dsp_passes_real_mp3_podcast() {
+    let path = "/home/aidevcon/Music/ishaiaTEST.mp3";
+
+    // Safety check: if the file isn't present on the machine running the tests, skip gracefully
+    if !std::path::Path::new(path).exists() {
+        println!("SKIP: Real MP3 fixture not found at {}", path);
+        return;
+    }
+
+    // KNOWN GAP (HONESTY NOTE):
+    // This test proves that the tier1/scout fail-fast check passes for a REAL spoken-word
+    // MP3 (ishaiaTEST.mp3) decoded via symphonia, rather than a synthetic WAV.
+    // HOWEVER, it only passes because this specific MP3 yields a `Some(frames)` from
+    // `total_frames_hint()`.
+    // BUG: If an MP3 lacks frame metadata (e.g., pure CBR without Xing, live stream),
+    // `read_scout_sample` returns `None`, causing an immediate hard Error in run_dsp
+    // ("could not read audio"). This bypassing of tier1/fallback is a known bug that
+    // MUST be fixed separately, as Wave 3 streaming (OLA) applies only to the render pass
+    // and will not fix the 30s bounded scout read.
+    let result = run_dsp(
+        &make_req(path, "podcast"), // Triggers streaming path
+        std::time::Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-real-mp3".to_string(),
+    );
+
+    assert!(
+        result.is_ok(),
+        "run_dsp failed for REAL healthy MP3 podcast: {:?}",
+        result.err()
+    );
+}
