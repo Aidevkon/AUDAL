@@ -335,8 +335,11 @@ impl StandardizedAudioStream {
         (b, s)
     }
 
-    pub fn tier1_verdict(&self) -> Result<(), String> {
-        self.health.tier1_verdict()
+    pub fn tier1_verdict(
+        &self,
+        timing: crate::dsp::signal_health::VerdictTiming,
+    ) -> Result<(), String> {
+        self.health.tier1_verdict(timing)
     }
 
     pub fn tier2_verdict(&self) -> Result<(), String> {

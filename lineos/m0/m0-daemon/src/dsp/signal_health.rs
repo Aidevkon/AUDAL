@@ -87,6 +87,23 @@ const DEAD_AIR_MIN_SECS: f32 = 3.0;
 /// streams (the music-floor guarantee).
 const MAX_DEAD_AIR_EVENTS: usize = 50;
 
+/// When a tier-1 verdict is requested.
+///
+/// `Progressive` — mid-stream, called every chunk
+/// from the render progress hook. Returns Ok during
+/// the grace period before the early window has
+/// filled, so a podcast that starts with a brief
+/// pause is not aborted prematurely.
+///
+/// `Final` — at EOF. Judges whatever was observed
+/// even if shorter than the early window, so a
+/// short all-silent file is still caught.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerdictTiming {
+    Progressive,
+    Final,
+}
+
 pub struct SignalHealthMonitor {
     sample_rate: u32,
 
@@ -238,7 +255,22 @@ impl SignalHealthMonitor {
     /// Tier 1: call after the early window (or at
     /// EOF if the file is shorter). Digital silence
     /// → fatal, fail fast.
-    pub fn tier1_verdict(&self) -> Result<(), String> {
+    pub fn tier1_verdict(
+        &self,
+        timing: VerdictTiming,
+    ) -> Result<(), String> {
+        // Grace period: still mid-stream and the
+        // early window has not filled yet — do not
+        // judge (avoids aborting on a brief opening
+        // pause). Final always judges what it has.
+        if timing == VerdictTiming::Progressive {
+            let early_cap = (EARLY_WINDOW_SECS
+                * self.sample_rate as f64)
+                as u64;
+            if self.early_frames < early_cap {
+                return Ok(());
+            }
+        }
         let dbfs = Self::dbfs(self.early_rms());
         if dbfs < DIGITAL_SILENCE_DBFS {
             return Err(format!(
@@ -344,8 +376,43 @@ mod tests {
         let silence = vec![0.0f32; SR as usize * 31];
         m.observe(&interleave(&silence));
         assert!(
-            m.tier1_verdict().is_err(),
+            m.tier1_verdict(super::VerdictTiming::Final).is_err(),
             "digital silence should fail Tier 1"
+        );
+    }
+
+    /// The grace-period guarantee: a file that
+    /// starts silent but has NOT yet filled the
+    /// early window must NOT be aborted mid-stream
+    /// (Progressive), yet the SAME silence IS caught
+    /// at EOF (Final). This is what makes the
+    /// progress hook safe to call every chunk.
+    #[test]
+    fn tier1_grace_period_progressive_vs_final() {
+        let sr = 48_000;
+        let mut m = SignalHealthMonitor::new(sr);
+
+        // Feed only 1s of digital silence — far less
+        // than the early window.
+        let silence = vec![0.0_f32; sr as usize * 2];
+        m.observe(&silence);
+
+        // Progressive: still reading, grace period →
+        // must NOT abort (would kill every podcast
+        // with a quiet intro).
+        assert!(
+            m.tier1_verdict(super::VerdictTiming::Progressive)
+                .is_ok(),
+            "Progressive must grant grace before the \
+             early window fills"
+        );
+
+        // Final: EOF reached with only silence seen —
+        // the short all-silent file IS caught.
+        assert!(
+            m.tier1_verdict(super::VerdictTiming::Final)
+                .is_err(),
+            "Final must catch an all-silent short file"
         );
     }
 
@@ -358,7 +425,7 @@ mod tests {
         let mut sig = tone(30.0, 0.01);
         sig.extend(vec![0.0f32; SR as usize * 300]);
         m.observe(&interleave(&sig));
-        assert!(m.tier1_verdict().is_ok(), "30s of tone should pass Tier 1");
+        assert!(m.tier1_verdict(super::VerdictTiming::Final).is_ok(), "30s of tone should pass Tier 1");
         assert!(
             m.tier2_verdict().is_err(),
             "mostly-silent file should fail Tier 2"
@@ -373,7 +440,7 @@ mod tests {
         sig.extend(vec![0.0f32; SR as usize * 5]);
         sig.extend(tone(10.0, 0.3));
         m.observe(&interleave(&sig));
-        assert!(m.tier1_verdict().is_ok());
+        assert!(m.tier1_verdict(super::VerdictTiming::Final).is_ok());
         assert!(
             m.tier2_verdict().is_ok(),
             "a gap between speech is not fatal"
@@ -397,7 +464,7 @@ mod tests {
     fn healthy_audio_passes_both_tiers() {
         let mut m = SignalHealthMonitor::new(SR);
         m.observe(&interleave(&tone(40.0, 0.3)));
-        assert!(m.tier1_verdict().is_ok());
+        assert!(m.tier1_verdict(super::VerdictTiming::Final).is_ok());
         assert!(m.tier2_verdict().is_ok());
         assert!(m.finish().events.is_empty(), "clean tone has no dead air");
     }
