@@ -82,7 +82,7 @@ fn render_episode(
         // path. The hook must not affect memory.
         |_| Ok(()),
     )
-        .expect("episode_render")
+    .expect("episode_render")
 }
 
 // ── TEST 1: first floor produces a valid
