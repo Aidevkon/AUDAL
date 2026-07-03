@@ -278,7 +278,8 @@ signal.
   (verdict, certainty) instead of bare enums
 
 ## Backend Status (as of 2026-07-02)
-✅ O(1) Streaming Podcast Pipeline (PR #38) — full pipeline scale-invariant: 1m=2m=138MB heap, decode→resample→render→cert all bounded
+🟡 O(1) Streaming Podcast Pipeline (PR #38) — Render/monitoring PROVEN scale-invariant: signal-health, dead-air summary, and DSP render are bounded (episode_render_heap_is_scale_invariant passes: 1m vs 2m heap diff <5MB).
+⬜ Full pipeline NOT yet O(1): decode_node loads the whole file to RAM (O(N)). End-to-end heap test (full_pipeline_heap_is_scale_invariant) is #[ignore]d pending streaming decode (Phase 8 second floor); un-ignore when it ships → full-pipeline O(1) then proven.
 ✅ Reference-Driven Podcast Auto-Tuning (§2.6) — deterministic LTASS-based spectral correction, non-ML, EqSource-traceable in ProofLog (d9d990b→6af5f29)
 ✅ DSP Pipeline (sp314-dsp)
 ✅ AudioRepo + ArcSwap (zero-latency)
