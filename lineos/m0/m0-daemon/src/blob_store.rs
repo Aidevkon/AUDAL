@@ -76,6 +76,11 @@ pub struct StoredBlob {
     #[serde(default)]
     pub processing_timeline: Vec<StageRecord>,
 
+    /// Dead-air diagnostics (bounded, O(1)).
+    /// Default = clean (batch path / no monitor).
+    #[serde(default)]
+    pub dead_air: crate::dsp::signal_health::DeadAirSummary,
+
     // Audio payload — not serialized to JSON (never sent to frontend).
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
     // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
@@ -249,6 +254,7 @@ mod tests {
             pcm_blake3: None,
             cert_signature: None,
             processing_timeline: vec![],
+            dead_air: Default::default(),
             audio_path: std::path::PathBuf::from("/tmp/stub.pcm"),
             sample_rate: 48000,
             channels: 2,

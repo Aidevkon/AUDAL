@@ -347,7 +347,7 @@ fn run_dsp_internal(
         // Dead-air timeline events (non-fatal) —
         // consumed here; certificate surfacing is
         // wave 2.
-        let _dead_air = stream.into_dead_air();
+        let dead_air = stream.into_dead_air();
 
         let (fingerprints, spatial_metadata) = ContentType::bypassed_render();
         profiler.mark_stage_with_hash("Mastering", render_res.output_sha256.clone());
@@ -357,6 +357,7 @@ fn run_dsp_internal(
         let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
             pcm_blake3: render_res.pcm_blake3.clone(),
             output_sha256: render_res.output_sha256.clone(),
+            dead_air,
         };
 
         let cert_out = crate::domain::nodes::certificate_node::run_streaming(

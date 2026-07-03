@@ -60,6 +60,23 @@ pub struct DeadAirSummary {
     pub truncated: bool,
 }
 
+/// Default = a clean summary: no dead air observed.
+/// Used by the batch (music) path, which has no
+/// SignalHealthMonitor — a mastered track legitimately
+/// has zero dead air, so count=0 is accurate, not a
+/// placeholder.
+impl Default for DeadAirSummary {
+    fn default() -> Self {
+        Self {
+            events: Vec::new(),
+            total_count: 0,
+            total_sec: 0.0,
+            longest_sec: 0.0,
+            truncated: false,
+        }
+    }
+}
+
 /// Digital-silence floor for Tier 1 early abort.
 const DIGITAL_SILENCE_DBFS: f32 = -100.0;
 /// Silence floor for Tier 2 (matches decode_node).

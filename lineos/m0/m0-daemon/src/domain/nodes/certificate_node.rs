@@ -119,6 +119,7 @@ pub fn run(
         telemetry_lra,
         telemetry_short_term,
         telemetry_momentary,
+        crate::dsp::signal_health::DeadAirSummary::default(),
     )
 }
 
@@ -131,6 +132,7 @@ pub fn run(
 pub struct StreamingCertData {
     pub pcm_blake3: String,
     pub output_sha256: String,
+    pub dead_air: crate::dsp::signal_health::DeadAirSummary,
 }
 
 /// Certificate node for the Episode streaming
@@ -227,6 +229,7 @@ pub fn run_streaming(
         telemetry_lra,
         telemetry_short_term,
         telemetry_momentary,
+        cert_data.dead_air,
     )
 }
 
@@ -262,6 +265,7 @@ fn assemble_blob(
     telemetry_lra: f32,
     telemetry_short_term: f32,
     telemetry_momentary: f32,
+    dead_air: crate::dsp::signal_health::DeadAirSummary,
 ) -> Result<CertificateOutput, String> {
     let cert_sig =
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, fingerprints);
@@ -283,6 +287,7 @@ fn assemble_blob(
         pcm_blake3: Some(pcm_blake3),
         cert_signature: Some(cert_sig),
         processing_timeline,
+        dead_air,
         loudness: StoredLoudness {
             integrated_lufs: lufs,
             short_term_lufs: telemetry_short_term,

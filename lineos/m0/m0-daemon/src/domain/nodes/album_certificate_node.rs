@@ -147,6 +147,7 @@ mod tests {
             pcm_blake3: None,
             cert_signature: None,
             processing_timeline: vec![],
+            dead_air: Default::default(),
             audio_path: std::path::PathBuf::new(),
             sample_rate: 48000,
             channels: 2,
