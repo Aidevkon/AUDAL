@@ -14,6 +14,11 @@ pub struct LraCalculator {
     /// Short-term loudness values (3s windows) that passed the absolute gate.
     short_term_values: Vec<f32>,
     sample_rate: u32,
+    hop_sum: f32,
+    hop_count: usize,
+    st_hops: [f32; 3],
+    st_idx: usize,
+    st_filled: usize,
 }
 
 impl LraCalculator {
@@ -21,6 +26,44 @@ impl LraCalculator {
         Self {
             short_term_values: Vec::new(),
             sample_rate,
+            hop_sum: 0.0,
+            hop_count: 0,
+            st_hops: [0.0; 3],
+            st_idx: 0,
+            st_filled: 0,
+        }
+    }
+
+    /// Feed audio chunks iteratively (streaming).
+    /// left and right must be equal length.
+    pub fn process_chunk(&mut self, left: &[f32], right: &[f32]) {
+        debug_assert_eq!(left.len(), right.len());
+        let hop_size_samples = self.sample_rate as usize * 2;
+
+        for (&l, &r) in left.iter().zip(right.iter()) {
+            self.hop_sum += l * l + r * r;
+            self.hop_count += 2;
+
+            if self.hop_count >= hop_size_samples {
+                self.st_hops[self.st_idx] = self.hop_sum;
+                self.st_idx = (self.st_idx + 1) % 3;
+                if self.st_filled < 3 {
+                    self.st_filled += 1;
+                }
+
+                if self.st_filled == 3 {
+                    let window_sum: f32 = self.st_hops.iter().sum();
+                    let window_len = hop_size_samples * 3;
+                    let ms = window_sum / window_len as f32;
+                    let lufs = ms_to_lufs(ms);
+                    if lufs > -70.0 {
+                        self.short_term_values.push(lufs);
+                    }
+                }
+
+                self.hop_sum = 0.0;
+                self.hop_count = 0;
+            }
         }
     }
 
@@ -149,5 +192,115 @@ mod tests {
         // Very small signal → very negative LUFS
         let lufs = ms_to_lufs(1e-10);
         assert!(lufs < -50.0);
+    }
+
+    #[test]
+    fn test_lra_streaming_equivalence() {
+        let sr = 48000;
+        let mut interleaved = Vec::new();
+        // 4s @ 0.5
+        for _ in 0..(sr * 4) {
+            interleaved.push(0.5);
+            interleaved.push(0.5);
+        }
+        // 4s @ 0.05
+        for _ in 0..(sr * 4) {
+            interleaved.push(0.05);
+            interleaved.push(0.05);
+        }
+        // 4s @ 0.5
+        for _ in 0..(sr * 4) {
+            interleaved.push(0.5);
+            interleaved.push(0.5);
+        }
+
+        let mut calc_batch = LraCalculator::new(sr);
+        calc_batch.feed_samples(&interleaved, 2);
+        let lra_batch = calc_batch.compute();
+
+        // anti-false-positive: signal has dynamics
+        assert!(
+            lra_batch > 1.0,
+            "Signal should have non-zero dynamics, got {}",
+            lra_batch
+        );
+
+        let mut calc_stream = LraCalculator::new(sr);
+
+        let frames = interleaved.len() / 2;
+        let mut left = alloc::vec::Vec::with_capacity(frames);
+        let mut right = alloc::vec::Vec::with_capacity(frames);
+        for i in 0..frames {
+            left.push(interleaved[i * 2]);
+            right.push(interleaved[i * 2 + 1]);
+        }
+
+        let chunk_size = 4096;
+        let mut pos = 0;
+        while pos < frames {
+            let end = (pos + chunk_size).min(frames);
+            calc_stream.process_chunk(&left[pos..end], &right[pos..end]);
+            pos = end;
+        }
+        let lra_stream = calc_stream.compute();
+
+        let diff = (lra_batch - lra_stream).abs();
+        assert!(
+            diff < 0.5,
+            "Streaming LRA {} differs from batch LRA {}",
+            lra_stream,
+            lra_batch
+        );
+    }
+
+    #[test]
+    fn test_lra_streaming_equivalence_ramp() {
+        let sr = 48000;
+        let mut interleaved = Vec::new();
+        // ράμπα: linear fade από 0.5 → 0.01 σε 12s
+        for i in 0..(sr * 12) {
+            let t = i as f32 / (sr * 12) as f32;
+            let amp = 0.5 * (1.0 - t) + 0.01 * t; // fade
+            interleaved.push(amp);
+            interleaved.push(amp);
+        }
+
+        let mut calc_batch = LraCalculator::new(sr);
+        calc_batch.feed_samples(&interleaved, 2);
+        let lra_batch = calc_batch.compute();
+
+        // anti-false-positive: signal has dynamics
+        assert!(
+            lra_batch > 1.0,
+            "Signal should have non-zero dynamics, got {}",
+            lra_batch
+        );
+
+        let mut calc_stream = LraCalculator::new(sr);
+
+        let frames = interleaved.len() / 2;
+        let mut left = alloc::vec::Vec::with_capacity(frames);
+        let mut right = alloc::vec::Vec::with_capacity(frames);
+        for i in 0..frames {
+            left.push(interleaved[i * 2]);
+            right.push(interleaved[i * 2 + 1]);
+        }
+
+        let chunk_size = 4096;
+        let mut pos = 0;
+        while pos < frames {
+            let end = (pos + chunk_size).min(frames);
+            calc_stream.process_chunk(&left[pos..end], &right[pos..end]);
+            pos = end;
+        }
+        let lra_stream = calc_stream.compute();
+
+        let diff = (lra_batch - lra_stream).abs();
+        assert!(
+            diff < 0.5,
+            "Streaming LRA {} differs from batch LRA {}",
+            lra_stream,
+            lra_batch
+        );
     }
 }

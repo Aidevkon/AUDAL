@@ -370,6 +370,7 @@ fn run_dsp_internal(
         let cert_out = crate::domain::nodes::certificate_node::run_streaming(
             &blob_id,
             render_res.output_lufs,
+            render_res.output_lra,
             render_res.true_peak_dbtp,
             &fingerprints,
             &spatial_metadata,

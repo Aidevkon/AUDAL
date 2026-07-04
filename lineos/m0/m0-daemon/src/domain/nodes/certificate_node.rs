@@ -145,15 +145,14 @@ pub struct StreamingCertData {
 /// source + telemetry); the StoredBlob assembly is
 /// the shared assemble_blob() helper.
 ///
-/// TODO(wave-2): telemetry_lra / short_term /
-///   momentary are 0.0 here. Episode gets its own
-///   dialogue_lra + noise_floor_db + apple_
-///   podcasts_compliant certificate variant in
-///   wave 2. See CREATOR_OS_DECISION_LOG.
+/// TODO(wave-2): short_term / momentary stay 0.0
+///   for wave 2; noise_floor_db + apple_podcasts
+///   pending.
 #[allow(clippy::too_many_arguments)]
 pub fn run_streaming(
     blob_id: &str,
     lufs: f32,
+    lra: f32,
     true_peak: f32,
     fingerprints: &StemFingerprints,
     spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
@@ -173,9 +172,8 @@ pub fn run_streaming(
     cert_data: StreamingCertData,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
-    // LRA / momentary / short-term are 0.0 for
-    // wave 1 (see TODO above).
-    let telemetry_lra = 0.0_f32;
+    // momentary / short-term stay 0.0.
+    let telemetry_lra = lra;
     let telemetry_short_term = 0.0_f32;
     let telemetry_momentary = 0.0_f32;
 

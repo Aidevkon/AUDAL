@@ -39,17 +39,10 @@ pub struct EpisodeRenderResult {
     pub output_lufs: f32,
     /// True peak after limiting (dBTP).
     pub true_peak_dbtp: f32,
-    // TODO(wave-2): dialogue_lra for the
-    //   podcast certificate. The generic
-    //   music LRA (LraCalculator) is not
-    //   streaming — it needs a 3s window
-    //   buffer — and is not the right metric
-    //   for spoken-word anyway. Episode
-    //   certificates currently omit LRA;
-    //   wave 2 adds dialogue_lra +
-    //   noise_floor_db + apple_podcasts_
-    //   compliant as an Episode certificate
-    //   variant. See CREATOR_OS_DECISION_LOG.
+    pub output_lra: f32,
+    // TODO(wave-2): noise_floor_db + apple_podcasts_
+    // compliant. (LRA now wired: streaming LraCalculator,
+    // EBU Tech 3342.)
 }
 
 /// Stream-render an Episode/podcast file
@@ -114,6 +107,7 @@ where
 
     // ── PASS 2: DSP + measure ─────────
     let mut lufs_meter = LufsMeter::new();
+    let mut lra_calc = lineos_telemetry::lra::LraCalculator::new(sample_rate);
     let mut peak_linear = 0f32;
     let mut frames_written = 0usize;
 
@@ -161,6 +155,7 @@ where
 
             // Running LUFS + peak
             lufs_meter.process_chunk(&left_buf[..frames], &right_buf[..frames]);
+            lra_calc.process_chunk(&left_buf[..frames], &right_buf[..frames]);
             for i in 0..frames {
                 peak_linear = peak_linear.max(left_buf[i].abs()).max(right_buf[i].abs());
             }
@@ -177,6 +172,7 @@ where
 
     // LUFS from streaming meter
     let output_lufs = lufs_meter.finish().unwrap_or(target_lufs);
+    let output_lra = lra_calc.compute();
 
     // Static gain correction (dB → linear)
     let correction_db = target_lufs - output_lufs;
@@ -278,6 +274,7 @@ where
         frames_written,
         sample_rate,
         output_lufs,
+        output_lra,
         true_peak_dbtp,
     })
 }
