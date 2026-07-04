@@ -52,6 +52,8 @@ pub struct DeadAirSummary {
     /// True if events were capped (total_count >
     /// events.len()).
     pub truncated: bool,
+    /// Minimum dBFS of any non-dead-air window. None if stream is 100% dead air.
+    pub noise_floor_dbfs: Option<f32>,
 }
 
 /// Default = a clean summary: no dead air observed.
@@ -67,6 +69,7 @@ impl Default for DeadAirSummary {
             total_sec: 0.0,
             longest_sec: 0.0,
             truncated: false,
+            noise_floor_dbfs: None,
         }
     }
 }
@@ -137,6 +140,7 @@ pub struct SignalHealthMonitor {
     dead_air_total_count: usize,
     dead_air_total_sec: f32,
     dead_air_longest_sec: f32,
+    min_nondead_dbfs: Option<f32>,
 }
 
 impl SignalHealthMonitor {
@@ -155,6 +159,7 @@ impl SignalHealthMonitor {
             dead_air_total_count: 0,
             dead_air_total_sec: 0.0,
             dead_air_longest_sec: 0.0,
+            min_nondead_dbfs: None,
         }
     }
 
@@ -206,20 +211,27 @@ impl SignalHealthMonitor {
             if self.dead_air_run_start.is_none() {
                 self.dead_air_run_start = Some(window_sec);
             }
-        } else if let Some(start) = self.dead_air_run_start.take() {
-            // Run ended — record if long enough.
-            let dur = window_sec - start;
-            if dur >= DEAD_AIR_MIN_SECS {
-                // Always count toward the uncapped summary.
-                self.dead_air_total_count += 1;
-                self.dead_air_total_sec += dur;
-                self.dead_air_longest_sec = self.dead_air_longest_sec.max(dur);
-                // Store detail only while under the cap (O(1)).
-                if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
-                    self.dead_air.push(DeadAirEvent {
-                        start_sec: start,
-                        duration_sec: dur,
-                    });
+        } else {
+            self.min_nondead_dbfs = Some(match self.min_nondead_dbfs {
+                Some(min) => min.min(dbfs),
+                None => dbfs,
+            });
+
+            if let Some(start) = self.dead_air_run_start.take() {
+                // Run ended — record if long enough.
+                let dur = window_sec - start;
+                if dur >= DEAD_AIR_MIN_SECS {
+                    // Always count toward the uncapped summary.
+                    self.dead_air_total_count += 1;
+                    self.dead_air_total_sec += dur;
+                    self.dead_air_longest_sec = self.dead_air_longest_sec.max(dur);
+                    // Store detail only while under the cap (O(1)).
+                    if self.dead_air.len() < MAX_DEAD_AIR_EVENTS {
+                        self.dead_air.push(DeadAirEvent {
+                            start_sec: start,
+                            duration_sec: dur,
+                        });
+                    }
                 }
             }
         }
@@ -373,6 +385,7 @@ impl SignalHealthMonitor {
             total_count: self.dead_air_total_count,
             total_sec: self.dead_air_total_sec,
             longest_sec: self.dead_air_longest_sec,
+            noise_floor_dbfs: self.min_nondead_dbfs,
         }
     }
 }
@@ -585,6 +598,93 @@ mod tests {
              ({}), got {}",
             DEAD_AIR_MIN_SECS,
             summary.longest_sec
+        );
+    }
+    #[test]
+    fn quiet_but_not_dead_air_sets_noise_floor() {
+        let mut m = SignalHealthMonitor::new(SR);
+        // -40 dBFS is above the -60 dead-air threshold.
+        // rms = 0.01 / sqrt(2) ≈ 0.00707 -> 20 * log10(0.00707) ≈ -43.0 dBFS
+        m.observe(&interleave(&tone(3.5, 0.01)));
+        let summary = m.finish();
+
+        let floor = summary.noise_floor_dbfs.expect("expected Some");
+        // Tolerance ±1 dB
+        assert!(
+            (floor - (-43.0)).abs() < 1.0,
+            "Noise floor should track the ~ -43 dBFS non-dead acoustic window, got {}",
+            floor
+        );
+    }
+
+    #[test]
+    fn dead_air_excluded_from_noise_floor() {
+        let mut m = SignalHealthMonitor::new(SR);
+        // -30 dBFS tone (rms ~ 0.0316) for 2 seconds.
+        m.observe(&interleave(&tone(2.0, 0.0316)));
+        // Digital silence for 4 seconds (dead air).
+        m.observe(&interleave(&vec![0.0f32; SR as usize * 4]));
+
+        let summary = m.finish();
+
+        let floor = summary.noise_floor_dbfs.expect("expected Some");
+        // Noise floor should ignore the dead-air silence and only reflect the -30 dBFS tone.
+        assert!(
+            floor >= -35.0,
+            "Noise floor should NOT drop to -100/dead-air. Expected ~ -30, got {}",
+            floor
+        );
+    }
+
+    #[test]
+    fn all_dead_air_yields_default_zero_floor() {
+        let mut m = SignalHealthMonitor::new(SR);
+        // 100% digital silence
+        m.observe(&interleave(&vec![0.0f32; SR as usize * 5]));
+
+        let summary = m.finish();
+
+        assert_eq!(
+            summary.noise_floor_dbfs, None,
+            "100% dead air -> no non-dead measurement ever occurred"
+        );
+    }
+
+    #[test]
+    fn noise_floor_picks_minimum_among_multiple_nondead_levels() {
+        let mut m = SignalHealthMonitor::new(SR);
+
+        // 1. Loud tone: ~2 secs peak amplitude 0.5 (RMS ≈ 0.354 -> 20*log10(0.354) ≈ -9.0 dBFS)
+        m.observe(&interleave(&tone(2.0, 0.5)));
+
+        // 2. Quiet tone: ~2 secs peak amplitude 0.01 (RMS ≈ 0.00707 -> 20*log10(0.00707) ≈ -43.0 dBFS)
+        m.observe(&interleave(&tone(2.0, 0.01)));
+
+        // 3. Digital silence: ~3 secs (dead air)
+        m.observe(&interleave(&vec![0.0f32; SR as usize * 3]));
+
+        let summary = m.finish();
+        let floor = summary.noise_floor_dbfs.expect("expected Some");
+
+        // a) Tight ±1.0 dB around -43.0
+        assert!(
+            (floor - (-43.0)).abs() < 1.0,
+            "Noise floor should track the minimum non-dead level (~ -43.0), got {}",
+            floor
+        );
+
+        // b) Explicit negative control: did not pick the loud tone
+        assert!(
+            (floor - (-9.0)).abs() > 20.0,
+            "Noise floor erroneously tracked the loud tone (-9 dBFS). Got {}",
+            floor
+        );
+
+        // c) Explicit second negative control: did not leak dead air
+        assert!(
+            floor > -55.0,
+            "Noise floor erroneously leaked digital silence / dead air (should be > -55), got {}",
+            floor
         );
     }
 }

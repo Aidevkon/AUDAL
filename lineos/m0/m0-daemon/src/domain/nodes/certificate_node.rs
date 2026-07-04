@@ -271,6 +271,9 @@ fn assemble_blob(
     let dr = 10.0;
     let sc = 1.0;
 
+    // Extract early to avoid borrow-after-move when dead_air is consumed below.
+    let noise_floor = dead_air.noise_floor_dbfs;
+
     let blob = StoredBlob {
         id: blob_id.to_string(),
         version: "1.0".into(),
@@ -292,6 +295,7 @@ fn assemble_blob(
             momentary_lufs: telemetry_momentary,
             true_peak_dbtp: true_peak,
             lra: telemetry_lra,
+            noise_floor_dbfs: noise_floor,
             k_weighted: true,
             ebu_r128_target_lufs: -23.0,
             ebu_r128_compliant: lufs <= -23.0 && true_peak <= -1.0,

@@ -49,6 +49,7 @@ mod tests {
                 momentary_lufs: -12.0,
                 true_peak_dbtp: -1.0,
                 lra: 8.0,
+                noise_floor_dbfs: None,
                 k_weighted: true,
                 ebu_r128_target_lufs: -23.0,
                 ebu_r128_compliant: false,

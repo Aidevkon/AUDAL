@@ -102,6 +102,8 @@ pub struct StoredLoudness {
     pub momentary_lufs: f32,
     pub true_peak_dbtp: f32,
     pub lra: f32,
+    #[serde(default)]
+    pub noise_floor_dbfs: Option<f32>,
     pub k_weighted: bool,
     pub ebu_r128_target_lufs: f32,
     pub ebu_r128_compliant: bool,
@@ -214,6 +216,7 @@ mod tests {
                 momentary_lufs: -12.0,
                 true_peak_dbtp: -1.0,
                 lra: 8.0,
+                noise_floor_dbfs: None,
                 k_weighted: true,
                 ebu_r128_target_lufs: -23.0,
                 ebu_r128_compliant: false,
