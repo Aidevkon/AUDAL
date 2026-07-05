@@ -1,4 +1,4 @@
-use openclaw::OpenClawEngine;
+use loom::LoomEngine;
 use pipelineforge::conditions::{ConditionSet, EngineerCondition};
 use pipelineforge::forge::Pipelineforge;
 
@@ -23,14 +23,14 @@ fn muddy_topology() -> String {
 #[test]
 fn engine_initializes_from_topology_json() {
     let json = minimal_topology();
-    let engine = OpenClawEngine::new(&json, 512, 48000);
+    let engine = LoomEngine::new(&json, 512, 48000);
     assert!(engine.is_ok(), "Engine should be created without error");
 }
 
 #[test]
 fn engine_processes_silence_without_panic() {
     let json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
 
     let mut samples = vec![0.0; 1024]; // 512 stereo frames
     engine.process(&mut samples);
@@ -43,7 +43,7 @@ fn engine_processes_silence_without_panic() {
 #[test]
 fn engine_processes_sine_wave() {
     let json = muddy_topology();
-    let mut engine = OpenClawEngine::new(&json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
 
     let mut samples = vec![0.0; 1024];
     for i in 0..512 {
@@ -67,7 +67,7 @@ fn engine_processes_sine_wave() {
 #[test]
 fn set_node_parameter_does_not_panic() {
     let json = muddy_topology();
-    let mut engine = OpenClawEngine::new(&json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
 
     engine.set_node_parameter("f0_biquad_lowmid", "freq_hz", 300.0);
 
@@ -79,7 +79,7 @@ fn set_node_parameter_does_not_panic() {
 #[test]
 fn engine_reset_produces_identical_output() {
     let json = muddy_topology();
-    let mut engine = OpenClawEngine::new(&json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
 
     let mut input = vec![0.0; 1024];
     for i in 0..512 {
@@ -123,8 +123,7 @@ fn time_aware_json() -> String {
 fn scheduler_advances_and_detects_boundary() {
     let json = time_aware_json();
     let mut scheduler =
-        openclaw::scheduler::SectionScheduler::from_time_aware_behaviour(&json, 512, 48000)
-            .unwrap();
+        loom::scheduler::SectionScheduler::from_time_aware_behaviour(&json, 512, 48000).unwrap();
 
     // We expect section boundary around 500ms
     // 500ms at 48000Hz = 24000 samples
@@ -151,7 +150,7 @@ fn crossfader_produces_valid_output() {
     let graph_a = sp314_nodes::graph::DspGraph::from_topology(&t1, 512, 48000).unwrap();
     let graph_b = sp314_nodes::graph::DspGraph::from_topology(&t2, 512, 48000).unwrap();
 
-    let mut crossfader = openclaw::crossfader::Crossfader::new(512);
+    let mut crossfader = loom::crossfader::Crossfader::new(512);
     crossfader.begin(graph_a, graph_b, 2400); // 50ms at 48kHz
 
     let mut active = true;
@@ -176,7 +175,7 @@ fn crossfader_produces_valid_output() {
 fn engine_switches_section_glitch_free() {
     let json = time_aware_json();
     let minimal_json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&minimal_json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&minimal_json, 512, 48000).unwrap();
 
     engine.load_time_aware_behaviour(&json).unwrap();
 
@@ -220,7 +219,7 @@ fn generate_test_flac_bytes(num_frames: usize, sample_rate: u32) -> Vec<u8> {
 #[test]
 fn stem_buffer_decodes_flac_bytes() {
     let bytes = generate_test_flac_bytes(1024, 48000);
-    let buffer = openclaw::stem::StemBuffer::from_flac_bytes("vocals", &bytes).unwrap();
+    let buffer = loom::stem::StemBuffer::from_flac_bytes("vocals", &bytes).unwrap();
     assert_eq!(buffer.id, "vocals");
     assert!(buffer.num_frames > 0);
     for s in &buffer.left {
@@ -234,7 +233,7 @@ fn stem_buffer_decodes_flac_bytes() {
 #[test]
 fn stem_buffer_read_block_pads_silence() {
     let bytes = generate_test_flac_bytes(100, 48000);
-    let buffer = openclaw::stem::StemBuffer::from_flac_bytes("vocals", &bytes).unwrap();
+    let buffer = loom::stem::StemBuffer::from_flac_bytes("vocals", &bytes).unwrap();
 
     let mut left = vec![0.0; 512];
     let mut right = vec![0.0; 512];
@@ -254,12 +253,12 @@ fn stem_buffer_read_block_pads_silence() {
 #[test]
 fn stem_engine_processes_without_panic() {
     let bytes = generate_test_flac_bytes(2048, 48000);
-    let buffer = openclaw::stem::StemBuffer::from_flac_bytes("test", &bytes).unwrap();
+    let buffer = loom::stem::StemBuffer::from_flac_bytes("test", &bytes).unwrap();
 
     let t = sp314_nodes::topology::DspTopology::from_json(&minimal_topology()).unwrap();
     let graph = sp314_nodes::graph::DspGraph::from_topology(&t, 512, 48000).unwrap();
 
-    let mut engine = openclaw::stem_engine::StemEngine::new(buffer, graph, 512);
+    let mut engine = loom::stem_engine::StemEngine::new(buffer, graph, 512);
 
     let mut left = vec![0.0; 512];
     let mut right = vec![0.0; 512];
@@ -275,7 +274,7 @@ fn process_stems_sums_four_channels() {
     let bytes = generate_test_flac_bytes(1024, 48000);
 
     let minimal_json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&minimal_json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&minimal_json, 512, 48000).unwrap();
 
     let tab_json = r#"{"sections":[]}"#; // minimal valid tab JSON for load_stems
     engine
@@ -298,7 +297,7 @@ fn stem_seek_advances_correctly() {
     let bytes = generate_test_flac_bytes(1024, 48000);
 
     let minimal_json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&minimal_json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&minimal_json, 512, 48000).unwrap();
 
     let tab_json = r#"{"sections":[]}"#;
     engine
@@ -360,7 +359,7 @@ fn biquad_glide_produces_no_nan() {
 fn set_stem_node_parameter_updates_correct_stem() {
     let bytes = generate_test_flac_bytes(1024, 48000);
     let minimal_json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&minimal_json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&minimal_json, 512, 48000).unwrap();
     let tab_json = r#"{"sections":[]}"#;
     engine
         .load_stems(&bytes, &bytes, &bytes, &bytes, tab_json)
@@ -384,7 +383,7 @@ fn set_stem_node_parameter_updates_correct_stem() {
 #[test]
 fn global_glide_ms_applies_to_all_nodes() {
     let json = minimal_topology();
-    let mut engine = OpenClawEngine::new(&json, 512, 48000).unwrap();
+    let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
     engine.set_global_glide_ms(100.0);
 
     // Verify it doesn't panic and processes audio

@@ -4555,6 +4555,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
 
 [[package]]
+name = "loom"
+version = "0.1.0"
+dependencies = [
+ "flacenc",
+ "pipelineforge",
+ "serde",
+ "serde_json",
+ "sp314-nodes",
+ "symphonia",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "loop9"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4644,7 +4658,6 @@ dependencies = [
  "lineos-telemetry",
  "lineos-types",
  "memmap2",
- "openclaw",
  "pipelineforge",
  "printpdf",
  "qrcode",
@@ -5554,20 +5567,6 @@ name = "oorandom"
 version = "11.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
-
-[[package]]
-name = "openclaw"
-version = "0.1.0"
-dependencies = [
- "flacenc",
- "pipelineforge",
- "serde",
- "serde_json",
- "sp314-nodes",
- "symphonia",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
 
 [[package]]
 name = "openssl"

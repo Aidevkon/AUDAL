@@ -13,7 +13,7 @@ members = [
     "lineos/m1/lame-sys",           # Phase 13A: LAME dynamic FFI (LGPL compliant)
     "apps/stillair/src-tauri",
     "apps/stillair/cockpit-dioxus",   # Phase 11: Dioxus 0.6 Cockpit
-    "creator-os/shared/adapter-runtime", "lineos/m1/sp314-nodes", "pipelines/pipelineforge", "apps/runtime/openclaw",  # Phase 8: Aether LLM adapter runtime
+    "creator-os/shared/adapter-runtime", "lineos/m1/sp314-nodes", "pipelines/pipelineforge", "apps/runtime/loom",  # Phase 8: Aether LLM adapter runtime
     "aether",
     "integration",
     "proof",

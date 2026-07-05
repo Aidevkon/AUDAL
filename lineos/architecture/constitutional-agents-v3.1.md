@@ -33,11 +33,11 @@ In **v3.1**, the system is divided into highly specialized **Agents**.
 *   **Mechanism:** When the DSP finishes, this agent hashes the raw PCM data (BLAKE3), stores it securely, and maintains the **A/B/C Tree** (the branching history of user decisions).
 *   **Constraint:** Never alters audio. It only tracks, hashes, and retrieves exact versions. It guarantees bit-for-bit reproducibility.
 
-### 2.3 OpenClaw Workflow Agent
-**Role:** The Execution Distributor (`distributor.rs` / `operator.rs`).
-*   **Responsibility:** The engine driver. It reads the current state and orchestrates the deterministic pipeline execution.
-*   **Mechanism:** It hands data over to `sp314-dsp` (Engine Layer), tells it exactly what parameters to use, waits for the result, and then routes the result to the Golden Blob Agent.
-*   **Constraint:** It does not decide *what* to do (that is the user's/schema's job), it only dictates *how* to execute it safely, efficiently, and concurrently.
+### 2.3 Conductor & Executor Agents
+**Role:** The Execution Orchestrators (`operator.rs`).
+*   **Responsibility:** The `Conductor` reads the current state and orchestrates the overall mastering workflow (batch or single). The `Executor` is the engine driver that handles the actual DSP execution.
+*   **Mechanism:** The `Conductor` prepares the execution plan and sends it to the `Executor`. The `Executor` hands data over to `sp314-dsp` (Engine Layer), runs the parameters, waits for the result, and then routes the output to the Golden Blob Agent.
+*   **Constraint:** They do not decide *what* to do (that is the user's/schema's job), they only dictate *how* to execute it safely, efficiently, and concurrently.
 
 ### 2.4 Coach Agent
 **Role:** The Rule-Based Analyst.
@@ -65,7 +65,7 @@ Agents do not call each other's functions directly (no spaghetti code).
 They communicate via a **Message Bus / Intent System**.
 
 1.  **UI Intent:** User clicks "Master".
-2.  **OpenClaw Agent:** Sees intent, locks the pipeline, dispatches job to `sp314-dsp`.
+2.  **Conductor & Executor:** Conductor sees intent and plans workflow; Executor locks pipeline and dispatches job to `sp314-dsp`.
 3.  **Golden Blob Agent:** Catches output, hashes it, saves the binary.
 4.  **Schema Agent:** Receives the hash and updates the Project State safely.
 5.  **Coach Agent:** Reads the new state, generates telemetry findings.

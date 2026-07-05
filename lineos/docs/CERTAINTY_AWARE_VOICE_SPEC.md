@@ -360,7 +360,7 @@ histograms from real audio using the existing corpus machinery.
 
 ### ✗ NEED (only if voice packs) — Backend WASM Sandbox
 Only `wasm-bindgen` exists today (front-end browser target in
-cockpit/openclaw). The backend (`m0-daemon`/`lineos`) has NO wasm
+cockpit/loom). The backend (`m0-daemon`/`lineos`) has NO wasm
 sandbox (`wasmtime`/`wasmer`). This is ONLY needed if the future
 direction includes loading untrusted voice packs as sandboxed
 plugins — not required for the certainty/prediction core. Deferred

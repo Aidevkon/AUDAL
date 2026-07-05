@@ -1,6 +1,6 @@
-import init, { OpenClawEngine } from './e11.js';
+import init, { LoomEngine } from './e11.js';
 
-class OpenClawWorklet extends AudioWorkletProcessor {
+class LoomWorklet extends AudioWorkletProcessor {
     constructor() {
         super();
         this.engine = null;
@@ -11,7 +11,7 @@ class OpenClawWorklet extends AudioWorkletProcessor {
 
             if (type === 'INIT') {
                 await init(data.wasmBytes);
-                this.engine = new OpenClawEngine(
+                this.engine = new LoomEngine(
                     data.topologyJson,
                     data.blockSize,
                     sampleRate
@@ -87,7 +87,7 @@ class OpenClawWorklet extends AudioWorkletProcessor {
 
             if (type === 'UPDATE_TOPOLOGY') {
                 if (data.topologyJson && this.engine) {
-                    this.engine = new OpenClawEngine(
+                    this.engine = new LoomEngine(
                         data.topologyJson,
                         data.blockSize,
                         sampleRate
@@ -131,4 +131,4 @@ class OpenClawWorklet extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor('openclaw-worklet', OpenClawWorklet);
+registerProcessor('loom-worklet', LoomWorklet);

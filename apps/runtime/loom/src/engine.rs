@@ -5,7 +5,7 @@ use sp314_nodes::{graph::DspGraph, topology::DspTopology};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub struct OpenClawEngine {
+pub struct LoomEngine {
     graph: DspGraph,
     block_size: usize,
     sample_rate: u32,
@@ -25,20 +25,20 @@ pub struct OpenClawEngine {
 }
 
 #[wasm_bindgen]
-impl OpenClawEngine {
+impl LoomEngine {
     #[wasm_bindgen(constructor)]
     pub fn new(
         topology_json: &str,
         block_size: usize,
         sample_rate: u32,
-    ) -> Result<OpenClawEngine, JsValue> {
+    ) -> Result<LoomEngine, JsValue> {
         let topology = DspTopology::from_json(topology_json)
             .map_err(|e| JsValue::from_str(&format!("Topology parse error: {}", e)))?;
 
         let graph = DspGraph::from_topology(&topology, block_size, sample_rate)
             .map_err(|e| JsValue::from_str(&format!("Graph build error: {:?}", e)))?;
 
-        Ok(OpenClawEngine {
+        Ok(LoomEngine {
             graph,
             block_size,
             sample_rate,

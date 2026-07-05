@@ -29,7 +29,6 @@ uuid         = { version = "1", features = ["v4"] }
 sp314-dsp    = { path = "../../m1/sp314-dsp", features = ["cli"] }
 lineos-types = { path = "../../m1/lineos-types" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
-openclaw      = { path = "../../../apps/runtime/openclaw" }
 sp314-nodes   = { path = "../../m1/sp314-nodes" }
 lineos-telemetry = { path = "../../m1/telemetry" }  # Phase 9: real LRA/momentary/short-term
 aether-bridge = { path = "../../../shared/aether-bridge" }
