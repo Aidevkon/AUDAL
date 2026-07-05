@@ -1,8 +1,9 @@
 use crate::dsp::lazy_reader::LazyAudioReader;
+use serde::Serialize;
 use std::path::Path;
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ScoutBucket {
     pub timestamp_sec: f32,
     pub peak_linear: f32,
@@ -14,7 +15,7 @@ pub struct ScoutBucket {
 /// included un-weighted and surround channels are not weighted
 /// ×1.5 per spec — results are numerically valid but not loudness-
 /// standard-compliant on multichannel input. See vision doc §11.6.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SparseScoutSummary {
     pub buckets: Vec<ScoutBucket>,
 
