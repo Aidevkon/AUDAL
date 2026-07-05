@@ -16,5 +16,6 @@ pub mod png_gen;
 pub mod preview;
 pub mod progress;
 pub mod projects;
+pub mod scout;
 pub mod timeline;
 pub mod tinder;

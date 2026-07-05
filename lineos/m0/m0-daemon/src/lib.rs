@@ -324,6 +324,7 @@ fn mastering_router(state: AppState) -> axum::Router {
             get(handlers::pdf_gen::get_album_certificate_pdf),
         )
         .route("/export", post(handlers::export::export_audio))
+        .route("/scout", post(handlers::scout::run_scout))
         // Phase 12A/12B: PCM playback via xaak (A-003 §8)
         .route("/playback/state", get(handlers::playback::get_state))
         .route("/playback/control", post(handlers::playback::post_control))
