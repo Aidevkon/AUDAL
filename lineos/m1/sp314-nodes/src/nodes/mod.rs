@@ -7,6 +7,7 @@ pub mod gain;
 pub mod harmonic;
 pub mod input;
 pub mod limiter;
+pub mod lookahead_telemetry;
 pub mod masking_eq;
 pub mod ms;
 pub mod multiband;
