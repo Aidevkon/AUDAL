@@ -28,6 +28,7 @@ pub mod harmonic;
 #[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
 pub mod io;
 pub mod limiter;
+pub mod lookahead_ring;
 pub mod masking_eq;
 pub mod metering;
 pub mod ola_buffer;
