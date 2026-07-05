@@ -111,20 +111,23 @@ impl DspAdapter {
         }
 
         // --- BISECT TRAPS AFTER DSP GRAPH ---
-        let frames = graph.debug_frames.max(1) as f64;
-        let mut idx = 1;
-        for node_id in &graph.execution_order {
-            if let (Some(&sq_l), Some(&sq_r)) =
-                (graph.debug_sq_l.get(node_id), graph.debug_sq_r.get(node_id))
-            {
-                let rms_l = (sq_l / frames).sqrt();
-                let rms_r = (sq_r / frames).sqrt();
-                let ratio = rms_r / rms_l.max(1e-9);
-                eprintln!(
-                    "[BISECT-5.{}-GRAPH-NODE] node_id={} L_rms={:.6} R_rms={:.6} ratio={:.4}",
-                    idx, node_id, rms_l, rms_r, ratio
-                );
-                idx += 1;
+        #[cfg(debug_assertions)]
+        {
+            let frames = graph.debug_frames.max(1) as f64;
+            let mut idx = 1;
+            for node_id in &graph.execution_order {
+                if let (Some(&sq_l), Some(&sq_r)) =
+                    (graph.debug_sq_l.get(node_id), graph.debug_sq_r.get(node_id))
+                {
+                    let rms_l = (sq_l / frames).sqrt();
+                    let rms_r = (sq_r / frames).sqrt();
+                    let ratio = rms_r / rms_l.max(1e-9);
+                    eprintln!(
+                        "[BISECT-5.{}-GRAPH-NODE] node_id={} L_rms={:.6} R_rms={:.6} ratio={:.4}",
+                        idx, node_id, rms_l, rms_r, ratio
+                    );
+                    idx += 1;
+                }
             }
         }
 

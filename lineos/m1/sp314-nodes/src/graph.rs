@@ -43,7 +43,9 @@ pub struct DspGraph {
     buffers: HashMap<String, (Vec<f32>, Vec<f32>)>,
     acc_left: Vec<f32>,
     acc_right: Vec<f32>,
+    #[cfg(debug_assertions)]
     pub debug_sq_l: HashMap<String, f64>,
+    #[cfg(debug_assertions)]
     pub debug_sq_r: HashMap<String, f64>,
     pub debug_frames: usize,
     block_size: usize,
@@ -331,7 +333,9 @@ impl DspGraph {
             buffers,
             acc_left: vec![0.0; block_size],
             acc_right: vec![0.0; block_size],
+            #[cfg(debug_assertions)]
             debug_sq_l: HashMap::new(),
+            #[cfg(debug_assertions)]
             debug_sq_r: HashMap::new(),
             debug_frames: 0,
             block_size,
@@ -412,16 +416,19 @@ impl DspGraph {
                 .unwrap()
                 .process_stereo(buf_l, buf_r);
 
-            let sq_l: f64 = buf_l[..self.block_size]
-                .iter()
-                .map(|&x| (x as f64) * (x as f64))
-                .sum();
-            let sq_r: f64 = buf_r[..self.block_size]
-                .iter()
-                .map(|&x| (x as f64) * (x as f64))
-                .sum();
-            *self.debug_sq_l.entry(node_id.clone()).or_insert(0.0) += sq_l;
-            *self.debug_sq_r.entry(node_id.clone()).or_insert(0.0) += sq_r;
+            #[cfg(debug_assertions)]
+            {
+                let sq_l: f64 = buf_l[..self.block_size]
+                    .iter()
+                    .map(|&x| (x as f64) * (x as f64))
+                    .sum();
+                let sq_r: f64 = buf_r[..self.block_size]
+                    .iter()
+                    .map(|&x| (x as f64) * (x as f64))
+                    .sum();
+                *self.debug_sq_l.entry(node_id.clone()).or_insert(0.0) += sq_l;
+                *self.debug_sq_r.entry(node_id.clone()).or_insert(0.0) += sq_r;
+            }
 
             if node_type == "Output" {
                 let len = left.len();
