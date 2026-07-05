@@ -24,7 +24,7 @@ For binding rules, go to:
 ### New Crates
 - `lineos/m1/sp314-nodes` v0.1.0 — primitive DSP nodes + DspNode trait
 - `pipelines/pipelineforge` v0.1.0 — Engineer Conditions → DAG routing
-- `apps/runtime/openclaw` v0.1.0 — WASM executor + AudioWorklet bridge
+- `apps/runtime/loom` v0.1.0 — WASM executor + AudioWorklet bridge
 - `lineos/m1/lineos-types` v0.1.0 — shared types, v2.9 → v3 migration
 
 ### E11 Engine
@@ -35,7 +35,7 @@ For binding rules, go to:
 
 ### Migration Status
 - All 6 v2.9-dependent crates migrated to lineos-types (3a complete)
-- m0-daemon wired to pipelineforge + openclaw (3b complete)
+- m0-daemon wired to pipelineforge + loom (3b complete)
 - Remaining 5 crates: 3b pending (MasteringPipeline replacement)
 
 ### Pending

@@ -1,3 +1,29 @@
+> **⚠️ ARCHITECTURAL DRIFT NOTICE (2026-07-06):** Αυτό το spec
+> περιγράφει την αρχιτεκτονική πριν το Phase 2 hexagonal refactor.
+> Γνωστές αποκλίσεις από τον σημερινό κώδικα:
+>   - "OpenClaw" (§2, §6) ήταν πρόχειρο codename για τον workflow
+>     orchestrator, σήμερα Conductor/Executor (operator.rs)
+>   - Το path στο §11 (lineos/integration/) έχει γίνει top-level
+>     integration/ crate
+>   - Το "E11" δεν είναι πλέον engine module, είναι telemetry/
+>     certificate tag string ("E11".into())
+>   - Λείπει εντελώς το onboarding/router layer (pipelineforge/
+>     router.rs, lineos-types/onboarding.rs) που δεν υπήρχε όταν
+>     γράφτηκε αυτό το doc
+>   - Αυτό το firewall είναι το τελικό βήμα (conclusion) του
+>     **Aether Black pipeline** (Markov classifiers →
+>     PredictiveController → ChaosLayer → IntegrationFirewall →
+>     build_dsp_config), επίσημα Stage 4 στο
+>     lineos/architecture/track_lifecycle.md — ένα ολοκληρωμένο,
+>     ενεργό, ονομασμένο σύστημα που αυτό το doc ποτέ δεν το
+>     αναφέρει ρητά με το όνομά του
+> Το core contract (IntegrationFirewall::build, DspConfig schema,
+> constitutional bounds, τα 8 tests) παραμένει ΑΚΡΙΒΕΣ και ενεργό
+> — μόνο η ΠΕΡΙΓΡΑΦΗ ΤΗΣ ΓΥΡΩ ΑΡΧΙΤΕΚΤΟΝΙΚΗΣ έχει ξεπεραστεί.
+> Status παραμένει LOCKED ως προς το contract. Πλήρης, ενημερωμένη
+> τεκμηρίωση του Aether Black pipeline ως σύνολο εκκρεμεί ως
+> ξεχωριστό, μελλοντικό documentation task.
+
 # S-009 — Integration Firewall (Aether → DSP)
 
 **Document:** `spec/locked/S-009_integration_firewall.md`
