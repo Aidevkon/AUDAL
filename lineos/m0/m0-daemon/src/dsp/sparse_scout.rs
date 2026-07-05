@@ -9,6 +9,11 @@ pub struct ScoutBucket {
     pub rms_linear: f32,
 }
 
+/// NOTE: channel handling is naive interleaved-energy, NOT ITU-R
+/// BS.1770-4 aware. On >2-channel (5.1/surround) input, LFE is
+/// included un-weighted and surround channels are not weighted
+/// ×1.5 per spec — results are numerically valid but not loudness-
+/// standard-compliant on multichannel input. See vision doc §11.6.
 #[derive(Debug, Clone)]
 pub struct SparseScoutSummary {
     pub buckets: Vec<ScoutBucket>,
