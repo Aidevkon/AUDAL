@@ -20,6 +20,7 @@ pub async fn run(
     blob_store: crate::blob_store::BlobStore,
     progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
     progress_map: Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>,
+    state_dir: String,
 ) {
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -58,6 +59,7 @@ pub async fn run(
                 let p_tx = progress_tx.clone();
                 let p_map = progress_map.clone();
                 let j_id = plan.session_id.clone();
+                let s_dir = state_dir.clone();
                 let result = tokio::task::spawn_blocking(move || {
                     crate::domain::dsp_pipeline::run_dsp(
                         &req,
@@ -66,6 +68,7 @@ pub async fn run(
                         Some(p_tx),
                         Some(p_map),
                         j_id,
+                        &s_dir,
                     )
                 })
                 .await;
@@ -84,10 +87,6 @@ pub async fn run(
                         // Zero file I/O in DSP layer — this is the correct layer
                         // Executor: persist UserMarkovModel — single overwrite
                         if let Some(ref model) = user_model_opt {
-                            let state_dir = format!(
-                                "{}/.creator_os/state",
-                                std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-                            );
                             let _ = std::fs::create_dir_all(&state_dir);
                             if let Ok(json) = model.to_json() {
                                 let model_path = format!("{}/user_model_corpus.json", state_dir);

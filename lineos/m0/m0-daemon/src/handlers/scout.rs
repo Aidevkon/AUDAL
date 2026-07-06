@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
+use crate::config::MAX_FILE_BYTES;
 use crate::dsp::sparse_scout::{run_sparse_scout, SparseScoutSummary};
-use crate::handlers::decode::MAX_FILE_BYTES;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -130,7 +130,8 @@ mod tests {
     async fn get_test_state() -> (AppState, tempfile::TempDir) {
         let audit_dir = tempfile::TempDir::new().unwrap();
         let audit = Arc::new(AuditLog::open(audit_dir.path().to_str().unwrap()).unwrap());
-        let (state, _) = AppState::new_for_test(audit).await;
+        let config = std::sync::Arc::new(crate::config::M0Config::from_env());
+        let (state, _) = AppState::new_for_test(audit, config).await;
         (state, audit_dir)
     }
 

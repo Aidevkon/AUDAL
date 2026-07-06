@@ -113,6 +113,7 @@ pub fn run(
     track_id: Option<&str>,
     blob_id: &str,
     pre_analysis: lineos_types::pre_analysis::PreAnalysisData,
+    state_dir: &str,
 ) -> Result<DspOutput, String> {
     // Autotune
     let autotune_result = sp314_dsp::pipeline::autotune::autotune(
@@ -151,10 +152,6 @@ pub fn run(
     // NODE 2: CORPUS (Must run BEFORE master mutates slices)
     // Load UserMarkovModel from state dir
     let proj_id = project_id.unwrap_or("default");
-    let state_dir = format!(
-        "{}/.creator_os/state",
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-    );
     let model_path = format!("{}/user_model_{}.json", state_dir, proj_id);
     let user_model = std::fs::read_to_string(&model_path)
         .ok()

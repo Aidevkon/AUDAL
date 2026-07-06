@@ -23,6 +23,8 @@ async fn test_agent_pipeline_executes_mastering() {
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+
     let (operator, _handles) = m0d::agents::operator::spawn_agents(
         audit.clone(),
         dummy_head_state,
@@ -31,6 +33,7 @@ async fn test_agent_pipeline_executes_mastering() {
         album_tx,
         progress_tx,
         progress_map,
+        config,
     );
 
     // Allow agents to start
@@ -92,6 +95,8 @@ async fn test_conductor_rejects_concurrent_mastering() {
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+
     let (operator, _handles) = m0d::agents::operator::spawn_agents(
         audit.clone(),
         dummy_head_state,
@@ -100,6 +105,7 @@ async fn test_conductor_rejects_concurrent_mastering() {
         album_tx,
         progress_tx,
         progress_map,
+        config,
     );
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -179,6 +185,8 @@ async fn test_schema_agent_validates_and_queries() {
     let (album_tx, _) = tokio::sync::broadcast::channel(64);
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+
     let (operator, _handles) = m0d::agents::operator::spawn_agents(
         audit,
         dummy_head_state,
@@ -187,6 +195,7 @@ async fn test_schema_agent_validates_and_queries() {
         album_tx,
         progress_tx,
         progress_map,
+        config,
     );
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 

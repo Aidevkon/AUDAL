@@ -49,7 +49,7 @@ const SINC_OVERSAMPLE: usize = 256;
 const RESAMPLE_CHUNK_FRAMES: usize = 1024;
 
 // Same guards as decode_smart.
-const MAX_FILE_BYTES: u64 = 500 * 1024 * 1024;
+use crate::config::MAX_FILE_BYTES;
 const MAX_DURATION_SECS: u64 = 720;
 
 // How many source frames to pull per reader call.

@@ -46,6 +46,8 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &req,
         Instant::now(),
@@ -53,6 +55,7 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         None, // progress_tx
         None, // progress_map
         "job-spatial-test".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
 
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());

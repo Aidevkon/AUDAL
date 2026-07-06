@@ -19,6 +19,7 @@ pub fn run_dsp(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
+    state_dir: &str,
 ) -> Result<
     (
         StoredBlob,
@@ -28,7 +29,15 @@ pub fn run_dsp(
     ),
     String,
 > {
-    run_dsp_internal(req, start, head_state, progress_tx, progress_map, job_id)
+    run_dsp_internal(
+        req,
+        start,
+        head_state,
+        progress_tx,
+        progress_map,
+        job_id,
+        state_dir,
+    )
 }
 
 #[inline(always)]
@@ -153,6 +162,7 @@ fn run_dsp_internal(
     progress_tx: Option<tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>>,
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
+    state_dir: &str,
 ) -> Result<
     (
         StoredBlob,
@@ -267,10 +277,6 @@ fn run_dsp_internal(
         // Corpus (user model) on the scout slice.
         let flavour = req.flavour_id.as_deref().unwrap_or("warm");
         let proj_id = req.project_id.as_deref().unwrap_or("default");
-        let state_dir = format!(
-            "{}/.creator_os/state",
-            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-        );
         let model_path = format!("{}/user_model_{}.json", state_dir, proj_id);
         let user_model = std::fs::read_to_string(&model_path)
             .ok()
@@ -800,6 +806,7 @@ fn run_dsp_internal(
         req.track_id.as_deref(),
         &blob_id,
         pre_analysis.clone(),
+        state_dir,
     )?;
     let pre_analysis = dsp_out.pre_analysis;
     let dsp_config = dsp_out.dsp_config;

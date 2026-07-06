@@ -21,6 +21,8 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     let (progress_tx, _) = tokio::sync::broadcast::channel(16);
     let progress_map = Arc::new(dashmap::DashMap::new());
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+
     let (operator, _handles) = m0d::agents::operator::spawn_agents(
         audit.clone(),
         dummy_head_state,
@@ -29,6 +31,7 @@ async fn test_album_sse_pipeline_emits_bpm() {
         album_tx,
         progress_tx,
         progress_map,
+        config,
     );
 
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;

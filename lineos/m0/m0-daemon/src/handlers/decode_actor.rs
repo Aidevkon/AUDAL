@@ -1,4 +1,5 @@
-use super::decode::{DecodeError, MAX_DURATION_SECS, MAX_FILE_BYTES};
+use super::decode::{DecodeError, MAX_DURATION_SECS};
+use crate::config::MAX_FILE_BYTES;
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::formats::FormatOptions;

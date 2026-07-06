@@ -12,8 +12,9 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
     let audit_dir = TempDir::new().unwrap();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir.path().to_str().unwrap()).unwrap());
 
-    let (state, _handles) = m0d::app_state::AppState::new_for_test(audit).await;
-    let app = m0d::build_router_for_test(state);
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+    let (state, _handles) = m0d::app_state::AppState::new_for_test(audit, config.clone()).await;
+    let app = m0d::build_router_for_test(state, &config);
 
     // 3. Bind to an ephemeral port
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

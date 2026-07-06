@@ -22,6 +22,7 @@ pub async fn run(
     album_tx: tokio::sync::broadcast::Sender<crate::app_state::AlbumEvent>,
     progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
     progress_map: Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>,
+    config: Arc<crate::config::M0Config>,
 ) {
     // AtomicBool: only one mastering job at a time
     // R2 decision: is the system busy?
@@ -37,6 +38,7 @@ pub async fn run(
         blob_store.clone(),
         progress_tx,
         progress_map.clone(),
+        config.state_path.clone(),
     ));
 
     while let Some(intent) = rx.recv().await {
@@ -124,6 +126,7 @@ pub async fn run(
                 let album_tx = album_tx.clone();
                 let head_state_ptr = head_state_ptr.clone();
                 let busy_clone = busy.clone();
+                let config_clone = config.clone();
 
                 tokio::spawn(async move {
                     let total = items.len();
@@ -405,7 +408,7 @@ pub async fn run(
                             anchor_idx,
                             &fatigue_map,
                         );
-                        let path = cert.write_to_disk(&batch_id);
+                        let path = cert.write_to_disk(&batch_id, &config_clone.certs_path);
                         tracing::info!(
                             batch_id = %batch_id,
                             "AB-P7: AlbumCertificate written → {:?}",

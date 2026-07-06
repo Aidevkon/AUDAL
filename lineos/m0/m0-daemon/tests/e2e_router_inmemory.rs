@@ -11,8 +11,9 @@ async fn test_get_flavours_router_wiring() {
     let audit_dir = TempDir::new().unwrap();
     let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir.path().to_str().unwrap()).unwrap());
 
-    let (state, _handles) = m0d::app_state::AppState::new_for_test(audit).await;
-    let app = m0d::build_router_for_test(state);
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+    let (state, _handles) = m0d::app_state::AppState::new_for_test(audit, config.clone()).await;
+    let app = m0d::build_router_for_test(state, &config);
 
     let request = Request::builder()
         .method("GET")

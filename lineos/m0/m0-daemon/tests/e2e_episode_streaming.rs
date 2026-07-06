@@ -261,6 +261,7 @@ fn full_pipeline_heap_is_scale_invariant() {
         let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
             xaak::repo::DspState::default(),
         ));
+        let state_tmp = tempfile::TempDir::new().unwrap();
         m0d::domain::dsp_pipeline::run_dsp(
             &req,
             std::time::Instant::now(),
@@ -268,6 +269,7 @@ fn full_pipeline_heap_is_scale_invariant() {
             None,
             None,
             id.to_string(),
+            state_tmp.path().to_str().unwrap(),
         )
         .expect("run_dsp failed")
     };

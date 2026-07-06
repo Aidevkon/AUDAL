@@ -66,6 +66,8 @@ fn test_run_dsp_aborts_on_digital_silence() {
     let path = "/tmp/qa_silence_abort.wav";
     write_wav(&silent_samples, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path, "podcast"), // Triggers streaming path
         Instant::now(),
@@ -73,6 +75,7 @@ fn test_run_dsp_aborts_on_digital_silence() {
         None,
         None,
         "qa-abort".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
 
     // Assert it fails due to digital silence
@@ -97,6 +100,8 @@ fn test_run_dsp_passes_healthy_podcast() {
     let path = "/tmp/qa_healthy_podcast.wav";
     write_wav(&healthy, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path, "podcast"), // Triggers streaming path
         Instant::now(),
@@ -104,6 +109,7 @@ fn test_run_dsp_passes_healthy_podcast() {
         None,
         None,
         "qa-healthy".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
 
     assert!(
@@ -137,6 +143,8 @@ fn test_run_dsp_passes_real_mp3_podcast() {
     // non-seekable input is added; fix then (designed, not implemented):
     // try_scout_from(sr*30, scout).or_else(from 0) — deterministic, avoids
     // intro, EOF-guarded. See scout-stationarity-assumption.md.
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path, "podcast"), // Triggers streaming path
         std::time::Instant::now(),
@@ -144,6 +152,7 @@ fn test_run_dsp_passes_real_mp3_podcast() {
         None,
         None,
         "qa-real-mp3".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
 
     assert!(
@@ -186,6 +195,8 @@ fn run_dsp_counts_dead_air_gaps() {
     let path = "/tmp/qa_dead_air_gaps.wav";
     write_wav(&samples, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path, "podcast"),
         Instant::now(),
@@ -193,6 +204,7 @@ fn run_dsp_counts_dead_air_gaps() {
         None,
         None,
         "qa-dead-air".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
 
     assert!(

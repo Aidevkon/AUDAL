@@ -68,37 +68,40 @@ pub struct AppState {
     pub db: DbConn,
     pub playback_state: Arc<ArcSwap<ScrubState>>,
     pub album_tx: broadcast::Sender<AlbumEvent>,
+    pub config: std::sync::Arc<crate::config::M0Config>,
 }
 
 impl AppState {
-    pub async fn new(audit: Arc<AuditLog>) -> (Self, crate::agents::operator::AgentHandles) {
+    pub async fn new(
+        audit: Arc<AuditLog>,
+        config: std::sync::Arc<crate::config::M0Config>,
+    ) -> (Self, crate::agents::operator::AgentHandles) {
         // Initialize SurrealDB — persistent local storage
         // ~/.creator_os/db survives reboots (Privacy Moat)
-        let fallback_path = format!(
-            "{}/.creator_os/db",
-            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-        );
-        let db_path = std::env::var("CREATOR_OS_DB_PATH").unwrap_or(fallback_path);
-        std::fs::create_dir_all(&db_path).unwrap_or_default();
-        let db = crate::db::init(&db_path)
+        let db_path = &config.db_path;
+        std::fs::create_dir_all(db_path).unwrap_or_default();
+        let db = crate::db::init(db_path)
             .await
             .expect("Failed to initialize SurrealDB");
 
-        Self::from_db(audit, db).await
+        Self::from_db(audit, db, config).await
     }
 
     pub async fn new_for_test(
         audit: Arc<AuditLog>,
+        config: std::sync::Arc<crate::config::M0Config>,
     ) -> (Self, crate::agents::operator::AgentHandles) {
         let db = crate::db::init_test()
             .await
             .expect("Failed to initialize in-memory test DB");
-        Self::from_db(audit, db).await
+
+        Self::from_db(audit, db, config).await
     }
 
     async fn from_db(
         audit: Arc<AuditLog>,
         db: DbConn,
+        config: std::sync::Arc<crate::config::M0Config>,
     ) -> (Self, crate::agents::operator::AgentHandles) {
         let (progress_tx, _) = broadcast::channel(128);
         let (album_tx, _) = broadcast::channel(64);
@@ -121,6 +124,7 @@ impl AppState {
             album_tx.clone(),
             progress_tx.clone(),
             progress_map.clone(),
+            config.clone(),
         );
 
         let state = Self {
@@ -137,6 +141,7 @@ impl AppState {
             db,
             playback_state: Arc::new(ArcSwap::from_pointee(ScrubState::new())),
             album_tx,
+            config,
         };
 
         (state, handles)

@@ -12,6 +12,7 @@ pub mod app_state;
 pub mod audit;
 pub mod blob_store;
 mod cdn;
+pub mod config;
 pub mod db;
 pub mod domain;
 pub mod dsp;
@@ -62,31 +63,23 @@ pub async fn run() -> Result<()> {
     tracing::info!("Authority: M0 Constitution v2.0");
 
     // ── Read env overrides ────────────────────────────────────────────────────
-    let registry_path =
-        std::env::var("M0_REGISTRY_PATH").unwrap_or_else(|_| REGISTRY_PATH.to_string());
-    let checksums_path =
-        std::env::var("M0_CHECKSUMS_PATH").unwrap_or_else(|_| CHECKSUMS_PATH.to_string());
-    let policies_path =
-        std::env::var("M0_POLICIES_PATH").unwrap_or_else(|_| POLICIES_PATH.to_string());
-    let audit_log_dir =
-        std::env::var("M0_AUDIT_LOG_DIR").unwrap_or_else(|_| AUDIT_LOG_DIR.to_string());
-    let assets_root = std::env::var("M0_ASSETS_ROOT").unwrap_or_else(|_| ASSETS_ROOT.to_string());
+    let config = std::sync::Arc::new(crate::config::M0Config::from_env());
 
     let gate = HealthGate::new();
 
     // ── Step 1: Audit log ─────────────────────────────────────────────────────
-    let audit = audit::AuditLog::open(&audit_log_dir)?;
+    let audit = audit::AuditLog::open(&config.audit_log_dir)?;
     audit.write(audit::entry_startup())?;
     gate.set_audit_writable(true).await;
-    tracing::info!("Audit log ready: {}", audit_log_dir);
+    tracing::info!("Audit log ready: {}", config.audit_log_dir);
 
     // ── Step 2: Registry ──────────────────────────────────────────────────────
-    let _reg = registry::Registry::load(&registry_path, &checksums_path).await?;
+    let _reg = registry::Registry::load(&config.registry_path, &config.checksums_path).await?;
     gate.set_registry_loaded(true).await;
     tracing::info!("Registry loaded OK");
 
     // ── Step 3: CDN + hash verification ──────────────────────────────────────
-    let cdn = cdn::Cdn::load(&assets_root, &checksums_path).await?;
+    let cdn = cdn::Cdn::load(&config.assets_root, &config.checksums_path).await?;
     let failures = cdn.verify_all().await;
     if !failures.is_empty() {
         for (name, err) in &failures {
@@ -98,7 +91,7 @@ pub async fn run() -> Result<()> {
     tracing::info!("CDN verified OK");
 
     // ── Step 4: Policy ────────────────────────────────────────────────────────
-    let _policy = policy::PolicyEngine::load(&policies_path)?;
+    let _policy = policy::PolicyEngine::load(&config.policies_path)?;
     gate.set_policy_active(true).await;
     tracing::info!("Policy engine loaded OK (deny-by-default active)");
 
@@ -122,7 +115,7 @@ pub async fn run() -> Result<()> {
 
     // ── Step 7: Build AppState for mastering API ──────────────────────────────
     let audit_arc = Arc::new(audit);
-    let (app_state, agent_handles) = AppState::new(audit_arc.clone()).await;
+    let (app_state, agent_handles) = AppState::new(audit_arc.clone(), config.clone()).await;
 
     // ── Graceful Shutdown Signal Hook ─────────────────────────────────────────
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
@@ -158,7 +151,7 @@ pub async fn run() -> Result<()> {
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
     // Phase 6: mastering router binds directly to 7402.
     // Caddy (7400) proxies → 7402. This matches M0 Constitution §03.
-    let mastering_router = mastering_router(app_state);
+    let mastering_router = mastering_router(app_state, &config);
     let mastering_addr: SocketAddr = MASTERING_ADDR.parse()?;
 
     // ── Step 9: Start health endpoint (port 7401) ──────────────────────────────
@@ -231,19 +224,6 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-/// Max simultaneous mastering jobs. Defaults to (physical cores - 1),
-/// leaving headroom for UI/OS. Override via M0_MAX_CONCURRENT_JOBS.
-fn max_concurrent_jobs() -> usize {
-    std::env::var("M0_MAX_CONCURRENT_JOBS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism()
-                .map(|n| n.get().saturating_sub(1).max(1))
-                .unwrap_or(1)
-        })
-}
-
 fn make_dsp_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
     let path = req.uri().path().to_string();
     let request_id = req
@@ -269,7 +249,7 @@ fn make_obs_span(req: &axum::http::Request<axum::body::Body>) -> tracing::Span {
 /// Build the mastering API Axum router.
 /// Phase 12A adds: POST /playback/control, GET /playback/state
 /// Authority: Phase 6 task-decomposition P6-003 · Phase 12A P12A-007
-fn mastering_router(state: AppState) -> axum::Router {
+fn mastering_router(state: AppState, config: &crate::config::M0Config) -> axum::Router {
     use axum::routing::{get, post};
 
     let observability_router = axum::Router::new()
@@ -362,7 +342,7 @@ fn mastering_router(state: AppState) -> axum::Router {
 
     let dsp_router = dsp_router
         .layer(tower::limit::ConcurrencyLimitLayer::new(
-            max_concurrent_jobs(),
+            config.max_concurrent_jobs,
         ))
         // TraceLayer after ConcurrencyLimitLayer = Trace is outer (Router::layer
         // composition: last call wraps first) = measures total client latency
@@ -410,6 +390,6 @@ fn mastering_router(state: AppState) -> axum::Router {
 /// Exposes the same router the production daemon serves, without
 /// widening visibility of the internal mastering_router builder.
 #[doc(hidden)]
-pub fn build_router_for_test(state: AppState) -> axum::Router {
-    mastering_router(state)
+pub fn build_router_for_test(state: AppState, config: &crate::config::M0Config) -> axum::Router {
+    mastering_router(state, config)
 }

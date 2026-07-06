@@ -331,16 +331,12 @@ pub async fn get_track_certificate_pdf(
 /// GET /album/:batch_id/certificate.pdf
 /// Generates (if needed) and returns the album certificate PDF.
 pub async fn get_album_certificate_pdf(
-    State(_app): State<AppState>,
+    State(app): State<AppState>,
     Path(batch_id): Path<String>,
 ) -> Response {
     let short_id = &batch_id[..batch_id.len().min(8)];
 
-    let base_dir = format!(
-        "{}/.creator_os/certificates",
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-    );
-    let certs_dir = std::env::var("CREATOR_OS_CERTS_PATH").unwrap_or(base_dir);
+    let certs_dir = app.config.certs_path.clone();
     std::fs::create_dir_all(&certs_dir).unwrap_or_default();
 
     let json_path = format!("{}/album_{}.certificate.json", certs_dir, short_id);

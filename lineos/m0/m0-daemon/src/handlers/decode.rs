@@ -21,7 +21,7 @@ use std::fmt;
 pub const TARGET_SAMPLE_RATE: u32 = 48_000;
 pub const TARGET_CHANNELS: u16 = 2;
 pub const MAX_DURATION_SECS: u64 = 720; // 12 minutes
-pub const MAX_FILE_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
+use crate::config::MAX_FILE_BYTES;
 
 // Rubato SincFixedIn parameters — fixed for determinism.
 // Linear interpolation selected: low CPU, acceptable quality for offline mastering.

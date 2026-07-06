@@ -95,6 +95,8 @@ fn inv_qa_1_output_integrity() {
     let path = "/tmp/qa_integrity.wav";
     write_wav(&input, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -102,6 +104,7 @@ fn inv_qa_1_output_integrity() {
         None,
         None,
         "qa-1".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -133,6 +136,8 @@ fn inv_qa_2_crest_factor_survival() {
     let path = "/tmp/qa_crest.wav";
     write_wav(&input, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -140,6 +145,7 @@ fn inv_qa_2_crest_factor_survival() {
         None,
         None,
         "qa-2".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -184,6 +190,8 @@ fn inv_qa_3_spectral_balance() {
     let path = "/tmp/qa_spectral.wav";
     write_wav(&input, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -191,6 +199,7 @@ fn inv_qa_3_spectral_balance() {
         None,
         None,
         "qa-3".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -263,6 +272,8 @@ fn inv_qa_4_compressor_is_active() {
         mix_levels: None,
         preview_id: None,
     };
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &req,
         Instant::now(),
@@ -270,6 +281,7 @@ fn inv_qa_4_compressor_is_active() {
         None,
         None,
         "qa-4".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -340,6 +352,8 @@ fn inv_qa_5_headroom_enforcement() {
     let path = "/tmp/qa_headroom.wav";
     write_wav(&signal, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -347,6 +361,7 @@ fn inv_qa_5_headroom_enforcement() {
         None,
         None,
         "qa-5".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -400,6 +415,8 @@ fn inv_qa_8_true_peak_ceiling() {
         let path = "/tmp/qa_tp_normal.wav";
         write_wav(&input, sr, path);
 
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let result = run_dsp(
             &make_req(path),
             Instant::now(),
@@ -407,6 +424,7 @@ fn inv_qa_8_true_peak_ceiling() {
             None,
             None,
             "qa-8a".to_string(),
+            state_tmp.path().to_str().unwrap(),
         );
         assert!(result.is_ok());
         let (blob, _, _, _) = result.unwrap();
@@ -446,6 +464,8 @@ fn inv_qa_8_true_peak_ceiling() {
         let path = "/tmp/qa_tp_hot.wav";
         write_wav(&hot, sr, path);
 
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let result = run_dsp(
             &make_req(path),
             Instant::now(),
@@ -453,6 +473,7 @@ fn inv_qa_8_true_peak_ceiling() {
             None,
             None,
             "qa-8b".to_string(),
+            state_tmp.path().to_str().unwrap(),
         );
         assert!(result.is_ok());
         let (blob, _, _, _) = result.unwrap();
@@ -494,6 +515,8 @@ fn inv_qa_7_stereo_phase_coherence() {
     let path = "/tmp/qa_phase.wav";
     write_wav(&input, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -501,6 +524,7 @@ fn inv_qa_7_stereo_phase_coherence() {
         None,
         None,
         "qa-7".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -624,6 +648,8 @@ fn inv_qa_9_multi_genre() {
         let path = format!("/tmp/qa_genre_{}.wav", name);
         write_wav(signal, sr, &path);
 
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let result = run_dsp(
             &make_req(&path),
             Instant::now(),
@@ -631,6 +657,7 @@ fn inv_qa_9_multi_genre() {
             None,
             None,
             format!("qa-9-{}", name),
+            state_tmp.path().to_str().unwrap(),
         );
         assert!(
             result.is_ok(),
@@ -774,6 +801,8 @@ fn inv_qa_6_mud_correction() {
     let path = "/tmp/qa_mud.wav";
     write_wav(&signal, sr, path);
 
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
     let result = run_dsp(
         &make_req(path),
         Instant::now(),
@@ -781,6 +810,7 @@ fn inv_qa_6_mud_correction() {
         None,
         None,
         "qa-6".to_string(),
+        state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
     let (blob, _, _, _) = result.unwrap();
@@ -868,6 +898,8 @@ fn inv_qa_10_overscale_stress() {
         );
         write_wav(&signal, sr, &path);
 
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let result = run_dsp(
             &make_req(&path),
             Instant::now(),
@@ -875,6 +907,7 @@ fn inv_qa_10_overscale_stress() {
             None,
             None,
             format!("qa-10-{}", name),
+            state_tmp.path().to_str().unwrap(),
         );
         assert!(
             result.is_ok(),

@@ -49,6 +49,8 @@ fn bench_decoupled_fork_ram_and_latency() {
 
         let _p = dhat::Profiler::builder().testing().build();
         let t0 = Instant::now();
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let _r = run_dsp(
             &req,
             Instant::now(),
@@ -56,6 +58,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             None,
             None,
             "job-bench-stereo".to_string(),
+            state_tmp.path().to_str().unwrap(),
         );
         stereo_time = t0.elapsed();
         let stats = dhat::HeapStats::get();
@@ -84,6 +87,8 @@ fn bench_decoupled_fork_ram_and_latency() {
 
         let _p = dhat::Profiler::builder().testing().build();
         let t0 = Instant::now();
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
         let _r = run_dsp(
             &req,
             Instant::now(),
@@ -91,6 +96,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             None,
             None,
             "job-bench-spatial".to_string(),
+            state_tmp.path().to_str().unwrap(),
         );
         spatial_time = t0.elapsed();
         let stats = dhat::HeapStats::get();

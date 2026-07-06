@@ -31,7 +31,17 @@ async fn test_e2e_latency_compensation() {
     let start = Instant::now();
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
-        run_dsp(&req, start, dummy_head_state, None, None, "".to_string())
+        let state_tmp = tempfile::TempDir::new().unwrap();
+
+        run_dsp(
+            &req,
+            start,
+            dummy_head_state,
+            None,
+            None,
+            "".to_string(),
+            state_tmp.path().to_str().unwrap(),
+        )
     })
     .await;
 
