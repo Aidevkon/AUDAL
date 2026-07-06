@@ -16,7 +16,13 @@ fn js_error(_msg: &str) -> JsValue {
 
 #[wasm_bindgen]
 pub struct LoomEngine {
-    graph: DspGraph,
+    /// None only during an active crossfade (graph ownership
+    /// transferred to the crossfader). All mutator methods on this
+    /// engine silently no-op while None — matches the pre-existing
+    /// behavior where parameter changes during crossfade were applied
+    /// to a soon-discarded dummy clone and lost; this makes that same
+    /// loss explicit instead of silent-by-accident.
+    graph: Option<DspGraph>,
     block_size: usize,
     sample_rate: u32,
     left_buf: Vec<f32>,
@@ -49,7 +55,7 @@ impl LoomEngine {
             .map_err(|e| JsValue::from_str(&format!("Graph build error: {:?}", e)))?;
 
         Ok(LoomEngine {
-            graph,
+            graph: Some(graph),
             block_size,
             sample_rate,
             left_buf: vec![0.0; block_size],
@@ -78,10 +84,9 @@ impl LoomEngine {
         // Start playing the first section immediately
         if let Some(first_section) = scheduler.sections.first_mut() {
             if let Some(graph) = first_section.ready_graph.take() {
-                self.graph = graph;
+                self.graph = Some(graph);
             }
         }
-
         self.scheduler = Some(scheduler);
         Ok(())
     }
@@ -104,13 +109,14 @@ impl LoomEngine {
                 .process_block(&mut self.left_buf, &mut self.right_buf);
             if complete {
                 if let Some(completed_graph) = self.crossfader.take_completed_graph() {
-                    self.graph = completed_graph;
+                    self.graph = Some(completed_graph);
                 }
             }
         } else {
             // 3. Normal processing
-            self.graph
-                .process_block(&mut self.left_buf, &mut self.right_buf);
+            if let Some(graph) = self.graph.as_mut() {
+                graph.process_block(&mut self.left_buf, &mut self.right_buf);
+            }
 
             // 4. Advance scheduler and check for section boundary
             if let Some(scheduler) = &mut self.scheduler {
@@ -119,13 +125,9 @@ impl LoomEngine {
                         if let Some(new_graph) = section.ready_graph.take() {
                             let fade_samples = section.crossfade_samples;
 
-                            // Re-take ownership of current graph by swapping it with a dummy,
-                            // or replacing it. Because we can't easily dummy it without allocation,
-                            // we can clone the canonical graph of the old section to put as placeholder.
-                            // However, we can just replace self.graph with new_graph, and hand the OLD graph
-                            // to the crossfader!
-                            let dummy = section.canonical_graph.clone();
-                            let old_graph = std::mem::replace(&mut self.graph, dummy);
+                            // We pass the old graph directly to the crossfader, leaving self.graph
+                            // as None for the duration of the crossfade!
+                            let old_graph = self.graph.take().unwrap();
                             self.crossfader.begin(old_graph, new_graph, fade_samples);
                         }
                     }
@@ -156,7 +158,7 @@ impl LoomEngine {
                 scheduler.current_index = idx;
                 if let Some(mut graph) = scheduler.sections[idx].ready_graph.take() {
                     graph.reset();
-                    self.graph = graph;
+                    self.graph = Some(graph);
                 }
             }
             self.crossfader.clear();
@@ -179,8 +181,9 @@ impl LoomEngine {
             self.left_buf[i] = input_output[i * 2];
             self.right_buf[i] = input_output[i * 2 + 1];
         }
-        self.graph
-            .process_block(&mut self.left_buf, &mut self.right_buf);
+        if let Some(graph) = self.graph.as_mut() {
+            graph.process_block(&mut self.left_buf, &mut self.right_buf);
+        }
         for i in 0..self.block_size {
             input_output[i * 2] = self.left_buf[i];
             input_output[i * 2 + 1] = self.right_buf[i];
@@ -193,9 +196,13 @@ impl LoomEngine {
         param: &str,
         value: f32,
     ) -> Result<(), JsValue> {
-        self.graph
-            .set_node_parameter(node_id, param, value)
-            .map_err(|e| js_error(&format!("{:?}", e)))
+        if let Some(graph) = self.graph.as_mut() {
+            graph
+                .set_node_parameter(node_id, param, value)
+                .map_err(|e| js_error(&format!("{:?}", e)))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn set_stem_node_parameter(
@@ -217,14 +224,18 @@ impl LoomEngine {
     }
 
     pub fn set_global_glide_ms(&mut self, glide_ms: f32) {
-        self.graph.set_global_glide_ms(glide_ms);
+        if let Some(graph) = self.graph.as_mut() {
+            graph.set_global_glide_ms(glide_ms);
+        }
         for engine in &mut self.stem_engines {
             engine.set_global_glide_ms(glide_ms);
         }
     }
 
     pub fn reset(&mut self) {
-        self.graph.reset();
+        if let Some(graph) = self.graph.as_mut() {
+            graph.reset();
+        }
         if let Some(scheduler) = &mut self.scheduler {
             scheduler.reset();
         }

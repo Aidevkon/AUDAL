@@ -51,7 +51,15 @@ pub struct DspGraph {
     pub debug_frames: usize,
     block_size: usize,
     sample_rate: u32,
-    topology: DspTopology,
+    /// Arc-wrapped to make cloning the topology data itself cheap.
+    /// NOTE: this does NOT make DspGraph::clone() cheap overall —
+    /// Clone still fully rebuilds every node and re-runs the
+    /// topological sort via from_topology(). Real "cheap clone"
+    /// would require each DspNode to support its own clone (separate,
+    /// larger task, not attempted here — nodes carry live, per-instance
+    /// mutable state that can't be Arc-shared between two active graph
+    /// copies).
+    topology: std::sync::Arc<DspTopology>,
 }
 
 impl Clone for DspGraph {
@@ -360,7 +368,7 @@ impl DspGraph {
             debug_frames: 0,
             block_size,
             sample_rate,
-            topology: topology.clone(), // IDE refresh: topology does implement Clone
+            topology: std::sync::Arc::new(topology.clone()), // IDE refresh: topology does implement Clone
         })
     }
 
