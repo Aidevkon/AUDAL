@@ -1,5 +1,5 @@
-use crate::glider::ParameterGlider;
 use crate::node::DspNode;
+use sp314_dsp::glider::ParameterGlider;
 
 pub struct GainNode {
     gain_linear: f32,

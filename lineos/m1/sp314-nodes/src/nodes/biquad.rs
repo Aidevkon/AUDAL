@@ -1,6 +1,6 @@
-use crate::glider::ParameterGlider;
 use crate::node::DspNode;
 use libm::{cosf, powf, sinf, sqrtf};
+use sp314_dsp::glider::ParameterGlider;
 
 const PI: f32 = core::f32::consts::PI;
 

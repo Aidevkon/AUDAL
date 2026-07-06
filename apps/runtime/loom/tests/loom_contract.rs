@@ -316,7 +316,7 @@ fn stem_seek_advances_correctly() {
 
 #[test]
 fn glider_reaches_target_after_glide_duration() {
-    let mut glider = sp314_nodes::glider::ParameterGlider::new(0.0, 300.0, 48000.0);
+    let mut glider = sp314_dsp::glider::ParameterGlider::new(0.0, 300.0, 48000.0);
     glider.set_target(1.0);
     let glide_samples = (300.0 / 1000.0 * 48000.0) as usize;
     for _ in 0..glide_samples {
@@ -327,7 +327,7 @@ fn glider_reaches_target_after_glide_duration() {
 
 #[test]
 fn glider_is_linear() {
-    let mut glider = sp314_nodes::glider::ParameterGlider::new(0.0, 100.0, 48000.0);
+    let mut glider = sp314_dsp::glider::ParameterGlider::new(0.0, 100.0, 48000.0);
     glider.set_target(1.0);
     let glide_samples = (100.0 / 1000.0 * 48000.0) as usize;
     for _ in 0..(glide_samples / 2) {

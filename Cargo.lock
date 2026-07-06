@@ -4562,6 +4562,7 @@ dependencies = [
  "pipelineforge",
  "serde",
  "serde_json",
+ "sp314-dsp",
  "sp314-nodes",
  "symphonia",
  "wasm-bindgen",

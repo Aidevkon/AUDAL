@@ -19,5 +19,6 @@ opt-level = 'z'
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+sp314-dsp = { path = "../../../lineos/m1/sp314-dsp" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
 flacenc = "0.3.1"
