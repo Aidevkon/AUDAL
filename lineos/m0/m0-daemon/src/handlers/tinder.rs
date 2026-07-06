@@ -58,7 +58,7 @@ fn state_to_info(idx: usize, s: &DspState) -> VariationInfo {
         .min_by(|(_, a), (_, b)| {
             let da = (a.ducking_depth - s.ducking_depth).abs() + (a.ms_width - s.ms_width).abs();
             let db = (b.ducking_depth - s.ducking_depth).abs() + (b.ms_width - s.ms_width).abs();
-            da.partial_cmp(&db).unwrap()
+            da.total_cmp(&db)
         })
         .map(|(name, _)| flavours::label(name).to_string())
         .unwrap_or_else(|| "Custom".to_string());
