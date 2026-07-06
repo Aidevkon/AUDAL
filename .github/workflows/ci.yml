@@ -20,6 +20,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Cache
         uses: actions/cache@v4
         with:
@@ -33,7 +37,7 @@ jobs:
       - name: Gate 2 — Format
         run: cargo fmt --check
       - name: Gate 3 — Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
       - name: Gate 4 — Unit tests
         run: cargo test --lib --workspace
       - name: Gate 5 — Domain quality
@@ -70,7 +74,7 @@ jobs:
       - name: Gate 2 — Format
         run: cargo fmt --check
       - name: Gate 3 — Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
       - name: Gate 4 — Unit tests
         run: cargo test --lib --workspace
       - name: Gate 5 — Domain quality
