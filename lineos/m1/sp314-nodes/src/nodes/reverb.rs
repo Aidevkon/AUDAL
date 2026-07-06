@@ -107,7 +107,12 @@ impl ReverbNode {
     }
 }
 
+const PARAMS: &[&str] = &["rt60", "hf_damping", "diffusion", "mix"];
+
 impl DspNode for ReverbNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let feedback = 0.84 + (self.rt60 / 8.0).min(0.13);
         let damping = self.hf_damping;
@@ -161,18 +166,22 @@ impl DspNode for ReverbNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "rt60" => self.rt60 = value,
             "hf_damping" => self.hf_damping = value,
             "diffusion" => self.diffusion = value,
             "mix" => self.mix = value,
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
-    fn set_parameter_no_glide(&mut self, name: &str, value: f32) {
-        self.set_parameter(name, value);
+    fn set_parameter_no_glide(&mut self, name: &str, value: f32) -> bool {
+        self.set_parameter(name, value)
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

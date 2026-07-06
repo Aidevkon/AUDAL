@@ -38,7 +38,12 @@ impl WidthNode {
     }
 }
 
+const PARAMS: &[&str] = &["decorrelation", "side_gain_db", "mono_comp_shelf_db"];
+
 impl DspNode for WidthNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let sq2 = std::f32::consts::SQRT_2;
         let isq2 = 1.0 / sq2;
@@ -92,17 +97,21 @@ impl DspNode for WidthNode {
         self.shelf_low = 0.0;
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "decorrelation" => self.decorrelation = value,
             "side_gain_db" => self.side_gain_db = value,
             "mono_comp_shelf_db" => self.mono_comp_shelf_db = value,
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
-    fn set_parameter_no_glide(&mut self, name: &str, value: f32) {
-        self.set_parameter(name, value);
+    fn set_parameter_no_glide(&mut self, name: &str, value: f32) -> bool {
+        self.set_parameter(name, value)
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

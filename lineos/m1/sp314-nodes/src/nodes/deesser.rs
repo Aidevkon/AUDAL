@@ -31,7 +31,12 @@ impl DeEsserNode {
     }
 }
 
+const PARAMS: &[&str] = &["threshold_db", "frequency_hz", "ratio"];
+
 impl DspNode for DeEsserNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let threshold_lin = powf(10.0, self.threshold_db / 20.0);
 
@@ -72,7 +77,10 @@ impl DspNode for DeEsserNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "threshold_db" => self.threshold_db = value,
             "frequency_hz" => {
@@ -81,8 +89,9 @@ impl DspNode for DeEsserNode {
                     Biquad::new(FilterType::HighPass, value, 0.707, self.sample_rate as f32);
             }
             "ratio" => self.ratio = value,
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

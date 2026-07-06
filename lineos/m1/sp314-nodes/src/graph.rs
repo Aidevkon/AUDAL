@@ -24,6 +24,7 @@ pub enum GraphError {
     CycleDetected,
     MissingNode(String),
     InvalidTopology(String),
+    UnknownParameter { node_id: String, parameter: String },
 }
 
 struct ParamEdge {
@@ -256,6 +257,17 @@ impl DspGraph {
                 _ => return Err(GraphError::UnknownNodeType(t_node.node_type.clone())),
             };
 
+            if let Some(obj) = t_node.parameters.as_object() {
+                for param_name in obj.keys() {
+                    if !node.has_parameter(param_name) {
+                        return Err(GraphError::UnknownParameter {
+                            node_id: t_node.node_id.clone(),
+                            parameter: param_name.clone(),
+                        });
+                    }
+                }
+            }
+
             nodes.insert(t_node.node_id.clone(), node);
             buffers.insert(
                 t_node.node_id.clone(),
@@ -284,6 +296,14 @@ impl DspGraph {
                     .or_default()
                     .push(edge.source.clone());
             } else if edge.modulation_type == "parameter" {
+                let target_param = edge.target_parameter.clone().unwrap_or_default();
+                if !nodes[&edge.target].has_parameter(&target_param) {
+                    return Err(GraphError::UnknownParameter {
+                        node_id: edge.target.clone(),
+                        parameter: target_param,
+                    });
+                }
+
                 param_edges.push(ParamEdge {
                     source_node: edge.source.clone(),
                     source_output: edge
@@ -291,7 +311,7 @@ impl DspGraph {
                         .clone()
                         .unwrap_or_else(|| "envelope".to_string()),
                     target_node: edge.target.clone(),
-                    target_parameter: edge.target_parameter.clone().unwrap_or_default(),
+                    target_parameter: target_param,
                 });
             }
         }
@@ -366,10 +386,17 @@ impl DspGraph {
                 .unwrap()
                 .get_output(&edge.source_output)
             {
-                self.nodes
+                let result = self
+                    .nodes
                     .get_mut(&edge.target_node)
                     .unwrap()
                     .set_parameter_no_glide(&edge.target_parameter, val);
+
+                assert!(
+                    result,
+                    "Runtime parameter validation failed for '{}' on node '{}'. This is a fatal logic error because it should have been caught by from_topology() build-time checks!",
+                    edge.target_parameter, edge.target_node
+                );
             }
         }
 
@@ -449,21 +476,32 @@ impl DspGraph {
         }
     }
 
-    pub fn set_node_parameter(&mut self, node_id: &str, param: &str, value: f32) {
+    pub fn set_node_parameter(
+        &mut self,
+        node_id: &str,
+        param: &str,
+        value: f32,
+    ) -> Result<(), GraphError> {
         if let Some(node) = self.nodes.get_mut(node_id) {
-            node.set_parameter(param, value);
+            if !node.set_parameter(param, value) {
+                return Err(GraphError::UnknownParameter {
+                    node_id: node_id.to_string(),
+                    parameter: param.to_string(),
+                });
+            }
+            Ok(())
+        } else {
+            Err(GraphError::MissingNode(node_id.to_string()))
         }
     }
 
-    pub fn set_node_glide_ms(&mut self, node_id: &str, glide_ms: f32) {
-        if let Some(node) = self.nodes.get_mut(node_id) {
-            node.set_parameter("glide_ms", glide_ms);
-        }
+    pub fn set_node_glide_ms(&mut self, node_id: &str, glide_ms: f32) -> Result<(), GraphError> {
+        self.set_node_parameter(node_id, "glide_ms", glide_ms)
     }
 
     pub fn set_global_glide_ms(&mut self, glide_ms: f32) {
         for node in self.nodes.values_mut() {
-            node.set_parameter("glide_ms", glide_ms);
+            let _ = node.set_parameter("glide_ms", glide_ms);
         }
     }
 }

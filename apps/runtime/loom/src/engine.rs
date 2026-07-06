@@ -4,6 +4,16 @@ use crate::stem_engine::StemEngine;
 use sp314_nodes::{graph::DspGraph, topology::DspTopology};
 use wasm_bindgen::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
+fn js_error(msg: &str) -> JsValue {
+    JsValue::from_str(msg)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn js_error(_msg: &str) -> JsValue {
+    JsValue::UNDEFINED
+}
+
 #[wasm_bindgen]
 pub struct LoomEngine {
     graph: DspGraph,
@@ -177,8 +187,15 @@ impl LoomEngine {
         }
     }
 
-    pub fn set_node_parameter(&mut self, node_id: &str, param: &str, value: f32) {
-        self.graph.set_node_parameter(node_id, param, value);
+    pub fn set_node_parameter(
+        &mut self,
+        node_id: &str,
+        param: &str,
+        value: f32,
+    ) -> Result<(), JsValue> {
+        self.graph
+            .set_node_parameter(node_id, param, value)
+            .map_err(|e| js_error(&format!("{:?}", e)))
     }
 
     pub fn set_stem_node_parameter(
@@ -187,14 +204,16 @@ impl LoomEngine {
         node_id: &str,
         param: &str,
         value: f32,
-    ) {
+    ) -> Result<(), JsValue> {
         // Use a simple if-chain without allocating a hashmap, per architect note
         for engine in &mut self.stem_engines {
             if engine.id == stem_id {
-                engine.set_node_parameter(node_id, param, value);
-                break;
+                return engine
+                    .set_node_parameter(node_id, param, value)
+                    .map_err(|e| js_error(&format!("{:?}", e)));
             }
         }
+        Ok(())
     }
 
     pub fn set_global_glide_ms(&mut self, glide_ms: f32) {

@@ -19,7 +19,12 @@ impl MaskingEqNode {
     }
 }
 
+const PARAMS: &[&str] = &[];
+
 impl DspNode for MaskingEqNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.eq.process_block(left, right, &self.stem_ratios);
     }
@@ -28,7 +33,9 @@ impl DspNode for MaskingEqNode {
         self.stem_ratios = *stem_ratios;
     }
 
-    fn set_parameter(&mut self, _name: &str, _value: f32) {}
+    fn set_parameter(&mut self, _name: &str, _value: f32) -> bool {
+        false
+    }
 
     fn get_output(&self, _name: &str) -> Option<f32> {
         None

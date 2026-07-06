@@ -44,7 +44,12 @@ impl NoiseGateNode {
     }
 }
 
+const PARAMS: &[&str] = &["threshold_db", "attack_ms", "hold_ms", "release_ms"];
+
 impl DspNode for NoiseGateNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let threshold_lin = 10.0_f32.powf(self.threshold_db / 20.0);
         let sr = self.sample_rate as f32;
@@ -106,14 +111,18 @@ impl DspNode for NoiseGateNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "threshold_db" => self.threshold_db = value,
             "attack_ms" => self.attack_ms = value,
             "hold_ms" => self.hold_ms = value,
             "release_ms" => self.release_ms = value,
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
     fn get_output(&self, name: &str) -> Option<f32> {

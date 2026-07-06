@@ -130,7 +130,12 @@ impl BiquadFilterNode {
     }
 }
 
+const PARAMS: &[&str] = &["filter_type", "freq_hz", "q", "gain_db", "glide_ms"];
+
 impl DspNode for BiquadFilterNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
             let mut recompute_needed = false;
@@ -164,56 +169,82 @@ impl DspNode for BiquadFilterNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         let mut changed = false;
-        if name == "filter_type" && self.filter_type != value {
-            self.filter_type = value;
-            changed = true;
-        } else if name == "freq_hz" {
-            self.freq_glider.set_target(value);
-        } else if name == "q" {
-            self.q_glider.set_target(value);
-        } else if name == "gain_db" {
-            self.gain_glider.set_target(value);
-        } else if name == "glide_ms" {
-            self.glide_ms = value;
-            self.freq_glider.set_glide_ms(value);
-            self.gain_glider.set_glide_ms(value);
-            self.q_glider.set_glide_ms(value);
+        match name {
+            "filter_type" => {
+                if self.filter_type != value {
+                    self.filter_type = value;
+                    changed = true;
+                }
+            }
+            "freq_hz" => self.freq_glider.set_target(value),
+            "q" => self.q_glider.set_target(value),
+            "gain_db" => self.gain_glider.set_target(value),
+            "glide_ms" => {
+                self.glide_ms = value;
+                self.freq_glider.set_glide_ms(value);
+                self.gain_glider.set_glide_ms(value);
+                self.q_glider.set_glide_ms(value);
+            }
+            _ => return false,
         }
 
         if changed {
             self.recompute();
         }
+        true
     }
 
-    fn set_parameter_no_glide(&mut self, name: &str, value: f32) {
+    fn set_parameter_no_glide(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         let mut changed = false;
-        if name == "filter_type" && self.filter_type != value {
-            self.filter_type = value;
-            changed = true;
-        } else if name == "freq_hz" && self.freq_hz != value {
-            self.freq_glider.set_target_instant(value);
-            self.freq_hz = value;
-            changed = true;
-        } else if name == "q" && self.q != value {
-            self.q_glider.set_target_instant(value);
-            self.q = value;
-            changed = true;
-        } else if name == "gain_db" && self.gain_db != value {
-            self.gain_glider.set_target_instant(value);
-            self.gain_db = value;
-            changed = true;
-        } else if name == "glide_ms" {
-            self.glide_ms = value;
-            self.freq_glider.set_glide_ms(value);
-            self.gain_glider.set_glide_ms(value);
-            self.q_glider.set_glide_ms(value);
+        match name {
+            "filter_type" => {
+                if self.filter_type != value {
+                    self.filter_type = value;
+                    changed = true;
+                }
+            }
+            "freq_hz" => {
+                if self.freq_hz != value {
+                    self.freq_glider.set_target_instant(value);
+                    self.freq_hz = value;
+                    changed = true;
+                }
+            }
+            "q" => {
+                if self.q != value {
+                    self.q_glider.set_target_instant(value);
+                    self.q = value;
+                    changed = true;
+                }
+            }
+            "gain_db" => {
+                if self.gain_db != value {
+                    self.gain_glider.set_target_instant(value);
+                    self.gain_db = value;
+                    changed = true;
+                }
+            }
+            "glide_ms" => {
+                self.glide_ms = value;
+                self.freq_glider.set_glide_ms(value);
+                self.gain_glider.set_glide_ms(value);
+                self.q_glider.set_glide_ms(value);
+            }
+            _ => return false,
         }
 
         if changed {
             self.recompute();
         }
+        true
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

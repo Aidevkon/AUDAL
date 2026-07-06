@@ -39,7 +39,12 @@ impl RmsDetectorNode {
     }
 }
 
+const PARAMS: &[&str] = &["threshold_db", "attack_ms", "release_ms"];
+
 impl DspNode for RmsDetectorNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         for (l, r) in left.iter().zip(right.iter()) {
             let sq_l = *l * *l;
@@ -61,22 +66,37 @@ impl DspNode for RmsDetectorNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         let mut changed = false;
-        if name == "threshold_db" && self.threshold_db != value {
-            self.threshold_db = value;
-            changed = true;
-        } else if name == "attack_ms" && self.attack_ms != value {
-            self.attack_ms = value;
-            changed = true;
-        } else if name == "release_ms" && self.release_ms != value {
-            self.release_ms = value;
-            changed = true;
+        match name {
+            "threshold_db" => {
+                if self.threshold_db != value {
+                    self.threshold_db = value;
+                    changed = true;
+                }
+            }
+            "attack_ms" => {
+                if self.attack_ms != value {
+                    self.attack_ms = value;
+                    changed = true;
+                }
+            }
+            "release_ms" => {
+                if self.release_ms != value {
+                    self.release_ms = value;
+                    changed = true;
+                }
+            }
+            _ => return false,
         }
 
         if changed {
             self.recompute();
         }
+        true
     }
 
     fn get_output(&self, name: &str) -> Option<f32> {

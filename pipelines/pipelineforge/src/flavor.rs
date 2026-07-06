@@ -89,7 +89,7 @@ impl Flavor {
                     { "node_id": "eq_mud", "node_type": "MaskingEQ", "parameters": {} },
                     { "node_id": "gain_makeup", "node_type": "Gain", "parameters": { "gain": 1.0 } },
                     { "node_id": "ambience_reverb", "node_type": "Reverb", "parameters": {"rt60": 0.0, "hf_damping": 0.5, "diffusion": 0.5, "mix": 0.0} },
-                    { "node_id": "ambience_width", "node_type": "Width", "parameters": {"decorrelation": 0.0, "side_gain_db": 0.0, "phase_variance": 0.0, "mono_comp_shelf_db": 0.0} },
+                    { "node_id": "ambience_width", "node_type": "Width", "parameters": {"decorrelation": 0.0, "side_gain_db": 0.0, "mono_comp_shelf_db": 0.0} },
                     { "node_id": "Output", "node_type": "Output", "parameters": {} }
                 ],
                 "edges": [

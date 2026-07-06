@@ -44,7 +44,19 @@ impl CompressorNode {
     }
 }
 
+const PARAMS: &[&str] = &[
+    "threshold_db",
+    "ratio",
+    "knee_db",
+    "attack_ms",
+    "release_ms",
+    "makeup_db",
+];
+
 impl DspNode for CompressorNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         let makeup_linear = powf(10.0, self.makeup_db / 20.0);
 
@@ -68,27 +80,35 @@ impl DspNode for CompressorNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         let mut env_changed = false;
-        if name == "threshold_db" {
-            self.threshold_db = value;
-        } else if name == "ratio" {
-            self.ratio = value;
-        } else if name == "knee_db" {
-            self.knee_db = value;
-        } else if name == "attack_ms" && self.attack_ms != value {
-            self.attack_ms = value;
-            env_changed = true;
-        } else if name == "release_ms" && self.release_ms != value {
-            self.release_ms = value;
-            env_changed = true;
-        } else if name == "makeup_db" {
-            self.makeup_db = value;
+        match name {
+            "threshold_db" => self.threshold_db = value,
+            "ratio" => self.ratio = value,
+            "knee_db" => self.knee_db = value,
+            "attack_ms" => {
+                if self.attack_ms != value {
+                    self.attack_ms = value;
+                    env_changed = true;
+                }
+            }
+            "release_ms" => {
+                if self.release_ms != value {
+                    self.release_ms = value;
+                    env_changed = true;
+                }
+            }
+            "makeup_db" => self.makeup_db = value,
+            _ => return false,
         }
 
         if env_changed {
             self.recompute_envelopes();
         }
+        true
     }
 
     fn get_output(&self, name: &str) -> Option<f32> {

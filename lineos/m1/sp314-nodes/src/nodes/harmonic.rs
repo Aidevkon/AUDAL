@@ -19,7 +19,12 @@ impl HarmonicNode {
     }
 }
 
+const PARAMS: &[&str] = &["drive", "mix", "even_amount", "odd_amount"];
+
 impl DspNode for HarmonicNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
             let mid = (*l + *r) * 0.5_f32;
@@ -30,14 +35,18 @@ impl DspNode for HarmonicNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "drive" => self.engine.set_drive_compensation(value),
             "mix" => {}
             "even_amount" => {}
             "odd_amount" => {}
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

@@ -46,7 +46,12 @@ impl MultibandCompressorNode {
     }
 }
 
+const PARAMS: &[&str] = &[];
+
 impl DspNode for MultibandCompressorNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         // Independent state per channel — no stereo crosstalk
         for l in left.iter_mut() {
@@ -57,8 +62,9 @@ impl DspNode for MultibandCompressorNode {
         }
     }
 
-    fn set_parameter(&mut self, _name: &str, _value: f32) {
+    fn set_parameter(&mut self, _name: &str, _value: f32) -> bool {
         // Future: f_low, f_high, per-band threshold/ratio
+        false
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

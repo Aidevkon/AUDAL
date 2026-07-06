@@ -57,7 +57,12 @@ impl Default for LookaheadTelemetryNode {
     }
 }
 
+const PARAMS: &[&str] = &[];
+
 impl DspNode for LookaheadTelemetryNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.ring_l.feed(left);
         self.ring_r.feed(right);
@@ -81,7 +86,9 @@ impl DspNode for LookaheadTelemetryNode {
         }
     }
 
-    fn set_parameter(&mut self, _name: &str, _value: f32) {}
+    fn set_parameter(&mut self, _name: &str, _value: f32) -> bool {
+        false
+    }
 
     fn get_output(&self, name: &str) -> Option<f32> {
         if name == "transient_detected" {

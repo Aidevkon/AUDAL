@@ -69,7 +69,7 @@ fn set_node_parameter_does_not_panic() {
     let json = muddy_topology();
     let mut engine = LoomEngine::new(&json, 512, 48000).unwrap();
 
-    engine.set_node_parameter("f0_biquad_lowmid", "freq_hz", 300.0);
+    let _ = engine.set_node_parameter("f0_biquad_lowmid", "freq_hz", 300.0);
 
     let mut samples = vec![0.0; 1024];
     engine.process(&mut samples);
@@ -370,8 +370,8 @@ fn set_stem_node_parameter_updates_correct_stem() {
     // The prompt says: "set_stem_node_parameter("vocals", "f0_biquad_lowmid", "freq_hz", 300.0)"
     // Even if the node doesn't exist, it shouldn't panic, but let's see if we can assert it updated.
     // It's hard to test inside the graph if the node doesn't exist. Let's just make sure it doesn't crash.
-    engine.set_stem_node_parameter("vocals", "Input", "gain", 0.5); // Input doesn't have gain, but shouldn't panic.
-    engine.set_stem_node_parameter("vocals", "Gain", "gain", 0.5); // Assuming there's a gain node.
+    let _ = engine.set_stem_node_parameter("vocals", "Input", "gain", 0.5); // Input doesn't have gain, but shouldn't panic.
+    let _ = engine.set_stem_node_parameter("vocals", "Gain", "gain", 0.5); // Assuming there's a gain node.
 
     let mut out = vec![0.0; 1024];
     engine.process_stems(&mut out);

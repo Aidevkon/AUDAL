@@ -52,7 +52,18 @@ impl AutoLevelNode {
     }
 }
 
+const PARAMS: &[&str] = &[
+    "target_rms_db",
+    "lookahead_ms",
+    "max_gain_db",
+    "min_gain_db",
+    "smoothing_ms",
+];
+
 impl DspNode for AutoLevelNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         if self.window_buffer.is_empty() {
             return;
@@ -121,7 +132,10 @@ impl DspNode for AutoLevelNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "target_rms_db" => self.target_rms_db = value,
             "lookahead_ms" => {
@@ -137,8 +151,9 @@ impl DspNode for AutoLevelNode {
             "max_gain_db" => self.max_gain_db = value,
             "min_gain_db" => self.min_gain_db = value,
             "smoothing_ms" => self.smoothing_ms = value,
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

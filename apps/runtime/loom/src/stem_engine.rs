@@ -43,8 +43,13 @@ impl StemEngine {
         self.graph.reset();
     }
 
-    pub fn set_node_parameter(&mut self, node_id: &str, param: &str, value: f32) {
-        self.graph.set_node_parameter(node_id, param, value);
+    pub fn set_node_parameter(
+        &mut self,
+        node_id: &str,
+        param: &str,
+        value: f32,
+    ) -> Result<(), sp314_nodes::graph::GraphError> {
+        self.graph.set_node_parameter(node_id, param, value)
     }
 
     pub fn set_global_glide_ms(&mut self, glide_ms: f32) {

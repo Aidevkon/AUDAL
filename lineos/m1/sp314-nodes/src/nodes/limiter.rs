@@ -25,29 +25,37 @@ impl LimiterNode {
     }
 }
 
+const PARAMS: &[&str] = &["ceiling_db"];
+
 impl DspNode for LimiterNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         self.limiter.process_block(left, right);
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
-        if name == "ceiling_db" && self.ceiling_db != value {
-            self.ceiling_db = value;
-            let config = LimiterConfig {
-                release_ms: 100.0,
-                blend_release_ms: 30.0,
-                ceiling_db: self.ceiling_db,
-                midside_eq_enabled: false,
-                true_peak_enabled: true,
-            };
-            // Note: Re-creating the limiter flushes the lookahead delay line.
-            // This is acceptable only when re-configuring before processing,
-            // but not ideal during live parameter automation.
-            // However, BrickwallLimiter in sp314-dsp doesn't expose a method
-            // to update ceiling_db dynamically without losing state.
-            // We'll keep the state reset here as it's the only safe way given the API.
-            self.limiter = BrickwallLimiter::new(config, self.sample_rate as u32);
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
         }
+        match name {
+            "ceiling_db" => {
+                if self.ceiling_db != value {
+                    self.ceiling_db = value;
+                    let config = LimiterConfig {
+                        release_ms: 100.0,
+                        blend_release_ms: 30.0,
+                        ceiling_db: self.ceiling_db,
+                        midside_eq_enabled: false,
+                        true_peak_enabled: true,
+                    };
+                    self.limiter = BrickwallLimiter::new(config, self.sample_rate as u32);
+                }
+            }
+            _ => return false,
+        }
+        true
     }
 
     fn get_output(&self, name: &str) -> Option<f32> {

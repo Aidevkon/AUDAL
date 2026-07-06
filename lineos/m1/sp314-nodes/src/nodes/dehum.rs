@@ -41,7 +41,12 @@ impl DeHumNode {
     }
 }
 
+const PARAMS: &[&str] = &["enabled", "fundamental_hz", "harmonics"];
+
 impl DspNode for DeHumNode {
+    fn param_names(&self) -> &'static [&'static str] {
+        PARAMS
+    }
     fn process_stereo(&mut self, left: &mut [f32], right: &mut [f32]) {
         if !self.enabled || self.notches.is_empty() {
             return;
@@ -62,7 +67,10 @@ impl DspNode for DeHumNode {
         }
     }
 
-    fn set_parameter(&mut self, name: &str, value: f32) {
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
         match name {
             "enabled" => self.enabled = value > 0.5,
             "fundamental_hz" => {
@@ -77,8 +85,9 @@ impl DspNode for DeHumNode {
                     self.build_notches();
                 }
             }
-            _ => {}
+            _ => return false,
         }
+        true
     }
 
     fn get_output(&self, _name: &str) -> Option<f32> {

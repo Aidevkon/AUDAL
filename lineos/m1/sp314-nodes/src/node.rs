@@ -16,15 +16,24 @@ pub trait DspNode: Send {
     /// existing 16 nodes are unaffected.
     fn update_features(&mut self, _stem_ratios: &[f32; 5]) {}
 
+    /// Η μοναδική πηγή αλήθειας ανά node
+    fn param_names(&self) -> &'static [&'static str];
+
+    /// Default implementation, δεν χρειάζεται να υλοποιηθεί στα nodes
+    fn has_parameter(&self, name: &str) -> bool {
+        self.param_names().contains(&name)
+    }
+
     /// Set a named parameter on this node.
     /// Called by parameter modulation edges between blocks.
-    /// Unknown parameter names are silently ignored.
-    fn set_parameter(&mut self, name: &str, value: f32);
+    /// Returns true if parameter is known, false otherwise.
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool;
 
     /// Set a named parameter on this node, but apply it instantly without gliding.
     /// Used by parameter modulation edges.
-    fn set_parameter_no_glide(&mut self, name: &str, value: f32) {
-        self.set_parameter(name, value);
+    /// Returns true if parameter is known, false otherwise.
+    fn set_parameter_no_glide(&mut self, name: &str, value: f32) -> bool {
+        self.set_parameter(name, value)
     }
 
     /// Read a named output value from this node.
