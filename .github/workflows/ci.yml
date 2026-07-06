@@ -23,7 +23,7 @@ jobs:
       - name: Install System Dependencies (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libmp3lame-dev
       - name: Cache
         uses: actions/cache@v4
         with:
@@ -61,6 +61,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Install System Dependencies (macOS)
+        run: brew install lame
       - name: Cache
         uses: actions/cache@v4
         with:
