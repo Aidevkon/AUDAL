@@ -117,6 +117,34 @@ fn episode_render_produces_valid_master() {
         "true peak {} exceeded ceiling",
         res.true_peak_dbtp
     );
+
+    // --- NEO REGRESSION TEST BLOCK ---
+    // 1. Διάβασμα των ΠΡΑΓΜΑΤΙΚΩΝ δειγμάτων (PCM) από το export του test
+    let exported_bytes = std::fs::read(&res.pcm_path).expect("Failed to read PCM from disk");
+    let mut actual_left = Vec::with_capacity(res.frames_written);
+    let mut actual_right = Vec::with_capacity(res.frames_written);
+
+    // Το αρχείο είναι f32 LE, interleaved. Διαβάζουμε με ασφάλεια (safe Rust).
+    for chunk in exported_bytes.chunks_exact(8) {
+        let l_bytes: [u8; 4] = chunk[0..4].try_into().unwrap();
+        let r_bytes: [u8; 4] = chunk[4..8].try_into().unwrap();
+        actual_left.push(f32::from_le_bytes(l_bytes));
+        actual_right.push(f32::from_le_bytes(r_bytes));
+    }
+
+    // 2. Ανεξάρτητη μέτρηση στο τελικό Exported PCM
+    let measured_pcm_lufs =
+        sp314_dsp::metering::lufs::measure_integrated_lufs(&actual_left, &actual_right);
+
+    // 3. Σύγκριση (Το Certificate/Output LUFS πρέπει να είναι απόλυτα ταυτόσημο με το PCM)
+    let diff = (res.output_lufs - measured_pcm_lufs).abs();
+    assert!(
+        diff < 0.5,
+        "FALSE ATTESTATION: Certificate says {} LUFS, but actual file is {} LUFS (diff: {})",
+        res.output_lufs,
+        measured_pcm_lufs,
+        diff
+    );
 }
 
 // ── TEST 2: first floor is deterministic

@@ -179,6 +179,7 @@ where
     let correction_linear = libm::powf(10.0_f32, correction_db / 20.0);
 
     // ── PASS 3: gain + limit + hash ───
+    let mut final_lufs_meter = LufsMeter::new();
     let limiter_config = LimiterConfig {
         release_ms: 15.0,
         blend_release_ms: 95.0,
@@ -222,6 +223,14 @@ where
 
             // Limit
             limiter.process_block(&mut left_buf[..chunk], &mut right_buf[..chunk]);
+
+            // Real (post-gain/limiter) LUFS measurement
+            // We only measure the actual frames, not the limiter flush tail
+            let valid_frames = chunk.min(frames_written.saturating_sub(pos));
+            if valid_frames > 0 {
+                final_lufs_meter
+                    .process_chunk(&left_buf[..valid_frames], &right_buf[..valid_frames]);
+            }
 
             // Peak after limiting
             for i in 0..chunk {
@@ -273,7 +282,7 @@ where
         output_sha256: format!("{:x}", sha256.finalize()),
         frames_written,
         sample_rate,
-        output_lufs,
+        output_lufs: final_lufs_meter.finish().unwrap_or(output_lufs),
         output_lra,
         true_peak_dbtp,
     })
