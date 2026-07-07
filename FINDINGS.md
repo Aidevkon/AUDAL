@@ -178,6 +178,70 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   be generated via the already-present lame-sys/lame encoder in this
   workspace, but that's new fixture-generation work, not a CI fix.
 
+### F-015 — BPM is hardcoded to 0.0 throughout the pipeline, silently falls back to 120 BPM in two separate places
+- **Status:** PARKED (real gap, not urgent — cosmetic UI effect today,
+  becomes a blocker for genre classification / BPM-aware ducking)
+- **Component:** `sp314-dsp/src/analysis/pre_analysis.rs` (bpm: 0.0 hardcoded),
+  `apps/stillair/cockpit-dioxus/src/components/neon_canvas.rs`
+  (FALLBACK_PULSE_MS=500ms silently produces 120 BPM math), 
+  `apps/stillair/src-tauri/src/commands/session.rs` (hardcoded "120"
+  string in Jini prompt template)
+- **Trigger:** When genre classification or BPM-aware DSP features
+  (maestro ducking already reads bpm as an input per `e2e_maestro_proof.rs` tests, but always via mocked test values, never real
+  detection) need an actual measured value instead of a placeholder.
+- **Context:** No autocorrelation/onset-detection algorithm exists
+  anywhere in the codebase. The Hero Instrument UI's floor pulse
+  has always animated at exactly 120 BPM regardless of the actual
+  track, because 0.0 (never-computed) falls through a fallback that
+  happens to equal 120 BPM by coincidence of the chosen constant
+  (60000ms / 500ms = 120). Found while investigating whether BPM
+  detection was ready enough to include in a first genre classifier
+  pass — it is not; real BPM detection is its own separate task.
+
+### F-016 — TrackFeatures struct is MFCC-only by design, not yet extended for future features (spectral centroid, onset rate, BPM)
+- **Status:** PARKED — deliberate, avoid schema guessing
+- **Trigger:** When onset detection or BPM detection is actually built
+  (separate task each), extend the struct then, with the real
+  shape those algorithms produce — not before.
+- **Context:** Considered adding placeholder 0.0 fields now "to save
+  future refactoring", rejected — same premature-abstraction pattern
+  already avoided today for API facades, typestate pattern, and
+  biquad unification. Sentinel 0.0 values for "not yet measured"
+  also violate the project's own §8 rule (`Option<T>`/explicit `Err`,
+  never numeric sentinels in forensic/DSP context).
+
+### F-017 — Genre corpus versioning/reproducibility design (pre-decided, not yet built)
+- **Status:** PARKED (design decided, no code yet — genre classifier
+  itself doesn't exist yet either, this is the plan for when it does)
+- **Component:** μελλοντικό `genre_classifier.rs` + certificate schema
+- **Trigger:** Όταν χτιστεί ο πρώτος πραγματικός genre classifier
+  (μετά τη συλλογή reference tracks + πρώτο measure_genre_centroids run)
+- **Context:** Ο χρήστης ρώτησε ρητά "πώς κάνει κάποιος remaster με
+  reproducibility αν εμείς έχουμε αλλάξει version corpus;". Λύση,
+  ίδιο μοτίβο με Cargo.lock: το certificate κλειδώνει ρητά ποιο
+  corpus version (π.χ. "genre-corpus-v3", με hash/tag) χρησιμοποιήθηκε
+  στο πρώτο mastering. Remaster δίνει ρητή επιλογή στον χρήστη:
+  "identical" (ίδιο locked version, true reproducibility) ή "latest"
+  (νέο corpus version, ρητά σημειωμένο ως αλλαγή). Καμία σιωπηλή
+  version drift ποτέ.
+
+### F-018 — measure_genre_centroids.rs has no sanity check for track duration
+- **Status:** PARKED (low risk, manual curation should catch this)
+- **Component:** `m0-daemon/tests/measure_genre_centroids.rs`
+- **Trigger:** Αν κατά λάθος μπει πολύ μεγάλο αρχείο (π.χ. ολόκληρο CD
+  rip αντί για ένα track) στο `genre_references/` folder.
+- **Context:** Δεν υπάρχει έλεγχος duration/file-size πριν το processing.
+  Discovered while automating reference-track download attempts —
+  some archive.org "tracks" were actually full album rips. Manual
+  curation (choosing individual, correctly-labeled tracks) should
+  avoid this in practice, but the tool itself doesn't defend against it.
+
+### F-022 — GenreClassifier implemented, wiring pending
+- **Status:** ACTIVE
+- **Component:** `lineos/m1/sp314-dsp/src/analysis/genre_classifier.rs`
+- **Trigger:** Όταν ξεκινήσει η ενσωμάτωση στο `pre_analysis.rs`.
+- **Context:** Ο αλγόριθμος (Z-Scored Euclidean) και τα thresholds (`MAX=4.0`, `DELTA=0.15`) έχουν υλοποιηθεί βάσει μετρήσεων στο καθαρό corpus, αλλά δεν καλούνται ακόμα στο runtime του m0-daemon pipeline.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
