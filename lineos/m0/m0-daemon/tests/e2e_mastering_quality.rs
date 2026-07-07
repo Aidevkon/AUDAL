@@ -948,3 +948,71 @@ fn inv_qa_10_overscale_stress() {
         println!("INV-QA-10 [{}]: true_peak={:.2}dBTP finite=OK", name, tp);
     }
 }
+
+/// INV-MUS-2 / S-0XX P1: Podcast path bit-exactness enforcement.
+/// This test pins the exact SHA-256 output of the podcast/Episode path
+/// (`from_preset("podcast")` → Episode, stem-bypass pipeline) at commit abfd1002a1bd08eed7c730f523a4067f9b849f98.
+/// It also asserts that >= 1 `EqSource::Reference` zone was produced in the DspConfig.
+///
+/// The writer (episode_render.rs mmap) was verified metadata-static (headerless raw PCM)
+/// at abfd1002a1bd08eed7c730f523a4067f9b849f98; a future red test after writer changes
+/// should be understood as a container change, not DSP drift.
+///
+/// UPDATE POLICY: The hash changes ONLY via a deliberate, reviewed change to the
+/// podcast DSP behavior. It must NEVER be updated just because "the test turned red".
+#[test]
+fn inv_mus_2_podcast_bit_exactness() {
+    use sha2::{Digest, Sha256};
+
+    let sr = 48000u32;
+    let input = generate_podcast_fixture(sr, 3.0);
+    let path = "/tmp/qa_podcast_bit_exactness.wav";
+    write_wav(&input, sr, path);
+
+    let state_tmp = tempfile::TempDir::new().unwrap();
+
+    let mut req = make_req(path);
+    req.preset_id = "podcast".to_string();
+    req.chaos_seed = Some(42);
+    req.persona_id = Some("warm_analog".to_string());
+    req.project_id = Some("test_proj".to_string());
+    req.track_id = Some("test_track".to_string());
+
+    let result = run_dsp(
+        &req,
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-podcast-hash".to_string(),
+        state_tmp.path().to_str().unwrap(),
+    );
+    assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    // Verify EqSource::Reference is present in the DspConfig
+    let config_json = blob
+        .aether_config
+        .expect("Missing aether_config in StoredBlob");
+    let dsp_config: integration::config::DspConfig =
+        serde_json::from_str(&config_json).expect("Failed to deserialize DspConfig");
+
+    let has_reference_zone = dsp_config
+        .eq
+        .zone_bands
+        .iter()
+        .any(|z| matches!(z.source, aether::semantic::zone::EqSource::Reference));
+    assert!(
+        has_reference_zone,
+        "Podcast path must produce at least one EqSource::Reference zone!"
+    );
+
+    // Read output PCM and verify bit exactness hash
+    let bytes = std::fs::read(&blob.audio_path).unwrap();
+    let hash = hex::encode(Sha256::digest(&bytes));
+
+    assert_eq!(
+        hash, "5d06853916e295b7e0fd4a2d60aa83d60f3787ce3d50a432f3e0aaae84f5ace5",
+        "Output PCM hash mismatch!"
+    );
+}
