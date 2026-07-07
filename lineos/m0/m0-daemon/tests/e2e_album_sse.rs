@@ -38,7 +38,7 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     // 2. Dispatch a Batch Mastering intent
     let params = m0d::agents::operator::MasteringParams {
-        audio_path: "/home/aidevcon/Music/test.wav".into(), // Ensure test.wav exists or uses dummy
+        audio_path: concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav").into(), // Uses committed fixture, always available on CI
         preset_id: "spotify".into(),
         target_lufs: -14.0,
         max_tp_db: -1.0,

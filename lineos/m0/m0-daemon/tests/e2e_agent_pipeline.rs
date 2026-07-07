@@ -2,7 +2,7 @@
 //! Tests the full Intent::ExecuteMastering flow:
 //! HTTP handler → Operator → Conductor → Executor → DspAdapter
 //!
-//! Uses real audio file: /home/aidevcon/Music/test.wav
+//! Uses real audio file: tests/fixtures/test_stereo_input.wav
 //! Asserts: LUFS in [-20, -8], true peak < -0.5 dBTP
 //! Authority: Constitutional Agent Architecture Spec v3.1
 
@@ -41,7 +41,7 @@ async fn test_agent_pipeline_executes_mastering() {
 
     // Build MasteringParams
     let params = m0d::agents::operator::MasteringParams {
-        audio_path: "/home/aidevcon/Music/test.wav".into(),
+        audio_path: concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav").into(),
         preset_id: "spotify".into(),
         target_lufs: -14.0,
         max_tp_db: -1.0,
@@ -114,7 +114,7 @@ async fn test_conductor_rejects_concurrent_mastering() {
     let (tx2, rx2) = oneshot::channel();
 
     let params1 = m0d::agents::operator::MasteringParams {
-        audio_path: "/home/aidevcon/Music/test.wav".into(),
+        audio_path: concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav").into(),
         preset_id: "spotify".into(),
         target_lufs: -14.0,
         max_tp_db: -1.0,
@@ -126,7 +126,7 @@ async fn test_conductor_rejects_concurrent_mastering() {
     };
 
     let params2 = m0d::agents::operator::MasteringParams {
-        audio_path: "/home/aidevcon/Music/test.wav".into(),
+        audio_path: concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav").into(),
         preset_id: "spotify".into(),
         target_lufs: -14.0,
         max_tp_db: -1.0,
