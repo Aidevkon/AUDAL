@@ -257,6 +257,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 | R-007 | GitHub CI never actually verified — 3 missing Linux/macOS system deps, clippy flags drifted from Justfile, Gate 5 OOM on shared runners | `775ccd4`, `cdd7a2f`, + 2 more |
 | R-008 | Item 10 (cross-platform float determinism) — verified non-issue via real ARM64 CI run, not theory | (same CI commits) |
 | R-009 | Two e2e tests (e2e_agent_pipeline.rs, e2e_album_sse.rs) used hardcoded personal-machine absolute paths with no portability guard — one masked by a race condition that made it appear to pass in earlier local runs | `1009def` |
+| F-023 | S-002 stem-count drift (4→5 stems) fixed to match real FiveStems code | `pending commit` |
 
 ---
 

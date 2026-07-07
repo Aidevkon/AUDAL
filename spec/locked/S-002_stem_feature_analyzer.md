@@ -1,3 +1,16 @@
+> **⚠️ ARCHITECTURAL DRIFT NOTICE (2026-07-07):** Αυτό το spec
+> περιγράφει 4-stem αρχιτεκτονική (bass/vocals/drums/other). Ο
+> πραγματικός κώδικας (lineos-types/src/analysis.rs,
+> sp314-dsp/src/analysis/analyzer.rs) ήδη υλοποιεί 5 stems
+> (bass/harmonics/voice/drums/ambience, μέσω FiveStems) — το "other"
+> έχει σπάσει σε ξεχωριστά harmonics + ambience. Το StemMetrics
+> έχει επίσης ένα επιπλέον πεδίο (transient_density) που δεν
+> υπάρχει σε αυτή την έκδοση του spec. Το core contract (τα
+> mathematical feature definitions §4.1-4.11, determinism guarantees
+> §6) παραμένει ΑΚΡΙΒΕΣ - μόνο ο αριθμός/ονόματα stems και το
+> StemMetrics field list χρειάζονται ενημέρωση. Βλ. ενότητα 3
+> (Interface) για το πραγματικό, τρέχον schema.
+
 # S-002 — Stem Feature Analyzer
 
 **Document:** `spec/locked/S-002_stem_feature_analyzer.md`
@@ -16,6 +29,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-07-07 | Architectural drift notice: real code implements 5 stems (FiveStems) not 4, StemMetrics gained transient_density field. Interface section updated to match. |
 | 1.0 | 2026-05-27 | R1: linear averaging clarification. R3: stereo_width_range test. Promoted to LOCKED. |
 | 0.2 | 2026-05-27 | Critical: stereo interleaved input (Option A). M1–M6 addressed. |
 | 0.1 | 2026-05-27 | Initial draft |
@@ -25,13 +39,13 @@
 ## 1. Purpose
 
 The Stem Feature Analyzer extracts deterministic, typed audio features
-from the 4 stems produced by S-001 (NMF Stem Separator).
+from the 5 stems produced by S-001 (NMF Stem Separator).
 
 Its output — a `StemFeatures` struct — is the primary data source
 for all Aether creative decisions. Personas, chaos, semantic zones,
 and auto-tuning all depend on this data.
 
-**One sentence:** Given 4 stereo stems, produce a deterministic feature
+**One sentence:** Given 5 stereo stems, produce a deterministic feature
 vector that describes the acoustic characteristics of each stem.
 
 ---
@@ -40,7 +54,7 @@ vector that describes the acoustic characteristics of each stem.
 
 ```
 E14 (S-001)
-    ↓ Bass, Vocals, Drums, Other (Vec<f32> stereo interleaved)
+    ↓ Bass, Harmonics, Voice, Drums, Ambience (Vec<f32> stereo interleaved)
 StemFeatureAnalyzer (S-002)
     ↓ StemFeatures (typed struct)
     ↓ validate against stem_features.schema.json
@@ -80,9 +94,10 @@ pub const ENERGY_RATIO_EPSILON:   f32   = 1e-4;   // tolerance for sum check
 /// All stems have the same length as the original mix.
 pub struct StemInput {
     pub bass:        Vec<f32>,  // stereo interleaved (L,R,L,R,...)
-    pub vocals:      Vec<f32>,  // stereo interleaved
+    pub harmonics:   Vec<f32>,  // stereo interleaved
+    pub voice:       Vec<f32>,  // stereo interleaved
     pub drums:       Vec<f32>,  // stereo interleaved
-    pub other:       Vec<f32>,  // stereo interleaved
+    pub ambience:    Vec<f32>,  // stereo interleaved
     pub sample_rate: u32,       // always 48000
 }
 ```
@@ -92,11 +107,12 @@ pub struct StemInput {
 ```rust
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemFeatures {
-    pub bass:   StemMetrics,
-    pub vocals: StemMetrics,
-    pub drums:  StemMetrics,
-    pub other:  StemMetrics,
-    pub mix:    MixMetrics,
+    pub bass:      StemMetrics,
+    pub harmonics: StemMetrics,
+    pub voice:     StemMetrics,
+    pub drums:     StemMetrics,
+    pub ambience:  StemMetrics,
+    pub mix:       MixMetrics,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -122,6 +138,9 @@ pub struct StemMetrics {
 
     // Energy
     pub energy_ratio:          f32,  // [0.0, 1.0] ratio vs full mix
+
+    // Transients
+    pub transient_density:     f32,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -132,7 +151,9 @@ pub struct MixMetrics {
     pub stereo_correlation:    f32,
     pub stereo_width:          f32,
     pub dynamic_range_db:      f32,
-    pub stem_energy_ratios:    [f32; 4],  // [bass, vocals, drums, other]
+    pub stem_energy_ratios:    [f32; 5],  // [bass, harmonics, voice, drums, ambience]
+    /// Energy-weighted average of stem centroids (S-008 requirement)
+    pub spectral_centroid_hz:  f32,
 }
 ```
 
@@ -302,7 +323,7 @@ Constraint: `Σ(energy_ratios) ≤ 1.0 + ENERGY_RATIO_EPSILON`
 ## 5. Processing Pipeline
 
 ```
-StemInput (4 × Vec<f32> stereo interleaved)
+StemInput (5 × Vec<f32> stereo interleaved)
     ↓
 [Deinterleave each stem → (L, R)]
     ↓
@@ -328,7 +349,7 @@ StemInput (4 × Vec<f32> stereo interleaved)
 [Mix aggregate]
     │  ├── stereo_correlation (full mix L+R)
     │  ├── stereo_width       (full mix)
-    │  └── stem_energy_ratios [4]
+    │  └── stem_energy_ratios [5]
     ↓
 StemFeatures (typed, serializable)
     ↓
@@ -485,6 +506,7 @@ lineos/m1/sp314-dsp/src/
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-07-07 | Architectural drift notice: real code implements 5 stems (FiveStems) not 4, StemMetrics gained transient_density field. Interface section updated to match. |
 | 1.0 | 2026-05-27 | R1: linear averaging clarification. R3: stereo_width_range test. Promoted to LOCKED. |
 | 0.2 | 2026-05-27 | Critical fix: stereo interleaved input (Option A per audit). M1: channel averaging strategy. M2: ENERGY_RATIO_EPSILON=1e-4. M3: Serialize derived. M4: per-frame internal only. M5: StftEngine reuse noted. M6: const block added. +2 contract tests. |
 | 0.1 | 2026-05-27 | Initial draft |
