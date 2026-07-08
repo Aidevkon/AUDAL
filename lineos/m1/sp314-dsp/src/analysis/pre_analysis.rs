@@ -232,6 +232,14 @@ fn true_peak_channel(signal: &[f32]) -> f32 {
 
 // ── LRA (BS.1770-4) ─────────────────────────────────────────────────────────
 
+/// Public measurement entry point for corpus tooling.
+/// Thin wrapper over the production BS.1770 loudness-range path
+/// (K-weighting, 400ms/100ms blocks, -70 LUFS absolute and
+/// -20 LU relative gates, p95-p10) — same math, one truth.
+pub fn loudness_range_lu(left: &[f32], right: &[f32]) -> f32 {
+    compute_lra(left, right)
+}
+
 fn compute_lra(left: &[f32], right: &[f32]) -> f32 {
     let n = left.len();
     if n < LRA_BLOCK {

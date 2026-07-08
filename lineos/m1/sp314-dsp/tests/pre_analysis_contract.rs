@@ -565,3 +565,34 @@ fn spectral_slope_contract() {
     let slope4 = sp314_dsp::analysis::spectral_slope(&positive_tilt);
     assert!(slope4 > 0.0, "Expected positive slope, got {}", slope4);
 }
+
+// ── Test 12: LRA Contract ────────────────────────────────────────────────────
+
+#[test]
+fn loudness_range_contract() {
+    let sr = 48000;
+    // 3s sine at 0.5 amplitude followed by 3s at 0.05
+    let total_samples = sr * 6;
+    let mut fixture = Vec::with_capacity(total_samples);
+    let freq = 1000.0;
+    let two_pi = 2.0 * 3.14159265358979323846;
+
+    for i in 0..total_samples {
+        let t = i as f32 / sr as f32;
+        let amp = if t < 3.0 { 0.5 } else { 0.05 };
+        fixture.push(amp * libm::sinf(two_pi * freq * t));
+    }
+
+    let lra_wrapper = sp314_dsp::analysis::loudness_range_lu(&fixture, &fixture);
+
+    let data = sp314_dsp::analysis::PreAnalyzer::run(&fixture, &fixture, sr as u32);
+
+    assert_eq!(
+        lra_wrapper.to_bits(),
+        data.loudness_range.to_bits(),
+        "LRA wrapper must be bit-identical to PreAnalyzer::run"
+    );
+
+    assert!(lra_wrapper > 0.0, "LRA must be > 0.0");
+    assert!(lra_wrapper.is_finite(), "LRA must be finite");
+}
