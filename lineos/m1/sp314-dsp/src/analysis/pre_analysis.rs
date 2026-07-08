@@ -373,6 +373,15 @@ fn bandpass_filter(signal: &[f32], lo: f32, hi: f32, sr: f32) -> Vec<f32> {
         .collect()
 }
 
+/// Public measurement entry point for corpus tooling.
+/// Thin wrapper over the production 8-band path — same filters,
+/// same math, one truth. Returns levels only (dB per band),
+/// discarding the filtered-signal buffers the private fn also
+/// produces.
+pub fn spectral_profile_levels(left: &[f32], right: &[f32], sr: u32) -> [f32; 8] {
+    spectral_profile_8band(left, right, sr).0
+}
+
 fn spectral_profile_8band(
     left: &[f32],
     right: &[f32],

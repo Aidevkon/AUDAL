@@ -467,3 +467,46 @@ fn short_input_silent() {
         assert!(v.is_finite(), "band_phase_correlation[{}] is not finite", i);
     }
 }
+
+// ── Test 10: Spectral Profile Wrapper ────────────────────────────────────────
+
+#[test]
+fn spectral_profile_levels_wrapper() {
+    let sr = 48000;
+    let n = sr; // 1 second
+    let pi2 = 2.0 * core::f32::consts::PI;
+
+    // Sine at 150Hz (Band 1: 80-250) and 1500Hz (Band 4: 1k-2k)
+    let left: Vec<f32> = (0..n)
+        .map(|i| {
+            let t = i as f32 / sr as f32;
+            0.5 * libm::sinf(pi2 * 150.0 * t) + 0.5 * libm::sinf(pi2 * 1500.0 * t)
+        })
+        .collect();
+    let right = left.clone();
+
+    // 1. Call the public wrapper
+    let levels = sp314_dsp::analysis::spectral_profile_levels(&left, &right, sr);
+
+    // 2. Call the production PreAnalyzer to get the internal 8-band result
+    let result = PreAnalyzer::run(&left, &right, sr);
+
+    // 3. Assert bit-exact identity
+    for k in 0..8 {
+        assert_eq!(
+            levels[k].to_bits(),
+            result.spectral_profile_db[k].to_bits(),
+            "Band {} mismatch",
+            k
+        );
+    }
+
+    // 4. Sanity-assert the band containing each sine is the loudest of its neighborhood
+    // Band 1 (150Hz) should be > Band 0 (20-80) and Band 2 (250-500)
+    assert!(levels[1] > levels[0], "Band 1 should be > Band 0");
+    assert!(levels[1] > levels[2], "Band 1 should be > Band 2");
+
+    // Band 4 (1500Hz) should be > Band 3 (500-1k) and Band 5 (2k-4k)
+    assert!(levels[4] > levels[3], "Band 4 should be > Band 3");
+    assert!(levels[4] > levels[5], "Band 4 should be > Band 5");
+}
