@@ -2,8 +2,17 @@
   "_comment": "Podcast Reference Profile v1.0 — first concrete ReferenceProfile for Creator OS",
   "_spec": "lineos/docs/reference-driven-sonic-vision-podcast-v1_1.md",
   "_authority": "Byrne et al. 1994 JASA DOI:10.1121/1.410152 (LTASS); ITU-R BS.1770-5 (2018); EBU R128 v5.0; Apple Podcasts art.893",
-  "_schema_version": 1,
+  "_schema_version": 2,
   "id": "podcast-v1",
+
+  "g_max_db": 6.0,
+  "_g_max_db_comment": "placeholder — refined during tuning; per-profile clamp",
+  "dead_zone_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "_dead_zone_db_comment": "deviations <= dead_zone are ignored; 0.0 = off. Music profiles will set these from measured per-band corpus σ",
+  "corpus": {
+    "source": "byrne-1994",
+    "version": "n/a"
+  },
 
   "hard_constraints": {
     "_comment": "Absolute limits — never violated by ReferenceResolver (INV-REF-1). Sources: ITU-R BS.1770-5 (2018), EBU R128 v5.0, Apple Podcasts art.893.",
@@ -19,6 +28,8 @@
     "_comment": "Normalised SHAPE only (mean=0, relative dB). NOT absolute dBFS levels — see spec Correction 1: Byrne values are dBSPL, used for shape only. Method: convert dBSPL to linear energy, average per band, convert back to dB, subtract mean.",
     "_method": "linear_energy_weighted_average_then_normalize",
     "_normalization": "mean_subtracted",
+    "normalization_band_count": 6,
+    "_normalization_band_count_comment": "bands carrying measured data; mean-centering uses only these — Byrne stops at 2.5 kHz, bands 6-7 are synthetic tilt",
     "bands": [
       {
         "index": 0,

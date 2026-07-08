@@ -24,8 +24,6 @@ const PODCAST_V1_JSON: &str = include_str!(
 // ── Proprietary craft constants ────────────────
 // "In dark, not hidden": the structure is public;
 // these values are the proprietary craft layer.
-// G_MAX_DB: placeholder — refined during tuning.
-const G_MAX_DB: f32 = 6.0;
 
 // SBR band indices (must match podcast-v1.json
 // and the 8-band PreAnalysisData layout).
@@ -46,6 +44,7 @@ struct BandJson {
 #[derive(Deserialize)]
 struct SpectralTargetJson {
     bands: Vec<BandJson>,
+    normalization_band_count: usize,
 }
 
 #[derive(Deserialize)]
@@ -64,18 +63,42 @@ struct SbrJson {
 }
 
 #[derive(Deserialize)]
+struct CorpusJson {
+    source: String,
+    version: String,
+}
+
+#[derive(Deserialize)]
 struct ProfileJson {
     id: String,
+    g_max_db: f32,
+    dead_zone_db: [f32; 8],
+    corpus: CorpusJson,
     hard_constraints: HardConstraintsJson,
     spectral_target: SpectralTargetJson,
     sbr: SbrJson,
 }
 
 // ── Runtime profile (parsed once) ─────────────
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProfileId {
+    PodcastV1,
+}
+
+#[derive(Clone, Debug)]
+pub struct Corpus {
+    pub source: String,
+    pub version: String,
+}
+
 /// Parsed, ready-to-use Reference Profile.
 /// Loaded from the compile-time embedded JSON.
 pub struct ReferenceProfile {
     pub id: String,
+    pub g_max_db: f32,
+    pub dead_zone_db: [f32; 8],
+    pub corpus: Corpus,
+    pub normalization_band_count: usize,
     /// Normalised spectral shape target (8 bands,
     /// mean=0, relative dB). NOT absolute dBFS —
     /// see spec Correction 1.
@@ -95,34 +118,50 @@ impl ReferenceProfile {
     /// Load and parse the embedded JSON.
     /// Panics at startup if the JSON is malformed
     /// (compile-time embed guarantees it is not).
+    pub fn load(id: ProfileId) -> Self {
+        match id {
+            ProfileId::PodcastV1 => {
+                let parsed: ProfileJson = serde_json::from_str(PODCAST_V1_JSON).expect(
+                    "podcast-v1.json is \
+                                 malformed — check embed",
+                );
+
+                let mut target = [0.0_f32; 8];
+                for band in &parsed.spectral_target.bands {
+                    assert!(
+                        band.index < 8,
+                        "podcast-v1.json: band index {} \
+                         out of range",
+                        band.index
+                    );
+                    target[band.index] = band.target_db_relative;
+                }
+
+                Self {
+                    id: parsed.id,
+                    g_max_db: parsed.g_max_db,
+                    dead_zone_db: parsed.dead_zone_db,
+                    corpus: Corpus {
+                        source: parsed.corpus.source,
+                        version: parsed.corpus.version,
+                    },
+                    normalization_band_count: parsed.spectral_target.normalization_band_count,
+                    spectral_target: target,
+                    target_lufs: parsed.hard_constraints.target_lufs,
+                    true_peak_ceiling_dbtp: parsed.hard_constraints.true_peak_ceiling_dbtp,
+                    gate_absolute_lufs: parsed.hard_constraints.gate_absolute_lufs,
+                    gate_relative_lu: parsed.hard_constraints.gate_relative_lu,
+                    lra_target_lu: parsed.hard_constraints.lra_target_lu,
+                    sbr_lo: parsed.sbr.lower_band_index,
+                    sbr_hi: parsed.sbr.upper_band_index,
+                }
+            }
+        }
+    }
+
+    /// Thin alias for load(ProfileId::PodcastV1).
     pub fn load_podcast_v1() -> Self {
-        let parsed: ProfileJson = serde_json::from_str(PODCAST_V1_JSON).expect(
-            "podcast-v1.json is \
-                         malformed — check embed",
-        );
-
-        let mut target = [0.0_f32; 8];
-        for band in &parsed.spectral_target.bands {
-            assert!(
-                band.index < 8,
-                "podcast-v1.json: band index {} \
-                 out of range",
-                band.index
-            );
-            target[band.index] = band.target_db_relative;
-        }
-
-        Self {
-            id: parsed.id,
-            spectral_target: target,
-            target_lufs: parsed.hard_constraints.target_lufs,
-            true_peak_ceiling_dbtp: parsed.hard_constraints.true_peak_ceiling_dbtp,
-            gate_absolute_lufs: parsed.hard_constraints.gate_absolute_lufs,
-            gate_relative_lu: parsed.hard_constraints.gate_relative_lu,
-            lra_target_lu: parsed.hard_constraints.lra_target_lu,
-            sbr_lo: parsed.sbr.lower_band_index,
-            sbr_hi: parsed.sbr.upper_band_index,
-        }
+        Self::load(ProfileId::PodcastV1)
     }
 }
 
@@ -136,15 +175,24 @@ pub struct ReferenceResolver;
 impl ReferenceResolver {
     /// Compute per-band gain offsets:
     ///   G_k = clamp(target[k] - signal[k],
-    ///               -G_MAX_DB, +G_MAX_DB)
+    ///               -g_max_db, +g_max_db)
     ///
     /// Spec §3.4 step 3. Positive → boost,
     /// negative → cut.
-    pub fn compute_gains(signal: &[f32; 8], target: &[f32; 8]) -> [f32; 8] {
+    pub fn compute_gains(
+        signal: &[f32; 8],
+        target: &[f32; 8],
+        g_max_db: f32,
+        dead_zone_db: &[f32; 8],
+    ) -> [f32; 8] {
         let mut gains = [0.0_f32; 8];
         for k in 0..8 {
             let raw = target[k] - signal[k];
-            gains[k] = libm::fminf(G_MAX_DB, libm::fmaxf(-G_MAX_DB, raw));
+            if libm::fabsf(raw) <= dead_zone_db[k] {
+                gains[k] = 0.0;
+            } else {
+                gains[k] = libm::fminf(g_max_db, libm::fmaxf(-g_max_db, raw));
+            }
         }
         gains
     }
@@ -181,7 +229,12 @@ impl ReferenceResolver {
     /// This is the entry point for §10.6
     /// (integration into DspConfig build path).
     pub fn resolve(signal_profile: &[f32; 8], profile: &ReferenceProfile) -> [f32; 8] {
-        Self::compute_gains(signal_profile, &profile.spectral_target)
+        Self::compute_gains(
+            signal_profile,
+            &profile.spectral_target,
+            profile.g_max_db,
+            &profile.dead_zone_db,
+        )
     }
 }
 
@@ -200,6 +253,13 @@ mod tests {
         assert_eq!(p.id, "podcast-v1");
         assert_eq!(p.sbr_lo, SBR_LO);
         assert_eq!(p.sbr_hi, SBR_HI);
+
+        assert_eq!(p.normalization_band_count, 6);
+        assert!((p.g_max_db - 6.0).abs() < 1e-6);
+        assert_eq!(p.dead_zone_db, [0.0; 8]);
+        assert_eq!(p.corpus.source, "byrne-1994");
+        assert_eq!(p.corpus.version, "n/a");
+
         // All 8 bands populated (none left at 0.0
         // except where the target genuinely is 0 —
         // none in podcast-v1).
@@ -219,7 +279,12 @@ mod tests {
     #[test]
     fn balanced_voice_zero_gains() {
         let p = load();
-        let gains = ReferenceResolver::compute_gains(&p.spectral_target, &p.spectral_target);
+        let gains = ReferenceResolver::compute_gains(
+            &p.spectral_target,
+            &p.spectral_target,
+            p.g_max_db,
+            &p.dead_zone_db,
+        );
         for (k, &g) in gains.iter().enumerate() {
             assert!(g.abs() < 1e-5, "band {k}: expected 0 gain, got {g}");
         }
@@ -271,11 +336,17 @@ mod tests {
         // Extreme deviation — should clamp
         signal[3] += 20.0;
         signal[4] -= 20.0;
-        let gains = ReferenceResolver::compute_gains(&signal, &p.spectral_target);
+        let gains = ReferenceResolver::compute_gains(
+            &signal,
+            &p.spectral_target,
+            p.g_max_db,
+            &p.dead_zone_db,
+        );
         for &g in &gains {
             assert!(
-                g >= -G_MAX_DB && g <= G_MAX_DB,
-                "gain {g} exceeds G_MAX_DB={G_MAX_DB}"
+                g >= -p.g_max_db && g <= p.g_max_db,
+                "gain {g} exceeds g_max_db={}",
+                p.g_max_db
             );
         }
     }
@@ -291,7 +362,12 @@ mod tests {
 
         let delta_before = ReferenceResolver::compute_sbr_delta(&signal, &p.spectral_target);
 
-        let gains = ReferenceResolver::compute_gains(&signal, &p.spectral_target);
+        let gains = ReferenceResolver::compute_gains(
+            &signal,
+            &p.spectral_target,
+            p.g_max_db,
+            &p.dead_zone_db,
+        );
         let mut output = signal;
         for k in 0..8 {
             output[k] += gains[k];
@@ -305,5 +381,42 @@ mod tests {
              converge. before={delta_before:.4}, \
              after={delta_after:.4}"
         );
+    }
+
+    #[test]
+    fn dead_zone_zero_is_identity() {
+        let p = load();
+        let signals = [
+            p.spectral_target, // perfectly balanced
+            {
+                let mut s = p.spectral_target;
+                s[SBR_LO] += 4.0;
+                s[SBR_HI] -= 3.0;
+                s
+            }, // muddy
+            {
+                let mut s = p.spectral_target;
+                s[3] += 20.0;
+                s[4] -= 20.0;
+                s
+            }, // extreme ±20
+            {
+                let mut s = p.spectral_target;
+                s[0] += 5.5;
+                s[7] -= 1.2;
+                s
+            }, // asymmetric
+        ];
+
+        let dead_zone = [0.0; 8];
+        for signal in &signals {
+            let gains =
+                ReferenceResolver::compute_gains(signal, &p.spectral_target, 6.0, &dead_zone);
+            for k in 0..8 {
+                let expected =
+                    libm::fminf(6.0, libm::fmaxf(-6.0, p.spectral_target[k] - signal[k]));
+                assert_eq!(gains[k].to_bits(), expected.to_bits());
+            }
+        }
     }
 }

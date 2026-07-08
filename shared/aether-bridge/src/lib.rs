@@ -165,16 +165,18 @@ pub fn build_dsp_config(
                 // round-trips to ~0 gains (balanced test).
                 //
                 // If podcast-v1.json changes which bands carry
-                // measured LTASS data, update SPEECH_BANDS.
-                const SPEECH_BANDS: usize = 6;
-                let speech_mean: f32 = pa.spectral_profile_db[..SPEECH_BANDS].iter().sum::<f32>()
-                    / SPEECH_BANDS as f32;
+                // measured LTASS data, update normalization_band_count in podcast-v1.json.
+                let profile = crate::reference_resolver::ReferenceProfile::load(
+                    crate::reference_resolver::ProfileId::PodcastV1,
+                );
+                let n = profile.normalization_band_count;
+                let speech_mean: f32 = pa.spectral_profile_db[..n].iter().sum::<f32>() / n as f32;
                 let normalized_profile: [f32; 8] =
                     core::array::from_fn(|k| pa.spectral_profile_db[k] - speech_mean);
 
                 let ref_gains = crate::reference_resolver::ReferenceResolver::resolve(
                     &normalized_profile,
-                    &crate::reference_resolver::ReferenceProfile::load_podcast_v1(),
+                    &profile,
                 );
 
                 zones.bands.extend(
