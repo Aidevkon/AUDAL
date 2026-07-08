@@ -27,6 +27,14 @@ use lineos_types::pre_analysis::PreAnalysisData;
 use proof::certificate::ExecutionCertificate;
 use proof::proof::ExecutionProof;
 
+/// Default is Music (reference correction skipped): unknown callers get no reference EQ rather than the wrong one. Episode must be explicit.
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+pub enum ContentType {
+    #[default]
+    Music,
+    Episode,
+}
+
 /// Aether tuning parameters from the caller.
 /// Decoupled from MasterRequest (m0 network DTO).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -39,6 +47,8 @@ pub struct AetherRequest {
     pub project_id: Option<String>,
     pub track_id: Option<String>,
     pub preset_name: Option<String>,
+    #[serde(default)]
+    pub content_type: ContentType,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -130,54 +140,56 @@ pub fn build_dsp_config(
 
         // pre_analysis is Option<&PreAnalysisData>;
         // skip reference correction if unavailable.
-        if let Some(pa) = pre_analysis {
-            // ── Signal normalization (mean-center) ──
-            // The ReferenceProfile target is a relative
-            // SHAPE, mean-subtracted over the 6 SPEECH
-            // bands only (Sub..HighMid, 20 Hz–4 kHz) —
-            // the bands carrying real Byrne LTASS data.
-            // Bands 6–7 (Treble/Air) are synthetic
-            // -4 dB/oct tilt extensions (Byrne stops at
-            // 2.5 kHz) and are EXCLUDED from the mean:
-            // the 6 measured targets sum to exactly 0.00,
-            // and including the dark synthetic bands
-            // would drag the mean down and corrupt the
-            // speech normalization.
-            //
-            // The raw signal is absolute dBFS, so it must
-            // be centered with the SAME 6-band mean
-            // before comparison — otherwise absolute
-            // levels meet a relative shape and every band
-            // reads as full-boost (the bug this fixes).
-            //
-            // Verified: a pure-LTASS signal at any level
-            // round-trips to ~0 gains (balanced test).
-            //
-            // If podcast-v1.json changes which bands carry
-            // measured LTASS data, update SPEECH_BANDS.
-            const SPEECH_BANDS: usize = 6;
-            let speech_mean: f32 =
-                pa.spectral_profile_db[..SPEECH_BANDS].iter().sum::<f32>() / SPEECH_BANDS as f32;
-            let normalized_profile: [f32; 8] =
-                core::array::from_fn(|k| pa.spectral_profile_db[k] - speech_mean);
+        if req.content_type == ContentType::Episode {
+            if let Some(pa) = pre_analysis {
+                // ── Signal normalization (mean-center) ──
+                // The ReferenceProfile target is a relative
+                // SHAPE, mean-subtracted over the 6 SPEECH
+                // bands only (Sub..HighMid, 20 Hz–4 kHz) —
+                // the bands carrying real Byrne LTASS data.
+                // Bands 6–7 (Treble/Air) are synthetic
+                // -4 dB/oct tilt extensions (Byrne stops at
+                // 2.5 kHz) and are EXCLUDED from the mean:
+                // the 6 measured targets sum to exactly 0.00,
+                // and including the dark synthetic bands
+                // would drag the mean down and corrupt the
+                // speech normalization.
+                //
+                // The raw signal is absolute dBFS, so it must
+                // be centered with the SAME 6-band mean
+                // before comparison — otherwise absolute
+                // levels meet a relative shape and every band
+                // reads as full-boost (the bug this fixes).
+                //
+                // Verified: a pure-LTASS signal at any level
+                // round-trips to ~0 gains (balanced test).
+                //
+                // If podcast-v1.json changes which bands carry
+                // measured LTASS data, update SPEECH_BANDS.
+                const SPEECH_BANDS: usize = 6;
+                let speech_mean: f32 = pa.spectral_profile_db[..SPEECH_BANDS].iter().sum::<f32>()
+                    / SPEECH_BANDS as f32;
+                let normalized_profile: [f32; 8] =
+                    core::array::from_fn(|k| pa.spectral_profile_db[k] - speech_mean);
 
-            let ref_gains = crate::reference_resolver::ReferenceResolver::resolve(
-                &normalized_profile,
-                &crate::reference_resolver::ReferenceProfile::load_podcast_v1(),
-            );
+                let ref_gains = crate::reference_resolver::ReferenceResolver::resolve(
+                    &normalized_profile,
+                    &crate::reference_resolver::ReferenceProfile::load_podcast_v1(),
+                );
 
-            zones.bands.extend(
-                ref_gains
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, &g)| g.abs() > MIN_GAIN_DB)
-                    .map(|(i, &g)| aether::semantic::zone::ZoneAdjustment {
-                        center_hz: REF_CFS[i],
-                        gain_db: g,
-                        q: REF_Q,
-                        source: aether::semantic::zone::EqSource::Reference,
-                    }),
-            );
+                zones.bands.extend(
+                    ref_gains
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &g)| g.abs() > MIN_GAIN_DB)
+                        .map(|(i, &g)| aether::semantic::zone::ZoneAdjustment {
+                            center_hz: REF_CFS[i],
+                            gain_db: g,
+                            q: REF_Q,
+                            source: aether::semantic::zone::EqSource::Reference,
+                        }),
+                );
+            }
         }
     }
 
@@ -356,7 +368,10 @@ mod tests {
 
     #[test]
     fn bridge_build_dsp_config_default_persona() {
-        let req = AetherRequest::default();
+        let req = AetherRequest {
+            content_type: ContentType::Music,
+            ..Default::default()
+        };
         let features = test_features();
         let result = build_dsp_config(&req, &features, None);
         assert!(result.is_ok());
@@ -376,6 +391,7 @@ mod tests {
         ] {
             let req = AetherRequest {
                 persona_id: Some(id.into()),
+                content_type: ContentType::Music,
                 ..Default::default()
             };
             assert!(
@@ -390,6 +406,7 @@ mod tests {
     fn bridge_unknown_persona_error() {
         let req = AetherRequest {
             persona_id: Some("nonexistent".into()),
+            content_type: ContentType::Music,
             ..Default::default()
         };
         let features = test_features();
@@ -403,6 +420,7 @@ mod tests {
     fn bridge_deterministic() {
         let req = AetherRequest {
             chaos_seed: Some(42),
+            content_type: ContentType::Music,
             ..Default::default()
         };
         let features = test_features();
@@ -419,6 +437,7 @@ mod tests {
             project_id: Some("test_proj".into()),
             track_id: Some("test_track".into()),
             preset_name: Some("spotify".into()),
+            content_type: ContentType::Music,
             ..Default::default()
         };
         let features = test_features();
@@ -440,6 +459,7 @@ mod tests {
     fn bridge_certificate_different_output_different_hash() {
         let req = AetherRequest {
             chaos_seed: Some(42),
+            content_type: ContentType::Music,
             ..Default::default()
         };
         let features = test_features();
@@ -469,7 +489,10 @@ mod tests {
     fn bridge_pre_analysis_zone_flags_wire_through() {
         use lineos_types::pre_analysis::PreAnalysisData;
 
-        let req = AetherRequest::default();
+        let req = AetherRequest {
+            content_type: ContentType::Music,
+            ..Default::default()
+        };
         let features = test_features();
 
         // Construct pre_analysis with zone flags active
@@ -506,7 +529,10 @@ mod tests {
 
     #[test]
     fn bridge_no_pre_analysis_no_corrective_zones() {
-        let req = AetherRequest::default();
+        let req = AetherRequest {
+            content_type: ContentType::Music,
+            ..Default::default()
+        };
         let features = test_features();
 
         // Without pre_analysis and with default (zero) StemFeatures,

@@ -1,4 +1,4 @@
-use aether_bridge::{build_dsp_config, AetherRequest};
+use aether_bridge::{build_dsp_config, AetherRequest, ContentType};
 use lineos_types::analysis::StemFeatures;
 use lineos_types::pre_analysis::PreAnalysisData;
 
@@ -10,6 +10,7 @@ fn podcast_req() -> AetherRequest {
         preset_name: Some("podcast".to_string()),
         project_id: Some("test".to_string()),
         track_id: Some("t1".to_string()),
+        content_type: ContentType::Episode,
         ..Default::default()
     }
 }
@@ -176,6 +177,32 @@ fn thin_input_boosts_low_end() {
         bass.gain_db > MIN_GAIN_DB,
         "Thin Bass should be BOOSTED. Got: {:.3} dB",
         bass.gain_db
+    );
+}
+
+/// INV-MUS-3 (S-0XX): Music content must never receive
+/// the speech reference profile.
+#[test]
+fn inv_mus_3_music_produces_zero_reference_zones() {
+    let req = AetherRequest {
+        content_type: ContentType::Music,
+        ..podcast_req()
+    };
+
+    let (dsp_config, _, _) = build_dsp_config(&req, &stem_features(), Some(&muddy_input()))
+        .expect("build_dsp_config failed");
+
+    let ref_bands: Vec<_> = dsp_config
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .collect();
+
+    assert!(
+        ref_bands.is_empty(),
+        "Music content produced {} reference zones, expected 0.",
+        ref_bands.len()
     );
 }
 

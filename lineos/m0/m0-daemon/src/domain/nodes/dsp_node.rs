@@ -69,6 +69,7 @@ pub fn build_intent_and_config(
         max_limiter_gr_db: 6.0,
     };
 
+    use crate::domain::content_type::{ContentType, ContentTypeExt};
     use crate::domain::dsp_pipeline::map_flavour_to_persona;
     let mapped_persona = map_flavour_to_persona(flavour_id);
     let aether_req = aether_bridge::AetherRequest {
@@ -80,6 +81,7 @@ pub fn build_intent_and_config(
         project_id: project_id.map(|s| s.to_string()),
         track_id: track_id.map(|s| s.to_string()),
         preset_name: Some(preset_id.to_string()),
+        content_type: ContentType::from_preset(preset_id),
     };
     let (dsp_config, proof_log, persona_config) =
         aether_bridge::build_dsp_config(&aether_req, streaming_features, Some(pre_analysis))
