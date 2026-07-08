@@ -382,6 +382,45 @@ pub fn spectral_profile_levels(left: &[f32], right: &[f32], sr: u32) -> [f32; 8]
     spectral_profile_8band(left, right, sr).0
 }
 
+/// Least-squares linear regression of y = levels_db[k] / 20.0 against
+/// x = log10(geometric center of band k), using ONLY bands 1..=6
+/// (geometric centers 141.4–5656.9 Hz — the Pestana 2013 100Hz–10kHz
+/// window; bands 0 and 7 excluded). Returns the slope in Pestana
+/// Table 2 units: log10(linear magnitude) per log10(Hz) — i.e.
+/// (dB/20) per decade — the SAME units as GATE_V1 slope bounds.
+/// Centers computed from BAND_EDGES via libm::sqrtf(lo*hi); all math
+/// libm-only; deterministic 6-point approximation of Pestana's
+/// dense-spectrum regression, adequate for the deliberately-loose
+/// gate (S-0XX §5).
+pub fn spectral_slope(levels_db: &[f32; 8]) -> f32 {
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    let mut sum_xx = 0.0;
+    let mut sum_xy = 0.0;
+    let n = 6.0;
+
+    for k in 1..=6 {
+        let lo = BAND_EDGES[k];
+        let hi = BAND_EDGES[k + 1];
+        let center = libm::sqrtf(lo * hi);
+        let x = libm::log10f(center);
+        let y = levels_db[k] / 20.0;
+
+        sum_x += x;
+        sum_y += y;
+        sum_xx += x * x;
+        sum_xy += x * y;
+    }
+
+    let denominator = n * sum_xx - sum_x * sum_x;
+    // Unreachable by construction: x values are fixed distinct constants from BAND_EDGES; kept as pure-math hygiene, not an input-dependent sentinel.
+    if libm::fabsf(denominator) < 1e-10 {
+        return 0.0;
+    }
+
+    (n * sum_xy - sum_x * sum_y) / denominator
+}
+
 fn spectral_profile_8band(
     left: &[f32],
     right: &[f32],

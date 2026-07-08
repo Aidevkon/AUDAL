@@ -510,3 +510,58 @@ fn spectral_profile_levels_wrapper() {
     assert!(levels[4] > levels[3], "Band 4 should be > Band 3");
     assert!(levels[4] > levels[5], "Band 4 should be > Band 5");
 }
+
+// ── Test 11: Spectral Slope ──────────────────────────────────────────────────
+
+#[test]
+fn spectral_slope_contract() {
+    let band_edges: [f32; 9] = [
+        20.0, 80.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 20000.0,
+    ];
+    let mut centers = [0.0; 8];
+    for k in 0..8 {
+        centers[k] = libm::sqrtf(band_edges[k] * band_edges[k + 1]);
+    }
+
+    // a) synthetic -1.0 fixture: levels_db[k] = -20*log10(center_k / center_1) for k in 1..=6
+    let mut fixture_minus_one = [0.0; 8];
+    fixture_minus_one[0] = 99.0; // arbitrary junk
+    fixture_minus_one[7] = -99.0; // arbitrary junk
+    for k in 1..=6 {
+        fixture_minus_one[k] = -20.0 * libm::log10f(centers[k] / centers[1]);
+    }
+    let slope1 = sp314_dsp::analysis::spectral_slope(&fixture_minus_one);
+    assert!(
+        libm::fabsf(slope1 - (-1.0)) < 1e-4,
+        "Expected slope -1.0, got {}",
+        slope1
+    );
+
+    // b) flat spectrum -> slope 0.0
+    let flat_spectrum = [-12.0; 8];
+    let slope2 = sp314_dsp::analysis::spectral_slope(&flat_spectrum);
+    assert!(
+        libm::fabsf(slope2) < 1e-6,
+        "Expected slope 0.0, got {}",
+        slope2
+    );
+
+    // c) band-exclusion proof: two inputs identical in bands 1..=6 but wildly different in bands 0 and 7
+    let mut different_ends = fixture_minus_one;
+    different_ends[0] = -144.0;
+    different_ends[7] = 20.0;
+    let slope3 = sp314_dsp::analysis::spectral_slope(&different_ends);
+    assert_eq!(
+        slope1.to_bits(),
+        slope3.to_bits(),
+        "Slope should be bit-identical regardless of bands 0 and 7"
+    );
+
+    // d) positive tilt fixture (+ slope) -> sign is positive
+    let mut positive_tilt = [0.0; 8];
+    for k in 1..=6 {
+        positive_tilt[k] = 20.0 * libm::log10f(centers[k] / centers[1]);
+    }
+    let slope4 = sp314_dsp::analysis::spectral_slope(&positive_tilt);
+    assert!(slope4 > 0.0, "Expected positive slope, got {}", slope4);
+}
