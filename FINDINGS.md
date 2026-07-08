@@ -243,7 +243,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** Ο αλγόριθμος (Z-Scored Euclidean) και τα thresholds (`MAX=4.0`, `DELTA=0.15`) έχουν υλοποιηθεί βάσει μετρήσεων στο καθαρό corpus, αλλά δεν καλούνται ακόμα στο runtime του m0-daemon pipeline.
 
 ### F-023 — Dead duplicate loop in measure_genre_centroids::measure_track
-- **Status:** PARKED
+- **Status:** RESOLVED (S-0XX step 5 commit 5 — file deleted; the replacement bin uses a single loop)
 - **Component:** m0-daemon/tests/measure_genre_centroids.rs
 - **Trigger:** dies with the file in S-0XX step 5 commit 5
 - **Context:** the second `while mono.len() >= FFT_SIZE` loop is unreachable — identical condition to the first, which drains below FFT_SIZE. Recorded so the replacement bin does not reproduce the ghost.
@@ -264,7 +264,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Status:** PARKED
 - **Component:** m0-daemon (decode.rs, future measure_corpus bin, standardized_stream.rs)
 - **Trigger:** Phase 8 stage 3 (orchestration wire-up)
-- **Context:** the corpus bin deliberately uses decode_audio as the single decode+resample truth. When production migrates to StandardizedAudioStream, the bin migrates in the same commit window — otherwise measurement and mastering hear different signals. Second intersection: the Phase 8 stateful PreAnalyzer refactor touches the spectral_profile_levels contract test; the chunked==batch to_bits verification covers both.
+- **Context:** the corpus bin deliberately uses decode_audio as the single decode+resample truth. When production migrates to StandardizedAudioStream, the bin migrates in the same commit window — otherwise measurement and mastering hear different signals. Second intersection: the Phase 8 stateful PreAnalyzer refactor touches the spectral_profile_levels contract test; the chunked==batch to_bits verification covers both. Upgraded 2026-07-08: a batch-vs-streaming decode equivalence test (same file at multiple sample rates incl. 44.1kHz, hash-compared) is a PREREQUISITE of the Phase 8 Stage-0 migration — bit-identical means the corpus stands; divergent means corpus version bump + re-measure with the same tool.
 
 ### F-027 — Cargo workspace profiles warning on every build
 - **Status:** PARKED (cosmetic)
@@ -273,10 +273,22 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** "profiles for the non root package will be ignored" — fix by moving the profiles to the workspace root.
 
 ### F-028 — Orphan stash entry of unknown content
-- **Status:** PARKED
+- **Status:** RESOLVED (identified: deliberate Hero Instrument work-in-progress stash, known to the orchestrator; will become a branch when its time comes)
 - **Component:** local git state (not the repo)
 - **Trigger:** quiet moment — git stash show -p stash@{0}, then a deliberate drop or apply
 - **Context:** one stash entry has ridden the prompt indicator since 2026-07-08's history-repair session; contents never inspected.
+
+### F-029 — LRA measured but not wired into BMR-128 certificate
+- **Status:** PARKED
+- **Component:** certificate schema, lineos-types/pre_analysis, certificate_node
+- **Trigger:** next certificate schema revision
+- **Context:** loudness_range is measured on every job (PreAnalysis) and now feeds corpus profiles (lra_target_lu), but the certificate does not carry it — a deliberate deferral by the orchestrator, recorded so "later" has an address.
+
+### F-030 — Butterworth skirt leakage characterizes the 8-band measurement on sparse spectra
+- **Status:** PARKED (characteristic, not a bug)
+- **Component:** sp314-dsp spectral_profile_8band
+- **Trigger:** if sharper band isolation is ever required
+- **Context:** measured during S-0XX smoke testing with pure-sine fixtures: a 141.4Hz carrier reads ~12dB down into band 0, and the band1→band2 step compresses ~3.7dB vs designed. Invisible on broadband music; visible and expected on sparse test spectra. Documented in the determinism test's fixture comments.
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
