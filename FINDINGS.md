@@ -242,6 +242,41 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** Όταν ξεκινήσει η ενσωμάτωση στο `pre_analysis.rs`.
 - **Context:** Ο αλγόριθμος (Z-Scored Euclidean) και τα thresholds (`MAX=4.0`, `DELTA=0.15`) έχουν υλοποιηθεί βάσει μετρήσεων στο καθαρό corpus, αλλά δεν καλούνται ακόμα στο runtime του m0-daemon pipeline.
 
+### F-023 — Dead duplicate loop in measure_genre_centroids::measure_track
+- **Status:** PARKED
+- **Component:** m0-daemon/tests/measure_genre_centroids.rs
+- **Trigger:** dies with the file in S-0XX step 5 commit 5
+- **Context:** the second `while mono.len() >= FFT_SIZE` loop is unreachable — identical condition to the first, which drains below FFT_SIZE. Recorded so the replacement bin does not reproduce the ghost.
+
+### F-024 — from_preset silent catch-all routes unknown presets to Music
+- **Status:** ACTIVE
+- **Component:** m0-daemon/src/domain/content_type.rs
+- **Trigger:** entry-router work (big-picture §11.1) or any new preset
+- **Context:** a typo or new preset string silently becomes Music — no error, no log. Candidate fix: exhaustive match over a canonical preset registry, or telemetry on the fallthrough arm.
+
+### F-025 — SBR band indices have two sources of truth
+- **Status:** PARKED
+- **Component:** aether-bridge/src/reference_resolver.rs
+- **Trigger:** when SBR enters the resolve path or a music profile uses different SBR bands
+- **Context:** compute_sbr_delta uses the SBR_LO/SBR_HI consts while the schema-v2 profile carries sbr_lo/sbr_hi. Not in the production path today (tests only).
+
+### F-026 — Phase 8 streaming × corpus tool decode coupling
+- **Status:** PARKED
+- **Component:** m0-daemon (decode.rs, future measure_corpus bin, standardized_stream.rs)
+- **Trigger:** Phase 8 stage 3 (orchestration wire-up)
+- **Context:** the corpus bin deliberately uses decode_audio as the single decode+resample truth. When production migrates to StandardizedAudioStream, the bin migrates in the same commit window — otherwise measurement and mastering hear different signals. Second intersection: the Phase 8 stateful PreAnalyzer refactor touches the spectral_profile_levels contract test; the chunked==batch to_bits verification covers both.
+
+### F-027 — Cargo workspace profiles warning on every build
+- **Status:** PARKED (cosmetic)
+- **Component:** workspace root Cargo.toml, apps/stillair/cockpit-dioxus, apps/runtime/loom
+- **Trigger:** next housekeeping pass
+- **Context:** "profiles for the non root package will be ignored" — fix by moving the profiles to the workspace root.
+
+### F-028 — Orphan stash entry of unknown content
+- **Status:** PARKED
+- **Component:** local git state (not the repo)
+- **Trigger:** quiet moment — git stash show -p stash@{0}, then a deliberate drop or apply
+- **Context:** one stash entry has ridden the prompt indicator since 2026-07-08's history-repair session; contents never inspected.
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
