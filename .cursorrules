@@ -190,3 +190,4 @@ Core engine IDs are PERMANENT. Never reassign.
 - If it triggers DSP without Operator authority and user confirmation, it is a violation.
 - If JINI sees raw DSP metrics, it is a Behaviour Layer breach.
 - If CockpitMode is written outside the Reducer, it is a constitutional breach.
+- If terminal output looks truncated, cut off, or incomplete in ANY way — never complete it from memory or inference. Re-run the exact command with output redirected to a file (e.g. `... > /tmp/out.log 2>&1`) and read the file, or use a paging-safe flag. Output appears truncated, re-running to file is always the correct move.
