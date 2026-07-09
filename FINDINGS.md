@@ -295,6 +295,12 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Component:** `sp314-dsp` (clipper_contract.rs, harmonic_oversample_contract.rs, phantom_master.rs, cut_heal/mod.rs, lookahead_ring.rs)
 - **Trigger:** next housekeeping pass, or whenever one of these files is touched for unrelated work (fix opportunistically)
 - **Context:** discovered 2026-07-09 running the correct CI clippy mirror (-D warnings with the three project-allowed lint exceptions) for the first time against sp314-dsp's full --all-targets surface — collapsible_if, excessive_precision, cloned_ref_to_slice_refs, legacy_numeric_constants, useless_vec. None touch code from today's genre-classifier wiring work; all pre-date this session. Individually trivial one-line fixes, just never swept.
+
+### F-033 — integration_router_concurrency timing test is fragile under system load
+- **Status:** PARKED
+- **Component:** m0-daemon/tests/integration_router_concurrency.rs
+- **Trigger:** recurs whenever CI or the dev machine is under load; fix by widening the 350ms threshold or replacing wall-clock timing with a more robust concurrency assertion (e.g. count in-flight requests directly rather than inferring from elapsed time)
+- **Context:** observed 2026-07-10 failing by ~25ms (374 vs 350ms expected) during a full `just ci` run while cargo was under build-directory lock contention; passed cleanly on isolated re-run. This is a wall-clock timing assertion (< 350ms for 2 parallel batches) — the only test category that fails from machine load rather than code change. Not a regression; no production code involved. Flagged because a threshold this tight will recur.
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
