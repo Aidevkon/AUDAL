@@ -2,25 +2,9 @@
 //! Deterministic, Z-scored MFCC classification for Creator OS.
 //! Authority: MEA-001 (Measurement-First)
 
-pub const GLOBAL_MFCC_MEAN: [f32; 13] = [
-    -11.282939, 4.619359, -0.058864, 0.501321, -0.170580, 0.042619, -0.102155, -0.096856,
-    -0.013764, -0.008137, -0.049515, -0.088642, -0.183755,
-];
-
-pub const GLOBAL_MFCC_STD: [f32; 13] = [
-    5.141149, 2.860325, 1.630_64, 1.107524, 0.978694, 0.814911, 0.702522, 0.689514, 0.601996,
-    0.570613, 0.520369, 0.525024, 0.494410,
-];
-
-pub const IDM_MFCC_MEAN: [f32; 13] = [
-    -0.028942, 0.050562, 0.335884, 0.066955, 0.350688, 0.257811, 0.187719, 0.268231, 0.186681,
-    0.190227, 0.149608, 0.127562, 0.153356,
-];
-
-pub const ACOUSTIC_MFCC_MEAN: [f32; 13] = [
-    0.036802, -0.064271, -0.427232, -0.085166, -0.446066, -0.327918, -0.238772, -0.341179,
-    -0.237452, -0.241960, -0.190298, -0.162255, -0.195061,
-];
+use super::genre_centroids_generated::{
+    ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, IDM_MFCC_MEAN,
+};
 
 // thresholds determined through intra/inter class variance recon
 pub const MAX_DISTANCE_THRESHOLD: f32 = 4.0;
@@ -32,6 +16,20 @@ pub enum Genre {
     Acoustic,
 }
 
+/// MFCC centroids sourced from genre_centroids_generated.rs
+/// (measure_corpus output) as of genre-corpus-v2-wiring-v3 — see that
+/// file's header for corpus provenance and the IDM-provisional caveat.
+///
+/// Classification is MFCC-only (13-dim Z-scored Euclidean) — this is
+/// v1/v2 scope (S-0XX §6). BPM/onset detection (v3, PreAnalysisData.bpm
+/// — currently hardcoded 0.0 everywhere) is a SEPARATE future signal,
+/// not a classifier input today. When it lands, the intended
+/// integration point is a second-stage tie-breaker or gate criterion
+/// downstream of classify()'s Option<Genre> result — NOT a change to
+/// the 13-dim MFCC distance math itself, which stays a clean, isolated,
+/// independently-testable unit. Do not preemptively add BPM parameters
+/// or fields to this classifier now; that would be speculative
+/// plumbing ahead of the actual v3 corpus/spec work.
 pub struct GenreClassifier;
 
 impl GenreClassifier {
@@ -123,10 +121,26 @@ mod tests {
     #[test]
     fn test_genre_classification_real_idm_track() {
         // Raw MFCC mean for an actual IDM reference track:
-        // /tmp/genre_references/idm/coolkid - Synchronicity.mp3
+        // idm/BoDleasons - Our Journey.mp3
+        // measured via the corrected 48kHz-resampled pipeline, genre-corpus-v2-wiring-v3 —
+        // replaces a cd5890c-era fixture (coolkid - Synchronicity.mp3) that was contaminated
+        // by the pre-fix MFCC pipeline AND independently fails today's LUFS gate
+        // (LufsTooLow -16.4 vs -14.0), making it unsuitable as either a measurement
+        // fixture or a reference-quality example.
         let raw_idm_track = [
-            -16.073845, 7.182110, 0.391454, 1.006915, 0.252865, 0.241503, 0.055008, -0.002895,
-            -0.192724, -0.136454, -0.155973, -0.103782, -0.179701,
+            -8.680081,
+            2.7254674,
+            0.52635294,
+            0.4284627,
+            0.04749891,
+            0.2554113,
+            -0.08625301,
+            0.06384678,
+            0.08782445,
+            0.16598931,
+            0.08583771,
+            -0.09737512,
+            -0.16520621,
         ];
 
         let result = GenreClassifier::classify(&raw_idm_track);

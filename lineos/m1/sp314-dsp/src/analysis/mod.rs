@@ -22,3 +22,4 @@ pub mod album_conductor;
 pub use album_conductor::{AlbumConductor, TrackPlan};
 pub mod genre_classifier;
 pub use genre_classifier::{Genre, GenreClassifier};
+pub mod genre_centroids_generated;
