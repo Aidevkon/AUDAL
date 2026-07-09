@@ -32,7 +32,7 @@ fn limiter_ring_buffer_wraps_correctly() {
         let val = (i as f32) + 1.0;
         let delayed = rb.push_and_pop(val);
         if i >= 240 {
-            assert_eq!(delayed, val - 240 as f32);
+            assert_eq!(delayed, val - 240_f32);
         } else {
             assert_eq!(delayed, 0.0);
         }

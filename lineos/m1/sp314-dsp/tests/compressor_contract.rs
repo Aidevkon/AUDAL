@@ -415,7 +415,7 @@ fn compressor_band_output_within_headroom() {
     let mut band = CompressorBand::new(default_config(), 48000);
     for _ in 0..100 {
         let y = band.process(100.0); // blow up input
-        assert!(y >= -2.0 && y <= 2.0);
+        assert!((-2.0..=2.0).contains(&y));
     }
 }
 
@@ -562,8 +562,8 @@ fn compressor_v3_output_within_headroom() {
         let mut l = 100.0;
         let mut r = 100.0;
         comp.process_stereo(&mut l, &mut r);
-        assert!(l >= -2.0 && l <= 2.0);
-        assert!(r >= -2.0 && r <= 2.0);
+        assert!((-2.0..=2.0).contains(&l));
+        assert!((-2.0..=2.0).contains(&r));
     }
 }
 

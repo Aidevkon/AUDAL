@@ -378,7 +378,7 @@ fn resonant_peaks_vs_fixture() {
     let highmid_count = result
         .resonant_peaks_hz
         .iter()
-        .filter(|&&f| f >= 2000.0 && f <= 8000.0)
+        .filter(|&&f| (2000.0..=8000.0).contains(&f))
         .count();
     assert!(
         highmid_count > 0,
@@ -404,7 +404,7 @@ fn band_correlation_in_range() {
 
         for (i, &c) in bpc.iter().enumerate() {
             assert!(
-                c >= -1.0 && c <= 1.0,
+                (-1.0..=1.0).contains(&c),
                 "{}: band_phase_correlation[{}] = {} out of range [-1,1]",
                 sid,
                 i,
@@ -655,7 +655,7 @@ fn loudness_range_contract() {
     let total_samples = sr * 6;
     let mut fixture = Vec::with_capacity(total_samples);
     let freq = 1000.0;
-    let two_pi = 2.0 * 3.14159265358979323846;
+    let two_pi = 2.0 * core::f32::consts::PI;
 
     for i in 0..total_samples {
         let t = i as f32 / sr as f32;

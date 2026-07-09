@@ -13,10 +13,8 @@ fn soft_clipper_transparent_on_low_signals() {
         let sig = (t * 2.0_f32 * std::f32::consts::PI * 1000.0_f32).sin() * 0.1_f32;
         let (l_out, _) = clipper.process(sig, sig);
         // Skip settling period (FIR delay ~100 samples)
-        if i > 100 {
-            if l_out.abs() > max_out {
-                max_out = l_out.abs();
-            }
+        if i > 100 && l_out.abs() > max_out {
+            max_out = l_out.abs();
         }
     }
     println!("Transparent max output: {:.6}", max_out);

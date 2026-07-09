@@ -62,7 +62,7 @@ pub fn assert_no_nan_inf(pcm: &[f32], context: &str) {
 pub fn assert_bounded(pcm: &[f32], context: &str) {
     for (i, &x) in pcm.iter().enumerate() {
         assert!(
-            x >= -1.0 && x <= 1.0,
+            (-1.0..=1.0).contains(&x),
             "{}: sample[{}] = {} (out of [-1,1])",
             context,
             i,

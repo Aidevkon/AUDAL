@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn peek_beyond_filled_returns_false() {
         let mut ring = LookaheadRing::new(100, 10);
-        ring.feed(&vec![1.0; 10]); // filled = 10
+        ring.feed(&[1.0; 10]); // filled = 10
 
         let mut dest = vec![0.0; 10];
         let success = ring.peek_into(20, &mut dest);

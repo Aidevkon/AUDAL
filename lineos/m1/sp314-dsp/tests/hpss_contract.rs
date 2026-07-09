@@ -103,7 +103,7 @@ fn hpss_separates_harmonic_content() {
 fn hpss_separates_percussive_content() {
     use sp314_dsp::stft::HpssProcessor;
 
-    const EXPECTED_PERC: f32 = 0.97300603_f32;
+    const EXPECTED_PERC: f32 = 0.973_006_f32;
 
     let n_frames = 64_usize;
     let n_bins = 1025_usize;

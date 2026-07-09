@@ -20,7 +20,6 @@ fn kweight_filter_coefficients_match_standard() {
     // Coefficients are hardcoded and match ITU-R BS.1770-4 Table 1.
     // By compiling successfully, they exist. We don't need to read them directly,
     // but we verify the filter's behavior matches.
-    assert!(true);
 }
 
 #[test]
@@ -67,10 +66,8 @@ fn kweight_filter_attenuates_sub_bass() {
         let sine_50hz = 1.0 * (2.0 * PI * 50.0 * t).sin();
         let out = filter.process(sine_50hz);
 
-        if i > 40000 {
-            if out.abs() > out_50hz {
-                out_50hz = out.abs();
-            }
+        if i > 40000 && out.abs() > out_50hz {
+            out_50hz = out.abs();
         }
     }
 

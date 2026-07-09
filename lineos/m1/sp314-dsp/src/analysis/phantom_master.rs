@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn distance_from_identical_is_zero() {
         let a = make_analysis(-14.0, 8.0, -1.0);
-        let pm = PhantomMaster::from_tracks(&[a.clone()]).unwrap();
+        let pm = PhantomMaster::from_tracks(std::slice::from_ref(&a)).unwrap();
         let d = pm.distance_from(&a);
         assert!(d < 0.01, "Distance from self should be ~0, got {}", d);
     }

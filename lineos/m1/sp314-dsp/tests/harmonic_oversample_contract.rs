@@ -6,7 +6,7 @@ fn harmonic_no_aliasing_at_high_freq() {
 
     let config = HarmonicConfig {
         drive: 2.0,
-        drive_compensation: 1.99526166,
+        drive_compensation: 1.995_261_7,
         even_amount: 0.6,
         odd_amount: 0.2,
         mix: 0.3,

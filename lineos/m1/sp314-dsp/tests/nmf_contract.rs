@@ -22,10 +22,10 @@ fn test_nmf_semantic_isolation() {
             if b < 8 {
                 val += 0.8_f32;
             }
-            if b >= 8 && b < 20 && f >= 4 && f < 12 {
+            if (8..20).contains(&b) && (4..12).contains(&f) {
                 val += 0.7_f32;
             }
-            if f < 4 || f >= 12 {
+            if !(4..12).contains(&f) {
                 val += 0.3_f32;
             }
             val += next_rand() * 0.05_f32;

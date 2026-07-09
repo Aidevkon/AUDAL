@@ -1,22 +1,24 @@
 // tests/harmonic_contract.rs
 
-const PAD_LINEAR: f32 = 0.5011872336272722;
-const GLOBAL_K_HARMONIC: f32 = 1.99526166;
+const PAD_LINEAR: f32 = 0.501_187_2;
+const GLOBAL_K_HARMONIC: f32 = 1.995_261_7;
 const PER_DRIVE: &[(f32, f32)] = &[
-    (0.1, 1.99526184),
-    (0.5, 1.99526221),
-    (1.0, 1.99526242),
-    (2.0, 1.99526212),
-    (5.0, 1.99526364),
-    (10.0, 1.99526302),
+    (0.1, 1.995_261_8),
+    (0.5, 1.995_262_3),
+    (1.0, 1.995_262_4),
+    (2.0, 1.995_262_1),
+    (5.0, 1.995_263_7),
+    (10.0, 1.995_263),
 ];
 
 #[test]
 fn harmonic_k_compensation_matches_reference() {
-    assert!(
-        GLOBAL_K_HARMONIC >= 0.5 && GLOBAL_K_HARMONIC <= 5.0,
-        "Global K is out of bounds"
-    );
+    const {
+        assert!(
+            GLOBAL_K_HARMONIC >= 0.5 && GLOBAL_K_HARMONIC <= 5.0,
+            "Global K is out of bounds"
+        )
+    };
 
     let sample_rate = 48000;
     let num_samples = sample_rate; // 1 second

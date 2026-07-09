@@ -61,7 +61,7 @@ fn two_pass_engine_peak_heap_under_50mb() {
     let total_duration_s = 240; // 4 minutes
     let chunk_size = 65536usize;
     let total_samples = total_duration_s * sample_rate as usize;
-    let total_chunks = (total_samples + chunk_size - 1) / chunk_size;
+    let total_chunks = total_samples.div_ceil(chunk_size);
 
     println!(
         "Simulating {}s file ({} chunks of {} samples)",

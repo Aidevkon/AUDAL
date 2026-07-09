@@ -156,7 +156,7 @@ mod tests {
         let mut seed = 42u32;
         for i in 0..samples {
             seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
-            let val = (seed as f32 / std::u32::MAX as f32) * 2.0 - 1.0;
+            let val = (seed as f32 / u32::MAX as f32) * 2.0 - 1.0;
             buf[i] = val * amp;
         }
         buf

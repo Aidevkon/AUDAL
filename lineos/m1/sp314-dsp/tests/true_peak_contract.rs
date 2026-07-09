@@ -107,7 +107,7 @@ fn test_itu_bs1770_4_nyquist_trap_reconstruction() {
         20.0 * max_true_peak.log10()
     );
     assert!(
-        max_true_peak >= 1.0 && max_true_peak < 1.05,
+        (1.0..1.05).contains(&max_true_peak),
         "True peak reconstruction should land in [1.0, 1.05): theoretical analog peak is exactly 1.0 \
          (0 dBFS) for this -45°-phase quarter-Nyquist tone; measured {:.6} (empirically confirmed \
          2026-06-25 at 1.012591 with our 18-tap FIR oversampler — small overshoot above 1.0 is \
