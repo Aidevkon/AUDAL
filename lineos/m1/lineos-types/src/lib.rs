@@ -64,4 +64,4 @@ pub use jini::{
 pub use mastering::MasteringIntent;
 pub use metrics::{Ebu128Measurement, LufsReport};
 pub use onboarding::{OnboardingState, PlatformTarget, TasteProfile, Vision, WizardState};
-pub use pre_analysis::{PreAnalysisData, ZoneActivationFlags};
+pub use pre_analysis::{Genre, PreAnalysisData, ZoneActivationFlags};

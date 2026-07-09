@@ -419,4 +419,25 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn parse_new_music_profiles() {
+        let acoustic_str =
+            include_str!("../../../lineos/shared/schema/reference-profiles/music-acoustic-v1.json");
+        let parsed_acoustic: Result<ProfileJson, _> = serde_json::from_str(acoustic_str);
+        assert!(
+            parsed_acoustic.is_ok(),
+            "acoustic profile failed to parse: {:?}",
+            parsed_acoustic.err()
+        );
+
+        let idm_str =
+            include_str!("../../../lineos/shared/schema/reference-profiles/music-idm-v1.json");
+        let parsed_idm: Result<ProfileJson, _> = serde_json::from_str(idm_str);
+        assert!(
+            parsed_idm.is_ok(),
+            "idm profile failed to parse: {:?}",
+            parsed_idm.err()
+        );
+    }
 }

@@ -163,6 +163,42 @@ impl PreAnalyzer {
             &resonant_peaks_hz,
         );
 
+        // ── Group C: Semantic Classification ──
+        // Extract MFCC frames mirroring measure_corpus.rs exactly (FFT_SIZE, -60dB RMS silence exclusion).
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfcc_frames = Vec::with_capacity(mono.len() / crate::stft::FFT_SIZE);
+        for chunk in mono.chunks(crate::stft::FFT_SIZE) {
+            if chunk.len() == crate::stft::FFT_SIZE {
+                let sum_sq: f32 = chunk.iter().map(|&x| x * x).sum();
+                let rms = libm::sqrtf(sum_sq / chunk.len() as f32);
+                let db = if rms > 1e-20 {
+                    20.0 * libm::log10f(rms)
+                } else {
+                    -144.0
+                };
+                if db >= -60.0 {
+                    let features = mfcc_analyzer.compute(chunk);
+                    mfcc_frames.push(features);
+                }
+            }
+        }
+
+        let genre = if mfcc_frames.is_empty() {
+            None
+        } else {
+            let mut mean = [0.0; lineos_corpus::mfcc::N_MFCC];
+            for frame in &mfcc_frames {
+                for i in 0..lineos_corpus::mfcc::N_MFCC {
+                    mean[i] += frame[i];
+                }
+            }
+            let count = mfcc_frames.len() as f32;
+            for i in 0..lineos_corpus::mfcc::N_MFCC {
+                mean[i] /= count;
+            }
+            crate::analysis::GenreClassifier::classify(&mean)
+        };
+
         PreAnalysisData {
             integrated_lufs,
             true_peak_dbtp,
@@ -182,6 +218,7 @@ impl PreAnalyzer {
             beats_ms: vec![],
             downbeats_ms: vec![],
             transients_ms: vec![],
+            genre,
         }
     }
 }

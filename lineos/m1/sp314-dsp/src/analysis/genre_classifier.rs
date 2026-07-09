@@ -10,11 +10,7 @@ use super::genre_centroids_generated::{
 pub const MAX_DISTANCE_THRESHOLD: f32 = 4.0;
 pub const MIN_DISTANCE_DELTA: f32 = 0.15;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Genre {
-    Idm,
-    Acoustic,
-}
+use lineos_types::pre_analysis::Genre;
 
 /// MFCC centroids sourced from genre_centroids_generated.rs
 /// (measure_corpus output) as of genre-corpus-v2-wiring-v3 — see that

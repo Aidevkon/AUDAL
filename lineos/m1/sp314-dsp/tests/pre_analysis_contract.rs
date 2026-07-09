@@ -676,3 +676,42 @@ fn loudness_range_contract() {
     assert!(lra_wrapper > 0.0, "LRA must be > 0.0");
     assert!(lra_wrapper.is_finite(), "LRA must be finite");
 }
+
+// ── Test 14: Genre Classification ────────────────────────────────────────────
+
+#[test]
+fn test_pre_analyzer_populates_genre() {
+    // 20s excerpt from BoDleasons - Our Journey.mp3 (middle of track, avoiding
+    // sparse intro), a gate-accepted IDM corpus track — see S-0XX corpus-manifest.json
+    // for full provenance.
+    let path = "tests/fixtures/bodleasons_mid.wav";
+    let mut reader = hound::WavReader::open(path).expect("Failed to open fixture");
+    let spec = reader.spec();
+
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    // Use the 16-bit integer conversion since real_world_60s.wav is 16-bit PCM.
+    let samples: Vec<i32> = reader.samples().map(|s| s.unwrap()).collect();
+
+    for chunk in samples.chunks(2) {
+        // Convert to f32 PCM [-1.0, 1.0]
+        left.push(chunk[0] as f32 / 32768.0);
+        right.push(chunk[1] as f32 / 32768.0);
+    }
+
+    let data = PreAnalyzer::run(&left, &right, spec.sample_rate);
+
+    println!("Genre for bodleasons_mid: {:?}", data.genre);
+    assert_eq!(
+        data.genre,
+        Some(lineos_types::pre_analysis::Genre::Idm),
+        "bodleasons mid must resolve to Idm"
+    );
+
+    // Silence/short input case
+    let silent_data = PreAnalyzer::run(&[0.0; 100], &[0.0; 100], 48000);
+    assert_eq!(
+        silent_data.genre, None,
+        "Short/silent input should yield None genre"
+    );
+}

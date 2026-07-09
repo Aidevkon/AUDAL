@@ -33,6 +33,14 @@ pub const RESONANT_PEAK_MAX_COUNT: usize = 16;
 /// Resonant peak statistical threshold: bin > local_avg + 3σ.
 pub const RESONANT_PEAK_SIGMA: f32 = 3.0;
 
+// ── Genre ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Genre {
+    Idm,
+    Acoustic,
+}
+
 // ── Zone Activation Flags ────────────────────────────────────────────────────
 
 /// Deterministic zone activation flags (Constitution §5).
@@ -107,6 +115,9 @@ pub struct PreAnalysisData {
     pub beats_ms: Vec<u32>,      // beat timestamps in ms
     pub downbeats_ms: Vec<u32>,  // downbeat timestamps in ms
     pub transients_ms: Vec<u32>, // onset timestamps in ms
+
+    // ── Semantic Classification ──
+    pub genre: Option<Genre>,
 }
 
 impl PreAnalysisData {
@@ -133,6 +144,7 @@ impl PreAnalysisData {
             beats_ms: vec![],
             downbeats_ms: vec![],
             transients_ms: vec![],
+            genre: None,
         }
     }
 }
