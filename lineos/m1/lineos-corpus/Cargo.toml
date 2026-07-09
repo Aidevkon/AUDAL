@@ -7,7 +7,6 @@ edition = "2021"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 lineos-types = { path = "../lineos-types" }
-aether = { path = "../../../aether" }
 realfft = "3"
 rustfft = "6"
 libm = "0.2.16"

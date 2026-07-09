@@ -4452,7 +4452,6 @@ dependencies = [
 name = "lineos-corpus"
 version = "0.1.0"
 dependencies = [
- "aether",
  "libm",
  "lineos-types",
  "realfft",
