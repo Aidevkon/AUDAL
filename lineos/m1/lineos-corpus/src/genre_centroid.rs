@@ -150,16 +150,28 @@ pub const GATE_V1_IDM: GateCriteria = GateCriteria {
     slope_max: -0.45,
 };
 
-/// gate-v1: deliberately loose — tightened only after measured corpus distributions (S-0XX §5)
+/// gate-v1.1: deliberately loose — tightened only after measured corpus distributions (S-0XX §5)
+///
+/// Retuned to gate-v1.1 (2026-07-09) from the first real-corpus measurement
+/// run (24 curated acoustic tracks): the original anchors were
+/// theoretically sound but excluded well-regarded 2010s+
+/// acoustic-pop/indie-folk masters (First Aid Kit, Fleet Foxes,
+/// Iron & Wine, Norah Jones) that the target bedroom-musician
+/// audience recognizes as reference-quality. slope_max loosened
+/// 0.15 (still excludes clearly bright pop mixes, e.g. measured
+/// Sara Bareilles -0.61, Marc Broussard -0.67); lufs_max loosened
+/// 1.5dB to the empirically-observed 2010s+ acoustic sweet spot
+/// (still excludes Bareilles at -6.86). GATE_V1_IDM unchanged —
+/// no real-corpus data yet to retune against.
 pub const GATE_V1_ACOUSTIC: GateCriteria = GateCriteria {
     // Pro-release ranges for Acoustic
     lufs_min: -24.0,
-    lufs_max: -10.0,
+    lufs_max: -8.5,
     // Anti-loudness-war crest floor
     crest_min_db: 8.0,
     // Pestana Table 2 slopes ±0.3 (Jazz anchor: -1.29, Folk anchor: -1.18)
     slope_min: -1.60,
-    slope_max: -0.85,
+    slope_max: -0.70,
 };
 
 /// Format as the shortest round-trip decimal.
@@ -349,6 +361,33 @@ mod tests {
             slope: -0.75,
         };
         assert_eq!(gate(&pass, &criteria), Ok(()));
+    }
+
+    #[test]
+    fn test_gate_v1_1_acoustic_boundary() {
+        // First Aid Kit (measured values: lufs -8.87649, slope -0.7214222)
+        // Must PASS gate-v1.1 acoustic
+        let fak = TrackGateInputs {
+            lufs: -8.87649,
+            crest_db: 10.0, // representative fixture value > crest_min_db
+            slope: -0.7214222,
+        };
+        assert_eq!(
+            gate(&fak, &GATE_V1_ACOUSTIC),
+            Ok(()),
+            "First Aid Kit must pass gate-v1.1"
+        );
+
+        // Sara Bareilles (measured values: lufs -6.863688, slope -0.6124779)
+        // Must FAIL gate-v1.1 acoustic
+        let bareilles = TrackGateInputs {
+            lufs: -6.863688,
+            crest_db: 10.0,
+            slope: -0.6124779,
+        };
+        let rej = gate(&bareilles, &GATE_V1_ACOUSTIC).unwrap_err();
+        assert!(rej.contains(&RejectReason::LufsTooHigh(-6.863688, -8.5)));
+        assert!(rej.contains(&RejectReason::SlopeTooHigh(-0.6124779, -0.70)));
     }
 
     #[test]

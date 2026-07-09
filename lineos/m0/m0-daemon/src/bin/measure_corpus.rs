@@ -455,7 +455,7 @@ fn main() {
 
     let manifest = CorpusManifest {
         corpus_version: corpus_version.to_string(),
-        gate_version: "gate-v1".to_string(),
+        gate_version: "gate-v1.1".to_string(), // acoustic retuned to v1.1 2026-07-09; idm still gate-v1 — bump this string wholesale when idm gets its own real-corpus retune.
         gate_criteria: serde_json::json!({
             "idm": { "lufs_min": -14.0, "lufs_max": -6.0, "crest_min_db": 4.0, "slope_min": -1.05, "slope_max": -0.45 },
             "acoustic": { "lufs_min": -24.0, "lufs_max": -10.0, "crest_min_db": 8.0, "slope_min": -1.60, "slope_max": -0.85 }
