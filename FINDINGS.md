@@ -291,7 +291,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** measured during S-0XX smoke testing with pure-sine fixtures: a 141.4Hz carrier reads ~12dB down into band 0, and the band1→band2 step compresses ~3.7dB vs designed. Invisible on broadband music; visible and expected on sparse test spectra. Documented in the determinism test's fixture comments.
 
 ### F-032 — sp314-dsp has 5 pre-existing clippy findings surfaced by the correct -D warnings mirror
-- **Status:** PARKED
+- **Status:** RESOLVED (resolved 2026-07-10, commit 682280a — 5 targeted findings plus 10 additional pre-existing findings from the same file surface, all mechanical clippy-suggested fixes with explicit bit-exact verification on anything touching calibration constants or test fixtures).
 - **Component:** `sp314-dsp` (clipper_contract.rs, harmonic_oversample_contract.rs, phantom_master.rs, cut_heal/mod.rs, lookahead_ring.rs)
 - **Trigger:** next housekeeping pass, or whenever one of these files is touched for unrelated work (fix opportunistically)
 - **Context:** discovered 2026-07-09 running the correct CI clippy mirror (-D warnings with the three project-allowed lint exceptions) for the first time against sp314-dsp's full --all-targets surface — collapsible_if, excessive_precision, cloned_ref_to_slice_refs, legacy_numeric_constants, useless_vec. None touch code from today's genre-classifier wiring work; all pre-date this session. Individually trivial one-line fixes, just never swept.
