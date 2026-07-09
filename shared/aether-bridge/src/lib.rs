@@ -140,7 +140,26 @@ pub fn build_dsp_config(
 
         // pre_analysis is Option<&PreAnalysisData>;
         // skip reference correction if unavailable.
+        let mut target_profile_id = None;
+
         if req.content_type == ContentType::Episode {
+            target_profile_id = Some(crate::reference_resolver::ProfileId::PodcastV1);
+        } else if req.content_type == ContentType::Music {
+            if let Some(pa) = pre_analysis {
+                match pa.genre {
+                    Some(lineos_types::pre_analysis::Genre::Acoustic) => {
+                        target_profile_id =
+                            Some(crate::reference_resolver::ProfileId::MusicAcoustic);
+                    }
+                    Some(lineos_types::pre_analysis::Genre::Idm) => {
+                        target_profile_id = Some(crate::reference_resolver::ProfileId::MusicIdm);
+                    }
+                    None => {} // Unclassified music skips reference correction
+                }
+            }
+        }
+
+        if let Some(profile_id) = target_profile_id {
             if let Some(pa) = pre_analysis {
                 // ── Signal normalization (mean-center) ──
                 // The ReferenceProfile target is a relative
@@ -166,9 +185,7 @@ pub fn build_dsp_config(
                 //
                 // If podcast-v1.json changes which bands carry
                 // measured LTASS data, update normalization_band_count in podcast-v1.json.
-                let profile = crate::reference_resolver::ReferenceProfile::load(
-                    crate::reference_resolver::ProfileId::PodcastV1,
-                );
+                let profile = crate::reference_resolver::ReferenceProfile::load(profile_id);
                 let n = profile.normalization_band_count;
                 let speech_mean: f32 = pa.spectral_profile_db[..n].iter().sum::<f32>() / n as f32;
                 let normalized_profile: [f32; 8] =

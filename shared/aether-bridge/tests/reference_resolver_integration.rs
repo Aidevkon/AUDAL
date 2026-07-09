@@ -180,10 +180,13 @@ fn thin_input_boosts_low_end() {
     );
 }
 
-/// INV-MUS-3 (S-0XX): Music content must never receive
-/// the speech reference profile.
+/// INV-MUS-3 (S-0XX): Music content must never receive the speech
+/// (PodcastV1) reference profile. This test specifically covers the
+/// unclassified case (genre: None) — see inv_mus_4/5 for classified
+/// Acoustic/Idm music receiving their OWN reference zones, which is
+/// expected and correct post-Part-B.
 #[test]
-fn inv_mus_3_music_produces_zero_reference_zones() {
+fn inv_mus_3_unclassified_music_produces_zero_speech_zones() {
     let req = AetherRequest {
         content_type: ContentType::Music,
         ..podcast_req()
@@ -282,4 +285,145 @@ fn firewall_clamps_malicious_50db_injection() {
             CFW_EQ_GAIN_MIN_DB
         );
     }
+}
+
+/// INV-MUS-4 (S-0XX): Music content classified as Acoustic
+/// receives the Acoustic reference profile correction zones.
+#[test]
+fn inv_mus_4_classified_acoustic_gets_acoustic_zones() {
+    let req = AetherRequest {
+        content_type: ContentType::Music,
+        ..podcast_req()
+    };
+
+    let mut pa = ltass_input([30.0, 30.0, -30.0, -30.0, 30.0, 30.0, -30.0, -30.0]);
+    pa.genre = Some(lineos_types::pre_analysis::Genre::Acoustic);
+
+    let (dsp_config, _, _) =
+        build_dsp_config(&req, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
+
+    let acoustic_gains: Vec<f32> = dsp_config
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    assert!(
+        !acoustic_gains.is_empty(),
+        "Acoustic music content produced zero reference zones, expected >0."
+    );
+
+    let req_pod = AetherRequest {
+        content_type: ContentType::Episode,
+        ..podcast_req()
+    };
+    let (dsp_config_pod, _, _) =
+        build_dsp_config(&req_pod, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
+
+    let pod_gains: Vec<f32> = dsp_config_pod
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    assert_ne!(
+        acoustic_gains, pod_gains,
+        "Acoustic music content must not produce Podcast zones."
+    );
+}
+
+/// INV-MUS-5 (S-0XX): Music content classified as Idm
+/// receives the Idm reference profile correction zones.
+#[test]
+fn inv_mus_5_classified_idm_gets_idm_zones() {
+    let req = AetherRequest {
+        content_type: ContentType::Music,
+        ..podcast_req()
+    };
+
+    let mut pa = ltass_input([30.0, 30.0, -30.0, -30.0, 30.0, 30.0, -30.0, -30.0]);
+    pa.genre = Some(lineos_types::pre_analysis::Genre::Idm);
+
+    let (dsp_config, _, _) =
+        build_dsp_config(&req, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
+
+    let idm_gains: Vec<f32> = dsp_config
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    assert!(
+        !idm_gains.is_empty(),
+        "Idm music content produced zero reference zones, expected >0."
+    );
+
+    let req_pod = AetherRequest {
+        content_type: ContentType::Episode,
+        ..podcast_req()
+    };
+    let (dsp_config_pod, _, _) =
+        build_dsp_config(&req_pod, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
+
+    let pod_gains: Vec<f32> = dsp_config_pod
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    assert_ne!(
+        idm_gains, pod_gains,
+        "Idm music content must not produce Podcast zones."
+    );
+}
+
+/// INV-MUS-6 (S-0XX): Music content classified as Acoustic and Idm
+/// produce strictly distinct reference zones from each other.
+#[test]
+fn inv_mus_6_acoustic_and_idm_routes_are_distinct() {
+    let req = AetherRequest {
+        content_type: ContentType::Music,
+        ..podcast_req()
+    };
+
+    let mut pa_ac = ltass_input([10.0, -5.0, 12.0, -6.0, 8.0, -4.0, 15.0, -7.0]);
+    pa_ac.genre = Some(lineos_types::pre_analysis::Genre::Acoustic);
+
+    let (dsp_config_ac, _, _) =
+        build_dsp_config(&req, &stem_features(), Some(&pa_ac)).expect("build_dsp_config failed");
+
+    let acoustic_gains: Vec<f32> = dsp_config_ac
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    let mut pa_idm = pa_ac.clone();
+    pa_idm.genre = Some(lineos_types::pre_analysis::Genre::Idm);
+
+    let (dsp_config_idm, _, _) =
+        build_dsp_config(&req, &stem_features(), Some(&pa_idm)).expect("build_dsp_config failed");
+
+    let idm_gains: Vec<f32> = dsp_config_idm
+        .eq
+        .zone_bands
+        .iter()
+        .filter(|b| b.source == EqSource::Reference)
+        .map(|b| b.gain_db)
+        .collect();
+
+    assert_ne!(
+        acoustic_gains, idm_gains,
+        "Acoustic and Idm profiles must produce distinct corrections for the same input."
+    );
 }

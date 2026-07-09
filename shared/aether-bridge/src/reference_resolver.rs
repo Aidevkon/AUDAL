@@ -20,6 +20,14 @@ const PODCAST_V1_JSON: &str = include_str!(
     "../../../lineos/shared/schema/reference-profiles/\
      podcast-v1.json"
 );
+const MUSIC_ACOUSTIC_V1_JSON: &str = include_str!(
+    "../../../lineos/shared/schema/reference-profiles/\
+     music-acoustic-v1.json"
+);
+const MUSIC_IDM_V1_JSON: &str = include_str!(
+    "../../../lineos/shared/schema/reference-profiles/\
+     music-idm-v1.json"
+);
 
 // ── Proprietary craft constants ────────────────
 // "In dark, not hidden": the structure is public;
@@ -83,6 +91,8 @@ struct ProfileJson {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileId {
     PodcastV1,
+    MusicAcoustic,
+    MusicIdm,
 }
 
 #[derive(Clone, Debug)]
@@ -119,43 +129,43 @@ impl ReferenceProfile {
     /// Panics at startup if the JSON is malformed
     /// (compile-time embed guarantees it is not).
     pub fn load(id: ProfileId) -> Self {
-        match id {
-            ProfileId::PodcastV1 => {
-                let parsed: ProfileJson = serde_json::from_str(PODCAST_V1_JSON).expect(
-                    "podcast-v1.json is \
-                                 malformed — check embed",
-                );
+        let (json_str, name) = match id {
+            ProfileId::PodcastV1 => (PODCAST_V1_JSON, "podcast-v1.json"),
+            ProfileId::MusicAcoustic => (MUSIC_ACOUSTIC_V1_JSON, "music-acoustic-v1.json"),
+            ProfileId::MusicIdm => (MUSIC_IDM_V1_JSON, "music-idm-v1.json"),
+        };
 
-                let mut target = [0.0_f32; 8];
-                for band in &parsed.spectral_target.bands {
-                    assert!(
-                        band.index < 8,
-                        "podcast-v1.json: band index {} \
-                         out of range",
-                        band.index
-                    );
-                    target[band.index] = band.target_db_relative;
-                }
+        let parsed: ProfileJson = serde_json::from_str(json_str)
+            .unwrap_or_else(|_| panic!("{} is malformed — check embed", name));
 
-                Self {
-                    id: parsed.id,
-                    g_max_db: parsed.g_max_db,
-                    dead_zone_db: parsed.dead_zone_db,
-                    corpus: Corpus {
-                        source: parsed.corpus.source,
-                        version: parsed.corpus.version,
-                    },
-                    normalization_band_count: parsed.spectral_target.normalization_band_count,
-                    spectral_target: target,
-                    target_lufs: parsed.hard_constraints.target_lufs,
-                    true_peak_ceiling_dbtp: parsed.hard_constraints.true_peak_ceiling_dbtp,
-                    gate_absolute_lufs: parsed.hard_constraints.gate_absolute_lufs,
-                    gate_relative_lu: parsed.hard_constraints.gate_relative_lu,
-                    lra_target_lu: parsed.hard_constraints.lra_target_lu,
-                    sbr_lo: parsed.sbr.lower_band_index,
-                    sbr_hi: parsed.sbr.upper_band_index,
-                }
-            }
+        let mut target = [0.0_f32; 8];
+        for band in &parsed.spectral_target.bands {
+            assert!(
+                band.index < 8,
+                "{}: band index {} out of range",
+                name,
+                band.index
+            );
+            target[band.index] = band.target_db_relative;
+        }
+
+        Self {
+            id: parsed.id,
+            g_max_db: parsed.g_max_db,
+            dead_zone_db: parsed.dead_zone_db,
+            corpus: Corpus {
+                source: parsed.corpus.source,
+                version: parsed.corpus.version,
+            },
+            normalization_band_count: parsed.spectral_target.normalization_band_count,
+            spectral_target: target,
+            target_lufs: parsed.hard_constraints.target_lufs,
+            true_peak_ceiling_dbtp: parsed.hard_constraints.true_peak_ceiling_dbtp,
+            gate_absolute_lufs: parsed.hard_constraints.gate_absolute_lufs,
+            gate_relative_lu: parsed.hard_constraints.gate_relative_lu,
+            lra_target_lu: parsed.hard_constraints.lra_target_lu,
+            sbr_lo: parsed.sbr.lower_band_index,
+            sbr_hi: parsed.sbr.upper_band_index,
         }
     }
 
