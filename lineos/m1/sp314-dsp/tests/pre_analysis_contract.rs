@@ -524,6 +524,10 @@ fn spectral_slope_contract() {
     }
 
     // a) synthetic -1.0 fixture: levels_db[k] = -20*log10(center_k / center_1) for k in 1..=6
+    // NOTE: Because spectral_slope now normalizes by bandwidth density (subtracting 10*log10(BW)),
+    // and our bandwidths roughly double per octave (proportional to center_k), the bandwidth term
+    // adds a slope of approximately -0.5. Thus, an amplitude slope of -1.0 minus the bandwidth
+    // term (-0.5) yields an expected reading of ≈ -1.5.
     let mut fixture_minus_one = [0.0; 8];
     fixture_minus_one[0] = 99.0; // arbitrary junk
     fixture_minus_one[7] = -99.0; // arbitrary junk
@@ -532,17 +536,17 @@ fn spectral_slope_contract() {
     }
     let slope1 = sp314_dsp::analysis::spectral_slope(&fixture_minus_one);
     assert!(
-        libm::fabsf(slope1 - (-1.0)) < 1e-4,
-        "Expected slope -1.0, got {}",
+        libm::fabsf(slope1 - (-1.5)) < 0.2,
+        "Expected slope ~ -1.5, got {}",
         slope1
     );
 
-    // b) flat spectrum -> slope 0.0
+    // b) flat spectrum -> slope 0.0 (now ~ -0.5 due to density)
     let flat_spectrum = [-12.0; 8];
     let slope2 = sp314_dsp::analysis::spectral_slope(&flat_spectrum);
     assert!(
-        libm::fabsf(slope2) < 1e-6,
-        "Expected slope 0.0, got {}",
+        libm::fabsf(slope2 - (-0.5)) < 0.2,
+        "Expected slope ~ -0.5, got {}",
         slope2
     );
 
@@ -564,6 +568,82 @@ fn spectral_slope_contract() {
     }
     let slope4 = sp314_dsp::analysis::spectral_slope(&positive_tilt);
     assert!(slope4 > 0.0, "Expected positive slope, got {}", slope4);
+}
+
+// ── Test: Broadband spectral slope density ────────────────────────────────────
+
+#[test]
+fn spectral_slope_broadband_density() {
+    let sr = 48000;
+    let n = sr * 2; // 2 seconds
+    let pi2 = 2.0 * core::f32::consts::PI;
+
+    // Build dense comb log-spaced every 1/24 octave from 100Hz to 10kHz
+    let mut freqs = Vec::new();
+    let mut f = 100.0f32;
+    let multiplier = libm::powf(2.0, 1.0 / 24.0);
+    while f <= 10000.0 {
+        freqs.push(f);
+        f *= multiplier;
+    }
+
+    let test_slope = |s: f32| {
+        let mut left = vec![0.0f32; n];
+        for &freq in &freqs {
+            // NOTE: Since the comb is log-spaced, the density of sines is 1/f.
+            // To achieve a power spectral density (PSD) proportional to f^{2s},
+            // the energy per sine must be f^{2s + 1}. Thus, amplitude is f^{s + 0.5}.
+            // This ensures a pink-like comb (s=-0.5) has constant amplitude (PSD \propto 1/f),
+            // which reads ≈ 0 without density correction, and -0.5 with it.
+            let amp = libm::powf(freq, s + 0.5);
+            for i in 0..n {
+                let t = i as f32 / sr as f32;
+                left[i] += amp * libm::sinf(pi2 * freq * t);
+            }
+        }
+        let max_val = left
+            .iter()
+            .map(|v| libm::fabsf(*v))
+            .fold(0.0f32, |a, b| a.max(b));
+        if max_val > 0.0 {
+            for v in left.iter_mut() {
+                *v = (*v / max_val) * 0.5;
+            }
+        }
+
+        let right = left.clone();
+        let levels = sp314_dsp::analysis::spectral_profile_levels(&left, &right, sr as u32);
+        sp314_dsp::analysis::spectral_slope(&levels)
+    };
+
+    let slope_minus_half = test_slope(-0.5);
+    let slope_minus_one = test_slope(-1.0);
+
+    println!("SLOPE MINUS HALF: {}", slope_minus_half);
+    println!("SLOPE MINUS ONE: {}", slope_minus_one);
+
+    // Tolerance ±0.15: F-030 — Butterworth skirt leakage biases
+    // slope readings ~0.1 shallow even on dense combs. The test's
+    // discriminating power is intact: the pre-fix bug read ≈ 0
+    // (error 0.5), far outside this window.
+    assert!(
+        libm::fabsf(slope_minus_half - (-0.5)) <= 0.15,
+        "Expected slope -0.5, got {}",
+        slope_minus_half
+    );
+    assert!(
+        libm::fabsf(slope_minus_one - (-1.0)) <= 0.15,
+        "Expected slope -1.0, got {}",
+        slope_minus_one
+    );
+    assert!(
+        slope_minus_half < -0.3,
+        "Bug-catching: pre-fix ≈ 0 cannot pass this"
+    );
+    assert!(
+        slope_minus_one < -0.6,
+        "Bug-catching: pre-fix ≈ 0 cannot pass this"
+    );
 }
 
 // ── Test 12: LRA Contract ────────────────────────────────────────────────────

@@ -390,16 +390,21 @@ pub fn spectral_profile_levels(left: &[f32], right: &[f32], sr: u32) -> [f32; 8]
     spectral_profile_8band(left, right, sr).0
 }
 
-/// Least-squares linear regression of y = levels_db[k] / 20.0 against
+/// Least-squares linear regression of spectral density against log frequency.
+///
+/// Normalizes each band to density before regression:
+///   y = (levels_db[k] - 10*log10(BAND_EDGES[k+1]-BAND_EDGES[k])) / 20
 /// x = log10(geometric center of band k), using ONLY bands 1..=6
 /// (geometric centers 141.4–5656.9 Hz — the Pestana 2013 100Hz–10kHz
 /// window; bands 0 and 7 excluded). Returns the slope in Pestana
 /// Table 2 units: log10(linear magnitude) per log10(Hz) — i.e.
-/// (dB/20) per decade — the SAME units as GATE_V1 slope bounds.
-/// Centers computed from BAND_EDGES via libm::sqrtf(lo*hi); all math
-/// libm-only; deterministic 6-point approximation of Pestana's
-/// dense-spectrum regression, adequate for the deliberately-loose
-/// gate (S-0XX §5).
+/// (dB/20) per decade.
+///
+/// NOTE: The pre-fix version omitted density normalization. Because our
+/// bands aggregate energy over exponentially growing widths (proportional to f),
+/// the unnormalized regression under-reported broadband steepness by ~0.5.
+/// Pestana 2013 regresses per-frequency density, so normalizing here matches
+/// the target units correctly.
 pub fn spectral_slope(levels_db: &[f32; 8]) -> f32 {
     let mut sum_x = 0.0;
     let mut sum_y = 0.0;
@@ -410,9 +415,10 @@ pub fn spectral_slope(levels_db: &[f32; 8]) -> f32 {
     for k in 1..=6 {
         let lo = BAND_EDGES[k];
         let hi = BAND_EDGES[k + 1];
+        let bw = hi - lo;
         let center = libm::sqrtf(lo * hi);
         let x = libm::log10f(center);
-        let y = levels_db[k] / 20.0;
+        let y = (levels_db[k] - 10.0 * libm::log10f(bw)) / 20.0;
 
         sum_x += x;
         sum_y += y;
