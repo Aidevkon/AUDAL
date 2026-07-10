@@ -22,3 +22,4 @@ pub mod album_conductor;
 pub use album_conductor::{AlbumConductor, TrackPlan};
 pub use lineos_types::pre_analysis::Genre;
 pub mod scout;
+pub mod scout_scanner;

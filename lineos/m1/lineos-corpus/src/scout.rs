@@ -70,6 +70,110 @@ pub fn compute_scout_decision(m: &ScoutMeasurements) -> ScoutDecision {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SegmentType {
+    Speech,
+    Music,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SegmentBoundary {
+    pub start_sec: f32,
+    pub end_sec: f32,
+    pub segment_type: SegmentType,
+    pub avg_leaning: f32,
+    /// Mean of RAW per-window confidence across the segment's windows —
+    /// includes window-level noise (e.g. a mid-sentence pause dip).
+    /// This reflects window-to-window measurement noise, NOT the
+    /// smoothed segment-level certainty (which is why a clean, obvious
+    /// speech segment can show a moderate avg_confidence like 0.53 —
+    /// individual noisy windows pull the average down even though the
+    /// smoothed leaning never wavered). Certificate consumers should
+    /// treat this as "average per-window agreement," not "how sure are
+    /// we this segment is correctly typed."
+    pub avg_confidence: f32,
+}
+
+// PROVISIONAL — smoothing gain + crossing threshold validated on
+// Flights 9-12 (2 clip pairs, both directions) but not corpus-tuned.
+pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoundary> {
+    if decisions.is_empty() {
+        return vec![];
+    }
+
+    let mut segments = Vec::new();
+    
+    // Initial activation: we start at the first decision's raw leaning score.
+    // Why? If a file starts purely with speech, we don't want to start at 0.5
+    // and artificially ramp up, which could delay the "Speech" classification
+    // if the confidence drops early. We snap to the actual initial state.
+    let mut activation = decisions[0].1.leaning_score;
+    let mut current_type = if activation >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+    
+    let mut current_start = decisions[0].0;
+    
+    // Accumulators for averages
+    let mut sum_leaning = 0.0;
+    let mut sum_confidence = 0.0;
+    let mut window_count = 0;
+
+    for &(t, ref dec) in decisions {
+        let prev_activation = activation;
+        activation += dec.confidence * (dec.leaning_score - activation);
+        
+        // We accumulate before the split check so the window that causes the crossing
+        // is included in the previous segment? Wait. The window that pushes it over
+        // the edge technically belongs to the *new* state. Let's accumulate it into
+        // the *current* state before checking the boundary, then reset. This is fine.
+        sum_leaning += dec.leaning_score;
+        sum_confidence += dec.confidence;
+        window_count += 1;
+
+        let crossed_to_speech = prev_activation < 0.5 && activation >= 0.5;
+        let crossed_to_music = prev_activation >= 0.5 && activation < 0.5;
+
+        if crossed_to_speech || crossed_to_music {
+            // Emit previous segment
+            let avg_leaning = sum_leaning / window_count as f32;
+            let avg_confidence = sum_confidence / window_count as f32;
+            
+            segments.push(SegmentBoundary {
+                start_sec: current_start,
+                end_sec: t, // The crossing time is the boundary
+                segment_type: current_type,
+                avg_leaning,
+                avg_confidence,
+            });
+
+            // Reset for new segment
+            current_type = if crossed_to_speech { SegmentType::Speech } else { SegmentType::Music };
+            current_start = t;
+            
+            // Start the new segment clean
+            sum_leaning = 0.0;
+            sum_confidence = 0.0;
+            window_count = 0;
+        }
+    }
+
+    // Emit final segment
+    // We use the timestamp of the last decision as the end_sec.
+    // Why? `scout.rs` doesn't know the WINDOW_SECS constant (it's in `sp314-dsp`),
+    // so using the last timestamp provided is the safest boundary without magic numbers.
+    let last_t = decisions.last().unwrap().0;
+    if window_count > 0 {
+        segments.push(SegmentBoundary {
+            start_sec: current_start,
+            end_sec: last_t,
+            segment_type: current_type,
+            avg_leaning: sum_leaning / window_count as f32,
+            avg_confidence: sum_confidence / window_count as f32,
+        });
+    }
+
+    segments
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +278,117 @@ mod tests {
             "Mono speech confidence should be high, got {}",
             decision.confidence
         );
+    }
+
+    // --- Part B: smooth_and_segment tests ---
+
+    fn mk_dec(leaning_score: f32, confidence: f32) -> ScoutDecision {
+        ScoutDecision {
+            leaning_score,
+            confidence,
+            per_axis_normalized: [0.0; 4],
+        }
+    }
+
+    #[test]
+    fn test_stable_speech_no_boundary() {
+        let stream = vec![
+            (0.0, mk_dec(0.9, 0.9)),
+            (1.0, mk_dec(0.85, 0.95)),
+            (2.0, mk_dec(0.92, 0.9)),
+        ];
+        let segments = smooth_and_segment(&stream);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, SegmentType::Speech);
+        assert_eq!(segments[0].start_sec, 0.0);
+        assert_eq!(segments[0].end_sec, 2.0);
+    }
+
+    #[test]
+    fn test_stable_music_no_boundary() {
+        let stream = vec![
+            (0.0, mk_dec(0.1, 0.9)),
+            (1.0, mk_dec(0.15, 0.95)),
+            (2.0, mk_dec(0.05, 0.9)),
+        ];
+        let segments = smooth_and_segment(&stream);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, SegmentType::Music);
+        assert_eq!(segments[0].start_sec, 0.0);
+        assert_eq!(segments[0].end_sec, 2.0);
+    }
+
+    #[test]
+    fn test_clean_transition() {
+        let stream = vec![
+            (0.0, mk_dec(0.9, 0.9)),
+            (1.0, mk_dec(0.9, 0.9)),
+            (2.0, mk_dec(0.1, 0.9)), // Sharp transition to music
+            (3.0, mk_dec(0.1, 0.9)),
+        ];
+        let segments = smooth_and_segment(&stream);
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].segment_type, SegmentType::Speech);
+        assert_eq!(segments[1].segment_type, SegmentType::Music);
+        // The crossing happens at t=2.0 (activation drops < 0.5)
+        assert_eq!(segments[0].end_sec, 2.0);
+        assert_eq!(segments[1].start_sec, 2.0);
+    }
+
+    #[test]
+    fn test_noisy_dip_no_false_boundary() {
+        // ACTUAL numbers from Flight 10/12 (speech clip, t=2s dip)
+        let stream = vec![
+            (0.0, mk_dec(0.970, 0.953)),
+            (1.0, mk_dec(0.832, 0.555)),
+            (2.0, mk_dec(0.567, 0.341)), // The noisy dip!
+            (3.0, mk_dec(0.605, 0.414)),
+            (4.0, mk_dec(0.578, 0.362)),
+            (5.0, mk_dec(0.939, 0.719)),
+        ];
+        let segments = smooth_and_segment(&stream);
+        // Should ignore the dip and stay Speech
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, SegmentType::Speech);
+    }
+
+    #[test]
+    fn test_asymmetric_attack_release() {
+        // Simulated IDM transition encoding the Flight 10/11 findings.
+        // Music Entering (Fast Attack):
+        let mut activation = 0.540; // The actual activation entering the blur zone in Flight 10
+        let mut speech_to_music_cross = None;
+        let attack_decisions = vec![
+            mk_dec(0.150, 0.250), // Window 1 of blur
+            mk_dec(0.150, 0.250), // Window 2 of blur
+            mk_dec(0.000, 1.000), // Pure music
+        ];
+        for (i, dec) in attack_decisions.iter().enumerate() {
+            let prev = activation;
+            activation += dec.confidence * (dec.leaning_score - activation);
+            if prev >= 0.5 && activation < 0.5 && speech_to_music_cross.is_none() {
+                speech_to_music_cross = Some(i);
+            }
+        }
+
+        // Music Leaving (Slow Release):
+        activation = 0.198; // The actual activation entering the blur zone in Flight 11
+        let mut music_to_speech_cross = None;
+        let release_decisions = vec![
+            mk_dec(0.626, 0.359), // Window 1 of blur (leaning Speech, but low conf!)
+            mk_dec(0.704, 0.422), // Window 2 of blur
+            mk_dec(0.970, 0.953), // Pure speech
+        ];
+        for (i, dec) in release_decisions.iter().enumerate() {
+            let prev = activation;
+            activation += dec.confidence * (dec.leaning_score - activation);
+            if prev < 0.5 && activation >= 0.5 && music_to_speech_cross.is_none() {
+                music_to_speech_cross = Some(i);
+            }
+        }
+
+        // Attack should cross earlier (index 0) than Release (index 1)
+        assert_eq!(speech_to_music_cross, Some(0)); // Crosses on the very first 0.150 window
+        assert_eq!(music_to_speech_cross, Some(1)); // Has to wait for the second window to cross!
     }
 }
