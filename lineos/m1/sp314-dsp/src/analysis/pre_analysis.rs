@@ -129,12 +129,7 @@ impl PreAnalyzer {
         let integrated_lufs = crate::metering::measure_integrated_lufs(left, right);
 
         // Interleave for stereo helpers
-        let stereo: Vec<f32> = left
-            .iter()
-            .zip(right.iter())
-            .flat_map(|(&l, &r)| [l, r])
-            .collect();
-        let global_phase_correlation = crate::analysis::stereo::stereo_correlation(&stereo);
+        let global_phase_correlation = crate::analysis::stereo::stereo_correlation(left, right);
         let stereo_width = (1.0_f32 - global_phase_correlation).clamp(0.0, 1.0);
 
         let mono: Vec<f32> = left

@@ -90,8 +90,8 @@ impl StemFeatureAnalyzer {
             integrated_lufs: measure_integrated_lufs(&mix_l, &mix_r),
             true_peak_dbtp: measure_true_peak_dbtp(&mix_l, &mix_r),
             loudness_range: measure_loudness_range(&mix_l, &mix_r, sample_rate),
-            stereo_correlation: stereo_correlation(&mix_stereo),
-            stereo_width: stereo_width(&mix_stereo),
+            stereo_correlation: stereo_correlation(&mix_l, &mix_r),
+            stereo_width: stereo_width(&mix_l, &mix_r),
             dynamic_range_db: dynamic_range_db(&mix_l, sample_rate),
             stem_energy_ratios: [
                 bass_ratio,
@@ -145,8 +145,8 @@ impl StemFeatureAnalyzer {
         let dyn_rng = dynamic_range_db(&l, sample_rate);
 
         // Stereo
-        let corr = stereo_correlation(stereo);
-        let width = stereo_width(stereo);
+        let corr = stereo_correlation(&l, &r);
+        let width = stereo_width(&l, &r);
 
         StemMetrics {
             spectral_centroid_hz: centroid,
@@ -202,12 +202,6 @@ impl StemFeatureAnalyzer {
             };
         }
 
-        // Interleave for stereo functions
-        let stereo: Vec<f32> = left
-            .iter()
-            .zip(right.iter())
-            .flat_map(|(&l, &r)| [l, r])
-            .collect();
 
         // Mix centroid: average of L and R centroids (S-008)
         let centroid = (spectral_centroid_hz(left, sample_rate)
@@ -224,8 +218,8 @@ impl StemFeatureAnalyzer {
         let dyn_range = dynamic_range_db(left, sample_rate);
 
         // Stereo metrics
-        let corr = stereo_correlation(&stereo);
-        let width = stereo_width(&stereo);
+        let corr = stereo_correlation(left, right);
+        let width = stereo_width(left, right);
 
         let mix = MixMetrics {
             integrated_lufs: lufs,
