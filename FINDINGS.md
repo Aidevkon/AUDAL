@@ -261,10 +261,11 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** compute_sbr_delta uses the SBR_LO/SBR_HI consts while the schema-v2 profile carries sbr_lo/sbr_hi. Not in the production path today (tests only).
 
 ### F-026 — Phase 8 streaming × corpus tool decode coupling
-- **Status:** PARKED
+- **Status:** RESOLVED
 - **Component:** m0-daemon (decode.rs, future measure_corpus bin, standardized_stream.rs)
 - **Trigger:** Phase 8 stage 3 (orchestration wire-up)
 - **Context:** the corpus bin deliberately uses decode_audio as the single decode+resample truth. When production migrates to StandardizedAudioStream, the bin migrates in the same commit window — otherwise measurement and mastering hear different signals. Second intersection: the Phase 8 stateful PreAnalyzer refactor touches the spectral_profile_levels contract test; the chunked==batch to_bits verification covers both. Upgraded 2026-07-08: a batch-vs-streaming decode equivalence test (same file at multiple sample rates incl. 44.1kHz, hash-compared) is a PREREQUISITE of the Phase 8 Stage-0 migration — bit-identical means the corpus stands; divergent means corpus version bump + re-measure with the same tool.
+  RESOLVED (verified 2026-07-10): batch-vs-streaming decode parity is guaranteed by StandardizedAudioStream's ring-buffer design (collects exactly 1024 frames before rubato, zero-pads only at EOF). Five byte-for-byte parity tests (SHA256+Blake3) cover resampled_44k, passthrough_48k, mono_44k, mono_48k, downsample_96k — all green. The prerequisite for M1 correct-feeding and the Pass 2 streaming engine is met; corpus stands, no version bump needed.
 
 ### F-027 — Cargo workspace profiles warning on every build
 - **Status:** PARKED (cosmetic)
