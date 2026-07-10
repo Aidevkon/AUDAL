@@ -238,7 +238,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ### F-022 — GenreClassifier implemented, wiring pending
 - **Status:** ACTIVE
-- **Component:** `lineos/m1/sp314-dsp/src/analysis/genre_classifier.rs`
+- **Component:** `lineos/m1/sp314-dsp/src/analysis/genre_classifier.rs` (NOTE: relocated to lineos-corpus/src/classifier.rs in Βήμα C, 2026-07-10)
 - **Trigger:** Όταν ξεκινήσει η ενσωμάτωση στο `pre_analysis.rs`.
 - **Context:** Ο αλγόριθμος (Z-Scored Euclidean) και τα thresholds (`MAX=4.0`, `DELTA=0.15`) έχουν υλοποιηθεί βάσει μετρήσεων στο καθαρό corpus, αλλά δεν καλούνται ακόμα στο runtime του m0-daemon pipeline.
 

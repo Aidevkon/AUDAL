@@ -1,6 +1,16 @@
-//! genre_classifier.rs
+//! classifier.rs
 //! Deterministic, Z-scored MFCC classification for Creator OS.
 //! Authority: MEA-001 (Measurement-First)
+//!
+//! Relocated from sp314-dsp (Βήμα C): the DSP crate measures,
+//! lineos-corpus owns interpretation. classify() is a pure,
+//! stateless fn(&[f32;13]) -> Option<Genre> — deliberately callable
+//! in a loop over windowed MFCC means, which is the foundation for
+//! future segment-aware routing (per-time-window genre → per-window
+//! reference profile → parameter automation, not topology change,
+//! per INV-AB-16). Lives beside MfccAnalyzer (mfcc.rs) and the
+//! measure_corpus tool that generated its centroids — model and
+//! inference in one place.
 
 use super::genre_centroids_generated::{
     ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, IDM_MFCC_MEAN,

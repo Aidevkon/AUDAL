@@ -20,7 +20,4 @@ pub mod morph_curve;
 pub use morph_curve::{CurveType, MorphCurve};
 pub mod album_conductor;
 pub use album_conductor::{AlbumConductor, TrackPlan};
-pub mod genre_classifier;
-pub use genre_classifier::GenreClassifier;
 pub use lineos_types::pre_analysis::Genre;
-pub mod genre_centroids_generated;

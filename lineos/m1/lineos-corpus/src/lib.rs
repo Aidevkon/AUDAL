@@ -24,3 +24,7 @@ pub use genre_centroid::{
     compute_bucket_centroid, compute_global_stats, format_f32_const, gate, CentroidError,
     GateCriteria, RejectReason, TrackGateInputs, GATE_V1_ACOUSTIC, GATE_V1_IDM,
 };
+
+pub mod classifier;
+pub mod genre_centroids_generated;
+pub use classifier::{GenreClassifier, MAX_DISTANCE_THRESHOLD, MIN_DISTANCE_DELTA};

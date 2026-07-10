@@ -196,7 +196,7 @@ impl PreAnalyzer {
             for i in 0..lineos_corpus::mfcc::N_MFCC {
                 mean[i] /= count;
             }
-            crate::analysis::GenreClassifier::classify(&mean)
+            lineos_corpus::classifier::GenreClassifier::classify(&mean)
         };
 
         PreAnalysisData {
