@@ -28,3 +28,4 @@ pub use genre_centroid::{
 pub mod classifier;
 pub mod genre_centroids_generated;
 pub use classifier::{GenreClassifier, MAX_DISTANCE_THRESHOLD, MIN_DISTANCE_DELTA};
+pub mod scout;

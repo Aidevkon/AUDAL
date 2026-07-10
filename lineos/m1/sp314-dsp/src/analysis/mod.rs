@@ -21,3 +21,4 @@ pub use morph_curve::{CurveType, MorphCurve};
 pub mod album_conductor;
 pub use album_conductor::{AlbumConductor, TrackPlan};
 pub use lineos_types::pre_analysis::Genre;
+pub mod scout;
