@@ -4,7 +4,8 @@ use sp314_dsp::analysis::scout_scanner::scan_file;
 use std::path::PathBuf;
 
 fn load_flight_clip_stereo(path: &str) -> (Vec<f32>, Vec<f32>, u32) {
-    let mut reader = hound::WavReader::open(path).unwrap_or_else(|_| panic!("failed to open clip at {}", path));
+    let mut reader =
+        hound::WavReader::open(path).unwrap_or_else(|_| panic!("failed to open clip at {}", path));
     let spec = reader.spec();
     let samples: Vec<i32> = reader.samples().map(|s| s.unwrap()).collect();
 
@@ -43,38 +44,55 @@ fn test_transition(
         .to_string();
 
     let (left, right, sample_rate) = load_flight_clip_stereo(&clip_path);
-    
+
     // Pass 1: Scan
     let decisions = scan_file(&left, &right, sample_rate);
-    
+
     // Pass 1: Segment
     let boundaries = smooth_and_segment(&decisions);
 
     println!("Timeline Map:");
     for (i, b) in boundaries.iter().enumerate() {
-        println!("  [{}] {:?} | {:.1}s -> {:.1}s | Avg Leaning: {:.3} | Avg Conf: {:.3}", 
-                 i, b.segment_type, b.start_sec, b.end_sec, b.avg_leaning, b.avg_confidence);
+        println!(
+            "  [{}] {:?} | {:.1}s -> {:.1}s | Avg Leaning: {:.3} | Avg Conf: {:.3}",
+            i, b.segment_type, b.start_sec, b.end_sec, b.avg_leaning, b.avg_confidence
+        );
     }
 
     // Assert exactly 2 segments (or close). If not 2, we fail loudly to investigate.
-    assert_eq!(boundaries.len(), 2, "Expected exactly 2 segments for {}", clip_name);
+    assert_eq!(
+        boundaries.len(),
+        2,
+        "Expected exactly 2 segments for {}",
+        clip_name
+    );
 
     // Segment 1 sanity
     let s1 = &boundaries[0];
     assert_eq!(s1.segment_type, expected_type_1);
     assert_eq!(s1.start_sec, 0.0);
-    assert!(s1.avg_confidence > 0.5, "Segment 1 confidence too low: {}", s1.avg_confidence);
+    assert!(
+        s1.avg_confidence > 0.5,
+        "Segment 1 confidence too low: {}",
+        s1.avg_confidence
+    );
 
     // Segment 2 sanity
     let s2 = &boundaries[1];
     assert_eq!(s2.segment_type, expected_type_2);
-    assert!(s2.avg_confidence > 0.5, "Segment 2 confidence too low: {}", s2.avg_confidence);
+    assert!(
+        s2.avg_confidence > 0.5,
+        "Segment 2 confidence too low: {}",
+        s2.avg_confidence
+    );
 
     // Boundary lands near expected time (± 3 seconds to account for 5s window and acoustic blur)
     let boundary_time = s1.end_sec; // Or s2.start_sec
     assert!(
-        (boundary_time - expected_boundary_sec).abs() < 3.5, 
-        "Boundary {:.1}s is too far from expected {:.1}s", boundary_time, expected_boundary_sec
+        (boundary_time - expected_boundary_sec).abs() < 3.5,
+        "Boundary {:.1}s is too far from expected {:.1}s",
+        boundary_time,
+        expected_boundary_sec
     );
 }
 
@@ -112,6 +130,6 @@ fn test_pass1_end_to_end() {
         SegmentType::Speech,
         18.0,
     );
-    
+
     println!("\nAll 4 integration clips passed. Pass 1 Pipeline is solid.");
 }

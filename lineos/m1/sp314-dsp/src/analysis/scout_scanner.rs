@@ -12,13 +12,9 @@ const HOP_SECS: f32 = 1.0;
 /// the stereo mix. Tomorrow, it could be an isolated stem (via A7 routing).
 /// The scanner makes no assumptions about the content, only that it is a
 /// coherent signal to be diagnosed.
-pub fn scan_file(
-    left: &[f32],
-    right: &[f32],
-    sample_rate: u32,
-) -> Vec<(f32, ScoutDecision)> {
+pub fn scan_file(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<(f32, ScoutDecision)> {
     let mut decisions = Vec::new();
-    
+
     // Safety check
     if left.is_empty() || right.is_empty() || left.len() != right.len() {
         return decisions;
@@ -105,34 +101,48 @@ mod tests {
             .to_string();
 
         let (_mono, left, right, sample_rate) = load_flight_clip_stereo(&clip_path);
-        
+
         let decisions = scan_file(&left, &right, sample_rate);
-        
-        // Duration is ~35 seconds. 
+
+        // Duration is ~35 seconds.
         // 35 - 5 (window) = 30 seconds of slidable area at 1s hops = ~31 windows.
         assert!(!decisions.is_empty(), "Scanner returned empty decisions");
         println!("Number of windows: {}", decisions.len());
 
         let mut prev_time = -1.0;
         for (i, &(t, ref decision)) in decisions.iter().enumerate() {
-            println!("Time {:05.1}s | Leaning: {:.3} | Conf: {:.3}", t, decision.leaning_score, decision.confidence);
+            println!(
+                "Time {:05.1}s | Leaning: {:.3} | Conf: {:.3}",
+                t, decision.leaning_score, decision.confidence
+            );
             // Check monotonicity and hop spacing
             if i > 0 {
-                assert!((t - prev_time - HOP_SECS).abs() < 0.001, "Timestamps not spaced by HOP_SECS");
+                assert!(
+                    (t - prev_time - HOP_SECS).abs() < 0.001,
+                    "Timestamps not spaced by HOP_SECS"
+                );
             }
             prev_time = t;
-            
+
             // Basic leaning checks
             // Speech region is ~0s to 17s. We check windows that end before 16s.
             if t + WINDOW_SECS < 16.0 {
-                assert!(decision.leaning_score > 0.5, "Speech region leaning too low at {:.1}s", t);
+                assert!(
+                    decision.leaning_score > 0.5,
+                    "Speech region leaning too low at {:.1}s",
+                    t
+                );
             }
             // IDM region is ~17s to 35s. We check windows that start after 18s.
             if t > 18.0 {
-                assert!(decision.leaning_score < 0.3, "Music region leaning too high at {:.1}s", t);
+                assert!(
+                    decision.leaning_score < 0.3,
+                    "Music region leaning too high at {:.1}s",
+                    t
+                );
             }
         }
-        
+
         println!("Sanity test passed. Verified monotonic timestamps and region leanings.");
     }
 }

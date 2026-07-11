@@ -102,16 +102,20 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
     }
 
     let mut segments = Vec::new();
-    
+
     // Initial activation: we start at the first decision's raw leaning score.
     // Why? If a file starts purely with speech, we don't want to start at 0.5
     // and artificially ramp up, which could delay the "Speech" classification
     // if the confidence drops early. We snap to the actual initial state.
     let mut activation = decisions[0].1.leaning_score;
-    let mut current_type = if activation >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
-    
+    let mut current_type = if activation >= 0.5 {
+        SegmentType::Speech
+    } else {
+        SegmentType::Music
+    };
+
     let mut current_start = decisions[0].0;
-    
+
     // Accumulators for averages
     let mut sum_leaning = 0.0;
     let mut sum_confidence = 0.0;
@@ -120,7 +124,7 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
     for &(t, ref dec) in decisions {
         let prev_activation = activation;
         activation += dec.confidence * (dec.leaning_score - activation);
-        
+
         // We accumulate before the split check so the window that causes the crossing
         // is included in the previous segment? Wait. The window that pushes it over
         // the edge technically belongs to the *new* state. Let's accumulate it into
@@ -136,7 +140,7 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
             // Emit previous segment
             let avg_leaning = sum_leaning / window_count as f32;
             let avg_confidence = sum_confidence / window_count as f32;
-            
+
             segments.push(SegmentBoundary {
                 start_sec: current_start,
                 end_sec: t, // The crossing time is the boundary
@@ -146,9 +150,13 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
             });
 
             // Reset for new segment
-            current_type = if crossed_to_speech { SegmentType::Speech } else { SegmentType::Music };
+            current_type = if crossed_to_speech {
+                SegmentType::Speech
+            } else {
+                SegmentType::Music
+            };
             current_start = t;
-            
+
             // Start the new segment clean
             sum_leaning = 0.0;
             sum_confidence = 0.0;
@@ -172,6 +180,36 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
     }
 
     segments
+}
+
+// PROVISIONAL — dead-zone bounds + escalation trigger. Awaiting M2
+// corpus calibration (measured confidence distributions across
+// real content) to set the real threshold. REPLACE ON THE FLY:
+// search "A7_PROVISIONAL" to find every value that needs updating
+// once M2 data exists.
+const A7_PROVISIONAL_DEAD_ZONE_LOW: f32 = 0.3;
+const A7_PROVISIONAL_DEAD_ZONE_HIGH: f32 = 0.7;
+const A7_PROVISIONAL_MIN_CONFIDENCE: f32 = 0.4; // below this, flag
+
+pub fn needs_stem_escalation(boundary: &SegmentBoundary) -> bool {
+    // A segment needs escalation if its leaning sits in the
+    // ambiguous dead zone AND its confidence is low — i.e. the
+    // mix-level Scout genuinely couldn't decide, not just noise
+    // that smoothing already resolved.
+    let in_dead_zone = boundary.avg_leaning > A7_PROVISIONAL_DEAD_ZONE_LOW
+        && boundary.avg_leaning < A7_PROVISIONAL_DEAD_ZONE_HIGH;
+    let low_confidence = boundary.avg_confidence < A7_PROVISIONAL_MIN_CONFIDENCE;
+    in_dead_zone && low_confidence
+}
+
+pub fn flag_escalation_candidates(boundaries: &[SegmentBoundary]) -> Vec<usize> {
+    // returns INDICES into the boundaries slice that need escalation
+    boundaries
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| needs_stem_escalation(b))
+        .map(|(i, _)| i)
+        .collect()
 }
 
 #[cfg(test)]
@@ -390,5 +428,60 @@ mod tests {
         // Attack should cross earlier (index 0) than Release (index 1)
         assert_eq!(speech_to_music_cross, Some(0)); // Crosses on the very first 0.150 window
         assert_eq!(music_to_speech_cross, Some(1)); // Has to wait for the second window to cross!
+    }
+
+    // --- Part C: Escalation Detection tests ---
+
+    fn mk_boundary(avg_leaning: f32, avg_confidence: f32) -> SegmentBoundary {
+        SegmentBoundary {
+            start_sec: 0.0,
+            end_sec: 1.0,
+            segment_type: if avg_leaning >= 0.5 {
+                SegmentType::Speech
+            } else {
+                SegmentType::Music
+            },
+            avg_leaning,
+            avg_confidence,
+        }
+    }
+
+    #[test]
+    fn test_confident_speech_no_escalation() {
+        let b = mk_boundary(0.95, 0.85);
+        assert!(!needs_stem_escalation(&b));
+    }
+
+    #[test]
+    fn test_confident_music_no_escalation() {
+        let b = mk_boundary(0.05, 0.80);
+        assert!(!needs_stem_escalation(&b));
+    }
+
+    #[test]
+    fn test_ambiguous_low_confidence_escalates() {
+        let b = mk_boundary(0.55, 0.35); // in dead zone (0.3-0.7) and conf < 0.4
+        assert!(needs_stem_escalation(&b));
+    }
+
+    #[test]
+    fn test_moderate_confidence_edge_speech_segment() {
+        // ACTUAL numbers from Pass-1 integration test (clip_transition_st.wav):
+        // Speech | 0.0s -> 15.0s | Avg Leaning: 0.716 | Avg Conf: 0.526
+        let b = mk_boundary(0.716, 0.526);
+        let escalation = needs_stem_escalation(&b);
+        assert!(!escalation, "Real speech segment shouldn't escalate! It survived because leaning 0.716 > 0.7 AND conf 0.526 > 0.4");
+    }
+
+    #[test]
+    fn test_flag_escalation_candidates_returns_correct_indices() {
+        let boundaries = vec![
+            mk_boundary(0.9, 0.9), // [0] Safe Speech
+            mk_boundary(0.6, 0.2), // [1] Escalate! (dead zone, low conf)
+            mk_boundary(0.1, 0.9), // [2] Safe Music
+            mk_boundary(0.4, 0.3), // [3] Escalate! (dead zone, low conf)
+        ];
+        let flags = flag_escalation_candidates(&boundaries);
+        assert_eq!(flags, vec![1, 3]);
     }
 }
