@@ -8,6 +8,7 @@ pub mod autotune;
 pub mod beat_detector;
 pub mod lazy_reader;
 pub mod maestro;
+pub mod pass1_pipeline;
 pub mod signal_health;
 pub mod sparse_scout;
 pub mod standardized_stream;

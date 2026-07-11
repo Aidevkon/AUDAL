@@ -8004,6 +8004,7 @@ name = "sp314-nodes"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "lineos-corpus",
  "serde",
  "serde_json",
  "sp314-dsp",
