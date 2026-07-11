@@ -202,7 +202,6 @@ impl StemFeatureAnalyzer {
             };
         }
 
-
         // Mix centroid: average of L and R centroids (S-008)
         let centroid = (spectral_centroid_hz(left, sample_rate)
             + spectral_centroid_hz(right, sample_rate))
