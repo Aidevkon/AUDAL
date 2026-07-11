@@ -36,6 +36,9 @@ impl ParameterGlider {
     /// Set a new target value. Starts gliding immediately.
     /// Called from set_node_parameter() — between blocks, never per-sample.
     pub fn set_target(&mut self, target: f32) {
+        if (target - self.target).abs() < 1e-6 {
+            return; // already gliding to this target — don't reset the clock
+        }
         if (target - self.current).abs() < 1e-6 {
             self.current = target;
             self.target = target;
@@ -94,5 +97,39 @@ impl ParameterGlider {
         self.current = self.target;
         self.samples_left = 0;
         self.step = 0.0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_repeated_set_target_does_not_reset_glide_clock() {
+        // Regression test for the Zeno's-Paradox bug found 2026-07-10:
+        // calling set_target() repeatedly with the SAME target every
+        // block was resetting the glide clock each time, turning a
+        // linear ramp into an asymptotic curve that never reached target.
+        let sample_rate = 48000.0;
+        let glide_ms = 300.0;
+        let mut glider = ParameterGlider::new(1.0, glide_ms, sample_rate);
+
+        glider.set_target(0.501);
+
+        // Simulate the buggy pattern: call set_target with the SAME value
+        // on every "block" for the full glide duration.
+        let glide_samples = (glide_ms / 1000.0 * sample_rate) as usize;
+        for _ in 0..glide_samples {
+            glider.set_target(0.501); // same target, called every sample/block
+            glider.next();
+        }
+
+        // After the full glide duration, current MUST have reached target
+        // exactly, despite the repeated same-target calls.
+        assert!(
+            (glider.value() - 0.501).abs() < 1e-4,
+            "glide should reach target even with repeated same-target calls, got {}",
+            glider.value()
+        );
     }
 }

@@ -212,6 +212,28 @@ pub fn flag_escalation_candidates(boundaries: &[SegmentBoundary]) -> Vec<usize> 
         .collect()
 }
 
+#[derive(Clone, Debug)]
+pub struct TimelineRouter {
+    boundaries: Vec<SegmentBoundary>,
+}
+
+impl TimelineRouter {
+    pub fn new(boundaries: Vec<SegmentBoundary>) -> Self {
+        Self { boundaries }
+    }
+
+    pub fn get_segment_type_at(&self, timestamp_sec: f32) -> Option<SegmentType> {
+        // Linear scan: Timeline Maps are extremely small (dozens of segments per file)
+        // so O(N) is practically instantaneous and cache-friendly compared to binary search overhead.
+        for b in &self.boundaries {
+            if timestamp_sec >= b.start_sec && timestamp_sec < b.end_sec {
+                return Some(b.segment_type);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

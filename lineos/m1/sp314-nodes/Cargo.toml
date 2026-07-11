@@ -11,3 +11,4 @@ serde_json  = "1.0"
 sp314-dsp   = { path = "../sp314-dsp" }
 
 [dev-dependencies]
+lineos-corpus = { path = "../lineos-corpus" }
