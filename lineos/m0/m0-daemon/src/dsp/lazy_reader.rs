@@ -266,6 +266,54 @@ impl LazyAudioReader {
         }
         Ok(written / self.channels)
     }
+
+    /// Allocates and reads exactly `frames_req` frames from the current
+    /// reader position, returning (left, right) vectors.
+    /// Handles channel downmixing (mono -> dual mono) automatically.
+    pub fn read_exact_frames_alloc(&mut self, frames_req: u64) -> Result<(Vec<f32>, Vec<f32>)> {
+        let channels = self.channels();
+        if channels == 0 {
+            return Err(LazyReaderError::NoSupportedTrack);
+        }
+
+        let frames_to_read = frames_req as usize;
+        let mut interleaved = vec![0.0_f32; frames_to_read * channels];
+        let mut total_written = 0usize;
+
+        // Scratch buffer sized as a multiple of channels (critical for fill_buffer contract)
+        let mut buf = vec![0.0_f32; 4096 * channels];
+
+        while total_written < frames_to_read {
+            let got_frames = self.fill_buffer(&mut buf)?;
+            if got_frames == 0 {
+                break;
+            }
+            let remaining = frames_to_read - total_written;
+            let take = got_frames.min(remaining);
+
+            let src_end = take * channels;
+            let dst_start = total_written * channels;
+            interleaved[dst_start..dst_start + src_end].copy_from_slice(&buf[..src_end]);
+
+            total_written += take;
+        }
+
+        interleaved.truncate(total_written * channels);
+
+        let left: Vec<f32> = interleaved.iter().step_by(channels).copied().collect();
+        let right: Vec<f32> = if channels >= 2 {
+            interleaved
+                .iter()
+                .skip(1)
+                .step_by(channels)
+                .copied()
+                .collect()
+        } else {
+            left.clone()
+        };
+
+        Ok((left, right))
+    }
 }
 
 /// Reads a representative ~30s sample from
