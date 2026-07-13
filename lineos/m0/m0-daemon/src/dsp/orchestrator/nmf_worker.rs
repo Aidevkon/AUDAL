@@ -86,7 +86,7 @@ pub fn spawn(
 pub fn dispatch_all_jobs(
     boundaries: &[lineos_corpus::scout::SegmentBoundary],
     tx: &std::sync::mpsc::Sender<NmfJob>,
-) -> usize {
+) -> (usize, Vec<usize>) {
     let flagged = lineos_corpus::scout::flag_escalation_candidates(boundaries);
     let mut sent = 0;
     for &idx in &flagged {
@@ -107,7 +107,7 @@ pub fn dispatch_all_jobs(
             ),
         }
     }
-    sent // return count actually dispatched, for logging/verification
+    (sent, flagged) // return count and indices for logging/verification and reuse
 }
 
 #[cfg(test)]
@@ -221,9 +221,10 @@ mod tests {
         ];
 
         let (tx, rx) = std::sync::mpsc::channel();
-        let sent = dispatch_all_jobs(&boundaries, &tx);
+        let (sent, flagged) = dispatch_all_jobs(&boundaries, &tx);
 
         assert_eq!(sent, 2, "Should have dispatched exactly 2 hybrid segments");
+        assert_eq!(flagged, vec![1, 3], "Flagged indices should be 1 and 3");
 
         let job1 = rx.recv().unwrap();
         assert_eq!(job1.segment_id, 1);

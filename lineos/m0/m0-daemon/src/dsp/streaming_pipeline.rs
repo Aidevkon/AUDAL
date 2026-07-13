@@ -174,104 +174,135 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut graph = DspGraph::from_topology(topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
     let mut writer = StreamingWavWriter::new(output_path, sample_rate)?;
-    let router = TimelineRouter::new(boundaries);
+    let router = TimelineRouter::new(boundaries.clone());
+
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+        input_path.to_string(),
+        sample_rate,
+        rx_job,
+        tx_res,
+    );
+    let (_, flagged_indices) =
+        crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+    let flagged_hybrid_indices: std::collections::HashSet<usize> =
+        flagged_indices.into_iter().collect();
+
+    let mut jit_cache: std::collections::HashMap<usize, sp314_dsp::stft::stem_renderer::FiveStems> =
+        std::collections::HashMap::new();
+    let mut failed_segments: std::collections::HashSet<usize> = std::collections::HashSet::new();
 
     let mut acc_left: Vec<f32> = Vec::with_capacity(block_size * 2);
     let mut acc_right: Vec<f32> = Vec::with_capacity(block_size * 2);
 
     let mut total_frames_processed: usize = 0;
     let mut last_type: Option<SegmentType> = None;
+    let mut last_idx: Option<usize> = None;
 
     let (_, _) = decode_streaming(input_path, |chunk| -> Result<(), Box<dyn Error>> {
-        match chunk {
-            DecodeChunk::Samples(interleaved) => {
-                for frame in interleaved.chunks_exact(2) {
-                    acc_left.push(frame[0]);
-                    acc_right.push(frame[1]);
-                }
-                while acc_left.len() >= block_size {
-                    let mut bl: Vec<f32> = acc_left.drain(..block_size).collect();
-                    let mut br: Vec<f32> = acc_right.drain(..block_size).collect();
+        let is_eof = matches!(chunk, DecodeChunk::EndOfStream);
+        if let DecodeChunk::Samples(interleaved) = chunk {
+            for frame in interleaved.chunks_exact(2) {
+                acc_left.push(frame[0]);
+                acc_right.push(frame[1]);
+            }
+        }
 
-                    let block_time_sec = total_frames_processed as f32 / sample_rate as f32;
-                    if let Some(seg_type) = router.get_segment_type_at(block_time_sec) {
-                        if Some(seg_type) != last_type {
-                            match seg_type {
-                                SegmentType::Speech => {
-                                    graph
-                                        .set_node_parameter(ducking_node_id, "gain", speech_gain)
-                                        .map_err(|e| {
-                                            Box::<dyn Error>::from(format!(
-                                                "ducking_node_id '{}' invalid: {:?}",
-                                                ducking_node_id, e
-                                            ))
-                                        })?;
+        loop {
+            let (mut bl, mut br, valid_frames) = if acc_left.len() >= block_size {
+                let bl: Vec<f32> = acc_left.drain(..block_size).collect();
+                let br: Vec<f32> = acc_right.drain(..block_size).collect();
+                (bl, br, block_size)
+            } else if is_eof && !acc_left.is_empty() {
+                let valid = acc_left.len();
+                let mut bl = acc_left.clone();
+                let mut br = acc_right.clone();
+                bl.resize(block_size, 0.0);
+                br.resize(block_size, 0.0);
+                acc_left.clear();
+                acc_right.clear();
+                (bl, br, valid)
+            } else {
+                break;
+            };
+
+            let block_time_sec = total_frames_processed as f32 / sample_rate as f32;
+            if let Some((seg_idx, seg_type)) = router.get_segment_at(block_time_sec) {
+                if let Some(old_idx) = last_idx {
+                    if old_idx != seg_idx {
+                        jit_cache.remove(&old_idx);
+                    }
+                }
+
+                if Some(seg_type) != last_type {
+                    match seg_type {
+                        SegmentType::Speech => {
+                            graph
+                                .set_node_parameter(ducking_node_id, "gain", speech_gain)
+                                .map_err(|e| {
+                                    Box::<dyn Error>::from(format!(
+                                        "ducking_node_id '{}' invalid: {:?}",
+                                        ducking_node_id, e
+                                    ))
+                                })?;
+                        }
+                        SegmentType::Music => {
+                            graph
+                                .set_node_parameter(ducking_node_id, "gain", music_gain)
+                                .map_err(|e| {
+                                    Box::<dyn Error>::from(format!(
+                                        "ducking_node_id '{}' invalid: {:?}",
+                                        ducking_node_id, e
+                                    ))
+                                })?;
+                        }
+                    }
+                    last_type = Some(seg_type);
+                }
+
+                if flagged_hybrid_indices.contains(&seg_idx) {
+                    if !jit_cache.contains_key(&seg_idx) && !failed_segments.contains(&seg_idx) {
+                        loop {
+                            match rx_res.recv_timeout(std::time::Duration::from_secs(10)) {
+                                Ok(result) => {
+                                    let id = result.segment_id;
+                                    jit_cache.insert(id, result.stems);
+                                    if id == seg_idx {
+                                        break;
+                                    }
                                 }
-                                SegmentType::Music => {
-                                    graph
-                                        .set_node_parameter(ducking_node_id, "gain", music_gain)
-                                        .map_err(|e| {
-                                            Box::<dyn Error>::from(format!(
-                                                "ducking_node_id '{}' invalid: {:?}",
-                                                ducking_node_id, e
-                                            ))
-                                        })?;
+                                Err(_e) => {
+                                    eprintln!("segment {} stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment", seg_idx);
+                                    failed_segments.insert(seg_idx);
+                                    break;
                                 }
                             }
-                            last_type = Some(seg_type);
                         }
                     }
 
-                    graph.process_block(&mut bl, &mut br);
-                    writer.write_chunk(&bl, &br)?;
-                    total_frames_processed += block_size;
-                }
-            }
-            DecodeChunk::EndOfStream => {
-                if !acc_left.is_empty() {
-                    let remaining = acc_left.len();
-                    let mut bl = acc_left.clone();
-                    let mut br = acc_right.clone();
-                    bl.resize(block_size, 0.0);
-                    br.resize(block_size, 0.0);
+                    if let Some(stems) = jit_cache.get(&seg_idx) {
+                        let segment_start_sec = boundaries[seg_idx].start_sec;
+                        let local_offset_sec = (block_time_sec - segment_start_sec).max(0.0);
+                        let local_start_frame = (local_offset_sec * sample_rate as f32) as usize;
+                        let local_end_frame = (local_start_frame + block_size).min(stems.voice.len());
 
-                    let block_time_sec = total_frames_processed as f32 / sample_rate as f32;
-                    if let Some(seg_type) = router.get_segment_type_at(block_time_sec) {
-                        if Some(seg_type) != last_type {
-                            match seg_type {
-                                SegmentType::Speech => {
-                                    graph
-                                        .set_node_parameter(ducking_node_id, "gain", speech_gain)
-                                        .map_err(|e| {
-                                            Box::<dyn Error>::from(format!(
-                                                "ducking_node_id '{}' invalid: {:?}",
-                                                ducking_node_id, e
-                                            ))
-                                        })?;
-                                }
-                                SegmentType::Music => {
-                                    graph
-                                        .set_node_parameter(ducking_node_id, "gain", music_gain)
-                                        .map_err(|e| {
-                                            Box::<dyn Error>::from(format!(
-                                                "ducking_node_id '{}' invalid: {:?}",
-                                                ducking_node_id, e
-                                            ))
-                                        })?;
-                                }
-                            }
-                            last_type = Some(seg_type);
+                        let _available_stem_frames = local_end_frame.saturating_sub(local_start_frame);
+                        // available_stem_frames: not yet consumed — this value is what the future dual-graph stem-mixing step (Wave 3) must use instead of a blind 0..block_size range, to avoid an out-of-bounds panic on a file's final partial block.
+
+                        if Some(seg_idx) != last_idx {
+                            println!("using local frames {}..{} of segment {} (voice.len={}, drums.len={})", 
+                                local_start_frame, local_end_frame, seg_idx, stems.voice.len(), stems.drums.len());
                         }
                     }
-
-                    graph.process_block(&mut bl, &mut br);
-                    writer.write_chunk(&bl[..remaining], &br[..remaining])?;
-                    total_frames_processed += remaining;
-
-                    acc_left.clear();
-                    acc_right.clear();
                 }
+
+                last_idx = Some(seg_idx);
             }
+
+            graph.process_block(&mut bl, &mut br);
+            writer.write_chunk(&bl[..valid_frames], &br[..valid_frames])?;
+            total_frames_processed += valid_frames;
         }
         Ok(())
     })
@@ -511,6 +542,67 @@ mod tests {
             "Music should be ducked by ~6dB (got {:.2} dB delta)",
             music_delta
         );
+
+        std::fs::remove_file(output_path).ok();
+    }
+
+    #[test]
+    fn test_streaming_pipeline_jit_orchestration() {
+        use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+        let topology_json = json!({
+            "topology_id": "jit_test",
+            "nodes": [
+                { "node_id": "in", "node_type": "Input", "parameters": {} },
+                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
+                { "node_id": "out", "node_type": "Output", "parameters": {} }
+            ],
+            "edges": [
+                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
+                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
+            ]
+        }).to_string();
+        let topology = DspTopology::from_json(&topology_json).unwrap();
+
+        let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+        let output_path = "/tmp/test_streaming_jit_output.wav";
+
+        // Synthetic boundaries with a guaranteed Hybrid candidate in the middle
+        let boundaries = vec![
+            SegmentBoundary {
+                start_sec: 0.0,
+                end_sec: 1.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.9,
+                avg_confidence: 0.8,
+            },
+            SegmentBoundary {
+                start_sec: 1.0,
+                end_sec: 2.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.5,
+                avg_confidence: 0.2,
+            }, // Hybrid
+            SegmentBoundary {
+                start_sec: 2.0,
+                end_sec: 60.0,
+                segment_type: SegmentType::Music,
+                avg_leaning: 0.1,
+                avg_confidence: 0.8,
+            },
+        ];
+
+        run_streaming_pipeline_with_timeline(
+            input_path,
+            output_path,
+            &topology,
+            1024,
+            48000,
+            boundaries,
+            "duck_gain",
+            1.0,
+            0.501,
+        )
+        .unwrap();
 
         std::fs::remove_file(output_path).ok();
     }

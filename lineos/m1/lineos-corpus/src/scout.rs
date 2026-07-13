@@ -232,6 +232,15 @@ impl TimelineRouter {
         }
         None
     }
+
+    pub fn get_segment_at(&self, timestamp_sec: f32) -> Option<(usize, SegmentType)> {
+        for (idx, b) in self.boundaries.iter().enumerate() {
+            if timestamp_sec >= b.start_sec && timestamp_sec < b.end_sec {
+                return Some((idx, b.segment_type));
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
