@@ -29,7 +29,8 @@ pub fn spawn(
         // ONCE here, not per hybrid segment.
         let mut renderer = sp314_dsp::stft::stem_renderer::FiveStemRenderer::new();
 
-        for job in rx {  // blocks until a job arrives, exits when sender drops
+        for job in rx {
+            // blocks until a job arrives, exits when sender drops
             // Own shadow reader per worker (doesn't touch main thread's reader)
             let mut shadow_reader = match LazyAudioReader::open(Path::new(&file_path)) {
                 Ok(r) => r,
@@ -41,7 +42,10 @@ pub fn spawn(
 
             let start_frame = (job.start_sec * sample_rate as f32) as u64;
             if let Err(e) = shadow_reader.seek_exact_frame(start_frame) {
-                eprintln!("NMF worker: seek failed for segment {}: {:?}", job.segment_id, e);
+                eprintln!(
+                    "NMF worker: seek failed for segment {}: {:?}",
+                    job.segment_id, e
+                );
                 continue;
             }
 
@@ -49,18 +53,30 @@ pub fn spawn(
             let (left, right) = match shadow_reader.read_exact_frames_alloc(frames_needed) {
                 Ok(lr) => lr,
                 Err(e) => {
-                    eprintln!("NMF worker: read failed for segment {}: {:?}", job.segment_id, e);
+                    eprintln!(
+                        "NMF worker: read failed for segment {}: {:?}",
+                        job.segment_id, e
+                    );
                     continue;
                 }
             };
 
             // mono downmix for the renderer
-            let mono: Vec<f32> = left.iter().zip(right.iter())
-                .map(|(l, r)| (l + r) * 0.5).collect();
+            let mono: Vec<f32> = left
+                .iter()
+                .zip(right.iter())
+                .map(|(l, r)| (l + r) * 0.5)
+                .collect();
 
             let stems = renderer.render(&mono);
 
-            if tx.send(NmfResult { segment_id: job.segment_id, stems }).is_err() {
+            if tx
+                .send(NmfResult {
+                    segment_id: job.segment_id,
+                    stems,
+                })
+                .is_err()
+            {
                 break; // main thread dropped its receiver, shut down
             }
         }
@@ -76,11 +92,18 @@ mod tests {
     fn nmf_job_result_are_channel_safe() {
         let (tx_job, rx_job) = std::sync::mpsc::channel::<NmfJob>();
         let (tx_res, rx_res) = std::sync::mpsc::channel::<NmfResult>();
-        tx_job.send(NmfJob { segment_id: 0, start_sec: 0.0, duration_sec: 5.0 }).unwrap();
+        tx_job
+            .send(NmfJob {
+                segment_id: 0,
+                start_sec: 0.0,
+                duration_sec: 5.0,
+            })
+            .unwrap();
         let job = rx_job.recv().unwrap();
         assert_eq!(job.segment_id, 0);
         // (just prove it compiles and round-trips; don't need real FiveStems data)
-        drop(tx_res); drop(rx_res); // exercise the types exist and channel-construct fine
+        drop(tx_res);
+        drop(rx_res); // exercise the types exist and channel-construct fine
     }
 
     #[test]
@@ -89,7 +112,8 @@ mod tests {
         let file_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav"
-        ).to_string();
+        )
+        .to_string();
 
         let (tx_job, rx_job) = std::sync::mpsc::channel::<NmfJob>();
         let (tx_res, rx_res) = std::sync::mpsc::channel::<NmfResult>();
@@ -104,7 +128,9 @@ mod tests {
         tx_job.send(job).unwrap();
 
         let start = std::time::Instant::now();
-        let result = rx_res.recv_timeout(Duration::from_secs(15)).expect("Worker should return result within 15s");
+        let result = rx_res
+            .recv_timeout(Duration::from_secs(15))
+            .expect("Worker should return result within 15s");
         let elapsed = start.elapsed();
 
         assert_eq!(result.segment_id, 42);
