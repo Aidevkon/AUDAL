@@ -83,6 +83,33 @@ pub fn spawn(
     })
 }
 
+pub fn dispatch_all_jobs(
+    boundaries: &[lineos_corpus::scout::SegmentBoundary],
+    tx: &std::sync::mpsc::Sender<NmfJob>,
+) -> usize {
+    let flagged = lineos_corpus::scout::flag_escalation_candidates(boundaries);
+    let mut sent = 0;
+    for &idx in &flagged {
+        let b = &boundaries[idx];
+        let duration = b.end_sec - b.start_sec;
+        // send() can fail if the receiver was dropped (worker crashed
+        // or shut down early) — don't panic the whole pipeline over
+        // one failed dispatch, log and continue
+        match tx.send(NmfJob {
+            segment_id: idx,
+            start_sec: b.start_sec,
+            duration_sec: duration,
+        }) {
+            Ok(()) => sent += 1,
+            Err(e) => eprintln!(
+                "dispatch_all_jobs: failed to send job for segment {}: {:?}",
+                idx, e
+            ),
+        }
+    }
+    sent // return count actually dispatched, for logging/verification
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,5 +170,72 @@ mod tests {
 
         drop(tx_job);
         handle.join().expect("Thread should join cleanly");
+    }
+
+    #[test]
+    fn test_dispatch_all_jobs_upfront() {
+        use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+
+        // Create a synthetic timeline
+        let boundaries = vec![
+            // 0: Speech, high confidence -> skip
+            SegmentBoundary {
+                start_sec: 0.0,
+                end_sec: 10.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.9,
+                avg_confidence: 0.8,
+            },
+            // 1: Hybrid candidate! leaning in dead zone (0.3-0.7) and confidence < 0.4
+            SegmentBoundary {
+                start_sec: 10.0,
+                end_sec: 20.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.5,
+                avg_confidence: 0.2,
+            },
+            // 2: Music, high confidence -> skip
+            SegmentBoundary {
+                start_sec: 20.0,
+                end_sec: 30.0,
+                segment_type: SegmentType::Music,
+                avg_leaning: 0.1,
+                avg_confidence: 0.8,
+            },
+            // 3: Hybrid candidate!
+            SegmentBoundary {
+                start_sec: 30.0,
+                end_sec: 35.5,
+                segment_type: SegmentType::Music,
+                avg_leaning: 0.6,
+                avg_confidence: 0.3,
+            },
+            // 4: Speech, high confidence -> skip
+            SegmentBoundary {
+                start_sec: 35.5,
+                end_sec: 50.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.85,
+                avg_confidence: 0.7,
+            },
+        ];
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let sent = dispatch_all_jobs(&boundaries, &tx);
+
+        assert_eq!(sent, 2, "Should have dispatched exactly 2 hybrid segments");
+
+        let job1 = rx.recv().unwrap();
+        assert_eq!(job1.segment_id, 1);
+        assert_eq!(job1.start_sec, 10.0);
+        assert_eq!(job1.duration_sec, 10.0);
+
+        let job2 = rx.recv().unwrap();
+        assert_eq!(job2.segment_id, 3);
+        assert_eq!(job2.start_sec, 30.0);
+        assert_eq!(job2.duration_sec, 5.5);
+
+        // the channel should be empty now
+        assert!(rx.try_recv().is_err());
     }
 }
