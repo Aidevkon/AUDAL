@@ -213,11 +213,13 @@ pub fn run_streaming_pipeline_with_timeline(
         "nodes": [
             { "node_id": "in", "node_type": "Input", "parameters": {} },
             { "node_id": "vca_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 10.0 } },
+            { "node_id": "widener", "node_type": "Width", "parameters": { "decorrelation": 0.0, "side_gain_db": 0.0, "mono_comp_shelf_db": 0.0 } },
             { "node_id": "out", "node_type": "Output", "parameters": {} }
         ],
         "edges": [
             { "source": "in", "target": "vca_gain", "modulation_type": "audio" },
-            { "source": "vca_gain", "target": "out", "modulation_type": "audio" }
+            { "source": "vca_gain", "target": "widener", "modulation_type": "audio" },
+            { "source": "widener", "target": "out", "modulation_type": "audio" }
         ]
     });
 
@@ -385,13 +387,12 @@ pub fn run_streaming_pipeline_with_timeline(
                         m_bl.resize(block_size, 0.0);
                         let mut m_br = m_bl.clone();
 
-                        let v_rms_pre = (v_bl.iter().map(|&x| x*x).sum::<f32>() / block_size as f32).sqrt();
+
 
                         vocal_graph.process_block(&mut v_bl, &mut v_br);
                         music_graph.process_block(&mut m_bl, &mut m_br);
 
-                        let v_rms_post = (v_bl.iter().map(|&x| x*x).sum::<f32>() / block_size as f32).sqrt();
-                        let m_rms = (m_bl.iter().map(|&x| x*x).sum::<f32>() / block_size as f32).sqrt();
+
 
                         for i in 0..available_stem_frames {
                             bl[i] = v_bl[i] + m_bl[i];

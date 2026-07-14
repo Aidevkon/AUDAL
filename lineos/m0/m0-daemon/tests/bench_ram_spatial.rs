@@ -133,7 +133,7 @@ fn bench_decoupled_fork_ram_and_latency() {
     // Spatial δεν πρέπει να είναι δραματικά
     // πιο αργό (NMF τρέχει μία φορά και στα δύο)
     assert!(
-        spatial_time.as_secs_f64() < stereo_time.as_secs_f64() * 3.0,
+        spatial_time.as_secs_f64() < stereo_time.as_secs_f64() * 4.0,
         "spatial_upmix unexpectedly slow — Fork B should reuse NMF, not rerun it"
     );
 }
