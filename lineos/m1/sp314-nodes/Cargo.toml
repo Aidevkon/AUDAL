@@ -12,3 +12,4 @@ sp314-dsp   = { path = "../sp314-dsp" }
 
 [dev-dependencies]
 lineos-corpus = { path = "../lineos-corpus" }
+aether-bridge = { path = "../../../shared/aether-bridge" }
