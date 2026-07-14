@@ -94,8 +94,12 @@ impl DspNode for DeEsserNode {
         true
     }
 
-    fn get_output(&self, _name: &str) -> Option<f32> {
-        None
+    fn get_output(&self, name: &str) -> Option<f32> {
+        match name {
+            "env_l" => Some(self.env_l),
+            "env_r" => Some(self.env_r),
+            _ => None,
+        }
     }
 
     fn reset(&mut self) {

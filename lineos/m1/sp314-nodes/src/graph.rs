@@ -503,6 +503,31 @@ impl DspGraph {
         }
     }
 
+    pub fn set_node_parameter_no_glide(
+        &mut self,
+        node_id: &str,
+        param: &str,
+        value: f32,
+    ) -> Result<(), GraphError> {
+        if let Some(node) = self.nodes.get_mut(node_id) {
+            if !node.set_parameter_no_glide(param, value) {
+                return Err(GraphError::UnknownParameter {
+                    node_id: node_id.to_string(),
+                    parameter: param.to_string(),
+                });
+            }
+            Ok(())
+        } else {
+            Err(GraphError::MissingNode(node_id.to_string()))
+        }
+    }
+
+    pub fn get_node_output(&self, node_id: &str, output_name: &str) -> Option<f32> {
+        self.nodes
+            .get(node_id)
+            .and_then(|n| n.get_output(output_name))
+    }
+
     pub fn set_node_glide_ms(&mut self, node_id: &str, glide_ms: f32) -> Result<(), GraphError> {
         self.set_node_parameter(node_id, "glide_ms", glide_ms)
     }
