@@ -1,6 +1,4 @@
-use crate::dsp::lazy_reader::LazyAudioReader;
 use sp314_dsp::stft::stem_renderer::FiveStems;
-use std::path::Path;
 
 /// Job sent from the main render loop to the background NMF worker.
 /// Lives in the quarantined `orchestrator` module so it can be
@@ -17,8 +15,10 @@ pub struct NmfResult {
     pub stems: FiveStems,
 }
 
+use crate::dsp::seekable_provider::ExactSeekProvider;
+
 pub fn spawn(
-    file_path: String,
+    mut shadow_reader: impl ExactSeekProvider + Send + 'static,
     sample_rate: u32,
     rx: std::sync::mpsc::Receiver<NmfJob>,
     tx: std::sync::mpsc::Sender<NmfResult>,
@@ -31,15 +31,6 @@ pub fn spawn(
 
         for job in rx {
             // blocks until a job arrives, exits when sender drops
-            // Own shadow reader per worker (doesn't touch main thread's reader)
-            let mut shadow_reader = match LazyAudioReader::open(Path::new(&file_path)) {
-                Ok(r) => r,
-                Err(e) => {
-                    eprintln!("NMF worker: failed to open shadow reader: {:?}", e);
-                    continue; // skip this job, don't kill the whole worker
-                }
-            };
-
             let start_frame = (job.start_sec * sample_rate as f32) as u64;
             if let Err(e) = shadow_reader.seek_exact_frame(start_frame) {
                 eprintln!(
@@ -145,7 +136,10 @@ mod tests {
         let (tx_job, rx_job) = std::sync::mpsc::channel::<NmfJob>();
         let (tx_res, rx_res) = std::sync::mpsc::channel::<NmfResult>();
 
-        let handle = spawn(file_path, 48000, rx_job, tx_res);
+        let shadow_reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(&file_path))
+                .unwrap();
+        let handle = spawn(shadow_reader, 48000, rx_job, tx_res);
 
         let job = NmfJob {
             segment_id: 42,

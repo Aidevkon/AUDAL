@@ -604,12 +604,11 @@ mod tests {
 
         let (tx_job, rx_job) = std::sync::mpsc::channel();
         let (tx_res, rx_res) = std::sync::mpsc::channel();
-        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job,
-            tx_res,
-        );
+        let shadow_reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
         let (_, flagged_indices) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
 
@@ -640,12 +639,11 @@ mod tests {
 
         let (tx_job2, rx_job2) = std::sync::mpsc::channel();
         let (tx_res2, rx_res2) = std::sync::mpsc::channel();
-        let _worker_handle2 = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job2,
-            tx_res2,
-        );
+        let shadow_reader2 =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle2 =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader2, 48000, rx_job2, tx_res2);
         let (_, flagged_indices2) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
 
@@ -756,12 +754,11 @@ mod tests {
 
         let (tx_job, rx_job) = std::sync::mpsc::channel();
         let (tx_res, rx_res) = std::sync::mpsc::channel();
-        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job,
-            tx_res,
-        );
+        let shadow_reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
         let (_, flagged_indices) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
 
@@ -865,12 +862,11 @@ mod tests {
 
         let (tx_job, rx_job) = std::sync::mpsc::channel();
         let (tx_res, rx_res) = std::sync::mpsc::channel();
-        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job,
-            tx_res,
-        );
+        let shadow_reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
         let (_, flagged_indices) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries2, &tx_job);
 
@@ -921,12 +917,11 @@ mod tests {
 
         let (tx_job, rx_job) = std::sync::mpsc::channel();
         let (tx_res, rx_res) = std::sync::mpsc::channel();
-        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job,
-            tx_res,
-        );
+        let shadow_reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
         let (_, flagged_indices) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
 
@@ -956,12 +951,11 @@ mod tests {
 
         let (tx_job2, rx_job2) = std::sync::mpsc::channel();
         let (tx_res2, rx_res2) = std::sync::mpsc::channel();
-        let _worker_handle2 = crate::dsp::orchestrator::nmf_worker::spawn(
-            input_path.to_string(),
-            48000,
-            rx_job2,
-            tx_res2,
-        );
+        let shadow_reader2 =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path))
+                .unwrap();
+        let _worker_handle2 =
+            crate::dsp::orchestrator::nmf_worker::spawn(shadow_reader2, 48000, rx_job2, tx_res2);
         let (_, flagged_indices2) =
             crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
 
