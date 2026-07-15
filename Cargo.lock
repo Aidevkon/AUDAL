@@ -8012,6 +8012,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sp314-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "lineos-corpus",
+ "lineos-types",
+ "serde",
+ "serde_json",
+ "sp314-dsp",
+ "sp314-nodes",
+]
+
+[[package]]
 name = "spade"
 version = "2.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

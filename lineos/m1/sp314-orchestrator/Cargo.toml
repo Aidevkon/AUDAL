@@ -1,0 +1,14 @@
+[package]
+name = "sp314-orchestrator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+sp314-dsp = { path = "../sp314-dsp" }
+sp314-nodes = { path = "../sp314-nodes" }
+lineos-corpus = { path = "../lineos-corpus" }
+lineos-types = { path = "../lineos-types" }
+
+[dev-dependencies]
+serde_json = "1"
