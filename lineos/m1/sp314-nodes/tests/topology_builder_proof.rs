@@ -103,8 +103,8 @@ fn builder_produces_identical_vocal_graph() {
     let mut graph_json = DspGraph::from_topology(&t_json, 512, 48000).unwrap();
     let mut graph_builder = DspGraph::from_topology(&t_builder, 512, 48000).unwrap();
 
-    let mut input_l = vec![0.5; 512];
-    let mut input_r = vec![-0.5; 512];
+    let input_l = vec![0.5; 512];
+    let input_r = vec![-0.5; 512];
 
     let mut out_json_l = input_l.clone();
     let mut out_json_r = input_r.clone();

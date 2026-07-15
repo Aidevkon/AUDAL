@@ -462,7 +462,6 @@ mod tests {
     use super::*;
     use crate::dsp::decode_provider::FileDecoder;
     use crate::handlers::decode::decode_raw_interleaved;
-    use serde_json::json;
     use sp314_nodes::topology::DspTopology;
 
     fn dummy_eq_topology() -> DspTopology {
