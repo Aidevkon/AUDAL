@@ -432,10 +432,9 @@ mod tests {
     use serde_json::json;
     use sp314_nodes::topology::DspTopology;
 
-    #[test]
-    fn streaming_pipeline_matches_batch_graph_processing() {
-        let topology_json = json!({
-            "topology_id": "streaming_validation_test",
+    fn dummy_eq_topology() -> DspTopology {
+        let json = serde_json::json!({
+            "topology_id": "dummy_eq_topology",
             "nodes": [
                 { "node_id": "in", "node_type": "Input", "parameters": {} },
                 { "node_id": "eq", "node_type": "BiquadFilter", "parameters": { "filter_type": 0.0, "freq_hz": 1000.0 } },
@@ -445,8 +444,28 @@ mod tests {
                 { "source": "in", "target": "eq", "modulation_type": "audio" },
                 { "source": "eq", "target": "out", "modulation_type": "audio" }
             ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        });
+        DspTopology::from_json(&json.to_string()).unwrap()
+    }
+
+    fn dummy_ducking_topology() -> DspTopology {
+        let json = serde_json::json!({
+            "topology_id": "dummy_ducking_topology",
+            "nodes": [
+                { "node_id": "in", "node_type": "Input", "parameters": {} },
+                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
+                { "node_id": "out", "node_type": "Output", "parameters": {} }
+            ],
+            "edges": [
+                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
+                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
+            ]
+        });
+        DspTopology::from_json(&json.to_string()).unwrap()
+    }
+    #[test]
+    fn streaming_pipeline_matches_batch_graph_processing() {
+        let topology = dummy_eq_topology();
 
         let input_path = "../../m1/sp314-dsp/tests/fixtures/sine_1khz_3s.wav";
         let block_size = 512;
@@ -505,19 +524,7 @@ mod tests {
 
     #[test]
     fn streaming_scout_matches_batch_beat_detector() {
-        let topology_json = json!({
-            "topology_id": "scout_validation_test",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "eq", "node_type": "BiquadFilter", "parameters": { "filter_type": 0.0, "freq_hz": 1000.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "eq", "modulation_type": "audio" },
-                { "source": "eq", "target": "out", "modulation_type": "audio" }
-            ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        let topology = dummy_eq_topology();
 
         let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
 
@@ -553,19 +560,7 @@ mod tests {
     #[ignore]
     fn streaming_pipeline_ducking_e2e() {
         use crate::dsp::pass1_pipeline::build_timeline_map;
-        let topology_json = json!({
-            "topology_id": "ducking_test",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
-                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
-            ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        let topology = dummy_ducking_topology();
 
         let input_path = "../../../flight_clips_stereo/clip_transition_st.wav";
         let boundaries = build_timeline_map(input_path).unwrap();
@@ -694,19 +689,7 @@ mod tests {
     #[test]
     fn test_streaming_pipeline_jit_orchestration() {
         use lineos_corpus::scout::{SegmentBoundary, SegmentType};
-        let topology_json = json!({
-            "topology_id": "jit_test",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
-                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
-            ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        let topology = dummy_ducking_topology();
 
         let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
         let output_path = "/tmp/test_streaming_jit_output.wav";
@@ -809,19 +792,7 @@ mod tests {
     #[test]
     fn test_streaming_pipeline_jit_fallback() {
         use lineos_corpus::scout::{SegmentBoundary, SegmentType};
-        let topology_json = json!({
-            "topology_id": "jit_test",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
-                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
-            ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        let topology = dummy_ducking_topology();
 
         let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
         let output_path = "/tmp/test_streaming_jit_fallback.wav";
@@ -892,19 +863,7 @@ mod tests {
     fn test_vocal_graph_e2e_ltass_proof() {
         use lineos_types::pre_analysis::PreAnalysisData;
 
-        let topology_json = json!({
-            "topology_id": "ducking_test",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "duck_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 300.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "duck_gain", "modulation_type": "audio" },
-                { "source": "duck_gain", "target": "out", "modulation_type": "audio" }
-            ]
-        }).to_string();
-        let topology = DspTopology::from_json(&topology_json).unwrap();
+        let topology = dummy_ducking_topology();
 
         let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
         let output_path_flat = "/tmp/test_vocal_graph_output_flat.wav";
