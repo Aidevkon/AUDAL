@@ -30,6 +30,7 @@ sp314-dsp    = { path = "../../m1/sp314-dsp", features = ["cli"] }
 lineos-types = { path = "../../m1/lineos-types" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
 sp314-nodes   = { path = "../../m1/sp314-nodes" }
+sp314-orchestrator = { path = "../../m1/sp314-orchestrator" }
 lineos-telemetry = { path = "../../m1/telemetry" }  # Phase 9: real LRA/momentary/short-term
 aether-bridge = { path = "../../../shared/aether-bridge" }
 integration   = { path = "../../../integration" }

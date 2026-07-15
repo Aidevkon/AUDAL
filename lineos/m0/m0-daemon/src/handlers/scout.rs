@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
 use crate::config::MAX_FILE_BYTES;
-use crate::dsp::sparse_scout::{run_sparse_scout, SparseScoutSummary};
+use sp314_orchestrator::sparse_scout::{run_sparse_scout, SparseScoutSummary};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,7 +65,9 @@ pub async fn run_scout(
 
     let result = tokio::task::spawn_blocking(move || {
         let reader = crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(&path))
-            .map_err(|e| crate::dsp::sparse_scout::SparseScoutError::Symphonia(e.to_string()))?;
+            .map_err(|e| {
+                sp314_orchestrator::sparse_scout::SparseScoutError::Symphonia(e.to_string())
+            })?;
         run_sparse_scout(reader, n_samples, window_ms)
     })
     .await

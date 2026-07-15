@@ -388,7 +388,7 @@ impl crate::dsp::audio_source::AudioSource for LazyAudioReader {
     }
 }
 
-impl crate::dsp::seekable_provider::AudioMetadataProvider for LazyAudioReader {
+impl sp314_orchestrator::seekable_provider::AudioMetadataProvider for LazyAudioReader {
     fn sample_rate(&self) -> u32 {
         self.sample_rate()
     }
@@ -400,7 +400,7 @@ impl crate::dsp::seekable_provider::AudioMetadataProvider for LazyAudioReader {
     }
 }
 
-impl crate::dsp::seekable_provider::ApproximateSeekProvider for LazyAudioReader {
+impl sp314_orchestrator::seekable_provider::ApproximateSeekProvider for LazyAudioReader {
     fn seek_approximate(&mut self, target: std::time::Duration) -> Result<std::time::Duration> {
         self.seek_approximate(target)
     }
@@ -409,7 +409,7 @@ impl crate::dsp::seekable_provider::ApproximateSeekProvider for LazyAudioReader 
     }
 }
 
-impl crate::dsp::seekable_provider::ExactSeekProvider for LazyAudioReader {
+impl sp314_orchestrator::seekable_provider::ExactSeekProvider for LazyAudioReader {
     fn seek_exact_frame(&mut self, target_frame: u64) -> Result<()> {
         self.seek_exact_frame(target_frame)
     }

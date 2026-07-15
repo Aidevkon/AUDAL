@@ -1,4 +1,3 @@
-pub mod seekable_provider;
 // src/dsp/mod.rs
 // v3 DSP adapter for m0-daemon.
 // Replaces MasteringPipeline::master() from v2.9.
@@ -13,7 +12,7 @@ pub mod maestro;
 pub mod orchestrator;
 pub mod pass1_pipeline;
 pub mod signal_health;
-pub mod sparse_scout;
+
 pub mod standardized_stream;
 pub mod streaming_pipeline;
 pub use audio_source::AudioSource;

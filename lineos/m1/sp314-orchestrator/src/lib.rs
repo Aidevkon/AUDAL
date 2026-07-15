@@ -5,3 +5,5 @@
 //! - Pass 2 streaming render
 //!
 //! Fully decoupled from file I/O.
+pub mod seekable_provider;
+pub mod sparse_scout;

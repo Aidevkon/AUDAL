@@ -15,7 +15,7 @@ pub struct NmfResult {
     pub stems: FiveStems,
 }
 
-use crate::dsp::seekable_provider::ExactSeekProvider;
+use sp314_orchestrator::seekable_provider::ExactSeekProvider;
 
 pub fn spawn(
     mut shadow_reader: impl ExactSeekProvider + Send + 'static,

@@ -1,4 +1,4 @@
-use crate::dsp::lazy_reader::LazyReaderError;
+use sp314_dsp::io::decode_types::LazyReaderError;
 
 pub trait AudioMetadataProvider {
     fn sample_rate(&self) -> u32;
