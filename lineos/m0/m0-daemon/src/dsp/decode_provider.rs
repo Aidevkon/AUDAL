@@ -21,3 +21,13 @@ impl DecodeProvider for FileDecoder {
         crate::handlers::decode_actor::decode_streaming(&self.path, on_chunk)
     }
 }
+
+pub trait WholeBufferProvider {
+    fn decode_to_memory(&self) -> Result<(Vec<f32>, u32, u16), DecodeError>;
+}
+
+impl WholeBufferProvider for FileDecoder {
+    fn decode_to_memory(&self) -> Result<(Vec<f32>, u32, u16), DecodeError> {
+        crate::handlers::decode::decode_raw_interleaved(&self.path)
+    }
+}

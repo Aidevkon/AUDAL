@@ -1,9 +1,12 @@
-use crate::handlers::decode::decode_raw_interleaved;
+use crate::dsp::decode_provider::WholeBufferProvider;
 use lineos_corpus::scout::SegmentBoundary;
 use std::error::Error;
 
-pub fn build_timeline_map(path: &str) -> Result<Vec<SegmentBoundary>, Box<dyn Error>> {
-    let (interleaved, sample_rate, channels) = decode_raw_interleaved(path)
+pub fn build_timeline_map(
+    decoder: impl WholeBufferProvider,
+) -> Result<Vec<SegmentBoundary>, Box<dyn Error>> {
+    let (interleaved, sample_rate, channels) = decoder
+        .decode_to_memory()
         .map_err(|e| -> Box<dyn Error> { format!("{:?}", e).into() })?;
 
     // De-interleave
@@ -37,7 +40,10 @@ mod tests {
     #[ignore]
     fn test_build_timeline_map() {
         let path = "../../../flight_clips_stereo/clip_transition_st.wav";
-        let map = build_timeline_map(path).unwrap();
+        let decoder = crate::dsp::decode_provider::FileDecoder {
+            path: path.to_string(),
+        };
+        let map = build_timeline_map(decoder).unwrap();
 
         println!("=== Pass 1: Timeline Map ===");
         for (i, b) in map.iter().enumerate() {

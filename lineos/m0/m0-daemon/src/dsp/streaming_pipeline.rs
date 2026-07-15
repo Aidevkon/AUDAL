@@ -595,7 +595,10 @@ mod tests {
         let topology = dummy_ducking_topology();
 
         let input_path = "../../../flight_clips_stereo/clip_transition_st.wav";
-        let boundaries = build_timeline_map(input_path).unwrap();
+        let decoder = crate::dsp::decode_provider::FileDecoder {
+            path: input_path.to_string(),
+        };
+        let boundaries = build_timeline_map(decoder).unwrap();
 
         let output_path = "/tmp/test_streaming_ducking_output.wav";
 
