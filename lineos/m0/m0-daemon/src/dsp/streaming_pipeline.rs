@@ -22,6 +22,7 @@
 //! bin/benchmark_streaming.rs.
 
 use crate::dsp::beat_detector::BeatDetector;
+use crate::dsp::decode_provider::DecodeProvider;
 use crate::handlers::decode_actor::{decode_streaming, DecodeChunk};
 use lineos_corpus::scout::{SegmentBoundary, SegmentType, TimelineRouter};
 use sp314_dsp::io::wav_writer::StreamingWavWriter;
@@ -161,7 +162,7 @@ pub fn run_streaming_pipeline_with_scout(
 }
 
 pub fn run_streaming_pipeline_with_timeline(
-    input_path: &str,
+    decoder: impl DecodeProvider,
     output_path: &str,
     topology: &DspTopology,
     block_size: usize,
@@ -171,6 +172,8 @@ pub fn run_streaming_pipeline_with_timeline(
     speech_gain: f32,
     music_gain: f32,
     pre_analysis: Option<&lineos_types::pre_analysis::PreAnalysisData>,
+    rx_res: std::sync::mpsc::Receiver<crate::dsp::orchestrator::nmf_worker::NmfResult>,
+    flagged_indices: Vec<usize>,
 ) -> Result<(), Box<dyn Error>> {
     let mut graph = DspGraph::from_topology(topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
@@ -257,16 +260,6 @@ pub fn run_streaming_pipeline_with_timeline(
         }
     }
 
-    let (tx_job, rx_job) = std::sync::mpsc::channel();
-    let (tx_res, rx_res) = std::sync::mpsc::channel();
-    let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
-        input_path.to_string(),
-        sample_rate,
-        rx_job,
-        tx_res,
-    );
-    let (_, flagged_indices) =
-        crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
     let flagged_hybrid_indices: std::collections::HashSet<usize> =
         flagged_indices.into_iter().collect();
 
@@ -281,7 +274,7 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut last_type: Option<SegmentType> = None;
     let mut last_idx: Option<usize> = None;
 
-    let (_, _) = decode_streaming(input_path, |chunk| -> Result<(), Box<dyn Error>> {
+    let (_, _) = decoder.stream_to(|chunk| -> Result<(), Box<dyn Error>> {
         let is_eof = matches!(chunk, DecodeChunk::EndOfStream);
         if let DecodeChunk::Samples(interleaved) = chunk {
             for frame in interleaved.chunks_exact(2) {
@@ -434,6 +427,7 @@ pub fn run_streaming_pipeline_with_timeline(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsp::decode_provider::FileDecoder;
     use crate::handlers::decode::decode_raw_interleaved;
     use serde_json::json;
     use sp314_nodes::topology::DspTopology;
@@ -578,8 +572,21 @@ mod tests {
 
         let output_path = "/tmp/test_streaming_ducking_output.wav";
 
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job,
+            tx_res,
+        );
+        let (_, flagged_indices) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
         let bad_run = run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path,
             &topology,
             512,
@@ -589,6 +596,8 @@ mod tests {
             1.0,
             0.501,
             None,
+            rx_res,
+            flagged_indices,
         );
         assert!(
             bad_run.is_err(),
@@ -599,8 +608,21 @@ mod tests {
             "Error string should mention the invalid node ID"
         );
 
+        let (tx_job2, rx_job2) = std::sync::mpsc::channel();
+        let (tx_res2, rx_res2) = std::sync::mpsc::channel();
+        let _worker_handle2 = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job2,
+            tx_res2,
+        );
+        let (_, flagged_indices2) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
+
         run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path,
             &topology,
             512,
@@ -610,6 +632,8 @@ mod tests {
             1.0,
             0.501,
             None,
+            rx_res2,
+            flagged_indices2,
         )
         .unwrap();
 
@@ -712,8 +736,21 @@ mod tests {
             },
         ];
 
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job,
+            tx_res,
+        );
+        let (_, flagged_indices) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
         run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path,
             &topology,
             1024,
@@ -723,6 +760,8 @@ mod tests {
             1.0,
             0.501,
             None,
+            rx_res,
+            flagged_indices,
         )
         .unwrap();
 
@@ -818,8 +857,21 @@ mod tests {
         // Since we can't easily force worker failure here without changing worker code,
         // let's just test that the fallback code exists and compiles, and we can rely on manual verification or future unit tests for the channel drop.
 
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job,
+            tx_res,
+        );
+        let (_, flagged_indices) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries2, &tx_job);
+
         run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path,
             &topology,
             1024,
@@ -829,6 +881,8 @@ mod tests {
             1.0,
             0.501,
             None,
+            rx_res,
+            flagged_indices,
         )
         .unwrap();
 
@@ -871,8 +925,21 @@ mod tests {
         );
         pre_flat.spectral_profile_db = profile.spectral_target.clone(); // Perfect match -> 0dB correction
 
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job,
+            tx_res,
+        );
+        let (_, flagged_indices) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
         run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path_flat,
             &topology,
             1024,
@@ -882,6 +949,8 @@ mod tests {
             1.0,
             0.501,
             Some(&pre_flat),
+            rx_res,
+            flagged_indices,
         )
         .unwrap();
 
@@ -891,8 +960,21 @@ mod tests {
         raw[3] -= 10.0; // Force heavy boost at 750 Hz
         pre_eq.spectral_profile_db = raw;
 
+        let (tx_job2, rx_job2) = std::sync::mpsc::channel();
+        let (tx_res2, rx_res2) = std::sync::mpsc::channel();
+        let _worker_handle2 = crate::dsp::orchestrator::nmf_worker::spawn(
+            input_path.to_string(),
+            48000,
+            rx_job2,
+            tx_res2,
+        );
+        let (_, flagged_indices2) =
+            crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
+
         run_streaming_pipeline_with_timeline(
-            input_path,
+            FileDecoder {
+                path: input_path.to_string(),
+            },
             output_path_eq,
             &topology,
             1024,
@@ -902,6 +984,8 @@ mod tests {
             1.0,
             0.501,
             Some(&pre_eq),
+            rx_res2,
+            flagged_indices2,
         )
         .unwrap();
 
