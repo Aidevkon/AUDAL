@@ -336,22 +336,22 @@ fn inv_mus_4_classified_acoustic_gets_acoustic_zones() {
     );
 }
 
-/// INV-MUS-5 (S-0XX): Music content classified as Idm
-/// receives the Idm reference profile correction zones.
+/// INV-MUS-5 (S-0XX): Music content classified as Techno
+/// receives the Techno reference profile correction zones.
 #[test]
-fn inv_mus_5_classified_idm_gets_idm_zones() {
+fn inv_mus_5_classified_techno_gets_techno_zones() {
     let req = AetherRequest {
         content_type: ContentType::Music,
         ..podcast_req()
     };
 
     let mut pa = ltass_input([30.0, 30.0, -30.0, -30.0, 30.0, 30.0, -30.0, -30.0]);
-    pa.genre = Some(lineos_types::pre_analysis::Genre::Idm);
+    pa.genre = Some(lineos_types::pre_analysis::Genre::Techno);
 
     let (dsp_config, _, _) =
         build_dsp_config(&req, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
 
-    let idm_gains: Vec<f32> = dsp_config
+    let techno_gains: Vec<f32> = dsp_config
         .eq
         .zone_bands
         .iter()
@@ -360,8 +360,8 @@ fn inv_mus_5_classified_idm_gets_idm_zones() {
         .collect();
 
     assert!(
-        !idm_gains.is_empty(),
-        "Idm music content produced zero reference zones, expected >0."
+        !techno_gains.is_empty(),
+        "Techno music content produced zero reference zones, expected >0."
     );
 
     let req_pod = AetherRequest {
@@ -380,15 +380,15 @@ fn inv_mus_5_classified_idm_gets_idm_zones() {
         .collect();
 
     assert_ne!(
-        idm_gains, pod_gains,
-        "Idm music content must not produce Podcast zones."
+        techno_gains, pod_gains,
+        "Techno music content must not produce Podcast zones."
     );
 }
 
-/// INV-MUS-6 (S-0XX): Music content classified as Acoustic and Idm
+/// INV-MUS-6 (S-0XX): Music content classified as Acoustic and Techno
 /// produce strictly distinct reference zones from each other.
 #[test]
-fn inv_mus_6_acoustic_and_idm_routes_are_distinct() {
+fn inv_mus_6_acoustic_and_techno_routes_are_distinct() {
     let req = AetherRequest {
         content_type: ContentType::Music,
         ..podcast_req()
@@ -408,13 +408,13 @@ fn inv_mus_6_acoustic_and_idm_routes_are_distinct() {
         .map(|b| b.gain_db)
         .collect();
 
-    let mut pa_idm = pa_ac.clone();
-    pa_idm.genre = Some(lineos_types::pre_analysis::Genre::Idm);
+    let mut pa_techno = pa_ac.clone();
+    pa_techno.genre = Some(lineos_types::pre_analysis::Genre::Techno);
 
-    let (dsp_config_idm, _, _) =
-        build_dsp_config(&req, &stem_features(), Some(&pa_idm)).expect("build_dsp_config failed");
+    let (dsp_config_techno, _, _) = build_dsp_config(&req, &stem_features(), Some(&pa_techno))
+        .expect("build_dsp_config failed");
 
-    let idm_gains: Vec<f32> = dsp_config_idm
+    let techno_gains: Vec<f32> = dsp_config_techno
         .eq
         .zone_bands
         .iter()
@@ -423,7 +423,7 @@ fn inv_mus_6_acoustic_and_idm_routes_are_distinct() {
         .collect();
 
     assert_ne!(
-        acoustic_gains, idm_gains,
-        "Acoustic and Idm profiles must produce distinct corrections for the same input."
+        acoustic_gains, techno_gains,
+        "Acoustic and Techno profiles must produce distinct corrections for the same input."
     );
 }

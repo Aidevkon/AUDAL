@@ -703,9 +703,14 @@ fn test_pre_analyzer_populates_genre() {
 
     println!("Genre for bodleasons_mid: {:?}", data.genre);
     assert_eq!(
-        data.genre,
-        Some(lineos_types::pre_analysis::Genre::Idm),
-        "bodleasons mid must resolve to Idm"
+        data.genre, None,
+        "bodleasons_mid.wav measures ~17.6 units from both Acoustic \
+         and Techno centroids (MAX_DISTANCE_THRESHOLD=4.0) via the \
+         real PreAnalyzer pipeline — genuinely out-of-bounds for \
+         both buckets today, not a misclassification. Historically \
+         asserted Idm before that bucket's retirement (lossy MP3 \
+         source); the underlying audio was never confirmed to match \
+         classifier.rs's separate hardcoded IDM test vector."
     );
 
     // Silence/short input case

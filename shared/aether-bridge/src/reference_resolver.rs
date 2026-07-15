@@ -24,9 +24,9 @@ const MUSIC_ACOUSTIC_V1_JSON: &str = include_str!(
     "../../../lineos/shared/schema/reference-profiles/\
      music-acoustic-v1.json"
 );
-const MUSIC_IDM_V1_JSON: &str = include_str!(
+const MUSIC_TECHNO_V1_JSON: &str = include_str!(
     "../../../lineos/shared/schema/reference-profiles/\
-     music-idm-v1.json"
+     music-techno-v1.json"
 );
 
 // ── Proprietary craft constants ────────────────
@@ -92,7 +92,7 @@ struct ProfileJson {
 pub enum ProfileId {
     PodcastV1,
     MusicAcoustic,
-    MusicIdm,
+    MusicTechno,
 }
 
 #[derive(Clone, Debug)]
@@ -132,7 +132,7 @@ impl ReferenceProfile {
         let (json_str, name) = match id {
             ProfileId::PodcastV1 => (PODCAST_V1_JSON, "podcast-v1.json"),
             ProfileId::MusicAcoustic => (MUSIC_ACOUSTIC_V1_JSON, "music-acoustic-v1.json"),
-            ProfileId::MusicIdm => (MUSIC_IDM_V1_JSON, "music-idm-v1.json"),
+            ProfileId::MusicTechno => (MUSIC_TECHNO_V1_JSON, "music-techno-v1.json"),
         };
 
         let parsed: ProfileJson = serde_json::from_str(json_str)

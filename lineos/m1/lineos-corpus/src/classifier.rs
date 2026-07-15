@@ -13,7 +13,7 @@
 //! inference in one place.
 
 use super::genre_centroids_generated::{
-    ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, IDM_MFCC_MEAN,
+    ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, TECHNO_MFCC_MEAN,
 };
 
 // thresholds determined through intra/inter class variance recon
@@ -47,20 +47,20 @@ impl GenreClassifier {
             z_track[i] = (raw_track_mean[i] - GLOBAL_MFCC_MEAN[i]) / (GLOBAL_MFCC_STD[i] + 1e-8);
         }
 
-        let mut dist_idm_sq = 0.0;
+        let mut dist_techno_sq = 0.0;
         let mut dist_acoustic_sq = 0.0;
         for i in 0..13 {
-            let d_i = z_track[i] - IDM_MFCC_MEAN[i];
+            let d_t = z_track[i] - TECHNO_MFCC_MEAN[i];
             let d_a = z_track[i] - ACOUSTIC_MFCC_MEAN[i];
-            dist_idm_sq += d_i * d_i;
+            dist_techno_sq += d_t * d_t;
             dist_acoustic_sq += d_a * d_a;
         }
 
-        let dist_idm = dist_idm_sq.sqrt();
+        let dist_techno = dist_techno_sq.sqrt();
         let dist_acoustic = dist_acoustic_sq.sqrt();
 
-        let (min_dist, genre) = if dist_idm < dist_acoustic {
-            (dist_idm, Genre::Idm)
+        let (min_dist, genre) = if dist_techno < dist_acoustic {
+            (dist_techno, Genre::Techno)
         } else {
             (dist_acoustic, Genre::Acoustic)
         };
@@ -69,7 +69,7 @@ impl GenreClassifier {
             return None; // Completely out of bounds (e.g. death metal or sine sweeps)
         }
 
-        if (dist_idm - dist_acoustic).abs() < MIN_DISTANCE_DELTA {
+        if (dist_techno - dist_acoustic).abs() < MIN_DISTANCE_DELTA {
             return None; // Ambiguous gray zone
         }
 
@@ -82,14 +82,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_genre_classification_idm_track() {
-        // Create a raw track that perfectly matches the IDM centroid in Z-space
-        let mut raw_idm = [0.0; 13];
+    fn test_genre_classification_techno_track() {
+        // Create a raw track that perfectly matches the TECHNO centroid in Z-space
+        let mut raw_techno = [0.0; 13];
         for i in 0..13 {
-            raw_idm[i] = IDM_MFCC_MEAN[i] * (GLOBAL_MFCC_STD[i] + 1e-8) + GLOBAL_MFCC_MEAN[i];
+            raw_techno[i] = TECHNO_MFCC_MEAN[i] * (GLOBAL_MFCC_STD[i] + 1e-8) + GLOBAL_MFCC_MEAN[i];
         }
-        let result = GenreClassifier::classify(&raw_idm);
-        assert_eq!(result, Some(Genre::Idm));
+        let result = GenreClassifier::classify(&raw_techno);
+        assert_eq!(result, Some(Genre::Techno));
     }
 
     #[test]
@@ -114,10 +114,10 @@ mod tests {
 
     #[test]
     fn test_genre_classification_ambiguous() {
-        // Track exactly halfway between IDM and Acoustic in Z-space
+        // Track exactly halfway between Techno and Acoustic in Z-space
         let mut raw_middle = [0.0; 13];
         for i in 0..13 {
-            let mid_z = (IDM_MFCC_MEAN[i] + ACOUSTIC_MFCC_MEAN[i]) / 2.0;
+            let mid_z = (TECHNO_MFCC_MEAN[i] + ACOUSTIC_MFCC_MEAN[i]) / 2.0;
             raw_middle[i] = mid_z * (GLOBAL_MFCC_STD[i] + 1e-8) + GLOBAL_MFCC_MEAN[i];
         }
         let result = GenreClassifier::classify(&raw_middle);
@@ -125,7 +125,8 @@ mod tests {
     }
 
     #[test]
-    fn test_genre_classification_real_idm_track() {
+    fn test_genre_classification_real_bodleasons_track() {
+        // Historically an IDM fixture; IDM bucket retired (lossy MP3 corpus) and replaced by Techno — this real track's MFCC vector correctly classifies as Techno, its closest neighboring electronic genre.
         // Raw MFCC mean for an actual IDM reference track:
         // idm/BoDleasons - Our Journey.mp3
         // measured via the corrected 48kHz-resampled pipeline, genre-corpus-v2-wiring-v3 —
@@ -150,6 +151,6 @@ mod tests {
         ];
 
         let result = GenreClassifier::classify(&raw_idm_track);
-        assert_eq!(result, Some(Genre::Idm));
+        assert_eq!(result, Some(Genre::Techno));
     }
 }

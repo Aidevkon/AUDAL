@@ -59,19 +59,19 @@ impl SegmentScout {
         let raw_mfcc = self.mfcc.compute(mono);
 
         use lineos_corpus::genre_centroids_generated::{
-            ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, IDM_MFCC_MEAN,
+            ACOUSTIC_MFCC_MEAN, GLOBAL_MFCC_MEAN, GLOBAL_MFCC_STD, TECHNO_MFCC_MEAN,
         };
 
-        let mut dist_idm_sq = 0.0;
+        let mut dist_techno_sq = 0.0;
         let mut dist_acoustic_sq = 0.0;
         for i in 0..13 {
             let z = (raw_mfcc[i] - GLOBAL_MFCC_MEAN[i]) / (GLOBAL_MFCC_STD[i] + 1e-8);
-            let d_i = z - IDM_MFCC_MEAN[i];
+            let d_t = z - TECHNO_MFCC_MEAN[i];
             let d_a = z - ACOUSTIC_MFCC_MEAN[i];
-            dist_idm_sq += d_i * d_i;
+            dist_techno_sq += d_t * d_t;
             dist_acoustic_sq += d_a * d_a;
         }
-        let mfcc_dist_b = dist_idm_sq.sqrt().min(dist_acoustic_sq.sqrt());
+        let mfcc_dist_b = dist_techno_sq.sqrt().min(dist_acoustic_sq.sqrt());
 
         // Axis C: Crest Factor
         let crest_c = crate::analysis::dynamics::crest_factor_db(mono);

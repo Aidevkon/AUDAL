@@ -37,7 +37,7 @@ pub const RESONANT_PEAK_SIGMA: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Genre {
-    Idm,
+    Techno,
     Acoustic,
 }
 

@@ -151,8 +151,8 @@ pub fn build_dsp_config(
                         target_profile_id =
                             Some(crate::reference_resolver::ProfileId::MusicAcoustic);
                     }
-                    Some(lineos_types::pre_analysis::Genre::Idm) => {
-                        target_profile_id = Some(crate::reference_resolver::ProfileId::MusicIdm);
+                    Some(lineos_types::pre_analysis::Genre::Techno) => {
+                        target_profile_id = Some(crate::reference_resolver::ProfileId::MusicTechno);
                     }
                     None => {} // Unclassified music skips reference correction
                 }
