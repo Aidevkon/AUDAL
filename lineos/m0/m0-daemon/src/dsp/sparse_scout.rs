@@ -1,6 +1,4 @@
-use crate::dsp::lazy_reader::LazyAudioReader;
 use serde::Serialize;
-use std::path::Path;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,8 +38,10 @@ pub enum SparseScoutError {
     AllSeeksFailed,
 }
 
+use crate::dsp::seekable_provider::ApproximateSeekProvider;
+
 pub fn run_sparse_scout(
-    path: &Path,
+    mut reader: impl ApproximateSeekProvider,
     n_samples: usize,
     window_ms: f64,
 ) -> Result<SparseScoutSummary, SparseScoutError> {
@@ -50,9 +50,6 @@ pub fn run_sparse_scout(
             "n_samples must be > 0".into(),
         ));
     }
-
-    let mut reader =
-        LazyAudioReader::open(path).map_err(|e| SparseScoutError::Symphonia(e.to_string()))?;
 
     let total_frames = match reader.total_frames_hint() {
         Some(frames) => frames,
@@ -146,6 +143,7 @@ pub fn run_sparse_scout(
 mod tests {
     // We import what will eventually be the implementation
     use super::*;
+    use crate::dsp::lazy_reader::LazyAudioReader;
     use std::fs;
     use std::path::Path;
 
@@ -174,7 +172,8 @@ mod tests {
         // 500Hz sine ensures a 10ms window contains exactly 5 full cycles (at 48kHz).
         write_test_wav(path, 48000, 60.0, 500.0, 0.5);
 
-        let result = run_sparse_scout(path, 50, 10.0).expect("scout should succeed");
+        let reader = LazyAudioReader::open(path).unwrap();
+        let result = run_sparse_scout(reader, 50, 10.0).expect("scout should succeed");
 
         // Assert peak is exactly 0.5 (with strict floating point tolerance)
         assert!(
@@ -201,8 +200,9 @@ mod tests {
         write_test_wav(path, 48000, 2.0, 500.0, 0.3); // Only 2 seconds long
 
         // Ask for 300 samples (redundant coverage, will overlap heavily)
+        let reader = LazyAudioReader::open(path).unwrap();
         let result =
-            run_sparse_scout(path, 300, 10.0).expect("scout should not crash on short file");
+            run_sparse_scout(reader, 300, 10.0).expect("scout should not crash on short file");
 
         // Total seeks should be properly bounded/recorded
         assert!(
@@ -266,7 +266,8 @@ mod tests {
         }
         w.finalize().unwrap();
 
-        let result = run_sparse_scout(path, n_samples, window_ms).expect("scout should succeed");
+        let reader = LazyAudioReader::open(path).unwrap();
+        let result = run_sparse_scout(reader, n_samples, window_ms).expect("scout should succeed");
 
         assert!(result.sampled_peak_linear < 0.9,
             "Sampling should miss the transient spike at 3.0s. Proves sampled_peak_linear limitation. Got {}",
@@ -311,7 +312,8 @@ mod tests {
         }
         w.finalize().unwrap();
 
-        let result = run_sparse_scout(path, n_samples, window_ms).expect("scout should succeed");
+        let reader = LazyAudioReader::open(path).unwrap();
+        let result = run_sparse_scout(reader, n_samples, window_ms).expect("scout should succeed");
 
         // Math Proof:
         // Offsets at ~0.0s (Loud), ~2.0s (Silence), ~4.0s (Loud), ~6.0s (Silence).
@@ -376,7 +378,8 @@ mod tests {
         let w = hound::WavWriter::create(path, spec).unwrap();
         w.finalize().unwrap();
 
-        let result = run_sparse_scout(path, 5, 10.0);
+        let reader = LazyAudioReader::open(path).unwrap();
+        let result = run_sparse_scout(reader, 5, 10.0);
 
         assert!(
             matches!(result, Err(SparseScoutError::AllSeeksFailed)),

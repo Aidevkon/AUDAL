@@ -64,7 +64,9 @@ pub async fn run_scout(
     let window_ms = req.window_ms;
 
     let result = tokio::task::spawn_blocking(move || {
-        run_sparse_scout(std::path::Path::new(&path), n_samples, window_ms)
+        let reader = crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(&path))
+            .map_err(|e| crate::dsp::sparse_scout::SparseScoutError::Symphonia(e.to_string()))?;
+        run_sparse_scout(reader, n_samples, window_ms)
     })
     .await
     .map_err(|e| format!("Spawn block error: {:?}", e))
