@@ -21,12 +21,12 @@
 //! Currently only exercised by
 //! bin/benchmark_streaming.rs.
 
-use crate::dsp::decode_provider::DecodeProvider;
 use crate::handlers::decode_actor::DecodeChunk;
 use lineos_corpus::scout::{SegmentBoundary, SegmentType, TimelineRouter};
 use sp314_dsp::io::wav_writer::StreamingWavWriter;
 use sp314_nodes::graph::DspGraph;
 use sp314_nodes::topology::DspTopology;
+use sp314_orchestrator::decode_provider::DecodeProvider;
 use std::error::Error;
 
 pub fn run_streaming_pipeline_with_timeline(
@@ -328,7 +328,28 @@ pub fn run_streaming_pipeline_with_timeline(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dsp::decode_provider::FileDecoder;
+    use sp314_dsp::io::decode_types::{DecodeChunk, DecodeError};
+    use sp314_orchestrator::decode_provider::{DecodeProvider, WholeBufferProvider};
+
+    pub struct FileDecoder {
+        pub path: String,
+    }
+
+    impl DecodeProvider for FileDecoder {
+        fn stream_to<E, F>(&self, on_chunk: F) -> Result<(u32, u16), DecodeError>
+        where
+            E: ToString,
+            F: FnMut(DecodeChunk<'_>) -> Result<(), E>,
+        {
+            crate::handlers::decode_actor::decode_streaming(&self.path, on_chunk)
+        }
+    }
+
+    impl WholeBufferProvider for FileDecoder {
+        fn decode_to_memory(&self) -> Result<(Vec<f32>, u32, u16), DecodeError> {
+            crate::handlers::decode::decode_raw_interleaved(&self.path)
+        }
+    }
     use crate::handlers::decode::decode_raw_interleaved;
     use sp314_nodes::topology::DspTopology;
 
@@ -350,11 +371,11 @@ mod tests {
     #[test]
     #[ignore]
     fn streaming_pipeline_ducking_e2e() {
-        use crate::dsp::pass1_pipeline::build_timeline_map;
+        use sp314_orchestrator::pass1_pipeline::build_timeline_map;
         let topology = dummy_ducking_topology();
 
         let input_path = "../../../flight_clips_stereo/clip_transition_st.wav";
-        let decoder = crate::dsp::decode_provider::FileDecoder {
+        let decoder = FileDecoder {
             path: input_path.to_string(),
         };
         let boundaries = build_timeline_map(decoder).unwrap();

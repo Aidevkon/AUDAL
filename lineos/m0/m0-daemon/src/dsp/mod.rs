@@ -6,11 +6,11 @@
 pub mod audio_source;
 pub mod autotune;
 pub mod beat_detector;
-pub mod decode_provider;
+
 pub mod lazy_reader;
 pub mod maestro;
 pub mod orchestrator;
-pub mod pass1_pipeline;
+
 pub mod signal_health;
 
 pub mod standardized_stream;
