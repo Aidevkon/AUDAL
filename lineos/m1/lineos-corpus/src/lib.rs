@@ -22,7 +22,7 @@ pub use mfcc::{MelFilterbank, MfccAnalyzer};
 pub mod genre_centroid;
 pub use genre_centroid::{
     compute_bucket_centroid, compute_global_stats, format_f32_const, gate, CentroidError,
-    GateCriteria, RejectReason, TrackGateInputs, GATE_V1_ACOUSTIC, GATE_V1_IDM,
+    GateCriteria, RejectReason, TrackGateInputs, GATE_V1_ACOUSTIC, GATE_V1_IDM, GATE_V1_TECHNO,
 };
 
 pub mod classifier;

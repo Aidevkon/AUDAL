@@ -150,6 +150,17 @@ pub const GATE_V1_IDM: GateCriteria = GateCriteria {
     slope_max: -0.45,
 };
 
+/// gate-v1: identical to GATE_V1_IDM. Copied deliberately because the underlying
+/// criteria (loudness, crest, slope) are sound for electronic/club music generally.
+/// The IDM retirement was due to lossy MP3 source files, not bad thresholds.
+pub const GATE_V1_TECHNO: GateCriteria = GateCriteria {
+    lufs_min: -14.0,
+    lufs_max: -6.0,
+    crest_min_db: 4.0,
+    slope_min: -1.05,
+    slope_max: -0.45,
+};
+
 /// gate-v1.1: deliberately loose — tightened only after measured corpus distributions (S-0XX §5)
 ///
 /// Retuned to gate-v1.1 (2026-07-09) from the first real-corpus measurement

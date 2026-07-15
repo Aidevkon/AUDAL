@@ -1,6 +1,6 @@
 use lineos_corpus::genre_centroid::{
     compute_bucket_centroid, compute_global_stats, format_f32_const, gate, RejectReason,
-    TrackGateInputs, GATE_V1_ACOUSTIC, GATE_V1_IDM,
+    TrackGateInputs, GATE_V1_ACOUSTIC, GATE_V1_IDM, GATE_V1_TECHNO,
 };
 use lineos_corpus::mfcc::{MfccAnalyzer, FFT_SIZE, N_MFCC};
 use m0d::handlers::decode::decode_audio;
@@ -207,6 +207,7 @@ fn main() {
             let gate_criteria = match name.as_str() {
                 "idm" => &GATE_V1_IDM,
                 "acoustic" => &GATE_V1_ACOUSTIC,
+                "techno" => &GATE_V1_TECHNO,
                 _ => {
                     eprintln!(
                         "Error: Unknown bucket '{}'. F-024 lesson: no silent catch-all.",
@@ -247,7 +248,16 @@ fn main() {
             if path.is_file() {
                 if let Some(ext) = path.extension() {
                     let ext = ext.to_string_lossy().to_lowercase();
-                    if ext == "wav" || ext == "mp3" || ext == "flac" {
+                    // Lossless format guard: explicitly warn and reject lossy formats.
+                    // Limitation: This only checks the file extension. A FLAC that was
+                    // transcoded from an MP3 will still pass this guard. It prevents
+                    // accidental inclusion of .mp3 files, but cannot guarantee the
+                    // acoustic provenance of the master.
+                    if ext == "mp3" || ext == "m4a" || ext == "aac" || ext == "ogg" {
+                        eprintln!("Warning: Skipping lossy file {:?}. Only lossless formats (.flac, .wav, .aiff) are permitted in the corpus.", path);
+                        continue;
+                    }
+                    if ext == "wav" || ext == "flac" || ext == "aiff" {
                         let bytes = fs::read(&path).unwrap();
                         let mut hasher = Sha256::new();
                         hasher.update(&bytes);

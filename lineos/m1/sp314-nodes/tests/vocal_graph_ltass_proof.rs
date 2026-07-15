@@ -1,11 +1,11 @@
+use aether_bridge::reference_resolver::{ProfileId, ReferenceProfile, ReferenceResolver};
 use serde_json::json;
 use sp314_nodes::{graph::DspGraph, topology::DspTopology};
-use aether_bridge::reference_resolver::{ReferenceProfile, ReferenceResolver, ProfileId};
 
 #[test]
 fn test_vocal_graph_ltass_correction() {
     let ref_cfs = [50.0, 150.0, 350.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0];
-    
+
     // 1. Build the topology JSON (using Rust builder for clarity and self-containment)
     let topology_json = json!({
         "topology_id": "vocal_graph_proof",
@@ -45,7 +45,7 @@ fn test_vocal_graph_ltass_correction() {
 
     // 2. Compute REAL LTASS gains via ReferenceResolver
     let profile = ReferenceProfile::load(ProfileId::PodcastV1);
-    
+
     // We construct a synthetic profile where most bands perfectly match the target,
     // but Band 3 (750 Hz) is deliberately 6 dB too quiet, which should produce a +6 dB boost request.
     let mut raw_profile = profile.spectral_target.clone();
@@ -53,7 +53,7 @@ fn test_vocal_graph_ltass_correction() {
     for v in raw_profile.iter_mut() {
         *v += -20.0;
     }
-    
+
     // Deliberately drop Band 3 by 6 dB to force a correction.
     // We don't raise another band, so normalization will shift the mean slightly,
     // resulting in a smaller correction distributed across all bands,
@@ -73,19 +73,24 @@ fn test_vocal_graph_ltass_correction() {
     println!("Computed Gains:     {:?}", ref_gains);
 
     // Assert that Band 3 asks for a boost
-    assert!(ref_gains[3] > 4.0, "Expected significant boost on Band 3, got {}", ref_gains[3]);
+    assert!(
+        ref_gains[3] > 4.0,
+        "Expected significant boost on Band 3, got {}",
+        ref_gains[3]
+    );
 
     // 3. Apply the 8 gains to the graph nodes
     for i in 0..8 {
         let node_id = format!("ltass_band_{}", i);
-        graph.set_node_parameter_no_glide(&node_id, "gain_db", ref_gains[i])
+        graph
+            .set_node_parameter_no_glide(&node_id, "gain_db", ref_gains[i])
             .expect(&format!("Failed to set gain on {}", node_id));
     }
 
     // 4. Test signal verification
     // Generate a 750Hz sine wave (Band 3 center frequency)
     // Run it unprocessed to measure base RMS, then run through graph to see the boost.
-    
+
     let mut base_l = vec![0.0; block_size];
     let mut base_r = vec![0.0; block_size];
     let freq = 750.0;
@@ -107,7 +112,7 @@ fn test_vocal_graph_ltass_correction() {
     // Process the exact same signal through the corrected graph
     let mut test_l = base_l.clone();
     let mut test_r = base_r.clone();
-    
+
     // Process a few blocks to settle the biquad states and group delay
     for _ in 0..5 {
         for i in 0..block_size {
@@ -120,22 +125,26 @@ fn test_vocal_graph_ltass_correction() {
         }
         graph.process_block(&mut test_l, &mut test_r);
     }
-    
+
     // Now measure output RMS
     let out_rms = (test_l.iter().map(|v| v * v).sum::<f32>() / (block_size as f32)).sqrt();
-    
+
     let db_change = 20.0 * (out_rms / base_rms).log10();
 
     println!("Base RMS: {:.6}", base_rms);
     println!("Output RMS: {:.6}", out_rms);
     println!("Measured DB Change at 750 Hz: {:.2} dB", db_change);
-    println!("Expected DB Change at 750 Hz (from gains): {:.2} dB", ref_gains[3]);
+    println!(
+        "Expected DB Change at 750 Hz (from gains): {:.2} dB",
+        ref_gains[3]
+    );
 
     // The measured dB change at exactly 750Hz should be very close to the peak gain of the filter,
     // though slightly offset by the broad Q=0.707 of adjacent bands which are also active.
     assert!(
         (db_change - ref_gains[3]).abs() < 1.5,
         "Measured gain {:.2} does not match expected correction {:.2}",
-        db_change, ref_gains[3]
+        db_change,
+        ref_gains[3]
     );
 }
