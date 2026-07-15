@@ -180,58 +180,91 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut writer = StreamingWavWriter::new(output_path, sample_rate)?;
     let router = TimelineRouter::new(boundaries.clone());
 
-    let vocal_topology_json = serde_json::json!({
-        "topology_id": "vocal_graph_topology",
-        "nodes": [
-            { "node_id": "in", "node_type": "Input", "parameters": {} },
-            { "node_id": "deesser", "node_type": "DeEsser", "parameters": { "threshold_db": 0.0, "frequency_hz": 6000.0 } },
-            { "node_id": "ltass_band_0", "node_type": "BiquadFilter", "parameters": { "freq_hz": 50.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_1", "node_type": "BiquadFilter", "parameters": { "freq_hz": 150.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_2", "node_type": "BiquadFilter", "parameters": { "freq_hz": 350.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_3", "node_type": "BiquadFilter", "parameters": { "freq_hz": 750.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_4", "node_type": "BiquadFilter", "parameters": { "freq_hz": 1500.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_5", "node_type": "BiquadFilter", "parameters": { "freq_hz": 3000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_6", "node_type": "BiquadFilter", "parameters": { "freq_hz": 6000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "ltass_band_7", "node_type": "BiquadFilter", "parameters": { "freq_hz": 12000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 } },
-            { "node_id": "vca_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 10.0 } },
-            { "node_id": "out", "node_type": "Output", "parameters": {} }
-        ],
-        "edges": [
-            { "source": "in", "target": "deesser", "modulation_type": "audio" },
-            { "source": "deesser", "target": "ltass_band_0", "modulation_type": "audio" },
-            { "source": "ltass_band_0", "target": "ltass_band_1", "modulation_type": "audio" },
-            { "source": "ltass_band_1", "target": "ltass_band_2", "modulation_type": "audio" },
-            { "source": "ltass_band_2", "target": "ltass_band_3", "modulation_type": "audio" },
-            { "source": "ltass_band_3", "target": "ltass_band_4", "modulation_type": "audio" },
-            { "source": "ltass_band_4", "target": "ltass_band_5", "modulation_type": "audio" },
-            { "source": "ltass_band_5", "target": "ltass_band_6", "modulation_type": "audio" },
-            { "source": "ltass_band_6", "target": "ltass_band_7", "modulation_type": "audio" },
-            { "source": "ltass_band_7", "target": "vca_gain", "modulation_type": "audio" },
-            { "source": "vca_gain", "target": "out", "modulation_type": "audio" }
-        ]
-    });
+    let mut vb = sp314_nodes::topology::DspTopologyBuilder::new("vocal_graph_topology");
+    let v_in = vb.add_node("in", "Input", serde_json::json!({}));
+    let v_deesser = vb.add_node(
+        "deesser",
+        "DeEsser",
+        serde_json::json!({ "threshold_db": 0.0, "frequency_hz": 6000.0 }),
+    );
+    let v_eq0 = vb.add_node(
+        "ltass_band_0",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 50.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq1 = vb.add_node(
+        "ltass_band_1",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 150.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq2 = vb.add_node(
+        "ltass_band_2",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 350.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq3 = vb.add_node(
+        "ltass_band_3",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 750.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq4 = vb.add_node(
+        "ltass_band_4",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 1500.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq5 = vb.add_node(
+        "ltass_band_5",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 3000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq6 = vb.add_node(
+        "ltass_band_6",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 6000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_eq7 = vb.add_node(
+        "ltass_band_7",
+        "BiquadFilter",
+        serde_json::json!({ "freq_hz": 12000.0, "q": 0.707, "filter_type": 3.0, "gain_db": 0.0 }),
+    );
+    let v_gain = vb.add_node(
+        "vca_gain",
+        "Gain",
+        serde_json::json!({ "gain": 1.0, "glide_ms": 10.0 }),
+    );
+    let v_out = vb.add_node("out", "Output", serde_json::json!({}));
 
-    let music_topology_json = serde_json::json!({
-        "topology_id": "vca_bus_topology",
-        "nodes": [
-            { "node_id": "in", "node_type": "Input", "parameters": {} },
-            { "node_id": "vca_gain", "node_type": "Gain", "parameters": { "gain": 1.0, "glide_ms": 10.0 } },
-            { "node_id": "widener", "node_type": "Width", "parameters": { "decorrelation": 0.0, "side_gain_db": 0.0, "mono_comp_shelf_db": 0.0 } },
-            { "node_id": "out", "node_type": "Output", "parameters": {} }
-        ],
-        "edges": [
-            { "source": "in", "target": "vca_gain", "modulation_type": "audio" },
-            { "source": "vca_gain", "target": "widener", "modulation_type": "audio" },
-            { "source": "widener", "target": "out", "modulation_type": "audio" }
-        ]
-    });
+    vb.connect(&v_in, &v_deesser);
+    vb.connect(&v_deesser, &v_eq0);
+    vb.connect(&v_eq0, &v_eq1);
+    vb.connect(&v_eq1, &v_eq2);
+    vb.connect(&v_eq2, &v_eq3);
+    vb.connect(&v_eq3, &v_eq4);
+    vb.connect(&v_eq4, &v_eq5);
+    vb.connect(&v_eq5, &v_eq6);
+    vb.connect(&v_eq6, &v_eq7);
+    vb.connect(&v_eq7, &v_gain);
+    vb.connect(&v_gain, &v_out);
+    let vocal_topology = vb.build();
 
-    let vocal_topology =
-        sp314_nodes::topology::DspTopology::from_json(&vocal_topology_json.to_string())
-            .map_err(|e| format!("{:?}", e))?;
-    let music_topology =
-        sp314_nodes::topology::DspTopology::from_json(&music_topology_json.to_string())
-            .map_err(|e| format!("{:?}", e))?;
+    let mut mb = sp314_nodes::topology::DspTopologyBuilder::new("vca_bus_topology");
+    let m_in = mb.add_node("in", "Input", serde_json::json!({}));
+    let m_gain = mb.add_node(
+        "vca_gain",
+        "Gain",
+        serde_json::json!({ "gain": 1.0, "glide_ms": 10.0 }),
+    );
+    let m_widener = mb.add_node(
+        "widener",
+        "Width",
+        serde_json::json!({ "decorrelation": 0.0, "side_gain_db": 0.0, "mono_comp_shelf_db": 0.0 }),
+    );
+    let m_out = mb.add_node("out", "Output", serde_json::json!({}));
+
+    mb.connect(&m_in, &m_gain);
+    mb.connect(&m_gain, &m_widener);
+    mb.connect(&m_widener, &m_out);
+    let music_topology = mb.build();
     let mut vocal_graph = DspGraph::from_topology(&vocal_topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
     let mut music_graph = DspGraph::from_topology(&music_topology, block_size, sample_rate)
