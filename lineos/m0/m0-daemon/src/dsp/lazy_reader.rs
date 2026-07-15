@@ -35,28 +35,7 @@ pub struct LazyAudioReader {
     residual_pos: usize,
 }
 
-#[derive(Debug)]
-pub enum LazyReaderError {
-    NoSupportedTrack,
-    Symphonia(String),
-    InvalidBufferLength { len: usize, channels: usize },
-}
-
-impl std::fmt::Display for LazyReaderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoSupportedTrack => write!(f, "no supported audio track found"),
-            Self::Symphonia(e) => write!(f, "symphonia error: {e}"),
-            Self::InvalidBufferLength { len, channels } => write!(
-                f,
-                "buffer length {len} is not a \
-                 multiple of channel count \
-                 {channels}"
-            ),
-        }
-    }
-}
-impl std::error::Error for LazyReaderError {}
+pub use sp314_dsp::io::decode_types::LazyReaderError;
 
 type Result<T> = std::result::Result<T, LazyReaderError>;
 

@@ -332,22 +332,6 @@ mod tests {
     use crate::handlers::decode::decode_raw_interleaved;
     use sp314_nodes::topology::DspTopology;
 
-    fn dummy_eq_topology() -> DspTopology {
-        let json = serde_json::json!({
-            "topology_id": "dummy_eq_topology",
-            "nodes": [
-                { "node_id": "in", "node_type": "Input", "parameters": {} },
-                { "node_id": "eq", "node_type": "BiquadFilter", "parameters": { "filter_type": 0.0, "freq_hz": 1000.0 } },
-                { "node_id": "out", "node_type": "Output", "parameters": {} }
-            ],
-            "edges": [
-                { "source": "in", "target": "eq", "modulation_type": "audio" },
-                { "source": "eq", "target": "out", "modulation_type": "audio" }
-            ]
-        });
-        DspTopology::from_json(&json.to_string()).unwrap()
-    }
-
     fn dummy_ducking_topology() -> DspTopology {
         let json = serde_json::json!({
             "topology_id": "dummy_ducking_topology",

@@ -13,8 +13,6 @@
 //!   stereo → stereo:           pass through
 //!   N > 2 channels → stereo:   average L+R pairs, clamp [-1, 1]
 
-use std::fmt;
-
 // ── Decode constants ──────────────────────────────────────────────────────────
 // All limits enforced before calling sp314-dsp.
 
@@ -51,32 +49,7 @@ pub struct AudioPcm {
 
 // ── DecodeError ───────────────────────────────────────────────────────────────
 
-#[derive(Debug)]
-pub enum DecodeError {
-    FileNotFound(String),
-    FileTooLarge(u64),
-    DurationExceeded(u64),
-    UnsupportedFormat(String),
-    DecodeFailure(String),
-    ResampleFailure(String),
-    ConsumerError(String),
-}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DecodeError::FileNotFound(p) => write!(f, "File not found: {p}"),
-            DecodeError::FileTooLarge(sz) => {
-                write!(f, "File too large ({} MB > 500MB limit)", sz / 1024 / 1024)
-            }
-            DecodeError::DurationExceeded(s) => write!(f, "Audio too long ({s}s > 12 min limit)"),
-            DecodeError::UnsupportedFormat(e) => write!(f, "Unsupported format: {e}"),
-            DecodeError::DecodeFailure(e) => write!(f, "Decode failure: {e}"),
-            DecodeError::ResampleFailure(e) => write!(f, "Resample failure: {e}"),
-            DecodeError::ConsumerError(e) => write!(f, "Consumer error: {e}"),
-        }
-    }
-}
+pub use sp314_dsp::io::decode_types::DecodeError;
 
 // ── Public entry point ────────────────────────────────────────────────────────
 

@@ -6,4 +6,5 @@ pub mod wav_writer;
 pub use flac_writer::FlacWriter;
 pub use wav_reader::{DecodedAudio, WavReader};
 pub use wav_writer::WavWriter;
+pub mod decode_types;
 pub mod stream;

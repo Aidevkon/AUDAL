@@ -7,13 +7,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
-pub enum DecodeChunk<'a> {
-    /// Bounded-size interleaved stereo samples (≤ some max chunk size, NOT
-    /// necessarily aligned to DspGraph's block_size — that alignment happens
-    /// downstream, this layer just avoids whole-file accumulation).
-    Samples(&'a [f32]),
-    EndOfStream,
-}
+pub use sp314_dsp::io::decode_types::DecodeChunk;
 
 /// Streaming decode: calls `on_chunk` for each decoded packet's samples
 /// instead of accumulating into one Vec<f32>. Preserves the existing
