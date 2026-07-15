@@ -395,3 +395,8 @@ impl StemRenderer {
         (harmonic, stems.drums)
     }
 }
+
+pub struct NmfResult {
+    pub segment_id: usize,
+    pub stems: FiveStems,
+}

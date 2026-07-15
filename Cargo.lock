@@ -8016,6 +8016,7 @@ dependencies = [
 name = "sp314-orchestrator"
 version = "0.1.0"
 dependencies = [
+ "aether-bridge",
  "lineos-corpus",
  "lineos-types",
  "serde",

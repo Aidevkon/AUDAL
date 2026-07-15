@@ -1,5 +1,3 @@
-use sp314_dsp::stft::stem_renderer::FiveStems;
-
 /// Job sent from the main render loop to the background NMF worker.
 /// Lives in the quarantined `orchestrator` module so it can be
 /// lifted into a future standalone crate with minimal rework.
@@ -10,10 +8,7 @@ pub struct NmfJob {
 }
 
 /// Result sent back from the worker once separation completes.
-pub struct NmfResult {
-    pub segment_id: usize,
-    pub stems: FiveStems,
-}
+use sp314_dsp::stft::stem_renderer::NmfResult;
 
 use sp314_orchestrator::seekable_provider::ExactSeekProvider;
 

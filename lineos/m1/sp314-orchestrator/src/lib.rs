@@ -9,3 +9,4 @@ pub mod decode_provider;
 pub mod pass1_pipeline;
 pub mod seekable_provider;
 pub mod sparse_scout;
+pub mod streaming_pipeline;

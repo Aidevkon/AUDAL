@@ -14,7 +14,7 @@ pub mod orchestrator;
 pub mod signal_health;
 
 pub mod standardized_stream;
-pub mod streaming_pipeline;
+
 pub use audio_source::AudioSource;
 pub use maestro::{AutoTuningController, RenderParams};
 
