@@ -38,6 +38,16 @@ pub enum Intent {
         session_id: String,
         response: oneshot::Sender<Result<AnalysisResult, ExecutorError>>,
     },
+    // R2 — Conductor → streaming workflow
+    ExecuteStreaming {
+        params: StreamingParams,
+        response: oneshot::Sender<Result<StreamingOutput, ConductorError>>,
+    },
+    // R3 — Conductor → Executor (streaming)
+    RunStreaming {
+        plan: StreamingPlan,
+        response: oneshot::Sender<Result<StreamingOutput, ExecutorError>>,
+    },
     // R2 — Conductor batch workflow
     ExecuteBatchMastering {
         batch_id: String,
@@ -123,6 +133,33 @@ pub struct AnalysisResult {
 pub struct MasteringOutput {
     pub job_id: String,
     pub blob_id: String,
+    pub status: &'static str,
+    pub pcm_data: Option<std::path::PathBuf>,
+    pub num_frames: usize,
+    pub sample_rate: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct StreamingParams {
+    pub audio_path: String,
+    pub output_path: String,
+    pub preset_id: String,
+    pub flavour_id: Option<String>,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct StreamingPlan {
+    pub audio_path: String,
+    pub output_path: String,
+    pub preset_id: String,
+    pub flavour_id: Option<String>,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct StreamingOutput {
+    pub job_id: String,
     pub status: &'static str,
     pub pcm_data: Option<std::path::PathBuf>,
     pub num_frames: usize,
@@ -224,12 +261,38 @@ impl Operator {
                     .await
                     .map_err(|e| format!("Conductor closed: {e}"))
             }
+            Intent::ExecuteStreaming { params, .. } => {
+                self.audit
+                    .write(AuditEntry::new(
+                        "operator.dispatch",
+                        AuditLevel::Audit,
+                        &format!("→ Conductor streaming session={}", params.session_id),
+                    ))
+                    .ok();
+                self.conductor_tx
+                    .send(intent)
+                    .await
+                    .map_err(|e| format!("Conductor closed: {e}"))
+            }
             Intent::RunDsp { .. } => {
                 self.audit
                     .write(AuditEntry::new(
                         "operator.dispatch",
                         AuditLevel::Audit,
                         "→ Executor",
+                    ))
+                    .ok();
+                self.executor_tx
+                    .send(intent)
+                    .await
+                    .map_err(|e| format!("Executor closed: {e}"))
+            }
+            Intent::RunStreaming { .. } => {
+                self.audit
+                    .write(AuditEntry::new(
+                        "operator.dispatch",
+                        AuditLevel::Audit,
+                        "→ Executor (streaming)",
                     ))
                     .ok();
                 self.executor_tx
