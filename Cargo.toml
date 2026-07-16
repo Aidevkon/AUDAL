@@ -31,6 +31,16 @@ members = [
 [profile.release]
 opt-level = 'z'
 
+# cockpit-dioxus originally declared its own release profile
+# (opt-level=3, lto, codegen-units=1 — max-speed WASM) which cargo
+# silently ignored in favor of the workspace 'z'. Preserved here as
+# a named profile; the dioxus build should opt into it explicitly.
+[profile.release-cockpit]
+inherits = "release"
+opt-level = 3
+lto = true
+codegen-units = 1
+
 # Optimize all third-party dependencies (like rustfft) to speed up math
 [profile.dev.package."*"]
 opt-level = 3
