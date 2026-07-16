@@ -4,7 +4,7 @@ use super::predictive::PredictiveController;
 use super::voice_v1::MarkovStateClassifier;
 
 #[cfg(test)]
-mod contract_tests {
+mod tests {
     use super::*;
     use lineos_types::analysis::StemMetrics;
 

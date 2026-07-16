@@ -18,6 +18,12 @@ pub struct SegmentScout {
     mfcc: MfccAnalyzer,
 }
 
+impl Default for SegmentScout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SegmentScout {
     pub fn new() -> Self {
         Self {
