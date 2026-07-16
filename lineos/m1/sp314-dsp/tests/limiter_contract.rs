@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 // tests/limiter_contract.rs
 
 use approx::assert_abs_diff_eq;

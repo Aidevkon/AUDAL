@@ -1,3 +1,7 @@
+// allow: polyphase oversampled waveshaper, circular delay-line
+// indexing and reversed-phase alignment; indices are the math.
+#![allow(clippy::needless_range_loop)]
+
 // src/harmonic/mod.rs
 // HarmonicEngine with 2x polyphase oversampling.
 // Eliminates aliasing from tanhf nonlinearity.

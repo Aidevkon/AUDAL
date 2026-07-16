@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 use approx::assert_abs_diff_eq;
 use sp314_dsp::masking_eq::{
     biquad::{process_biquad, rbj_peaking_coeffs},

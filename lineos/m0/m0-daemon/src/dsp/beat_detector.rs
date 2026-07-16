@@ -106,8 +106,7 @@ impl BeatDetector {
 
         // Bucket size is 10ms, peak_ioi_ms = bucket * 10
         // We iterate and keep the highest count.
-        for bucket in 1..histogram.len() {
-            let count = histogram[bucket];
+        for (bucket, &count) in histogram.iter().enumerate().skip(1) {
             let bpm = 60000.0 / (bucket * 10) as f32;
             if (60.0..=200.0).contains(&bpm) && count > best_count {
                 best_count = count;

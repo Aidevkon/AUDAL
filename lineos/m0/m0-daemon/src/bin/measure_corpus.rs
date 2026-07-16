@@ -502,8 +502,8 @@ fn main() {
         for track in &accepted_tracks {
             let mean = track.levels_db.iter().sum::<f32>() / 8.0;
             let mut centered = [0.0; 8];
-            for k in 0..8 {
-                centered[k] = track.levels_db[k] - mean;
+            for (c, &l) in centered.iter_mut().zip(&track.levels_db) {
+                *c = l - mean;
             }
             mean_centered_shapes.push(centered);
         }
@@ -518,8 +518,8 @@ fn main() {
         }
 
         let target_mean = target_db.iter().sum::<f32>() / 8.0;
-        for k in 0..8 {
-            target_db[k] -= target_mean;
+        for t in target_db.iter_mut() {
+            *t -= target_mean;
         }
 
         // target = where we pull toward (energy-weighted); dead zone = population spread around its arithmetic center; different questions, different centers.

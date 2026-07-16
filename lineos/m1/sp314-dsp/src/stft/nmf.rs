@@ -1,3 +1,8 @@
+// allow: index-based loops here are row-major matrix math on flat W/H
+// buffers (w[b*k+c], h[c*n_frames+f]); iterator rewrites would obscure
+// the linear algebra in the engine's most determinism-critical code.
+#![allow(clippy::needless_range_loop)]
+
 pub const N_COMPONENTS: usize = 5;
 pub const N_ITER: usize = 30;
 const EPS: f32 = 1e-10_f32;

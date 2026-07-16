@@ -1,3 +1,8 @@
+// allow: index loops here are triangular filterbank ranges over
+// computed bin boundaries, DCT basis math, and a zero-allocation
+// lockstep window multiply; iterator forms would obscure the math.
+#![allow(clippy::needless_range_loop)]
+
 //! MFCC — Mel-Frequency Cepstral Coefficients
 //! Authority: corpus-learning-spec-v1_2.md
 //! Zero heap allocation in compute() — all buffers pre-allocated.

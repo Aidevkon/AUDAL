@@ -1,3 +1,7 @@
+// allow: polyphase up/down FIR with circular indexing and
+// reversed-phase alignment (3-p); indices are the filter math.
+#![allow(clippy::needless_range_loop)]
+
 const TAPS: usize = 16;
 
 const POLYPHASE_UP: [[f64; TAPS]; 4] = [

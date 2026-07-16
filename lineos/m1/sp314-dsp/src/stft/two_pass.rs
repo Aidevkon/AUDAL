@@ -682,10 +682,10 @@ impl TwoPassEngine {
             drums_transient_sum += out.drums_transient;
             chunk_count += 1;
 
-            for i in 0..5 {
-                global_spatial_sums[i].0 += out.spatial_sums[i].0;
-                global_spatial_sums[i].1 += out.spatial_sums[i].1;
-                global_spatial_sums[i].2 += out.spatial_sums[i].2;
+            for (g, s) in global_spatial_sums.iter_mut().zip(&out.spatial_sums) {
+                g.0 += s.0;
+                g.1 += s.1;
+                g.2 += s.2;
             }
 
             // Psychoacoustic Collision Matrix — smoothed micro-ducking sequentially across chunks.

@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 use sp314_dsp::masking_eq::biquad::{
     process_tdf2, rbj_bell, rbj_high_shelf, rbj_highpass, rbj_low_shelf, rbj_lowpass, BiquadCoeffs,
     BiquadState,

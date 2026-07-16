@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 // tests/restoration_contract.rs
 // Dev-time rules apply — std::f32 permitted for test signal generation.
 

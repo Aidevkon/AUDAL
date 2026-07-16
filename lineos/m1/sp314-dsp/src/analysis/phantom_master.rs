@@ -89,8 +89,8 @@ impl PhantomMaster {
 
         // Spectral profile — weighted centroid per band
         let mut spectral = [0.0f32; 8];
-        for band in 0..8 {
-            spectral[band] = weighted_mean(
+        for (band, s) in spectral.iter_mut().enumerate() {
+            *s = weighted_mean(
                 analyses.iter().map(|a| a.spectral_profile_db[band]),
                 &weights,
                 total_weight,

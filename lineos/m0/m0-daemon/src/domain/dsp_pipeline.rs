@@ -123,6 +123,8 @@ fn spatial_conformance_path(
 
     // 4. Interleave 6ch και γράψε raw PCM dump
     let mut interleaved = Vec::with_capacity(num_frames * 6);
+    // allow: 6ch interleave, column access across planar buffers
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_frames {
         for ch in 0..6 {
             interleaved.push(channels[ch][i]);

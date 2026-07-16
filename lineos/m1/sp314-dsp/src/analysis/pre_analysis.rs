@@ -188,8 +188,8 @@ impl PreAnalyzer {
                 }
             }
             let count = mfcc_frames.len() as f32;
-            for i in 0..lineos_corpus::mfcc::N_MFCC {
-                mean[i] /= count;
+            for m in mean.iter_mut() {
+                *m /= count;
             }
             lineos_corpus::classifier::GenreClassifier::classify(&mean)
         };
@@ -246,8 +246,7 @@ fn true_peak_channel(signal: &[f32]) -> f32 {
     }
     // Polyphase interpolation: for each input sample, compute 3 interpolated
     // samples (phases 0,1,2; phase 3 ≈ original sample)
-    for phase_idx in 0..3 {
-        let h = &POLYPHASE[phase_idx];
+    for h in POLYPHASE.iter().take(3) {
         for i in TAPS_PER_PHASE..n {
             let mut acc: f32 = 0.0;
             for j in 0..TAPS_PER_PHASE {

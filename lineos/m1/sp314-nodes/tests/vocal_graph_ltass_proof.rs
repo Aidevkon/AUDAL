@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 use aether_bridge::reference_resolver::{ProfileId, ReferenceProfile, ReferenceResolver};
 use serde_json::json;
 use sp314_nodes::{graph::DspGraph, topology::DspTopology};

@@ -155,10 +155,10 @@ pub fn run_streaming_pipeline_with_timeline(
             &profile,
         );
 
-        for i in 0..8 {
+        for (i, &gain) in ref_gains.iter().enumerate() {
             let node_id = format!("ltass_band_{}", i);
             vocal_graph
-                .set_node_parameter_no_glide(&node_id, "gain_db", ref_gains[i])
+                .set_node_parameter_no_glide(&node_id, "gain_db", gain)
                 .map_err(|e| format!("Failed to set LTASS gain: {:?}", e))?;
         }
     }
@@ -276,9 +276,9 @@ pub fn run_streaming_pipeline_with_timeline(
                         let mut v_br = v_bl.clone();
 
                         let mut m_bl = vec![0.0f32; available_stem_frames];
-                        for i in 0..available_stem_frames {
+                        for (i, m) in m_bl.iter_mut().enumerate() {
                             let idx = local_start_frame + i;
-                            m_bl[i] = stems.drums[idx] + stems.bass[idx] + stems.harmonics[idx] + stems.ambience[idx];
+                            *m = stems.drums[idx] + stems.bass[idx] + stems.harmonics[idx] + stems.ambience[idx];
                         }
                         m_bl.resize(block_size, 0.0);
                         let mut m_br = m_bl.clone();

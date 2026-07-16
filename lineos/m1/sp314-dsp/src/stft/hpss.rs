@@ -1,3 +1,7 @@
+// allow: sliding-median loops with edge-clamped index arithmetic;
+// the computed idx IS the algorithm.
+#![allow(clippy::needless_range_loop)]
+
 pub const L_HARM: usize = 17; // time frames window
 pub const L_PERC: usize = 17; // frequency bins window
 

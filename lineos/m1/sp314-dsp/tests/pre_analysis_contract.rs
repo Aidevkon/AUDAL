@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 // pre_analysis_contract.rs — Oracle-TDD contract tests for PreAnalysisData
 // Authority: Pre-Analysis Constitution v1.3
 // Workflow:  Oracle-TDD Step 3 (RED until PreAnalyzer is implemented)

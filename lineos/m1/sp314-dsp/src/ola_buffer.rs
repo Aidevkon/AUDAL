@@ -1,3 +1,7 @@
+// allow: ring-buffer loops with modular indexing
+// ((ring_idx + i) % window_size); iterator forms obscure the OLA math.
+#![allow(clippy::needless_range_loop)]
+
 //! ola_buffer.rs — Generic Overlap-Add Ring Buffer
 //! Reusable DSP primitive for seamless chunk stitching with perfect reconstruction.
 

@@ -1,3 +1,8 @@
+// allow: index loops here iterate 2-D complex STFT frames
+// (frames[t][b]) with per-bin magnitude math; iterator rewrites
+// obscure the time×frequency structure.
+#![allow(clippy::needless_range_loop)]
+
 // analysis/spectral.rs — Spectral feature extraction
 // libm only. No std::f32 methods.
 // Per-channel computation → averaged per S-002 §4 (Option A)

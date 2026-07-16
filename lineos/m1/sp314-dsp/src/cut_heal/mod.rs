@@ -132,9 +132,7 @@ impl CrossfadeHeal {
             audio[cut_end + i] *= 1.0 - t;
         }
 
-        for i in cut_start..cut_end {
-            audio[i] = 0.0;
-        }
+        audio[cut_start..cut_end].fill(0.0);
     }
 }
 
@@ -145,8 +143,8 @@ mod tests {
     fn generate_sine(freq: f32, sample_rate: u32, samples: usize, amp: f32) -> Vec<f32> {
         let mut buf = vec![0.0; samples];
         let phase_inc = 2.0 * std::f32::consts::PI * freq / sample_rate as f32;
-        for i in 0..samples {
-            buf[i] = (i as f32 * phase_inc).sin() * amp;
+        for (i, s) in buf.iter_mut().enumerate() {
+            *s = (i as f32 * phase_inc).sin() * amp;
         }
         buf
     }
@@ -154,10 +152,10 @@ mod tests {
     fn generate_noise(samples: usize, amp: f32) -> Vec<f32> {
         let mut buf = vec![0.0; samples];
         let mut seed = 42u32;
-        for i in 0..samples {
+        for s in buf.iter_mut() {
             seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
             let val = (seed as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            buf[i] = val * amp;
+            *s = val * amp;
         }
         buf
     }
@@ -170,9 +168,7 @@ mod tests {
                                                               // insert 300ms silence in the middle
         let start = 12000;
         let len = (sr as f32 * 0.3) as usize;
-        for i in start..start + len {
-            audio[i] = 0.0;
-        }
+        audio[start..start + len].fill(0.0);
         let cuts = SilenceCut::detect(&audio, sr);
         assert!(!cuts.is_empty(), "Should detect long silence");
         assert_eq!(cuts[0].0, 12288); // block aligned 24 * 512 = 12288
@@ -186,9 +182,7 @@ mod tests {
         let mut audio = generate_sine(440.0, sr, 48000, 0.5);
         let start = 12000;
         let len = (sr as f32 * 0.1) as usize; // 100ms is < 200ms
-        for i in start..start + len {
-            audio[i] = 0.0;
-        }
+        audio[start..start + len].fill(0.0);
         let cuts = SilenceCut::detect(&audio, sr);
         assert!(cuts.is_empty(), "Should ignore short gap");
     }

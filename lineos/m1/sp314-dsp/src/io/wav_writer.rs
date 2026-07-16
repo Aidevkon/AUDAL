@@ -1,3 +1,7 @@
+// allow: frame-major 6-channel interleave loops; column access
+// across 6 planar buffers has no cleaner iterator form.
+#![allow(clippy::needless_range_loop)]
+
 // src/io/wav_writer.rs
 
 /// Simple WAV writer using `hound`.

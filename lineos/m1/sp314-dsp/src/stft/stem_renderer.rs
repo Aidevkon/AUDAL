@@ -1,3 +1,8 @@
+// allow: index loops here are temporal-neighbor mask math
+// (masks[f-1][b]), flat W/H matrix offsets, and multi-stem
+// lockstep sums; iterator forms would obscure them.
+#![allow(clippy::needless_range_loop)]
+
 use crate::stft::hpss::HpssProcessor;
 use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
 use crate::stft::{StftEngine, N_BINS};

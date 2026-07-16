@@ -144,8 +144,8 @@ impl OlaRingBuffer {
 
         // Mix previous overlap into the start of this chunk
         let mix_len = overlap_len.min(out_len);
-        for i in 0..mix_len {
-            result[i] += self.overlap[i];
+        for (r, o) in result[..mix_len].iter_mut().zip(&self.overlap[..mix_len]) {
+            *r += o;
         }
 
         // Save tail of this chunk as new overlap

@@ -1,3 +1,7 @@
+// allow: polyphase FIR with circular delay-line indexing
+// ((write_pos + N - tap) % N); indices are the filter alignment.
+#![allow(clippy::needless_range_loop)]
+
 // src/limiter/true_peak.rs
 
 const POLYPHASE: [[f64; 18]; 4] = [

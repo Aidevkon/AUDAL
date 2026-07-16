@@ -1,3 +1,7 @@
+// allow: contract tests index synthetic buffers the same way the
+// DSP code under test does; iterator rewrites add nothing here.
+#![allow(clippy::needless_range_loop)]
+
 use approx::assert_abs_diff_eq;
 use serde_json::Value;
 use sp314_dsp::psychoacoustic::{

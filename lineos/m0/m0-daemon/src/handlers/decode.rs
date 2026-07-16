@@ -115,8 +115,8 @@ pub fn decode_smart(path: &str) -> Result<lineos_types::AudioPayload, DecodeErro
             // De-interleave into 6 discrete channels: [L, R, C, LFE, Ls, Rs]
             let frames = raw.len() / 6;
             let mut channels: [Vec<f32>; 6] = Default::default();
-            for ch_idx in 0..6 {
-                channels[ch_idx] = Vec::with_capacity(frames);
+            for ch in channels.iter_mut() {
+                *ch = Vec::with_capacity(frames);
             }
             for frame in raw.chunks_exact(6) {
                 for ch_idx in 0..6 {

@@ -22,8 +22,8 @@ pub fn compute_global_stats(
             mean[i] += frame[i];
         }
     }
-    for i in 0..N_MFCC {
-        mean[i] /= n;
+    for m in mean.iter_mut() {
+        *m /= n;
     }
 
     let mut var = [0.0; N_MFCC];
@@ -69,8 +69,8 @@ pub fn compute_bucket_centroid(
             mean[i] += z[i];
         }
     }
-    for i in 0..N_MFCC {
-        mean[i] /= n;
+    for m in mean.iter_mut() {
+        *m /= n;
     }
 
     let mut var = [0.0; N_MFCC];
@@ -80,8 +80,8 @@ pub fn compute_bucket_centroid(
             var[i] += diff * diff;
         }
     }
-    for i in 0..N_MFCC {
-        var[i] /= n;
+    for v in var.iter_mut() {
+        *v /= n;
     }
 
     Ok((mean, var))
