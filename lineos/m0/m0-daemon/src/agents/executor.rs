@@ -257,7 +257,7 @@ pub async fn run(
 
                     // 3. Call run_streaming_pipeline_with_timeline
                     let output_path = plan.output_path.clone();
-                    sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
+                    let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
                         main_decoder,
                         &output_path,
                         &ducking_topology, // Passing minimal ducking fallback graph
@@ -280,7 +280,7 @@ pub async fn run(
                         job_id,
                         status: "completed",
                         pcm_data: Some(std::path::PathBuf::from(output_path)),
-                        num_frames: 0, // Frame count deferred
+                        num_frames: frames_written,
                         sample_rate,
                     })
                 })

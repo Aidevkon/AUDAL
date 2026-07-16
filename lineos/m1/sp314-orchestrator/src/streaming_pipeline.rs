@@ -31,6 +31,7 @@ use std::error::Error;
 
 // allow: 12 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
 #[allow(clippy::too_many_arguments)]
+/// Returns the total number of per-channel frames written.
 pub fn run_streaming_pipeline_with_timeline(
     decoder: impl DecodeProvider,
     output_path: &str,
@@ -44,7 +45,7 @@ pub fn run_streaming_pipeline_with_timeline(
     pre_analysis: Option<&lineos_types::pre_analysis::PreAnalysisData>,
     rx_res: std::sync::mpsc::Receiver<sp314_dsp::stft::stem_renderer::NmfResult>,
     flagged_indices: Vec<usize>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<usize, Box<dyn Error>> {
     let mut graph = DspGraph::from_topology(topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
     let mut writer = StreamingWavWriter::new(output_path, sample_rate)?;
@@ -324,5 +325,5 @@ pub fn run_streaming_pipeline_with_timeline(
     .map_err(|e| format!("{:?}", e))?;
 
     writer.finalize()?;
-    Ok(())
+    Ok(total_frames_processed)
 }

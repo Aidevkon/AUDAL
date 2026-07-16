@@ -76,7 +76,7 @@ fn streaming_pipeline_ducking_e2e() {
     let (_, flagged_indices2) =
         m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
 
-    run_streaming_pipeline_with_timeline(
+    let frames = run_streaming_pipeline_with_timeline(
         FileDecoder {
             path: input_path.to_string(),
         },
@@ -93,6 +93,7 @@ fn streaming_pipeline_ducking_e2e() {
         flagged_indices2,
     )
     .unwrap();
+    assert!(frames > 0, "pipeline must report frames written, got 0");
 
     // Decode the output and compute RMS!
     let (out_samples, sr, channels) = decode_raw_interleaved(output_path).unwrap();
