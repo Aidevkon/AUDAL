@@ -1,4 +1,3 @@
-use hound;
 use lineos_corpus::scout::{smooth_and_segment, SegmentType};
 use sp314_dsp::analysis::scout_scanner::scan_file;
 use std::path::PathBuf;

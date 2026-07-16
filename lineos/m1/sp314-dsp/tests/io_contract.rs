@@ -3,7 +3,6 @@
 // tests/io_contract.rs
 
 use approx::assert_abs_diff_eq;
-use hound;
 use sp314_dsp::io::{WavReader, WavWriter};
 use std::fs;
 
