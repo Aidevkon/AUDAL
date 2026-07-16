@@ -12,7 +12,7 @@ fmt:
     cargo fmt --check
 
 clippy:
-    cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
+    cargo clippy --all-targets --workspace -- -D warnings
 
 test-unit:
     cargo test --lib --workspace
