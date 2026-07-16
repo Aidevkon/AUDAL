@@ -446,3 +446,49 @@ fn test_vocal_graph_e2e_ltass_proof() {
     std::fs::remove_file(output_path_flat).ok();
     std::fs::remove_file(output_path_eq).ok();
 }
+
+#[test]
+fn tapped_decoder_dump_is_byte_identical_to_source_stream() {
+    use sp314_orchestrator::decode_provider::{DecodeProvider, TappedDecoder};
+
+    let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+    let tap_path = "/tmp/test_tap_dump.pcm";
+
+    // Reference: collect the raw stream directly.
+    let plain = FileDecoder {
+        path: input_path.to_string(),
+    };
+    let mut reference: Vec<f32> = Vec::new();
+    plain
+        .stream_to(|chunk| -> Result<(), String> {
+            if let sp314_dsp::io::decode_types::DecodeChunk::Samples(s) = chunk {
+                reference.extend_from_slice(s);
+            }
+            Ok(())
+        })
+        .unwrap();
+
+    // Tapped: stream through the decorator, consuming nothing.
+    let tapped = TappedDecoder::new(
+        FileDecoder {
+            path: input_path.to_string(),
+        },
+        tap_path,
+    );
+    tapped
+        .stream_to(|_chunk| -> Result<(), String> { Ok(()) })
+        .unwrap();
+    assert!(tapped.take_tap_error().is_none(), "tap must not error");
+
+    // Compare bytes.
+    let dumped = std::fs::read(tap_path).unwrap();
+    let reference_bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(reference.as_ptr() as *const u8, reference.len() * 4) };
+    assert_eq!(
+        dumped.len(),
+        reference_bytes.len(),
+        "tap dump length mismatch"
+    );
+    assert_eq!(dumped, reference_bytes, "tap dump must be byte-identical");
+    let _ = std::fs::remove_file(tap_path);
+}
