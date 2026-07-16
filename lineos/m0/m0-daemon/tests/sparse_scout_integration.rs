@@ -161,7 +161,11 @@ fn test_quadratic_mean_differs_from_arithmetic_mean_under_varying_loudness() {
     for i in 0..n {
         let time_sec = i as f32 / sr as f32;
         let segment_idx = ((time_sec + 1.0) / 2.0) as usize;
-        let s = if segment_idx % 2 == 0 { 1.0 } else { 0.0 };
+        let s = if segment_idx.is_multiple_of(2) {
+            1.0
+        } else {
+            0.0
+        };
         w.write_sample(s).unwrap();
         w.write_sample(s).unwrap();
     }

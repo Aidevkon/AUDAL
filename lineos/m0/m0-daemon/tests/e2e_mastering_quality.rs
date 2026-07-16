@@ -777,7 +777,7 @@ fn inv_qa_6_mud_correction() {
         // Weak high clarity reference
         let clarity = (2.0 * std::f32::consts::PI * 6000.0 * t).sin() * 0.05;
         // GLSL noise for FFT stability
-        let noise = ((i as f32 * 12.9898).sin() * 43758.5453).fract() * 0.01;
+        let noise = ((i as f32 * 12.9898).sin() * 43_758.547).fract() * 0.01;
         let mix = (mud + clarity + noise).clamp(-1.0, 1.0);
         signal.push(mix);
         signal.push(mix);

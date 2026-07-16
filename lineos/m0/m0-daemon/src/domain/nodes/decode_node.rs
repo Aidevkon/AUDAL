@@ -298,7 +298,7 @@ mod tests {
             // deliberately odd chunk size, not aligned to anything
             for &s in chunk {
                 stream_blake3.update(&s.to_le_bytes());
-                sha2::Digest::update(&mut stream_sha256, &s.to_be_bytes());
+                sha2::Digest::update(&mut stream_sha256, s.to_be_bytes());
             }
         }
         let stream_blake3_hex = stream_blake3.finalize().to_hex().to_string();

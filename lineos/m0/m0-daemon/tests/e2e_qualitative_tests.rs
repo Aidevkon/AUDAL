@@ -34,7 +34,7 @@ pub fn assert_phase_coherence_null(
         let matched_master = mastered_samples[i] * gain_compensation;
 
         // 2. Phase Inversion στο Original (Πολλαπλασιασμός με -1.0)
-        let inverted_original = original_samples[i] * -1.0;
+        let inverted_original = -original_samples[i];
 
         // 3. Summing (Το Nulling process)
         let residual = matched_master + inverted_original;

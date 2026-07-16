@@ -150,7 +150,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert_eq!(result.segment_id, 42);
-        assert!(result.stems.voice.len() > 0);
+        assert!(!result.stems.voice.is_empty());
         let expected_frames = (5.0 * 48000.0) as usize;
         // There may be a small truncation in processing chunks, check roughly
         assert!((result.stems.voice.len() as isize - expected_frames as isize).abs() < 2048);

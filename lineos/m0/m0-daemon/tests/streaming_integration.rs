@@ -258,7 +258,7 @@ fn test_streaming_pipeline_jit_fallback() {
     let output_path = "/tmp/test_streaming_jit_fallback.wav";
 
     // Hybrid segment out of bounds -> Worker will fail to extract -> Main thread timeout
-    let _boundaries = vec![SegmentBoundary {
+    let _boundaries = [SegmentBoundary {
         start_sec: 1000.0,
         end_sec: 1001.0,
         segment_type: SegmentType::Speech,
@@ -340,7 +340,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
     let profile = aether_bridge::reference_resolver::ReferenceProfile::load(
         aether_bridge::reference_resolver::ProfileId::PodcastV1,
     );
-    pre_flat.spectral_profile_db = profile.spectral_target.clone(); // Perfect match -> 0dB correction
+    pre_flat.spectral_profile_db = profile.spectral_target; // Perfect match -> 0dB correction
 
     let (tx_job, rx_job) = std::sync::mpsc::channel();
     let (tx_res, rx_res) = std::sync::mpsc::channel();
@@ -371,7 +371,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
 
     // RUN 2: Aggressive EQ LTASS
     let mut pre_eq = PreAnalysisData::silent();
-    let mut raw = profile.spectral_target.clone();
+    let mut raw = profile.spectral_target;
     raw[3] -= 10.0; // Force heavy boost at 750 Hz
     pre_eq.spectral_profile_db = raw;
 

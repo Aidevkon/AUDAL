@@ -427,7 +427,7 @@ mod tests {
         // Music Entering (Fast Attack):
         let mut activation = 0.540; // The actual activation entering the blur zone in Flight 10
         let mut speech_to_music_cross = None;
-        let attack_decisions = vec![
+        let attack_decisions = [
             mk_dec(0.150, 0.250), // Window 1 of blur
             mk_dec(0.150, 0.250), // Window 2 of blur
             mk_dec(0.000, 1.000), // Pure music
@@ -443,7 +443,7 @@ mod tests {
         // Music Leaving (Slow Release):
         activation = 0.198; // The actual activation entering the blur zone in Flight 11
         let mut music_to_speech_cross = None;
-        let release_decisions = vec![
+        let release_decisions = [
             mk_dec(0.626, 0.359), // Window 1 of blur (leaning Speech, but low conf!)
             mk_dec(0.704, 0.422), // Window 2 of blur
             mk_dec(0.970, 0.953), // Pure speech

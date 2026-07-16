@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_sqrt_bit_identity() {
         // IEEE 754 requires correctly-rounded sqrt, so libm::sqrtf is bit-identical to std::f32::sqrt
-        let values: [f32; 8] = [0.0, 0.25, 1.0, 2.0, 3.15, 100.0, 1e-8, 12345.6789];
+        let values: [f32; 8] = [0.0, 0.25, 1.0, 2.0, 3.15, 100.0, 1e-8, 12_345.679];
         for &x in &values {
             let std_sqrt = x.sqrt();
             let libm_sqrt = libm::sqrtf(x);
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn test_format_f32_const() {
         // Values that previously tripped clippy::excessive-precision
-        let cases = [1.630640, 0.1234567, -0.0001, 2.0, std::f32::consts::PI];
+        let cases = [1.630_64, 0.1234567, -0.0001, 2.0, std::f32::consts::PI];
 
         for &val in &cases {
             let formatted = format_f32_const(val);

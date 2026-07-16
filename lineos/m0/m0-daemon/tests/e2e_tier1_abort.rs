@@ -224,7 +224,7 @@ fn run_dsp_counts_dead_air_gaps() {
 
     assert_eq!(count, 2, "Expected exactly 2 dead air events");
     assert!(
-        sec >= 7.0 && sec <= 9.0,
+        (7.0..=9.0).contains(&sec),
         "Expected total_sec between 7.0 and 9.0, got {}",
         sec
     );

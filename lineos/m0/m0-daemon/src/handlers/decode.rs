@@ -621,8 +621,7 @@ mod tests {
         let stereo_440hz: Vec<f32> = (0..48000 * 2)
             .map(|i| {
                 let frame = i / 2;
-                let v = (2.0 * std::f32::consts::PI * 440.0 * frame as f32 / 48000.0).sin() * 0.5;
-                v
+                (2.0 * std::f32::consts::PI * 440.0 * frame as f32 / 48000.0).sin() * 0.5
             })
             .collect();
         // No resampling needed — just verify the vector is well-formed.
@@ -647,7 +646,10 @@ mod tests {
         assert!(pcm.duration_ms > 0, "Must have positive duration");
         // All samples must be within range (no clipping overflow)
         for (i, &s) in pcm.samples.iter().enumerate() {
-            assert!(s >= -1.001 && s <= 1.001, "Sample [{i}] out of range: {s}");
+            assert!(
+                (-1.001..=1.001).contains(&s),
+                "Sample [{i}] out of range: {s}"
+            );
         }
         println!(
             "✅ gargar.mp3: {}ms, {}/{} ch/sr, {} samples",

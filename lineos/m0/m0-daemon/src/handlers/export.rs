@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn test_pcm_bytes_roundtrip() {
-        let samples = vec![0.5f32, -0.5f32, 1.0f32, 0.0f32];
+        let samples = [0.5f32, -0.5f32, 1.0f32, 0.0f32];
         let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
         let decoded = pcm_bytes_to_f32(&bytes);
         assert_eq!(decoded.len(), samples.len());

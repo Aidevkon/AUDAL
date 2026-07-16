@@ -81,13 +81,7 @@ fn generate_fixture(amps: &[f64; 6], peak_norm: f64) -> Vec<i16> {
 
     let mut pcm = Vec::with_capacity(total_samples * 2);
     for v in float_samples {
-        let mut int_val = (32767.0 * v * scale) as i32;
-        if int_val > 32767 {
-            int_val = 32767;
-        }
-        if int_val < -32768 {
-            int_val = -32768;
-        }
+        let int_val = ((32767.0 * v * scale) as i32).clamp(-32768, 32767);
         let s16 = int_val as i16;
         pcm.push(s16); // Left
         pcm.push(s16); // Right

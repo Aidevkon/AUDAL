@@ -139,7 +139,7 @@ fn scheduler_advances_and_detects_boundary() {
     assert!(boundary_crossed_at.is_some());
     let (block_idx, new_section_idx) = boundary_crossed_at.unwrap();
     assert_eq!(new_section_idx, 1);
-    assert!(block_idx >= 46 && block_idx <= 47); // around 24000 samples
+    assert!((46..=47).contains(&block_idx)); // around 24000 samples
 }
 
 #[test]

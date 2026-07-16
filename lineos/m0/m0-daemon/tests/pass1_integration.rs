@@ -28,7 +28,7 @@ fn test_build_timeline_map() {
     // Assert boundary is near the known ~15-18s region
     let transition_time = map[0].end_sec;
     assert!(
-        transition_time >= 15.0 && transition_time < 18.0,
+        (15.0..18.0).contains(&transition_time),
         "Expected transition boundary between 15s and 18s, got {:.2}s",
         transition_time
     );

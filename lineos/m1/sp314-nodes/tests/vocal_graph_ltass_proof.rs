@@ -48,7 +48,7 @@ fn test_vocal_graph_ltass_correction() {
 
     // We construct a synthetic profile where most bands perfectly match the target,
     // but Band 3 (750 Hz) is deliberately 6 dB too quiet, which should produce a +6 dB boost request.
-    let mut raw_profile = profile.spectral_target.clone();
+    let mut raw_profile = profile.spectral_target;
     // Move all bands to an absolute level (e.g. around -20 dBFS)
     for v in raw_profile.iter_mut() {
         *v += -20.0;
@@ -84,7 +84,7 @@ fn test_vocal_graph_ltass_correction() {
         let node_id = format!("ltass_band_{}", i);
         graph
             .set_node_parameter_no_glide(&node_id, "gain_db", ref_gains[i])
-            .expect(&format!("Failed to set gain on {}", node_id));
+            .unwrap_or_else(|_| panic!("Failed to set gain on {}", node_id));
     }
 
     // 4. Test signal verification
