@@ -14,6 +14,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use xaak::repo::DspState;
 
+// allow: 8 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     mut rx: mpsc::Receiver<Intent>,
     head_state_ptr: Arc<ArcSwap<DspState>>,

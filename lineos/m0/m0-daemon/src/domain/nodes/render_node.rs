@@ -21,6 +21,8 @@ pub struct SpatialSlicesMut<'a> {
     pub rs: &'a mut [f32],
 }
 
+// allow: 12 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     two_pass: &mut TwoPassEngine,
     mono: &[f32],

@@ -18,6 +18,8 @@ impl ExecutionProof {
     /// Generate certificate after render completes.
     /// project_id, track_id: provided by caller (session context).
     /// TODO: obtain from SessionContext in v2.0.
+    // allow: 10 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+    #[allow(clippy::too_many_arguments)]
     pub fn generate(
         input_pcm_hash: String,
         output_pcm: &[f32],

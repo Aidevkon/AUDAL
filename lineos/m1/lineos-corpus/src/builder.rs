@@ -62,6 +62,8 @@ fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
     }
 }
 
+// allow: 8 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 fn build_windowed_stem(
     signal: &[f32],
     stem_type: &str,
@@ -127,6 +129,8 @@ fn features_for<'a>(stem: &str, f: &'a StemFeatures) -> &'a StemMetrics {
     }
 }
 
+// allow: 10 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 pub fn build_timeline(
     features: &StemFeatures,
     voice_audio: &[f32],

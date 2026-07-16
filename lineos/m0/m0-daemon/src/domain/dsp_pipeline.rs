@@ -54,6 +54,8 @@ pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 }
 
 #[inline(always)]
+// allow: 9 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 fn spatial_conformance_path(
     mut channels: [Vec<f32>; 6],
     sample_rate: u32,

@@ -18,6 +18,8 @@ fn calculate_mse(actual: &[f64], expected: &[f64]) -> f64 {
     sum / actual.len() as f64
 }
 
+// allow: 8 args; test helper — a params struct adds nothing here
+#[allow(clippy::too_many_arguments)]
 fn check_filter(
     name: &str,
     coeffs: BiquadCoeffs,

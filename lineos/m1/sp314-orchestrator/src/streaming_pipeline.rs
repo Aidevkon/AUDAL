@@ -29,6 +29,8 @@ use sp314_nodes::graph::DspGraph;
 use sp314_nodes::topology::DspTopology;
 use std::error::Error;
 
+// allow: 12 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 pub fn run_streaming_pipeline_with_timeline(
     decoder: impl DecodeProvider,
     output_path: &str,

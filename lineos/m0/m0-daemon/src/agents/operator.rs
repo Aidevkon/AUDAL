@@ -353,6 +353,8 @@ pub struct AgentHandles {
 
 /// Spawn all four agent tasks. Call once from main().
 /// Returns (Operator, AgentHandles) — wire into AppState and Graceful Shutdown.
+// allow: 8 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_agents(
     audit: Arc<AuditLog>,
     head_state_ptr: Arc<ArcSwap<DspState>>,

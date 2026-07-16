@@ -41,6 +41,8 @@ impl FiveDotOneRenderer {
     ///         buffers (chunk write position)
     /// Each out_* slice must have length >=
     ///   offset + stage.l.len()
+    // allow: 8 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+    #[allow(clippy::too_many_arguments)]
     pub fn render_into(
         stage: &FiveDotOneStage,
         out_l: &mut [f32],
