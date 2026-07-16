@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_sqrt_bit_identity() {
         // IEEE 754 requires correctly-rounded sqrt, so libm::sqrtf is bit-identical to std::f32::sqrt
-        let values: [f32; 8] = [0.0, 0.25, 1.0, 2.0, 3.14159, 100.0, 1e-8, 12345.6789];
+        let values: [f32; 8] = [0.0, 0.25, 1.0, 2.0, 3.15, 100.0, 1e-8, 12345.6789];
         for &x in &values {
             let std_sqrt = x.sqrt();
             let libm_sqrt = libm::sqrtf(x);
