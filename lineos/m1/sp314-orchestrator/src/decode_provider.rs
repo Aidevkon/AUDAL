@@ -92,3 +92,16 @@ impl<D: DecodeProvider> DecodeProvider for TappedDecoder<D> {
         result
     }
 }
+
+/// Blanket impl so callers can pass &decoder and retain ownership —
+/// needed by decorators like TappedDecoder whose post-run state
+/// (take_tap_error) must be inspected after the pipeline returns.
+impl<T: DecodeProvider> DecodeProvider for &T {
+    fn stream_to<E, F>(&self, on_chunk: F) -> Result<(u32, u16), DecodeError>
+    where
+        E: ToString,
+        F: FnMut(DecodeChunk<'_>) -> Result<(), E>,
+    {
+        (**self).stream_to(on_chunk)
+    }
+}

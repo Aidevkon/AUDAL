@@ -156,6 +156,8 @@ pub async fn run(
                 // R3: pure extraction + execution.
                 let audio_path = plan.audio_path.clone();
                 let job_id = plan.session_id.clone();
+                let blob_id = uuid::Uuid::new_v4().to_string();
+                let raw_tap_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
 
                 let result = tokio::task::spawn_blocking(move || {
                     let path = std::path::Path::new(&audio_path);
@@ -251,14 +253,17 @@ pub async fn run(
                         );
 
                     // 2. Construct fresh FileDecoder
-                    let main_decoder = crate::dsp::file_decoder::FileDecoder {
-                        path: audio_path.clone(),
-                    };
+                    let main_decoder = sp314_orchestrator::decode_provider::TappedDecoder::new(
+                        crate::dsp::file_decoder::FileDecoder {
+                            path: audio_path.clone(),
+                        },
+                        raw_tap_path.clone(),
+                    );
 
                     // 3. Call run_streaming_pipeline_with_timeline
                     let output_path = plan.output_path.clone();
                     let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
-                        main_decoder,
+                        &main_decoder,
                         &output_path,
                         &ducking_topology, // Passing minimal ducking fallback graph
                         1024,
@@ -275,9 +280,22 @@ pub async fn run(
                         ExecutorError::DspFailed(format!("Streaming pipeline failed: {}", e))
                     })?;
 
+                    if let Some(e) = main_decoder.take_tap_error() {
+                        eprintln!(
+                            "[V3] raw A/B tap failed (best-effort, master unaffected): {e}"
+                        );
+                    }
+                    let mastered_raw_path =
+                        std::path::PathBuf::from(format!("/tmp/m0d-mastered-{}.pcm", blob_id));
+                    crate::dsp::wav_to_raw::wav_to_raw_pcm(&output_path, &mastered_raw_path)
+                        .map_err(|e| {
+                            ExecutorError::DspFailed(format!("wav→raw post-pass failed: {e}"))
+                        })?;
+
                     // 4. Real StreamingOutput
                     Ok(crate::agents::operator::StreamingOutput {
                         job_id,
+                        blob_id,
                         status: "completed",
                         pcm_data: Some(std::path::PathBuf::from(output_path)),
                         num_frames: frames_written,

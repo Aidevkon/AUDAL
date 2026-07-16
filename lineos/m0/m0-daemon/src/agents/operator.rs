@@ -160,6 +160,7 @@ pub struct StreamingPlan {
 #[derive(Debug, Clone)]
 pub struct StreamingOutput {
     pub job_id: String,
+    pub blob_id: String,
     pub status: &'static str,
     pub pcm_data: Option<std::path::PathBuf>,
     pub num_frames: usize,

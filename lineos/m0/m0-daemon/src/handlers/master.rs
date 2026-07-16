@@ -486,18 +486,44 @@ pub async fn trigger_streaming(
         }
 
         match rx.await {
-            Ok(Ok(_output)) => {
-                // Streaming completed. No playback.load for V3 streaming.
+            Ok(Ok(output)) => {
+                let blob_id_str = output.blob_id.clone();
                 state_bg.progress.insert(
                     session_bg.clone(),
                     crate::app_state::MasteringProgress {
                         job_id: session_bg,
                         stage: "COMPLETED".into(),
                         elapsed_ms: 0,
-                        blob_id: None,
+                        blob_id: Some(blob_id_str.clone()),
                         error: None,
                     },
                 );
+
+                if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
+                    let transfer = xaak::PcmTransfer {
+                        pcm_path: std::path::PathBuf::from(format!(
+                            "/tmp/m0d-mastered-{}.pcm",
+                            blob_id_str
+                        )),
+                        sample_rate: output.sample_rate,
+                        channels: 2,
+                        blob_id: b_id,
+                        num_frames: output.num_frames,
+                    };
+                    state_bg.playback.load(transfer);
+
+                    let raw_transfer = xaak::PcmTransfer {
+                        pcm_path: std::path::PathBuf::from(format!(
+                            "/tmp/m0d-raw-{}.pcm",
+                            blob_id_str
+                        )),
+                        sample_rate: output.sample_rate,
+                        channels: 2,
+                        blob_id: b_id,
+                        num_frames: output.num_frames,
+                    };
+                    state_bg.playback.load_raw(raw_transfer);
+                }
             }
             Ok(Err(e)) => {
                 state_bg.progress.insert(
