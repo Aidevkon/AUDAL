@@ -111,6 +111,63 @@ pub async fn run(
                 });
             }
 
+            Intent::ExecuteStreaming { params, response } => {
+                // R2 decision: busy check
+                if busy.swap(true, Ordering::SeqCst) {
+                    let _ = response.send(Err(ConductorError::Busy));
+                    continue;
+                }
+
+                let executor_tx = executor_tx.clone();
+                let busy_clone = busy.clone();
+
+                // Spawn so HTTP handler is not blocked
+                tokio::spawn(async move {
+                    // R2: build StreamingPlan from StreamingParams
+                    // Pure translation — no business logic on values
+                    let plan = super::operator::StreamingPlan {
+                        audio_path: params.audio_path,
+                        output_path: params.output_path,
+                        preset_id: params.preset_id,
+                        flavour_id: params.flavour_id,
+                        session_id: params.session_id,
+                    };
+
+                    // Dispatch to Executor (R3)
+                    let (tx, rx) = oneshot::channel();
+                    let run_streaming_intent = Intent::RunStreaming { plan, response: tx };
+
+                    if executor_tx.send(run_streaming_intent).await.is_err() {
+                        let _ = response.send(Err(ConductorError::ExecutorFailed(
+                            "Executor channel closed".into(),
+                        )));
+                        busy_clone.store(false, Ordering::SeqCst);
+                        return;
+                    }
+
+                    // Await Executor result
+                    match rx.await {
+                        Err(_) => {
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(
+                                "Executor dropped oneshot".into(),
+                            )));
+                        }
+                        Ok(Err(ExecutorError::DspFailed(e))) => {
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(e)));
+                        }
+                        Ok(Err(ExecutorError::BlobStoreFailed(e))) => {
+                            let _ = response.send(Err(ConductorError::ExecutorFailed(e)));
+                        }
+                        Ok(Ok(streaming_output)) => {
+                            let _ = response.send(Ok(streaming_output));
+                        }
+                    }
+
+                    // Release busy flag
+                    busy_clone.store(false, Ordering::SeqCst);
+                });
+            }
+
             Intent::ExecuteBatchMastering {
                 batch_id,
                 items,

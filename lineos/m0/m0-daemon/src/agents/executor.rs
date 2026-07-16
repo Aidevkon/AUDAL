@@ -152,6 +152,14 @@ pub async fn run(
                 }
             }
 
+            Intent::RunStreaming {
+                plan: _,
+                response: _,
+            } => {
+                // R3: pure extraction + execution.
+                todo!("Implement RunStreaming logic in Executor: 30s lazy_reader slice + sp314_orchestrator::run_streaming_pipeline_with_timeline")
+            }
+
             Intent::RunAnalysis {
                 audio_path,
                 session_id,
