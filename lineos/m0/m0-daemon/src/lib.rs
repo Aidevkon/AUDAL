@@ -290,6 +290,10 @@ fn mastering_router(state: AppState, config: &crate::config::M0Config) -> axum::
             "/master/batch",
             post(handlers::master::trigger_batch_mastering),
         )
+        .route(
+            "/master/streaming",
+            post(handlers::master::trigger_streaming),
+        )
         .route("/preview", post(handlers::preview::create_preview))
         .route(
             "/preview/:id/:stem",

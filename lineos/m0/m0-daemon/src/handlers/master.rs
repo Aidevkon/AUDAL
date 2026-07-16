@@ -408,3 +408,124 @@ pub async fn trigger_batch_mastering(
         "status":   "queued"
     }))
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamingRequest {
+    pub audio_path: String,
+    pub output_path: String,
+    pub preset_id: String,
+    pub flavour_id: Option<String>,
+}
+
+/// POST /master/streaming — run v3 streaming pipeline.
+pub async fn trigger_streaming(
+    State(state): State<AppState>,
+    Json(req): Json<StreamingRequest>,
+) -> Json<serde_json::Value> {
+    use crate::agents::operator::{Intent, StreamingParams};
+    use tokio::sync::oneshot;
+
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    let params = StreamingParams {
+        audio_path: req.audio_path.clone(),
+        output_path: req.output_path,
+        preset_id: req.preset_id.clone(),
+        flavour_id: req.flavour_id.clone(),
+        session_id: session_id.clone(),
+    };
+
+    // Register progress immediately
+    state.progress.insert(
+        session_id.clone(),
+        crate::app_state::MasteringProgress {
+            job_id: session_id.clone(),
+            stage: "DISPATCHED".into(),
+            elapsed_ms: 0,
+            blob_id: None,
+            error: None,
+        },
+    );
+
+    state
+        .audit
+        .write(crate::audit::AuditEntry::new(
+            "m0d.streaming_dispatched",
+            crate::audit::AuditLevel::Audit,
+            &format!(
+                "session={} path={} preset={}",
+                session_id, req.audio_path, req.preset_id
+            ),
+        ))
+        .ok();
+
+    // Dispatch to Conductor — non-blocking
+    let (tx, rx) = oneshot::channel();
+    let intent = Intent::ExecuteStreaming {
+        params,
+        response: tx,
+    };
+
+    let state_bg = state.clone();
+    let session_bg = session_id.clone();
+
+    tokio::spawn(async move {
+        if state_bg.operator.dispatch(intent).await.is_err() {
+            state_bg.progress.insert(
+                session_bg.clone(),
+                crate::app_state::MasteringProgress {
+                    job_id: session_bg,
+                    stage: "ERROR".into(),
+                    elapsed_ms: 0,
+                    blob_id: None,
+                    error: Some("Conductor channel closed".into()),
+                },
+            );
+            return;
+        }
+
+        match rx.await {
+            Ok(Ok(_output)) => {
+                // Streaming completed. No playback.load for V3 streaming.
+                state_bg.progress.insert(
+                    session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id: session_bg,
+                        stage: "COMPLETED".into(),
+                        elapsed_ms: 0,
+                        blob_id: None,
+                        error: None,
+                    },
+                );
+            }
+            Ok(Err(e)) => {
+                state_bg.progress.insert(
+                    session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id: session_bg,
+                        stage: "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id: None,
+                        error: Some(format!("{:?}", e)),
+                    },
+                );
+            }
+            Err(_) => {
+                state_bg.progress.insert(
+                    session_bg.clone(),
+                    crate::app_state::MasteringProgress {
+                        job_id: session_bg,
+                        stage: "ERROR".into(),
+                        elapsed_ms: 0,
+                        blob_id: None,
+                        error: Some("Conductor dropped response".into()),
+                    },
+                );
+            }
+        }
+    });
+
+    // Return job_id IMMEDIATELY
+    Json(serde_json::json!({ "job_id": session_id }))
+}
