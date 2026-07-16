@@ -287,10 +287,6 @@ fn mastering_router(state: AppState, config: &crate::config::M0Config) -> axum::
     let dsp_router = axum::Router::new()
         .route("/master", post(handlers::master::trigger_mastering))
         .route(
-            "/master/batch",
-            post(handlers::master::trigger_batch_mastering),
-        )
-        .route(
             "/master/streaming",
             post(handlers::master::trigger_streaming),
         )
