@@ -152,12 +152,153 @@ pub async fn run(
                 }
             }
 
-            Intent::RunStreaming {
-                plan: _,
-                response: _,
-            } => {
+            Intent::RunStreaming { plan, response } => {
                 // R3: pure extraction + execution.
-                todo!("Implement RunStreaming logic in Executor: 30s lazy_reader slice + sp314_orchestrator::run_streaming_pipeline_with_timeline")
+                let audio_path = plan.audio_path.clone();
+                let job_id = plan.session_id.clone();
+
+                let result = tokio::task::spawn_blocking(move || {
+                    let path = std::path::Path::new(&audio_path);
+
+                    // 1. Read the 30s scout sample
+                    let (left, right, sample_rate) =
+                        crate::dsp::lazy_reader::read_scout_sample(path, 30.0).ok_or_else(
+                            || ExecutorError::DspFailed("Failed to read 30s scout sample".into()),
+                        )?;
+
+                    // 2. Run PreAnalyzer
+                    let mut pre_analysis = sp314_dsp::analysis::pre_analysis::PreAnalyzer::run(
+                        &left,
+                        &right,
+                        sample_rate,
+                    );
+
+                    // 3. If content suggests Music (TODO: define genre/content-type decision), run BeatDetector
+                    // TODO: Decide if genre is Music before running BeatDetector
+                    let mono: Vec<f32> = left
+                        .iter()
+                        .zip(right.iter())
+                        .map(|(l, r)| (*l + *r) * 0.5)
+                        .collect();
+                    let beat_detector = crate::dsp::beat_detector::BeatDetector::new(sample_rate);
+                    let (bpm, beats_ms, downbeats_ms, transients_ms) = beat_detector.analyze(&mono);
+
+                    pre_analysis.bpm = bpm;
+                    pre_analysis.beats_ms = beats_ms;
+                    pre_analysis.downbeats_ms = downbeats_ms;
+                    pre_analysis.transients_ms = transients_ms;
+
+                    // 4. Print/log as a temporary checkpoint
+                    eprintln!(
+                        "RunStreaming PreAnalysis Checkpoint: genre={:?} bpm={}",
+                        pre_analysis.genre, pre_analysis.bpm
+                    );
+
+                    // a. Build boundaries
+                    let decoder = crate::dsp::file_decoder::FileDecoder {
+                        path: audio_path.clone(),
+                    };
+                    let boundaries = sp314_orchestrator::pass1_pipeline::build_timeline_map(
+                        decoder,
+                    )
+                    .map_err(|e| {
+                        ExecutorError::DspFailed(format!("Failed to build timeline map: {}", e))
+                    })?;
+
+                    // b. Build minimal ducking topology
+                    let mut db =
+                        sp314_nodes::topology::DspTopologyBuilder::new("ducking_fallback_topology");
+                    let d_in = db.add_node("in", "Input", serde_json::json!({}));
+                    let d_gain = db.add_node(
+                        "duck_gain",
+                        "Gain",
+                        serde_json::json!({ "gain": 1.0, "glide_ms": 300.0 }),
+                    );
+                    let d_out = db.add_node("out", "Output", serde_json::json!({}));
+
+                    db.connect(&d_in, &d_gain);
+                    db.connect(&d_gain, &d_out);
+                    let ducking_topology = db.build();
+
+                    // c. Temporary eprintln!
+                    eprintln!(
+                        "RunStreaming Topology Checkpoint: {} boundaries, Fallback Graph nodes: {}",
+                        boundaries.len(),
+                        ducking_topology.nodes.len(),
+                    );
+
+                    // 1. Construct NMF channels and spawn worker
+                    let (tx_job, rx_job) = std::sync::mpsc::channel();
+                    let (tx_res, rx_res) = std::sync::mpsc::channel();
+                    let shadow_reader = crate::dsp::lazy_reader::LazyAudioReader::open(
+                        std::path::Path::new(&audio_path),
+                    )
+                    .map_err(|e| {
+                        ExecutorError::DspFailed(format!("Failed to open shadow reader: {}", e))
+                    })?;
+
+                    let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
+                        shadow_reader,
+                        sample_rate,
+                        rx_job,
+                        tx_res,
+                    );
+
+                    let (_, flagged_indices) =
+                        crate::dsp::orchestrator::nmf_worker::dispatch_all_jobs(
+                            &boundaries,
+                            &tx_job,
+                        );
+
+                    // 2. Construct fresh FileDecoder
+                    let main_decoder = crate::dsp::file_decoder::FileDecoder {
+                        path: audio_path.clone(),
+                    };
+
+                    // 3. Call run_streaming_pipeline_with_timeline
+                    let output_path = plan.output_path.clone();
+                    sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
+                        main_decoder,
+                        &output_path,
+                        &ducking_topology, // Passing minimal ducking fallback graph
+                        1024,
+                        sample_rate,
+                        boundaries,
+                        "duck_gain", // ducking_node_id
+                        1.0,         // speech_gain
+                        0.501,       // music_gain (-6dB)
+                        Some(&pre_analysis),
+                        rx_res,
+                        flagged_indices,
+                    )
+                    .map_err(|e| {
+                        ExecutorError::DspFailed(format!("Streaming pipeline failed: {}", e))
+                    })?;
+
+                    // 4. Real StreamingOutput
+                    Ok(crate::agents::operator::StreamingOutput {
+                        job_id,
+                        status: "completed",
+                        pcm_data: Some(std::path::PathBuf::from(output_path)),
+                        num_frames: 0, // Frame count deferred
+                        sample_rate,
+                    })
+                })
+                .await;
+
+                match result {
+                    Err(e) => {
+                        let _ = response.send(Err(ExecutorError::DspFailed(format!(
+                            "spawn_blocking join error: {e}"
+                        ))));
+                    }
+                    Ok(Err(e)) => {
+                        let _ = response.send(Err(e));
+                    }
+                    Ok(Ok(output)) => {
+                        let _ = response.send(Ok(output));
+                    }
+                }
             }
 
             Intent::RunAnalysis {
