@@ -445,26 +445,47 @@ pub async fn run(
                 session_id,
                 response,
             } => {
-                // R3: decode + PreAnalyzer only. No DSP. No decisions.
                 let result = tokio::task::spawn_blocking(move || {
-                    let payload =
-                        crate::handlers::decode::decode_smart(&audio_path).map_err(|e| {
-                            super::operator::ExecutorError::DspFailed(format!("Decode error: {e}"))
+                    // R3: streaming measurement only. No DSP. No
+                    // decisions. Migrated off decode_smart's
+                    // whole-file-in-memory read (a real risk for
+                    // long audiobooks/podcasts) to the same
+                    // StandardizedAudioStream pass the v3 render
+                    // path already uses — one full-file read,
+                    // O(1) memory, matching this codebase's
+                    // established streaming pattern.
+                    let path = std::path::Path::new(&audio_path);
+                    let metrics =
+                        crate::dsp::input_lufs::measure_input_metrics(path).map_err(|e| {
+                            super::operator::ExecutorError::DspFailed(format!(
+                                "input measurement failed: {e}"
+                            ))
                         })?;
-                    let stereo = payload.to_stereo_for_telemetry();
-                    use sp314_dsp::analysis::PreAnalyzer;
-                    let analysis =
-                        PreAnalyzer::run(&stereo.left, &stereo.right, stereo.sample_rate);
+                    // -144.0 matches PreAnalysisData::silent()'s
+                    // existing codebase convention for "too short
+                    // to gate" — not a new sentinel invented here.
+                    let integrated_lufs = metrics.integrated_lufs.unwrap_or(-144.0);
 
-                    // TODO: Auto input-trim based on pre-analysis loudness.
-                    // Replaces manual INPUT TRIM removed from UI.
-                    // Calculate headroom and apply gain before DSP chain.
+                    // bpm: DEFERRED, not forgotten. The streaming
+                    // BeatDetector needed for a real value here is
+                    // a planned necessity (see NEST: it will be
+                    // built for the Kepler UI instrument regardless
+                    // of this task), not YAGNI — but building it is
+                    // out of scope for this migration. Confirmed via
+                    // recon that bpm is pure passthrough in album
+                    // cohesion today (dead-ends at UI telemetry,
+                    // never drives any DSP/certificate decision), so
+                    // 0.0 here changes no real behavior versus what
+                    // v3's own RunStreaming arm already reports
+                    // (which is also frequently 0.0 today, per a
+                    // separate, already-logged finding).
+                    let bpm = 0.0;
 
                     Ok(super::operator::AnalysisResult {
                         session_id,
-                        integrated_lufs: analysis.integrated_lufs,
-                        true_peak_dbtp: analysis.true_peak_dbtp,
-                        bpm: analysis.bpm,
+                        integrated_lufs,
+                        true_peak_dbtp: metrics.true_peak_dbtp,
+                        bpm,
                     })
                 })
                 .await
