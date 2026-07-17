@@ -1,4 +1,5 @@
 use sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline;
+use sp314_orchestrator::streaming_pipeline::{StreamingConfig, TimelinePlan};
 
 use m0d::dsp::file_decoder::FileDecoder;
 use m0d::handlers::decode::decode_raw_interleaved;
@@ -47,16 +48,20 @@ fn streaming_pipeline_ducking_e2e() {
             path: input_path.to_string(),
         },
         output_path,
-        &topology,
-        512,
-        48000,
-        boundaries.clone(),
-        "invalid_node_id",
-        1.0,
-        0.501,
-        None,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 512,
+            sample_rate: 48000,
+            ducking_node_id: "invalid_node_id",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries: boundaries.clone(),
+            flagged_indices,
+            pre_analysis: None,
+        },
         rx_res,
-        flagged_indices,
     );
     assert!(
         bad_run.is_err(),
@@ -81,16 +86,20 @@ fn streaming_pipeline_ducking_e2e() {
             path: input_path.to_string(),
         },
         output_path,
-        &topology,
-        512,
-        48000,
-        boundaries,
-        "duck_gain",
-        1.0,
-        0.501,
-        None,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 512,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries,
+            flagged_indices: flagged_indices2,
+            pre_analysis: None,
+        },
         rx_res2,
-        flagged_indices2,
     )
     .unwrap();
     assert!(frames > 0, "pipeline must report frames written, got 0");
@@ -196,16 +205,20 @@ fn test_streaming_pipeline_jit_orchestration() {
             path: input_path.to_string(),
         },
         output_path,
-        &topology,
-        1024,
-        48000,
-        boundaries,
-        "duck_gain",
-        1.0,
-        0.501,
-        None,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries,
+            flagged_indices,
+            pre_analysis: None,
+        },
         rx_res,
-        flagged_indices,
     )
     .unwrap();
 
@@ -303,16 +316,20 @@ fn test_streaming_pipeline_jit_fallback() {
             path: input_path.to_string(),
         },
         output_path,
-        &topology,
-        1024,
-        48000,
-        boundaries2,
-        "duck_gain",
-        1.0,
-        0.501,
-        None,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries: boundaries2,
+            flagged_indices,
+            pre_analysis: None,
+        },
         rx_res,
-        flagged_indices,
     )
     .unwrap();
 
@@ -357,16 +374,20 @@ fn test_vocal_graph_e2e_ltass_proof() {
             path: input_path.to_string(),
         },
         output_path_flat,
-        &topology,
-        1024,
-        48000,
-        boundaries.clone(),
-        "duck_gain",
-        1.0,
-        0.501,
-        Some(&pre_flat),
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries: boundaries.clone(),
+            flagged_indices,
+            pre_analysis: Some(&pre_flat),
+        },
         rx_res,
-        flagged_indices,
     )
     .unwrap();
 
@@ -390,16 +411,20 @@ fn test_vocal_graph_e2e_ltass_proof() {
             path: input_path.to_string(),
         },
         output_path_eq,
-        &topology,
-        1024,
-        48000,
-        boundaries,
-        "duck_gain",
-        1.0,
-        0.501,
-        Some(&pre_eq),
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+        },
+        TimelinePlan {
+            boundaries,
+            flagged_indices: flagged_indices2,
+            pre_analysis: Some(&pre_eq),
+        },
         rx_res2,
-        flagged_indices2,
     )
     .unwrap();
 

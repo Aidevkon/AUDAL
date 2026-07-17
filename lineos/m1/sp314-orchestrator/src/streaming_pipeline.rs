@@ -29,23 +29,40 @@ use sp314_nodes::graph::DspGraph;
 use sp314_nodes::topology::DspTopology;
 use std::error::Error;
 
-// allow: 12 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
-#[allow(clippy::too_many_arguments)]
+/// DSP graph + gain configuration for a streaming run.
+pub struct StreamingConfig<'a> {
+    pub topology: &'a DspTopology,
+    pub block_size: usize,
+    pub sample_rate: u32,
+    pub ducking_node_id: &'a str,
+    pub speech_gain: f32,
+    pub music_gain: f32,
+}
+
+/// Pre-analysis products that drive segment routing.
+pub struct TimelinePlan<'a> {
+    pub boundaries: Vec<SegmentBoundary>,
+    pub flagged_indices: Vec<usize>,
+    pub pre_analysis: Option<&'a lineos_types::pre_analysis::PreAnalysisData>,
+}
+
 /// Returns the total number of per-channel frames written.
 pub fn run_streaming_pipeline_with_timeline(
     decoder: impl DecodeProvider,
     output_path: &str,
-    topology: &DspTopology,
-    block_size: usize,
-    sample_rate: u32,
-    boundaries: Vec<SegmentBoundary>,
-    ducking_node_id: &str,
-    speech_gain: f32,
-    music_gain: f32,
-    pre_analysis: Option<&lineos_types::pre_analysis::PreAnalysisData>,
+    config: &StreamingConfig<'_>,
+    plan: TimelinePlan<'_>,
     rx_res: std::sync::mpsc::Receiver<sp314_dsp::stft::stem_renderer::NmfResult>,
-    flagged_indices: Vec<usize>,
 ) -> Result<usize, Box<dyn Error>> {
+    let topology = config.topology;
+    let block_size = config.block_size;
+    let sample_rate = config.sample_rate;
+    let ducking_node_id = config.ducking_node_id;
+    let speech_gain = config.speech_gain;
+    let music_gain = config.music_gain;
+    let boundaries = plan.boundaries;
+    let flagged_indices = plan.flagged_indices;
+    let pre_analysis = plan.pre_analysis;
     let mut graph = DspGraph::from_topology(topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
     let mut writer = StreamingWavWriter::new(output_path, sample_rate)?;

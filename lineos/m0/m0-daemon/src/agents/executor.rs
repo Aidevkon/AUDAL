@@ -265,16 +265,20 @@ pub async fn run(
                     let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
                         &main_decoder,
                         &output_path,
-                        &ducking_topology, // Passing minimal ducking fallback graph
-                        1024,
-                        sample_rate,
-                        boundaries,
-                        "duck_gain", // ducking_node_id
-                        1.0,         // speech_gain
-                        0.501,       // music_gain (-6dB)
-                        Some(&pre_analysis),
+                        &sp314_orchestrator::streaming_pipeline::StreamingConfig {
+                            topology: &ducking_topology,
+                            block_size: 1024,
+                            sample_rate,
+                            ducking_node_id: "duck_gain",
+                            speech_gain: 1.0,
+                            music_gain: 0.501,
+                        },
+                        sp314_orchestrator::streaming_pipeline::TimelinePlan {
+                            boundaries,
+                            flagged_indices,
+                            pre_analysis: Some(&pre_analysis),
+                        },
                         rx_res,
-                        flagged_indices,
                     )
                     .map_err(|e| {
                         ExecutorError::DspFailed(format!("Streaming pipeline failed: {}", e))
