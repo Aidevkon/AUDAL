@@ -256,16 +256,15 @@ pub async fn trigger_streaming(
     };
 
     // Register progress immediately
-    state.progress.insert(
-        session_id.clone(),
-        crate::app_state::MasteringProgress {
-            job_id: session_id.clone(),
-            stage: "DISPATCHED".into(),
-            elapsed_ms: 0,
-            blob_id: None,
-            error: None,
-        },
-    );
+    let progress = crate::app_state::MasteringProgress {
+        job_id: session_id.clone(),
+        stage: "DISPATCHED".into(),
+        elapsed_ms: 0,
+        blob_id: None,
+        error: None,
+    };
+    state.progress.insert(session_id.clone(), progress.clone());
+    let _ = state.progress_tx.send(progress);
 
     state
         .audit
@@ -291,32 +290,34 @@ pub async fn trigger_streaming(
 
     tokio::spawn(async move {
         if state_bg.operator.dispatch(intent).await.is_err() {
-            state_bg.progress.insert(
-                session_bg.clone(),
-                crate::app_state::MasteringProgress {
-                    job_id: session_bg,
-                    stage: "ERROR".into(),
-                    elapsed_ms: 0,
-                    blob_id: None,
-                    error: Some("Conductor channel closed".into()),
-                },
-            );
+            let progress = crate::app_state::MasteringProgress {
+                job_id: session_bg.clone(),
+                stage: "ERROR".into(),
+                elapsed_ms: 0,
+                blob_id: None,
+                error: Some("Conductor channel closed".into()),
+            };
+            state_bg
+                .progress
+                .insert(session_bg.clone(), progress.clone());
+            let _ = state_bg.progress_tx.send(progress);
             return;
         }
 
         match rx.await {
             Ok(Ok(output)) => {
                 let blob_id_str = output.blob_id.clone();
-                state_bg.progress.insert(
-                    session_bg.clone(),
-                    crate::app_state::MasteringProgress {
-                        job_id: session_bg,
-                        stage: "CERTIFIED".into(), // certification now runs on the streamed output (Episode-parity streaming cert)
-                        elapsed_ms: 0,
-                        blob_id: Some(blob_id_str.clone()),
-                        error: None,
-                    },
-                );
+                let progress = crate::app_state::MasteringProgress {
+                    job_id: session_bg.clone(),
+                    stage: "CERTIFIED".into(), // certification now runs on the streamed output (Episode-parity streaming cert)
+                    elapsed_ms: 0,
+                    blob_id: Some(blob_id_str.clone()),
+                    error: None,
+                };
+                state_bg
+                    .progress
+                    .insert(session_bg.clone(), progress.clone());
+                let _ = state_bg.progress_tx.send(progress);
 
                 if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
                     let transfer = xaak::PcmTransfer {
@@ -345,28 +346,30 @@ pub async fn trigger_streaming(
                 }
             }
             Ok(Err(e)) => {
-                state_bg.progress.insert(
-                    session_bg.clone(),
-                    crate::app_state::MasteringProgress {
-                        job_id: session_bg,
-                        stage: "ERROR".into(),
-                        elapsed_ms: 0,
-                        blob_id: None,
-                        error: Some(format!("{:?}", e)),
-                    },
-                );
+                let progress = crate::app_state::MasteringProgress {
+                    job_id: session_bg.clone(),
+                    stage: "ERROR".into(),
+                    elapsed_ms: 0,
+                    blob_id: None,
+                    error: Some(format!("{:?}", e)),
+                };
+                state_bg
+                    .progress
+                    .insert(session_bg.clone(), progress.clone());
+                let _ = state_bg.progress_tx.send(progress);
             }
             Err(_) => {
-                state_bg.progress.insert(
-                    session_bg.clone(),
-                    crate::app_state::MasteringProgress {
-                        job_id: session_bg,
-                        stage: "ERROR".into(),
-                        elapsed_ms: 0,
-                        blob_id: None,
-                        error: Some("Conductor dropped response".into()),
-                    },
-                );
+                let progress = crate::app_state::MasteringProgress {
+                    job_id: session_bg.clone(),
+                    stage: "ERROR".into(),
+                    elapsed_ms: 0,
+                    blob_id: None,
+                    error: Some("Conductor dropped response".into()),
+                };
+                state_bg
+                    .progress
+                    .insert(session_bg.clone(), progress.clone());
+                let _ = state_bg.progress_tx.send(progress);
             }
         }
     });
