@@ -145,6 +145,8 @@ pub struct StreamingParams {
     pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
+    pub intent_tone: Option<f32>,
+    pub intent_dynamics: Option<f32>,
     pub session_id: String,
 }
 
@@ -154,6 +156,8 @@ pub struct StreamingPlan {
     pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
+    pub intent_tone: Option<f32>,
+    pub intent_dynamics: Option<f32>,
     pub session_id: String,
 }
 

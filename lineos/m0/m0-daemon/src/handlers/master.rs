@@ -233,6 +233,8 @@ pub struct StreamingRequest {
     pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
+    pub intent_tone: Option<f32>,
+    pub intent_dynamics: Option<f32>,
 }
 
 /// POST /master/streaming — run v3 streaming pipeline.
@@ -250,6 +252,8 @@ pub async fn trigger_streaming(
         output_path: req.output_path,
         preset_id: req.preset_id.clone(),
         flavour_id: req.flavour_id.clone(),
+        intent_tone: req.intent_tone,
+        intent_dynamics: req.intent_dynamics,
         session_id: session_id.clone(),
     };
 

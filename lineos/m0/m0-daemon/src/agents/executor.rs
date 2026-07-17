@@ -345,8 +345,8 @@ pub async fn run(
                     let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
                         &plan.preset_id,
                         plan.flavour_id.as_deref().unwrap_or("default"),
-                        None, // intent_tone — StreamingRequest doesn't carry it yet (P4 roster)
-                        None, // intent_dynamics — same
+                        plan.intent_tone,
+                        plan.intent_dynamics,
                         None, // chaos_seed — same
                         None, // project_id — same
                         None, // track_id — same

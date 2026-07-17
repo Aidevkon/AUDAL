@@ -41,6 +41,8 @@ async fn test_agent_pipeline_executes_streaming() {
         output_path: output_path.to_string(),
         preset_id: "podcast".into(),
         flavour_id: None,
+        intent_tone: Some(0.5),
+        intent_dynamics: Some(0.5),
         session_id: "streaming_smoke_001".into(),
     };
 

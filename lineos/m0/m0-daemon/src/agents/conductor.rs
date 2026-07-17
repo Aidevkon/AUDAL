@@ -132,6 +132,8 @@ pub async fn run(
                         output_path: params.output_path,
                         preset_id: params.preset_id,
                         flavour_id: params.flavour_id,
+                        intent_tone: params.intent_tone,
+                        intent_dynamics: params.intent_dynamics,
                         session_id: params.session_id,
                     };
 

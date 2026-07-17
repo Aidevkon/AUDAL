@@ -20,7 +20,9 @@ async fn test_streaming_http_smoke() {
         "audioPath": concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav"),
         "outputPath": "/tmp/test_streaming_http_output.wav",
         "presetId": "podcast",
-        "flavourId": null
+        "flavourId": null,
+        "intentTone": 0.5,
+        "intentDynamics": 0.5
     });
 
     let request = Request::builder()
