@@ -12,6 +12,7 @@ pub mod app_state;
 pub mod audit;
 pub mod blob_store;
 mod cdn;
+pub mod classification;
 pub mod config;
 pub mod db;
 pub mod domain;
