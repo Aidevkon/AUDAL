@@ -75,7 +75,9 @@ impl M0Client {
     pub async fn trigger_mastering(&self, req: MasterRequest) -> Result<MasterResponse, M0Error> {
         let resp = self
             .client
-            .post(format!("{M0_BASE}/master"))
+            // v3 streaming path — certified, SSE-progressed, daemon-owned
+            // output path. Replaces the retired v2 batch endpoint.
+            .post(format!("{M0_BASE}/master/streaming"))
             .json(&req)
             // Override the default 30s timeout — mastering is slow.
             .timeout(Duration::from_secs(TIMEOUT_MASTER_SECS))
