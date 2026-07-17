@@ -253,10 +253,25 @@ pub async fn run(
                         );
 
                     // 2. Construct fresh FileDecoder
+                    // Decoder stack: Tapped(Standardized(file)).
+                    // StandardizedDecoder guarantees 48k/stereo/
+                    // sanitized chunks (the same contract v2 and the
+                    // Episode path enforce) and computes the
+                    // input-identity hashes internally; TappedDecoder
+                    // tees those standardized chunks to the raw A/B
+                    // dump — so the A/B "raw" is exactly what entered
+                    // the DSP, which is the honest comparison.
+                    let std_decoder =
+                        crate::dsp::standardized_decoder::StandardizedDecoder::open(
+                            std::path::Path::new(&audio_path),
+                        )
+                        .map_err(|e| {
+                            ExecutorError::DspFailed(format!(
+                                "standardized decode open failed: {e}"
+                            ))
+                        })?;
                     let main_decoder = sp314_orchestrator::decode_provider::TappedDecoder::new(
-                        crate::dsp::file_decoder::FileDecoder {
-                            path: audio_path.clone(),
-                        },
+                        std_decoder,
                         raw_tap_path.clone(),
                     );
 
@@ -268,7 +283,7 @@ pub async fn run(
                         &sp314_orchestrator::streaming_pipeline::StreamingConfig {
                             topology: &ducking_topology,
                             block_size: 1024,
-                            sample_rate,
+                            sample_rate: 48_000, // StandardizedDecoder's output rate — the DSP graph must be built for what it will actually receive, not the file's native rate
                             ducking_node_id: "duck_gain",
                             speech_gain: 1.0,
                             music_gain: 0.501,
@@ -303,7 +318,7 @@ pub async fn run(
                         status: "completed",
                         pcm_data: Some(std::path::PathBuf::from(output_path)),
                         num_frames: frames_written,
-                        sample_rate,
+                        sample_rate: 48_000, // Standardized output rate
                     })
                 })
                 .await;
