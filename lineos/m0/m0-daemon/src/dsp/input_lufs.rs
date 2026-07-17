@@ -20,12 +20,20 @@ use crate::dsp::standardized_stream::StandardizedAudioStream;
 
 const CHUNK_FRAMES: usize = 4096;
 
-/// Returns the full-file integrated LUFS of the standardized
-/// (48k/stereo/sanitized) input, or None if the file is too short
-/// for EBU R128 gating (matches LufsMeter::finish()'s own contract).
-pub fn measure_input_lufs(path: &std::path::Path) -> Result<Option<f32>, String> {
+pub struct InputMetrics {
+    pub integrated_lufs: Option<f32>,
+    pub true_peak_dbtp: f32,
+}
+
+/// Full-file input measurement — LUFS AND true peak, in one
+/// standardized-stream pass. Extended from the original
+/// LUFS-only measure_input_lufs (Part B, 67bc87c) to also serve
+/// RunAnalysis's migration off decode_smart, without a second
+/// full-file read for the same data.
+pub fn measure_input_metrics(path: &std::path::Path) -> Result<InputMetrics, String> {
     let mut stream = StandardizedAudioStream::open(path)?;
-    let mut meter = sp314_dsp::metering::LufsMeter::new();
+    let mut lufs_meter = sp314_dsp::metering::LufsMeter::new();
+    let mut peak_meter = sp314_dsp::metering::true_peak_meter::TruePeakMeter::new();
     let mut buf = vec![0f32; CHUNK_FRAMES * 2];
     let mut left = vec![0f32; CHUNK_FRAMES];
     let mut right = vec![0f32; CHUNK_FRAMES];
@@ -39,10 +47,21 @@ pub fn measure_input_lufs(path: &std::path::Path) -> Result<Option<f32>, String>
             left[i] = buf[i * 2];
             right[i] = buf[i * 2 + 1];
         }
-        meter.process_chunk(&left[..frames], &right[..frames]);
+        lufs_meter.process_chunk(&left[..frames], &right[..frames]);
+        peak_meter.process_chunk(&left[..frames], &right[..frames]);
     }
 
-    Ok(meter.finish())
+    Ok(InputMetrics {
+        integrated_lufs: lufs_meter.finish(),
+        true_peak_dbtp: peak_meter.finish(),
+    })
+}
+
+/// Backward-compatible wrapper — the original LUFS-only signature,
+/// used by the v3 executor's gain-staging call site (Part C,
+/// 916eef5). Kept so that call site needs no change.
+pub fn measure_input_lufs(path: &std::path::Path) -> Result<Option<f32>, String> {
+    Ok(measure_input_metrics(path)?.integrated_lufs)
 }
 
 #[cfg(test)]
@@ -81,15 +100,20 @@ mod tests {
             .collect();
         write_test_wav(wav_path, 48_000, &src);
 
-        let result = measure_input_lufs(std::path::Path::new(wav_path)).unwrap();
+        let result = measure_input_metrics(std::path::Path::new(wav_path)).unwrap();
         assert!(
-            result.is_some(),
+            result.integrated_lufs.is_some(),
             "2s of tone should yield a measurable LUFS"
         );
-        let lufs = result.unwrap();
+        let lufs = result.integrated_lufs.unwrap();
         assert!(
             lufs.is_finite() && lufs < 0.0,
             "expected a plausible negative LUFS, got {lufs}"
+        );
+        assert!(
+            result.true_peak_dbtp.is_finite() && result.true_peak_dbtp < 0.0,
+            "expected a plausible negative true peak, got {}",
+            result.true_peak_dbtp
         );
         let _ = std::fs::remove_file(wav_path);
     }
@@ -110,18 +134,26 @@ mod tests {
             .collect();
         write_test_wav(wav_path, 48_000, &src);
 
-        let via_helper = measure_input_lufs(std::path::Path::new(wav_path)).unwrap();
+        let via_helper = measure_input_metrics(std::path::Path::new(wav_path)).unwrap();
 
         let mut ref_meter = sp314_dsp::metering::LufsMeter::new();
+        let mut peak_meter = sp314_dsp::metering::true_peak_meter::TruePeakMeter::new();
         let left: Vec<f32> = src.chunks_exact(2).map(|f| f[0]).collect();
         let right: Vec<f32> = src.chunks_exact(2).map(|f| f[1]).collect();
         ref_meter.process_chunk(&left, &right);
+        peak_meter.process_chunk(&left, &right);
         let reference = ref_meter.finish();
+        let ref_peak = peak_meter.finish();
 
         assert_eq!(
-            via_helper.map(|v| (v * 1000.0).round()),
+            via_helper.integrated_lufs.map(|v| (v * 1000.0).round()),
             reference.map(|v| (v * 1000.0).round()),
             "standardized-stream measurement must match direct LufsMeter to 3 decimals"
+        );
+        assert_eq!(
+            (via_helper.true_peak_dbtp * 1000.0).round(),
+            (ref_peak * 1000.0).round(),
+            "standardized-stream measurement must match direct TruePeakMeter to 3 decimals"
         );
         let _ = std::fs::remove_file(wav_path);
     }
@@ -139,10 +171,38 @@ mod tests {
             .collect();
         write_test_wav(wav_path, 48_000, &src);
 
-        let result = measure_input_lufs(std::path::Path::new(wav_path)).unwrap();
+        let result = measure_input_metrics(std::path::Path::new(wav_path)).unwrap();
         assert!(
-            result.is_none(),
+            result.integrated_lufs.is_none(),
             "sub-gating-window audio should yield None, not a bogus value"
+        );
+        assert!(
+            result.true_peak_dbtp.is_finite(),
+            "true peak is always valid"
+        );
+        let _ = std::fs::remove_file(wav_path);
+    }
+
+    #[test]
+    fn wrapper_preserves_lufs_exactly() {
+        let wav_path = "/tmp/test_input_lufs_wrapper.wav";
+        let n = 48_000 * 2;
+        let src: Vec<f32> = (0..n)
+            .flat_map(|i| {
+                let v = 0.3 * (i as f32 * 0.05).sin();
+                [v, v]
+            })
+            .collect();
+        write_test_wav(wav_path, 48_000, &src);
+
+        let from_metrics = measure_input_metrics(std::path::Path::new(wav_path))
+            .unwrap()
+            .integrated_lufs;
+        let from_wrapper = measure_input_lufs(std::path::Path::new(wav_path)).unwrap();
+
+        assert_eq!(
+            from_metrics, from_wrapper,
+            "wrapper should be a transparent passthrough"
         );
         let _ = std::fs::remove_file(wav_path);
     }
