@@ -15,6 +15,7 @@ pub mod orchestrator;
 
 pub mod signal_health;
 
+pub mod standardized_decoder;
 pub mod standardized_stream;
 
 pub use audio_source::AudioSource;

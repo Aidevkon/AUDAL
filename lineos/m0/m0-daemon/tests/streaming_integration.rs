@@ -517,3 +517,64 @@ fn tapped_decoder_dump_is_byte_identical_to_source_stream() {
     assert_eq!(dumped, reference_bytes, "tap dump must be byte-identical");
     let _ = std::fs::remove_file(tap_path);
 }
+
+#[test]
+fn standardized_decoder_resamples_and_hashes() {
+    use m0d::dsp::standardized_decoder::StandardizedDecoder;
+    use sp314_orchestrator::decode_provider::DecodeProvider;
+
+    // Generate a 44.1k fixture on the fly — the first non-48k
+    // input the streaming path has ever been tested with.
+    let wav_path = "/tmp/test_441_fixture.wav";
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: 44_100,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+    for i in 0..44_100 {
+        let v = 0.4 * (i as f32 * 0.02).sin();
+        writer.write_sample(v).unwrap();
+        writer.write_sample(v * 0.8).unwrap();
+    }
+    writer.finalize().unwrap();
+
+    let dec = StandardizedDecoder::open(std::path::Path::new(wav_path)).unwrap();
+    let mut total_samples: usize = 0;
+    let (sr, ch) = dec
+        .stream_to(|chunk| -> Result<(), String> {
+            if let sp314_dsp::io::decode_types::DecodeChunk::Samples(s) = chunk {
+                for &v in s {
+                    assert!(v.is_finite(), "sanitized stream must have no NaN/inf");
+                    assert!(
+                        (-1.0..=1.0).contains(&v),
+                        "sanitized stream must be clamped"
+                    );
+                }
+                total_samples += s.len();
+            }
+            Ok(())
+        })
+        .unwrap();
+
+    assert_eq!(sr, 48_000, "adapter must report the standardized rate");
+    assert_eq!(ch, 2);
+    // 1s at 44.1k → 48k = 48000 frames of real material, PLUS the
+    // SincFixedIn flush tail (~2000 frames of interpolator delay
+    // drained at EOF — the same tail episode_render's Pass 3
+    // accounts for via its total_with_flush/valid_frames split).
+    // Measured on this fixture: 50014. Assert the real material is
+    // fully present and the tail stays in the expected order of
+    // magnitude.
+    let frames = total_samples / 2;
+    assert!(
+        (48_000..=53_000).contains(&frames),
+        "expected 48000 real frames + sinc flush tail (~2k), got {frames}"
+    );
+
+    let (b3, sha) = dec.input_hashes();
+    assert_eq!(b3.len(), 64, "blake3 hex must be 64 chars");
+    assert_eq!(sha.len(), 64, "sha256 hex must be 64 chars");
+    let _ = std::fs::remove_file(wav_path);
+}
