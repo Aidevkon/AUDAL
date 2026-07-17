@@ -158,6 +158,12 @@ pub async fn run(
                 let audio_path = plan.audio_path.clone();
                 let job_id = plan.session_id.clone();
                 let blob_id = uuid::Uuid::new_v4().to_string();
+                // Daemon-owned output path — matching v2's pattern (episode_render's
+                // pcm_path derives from blob_id the same way). The caller no longer
+                // supplies this: an unsanitized caller-supplied path was a
+                // trust/traversal gap, and the UI has no concept of this field
+                // anyway (MasterRequest never carried one for v2 either).
+                let output_path = format!("/tmp/m0d-v3-streaming-{}.wav", blob_id);
                 let raw_tap_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
 
                 let path_hash =
@@ -294,7 +300,6 @@ pub async fn run(
                     );
 
                     // 3. Call run_streaming_pipeline_with_timeline
-                    let output_path = plan.output_path.clone();
                     let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
                         &main_decoder,
                         &output_path,

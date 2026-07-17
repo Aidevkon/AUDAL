@@ -142,7 +142,6 @@ pub struct MasteringOutput {
 #[derive(Debug, Clone)]
 pub struct StreamingParams {
     pub audio_path: String,
-    pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,
@@ -153,7 +152,6 @@ pub struct StreamingParams {
 #[derive(Debug, Clone)]
 pub struct StreamingPlan {
     pub audio_path: String,
-    pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,

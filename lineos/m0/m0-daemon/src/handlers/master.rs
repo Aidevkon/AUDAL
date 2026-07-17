@@ -230,7 +230,6 @@ pub async fn trigger_mastering(
 #[serde(rename_all = "camelCase")]
 pub struct StreamingRequest {
     pub audio_path: String,
-    pub output_path: String,
     pub preset_id: String,
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,
@@ -249,7 +248,6 @@ pub async fn trigger_streaming(
 
     let params = StreamingParams {
         audio_path: req.audio_path.clone(),
-        output_path: req.output_path,
         preset_id: req.preset_id.clone(),
         flavour_id: req.flavour_id.clone(),
         intent_tone: req.intent_tone,

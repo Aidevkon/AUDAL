@@ -29,16 +29,12 @@ async fn test_agent_pipeline_executes_streaming() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-    let output_path = "/tmp/test_streaming_smoke_output.wav";
-    let _ = std::fs::remove_file(output_path);
-
     let params = m0d::agents::operator::StreamingParams {
         audio_path: concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/test_stereo_input.wav"
         )
         .into(),
-        output_path: output_path.to_string(),
         preset_id: "podcast".into(),
         flavour_id: None,
         intent_tone: Some(0.5),
@@ -71,7 +67,8 @@ async fn test_agent_pipeline_executes_streaming() {
             assert_eq!(output.status, "certified", "status must be certified");
 
             // Check output file
-            let meta = std::fs::metadata(output_path).expect("Output file must exist");
+            let output_path = format!("/tmp/m0d-v3-streaming-{}.wav", output.blob_id);
+            let meta = std::fs::metadata(&output_path).expect("Output file must exist");
             assert!(meta.len() > 1000, "Output file must be non-empty");
             println!("   File size: {} bytes", meta.len());
         }

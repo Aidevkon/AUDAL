@@ -18,7 +18,6 @@ async fn test_streaming_http_smoke() {
     // 1. Send POST /master/streaming
     let req_body = serde_json::json!({
         "audioPath": concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav"),
-        "outputPath": "/tmp/test_streaming_http_output.wav",
         "presetId": "podcast",
         "flavourId": null,
         "intentTone": 0.5,
@@ -51,6 +50,7 @@ async fn test_streaming_http_smoke() {
 
     // 2. Poll GET /progress/:job_id
     let mut final_stage = String::new();
+    let mut final_blob_id = String::new();
     for _ in 0..60 {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
@@ -73,6 +73,9 @@ async fn test_streaming_http_smoke() {
 
         if stage == "CERTIFIED" || stage == "ERROR" {
             final_stage = stage.to_string();
+            if let Some(b) = j.get("blob_id").and_then(|v| v.as_str()) {
+                final_blob_id = b.to_string();
+            }
             if stage == "ERROR" {
                 println!("Got ERROR: {:?}", j.get("error"));
             }
@@ -83,8 +86,8 @@ async fn test_streaming_http_smoke() {
     assert_eq!(final_stage, "CERTIFIED", "Final stage should be CERTIFIED");
 
     // 3. Check output file
-    let out_meta =
-        std::fs::metadata("/tmp/test_streaming_http_output.wav").expect("Output file should exist");
+    let out_path = format!("/tmp/m0d-v3-streaming-{}.wav", final_blob_id);
+    let out_meta = std::fs::metadata(&out_path).expect("Output file should exist");
     assert!(out_meta.len() > 1000, "Output file should be non-empty");
     println!("Output file size: {}", out_meta.len());
 }

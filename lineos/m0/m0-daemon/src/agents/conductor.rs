@@ -129,7 +129,6 @@ pub async fn run(
                     // Pure translation — no business logic on values
                     let plan = super::operator::StreamingPlan {
                         audio_path: params.audio_path,
-                        output_path: params.output_path,
                         preset_id: params.preset_id,
                         flavour_id: params.flavour_id,
                         intent_tone: params.intent_tone,
