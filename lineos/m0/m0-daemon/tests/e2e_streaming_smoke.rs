@@ -66,7 +66,7 @@ async fn test_agent_pipeline_executes_streaming() {
             println!("   job_id: {}", output.job_id);
             println!("   status: {}", output.status);
             println!("   pcm_data: {:?}", output.pcm_data);
-            assert_eq!(output.status, "completed", "status must be completed");
+            assert_eq!(output.status, "certified", "status must be certified");
 
             // Check output file
             let meta = std::fs::metadata(output_path).expect("Output file must exist");

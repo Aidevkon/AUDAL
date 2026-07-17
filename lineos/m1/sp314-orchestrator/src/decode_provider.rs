@@ -42,6 +42,13 @@ impl<D: DecodeProvider> TappedDecoder<D> {
         }
     }
 
+    /// Access the wrapped decoder (e.g. to read post-run state
+    /// like StandardizedDecoder::input_hashes after the stream
+    /// has drained).
+    pub fn inner(&self) -> &D {
+        &self.inner
+    }
+
     /// Returns and clears the tap error, if any occurred.
     pub fn take_tap_error(&self) -> Option<std::io::Error> {
         self.tap_error.borrow_mut().take()

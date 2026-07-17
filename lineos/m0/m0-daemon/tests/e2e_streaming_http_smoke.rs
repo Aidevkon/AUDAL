@@ -69,7 +69,7 @@ async fn test_streaming_http_smoke() {
         let stage = j.get("stage").unwrap().as_str().unwrap();
         println!("Polled stage: {}", stage);
 
-        if stage == "COMPLETED" || stage == "ERROR" {
+        if stage == "CERTIFIED" || stage == "ERROR" {
             final_stage = stage.to_string();
             if stage == "ERROR" {
                 println!("Got ERROR: {:?}", j.get("error"));
@@ -78,7 +78,7 @@ async fn test_streaming_http_smoke() {
         }
     }
 
-    assert_eq!(final_stage, "COMPLETED", "Final stage should be COMPLETED");
+    assert_eq!(final_stage, "CERTIFIED", "Final stage should be CERTIFIED");
 
     // 3. Check output file
     let out_meta =

@@ -8,6 +8,7 @@
 //! spawn_blocking and returns DspOutput to Conductor.
 
 use super::operator::{DspOutput, ExecutorError, Intent};
+use crate::domain::content_type::ContentTypeExt;
 use arc_swap::ArcSwap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -159,6 +160,12 @@ pub async fn run(
                 let blob_id = uuid::Uuid::new_v4().to_string();
                 let raw_tap_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
 
+                let path_hash =
+                    crate::domain::dsp_pipeline::compute_sha256_bytes(audio_path.as_bytes());
+                let input_hash_hex_path = hex::encode(path_hash);
+                let seed = crate::domain::dsp_pipeline::derive_seed(&path_hash);
+                let cert_start = std::time::Instant::now();
+
                 let result = tokio::task::spawn_blocking(move || {
                     let path = std::path::Path::new(&audio_path);
 
@@ -195,6 +202,17 @@ pub async fn run(
                         "RunStreaming PreAnalysis Checkpoint: genre={:?} bpm={}",
                         pre_analysis.genre, pre_analysis.bpm
                     );
+
+                    let scout_out = crate::domain::nodes::scout_node::run(
+                        &left,
+                        &right,
+                        sample_rate,
+                        "default",
+                        plan.flavour_id.as_deref().unwrap_or("default"),
+                        &pre_analysis,
+                    )
+                    .map_err(|e| ExecutorError::DspFailed(format!("scout failed: {e}")))?;
+                    let streaming_features = scout_out.scout.features.clone();
 
                     // a. Build boundaries
                     let decoder = crate::dsp::file_decoder::FileDecoder {
@@ -306,20 +324,80 @@ pub async fn run(
                     }
                     let mastered_raw_path =
                         std::path::PathBuf::from(format!("/tmp/m0d-mastered-{}.pcm", blob_id));
-                    crate::dsp::wav_to_raw::wav_to_raw_pcm(&output_path, &mastered_raw_path)
-                        .map_err(|e| {
-                            ExecutorError::DspFailed(format!("wav→raw post-pass failed: {e}"))
-                        })?;
+                    let measured =
+                        crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)
+                            .map_err(|e| {
+                                ExecutorError::DspFailed(format!("wav→raw post-pass failed: {e}"))
+                            })?;
 
-                    // 4. Real StreamingOutput
-                    Ok(crate::agents::operator::StreamingOutput {
-                        job_id,
-                        blob_id,
-                        status: "completed",
-                        pcm_data: Some(std::path::PathBuf::from(output_path)),
-                        num_frames: frames_written,
-                        sample_rate: 48_000, // Standardized output rate
-                    })
+                    // Two independent counts of the same quantity: the pipeline
+                    // counted frames while WRITING the WAV; the measured pass
+                    // counted frames while READING it back. They must agree.
+                    if frames_written != measured.frames_written {
+                        return Err(ExecutorError::DspFailed(format!(
+                            "frame count mismatch: pipeline wrote {} but measured pass read {}",
+                            frames_written, measured.frames_written
+                        )));
+                    }
+
+                    let (_input_blake3, input_sha256) = main_decoder.inner().input_hashes();
+
+                    let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
+                        &plan.preset_id,
+                        plan.flavour_id.as_deref().unwrap_or("default"),
+                        None, // intent_tone — StreamingRequest doesn't carry it yet (P4 roster)
+                        None, // intent_dynamics — same
+                        None, // chaos_seed — same
+                        None, // project_id — same
+                        None, // track_id — same
+                        None, // target_lufs — streaming default
+                        &streaming_features,
+                        &pre_analysis,
+                    )
+                    .map_err(ExecutorError::DspFailed)?;
+                    let (fingerprints, spatial_metadata) =
+                        crate::domain::content_type::ContentType::bypassed_render();
+                    let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
+                        pcm_blake3: measured.pcm_blake3.clone(),
+                        output_sha256: measured.output_sha256.clone(),
+                        dead_air: Default::default(), // decoder consumed by reference; into_dead_air needs ownership — deferred, honest default (rescue roster)
+                    };
+                    let cert_out = crate::domain::nodes::certificate_node::run_streaming(
+                        &blob_id,
+                        measured.output_lufs,
+                        measured.output_lra,
+                        measured.true_peak_dbtp,
+                        &fingerprints,
+                        &spatial_metadata,
+                        &icfg.proof_log,
+                        &icfg.persona_config,
+                        &icfg.aether_req,
+                        &icfg.dsp_config,
+                        std::path::PathBuf::from(&output_path),
+                        &input_hash_hex_path,
+                        48_000,
+                        cert_start.elapsed().as_millis() as u64,
+                        seed,
+                        &plan.preset_id,
+                        input_sha256,
+                        measured.frames_written,
+                        Vec::new(), // processing_timeline — v3 has no TimelineProfiler yet (rescue roster)
+                        cert_data,
+                    )
+                    .map_err(ExecutorError::DspFailed)?;
+
+                    // 4. Real StreamingOutput + Blob
+                    Ok((
+                        crate::agents::operator::StreamingOutput {
+                            job_id,
+                            blob_id: blob_id.clone(),
+                            status: "certified",
+                            pcm_data: Some(mastered_raw_path.clone()),
+                            num_frames: measured.frames_written,
+                            sample_rate: 48_000,
+                        },
+                        cert_out.blob,
+                    ))
                 })
                 .await;
 
@@ -332,7 +410,8 @@ pub async fn run(
                     Ok(Err(e)) => {
                         let _ = response.send(Err(e));
                     }
-                    Ok(Ok(output)) => {
+                    Ok(Ok((output, blob))) => {
+                        blob_store.insert(blob);
                         let _ = response.send(Ok(output));
                     }
                 }

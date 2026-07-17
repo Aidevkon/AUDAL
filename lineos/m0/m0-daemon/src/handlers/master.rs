@@ -309,7 +309,7 @@ pub async fn trigger_streaming(
                     session_bg.clone(),
                     crate::app_state::MasteringProgress {
                         job_id: session_bg,
-                        stage: "COMPLETED".into(),
+                        stage: "CERTIFIED".into(), // certification now runs on the streamed output (Episode-parity streaming cert)
                         elapsed_ms: 0,
                         blob_id: Some(blob_id_str.clone()),
                         error: None,
