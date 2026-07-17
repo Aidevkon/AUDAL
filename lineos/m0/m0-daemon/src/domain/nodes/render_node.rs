@@ -21,22 +21,40 @@ pub struct SpatialSlicesMut<'a> {
     pub rs: &'a mut [f32],
 }
 
-// allow: 12 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
+/// Non-audio render configuration for a single chunk.
+pub struct RenderSettings<'a> {
+    pub ducking_gain: f32,
+    pub mix_levels: Option<&'a MixLevels>,
+    pub flavour_id: Option<&'a str>,
+    pub sample_rate: u32,
+}
+
+/// Immutable input audio for a single chunk.
+pub struct RenderInputs<'a> {
+    pub mono: &'a [f32],
+    pub original_left: &'a [f32],
+    pub original_right: &'a [f32],
+}
+
+// allow: 7 args — 3 are &mut output slices, deliberately positional
+// (grouping mutable slices behind a struct adds lifetime noise, not clarity)
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     two_pass: &mut TwoPassEngine,
-    mono: &[f32],
     scout: &ScoutResult,
-    ducking_gain: f32,
-    mix_levels: Option<&MixLevels>,
-    flavour_id: Option<&str>,
-    sample_rate: u32,
-    original_left: &[f32],
-    original_right: &[f32],
+    settings: &RenderSettings<'_>,
+    inputs: &RenderInputs<'_>,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
     mut spatial: Option<&mut SpatialSlicesMut<'_>>,
 ) -> Result<(StemFingerprints, sp314_dsp::stft::two_pass::RenderMetadata), String> {
+    let mono = inputs.mono;
+    let original_left = inputs.original_left;
+    let original_right = inputs.original_right;
+    let ducking_gain = settings.ducking_gain;
+    let mix_levels = settings.mix_levels;
+    let flavour_id = settings.flavour_id;
+    let sample_rate = settings.sample_rate;
     let mut h_voice = Sha256::new();
     let mut h_drums = Sha256::new();
     let mut h_bass = Sha256::new();

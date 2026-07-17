@@ -728,14 +728,18 @@ fn run_dsp_internal(
     } else {
         crate::domain::nodes::render_node::run(
             &mut two_pass,
-            &mono,
             &scout,
-            final_ducking,
-            req.mix_levels.as_ref(),
-            req.flavour_id.as_deref(),
-            chunk.sample_rate,
-            &chunk.left,
-            &chunk.right,
+            &crate::domain::nodes::render_node::RenderSettings {
+                ducking_gain: final_ducking,
+                mix_levels: req.mix_levels.as_ref(),
+                flavour_id: req.flavour_id.as_deref(),
+                sample_rate: chunk.sample_rate,
+            },
+            &crate::domain::nodes::render_node::RenderInputs {
+                mono: &mono,
+                original_left: &chunk.left,
+                original_right: &chunk.right,
+            },
             &mut left_vec[..],
             &mut right_vec[..],
             spatial_slices.as_mut(),
