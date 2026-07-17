@@ -234,6 +234,7 @@ pub struct StreamingRequest {
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,
     pub intent_dynamics: Option<f32>,
+    pub target_lufs_override: Option<f32>,
 }
 
 /// POST /master/streaming — run v3 streaming pipeline.
@@ -252,6 +253,7 @@ pub async fn trigger_streaming(
         flavour_id: req.flavour_id.clone(),
         intent_tone: req.intent_tone,
         intent_dynamics: req.intent_dynamics,
+        target_lufs_override: req.target_lufs_override,
         session_id: session_id.clone(),
     };
 

@@ -146,6 +146,12 @@ pub struct StreamingParams {
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,
     pub intent_dynamics: Option<f32>,
+    /// Album cohesion override: when Some, this LUFS target wins
+    /// over the preset's default (LoudnessTarget::from_preset).
+    /// None for every normal single-track master today — album
+    /// cohesion is the only intended caller, wired separately
+    /// (Part 2b).
+    pub target_lufs_override: Option<f32>,
     pub session_id: String,
 }
 
@@ -156,6 +162,12 @@ pub struct StreamingPlan {
     pub flavour_id: Option<String>,
     pub intent_tone: Option<f32>,
     pub intent_dynamics: Option<f32>,
+    /// Album cohesion override: when Some, this LUFS target wins
+    /// over the preset's default (LoudnessTarget::from_preset).
+    /// None for every normal single-track master today — album
+    /// cohesion is the only intended caller, wired separately
+    /// (Part 2b).
+    pub target_lufs_override: Option<f32>,
     pub session_id: String,
 }
 

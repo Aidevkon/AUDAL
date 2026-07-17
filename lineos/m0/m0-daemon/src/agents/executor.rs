@@ -237,15 +237,17 @@ pub async fn run(
                     // formula v2 uses). Runs on the ORIGINAL input (not the
                     // standardized stream used for rendering) so it reflects the
                     // true source material.
-                    let target = lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id);
+                    let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
+                        lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
+                    });
                     let input_lufs = crate::dsp::input_lufs::measure_input_lufs(path)
                         .map_err(|e| ExecutorError::DspFailed(format!("input LUFS measurement failed: {e}")))?;
                     let pre_gain_linear = match input_lufs {
                         Some(measured) => {
-                            let result = sp314_dsp::pipeline::autotune::autotune(measured, target.target_lufs);
+                            let result = sp314_dsp::pipeline::autotune::autotune(measured, target_lufs);
                             libm::powf(10.0, result.pre_gain_db / 20.0)
                         }
-                        None => 1.0, // too short to gate — no correction, matches autotune's own safe fallback
+                        None => 1.0,
                     };
 
                     // b. Build minimal ducking topology

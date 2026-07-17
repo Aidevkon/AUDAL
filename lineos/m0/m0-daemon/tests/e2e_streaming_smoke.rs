@@ -39,6 +39,7 @@ async fn test_agent_pipeline_executes_streaming() {
         flavour_id: None,
         intent_tone: Some(0.5),
         intent_dynamics: Some(0.5),
+        target_lufs_override: None,
         session_id: "streaming_smoke_001".into(),
     };
 

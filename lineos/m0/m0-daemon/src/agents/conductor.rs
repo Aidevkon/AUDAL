@@ -133,6 +133,7 @@ pub async fn run(
                         flavour_id: params.flavour_id,
                         intent_tone: params.intent_tone,
                         intent_dynamics: params.intent_dynamics,
+                        target_lufs_override: params.target_lufs_override,
                         session_id: params.session_id,
                     };
 
