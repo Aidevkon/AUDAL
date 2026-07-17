@@ -47,6 +47,26 @@ impl LoudnessTarget {
             platform: "podcast".into(),
         }
     }
+
+    /// Resolve a preset_id string to its LoudnessTarget. Mirrors
+    /// the existing ContentType::from_preset string-matching
+    /// pattern — this mapping never existed for LoudnessTarget
+    /// before (confirmed by recon 2026-07-17: neither v2 nor v3
+    /// ever called it, both hardcoded -14.0 directly in their HTTP
+    /// handlers instead). Unknown preset_ids fall back to
+    /// spotify()'s -14.0 default rather than erroring — matches
+    /// the existing unwrap_or(-14.0) fallback behavior callers
+    /// already relied on, so this is a strict improvement, not a
+    /// behavior change for the unknown-preset case.
+    pub fn from_preset(preset_id: &str) -> Self {
+        match preset_id {
+            "spotify" | "spotifyv3" | "streaming" => Self::spotify(),
+            "youtube" => Self::youtube(),
+            "broadcast" | "broadcastvideo" | "atscA85" => Self::broadcast(),
+            "podcast" | "spoken_word" | "episode" | "acx" | "apple_podcasts" => Self::podcast(),
+            _ => Self::spotify(),
+        }
+    }
 }
 
 /// v2.9 compatibility aliases
