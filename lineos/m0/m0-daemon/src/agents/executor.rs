@@ -231,6 +231,23 @@ pub async fn run(
                         ExecutorError::DspFailed(format!("Failed to build timeline map: {}", e))
                     })?;
 
+                    // Full-file input LUFS measurement — the missing pre-gain
+                    // step for v3 (Parts A+B: LoudnessTarget::from_preset +
+                    // measure_input_lufs, combined here with the same closed-form
+                    // formula v2 uses). Runs on the ORIGINAL input (not the
+                    // standardized stream used for rendering) so it reflects the
+                    // true source material.
+                    let target = lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id);
+                    let input_lufs = crate::dsp::input_lufs::measure_input_lufs(path)
+                        .map_err(|e| ExecutorError::DspFailed(format!("input LUFS measurement failed: {e}")))?;
+                    let pre_gain_linear = match input_lufs {
+                        Some(measured) => {
+                            let result = sp314_dsp::pipeline::autotune::autotune(measured, target.target_lufs);
+                            libm::powf(10.0, result.pre_gain_db / 20.0)
+                        }
+                        None => 1.0, // too short to gate — no correction, matches autotune's own safe fallback
+                    };
+
                     // b. Build minimal ducking topology
                     let mut db =
                         sp314_nodes::topology::DspTopologyBuilder::new("ducking_fallback_topology");
@@ -310,6 +327,7 @@ pub async fn run(
                             ducking_node_id: "duck_gain",
                             speech_gain: 1.0,
                             music_gain: 0.501,
+                            pre_gain_linear,
                         },
                         sp314_orchestrator::streaming_pipeline::TimelinePlan {
                             boundaries,

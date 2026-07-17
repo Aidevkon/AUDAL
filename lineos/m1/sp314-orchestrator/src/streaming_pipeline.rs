@@ -37,6 +37,33 @@ pub struct StreamingConfig<'a> {
     pub ducking_node_id: &'a str,
     pub speech_gain: f32,
     pub music_gain: f32,
+    /// Pre-render gain (linear, not dB) computed from a
+    /// full-file input LUFS measurement — the missing v3
+    /// counterpart to v2's autotune pre-gain. 1.0 = unity.
+    /// APPLIED AT TWO SITES (see apply_pre_gain call sites
+    /// below) because the fallback and dual-graph paths draw
+    /// from structurally separate buffers — the dual-graph
+    /// stems come from an independent NMF worker reading the
+    /// file directly, not through this function's decoder.
+    /// If you add a new DSP path here, it MUST also call
+    /// apply_pre_gain on its input before any graph processing.
+    pub pre_gain_linear: f32,
+}
+
+/// Multiply left/right buffers by a linear gain, in place.
+/// The single source of truth for pre-gain application — both
+/// the fallback and dual-graph paths call this so the logic
+/// never diverges even if one path's surrounding code changes.
+fn apply_pre_gain(left: &mut [f32], right: &mut [f32], gain: f32) {
+    if (gain - 1.0).abs() < f32::EPSILON {
+        return; // unity gain, skip the pass entirely
+    }
+    for s in left.iter_mut() {
+        *s *= gain;
+    }
+    for s in right.iter_mut() {
+        *s *= gain;
+    }
 }
 
 /// Pre-analysis products that drive segment routing.
@@ -221,6 +248,8 @@ pub fn run_streaming_pipeline_with_timeline(
                 break;
             };
 
+            apply_pre_gain(&mut bl, &mut br, config.pre_gain_linear);
+
             let mut dual_graph_processed = false;
             let block_time_sec = total_frames_processed as f32 / sample_rate as f32;
             if let Some((seg_idx, seg_type)) = router.get_segment_at(block_time_sec) {
@@ -301,7 +330,8 @@ pub fn run_streaming_pipeline_with_timeline(
                         m_bl.resize(block_size, 0.0);
                         let mut m_br = m_bl.clone();
 
-
+                        apply_pre_gain(&mut v_bl, &mut v_br, config.pre_gain_linear);
+                        apply_pre_gain(&mut m_bl, &mut m_br, config.pre_gain_linear);
 
                         vocal_graph.process_block(&mut v_bl, &mut v_br);
                         music_graph.process_block(&mut m_bl, &mut m_br);

@@ -55,6 +55,7 @@ fn streaming_pipeline_ducking_e2e() {
             ducking_node_id: "invalid_node_id",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -93,6 +94,7 @@ fn streaming_pipeline_ducking_e2e() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries,
@@ -212,6 +214,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries,
@@ -323,6 +326,7 @@ fn test_streaming_pipeline_jit_fallback() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries: boundaries2,
@@ -381,6 +385,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -418,6 +423,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
+            pre_gain_linear: 1.0,
         },
         TimelinePlan {
             boundaries,
@@ -577,4 +583,106 @@ fn standardized_decoder_resamples_and_hashes() {
     assert_eq!(b3.len(), 64, "blake3 hex must be 64 chars");
     assert_eq!(sha.len(), 64, "sha256 hex must be 64 chars");
     let _ = std::fs::remove_file(wav_path);
+}
+
+#[test]
+fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
+    let topology = dummy_ducking_topology();
+
+    let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+    let output_path_unity = "/tmp/test_streaming_pre_gain_unity.wav";
+    let output_path_boost = "/tmp/test_streaming_pre_gain_boost.wav";
+
+    // No boundaries -> guaranteed to use fallback path exclusively.
+    let boundaries = vec![];
+
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    let shadow_reader =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path)).unwrap();
+    let _worker_handle =
+        m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
+    let (_, flagged_indices) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
+    // Run 1: Unity (1.0)
+    run_streaming_pipeline_with_timeline(
+        FileDecoder {
+            path: input_path.to_string(),
+        },
+        output_path_unity,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 1.0,
+            pre_gain_linear: 1.0,
+        },
+        TimelinePlan {
+            boundaries: boundaries.clone(),
+            flagged_indices: flagged_indices.clone(),
+            pre_analysis: None,
+        },
+        rx_res,
+    )
+    .unwrap();
+
+    // Run 2: Boost (2.0)
+    let (tx_job2, rx_job2) = std::sync::mpsc::channel();
+    let (tx_res2, rx_res2) = std::sync::mpsc::channel();
+    let shadow_reader2 =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path)).unwrap();
+    let _worker_handle2 =
+        m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader2, 48000, rx_job2, tx_res2);
+    let (_, flagged_indices2) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job2);
+
+    run_streaming_pipeline_with_timeline(
+        FileDecoder {
+            path: input_path.to_string(),
+        },
+        output_path_boost,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 1.0,
+            pre_gain_linear: 2.0,
+        },
+        TimelinePlan {
+            boundaries: boundaries.clone(),
+            flagged_indices: flagged_indices2,
+            pre_analysis: None,
+        },
+        rx_res2,
+    )
+    .unwrap();
+
+    let (unity_samples, _, _) =
+        m0d::handlers::decode::decode_raw_interleaved(output_path_unity).unwrap();
+    let (boost_samples, _, _) =
+        m0d::handlers::decode::decode_raw_interleaved(output_path_boost).unwrap();
+
+    let max_unity = unity_samples
+        .iter()
+        .map(|&x| x.abs())
+        .fold(0.0f32, f32::max);
+    let max_boost = boost_samples
+        .iter()
+        .map(|&x| x.abs())
+        .fold(0.0f32, f32::max);
+
+    println!("Max Unity: {:.6}, Max Boost: {:.6}", max_unity, max_boost);
+    assert!(max_unity > 0.01, "Input needs some amplitude");
+    assert!(
+        (max_boost - max_unity * 2.0).abs() < 1e-4,
+        "Boost output should be exactly 2x unity output"
+    );
+
+    std::fs::remove_file(output_path_unity).ok();
+    std::fs::remove_file(output_path_boost).ok();
 }
