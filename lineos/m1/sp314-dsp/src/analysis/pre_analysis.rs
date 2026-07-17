@@ -8,7 +8,7 @@ use crate::stft::StftEngine;
 use lineos_types::pre_analysis::*;
 
 // ── Polyphase FIR coefficients (from true_peak_fir.json, Blackman-Harris 71-tap) ──
-const POLYPHASE: [[f32; 18]; 4] = [
+pub(crate) const POLYPHASE: [[f32; 18]; 4] = [
     // Phase 0
     [
         1.543_402_8e-6,
@@ -95,7 +95,7 @@ const POLYPHASE: [[f32; 18]; 4] = [
     ],
 ];
 
-const TAPS_PER_PHASE: usize = 18;
+pub(crate) const TAPS_PER_PHASE: usize = 18;
 #[allow(dead_code)]
 const N_PHASES: usize = 4;
 
@@ -220,7 +220,7 @@ impl PreAnalyzer {
 
 // ── True Peak (4x polyphase FIR) ─────────────────────────────────────────────
 
-fn true_peak_detect(left: &[f32], right: &[f32]) -> f32 {
+pub(crate) fn true_peak_detect(left: &[f32], right: &[f32]) -> f32 {
     let tp_l = true_peak_channel(left);
     let tp_r = true_peak_channel(right);
     let peak = if tp_l > tp_r { tp_l } else { tp_r };
@@ -231,7 +231,7 @@ fn true_peak_detect(left: &[f32], right: &[f32]) -> f32 {
     }
 }
 
-fn true_peak_channel(signal: &[f32]) -> f32 {
+pub(crate) fn true_peak_channel(signal: &[f32]) -> f32 {
     let n = signal.len();
     if n == 0 {
         return 0.0;
