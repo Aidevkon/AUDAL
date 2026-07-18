@@ -39,6 +39,11 @@ impl StandardizedDecoder {
     pub fn into_dead_air(self) -> crate::dsp::signal_health::DeadAirSummary {
         self.stream.into_inner().into_dead_air()
     }
+
+    /// See StandardizedAudioStream::expected_output_frames doc.
+    pub fn expected_output_frames(&self) -> Option<u64> {
+        self.stream.borrow().expected_output_frames()
+    }
 }
 
 impl DecodeProvider for StandardizedDecoder {

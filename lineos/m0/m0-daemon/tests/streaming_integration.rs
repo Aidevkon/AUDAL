@@ -56,6 +56,7 @@ fn streaming_pipeline_ducking_e2e() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -95,6 +96,7 @@ fn streaming_pipeline_ducking_e2e() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries,
@@ -215,6 +217,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries,
@@ -327,6 +330,7 @@ fn test_streaming_pipeline_jit_fallback() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries: boundaries2,
@@ -386,6 +390,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -424,6 +429,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             speech_gain: 1.0,
             music_gain: 0.501,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries,
@@ -619,6 +625,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             speech_gain: 1.0,
             music_gain: 1.0,
             pre_gain_linear: 1.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -652,6 +659,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             speech_gain: 1.0,
             music_gain: 1.0,
             pre_gain_linear: 2.0,
+            expected_output_frames: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -754,4 +762,81 @@ fn expected_output_frames_matches_source_for_passthrough_48k() {
     );
 
     let _ = std::fs::remove_file(wav_path);
+}
+
+#[test]
+fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
+    // The actual end-to-end proof: run the full streaming pipeline
+    // on a 44.1k fixture (which we KNOW produces 50014 raw frames
+    // without a cap) and confirm the WRITTEN output is trimmed to
+    // exactly the expected 48000 frames when the cap is wired in.
+    let topology = dummy_ducking_topology(); // mirror existing test setup
+    let wav_path = "/tmp/test_expected_frames_e2e_441.wav";
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: 44_100,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+    for i in 0..44_100 {
+        let v = 0.4 * (i as f32 * 0.02).sin();
+        writer.write_sample(v).unwrap();
+        writer.write_sample(v * 0.8).unwrap();
+    }
+    writer.finalize().unwrap();
+
+    let output_path = "/tmp/test_expected_frames_e2e_output.wav";
+    let std_decoder =
+        m0d::dsp::standardized_decoder::StandardizedDecoder::open(std::path::Path::new(wav_path))
+            .unwrap();
+    let expected = std_decoder.expected_output_frames();
+    assert_eq!(expected, Some(48_000), "sanity check on the known fixture");
+
+    use sp314_orchestrator::decode_provider::TappedDecoder;
+    let tapped = TappedDecoder::new(
+        std_decoder,
+        "/tmp/test_expected_frames_e2e_tap.pcm".to_string(),
+    );
+
+    let boundaries = vec![];
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    let shadow_reader =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(wav_path)).unwrap();
+    let _worker_handle =
+        m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48_000, rx_job, tx_res);
+    let (_, flagged_indices) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
+    let frames_written = run_streaming_pipeline_with_timeline(
+        &tapped,
+        output_path,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48_000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 1.0,
+            pre_gain_linear: 1.0,
+            expected_output_frames: expected,
+        },
+        TimelinePlan {
+            boundaries: vec![],
+            flagged_indices,
+            pre_analysis: None,
+        },
+        rx_res,
+    )
+    .unwrap();
+
+    assert_eq!(
+        frames_written, 48_000,
+        "output must be trimmed to exactly the expected 48000 frames, not the raw 50014"
+    );
+
+    std::fs::remove_file(wav_path).ok();
+    std::fs::remove_file(output_path).ok();
+    std::fs::remove_file("/tmp/test_expected_frames_e2e_tap.pcm").ok();
 }

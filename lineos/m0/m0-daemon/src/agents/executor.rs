@@ -330,6 +330,7 @@ pub async fn run(
                             speech_gain: 1.0,
                             music_gain: 0.501,
                             pre_gain_linear,
+                            expected_output_frames: main_decoder.inner().expected_output_frames(),
                         },
                         sp314_orchestrator::streaming_pipeline::TimelinePlan {
                             boundaries,

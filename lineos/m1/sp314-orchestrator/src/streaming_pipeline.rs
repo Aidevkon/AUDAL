@@ -48,6 +48,13 @@ pub struct StreamingConfig<'a> {
     /// If you add a new DSP path here, it MUST also call
     /// apply_pre_gain on its input before any graph processing.
     pub pre_gain_linear: f32,
+    /// Exact expected output frame count (from the decoder's
+    /// StandardizedAudioStream, if resampling occurred) — anything
+    /// written beyond this many frames is resampler padding/tail
+    /// artifact, not real audio. None = no cap (trust whatever the
+    /// stream produces, today's pre-fix behavior — passthrough
+    /// files with no resampling have no artifact to trim anyway).
+    pub expected_output_frames: Option<u64>,
 }
 
 /// Multiply left/right buffers by a linear gain, in place.
@@ -364,8 +371,17 @@ pub fn run_streaming_pipeline_with_timeline(
             if !dual_graph_processed {
                 graph.process_block(&mut bl, &mut br);
             }
-            writer.write_chunk(&bl[..valid_frames], &br[..valid_frames])?;
-            total_frames_processed += valid_frames;
+
+            let frames_to_write = if let Some(cap) = config.expected_output_frames {
+                let remaining = (cap as usize).saturating_sub(total_frames_processed);
+                valid_frames.min(remaining)
+            } else {
+                valid_frames
+            };
+            if frames_to_write > 0 {
+                writer.write_chunk(&bl[..frames_to_write], &br[..frames_to_write])?;
+                total_frames_processed += frames_to_write;
+            }
         }
         Ok(())
     })
