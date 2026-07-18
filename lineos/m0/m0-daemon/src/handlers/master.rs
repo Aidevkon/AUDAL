@@ -117,6 +117,7 @@ pub async fn trigger_mastering(
             elapsed_ms: 0,
             blob_id: None,
             error: None,
+            bpm: None,
         },
     );
 
@@ -153,6 +154,7 @@ pub async fn trigger_mastering(
                     elapsed_ms: 0,
                     blob_id: None,
                     error: Some("Conductor channel closed".into()),
+                    bpm: None,
                 },
             );
             return;
@@ -169,6 +171,7 @@ pub async fn trigger_mastering(
                         elapsed_ms: 0,
                         blob_id: Some(blob_id_str.clone()),
                         error: None,
+                        bpm: None,
                     },
                 );
 
@@ -206,6 +209,7 @@ pub async fn trigger_mastering(
                         elapsed_ms: 0,
                         blob_id: None,
                         error: Some(format!("{:?}", e)),
+                        bpm: None,
                     },
                 );
             }
@@ -218,6 +222,7 @@ pub async fn trigger_mastering(
                         elapsed_ms: 0,
                         blob_id: None,
                         error: Some("Conductor dropped response".into()),
+                        bpm: None,
                     },
                 );
             }
@@ -266,6 +271,7 @@ pub async fn trigger_streaming(
         elapsed_ms: 0,
         blob_id: None,
         error: None,
+        bpm: None,
     };
     state.progress.insert(session_id.clone(), progress.clone());
     let _ = state.progress_tx.send(progress);
@@ -300,6 +306,7 @@ pub async fn trigger_streaming(
                 elapsed_ms: 0,
                 blob_id: None,
                 error: Some("Conductor channel closed".into()),
+                bpm: None,
             };
             state_bg
                 .progress
@@ -317,6 +324,7 @@ pub async fn trigger_streaming(
                     elapsed_ms: 0,
                     blob_id: Some(blob_id_str.clone()),
                     error: None,
+                    bpm: None,
                 };
                 state_bg
                     .progress
@@ -356,6 +364,7 @@ pub async fn trigger_streaming(
                     elapsed_ms: 0,
                     blob_id: None,
                     error: Some(format!("{:?}", e)),
+                    bpm: None,
                 };
                 state_bg
                     .progress
@@ -369,6 +378,7 @@ pub async fn trigger_streaming(
                     elapsed_ms: 0,
                     blob_id: None,
                     error: Some("Conductor dropped response".into()),
+                    bpm: None,
                 };
                 state_bg
                     .progress

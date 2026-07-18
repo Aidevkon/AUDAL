@@ -29,6 +29,7 @@ pub async fn get_progress(
             elapsed_ms: 0,
             blob_id: None,
             error: None,
+            bpm: None,
         }),
     }
 }

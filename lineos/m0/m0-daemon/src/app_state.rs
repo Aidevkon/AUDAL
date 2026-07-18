@@ -28,6 +28,13 @@ pub struct MasteringProgress {
     pub elapsed_ms: u64,
     pub blob_id: Option<String>,
     pub error: Option<String>,
+    /// Full-file, accurate BPM — telemetry only, for the Kepler UI
+    /// instrument. None until the analysis pass computes it (most
+    /// stages won't carry this; only the stage that follows the
+    /// full-file measurement pass will). Unrelated to and never
+    /// overriding PreAnalyzer's 30s-scout bpm, which drives real DSP
+    /// ducking decisions elsewhere.
+    pub bpm: Option<f32>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

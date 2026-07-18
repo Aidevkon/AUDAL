@@ -192,6 +192,7 @@ fn run_dsp_internal(
             elapsed_ms: start.elapsed().as_millis() as u64,
             blob_id: None,
             error: None,
+            bpm: None,
         };
         if let Some(map) = &progress_map {
             map.insert(job_id.clone(), p.clone());

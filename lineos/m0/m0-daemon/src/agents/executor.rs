@@ -136,6 +136,7 @@ pub async fn run(
                             elapsed_ms: start.elapsed().as_millis() as u64,
                             blob_id: Some(blob.id.clone()),
                             error: None,
+                            bpm: None,
                         };
                         progress_map.insert(plan.session_id.clone(), p.clone());
                         let _ = progress_tx.send(p);
@@ -171,6 +172,7 @@ pub async fn run(
                 let input_hash_hex_path = hex::encode(path_hash);
                 let seed = crate::domain::dsp_pipeline::derive_seed(&path_hash);
                 let cert_start = std::time::Instant::now();
+                let progress_tx_clone = progress_tx.clone();
 
                 let result = tokio::task::spawn_blocking(move || {
                     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
@@ -242,8 +244,18 @@ pub async fn run(
                     let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
                         lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
                     });
-                    let input_lufs = crate::dsp::input_lufs::measure_input_lufs(path)
-                        .map_err(|e| ExecutorError::DspFailed(format!("input LUFS measurement failed: {e}")))?;
+                    let metrics = crate::dsp::input_lufs::measure_input_metrics(path)
+                        .map_err(|e| ExecutorError::DspFailed(format!("input measurement failed: {e}")))?;
+                    let input_lufs = metrics.integrated_lufs;
+
+                    let _ = progress_tx_clone.send(crate::app_state::MasteringProgress {
+                        job_id: job_id.clone(),
+                        stage: "ANALYZING".to_string(),
+                        elapsed_ms: 0,
+                        blob_id: None,
+                        error: None,
+                        bpm: Some(metrics.bpm),
+                    });
                     let pre_gain_linear = match input_lufs {
                         Some(measured) => {
                             let result = sp314_dsp::pipeline::autotune::autotune(measured, target_lufs);
