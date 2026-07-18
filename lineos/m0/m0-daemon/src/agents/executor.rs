@@ -173,6 +173,7 @@ pub async fn run(
                 let cert_start = std::time::Instant::now();
 
                 let result = tokio::task::spawn_blocking(move || {
+                    let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
                     let path = std::path::Path::new(&audio_path);
 
                     // 1. Read the 30s scout sample
@@ -219,6 +220,7 @@ pub async fn run(
                     )
                     .map_err(|e| ExecutorError::DspFailed(format!("scout failed: {e}")))?;
                     let streaming_features = scout_out.scout.features.clone();
+                    profiler.mark_stage_with_hash("Scout/PreAnalysis", String::new());
 
                     // a. Build boundaries
                     let decoder = crate::dsp::file_decoder::FileDecoder {
@@ -317,6 +319,7 @@ pub async fn run(
                         std_decoder,
                         raw_tap_path.clone(),
                     );
+                    profiler.mark_stage_with_hash("Decode Setup", String::new());
 
                     // 3. Call run_streaming_pipeline_with_timeline
                     let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
@@ -342,6 +345,7 @@ pub async fn run(
                     .map_err(|e| {
                         ExecutorError::DspFailed(format!("Streaming pipeline failed: {}", e))
                     })?;
+                    profiler.mark_stage_with_hash("Streaming Render", String::new());
 
                     if let Some(e) = main_decoder.take_tap_error() {
                         eprintln!(
@@ -355,6 +359,7 @@ pub async fn run(
                             .map_err(|e| {
                                 ExecutorError::DspFailed(format!("wav→raw post-pass failed: {e}"))
                             })?;
+                    profiler.mark_stage_with_hash("Verification Pass", measured.pcm_blake3.clone());
 
                     // Two independent counts of the same quantity: the pipeline
                     // counted frames while WRITING the WAV; the measured pass
@@ -389,6 +394,7 @@ pub async fn run(
                     .map_err(ExecutorError::DspFailed)?;
                     let (fingerprints, spatial_metadata) =
                         crate::domain::content_type::ContentType::bypassed_render();
+                    profiler.mark_stage_with_hash("Certificate Assembly", String::new());
                     let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
                         pcm_blake3: measured.pcm_blake3.clone(),
                         output_sha256: measured.output_sha256.clone(),
@@ -413,7 +419,7 @@ pub async fn run(
                         &plan.preset_id,
                         input_sha256,
                         measured.frames_written,
-                        Vec::new(), // processing_timeline — v3 has no TimelineProfiler yet (rescue roster)
+                        profiler.finalize(),
                         cert_data,
                     )
                     .map_err(ExecutorError::DspFailed)?;

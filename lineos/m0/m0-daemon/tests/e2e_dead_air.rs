@@ -105,5 +105,38 @@ async fn dead_air_reaches_the_real_certificate() {
         blob.dead_air.total_sec
     );
 
+    assert!(
+        !blob.processing_timeline.is_empty(),
+        "expected real timeline stages, got an empty vec"
+    );
+    assert_eq!(
+        blob.processing_timeline.len(),
+        5,
+        "expected exactly 5 stages (Scout/PreAnalysis, Decode Setup, \
+         Streaming Render, Verification Pass, Certificate Assembly), \
+         got {}",
+        blob.processing_timeline.len()
+    );
+    // The Verification Pass stage should carry a real hash (the
+    // only stage wired with one today) — proves stage-specific data
+    // isn't just placeholder-uniform.
+    let verification_stage = blob
+        .processing_timeline
+        .iter()
+        .find(|s| s.stage == "Verification Pass")
+        .expect("Verification Pass stage must exist");
+    assert!(
+        !verification_stage.stage_hash.is_empty(),
+        "Verification Pass should carry a real pcm_blake3 hash, got empty"
+    );
+    for stage in &blob.processing_timeline {
+        println!(
+            "  stage={} duration_ms={} hash_len={}",
+            stage.stage,
+            stage.duration_ms,
+            stage.stage_hash.len()
+        );
+    }
+
     std::fs::remove_file(wav_path).ok();
 }
