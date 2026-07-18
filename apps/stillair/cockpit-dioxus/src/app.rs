@@ -76,6 +76,7 @@ pub fn App() -> Element {
     let mut journey_elapsed_ms: Signal<u64> = use_signal(|| 0);
     let mut bpm_signal: Signal<f32> = use_signal(|| 0.0);
     let mut dropped_path: Signal<Option<String>> = use_signal(|| None);
+    let mut dropped_paths: Signal<Vec<String>> = use_signal(Vec::new);
     let last_platform: Signal<Option<String>> = use_signal(|| None);
     let last_flavour: Signal<Option<String>> = use_signal(|| None);
     let mut pending_master_req: Signal<PendingMasterReq> = use_signal(|| None);
@@ -433,12 +434,22 @@ pub fn App() -> Element {
                                                         let count = paths_array.length();
 
                                                         if count > 0 {
-                                                            let first_path = paths_array
-                                                                .get(0)
-                                                                .as_string()
-                                                                .unwrap_or_default();
-
-                                                            dropped_path.set(Some(first_path));
+                                                            let all_paths: Vec<String> = (0..count)
+                                                                .filter_map(|i| {
+                                                                    paths_array.get(i).as_string()
+                                                                })
+                                                                .collect();
+                                                            // Keep dropped_path (first file) for the existing
+                                                            // single-track flow — untouched behavior. dropped_paths
+                                                            // (all files) is new: not yet consumed by any dispatch
+                                                            // path — closes a real data-loss gap (multi-file drops
+                                                            // silently discarded all but the first) and sets up the
+                                                            // full album dispatch UI as its own, separate future task
+                                                            // (needs a new Tauri command + multi-track progress UI,
+                                                            // out of scope here — see NEST 2026-07-18).
+                                                            dropped_path
+                                                                .set(all_paths.first().cloned());
+                                                            dropped_paths.set(all_paths);
 
                                                             dispatch_hangar(
                                                                 hangar_state,
