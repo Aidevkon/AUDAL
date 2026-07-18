@@ -362,19 +362,28 @@ pub async fn run(
                             ducking_gain: ducking,
                         });
 
-                        // Build ExecutionPlan for this track
-                        let plan = ExecutionPlan {
+                        // Build StreamingPlan for this track — v3
+                        // dispatch (album cohesion migration, Part
+                        // 2b). cohesion_target overrides the
+                        // preset's default LUFS via the mechanism
+                        // built in Part 2a; every other creative
+                        // field passes through from this track's
+                        // own MasteringParams (Part 2b-i closed the
+                        // gap where intent knobs never reached here).
+                        let plan = super::operator::StreamingPlan {
                             audio_path: params.audio_path.clone(),
                             preset_id: params.preset_id.clone(),
-                            target_lufs: cohesion_target,
-                            max_tp_db: params.max_tp_db,
+                            flavour_id: params.flavour_id.clone(),
+                            intent_tone: params.intent_tone,
+                            intent_dynamics: params.intent_dynamics,
+                            target_lufs_override: Some(cohesion_target),
                             session_id: params.session_id.clone(),
                         };
 
                         // Dispatch to Executor (R3) — sequential, await each
                         let (tx, rx) = oneshot::channel();
                         if executor_tx
-                            .send(Intent::RunDsp { plan, response: tx })
+                            .send(Intent::RunStreaming { plan, response: tx })
                             .await
                             .is_err()
                         {
@@ -389,11 +398,11 @@ pub async fn run(
                         }
 
                         match rx.await {
-                            Ok(Ok(dsp_output)) => {
+                            Ok(Ok(streaming_output)) => {
                                 outputs.push(super::operator::BatchTrackOutput {
                                     track_index: index,
                                     session_id: params.session_id,
-                                    blob_id: dsp_output.blob_id,
+                                    blob_id: streaming_output.blob_id,
                                     status: "ok",
                                     error: None,
                                 });
