@@ -483,20 +483,13 @@ pub async fn run(
                     // to gate" — not a new sentinel invented here.
                     let integrated_lufs = metrics.integrated_lufs.unwrap_or(-144.0);
 
-                    // bpm: DEFERRED, not forgotten. The streaming
-                    // BeatDetector needed for a real value here is
-                    // a planned necessity (see NEST: it will be
-                    // built for the Kepler UI instrument regardless
-                    // of this task), not YAGNI — but building it is
-                    // out of scope for this migration. Confirmed via
-                    // recon that bpm is pure passthrough in album
-                    // cohesion today (dead-ends at UI telemetry,
-                    // never drives any DSP/certificate decision), so
-                    // 0.0 here changes no real behavior versus what
-                    // v3's own RunStreaming arm already reports
-                    // (which is also frequently 0.0 today, per a
-                    // separate, already-logged finding).
-                    let bpm = 0.0;
+                    // Real, full-file BPM via measure_input_metrics's
+                    // StreamingBeatDetector integration (2026-07-19) — the
+                    // previously-deferred value now landed. This is TELEMETRY-ONLY,
+                    // same as everywhere else this bpm is used; it does not drive
+                    // any DSP decision (album cohesion's bpm remains pure
+                    // passthrough, confirmed via recon in c85f56a).
+                    let bpm = metrics.bpm;
 
                     Ok(super::operator::AnalysisResult {
                         session_id,

@@ -23,6 +23,14 @@ const CHUNK_FRAMES: usize = 4096;
 pub struct InputMetrics {
     pub integrated_lufs: Option<f32>,
     pub true_peak_dbtp: f32,
+    /// Full-file, accurate BPM via StreamingBeatDetector — for
+    /// TELEMETRY/UI DISPLAY ONLY. Distinct from and unrelated to
+    /// PreAnalyzer's 30s-scout-based bpm (which drives real DSP
+    /// ducking-gain decisions in AutoTuningController and must
+    /// never be replaced or touched by this value — confirmed via
+    /// recon 2026-07-19 that the scout bpm is load-bearing for
+    /// audio output, this one is purely informational).
+    pub bpm: f32,
 }
 
 /// Full-file input measurement — LUFS AND true peak, in one
@@ -34,9 +42,11 @@ pub fn measure_input_metrics(path: &std::path::Path) -> Result<InputMetrics, Str
     let mut stream = StandardizedAudioStream::open(path)?;
     let mut lufs_meter = sp314_dsp::metering::LufsMeter::new();
     let mut peak_meter = sp314_dsp::metering::true_peak_meter::TruePeakMeter::new();
+    let mut beat_detector = crate::dsp::beat_detector::StreamingBeatDetector::new(48_000);
     let mut buf = vec![0f32; CHUNK_FRAMES * 2];
     let mut left = vec![0f32; CHUNK_FRAMES];
     let mut right = vec![0f32; CHUNK_FRAMES];
+    let mut mono = vec![0f32; CHUNK_FRAMES];
 
     loop {
         let frames = stream.fill_buffer(&mut buf)?;
@@ -46,14 +56,17 @@ pub fn measure_input_metrics(path: &std::path::Path) -> Result<InputMetrics, Str
         for i in 0..frames {
             left[i] = buf[i * 2];
             right[i] = buf[i * 2 + 1];
+            mono[i] = (left[i] + right[i]) * 0.5;
         }
         lufs_meter.process_chunk(&left[..frames], &right[..frames]);
         peak_meter.process_chunk(&left[..frames], &right[..frames]);
+        beat_detector.feed_chunk(&mono[..frames]);
     }
 
     Ok(InputMetrics {
         integrated_lufs: lufs_meter.finish(),
         true_peak_dbtp: peak_meter.finish(),
+        bpm: beat_detector.finish().0,
     })
 }
 
@@ -115,6 +128,7 @@ mod tests {
             "expected a plausible negative true peak, got {}",
             result.true_peak_dbtp
         );
+        assert!(result.bpm >= 0.0, "BPM should be non-negative");
         let _ = std::fs::remove_file(wav_path);
     }
 
@@ -155,6 +169,7 @@ mod tests {
             (ref_peak * 1000.0).round(),
             "standardized-stream measurement must match direct TruePeakMeter to 3 decimals"
         );
+        assert!(via_helper.bpm >= 0.0, "BPM should be non-negative");
         let _ = std::fs::remove_file(wav_path);
     }
 
@@ -180,6 +195,7 @@ mod tests {
             result.true_peak_dbtp.is_finite(),
             "true peak is always valid"
         );
+        assert_eq!(result.bpm, 0.0, "BPM should be 0.0 for audio too short");
         let _ = std::fs::remove_file(wav_path);
     }
 
@@ -204,6 +220,52 @@ mod tests {
             from_metrics, from_wrapper,
             "wrapper should be a transparent passthrough"
         );
+        let _ = std::fs::remove_file(wav_path);
+    }
+
+    #[test]
+    fn measures_correct_bpm_on_known_tempo_fixture() {
+        // Same click-track pattern proven in beat_detector.rs's oracle
+        // test yesterday (7e32e32) — sharp, precisely-timed transients
+        // at a known BPM, a much stronger signal than a continuous tone
+        // for validating tempo detection specifically.
+        let wav_path = "/tmp/test_input_metrics_bpm.wav";
+        let sr = 48_000u32;
+        let bpm_target = 120.0f32;
+        let duration_secs = 8.0f32;
+        let n = (sr as f32 * duration_secs) as usize;
+        let interval_samples = (60.0 / bpm_target * sr as f32) as usize;
+
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: sr,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+        let mut samples = vec![0.0f32; n];
+        let mut pos = 0;
+        while pos + 20 < n {
+            for i in 0..20 {
+                samples[pos + i] = 0.9 * (1.0 - i as f32 / 20.0);
+            }
+            pos += interval_samples;
+        }
+        for &s in &samples {
+            writer.write_sample(s).unwrap();
+            writer.write_sample(s).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let result = measure_input_metrics(std::path::Path::new(wav_path)).unwrap();
+
+        assert!(
+            (result.bpm - bpm_target).abs() < 1.0,
+            "expected ~{}bpm, got {}",
+            bpm_target,
+            result.bpm
+        );
+
         let _ = std::fs::remove_file(wav_path);
     }
 }

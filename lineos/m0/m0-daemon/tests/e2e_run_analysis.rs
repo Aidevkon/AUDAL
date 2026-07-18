@@ -22,10 +22,19 @@ fn write_test_wav(path: &str, sample_rate: u32, seconds: f32) {
         sample_format: hound::SampleFormat::Float,
     };
     let mut writer = hound::WavWriter::create(path, spec).unwrap();
-    for i in 0..n {
-        let v = 0.4 * (i as f32 * 0.02).sin();
-        writer.write_sample(v).unwrap();
-        writer.write_sample(v * 0.9).unwrap();
+    let bpm_target = 120.0f32;
+    let interval_samples = (60.0 / bpm_target * sample_rate as f32) as usize;
+    let mut samples = vec![0.0f32; n];
+    let mut pos = 0;
+    while pos + 20 < n {
+        for i in 0..20 {
+            samples[pos + i] = 0.9 * (1.0 - i as f32 / 20.0);
+        }
+        pos += interval_samples;
+    }
+    for &s in &samples {
+        writer.write_sample(s).unwrap();
+        writer.write_sample(s).unwrap();
     }
     writer.finalize().unwrap();
 }
@@ -90,13 +99,13 @@ async fn run_analysis_produces_sane_streaming_metrics() {
         "expected a plausible negative true peak, got {}",
         analysis.true_peak_dbtp
     );
-    // Deliberately deferred (c85f56a) — a real streaming BeatDetector
-    // is tracked as a planned necessity, not built yet. This
-    // assertion documents current behavior; if it starts failing,
-    // that's a signal the deferred work landed, update accordingly.
-    assert_eq!(
-        analysis.bpm, 0.0,
-        "bpm is deliberately deferred until the streaming BeatDetector lands"
+    // The streaming BeatDetector work landed (7e32e32, input_lufs.rs
+    // wiring) — this now asserts a REAL, correct value instead of
+    // documenting a deferred 0.0.
+    assert!(
+        (analysis.bpm - 120.0).abs() < 1.0,
+        "expected ~120bpm from the click-track fixture, got {}",
+        analysis.bpm
     );
 
     std::fs::remove_file(wav_path).ok();
