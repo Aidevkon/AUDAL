@@ -46,6 +46,16 @@ pub enum AlbumEvent {
         bpm: f32,
         ducking_gain: f32,
     },
+    #[serde(rename = "forensic")]
+    Forensic { track: usize, lufs: f32 },
+    #[serde(rename = "cohesion")]
+    Cohesion { per_track_targets: Vec<f32> },
+    #[serde(rename = "fatigue")]
+    Fatigue {
+        track: usize,
+        ducking: f32,
+        width: f32,
+    },
 }
 
 /// Shared application state for the mastering API router (port 7400).

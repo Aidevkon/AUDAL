@@ -235,6 +235,10 @@ pub async fn run(
                                     analysis.integrated_lufs
                                 );
                                 track_lufs.push(analysis.integrated_lufs);
+                                let _ = album_tx.send(crate::app_state::AlbumEvent::Forensic {
+                                    track: track_lufs.len(),
+                                    lufs: analysis.integrated_lufs,
+                                });
                                 track_analyses.push(analysis);
                             }
                             _ => {
@@ -277,6 +281,10 @@ pub async fn run(
                             (global_target - offset).clamp(-40.0, 0.0)
                         })
                         .collect();
+
+                    let _ = album_tx.send(crate::app_state::AlbumEvent::Cohesion {
+                        per_track_targets: per_track_targets.clone(),
+                    });
 
                     tracing::info!(
                         batch_id = %batch_id,
@@ -360,6 +368,18 @@ pub async fn run(
                             track: index + 1,
                             bpm,
                             ducking_gain: ducking,
+                        });
+
+                        let width = if ear_delta.fatigue_detected {
+                            let current = head_state_ptr.load();
+                            (current.ms_width * ear_delta.width_multiplier).clamp(0.5, 2.0)
+                        } else {
+                            1.0
+                        };
+                        let _ = album_tx.send(crate::app_state::AlbumEvent::Fatigue {
+                            track: index + 1,
+                            ducking,
+                            width,
                         });
 
                         // Build StreamingPlan for this track — v3

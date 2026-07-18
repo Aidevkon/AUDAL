@@ -64,29 +64,66 @@ async fn test_album_sse_pipeline_emits_bpm() {
 
     operator.dispatch(intent).await.expect("Dispatch failed");
 
-    // 3. Wait for the SSE event
-    let event = tokio::time::timeout(tokio::time::Duration::from_secs(10), rx.recv())
-        .await
-        .expect("Timeout waiting for SSE event")
-        .expect("Channel closed");
+    let mut seen_pre_analysis = false;
+    let mut seen_forensic = false;
+    let mut seen_cohesion = false;
+    let mut seen_fatigue = false;
 
-    // 4. Assert the event is PreAnalysis and contains BPM
-    match event {
-        m0d::app_state::AlbumEvent::PreAnalysis {
-            track,
-            bpm,
-            ducking_gain,
-        } => {
-            println!("✅ Received PreAnalysis SSE Event!");
-            println!("   Track: {}", track);
-            println!("   BPM: {}", bpm);
-            println!("   Ducking Gain: {}", ducking_gain);
-            assert_eq!(track, 1, "Should be track 1");
-            assert!(bpm >= 0.0, "BPM should be valid");
-            assert!(
-                ducking_gain > 0.0 && ducking_gain <= 1.0,
-                "Ducking gain should be in [0.3, 1.0]"
-            );
+    // Collect events until we've seen all 4 kinds or time out —
+    // proves Forensic/Cohesion/Fatigue actually fire with sane data,
+    // not just that PreAnalysis (already proven) still works.
+    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(10);
+    while tokio::time::Instant::now() < deadline
+        && !(seen_pre_analysis && seen_forensic && seen_cohesion && seen_fatigue)
+    {
+        let event =
+            match tokio::time::timeout(tokio::time::Duration::from_secs(10), rx.recv()).await {
+                Ok(Ok(e)) => e,
+                _ => break,
+            };
+
+        match event {
+            m0d::app_state::AlbumEvent::PreAnalysis {
+                track,
+                bpm,
+                ducking_gain,
+            } => {
+                println!("✅ PreAnalysis: track={track} bpm={bpm} ducking_gain={ducking_gain}");
+                assert_eq!(track, 1);
+                assert!(bpm >= 0.0);
+                assert!(ducking_gain > 0.0 && ducking_gain <= 1.0);
+                seen_pre_analysis = true;
+            }
+            m0d::app_state::AlbumEvent::Forensic { track, lufs } => {
+                println!("✅ Forensic: track={track} lufs={lufs}");
+                assert_eq!(track, 1);
+                assert!(lufs.is_finite(), "lufs should be a real measured value");
+                seen_forensic = true;
+            }
+            m0d::app_state::AlbumEvent::Cohesion { per_track_targets } => {
+                println!("✅ Cohesion: per_track_targets={per_track_targets:?}");
+                assert!(
+                    !per_track_targets.is_empty(),
+                    "cohesion targets should be non-empty for a real batch"
+                );
+                seen_cohesion = true;
+            }
+            m0d::app_state::AlbumEvent::Fatigue {
+                track,
+                ducking,
+                width,
+            } => {
+                println!("✅ Fatigue: track={track} ducking={ducking} width={width}");
+                assert_eq!(track, 1);
+                assert!(ducking > 0.0);
+                assert!(width > 0.0);
+                seen_fatigue = true;
+            }
         }
     }
+
+    assert!(seen_pre_analysis, "never received a PreAnalysis event");
+    assert!(seen_forensic, "never received a Forensic event");
+    assert!(seen_cohesion, "never received a Cohesion event");
+    assert!(seen_fatigue, "never received a Fatigue event");
 }
