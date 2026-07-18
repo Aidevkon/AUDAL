@@ -291,6 +291,10 @@ fn mastering_router(state: AppState, config: &crate::config::M0Config) -> axum::
             "/master/streaming",
             post(handlers::master::trigger_streaming),
         )
+        .route(
+            "/album/master",
+            post(handlers::album::trigger_album_mastering),
+        )
         .route("/preview", post(handlers::preview::create_preview))
         .route(
             "/preview/:id/:stem",
