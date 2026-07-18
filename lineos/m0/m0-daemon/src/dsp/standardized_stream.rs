@@ -100,6 +100,19 @@ pub struct StandardizedAudioStream {
     // Delivered-frame accounting for the trait's
     // total_frames_hint (best-effort).
     est_total_frames: Option<u64>,
+
+    /// Exact expected output frame count at TARGET_SR, computed
+    /// from the source file's EXACT frame count (Symphonia's WAV
+    /// demuxer parses this precisely from the RIFF data chunk size
+    /// / block_align — deterministic, not an estimate) times the
+    /// resample ratio. This is the TRUE target length — anything
+    /// a caller reads beyond this many frames is resampler
+    /// padding/tail artifact (from the final chunk's zero-padding
+    /// AND the sinc filter's internal delay line drain), not real
+    /// audio content. None if the source's exact frame count isn't
+    /// available (falls back to trusting whatever the stream
+    /// produces — no trim).
+    expected_output_frames: Option<u64>,
 }
 
 impl StandardizedAudioStream {
@@ -119,6 +132,14 @@ impl StandardizedAudioStream {
         let reader = LazyAudioReader::open(path).map_err(|e| format!("standardized open: {e}"))?;
         let orig_sr = reader.sample_rate();
         let orig_ch = reader.channels();
+
+        let expected_output_frames = reader.total_frames_hint().map(|src_frames| {
+            if orig_sr == TARGET_SR {
+                src_frames
+            } else {
+                ((src_frames as f64) * (TARGET_SR as f64 / orig_sr as f64)).round() as u64
+            }
+        });
 
         // Duration guard (metadata only — never
         // reads the audio).
@@ -174,6 +195,7 @@ impl StandardizedAudioStream {
             sha256: Sha256::new(),
             health: SignalHealthMonitor::new(TARGET_SR),
             est_total_frames,
+            expected_output_frames,
         })
     }
 
@@ -351,6 +373,14 @@ impl StandardizedAudioStream {
     /// exact — O(1) memory on any duration).
     pub fn into_dead_air(self) -> DeadAirSummary {
         self.health.finish()
+    }
+
+    /// See `expected_output_frames` field doc. Callers needing
+    /// exact A/B length parity with the source should trim their
+    /// written output to this many frames (if Some) rather than
+    /// however many the stream happens to produce.
+    pub fn expected_output_frames(&self) -> Option<u64> {
+        self.expected_output_frames
     }
 }
 

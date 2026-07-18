@@ -686,3 +686,72 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
     std::fs::remove_file(output_path_unity).ok();
     std::fs::remove_file(output_path_boost).ok();
 }
+
+#[test]
+fn expected_output_frames_is_exact_for_resampled_audio() {
+    // 1 second @ 44.1k -> expect exactly 48000 output frames (the
+    // TRUE target), even though the stream's actual fill_buffer
+    // reads will produce MORE than this (padding + resampler tail
+    // artifacts — measured this session at 50014 for this exact
+    // fixture, ~2014 frames of which are NOT real audio).
+    let wav_path = "/tmp/test_expected_frames_441.wav";
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: 44_100,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+    for i in 0..44_100 {
+        let v = 0.4 * (i as f32 * 0.02).sin();
+        writer.write_sample(v).unwrap();
+        writer.write_sample(v * 0.8).unwrap();
+    }
+    writer.finalize().unwrap();
+
+    let stream = m0d::dsp::standardized_stream::StandardizedAudioStream::open(
+        std::path::Path::new(wav_path),
+    )
+    .unwrap();
+
+    assert_eq!(
+        stream.expected_output_frames(),
+        Some(48_000),
+        "1s of 44.1k audio must expect exactly 48000 output frames at 48k"
+    );
+
+    let _ = std::fs::remove_file(wav_path);
+}
+
+#[test]
+fn expected_output_frames_matches_source_for_passthrough_48k() {
+    // No resampling needed when source is already 48k — expected
+    // output frames must equal source frames exactly, ratio = 1.0.
+    let wav_path = "/tmp/test_expected_frames_48k.wav";
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: 48_000,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+    for i in 0..48_000 {
+        let v = 0.4 * (i as f32 * 0.02).sin();
+        writer.write_sample(v).unwrap();
+        writer.write_sample(v * 0.8).unwrap();
+    }
+    writer.finalize().unwrap();
+
+    let stream = m0d::dsp::standardized_stream::StandardizedAudioStream::open(
+        std::path::Path::new(wav_path),
+    )
+    .unwrap();
+
+    assert_eq!(
+        stream.expected_output_frames(),
+        Some(48_000),
+        "passthrough (48k source) must report expected_output_frames == source frame count"
+    );
+
+    let _ = std::fs::remove_file(wav_path);
+}
