@@ -367,6 +367,12 @@ pub async fn run(
                     }
 
                     let (_input_blake3, input_sha256) = main_decoder.inner().input_hashes();
+                    // main_decoder is no longer needed after this point —
+                    // consumed by value to extract the real dead-air
+                    // summary (previously deferred as Default::default()
+                    // because input_hashes() needed a live &self
+                    // reference first; now sequenced correctly).
+                    let dead_air = main_decoder.into_inner().into_dead_air();
 
                     let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
                         &plan.preset_id,
@@ -386,7 +392,7 @@ pub async fn run(
                     let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
                         pcm_blake3: measured.pcm_blake3.clone(),
                         output_sha256: measured.output_sha256.clone(),
-                        dead_air: Default::default(), // decoder consumed by reference; into_dead_air needs ownership — deferred, honest default (rescue roster)
+                        dead_air,
                     };
                     let cert_out = crate::domain::nodes::certificate_node::run_streaming(
                         &blob_id,

@@ -49,6 +49,15 @@ impl<D: DecodeProvider> TappedDecoder<D> {
         &self.inner
     }
 
+    /// Consume the wrapper and return the inner decoder by value —
+    /// needed for operations like StandardizedDecoder::into_dead_air
+    /// that require ownership, not just a reference. Call this LAST,
+    /// after any &self-based operations (input_hashes(),
+    /// take_tap_error()) have already run.
+    pub fn into_inner(self) -> D {
+        self.inner
+    }
+
     /// Returns and clears the tap error, if any occurred.
     pub fn take_tap_error(&self) -> Option<std::io::Error> {
         self.tap_error.borrow_mut().take()
