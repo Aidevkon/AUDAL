@@ -187,6 +187,15 @@ pub struct StreamingOutput {
     pub pcm_data: Option<std::path::PathBuf>,
     pub num_frames: usize,
     pub sample_rate: u32,
+    /// Real content hash of the mastered output (from the C1
+    /// measured wav→raw pass) — was previously unavailable to
+    /// callers, forcing album cohesion to substitute session_id as
+    /// a fake input_hash (found 2026-07-18).
+    pub pcm_blake3: String,
+    /// Actual POST-mastering integrated LUFS — was previously
+    /// unavailable to callers, forcing album cohesion to report the
+    /// PRE-mastering measurement instead (found 2026-07-18).
+    pub output_lufs: f32,
 }
 
 /// Output for a single track in a batch job
@@ -197,6 +206,8 @@ pub struct BatchTrackOutput {
     pub blob_id: String,
     pub status: &'static str, // "ok" | "error"
     pub error: Option<String>,
+    pub pcm_blake3: String,
+    pub output_lufs: f32,
 }
 
 /// One finding from WizardAgent (R2)

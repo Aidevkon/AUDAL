@@ -420,6 +420,8 @@ pub async fn run(
                             pcm_data: Some(mastered_raw_path.clone()),
                             num_frames: measured.frames_written,
                             sample_rate: 48_000,
+                            pcm_blake3: measured.pcm_blake3.clone(),
+                            output_lufs: measured.output_lufs,
                         },
                         cert_out.blob,
                     ))

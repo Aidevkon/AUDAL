@@ -393,6 +393,8 @@ pub async fn run(
                                 blob_id: String::new(),
                                 status: "error",
                                 error: Some("Executor channel closed".into()),
+                                pcm_blake3: String::new(),
+                                output_lufs: 0.0,
                             });
                             continue;
                         }
@@ -405,6 +407,8 @@ pub async fn run(
                                     blob_id: streaming_output.blob_id,
                                     status: "ok",
                                     error: None,
+                                    pcm_blake3: streaming_output.pcm_blake3,
+                                    output_lufs: streaming_output.output_lufs,
                                 });
                             }
                             Ok(Err(e)) => {
@@ -414,6 +418,8 @@ pub async fn run(
                                     blob_id: String::new(),
                                     status: "error",
                                     error: Some(format!("{:?}", e)),
+                                    pcm_blake3: String::new(),
+                                    output_lufs: 0.0,
                                 });
                             }
                             Err(_) => {
@@ -423,6 +429,8 @@ pub async fn run(
                                     blob_id: String::new(),
                                     status: "error",
                                     error: Some("Executor dropped oneshot".into()),
+                                    pcm_blake3: String::new(),
+                                    output_lufs: 0.0,
                                 });
                             }
                         }
@@ -448,15 +456,14 @@ pub async fn run(
                         .collect();
 
                     let album_cert_path = {
-                        // Build proxy blobs from track_lufs + blob_ids
+                        // Build proxy blobs from real output metrics
                         let proxy_blobs: Vec<crate::blob_store::StoredBlob> = outputs
                             .iter()
-                            .zip(track_lufs.iter())
-                            .map(|(o, &lufs)| crate::blob_store::StoredBlob {
+                            .map(|o| crate::blob_store::StoredBlob {
                                 id: o.blob_id.clone(),
-                                input_hash: o.session_id.clone(),
+                                input_hash: o.pcm_blake3.clone(),
                                 loudness: crate::blob_store::StoredLoudness {
-                                    integrated_lufs: lufs,
+                                    integrated_lufs: o.output_lufs,
                                     ..Default::default()
                                 },
                                 ..Default::default()
