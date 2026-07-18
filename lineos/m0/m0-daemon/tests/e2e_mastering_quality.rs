@@ -92,10 +92,10 @@ fn make_head() -> Arc<ArcSwap<DspState>> {
 fn inv_qa_1_output_integrity() {
     let sr = 48000u32;
     let input = generate_chaos_mix(sr, 3.0);
-    let path = "/tmp/qa_integrity.wav";
-    write_wav(&input, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -133,10 +133,10 @@ fn inv_qa_2_crest_factor_survival() {
     let input_l: Vec<f32> = input.iter().step_by(2).copied().collect();
     let input_crest = crest_factor_db(&input_l);
 
-    let path = "/tmp/qa_crest.wav";
-    write_wav(&input, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -187,10 +187,10 @@ fn inv_qa_3_spectral_balance() {
 
     let input_centroid = spectral_centroid_hz(&input_l, sr);
 
-    let path = "/tmp/qa_spectral.wav";
-    write_wav(&input, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -254,7 +254,9 @@ fn inv_qa_4_compressor_is_active() {
     let input_rms = (input_l.iter().map(|s| s * s).sum::<f32>() / input_l.len() as f32).sqrt();
     let input_crest = crest_factor_db(&input_l);
 
-    let path = "/tmp/qa_compressor.wav";
+    let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
     write_wav(&input, sr, path);
 
     let req = MasterRequest {
@@ -272,7 +274,6 @@ fn inv_qa_4_compressor_is_active() {
         mix_levels: None,
         preview_id: None,
     };
-    let state_tmp = tempfile::TempDir::new().unwrap();
 
     let result = run_dsp(
         &req,
@@ -349,10 +350,10 @@ fn inv_qa_5_headroom_enforcement() {
     let input_l: Vec<f32> = signal.iter().step_by(2).copied().collect();
     let input_crest = crest_factor_db(&input_l);
 
-    let path = "/tmp/qa_headroom.wav";
-    write_wav(&signal, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&signal, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -412,10 +413,10 @@ fn inv_qa_8_true_peak_ceiling() {
     // Test A: Normal chaos mix
     {
         let input = generate_chaos_mix(sr, 3.0);
-        let path = "/tmp/qa_tp_normal.wav";
-        write_wav(&input, sr, path);
-
         let state_tmp = tempfile::TempDir::new().unwrap();
+        let path = state_tmp.path().join("input.wav");
+        let path = path.to_str().unwrap();
+        write_wav(&input, sr, path);
 
         let result = run_dsp(
             &make_req(path),
@@ -461,10 +462,10 @@ fn inv_qa_8_true_peak_ceiling() {
             hot.push(s);
             hot.push(s);
         }
-        let path = "/tmp/qa_tp_hot.wav";
-        write_wav(&hot, sr, path);
-
         let state_tmp = tempfile::TempDir::new().unwrap();
+        let path = state_tmp.path().join("input.wav");
+        let path = path.to_str().unwrap();
+        write_wav(&hot, sr, path);
 
         let result = run_dsp(
             &make_req(path),
@@ -512,10 +513,10 @@ fn inv_qa_8_true_peak_ceiling() {
 fn inv_qa_7_stereo_phase_coherence() {
     let sr = 48000u32;
     let input = generate_chaos_mix(sr, 4.0);
-    let path = "/tmp/qa_phase.wav";
-    write_wav(&input, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -645,13 +646,13 @@ fn inv_qa_9_multi_genre() {
     ];
 
     for (name, signal) in genres {
-        let path = format!("/tmp/qa_genre_{}.wav", name);
-        write_wav(signal, sr, &path);
-
         let state_tmp = tempfile::TempDir::new().unwrap();
+        let path = state_tmp.path().join(format!("genre_{}.wav", name));
+        let path = path.to_str().unwrap();
+        write_wav(signal, sr, path);
 
         let result = run_dsp(
-            &make_req(&path),
+            &make_req(path),
             Instant::now(),
             make_head(),
             None,
@@ -798,10 +799,10 @@ fn inv_qa_6_mud_correction() {
         f32::MAX
     };
 
-    let path = "/tmp/qa_mud.wav";
-    write_wav(&signal, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&signal, sr, path);
 
     let result = run_dsp(
         &make_req(path),
@@ -892,16 +893,16 @@ fn inv_qa_10_overscale_stress() {
 
     for (name, dbfs) in cases {
         let signal = make_sine(*dbfs, 2.0);
-        let path = format!(
-            "/tmp/qa_overscale_{}.wav",
-            name.replace("+", "plus").replace("-", "minus")
-        );
-        write_wav(&signal, sr, &path);
-
         let state_tmp = tempfile::TempDir::new().unwrap();
+        let path = state_tmp.path().join(format!(
+            "overscale_{}.wav",
+            name.replace("+", "plus").replace("-", "minus")
+        ));
+        let path = path.to_str().unwrap();
+        write_wav(&signal, sr, path);
 
         let result = run_dsp(
-            &make_req(&path),
+            &make_req(path),
             Instant::now(),
             make_head(),
             None,
@@ -966,10 +967,10 @@ fn inv_mus_2_podcast_bit_exactness() {
 
     let sr = 48000u32;
     let input = generate_podcast_fixture(sr, 3.0);
-    let path = "/tmp/qa_podcast_bit_exactness.wav";
-    write_wav(&input, sr, path);
-
     let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
 
     let mut req = make_req(path);
     req.preset_id = "podcast".to_string();
