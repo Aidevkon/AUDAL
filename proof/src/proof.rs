@@ -23,6 +23,7 @@ impl ExecutionProof {
     pub fn generate(
         input_pcm_hash: String,
         output_pcm: &[f32],
+        lra: f32,
         persona: &PersonaConfig,
         dsp_config: &DspConfig,
         proof_log: &ProofLog,
@@ -41,6 +42,7 @@ impl ExecutionProof {
         Self::generate_from_hash(
             input_pcm_hash,
             output_pcm_hash,
+            lra,
             persona,
             dsp_config,
             proof_log,
@@ -67,6 +69,7 @@ impl ExecutionProof {
     pub fn generate_from_hash(
         input_pcm_hash: String,
         output_pcm_hash: String,
+        lra: f32,
         persona: &PersonaConfig,
         dsp_config: &DspConfig,
         proof_log: &ProofLog,
@@ -97,6 +100,7 @@ impl ExecutionProof {
                 .unwrap_or_else(|| "none".into()),
             final_dsp_config_hash: Self::hash_json(dsp_config),
             output_pcm_hash,
+            lra,
             rendered_at: rendered_at.into(),
             system_version: system_version.into(),
             persona_id: persona.id.clone(),
@@ -239,6 +243,7 @@ mod tests {
         let c1 = ExecutionProof::generate(
             input_hash.clone(),
             &o,
+            7.5, // plausible LRA — these tests exercise hash/signature logic, not LRA-specific behavior; confirmed via recon that lra isn't part of the signed payload (F-029)
             &p,
             &cfg,
             &log,
@@ -251,6 +256,7 @@ mod tests {
         let c2 = ExecutionProof::generate(
             input_hash,
             &o,
+            7.5,
             &p,
             &cfg,
             &log,
@@ -275,6 +281,7 @@ mod tests {
         let c1 = ExecutionProof::generate(
             input_hash.clone(),
             &o,
+            7.5,
             &p,
             &cfg,
             &log,
@@ -287,6 +294,7 @@ mod tests {
         let c2 = ExecutionProof::generate(
             input_hash,
             &o2,
+            7.5,
             &p,
             &cfg,
             &log,
@@ -306,6 +314,7 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
+            7.5,
             &p,
             &cfg,
             &log,
@@ -325,6 +334,7 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
+            7.5,
             &p,
             &cfg,
             &log,
@@ -356,6 +366,7 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
+            7.5,
             &p,
             &cfg,
             &log,

@@ -74,6 +74,7 @@ pub fn run(
     let cert = aether_bridge::generate_certificate(
         input_pcm_hash,
         &post_master_samples,
+        telemetry_lra,
         persona_config,
         dsp_config,
         proof_log,
@@ -183,6 +184,7 @@ pub fn run_streaming(
     let cert = aether_bridge::generate_certificate_from_hash(
         input_pcm_hash,
         cert_data.output_sha256,
+        telemetry_lra,
         persona_config,
         dsp_config,
         proof_log,

@@ -22,6 +22,7 @@ pub struct ExecutionCertificate {
     pub final_dsp_config_hash: String,
     /// SHA-256 of output PCM (raw f32 big-endian bytes)
     pub output_pcm_hash: String,
+    pub lra: f32,
     pub rendered_at: String, // ISO-8601
     pub system_version: String,
     pub persona_id: String,
