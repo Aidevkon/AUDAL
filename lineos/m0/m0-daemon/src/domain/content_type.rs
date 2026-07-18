@@ -27,7 +27,26 @@ impl ContentTypeExt for ContentType {
     fn from_preset(preset_id: &str) -> Self {
         match preset_id {
             "podcast" | "spoken_word" | "episode" | "acx" | "apple_podcasts" => Self::Episode,
-            _ => Self::Music,
+            // Known, valid Music-tier presets (same list as
+            // LoudnessTarget::from_preset in lineos-types/src/config.rs)
+            // — listed explicitly so they're recognized, not silently
+            // caught by the fallback below.
+            "spotify" | "spotifyv3" | "streaming" | "youtube" | "broadcast" | "broadcastvideo"
+            | "atscA85" => Self::Music,
+            // Deliberately NOT included here: flavour_id strings
+            // (warm_analog, club_punch, etc — a completely different
+            // namespace, xaak/src/flavours.rs) and intent-knob values.
+            // If one of those ever reaches this function, that IS a
+            // real bug elsewhere (wrong field passed to the wrong
+            // place) and should be visible below, not silently
+            // absorbed as if it were a valid-but-unrecognized preset.
+            _ => {
+                tracing::warn!(
+                    preset_id = %preset_id,
+                    "Unknown preset_id in ContentType::from_preset, defaulting to Music"
+                );
+                Self::Music
+            }
         }
     }
 
@@ -56,5 +75,75 @@ impl ContentTypeExt for ContentType {
                 spatial: [BandSpatialMetrics::default(); 5],
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod content_type_tests {
+    use super::*;
+
+    #[test]
+    fn known_episode_presets_map_correctly() {
+        for preset in ["podcast", "spoken_word", "episode", "acx", "apple_podcasts"] {
+            assert_eq!(
+                ContentType::from_preset(preset),
+                ContentType::Episode,
+                "expected {preset} to map to Episode"
+            );
+        }
+    }
+
+    #[test]
+    fn known_music_presets_map_correctly() {
+        for preset in [
+            "spotify",
+            "spotifyv3",
+            "streaming",
+            "youtube",
+            "broadcast",
+            "broadcastvideo",
+            "atscA85",
+        ] {
+            assert_eq!(
+                ContentType::from_preset(preset),
+                ContentType::Music,
+                "expected {preset} to map to Music"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_preset_still_defaults_to_music_but_is_now_logged() {
+        // Behavior is unchanged (still defaults to Music, no signature
+        // change, no call site disruption) — this test locks in that
+        // the FALLBACK VALUE is identical to before. The actual
+        // warn!() emission isn't unit-testable without a tracing
+        // subscriber harness, which is out of scope for this small
+        // fix; the log line itself was verified by eye in the diff.
+        // This test's job is to prove the unknown case doesn't crash
+        // and doesn't accidentally start returning something else.
+        assert_eq!(
+            ContentType::from_preset("this_is_definitely_not_a_real_preset"),
+            ContentType::Music
+        );
+    }
+
+    #[test]
+    fn flavour_id_strings_correctly_fall_to_unknown_path_not_recognized() {
+        // Deliberate: flavour strings are a DIFFERENT namespace and
+        // must NOT be silently recognized here — if one reaches this
+        // function, it's a real bug elsewhere that should surface via
+        // the warn!() path (verified by eye), not be quietly absorbed
+        // as if it were a legitimate unrecognized-but-fine preset.
+        for flavour in ["warm_analog", "club_punch", "cinematic_wide"] {
+            assert_eq!(
+                ContentType::from_preset(flavour),
+                ContentType::Music,
+                "flavour strings still fall through to the Music \
+                 default, but via the WARNING path, not a recognized \
+                 preset match — confirmed by code inspection of the \
+                 match arms, not distinguishable by return value alone"
+            );
+        }
     }
 }
