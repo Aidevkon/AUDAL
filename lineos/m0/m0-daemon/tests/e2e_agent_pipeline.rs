@@ -53,6 +53,8 @@ async fn test_agent_pipeline_executes_mastering() {
         project_id: None,
         track_id: None,
         flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
         chaos_seed: None,
     };
 
@@ -130,6 +132,8 @@ async fn test_conductor_rejects_concurrent_mastering() {
         project_id: None,
         track_id: None,
         flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
         chaos_seed: None,
     };
 
@@ -146,6 +150,8 @@ async fn test_conductor_rejects_concurrent_mastering() {
         project_id: None,
         track_id: None,
         flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
         chaos_seed: None,
     };
 

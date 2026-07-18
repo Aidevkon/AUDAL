@@ -92,6 +92,14 @@ pub struct MasteringParams {
     pub project_id: Option<String>,
     pub track_id: Option<String>,
     pub flavour_id: Option<String>,
+    /// Per-track creative knobs. None for every current caller —
+    /// no UI path sends these for album batch tracks today. Added
+    /// so the v3 dispatch (Part 2b-ii) doesn't silently discard
+    /// something that should have existed alongside flavour_id
+    /// from the start; this was a real gap, not a deliberate
+    /// omission, per recon 2026-07-18.
+    pub intent_tone: Option<f32>,
+    pub intent_dynamics: Option<f32>,
     pub chaos_seed: Option<u64>,
 }
 

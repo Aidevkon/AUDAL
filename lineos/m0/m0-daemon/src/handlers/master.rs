@@ -103,6 +103,8 @@ pub async fn trigger_mastering(
         project_id: req.project_id.clone(),
         track_id: req.track_id.clone(),
         flavour_id: req.flavour_id.clone(),
+        intent_tone: req.intent_tone,
+        intent_dynamics: req.intent_dynamics,
         chaos_seed: req.chaos_seed,
     };
 

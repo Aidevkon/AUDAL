@@ -50,6 +50,8 @@ async fn test_album_sse_pipeline_emits_bpm() {
         project_id: None,
         track_id: None,
         flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
         chaos_seed: None,
     };
 
