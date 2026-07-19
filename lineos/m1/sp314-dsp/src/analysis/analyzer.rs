@@ -108,7 +108,9 @@ impl StemFeatureAnalyzer {
             loudness_range: measure_loudness_range(&mix_l, &mix_r, sample_rate),
             stereo_correlation: stereo_correlation(&mix_l, &mix_r),
             stereo_width: stereo_width(&mix_l, &mix_r),
-            dynamic_range_db: dynamic_range_db(&mix_l, sample_rate),
+            dynamic_range_db: (dynamic_range_db(&mix_l, sample_rate)
+                + dynamic_range_db(&mix_r, sample_rate))
+                * 0.5,
             stem_energy_ratios: [
                 bass_ratio,
                 harmonics_ratio,
@@ -158,7 +160,7 @@ impl StemFeatureAnalyzer {
         } else {
             raw_crest.clamp(0.0, 30.0)
         };
-        let dyn_rng = dynamic_range_db(&l, sample_rate);
+        let dyn_rng = (dynamic_range_db(&l, sample_rate) + dynamic_range_db(&r, sample_rate)) * 0.5;
 
         // Stereo
         let corr = stereo_correlation(&l, &r);
@@ -229,8 +231,9 @@ impl StemFeatureAnalyzer {
         // RMS: average of L and R
         let _rms = (rms_db(left) + rms_db(right)) * 0.5;
 
-        // Dynamic range on L channel (representative)
-        let dyn_range = dynamic_range_db(left, sample_rate);
+        // Dynamic range: average of L and R channels
+        let dyn_range =
+            (dynamic_range_db(left, sample_rate) + dynamic_range_db(right, sample_rate)) * 0.5;
 
         // Stereo metrics
         let corr = stereo_correlation(left, right);
@@ -335,7 +338,7 @@ impl StreamingStemAnalyzer {
         let lra = self.lra.finish();
 
         let (dyn_rms_l, dyn_crest_l, dyn_rng_l) = self.dyn_l.finish();
-        let (dyn_rms_r, dyn_crest_r, _dyn_rng_r) = self.dyn_r.finish();
+        let (dyn_rms_r, dyn_crest_r, dyn_rng_r) = self.dyn_r.finish();
 
         let (spec_c_l, spec_f_l, spec_cr_l) = self.spec_l.finish();
         let (spec_c_r, spec_f_r, spec_cr_r) = self.spec_r.finish();
@@ -357,8 +360,8 @@ impl StreamingStemAnalyzer {
             raw_crest.clamp(0.0, 30.0)
         };
 
-        // Parked Finding (P3): dynamic_range is from left channel only
-        let dyn_rng = dyn_rng_l;
+        // Dynamic range: average of L and R channels (P3 fix matches offline)
+        let dyn_rng = (dyn_rng_l + dyn_rng_r) * 0.5;
 
         let true_peak_dbtp = if self.tp_max > 1e-10 {
             20.0 * libm::log10f(self.tp_max)
