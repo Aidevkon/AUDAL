@@ -42,6 +42,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
       - name: Gate 4 — Unit tests
         run: cargo test --lib --workspace
+      - name: Gate 4b — Unit tests (Features)
+        run: cargo test --lib -p sp314-dsp --features cli
       - name: Gate 5 — Domain quality
         run: |
           cargo test -p sp314-dsp --test four_stem_contract -- --test-threads=2
@@ -86,6 +88,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
       - name: Gate 4 — Unit tests
         run: cargo test --lib --workspace
+      - name: Gate 4b — Unit tests (Features)
+        run: cargo test --lib -p sp314-dsp --features cli
       - name: Gate 5 — Domain quality
         run: |
           cargo test -p sp314-dsp --test four_stem_contract -- --test-threads=2
