@@ -324,6 +324,12 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** Part of Cycle 1's definition of done — needs fixing alongside the `StreamingStftEncoder` boundary swap.
 - **Context:** The `pad_frames=20` logic discards exactly 10240 samples worth of frames at chunk boundaries to account for the prepended HPSS lookback history. However, it fails to account for the encoder's internal leading zero-pad (1024 samples / 2 frames for `StreamingStftEncoder`, 2560 samples / 5 frames for the old `StftStreamContext`) pushing the actual audio further into the matrix. A synthetic test directly inspecting frame magnitudes (100Hz history vs 2000Hz real data) proved that `pad_frames=20` leaves Frame 20 severely mixed and Frame 21 contaminated with history energy. This means 2 frames of prior-chunk history leak into the core output at every chunk boundary, causing an overlap/stutter every 1.3 seconds.
 
+### F-037 — two_pass.rs appends 1024 samples of hardcoded silence to every rendered output
+- **Status:** ACTIVE
+- **Component:** `lineos/m1/sp314-dsp/src/stft/two_pass.rs`
+- **Trigger:** My recommendation: Fix in Cycle 1 alongside F-036, since both touch the exact same chunk-boundary state logic in `process_chunks_with_params` and the subsequent test pass will verify both simultaneously.
+- **Context:** The streaming pipeline uses direct time-domain envelope masking (`apply_mask_to_chunk`), not Inverse STFT — there is no real OLA/ISTFT reconstruction anywhere in this path (the `OlaRingBuffer` struct exists but is dead code). Despite this, `two_pass.rs` unconditionally appends a 1024-sample all-zero `FiveStemsChunk` after the real chunk loop finishes, solely to match the byte-length the old ISTFT-based pipeline used to produce ("legacy OLA-tail compatibility hack"). This adds ~21.3ms of trailing silence to every single rendered master. It is not trimmed anywhere downstream — `frames_written` counts it as real audio and it lands directly in the output file on disk.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
