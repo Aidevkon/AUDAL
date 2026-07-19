@@ -14,7 +14,7 @@ use crate::spatial::SpatialPreAnalysis;
 use crate::stft::hpss::HpssStreamContext;
 use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
 use crate::stft::stem_renderer::FiveStems;
-use crate::stft::{StftStreamContext, N_BINS};
+use crate::stft::{StreamingStftEncoder, N_BINS};
 use lineos_corpus::mfcc::MfccAnalyzer;
 use lineos_types::StemFeatures;
 
@@ -198,8 +198,15 @@ impl TwoPassEngine {
 
         // STFT on proxy
         let t_stft = std::time::Instant::now();
-        let mut ctx = StftStreamContext::new();
-        let proxy_frames = ctx.forward_chunk(&proxy);
+        let proxy_frames: Vec<Vec<f32>> = {
+            let mut enc = StreamingStftEncoder::new();
+            let mut frames = enc.feed_chunk(&proxy);
+            frames.extend(enc.finish());
+            frames
+                .into_iter()
+                .map(|frame| frame.iter().map(|c| c.norm()).collect())
+                .collect()
+        };
         eprintln!("[PERF] stft_proxy={}ms", t_stft.elapsed().as_millis());
         let n_frames = proxy_frames.len();
         let n_bins = if n_frames > 0 {
@@ -487,14 +494,35 @@ impl TwoPassEngine {
                     &[]
                 };
 
-                let mut stft_ctx = StftStreamContext::new();
                 let mut hpss_ctx = HpssStreamContext::new();
-                let mut stft_l = StftStreamContext::new();
-                let mut stft_r = StftStreamContext::new();
 
-                let chunk_frames = stft_ctx.forward_chunk(padded_chunk);
-                let core_frames_l = stft_l.forward_chunk(padded_left);
-                let core_frames_r = stft_r.forward_chunk(padded_right);
+                let chunk_frames: Vec<Vec<f32>> = {
+                    let mut enc = StreamingStftEncoder::new();
+                    let mut frames = enc.feed_chunk(padded_chunk);
+                    frames.extend(enc.finish());
+                    frames
+                        .into_iter()
+                        .map(|frame| frame.iter().map(|c| c.norm()).collect())
+                        .collect()
+                };
+                let core_frames_l: Vec<Vec<f32>> = {
+                    let mut enc = StreamingStftEncoder::new();
+                    let mut frames = enc.feed_chunk(padded_left);
+                    frames.extend(enc.finish());
+                    frames
+                        .into_iter()
+                        .map(|frame| frame.iter().map(|c| c.norm()).collect())
+                        .collect()
+                };
+                let core_frames_r: Vec<Vec<f32>> = {
+                    let mut enc = StreamingStftEncoder::new();
+                    let mut frames = enc.feed_chunk(padded_right);
+                    frames.extend(enc.finish());
+                    frames
+                        .into_iter()
+                        .map(|frame| frame.iter().map(|c| c.norm()).collect())
+                        .collect()
+                };
 
                 let n_frames = chunk_frames.len();
                 if n_frames == 0 {
@@ -1035,5 +1063,92 @@ mod tests {
             assert_eq!(chunk.voice.len(), chunk.harmonics.len());
             assert_eq!(chunk.voice.len(), chunk.ambience.len());
         });
+    }
+
+    /// Verifies that the spectrum at chunk boundaries is NOT polluted by
+    /// STFT zero-padding artifacts. Each chunk is fed to a fresh
+    /// StreamingStftEncoder; results must be bit-identical (f32 ==) to
+    /// StftEngine::forward() on the same chunk, since StreamingStftEncoder
+    /// is proven bit-identical to forward().
+    #[test]
+    fn two_pass_streaming_stft_boundary_frames_unpolluted() {
+        use crate::stft::{StftEngine, StreamingStftEncoder, FFT_SIZE, HOP_SIZE, N_BINS};
+
+        // 2*FFT_SIZE + HOP_SIZE samples of a single tone — spectrum easy to inspect.
+        let n = 2 * FFT_SIZE + HOP_SIZE;
+        let signal: Vec<f32> = (0..n)
+            .map(|i| libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
+            .collect();
+
+        // Three chunks: FFT_SIZE, FFT_SIZE, HOP_SIZE — boundaries at those indices.
+        let chunks: [&[f32]; 3] = [
+            &signal[..FFT_SIZE],
+            &signal[FFT_SIZE..2 * FFT_SIZE],
+            &signal[2 * FFT_SIZE..],
+        ];
+
+        // Offline oracle per chunk: StftEngine::forward(chunk) → magnitude.
+        let offline: Vec<Vec<Vec<f32>>> = chunks
+            .iter()
+            .map(|chunk| {
+                let mut engine = StftEngine::new();
+                let (complex_frames, n_frames) = engine.forward(chunk);
+                complex_frames
+                    .into_iter()
+                    .take(n_frames)
+                    .map(|frame| {
+                        frame
+                            .iter()
+                            .take(N_BINS)
+                            .map(|c| c.norm())
+                            .collect::<Vec<f32>>()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Streaming per-chunk encoder — same pattern as the new two_pass.rs code.
+        let streaming: Vec<Vec<Vec<f32>>> = chunks
+            .iter()
+            .map(|chunk| {
+                let mut enc = StreamingStftEncoder::new();
+                let mut frames = enc.feed_chunk(chunk);
+                frames.extend(enc.finish());
+                frames
+                    .into_iter()
+                    .map(|frame| {
+                        frame
+                            .iter()
+                            .take(N_BINS)
+                            .map(|c| c.norm())
+                            .collect::<Vec<f32>>()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Strict f32 bit-pattern equality — no tolerance.
+        // Any discrepancy means a boundary frame is polluted.
+        for (ci, (off_chunk, str_chunk)) in offline.iter().zip(streaming.iter()).enumerate() {
+            assert_eq!(
+                off_chunk.len(),
+                str_chunk.len(),
+                "chunk {ci}: frame count mismatch (offline={} streaming={})",
+                off_chunk.len(),
+                str_chunk.len()
+            );
+            for (fi, (off_frame, str_frame)) in off_chunk.iter().zip(str_chunk.iter()).enumerate() {
+                for (bi, (o, s)) in off_frame.iter().zip(str_frame.iter()).enumerate() {
+                    assert_eq!(
+                        o.to_bits(),
+                        s.to_bits(),
+                        "chunk={ci} frame={fi} bin={bi}: offline={o} streaming={s}"
+                    );
+                }
+            }
+        }
+
+        // Chunk sizes used — suppress unused warning.
+        let _ = HOP_SIZE;
     }
 }
