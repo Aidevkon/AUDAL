@@ -12,11 +12,23 @@ use xaak::repo::DspState;
 fn generate_chaos_mix(sr: u32, dur_secs: f32) -> Vec<f32> {
     let n = (sr as f32 * dur_secs) as usize;
     let mut out = Vec::with_capacity(n * 2);
+    let mut phase_kick = 0.0_f64;
+    let mut phase_bass = 0.0_f64;
+    let mut phase_synth = 0.0_f64;
+
+    let step_kick = 2.0 * std::f64::consts::PI * 50.0 / (sr as f64);
+    let step_bass = 2.0 * std::f64::consts::PI * 150.0 / (sr as f64);
+    let step_synth = 2.0 * std::f64::consts::PI * 440.0 / (sr as f64);
+    let two_pi = 2.0 * std::f64::consts::PI;
+
     for i in 0..n {
-        let t = i as f32 / sr as f32;
-        let kick = (2.0 * std::f32::consts::PI * 50.0 * t).sin() * 0.4;
-        let bass = (2.0 * std::f32::consts::PI * 150.0 * t).sin() * 0.2;
-        let synth = (2.0 * std::f32::consts::PI * 440.0 * t).sin() * 0.1;
+        let kick = (phase_kick as f32).sin() * 0.4;
+        let bass = (phase_bass as f32).sin() * 0.2;
+        let synth = (phase_synth as f32).sin() * 0.1;
+
+        phase_kick = (phase_kick + step_kick) % two_pi;
+        phase_bass = (phase_bass + step_bass) % two_pi;
+        phase_synth = (phase_synth + step_synth) % two_pi;
         let spike = if (i % (sr / 2) as usize) < 5 {
             0.9
         } else {
