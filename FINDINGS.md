@@ -318,6 +318,12 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** Fix this test infrastructure bug (e.g., compute phase modulo 2*PI, or use f64) before trusting the 179s spectral baseline or post-swap numbers.
 - **Context:** The 178.86s fixture itself degrades over time due to f32 phase-accumulation error in the `sin()` argument. Specifically, `2.0 * PI * 440.0 * t` grows past `f32`'s usable mantissa precision at this duration (~494,435 radians leaves only ~5 bits for the fractional phase). This causes severe high-frequency quantization distortion, skewing the input centroid from 192Hz (at 4s) to 294Hz (at 179s) regardless of STFT pipeline correctness.
 
+### F-036 — pad_frames=20 undersized discard leaks history frames into output
+- **Status:** ACTIVE
+- **Component:** `lineos/m1/sp314-dsp/src/stft/two_pass.rs`
+- **Trigger:** Part of Cycle 1's definition of done — needs fixing alongside the `StreamingStftEncoder` boundary swap.
+- **Context:** The `pad_frames=20` logic discards exactly 10240 samples worth of frames at chunk boundaries to account for the prepended HPSS lookback history. However, it fails to account for the encoder's internal leading zero-pad (1024 samples / 2 frames for `StreamingStftEncoder`, 2560 samples / 5 frames for the old `StftStreamContext`) pushing the actual audio further into the matrix. A synthetic test directly inspecting frame magnitudes (100Hz history vs 2000Hz real data) proved that `pad_frames=20` leaves Frame 20 severely mixed and Frame 21 contaminated with history energy. This means 2 frames of prior-chunk history leak into the core output at every chunk boundary, causing an overlap/stutter every 1.3 seconds.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
