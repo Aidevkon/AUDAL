@@ -249,10 +249,11 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** the second `while mono.len() >= FFT_SIZE` loop is unreachable — identical condition to the first, which drains below FFT_SIZE. Recorded so the replacement bin does not reproduce the ghost.
 
 ### F-024 — from_preset silent catch-all routes unknown presets to Music
-- **Status:** ACTIVE
+- **Status:** RESOLVED
 - **Component:** m0-daemon/src/domain/content_type.rs
 - **Trigger:** entry-router work (big-picture §11.1) or any new preset
 - **Context:** a typo or new preset string silently becomes Music — no error, no log. Candidate fix: exhaustive match over a canonical preset registry, or telemetry on the fallthrough arm.
+  Resolved 2026-07-19 (commit 7b1df33) — exhaustive match over known preset strings + tracing::warn!() on genuine unknowns.
 
 ### F-025 — SBR band indices have two sources of truth
 - **Status:** PARKED
@@ -280,10 +281,11 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** one stash entry has ridden the prompt indicator since 2026-07-08's history-repair session; contents never inspected.
 
 ### F-029 — LRA measured but not wired into BMR-128 certificate
-- **Status:** PARKED
+- **Status:** RESOLVED
 - **Component:** certificate schema, lineos-types/pre_analysis, certificate_node
 - **Trigger:** next certificate schema revision
 - **Context:** loudness_range is measured on every job (PreAnalysis) and now feeds corpus profiles (lra_target_lu), but the certificate does not carry it — a deliberate deferral by the orchestrator, recorded so "later" has an address.
+  Resolved 2026-07-19 (commit c5ec926) — lra threaded through certificate_node -> aether-bridge -> proof's ExecutionCertificate.
 
 ### F-030 — Butterworth skirt leakage characterizes the 8-band measurement on sparse spectra
 - **Status:** PARKED (characteristic, not a bug)
@@ -298,10 +300,11 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Context:** discovered 2026-07-09 running the correct CI clippy mirror (-D warnings with the three project-allowed lint exceptions) for the first time against sp314-dsp's full --all-targets surface — collapsible_if, excessive_precision, cloned_ref_to_slice_refs, legacy_numeric_constants, useless_vec. None touch code from today's genre-classifier wiring work; all pre-date this session. Individually trivial one-line fixes, just never swept.
 
 ### F-033 — integration_router_concurrency timing test is fragile under system load
-- **Status:** PARKED
+- **Status:** RESOLVED
 - **Component:** m0-daemon/tests/integration_router_concurrency.rs
 - **Trigger:** recurs whenever CI or the dev machine is under load; fix by widening the 350ms threshold or replacing wall-clock timing with a more robust concurrency assertion (e.g. count in-flight requests directly rather than inferring from elapsed time)
 - **Context:** observed 2026-07-10 failing by ~25ms (374 vs 350ms expected) during a full `just ci` run while cargo was under build-directory lock contention; passed cleanly on isolated re-run. This is a wall-clock timing assertion (< 350ms for 2 parallel batches) — the only test category that fails from machine load rather than code change. Not a regression; no production code involved. Flagged because a threshold this tight will recur.
+  Resolved 2026-07-19 — upper bound widened 350ms->390ms with documented rationale; lower bound (>=200ms, the real backpressure proof) left untouched. True fix (direct in-flight counter instead of timing inference) would need production code, not done.
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)

@@ -68,10 +68,26 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
         elapsed
     );
 
-    // Check it's not absurdly slow (e.g. fully sequential taking 400ms+)
+    // Check it's not absurdly slow (fully sequential — all 4 requests
+    // one at a time — would take ~400ms, which would indicate the
+    // concurrency limit is silently 1 instead of 2). Widened from
+    // 350ms to 390ms (2026-07-19, F-033): observed a real false
+    // failure at 374ms during a loaded `just ci` run (correct
+    // backpressure behavior, just slower due to system load) — the
+    // original 350ms left almost no margin above the expected ~200ms
+    // correct case. 390ms keeps real detection power (still well
+    // below the ~400ms a fully-serial regression would produce) while
+    // giving load-induced jitter a realistic buffer. If this still
+    // proves flaky under heavier CI load, the CORRECT fix (not done
+    // here — requires production code) is a #[cfg(debug_assertions)]
+    // atomic in-flight counter the test can observe directly instead
+    // of inferring concurrency from wall-clock time.
     assert!(
-        elapsed < Duration::from_millis(350),
-        "MEASUREMENT FAILED: Expected elapsed time < 350ms (2 parallel batches), but took {:?}",
+        elapsed < Duration::from_millis(390),
+        "MEASUREMENT FAILED: Expected elapsed time < 390ms (2 parallel \
+         batches, allowing for system load), but took {:?} — if this is \
+         consistently close to 400ms, the concurrency limit may not be \
+         applying correctly",
         elapsed
     );
 }
