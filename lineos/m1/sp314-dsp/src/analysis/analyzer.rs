@@ -47,10 +47,21 @@ impl StemFeatureAnalyzer {
         let ambience_ratio = Self::energy_ratio(&stems.ambience, mix_energy);
 
         // Sum check assertion (constitutional)
-        debug_assert!(
-            bass_ratio + harmonics_ratio + voice_ratio + drums_ratio + ambience_ratio
-                <= 1.0 + ENERGY_RATIO_EPSILON
-        );
+        let ratio_sum = bass_ratio + harmonics_ratio + voice_ratio + drums_ratio + ambience_ratio;
+        if mix_energy >= 1e-10 {
+            debug_assert!(
+                (1.0 - ENERGY_RATIO_EPSILON..=1.0 + ENERGY_RATIO_EPSILON).contains(&ratio_sum),
+                "energy ratio sum out of bounds: bass={bass_ratio} harmonics={harmonics_ratio} \
+                 voice={voice_ratio} drums={drums_ratio} ambience={ambience_ratio} sum={ratio_sum}"
+            );
+        } else {
+            debug_assert_eq!(
+                ratio_sum, 0.0,
+                "energy ratio sum must be 0.0 for silent mix: bass={bass_ratio} \
+                 harmonics={harmonics_ratio} voice={voice_ratio} drums={drums_ratio} \
+                 ambience={ambience_ratio} sum={ratio_sum}"
+            );
+        }
 
         // Mix: combine all stems
         let mix_stereo = Self::combine_stereo_five(
@@ -600,10 +611,21 @@ impl StreamingStemFeaturesAnalyzer {
         let drums_ratio = ratio(self.e_dr);
         let ambience_ratio = ratio(self.e_am);
 
-        debug_assert!(
-            bass_ratio + harmonics_ratio + voice_ratio + drums_ratio + ambience_ratio
-                <= 1.0 + ENERGY_RATIO_EPSILON
-        );
+        let ratio_sum = bass_ratio + harmonics_ratio + voice_ratio + drums_ratio + ambience_ratio;
+        if mix_energy >= 1e-10 {
+            debug_assert!(
+                (1.0 - ENERGY_RATIO_EPSILON..=1.0 + ENERGY_RATIO_EPSILON).contains(&ratio_sum),
+                "energy ratio sum out of bounds: bass={bass_ratio} harmonics={harmonics_ratio} \
+                 voice={voice_ratio} drums={drums_ratio} ambience={ambience_ratio} sum={ratio_sum}"
+            );
+        } else {
+            debug_assert_eq!(
+                ratio_sum, 0.0,
+                "energy ratio sum must be 0.0 for silent mix: bass={bass_ratio} \
+                 harmonics={harmonics_ratio} voice={voice_ratio} drums={drums_ratio} \
+                 ambience={ambience_ratio} sum={ratio_sum}"
+            );
+        }
         // analyze() does NOT write energy_ratio back to per-stem StemMetrics;
         // those fields stay 0.0 from StreamingStemAnalyzer::finish(). Match exactly.
 
