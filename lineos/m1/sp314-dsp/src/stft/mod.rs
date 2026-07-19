@@ -237,6 +237,69 @@ impl StftStreamContext {
     }
 }
 
+/// Streaming STFT Encoder.
+/// Modeled as an exact bit-identical streaming counterpart to StftEngine::forward().
+/// Memory profile: bounded. The carry buffer can reach up to FFT_SIZE + the 
+/// largest chunk length passed to feed_chunk. It is initialized with capacity 
+/// FFT_SIZE * 2 (will reallocate for larger chunks, but only once per maximum size).
+pub struct StreamingStftEncoder {
+    engine: StftEngine,
+    carry: Vec<f32>,
+    buf: Vec<Complex<f32>>,
+}
+
+impl Default for StreamingStftEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl StreamingStftEncoder {
+    pub fn new() -> Self {
+        let mut carry = Vec::with_capacity(FFT_SIZE * 2);
+        // Pre-fill with exactly FFT_SIZE/2 zeros (the leading pad forward() prepends)
+        carry.resize(FFT_SIZE / 2, 0.0_f32);
+        Self {
+            engine: StftEngine::new(),
+            carry,
+            buf: vec![Complex::new(0.0_f32, 0.0_f32); FFT_SIZE],
+        }
+    }
+
+    fn drain_completed_frames(&mut self) -> Vec<Vec<Complex<f32>>> {
+        let mut frames = Vec::new();
+        while self.carry.len() >= FFT_SIZE {
+            for j in 0..FFT_SIZE {
+                self.buf[j] = Complex::new(self.carry[j] * self.engine.window[j], 0.0_f32);
+            }
+            let fft = self.engine.fft_forward.clone();
+            fft.process_with_scratch(&mut self.buf, &mut self.engine.scratch);
+            let mut frame = vec![Complex::new(0.0_f32, 0.0_f32); N_BINS];
+            frame.copy_from_slice(&self.buf[..N_BINS]);
+            frames.push(frame);
+
+            self.carry.drain(0..HOP_SIZE);
+        }
+        frames
+    }
+
+    /// Feeds samples; returns any frames completed by this chunk.
+    pub fn feed_chunk(&mut self, chunk: &[f32]) -> Vec<Vec<Complex<f32>>> {
+        self.carry.extend_from_slice(chunk);
+        self.drain_completed_frames()
+    }
+
+    /// Appends the trailing zero-pad and returns the final frames.
+    pub fn finish(mut self) -> Vec<Vec<Complex<f32>>> {
+        let pad = FFT_SIZE / 2;
+        let pad_zeros = vec![0.0_f32; pad];
+        self.carry.extend_from_slice(&pad_zeros);
+
+        self.drain_completed_frames()
+        // Whatever remains shorter than FFT_SIZE is discarded, matching forward()
+    }
+}
+
 pub mod spectral_flux;
 pub use spectral_flux::SpectralFluxDetector;
 
@@ -308,5 +371,78 @@ mod streaming_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn streaming_stft_matches_offline_reference() {
+        let mut engine = StftEngine::new();
+        let signal: Vec<f32> = (0..20000).map(|i| libm::sinf(i as f32 * 0.1)).collect();
+
+        let scenarios = vec![
+            signal[..10240].to_vec(), // Exact multiple of HOP_SIZE (10240 % 512 == 0)
+            signal[..10000].to_vec(), // Not a multiple
+            signal[..10].to_vec(),    // Tiny signal
+            signal[..1023].to_vec(),  // Just under FFT_SIZE / 2
+            signal[..1].to_vec(),     // One sample
+            // Empty signal derivation: 
+            // forward() pads FFT_SIZE/2 (1024) zeros at the start and end. 
+            // Total padded length for empty signal (L=0) is 2048.
+            // Loop condition `while pos + 2048 <= 2048` executes exactly once for pos=0.
+            // So forward() yields exactly 1 frame of silence.
+            vec![], 
+        ];
+
+        for sig in scenarios {
+            let (offline_frames, offline_n) = engine.forward(&sig);
+
+            let chunk_sizes = vec![
+                vec![4096, 4096, 4096],
+                vec![1024; 20],
+                vec![512; 30],
+                vec![513; 30],
+                vec![1; 10240],
+                vec![4096, 1, 513, 1024, 888, 10], // Uneven mixed sequence
+            ];
+
+            for sizes in chunk_sizes {
+                let mut streaming = StreamingStftEncoder::new();
+                let mut online_frames = Vec::new();
+                let mut pos = 0;
+                for size in sizes {
+                    if pos >= sig.len() { break; }
+                    let end = (pos + size).min(sig.len());
+                    let chunk = &sig[pos..end];
+                    online_frames.extend(streaming.feed_chunk(chunk));
+                    pos = end;
+                }
+                if pos < sig.len() {
+                    online_frames.extend(streaming.feed_chunk(&sig[pos..]));
+                }
+                online_frames.extend(streaming.finish());
+
+                assert_eq!(offline_n, online_frames.len(), "Frame count mismatch");
+                assert_eq!(offline_frames.len(), online_frames.len(), "Vector lengths mismatch");
+
+                for (f_off, f_on) in offline_frames.iter().zip(online_frames.iter()) {
+                    assert_eq!(f_off.len(), N_BINS);
+                    assert_eq!(f_on.len(), N_BINS);
+                    for b in 0..N_BINS {
+                        assert_eq!(f_off[b].re, f_on[b].re, "Mismatch at sig len={}, bin={}", sig.len(), b);
+                        assert_eq!(f_off[b].im, f_on[b].im, "Mismatch at sig len={}, bin={}", sig.len(), b);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_stft_carry_is_bounded() {
+        let mut streaming = StreamingStftEncoder::new();
+        let chunk = vec![0.0_f32; 100];
+        for _ in 0..10000 {
+            streaming.feed_chunk(&chunk);
+            assert!(streaming.carry.len() <= FFT_SIZE + 100, "Carry buffer exceeded bounds");
+        }
+        let _ = streaming.finish();
     }
 }
