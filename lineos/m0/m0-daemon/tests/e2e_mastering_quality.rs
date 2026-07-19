@@ -232,6 +232,102 @@ fn inv_qa_3_spectral_balance() {
     );
 }
 
+#[test]
+fn inv_qa_3_spectral_balance_20s() {
+    // This test pins the intermediate scale (~15 chunks at CHUNK_FRAMES=65536) to measure
+    // the boundary misalignment severity. It does NOT assert a correctness threshold yet,
+    // only that the metric is finite/measurable. Once the two_pass chunking bug is fixed
+    // and re-tuned, this will become an asserted regression pin.
+    let sr = 48000u32;
+    let dur_secs = 20.48; // ~15 chunks
+    let input = generate_chaos_mix(sr, dur_secs);
+    let input_l: Vec<f32> = input.iter().step_by(2).copied().collect();
+
+    let input_centroid = spectral_centroid_hz(&input_l, sr);
+
+    let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-3-20s".to_string(),
+        state_tmp.path().to_str().unwrap(),
+    );
+    assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    let output_l = read_raw_pcm_left(&blob.audio_path);
+    let output_centroid = spectral_centroid_hz(&output_l, sr);
+
+    let shift_pct = ((output_centroid - input_centroid) / input_centroid).abs() * 100.0;
+
+    println!(
+        "INV-QA-3-20s: input={:.0}Hz \
+         output={:.0}Hz shift={:.1}%",
+        input_centroid, output_centroid, shift_pct
+    );
+
+    assert!(
+        shift_pct.is_finite() && shift_pct >= 0.0,
+        "shift_pct must be finite and non-negative"
+    );
+}
+
+#[test]
+#[ignore = "Full-length spectral baseline, runs too slow for routine CI; run manually for alignment verification"]
+fn inv_qa_3_spectral_balance_full() {
+    // This test pins the realistic scale (~131 chunks at CHUNK_FRAMES=65536) to measure
+    // the true compounded effect of the boundary misalignment. It is ignored by default
+    // because it loads a 179s file entirely into RAM (decode_node limit) and takes ~25s
+    // of heavy NMF CPU time. Run manually before/after two_pass.rs fixes.
+    // Like the 20s test, it only asserts a finite number, not a pass/fail bar.
+    let sr = 48000u32;
+    let dur_secs = 178.86; // ~131 chunks
+    let input = generate_chaos_mix(sr, dur_secs);
+    let input_l: Vec<f32> = input.iter().step_by(2).copied().collect();
+
+    let input_centroid = spectral_centroid_hz(&input_l, sr);
+
+    let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
+
+    let result = run_dsp(
+        &make_req(path),
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-3-full".to_string(),
+        state_tmp.path().to_str().unwrap(),
+    );
+    assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
+    let (blob, _, _, _) = result.unwrap();
+
+    let output_l = read_raw_pcm_left(&blob.audio_path);
+    let output_centroid = spectral_centroid_hz(&output_l, sr);
+
+    let shift_pct = ((output_centroid - input_centroid) / input_centroid).abs() * 100.0;
+
+    println!(
+        "INV-QA-3-FULL: input={:.0}Hz \
+         output={:.0}Hz shift={:.1}%",
+        input_centroid, output_centroid, shift_pct
+    );
+
+    assert!(
+        shift_pct.is_finite() && shift_pct >= 0.0,
+        "shift_pct must be finite and non-negative"
+    );
+}
+
 /// INV-QA-4: Compressor activity.
 /// SpotifyV3: ratio 2.5:1, attack 10ms,
 /// parallel_mix 0.5.

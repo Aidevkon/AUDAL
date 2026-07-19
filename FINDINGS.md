@@ -306,6 +306,12 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** recurs whenever CI or the dev machine is under load; fix by widening the 350ms threshold or replacing wall-clock timing with a more robust concurrency assertion (e.g. count in-flight requests directly rather than inferring from elapsed time)
 - **Context:** observed 2026-07-10 failing by ~25ms (374 vs 350ms expected) during a full `just ci` run while cargo was under build-directory lock contention; passed cleanly on isolated re-run. This is a wall-clock timing assertion (< 350ms for 2 parallel batches) — the only test category that fails from machine load rather than code change. Not a regression; no production code involved. Flagged because a threshold this tight will recur.
   Resolved 2026-07-19 — upper bound widened 350ms->390ms with documented rationale; lower bound (>=200ms, the real backpressure proof) left untouched. True fix (direct in-flight counter instead of timing inference) would need production code, not done.
+### F-034 — two_pass.rs boundary alignment shift converges to 55.5% at realistic scale
+- **Status:** ACTIVE
+- **Component:** `lineos/m1/sp314-dsp/src/stft/two_pass.rs`, `m0-daemon/tests/e2e_mastering_quality.rs`
+- **Trigger:** Fix the boundary alignment bug (swapping StftStreamContext for StreamingStftEncoder) and evaluate re-tuning needs.
+- **Context:** Measured baseline spectral centroid shift on the reverted (fad8261, pre-swap) code: 3 chunks (4s) = 64.0%; 15 chunks (20s) = 57.5%; 131 chunks (179s) = 55.5%. The boundary artifact's relative weight shrinks as clean chunk-interior content accumulates. 55.5% is the representative current-state baseline for full-length audio, not the 64.0% measured by the short 4-second CI fixture. These numbers serve as the reference point for evaluating the swap+retune.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
