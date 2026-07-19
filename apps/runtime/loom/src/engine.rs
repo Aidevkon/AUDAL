@@ -49,10 +49,10 @@ impl LoomEngine {
         sample_rate: u32,
     ) -> Result<LoomEngine, JsValue> {
         let topology = DspTopology::from_json(topology_json)
-            .map_err(|e| JsValue::from_str(&format!("Topology parse error: {}", e)))?;
+            .map_err(|e| js_error(&format!("Topology parse error: {}", e)))?;
 
         let graph = DspGraph::from_topology(&topology, block_size, sample_rate)
-            .map_err(|e| JsValue::from_str(&format!("Graph build error: {:?}", e)))?;
+            .map_err(|e| js_error(&format!("Graph build error: {:?}", e)))?;
 
         Ok(LoomEngine {
             graph: Some(graph),
@@ -79,7 +79,7 @@ impl LoomEngine {
             self.block_size,
             self.sample_rate,
         )
-        .map_err(|e| JsValue::from_str(&format!("Scheduler error: {:?}", e)))?;
+        .map_err(|e| js_error(&format!("Scheduler error: {:?}", e)))?;
 
         // Start playing the first section immediately
         if let Some(first_section) = scheduler.sections.first_mut() {
@@ -263,13 +263,13 @@ impl LoomEngine {
         use crate::stem_engine::StemEngine;
 
         let v_buf = StemBuffer::from_flac_bytes("vocals", vocals_flac)
-            .map_err(|e| JsValue::from_str(&format!("Vocals decode: {:?}", e)))?;
+            .map_err(|e| js_error(&format!("Vocals decode: {:?}", e)))?;
         let d_buf = StemBuffer::from_flac_bytes("drums", drums_flac)
-            .map_err(|e| JsValue::from_str(&format!("Drums decode: {:?}", e)))?;
+            .map_err(|e| js_error(&format!("Drums decode: {:?}", e)))?;
         let b_buf = StemBuffer::from_flac_bytes("bass", bass_flac)
-            .map_err(|e| JsValue::from_str(&format!("Bass decode: {:?}", e)))?;
+            .map_err(|e| js_error(&format!("Bass decode: {:?}", e)))?;
         let o_buf = StemBuffer::from_flac_bytes("other", other_flac)
-            .map_err(|e| JsValue::from_str(&format!("Other decode: {:?}", e)))?;
+            .map_err(|e| js_error(&format!("Other decode: {:?}", e)))?;
 
         // Parse JSON for stem_configs
         #[derive(serde::Deserialize)]
@@ -278,8 +278,8 @@ impl LoomEngine {
                 Option<std::collections::HashMap<String, sp314_nodes::topology::DspTopology>>,
         }
 
-        let tab: TabWithStems = serde_json::from_str(tab_json)
-            .map_err(|e| JsValue::from_str(&format!("JSON error: {}", e)))?;
+        let tab: TabWithStems =
+            serde_json::from_str(tab_json).map_err(|e| js_error(&format!("JSON error: {}", e)))?;
         let mut configs = tab.stem_configs.unwrap_or_default();
 
         // Helper to get or create minimal graph
@@ -288,7 +288,7 @@ impl LoomEngine {
                 sp314_nodes::topology::DspTopology::from_json(r#"{"topology_id":"minimal","nodes":[{"node_id":"Input","node_type":"Input","parameters":{}},{"node_id":"Output","node_type":"Output","parameters":{}}],"edges":[{"source":"Input","target":"Output"}]}"#).unwrap()
             });
             DspGraph::from_topology(&top, self.block_size, self.sample_rate)
-                .map_err(|e| JsValue::from_str(&format!("Graph error: {:?}", e)))
+                .map_err(|e| js_error(&format!("Graph error: {:?}", e)))
         };
 
         let v_engine = StemEngine::new(v_buf, make_graph("vocals")?, self.block_size);
