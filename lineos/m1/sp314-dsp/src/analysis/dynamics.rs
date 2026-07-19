@@ -188,7 +188,7 @@ mod streaming_tests {
             block_size * 1 + 10,
             block_size - 1, // shorter than one block
             1,
-            0
+            0,
         ];
 
         let chunk_sizes = [4096, 1024, 4800, 4801, 1];
@@ -201,7 +201,7 @@ mod streaming_tests {
             let sine = libm::sinf(2.0 * core::f32::consts::PI * 440.0 * t);
             prng = prng.wrapping_mul(1664525).wrapping_add(1013904223);
             let noise = (prng as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            
+
             let amp = if i < block_size * 2 {
                 0.8
             } else if i < block_size * 3 {
@@ -209,7 +209,7 @@ mod streaming_tests {
             } else {
                 0.2
             };
-            
+
             full_signal.push((sine * 0.5 + noise * 0.5) * amp);
         }
 
@@ -227,9 +227,21 @@ mod streaming_tests {
                 }
                 let (rms, crest, dyn_rng) = analyzer.finish();
 
-                assert_eq!(rms, expected_rms, "RMS mismatch (len={}, chunk={})", len, cs);
-                assert_eq!(crest, expected_crest, "Crest mismatch (len={}, chunk={})", len, cs);
-                assert_eq!(dyn_rng, expected_dyn, "Dynamic Range mismatch (len={}, chunk={})", len, cs);
+                assert_eq!(
+                    rms, expected_rms,
+                    "RMS mismatch (len={}, chunk={})",
+                    len, cs
+                );
+                assert_eq!(
+                    crest, expected_crest,
+                    "Crest mismatch (len={}, chunk={})",
+                    len, cs
+                );
+                assert_eq!(
+                    dyn_rng, expected_dyn,
+                    "Dynamic Range mismatch (len={}, chunk={})",
+                    len, cs
+                );
             }
 
             let mut analyzer = StreamingDynamicsAnalyzer::new(sr);
@@ -245,8 +257,16 @@ mod streaming_tests {
             let (rms, crest, dyn_rng) = analyzer.finish();
 
             assert_eq!(rms, expected_rms, "RMS mismatch (len={}, chunk=mixed)", len);
-            assert_eq!(crest, expected_crest, "Crest mismatch (len={}, chunk=mixed)", len);
-            assert_eq!(dyn_rng, expected_dyn, "Dynamic Range mismatch (len={}, chunk=mixed)", len);
+            assert_eq!(
+                crest, expected_crest,
+                "Crest mismatch (len={}, chunk=mixed)",
+                len
+            );
+            assert_eq!(
+                dyn_rng, expected_dyn,
+                "Dynamic Range mismatch (len={}, chunk=mixed)",
+                len
+            );
         }
     }
 }

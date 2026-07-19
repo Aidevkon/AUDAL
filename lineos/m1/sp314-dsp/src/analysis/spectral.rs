@@ -8,8 +8,8 @@
 // Per-channel computation → averaged per S-002 §4 (Option A)
 
 use crate::stft::StftEngine;
-use crate::stft::N_BINS;
 use crate::stft::StreamingStftEncoder;
+use crate::stft::N_BINS;
 
 use rustfft::{num_complex::Complex, FftPlanner};
 
@@ -271,14 +271,14 @@ impl StreamingSpectralAnalyzer {
             let re = frame[b].re;
             let im = frame[b].im;
             let mag = libm::sqrtf(re * re + im * im);
-            
+
             let freq = b as f32 * bin_hz;
             c_weighted_sum += freq * mag;
             c_mag_sum += mag;
-            
+
             f_log_sum += libm::logf(mag + eps);
             f_arith += mag;
-            
+
             if mag > cr_max_mag {
                 cr_max_mag = mag;
             }
@@ -313,11 +313,23 @@ impl StreamingSpectralAnalyzer {
         for frame in frames {
             self.process_frame(&frame);
         }
-        
-        let c = if self.centroid_valid_frames == 0 { 1000.0 } else { self.centroid_total / self.centroid_valid_frames as f32 };
-        let f = if self.flatness_valid_frames == 0 { 0.5 } else { (self.flatness_total / self.flatness_valid_frames as f32).clamp(0.0, 1.0) };
-        let cr = if self.crest_valid_frames == 0 { 10.0 } else { self.crest_total / self.crest_valid_frames as f32 };
-        
+
+        let c = if self.centroid_valid_frames == 0 {
+            1000.0
+        } else {
+            self.centroid_total / self.centroid_valid_frames as f32
+        };
+        let f = if self.flatness_valid_frames == 0 {
+            0.5
+        } else {
+            (self.flatness_total / self.flatness_valid_frames as f32).clamp(0.0, 1.0)
+        };
+        let cr = if self.crest_valid_frames == 0 {
+            10.0
+        } else {
+            self.crest_total / self.crest_valid_frames as f32
+        };
+
         (c, f, cr)
     }
 }
@@ -355,9 +367,21 @@ mod streaming_tests {
                     analyzer.feed_chunk(chunk);
                 }
                 let (c, f, cr) = analyzer.finish();
-                assert_eq!(c, expected_c, "Centroid mismatch (len={}, chunk={})", len, cs);
-                assert_eq!(f, expected_f, "Flatness mismatch (len={}, chunk={})", len, cs);
-                assert_eq!(cr, expected_cr, "Crest mismatch (len={}, chunk={})", len, cs);
+                assert_eq!(
+                    c, expected_c,
+                    "Centroid mismatch (len={}, chunk={})",
+                    len, cs
+                );
+                assert_eq!(
+                    f, expected_f,
+                    "Flatness mismatch (len={}, chunk={})",
+                    len, cs
+                );
+                assert_eq!(
+                    cr, expected_cr,
+                    "Crest mismatch (len={}, chunk={})",
+                    len, cs
+                );
             }
 
             let mut analyzer = StreamingSpectralAnalyzer::new(sr);
@@ -371,8 +395,16 @@ mod streaming_tests {
                 chunk_idx += 1;
             }
             let (c, f, cr) = analyzer.finish();
-            assert_eq!(c, expected_c, "Centroid mismatch (len={}, chunk=mixed)", len);
-            assert_eq!(f, expected_f, "Flatness mismatch (len={}, chunk=mixed)", len);
+            assert_eq!(
+                c, expected_c,
+                "Centroid mismatch (len={}, chunk=mixed)",
+                len
+            );
+            assert_eq!(
+                f, expected_f,
+                "Flatness mismatch (len={}, chunk=mixed)",
+                len
+            );
             assert_eq!(cr, expected_cr, "Crest mismatch (len={}, chunk=mixed)", len);
         }
     }
