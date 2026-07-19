@@ -308,7 +308,7 @@ impl StreamingSpectralAnalyzer {
         if self.was_empty {
             return (1000.0, 0.5, 10.0);
         }
-        let encoder = std::mem::replace(&mut self.encoder, StreamingStftEncoder::new());
+        let encoder = std::mem::take(&mut self.encoder);
         let frames = encoder.finish();
         for frame in frames {
             self.process_frame(&frame);

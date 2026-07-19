@@ -199,12 +199,12 @@ impl StreamingSpatialAnalyzer {
             let abs_idx = self.total_samples + i;
 
             if self.exact_total_frames.is_some() {
-                if abs_idx % self.stride == 0 && self.left_pca.len() < PCA_MAX_SAMPLES {
+                if abs_idx.is_multiple_of(self.stride) && self.left_pca.len() < PCA_MAX_SAMPLES {
                     self.left_pca.push(l);
                     self.right_pca.push(r);
                 }
             } else {
-                if abs_idx % self.stride == 0 {
+                if abs_idx.is_multiple_of(self.stride) {
                     if self.left_pca.len() == PCA_MAX_SAMPLES {
                         // In-place decimation: keep even indices, drop odd indices
                         let mut keep_idx = 0;
