@@ -107,8 +107,24 @@ impl LraCalculator {
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
 
         // Relative gate: -20 LU below ungated mean of gated short-term values
-        let ungated_mean = sorted.iter().map(|&v| v as f64).sum::<f64>() / sorted.len() as f64;
-        let gate = ungated_mean as f32 - 20.0;
+        // EBU R128's relative gate requires averaging LOUDNESS in the
+        // linear power domain, not arithmetic-averaging the LUFS values
+        // themselves — LUFS is a logarithmic (dB-like) scale, and
+        // averaging logs is not the same as the log of the average.
+        // Found 2026-07-19: the previous arithmetic-mean-of-LUFS
+        // approach let long noise-floor/near-silence sections (passing
+        // the -70 LUFS absolute gate but still quiet, e.g. -60 LUFS)
+        // drag the mean down further than physically correct, lowering
+        // the relative gate and letting more low-level content leak into
+        // the percentile calculation — artificially inflating measured
+        // LRA on tracks with sustained quiet passages.
+        let mean_ms = sorted
+            .iter()
+            .map(|&lufs| libm::powf(10.0_f32, (lufs + 0.691) / 10.0) as f64)
+            .sum::<f64>()
+            / sorted.len() as f64;
+        let ungated_mean = -0.691 + 10.0 * libm::log10f(mean_ms as f32);
+        let gate = ungated_mean - 20.0;
 
         let gated: Vec<f32> = sorted.iter().copied().filter(|&v| v > gate).collect();
 
@@ -302,5 +318,125 @@ mod tests {
             lra_stream,
             lra_batch
         );
+    }
+
+    #[test]
+    fn noise_floor_section_does_not_inflate_lra() {
+        // Scenario A: "Clean" track with some loud passages and dynamic range.
+        let clean_lufs = alloc::vec![
+            -14.0, -14.5, -13.0, -12.0, -15.0, -16.0, -14.0, // loud parts
+            -24.0, -23.0, -25.0, -26.0, // quieter parts
+        ];
+
+        let mut calc_clean = LraCalculator::new(48000);
+        calc_clean.short_term_values = clean_lufs.clone();
+        let lra_clean = calc_clean.compute();
+
+        // Scenario B: Same track, but accompanied by a huge noise floor
+        // section that easily passes the -70 absolute gate.
+        let mut dirty_lufs = clean_lufs.clone();
+        for _ in 0..100 {
+            dirty_lufs.push(-60.0); // 100 blocks of noise floor
+        }
+
+        let mut calc_dirty = LraCalculator::new(48000);
+        calc_dirty.short_term_values = dirty_lufs;
+        let lra_dirty = calc_dirty.compute();
+
+        eprintln!("LRA Clean (no noise floor): {}", lra_clean);
+        eprintln!("LRA Dirty (with noise floor): {}", lra_dirty);
+
+        // The relative gate should correctly reject the -60 LUFS blocks
+        // because the linear energy mean is dominated by the loud parts.
+        let diff = (lra_clean - lra_dirty).abs();
+        assert!(
+            diff < 1.0,
+            "Noise floor artificially inflated LRA: clean {}, dirty {}",
+            lra_clean,
+            lra_dirty
+        );
+    }
+
+    #[test]
+    fn matches_ffmpeg_ebur128_reference_on_real_wav() {
+        // External-oracle validation (not just internal comparison): a
+        // real WAV fixture measured by BOTH our LraCalculator AND
+        // ffmpeg's ebur128 filter (the de facto reference EBU R128
+        // implementation most audio tools are validated against).
+        // Skips gracefully if ffmpeg isn't available rather than
+        // failing CI on machines without it installed.
+        use std::process::Command;
+
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            eprintln!("ffmpeg not available, skipping oracle comparison");
+            return;
+        }
+
+        let wav_path = "/tmp/test_lra_oracle.wav";
+        let sr = 48_000u32;
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: sr,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(wav_path, spec).unwrap();
+        // 4s loud passage, 2s quiet passage, 4s loud passage again —
+        // real dynamic range for LRA to measure, plus a moderate quiet
+        // section that should NOT be gated out incorrectly (this is the
+        // exact scenario the fix addresses).
+        let write_tone = |w: &mut hound::WavWriter<_>, secs: f32, amp: f32| {
+            let n = (sr as f32 * secs) as usize;
+            for i in 0..n {
+                let v = amp * (i as f32 * 0.05).sin();
+                w.write_sample(v).unwrap();
+                w.write_sample(v).unwrap(); // write twice for stereo
+            }
+        };
+        write_tone(&mut writer, 4.0, 0.5);
+        write_tone(&mut writer, 2.0, 0.05);
+        write_tone(&mut writer, 4.0, 0.5);
+        writer.finalize().unwrap();
+
+        // Run ffmpeg's ebur128 filter, parse LRA from stderr.
+        let output = Command::new("ffmpeg")
+            .args([
+                "-i",
+                wav_path,
+                "-af",
+                "ebur128=peak=true",
+                "-f",
+                "null",
+                "-",
+            ])
+            .output()
+            .expect("ffmpeg execution failed");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let ffmpeg_lra: f32 = stderr
+            .lines()
+            .rfind(|l| l.trim_start().starts_with("LRA:"))
+            .and_then(|l| l.split_whitespace().nth(1))
+            .and_then(|v| v.parse().ok())
+            .expect("could not parse LRA from ffmpeg output");
+
+        // Read the WAV back, feed it through LraCalculator via the
+        // established feed_samples method (seen in test_lra_streaming_equivalence).
+        let mut reader = hound::WavReader::open(wav_path).unwrap();
+        let samples: alloc::vec::Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
+
+        let mut calc = LraCalculator::new(sr);
+        calc.feed_samples(&samples, 2);
+        let our_lra = calc.compute();
+
+        eprintln!("ffmpeg ebur128 LRA: {ffmpeg_lra}");
+        eprintln!("our LraCalculator LRA: {our_lra}");
+
+        assert!(
+            (ffmpeg_lra - our_lra).abs() < 1.5,
+            "our LRA ({our_lra}) diverges from ffmpeg's reference \
+             ebur128 measurement ({ffmpeg_lra}) by more than 1.5 LU"
+        );
+
+        std::fs::remove_file(wav_path).ok();
     }
 }
