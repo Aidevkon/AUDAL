@@ -80,7 +80,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   its two active graphs — new API surface, not attempted.
 
 ### F-006 — ~10 pre-existing JsValue::from_str() calls in engine.rs are unguarded against native-test panics
-- **Status:** PARKED (known landmine, not yet triggered)
+- **Status:** RESOLVED
 - **Component:** `apps/runtime/loom/src/engine.rs` (constructor,
   `load_stems`, `load_time_aware_behaviour`)
 - **Trigger:** Any new test that exercises the *failure* path of these
@@ -90,6 +90,7 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   sites this session via a `js_error()` cfg-gated helper — the same
   landmine is still live at the ~10 pre-existing sites, just never
   exercised because no existing test hits their error paths yet.
+  Resolved 2026-07-19 (commit dbbab97) — all 9 remaining call sites replaced with the existing js_error() helper.
 
 ### F-007 — API response format is inconsistent across handlers
 - **Status:** PARKED (needs explicit architecture decision, not silent fix)
