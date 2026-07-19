@@ -38,14 +38,13 @@ fn check_parity(left: &[f32], right: &[f32], chunk_size: usize, label: &str) {
         label, reference, streaming, diff
     );
 
-    // EBU R128 spec requires gating block
-    // accuracy to within 0.1 LU — we use
-    // a tighter bound to catch
-    // accumulation errors early.
-    assert!(
-        diff < 0.1,
-        "{}: streaming LufsMeter diverges from monolithic reference by {:.4} LUFS (threshold 0.1)",
+    assert_eq!(
+        streaming,
+        reference,
+        "{}: streaming LufsMeter diverges from monolithic reference. streaming_bits={:08x}, reference_bits={:08x}, diff={:.8}",
         label,
+        streaming.to_bits(),
+        reference.to_bits(),
         diff
     );
 }
@@ -100,18 +99,20 @@ fn parity_low_amplitude() {
     for (cl, cr) in l.chunks(512).zip(r.chunks(512)) {
         meter.process_chunk(cl, cr);
     }
-    let streaming = meter.finish();
+    let streaming = meter.finish().unwrap_or(-144.0);
 
     println!(
-        "low_amplitude: reference={:.3} streaming={:?}",
+        "low_amplitude: reference={:.3} streaming={:.3}",
         reference, streaming
     );
 
-    if let Some(s) = streaming {
-        let diff = (s - reference).abs();
-        assert!(diff < 0.1, "low amplitude parity failed: diff={:.4}", diff);
-    }
-    // If streaming returns None (all blocks
-    // gated), that's acceptable for very
-    // quiet signals — no assertion needed.
+    let diff = (streaming - reference).abs();
+    assert_eq!(
+        streaming,
+        reference,
+        "low amplitude parity failed. streaming_bits={:08x}, reference_bits={:08x}, diff={:.8}",
+        streaming.to_bits(),
+        reference.to_bits(),
+        diff
+    );
 }
