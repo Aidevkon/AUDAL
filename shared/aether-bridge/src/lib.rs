@@ -25,7 +25,7 @@ use integration::proof_log::ProofLog;
 use lineos_types::analysis::StemFeatures;
 use lineos_types::pre_analysis::PreAnalysisData;
 use proof::certificate::ExecutionCertificate;
-use proof::proof::ExecutionProof;
+use proof::proof::{CertificateContext, ExecutionProof};
 
 /// Default is Music (reference correction skipped): unknown callers get no reference EQ rather than the wrong one. Episode must be explicit.
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
@@ -316,29 +316,36 @@ pub fn build_dsp_config(
 /// Phase 3 of RFC-005 pipeline: Post-DSP certificate generation.
 /// Run AFTER DSP render with actual input + output PCM.
 /// Cryptographically binds audio to DspConfig (S-010).
+pub struct CertificateRequest<'a> {
+    pub lra: f32,
+    pub persona: &'a PersonaConfig,
+    pub dsp_config: &'a DspConfig,
+    pub proof_log: &'a ProofLog,
+    pub req: &'a AetherRequest,
+    pub system_version: &'a str,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn generate_certificate(
     input_pcm_hash: String,
     output_pcm: &[f32],
-    lra: f32,
-    persona: &PersonaConfig,
-    dsp_config: &DspConfig,
-    proof_log: &ProofLog,
-    req: &AetherRequest,
-    system_version: &str,
+    ctx: CertificateRequest,
 ) -> ExecutionCertificate {
+    let rendered_at = chrono::Utc::now().to_rfc3339();
     ExecutionProof::generate(
         input_pcm_hash,
         output_pcm,
-        lra,
-        persona,
-        dsp_config,
-        proof_log,
-        req.project_id.as_deref().unwrap_or("default"),
-        req.track_id.as_deref().unwrap_or("default"),
-        &chrono::Utc::now().to_rfc3339(),
-        system_version,
-        req.preset_name.as_deref().unwrap_or("default"),
+        CertificateContext {
+            lra: ctx.lra,
+            persona: ctx.persona,
+            dsp_config: ctx.dsp_config,
+            proof_log: ctx.proof_log,
+            project_id: ctx.req.project_id.as_deref().unwrap_or("default"),
+            track_id: ctx.req.track_id.as_deref().unwrap_or("default"),
+            rendered_at: &rendered_at,
+            system_version: ctx.system_version,
+            preset_name: ctx.req.preset_name.as_deref().unwrap_or("default"),
+        },
     )
 }
 
@@ -353,25 +360,23 @@ pub fn generate_certificate(
 pub fn generate_certificate_from_hash(
     input_pcm_hash: String,
     output_pcm_hash: String,
-    lra: f32,
-    persona: &PersonaConfig,
-    dsp_config: &DspConfig,
-    proof_log: &ProofLog,
-    req: &AetherRequest,
-    system_version: &str,
+    ctx: CertificateRequest,
 ) -> ExecutionCertificate {
+    let rendered_at = chrono::Utc::now().to_rfc3339();
     ExecutionProof::generate_from_hash(
         input_pcm_hash,
         output_pcm_hash,
-        lra,
-        persona,
-        dsp_config,
-        proof_log,
-        req.project_id.as_deref().unwrap_or("default"),
-        req.track_id.as_deref().unwrap_or("default"),
-        &chrono::Utc::now().to_rfc3339(),
-        system_version,
-        req.preset_name.as_deref().unwrap_or("default"),
+        CertificateContext {
+            lra: ctx.lra,
+            persona: ctx.persona,
+            dsp_config: ctx.dsp_config,
+            proof_log: ctx.proof_log,
+            project_id: ctx.req.project_id.as_deref().unwrap_or("default"),
+            track_id: ctx.req.track_id.as_deref().unwrap_or("default"),
+            rendered_at: &rendered_at,
+            system_version: ctx.system_version,
+            preset_name: ctx.req.preset_name.as_deref().unwrap_or("default"),
+        },
     )
 }
 
@@ -473,9 +478,16 @@ mod tests {
         let output = vec![0.05_f32; 1000];
 
         let cert = generate_certificate(
-            input_hash, &output,
-            7.5, // plausible LRA — these tests exercise hash/signature logic, not LRA-specific behavior; confirmed via recon that lra isn't part of the signed payload (F-029)
-            &persona, &cfg, &log, &req, "1.0.0",
+            input_hash,
+            &output,
+            CertificateRequest {
+                lra: 7.5, // plausible LRA — these tests exercise hash/signature logic, not LRA-specific behavior; confirmed via recon that lra isn't part of the signed payload (F-029)
+                persona: &persona,
+                dsp_config: &cfg,
+                proof_log: &log,
+                req: &req,
+                system_version: "1.0.0",
+            },
         );
         assert_eq!(cert.persona_id, "warm_analog");
         assert_eq!(cert.preset_name, "spotify");
@@ -503,15 +515,26 @@ mod tests {
         let c1 = generate_certificate(
             input_hash.clone(),
             &output1,
-            7.5,
-            &persona,
-            &cfg,
-            &log,
-            &req,
-            "1.0.0",
+            CertificateRequest {
+                lra: 7.5,
+                persona: &persona,
+                dsp_config: &cfg,
+                proof_log: &log,
+                req: &req,
+                system_version: "1.0.0",
+            },
         );
         let c2 = generate_certificate(
-            input_hash, &output2, 7.5, &persona, &cfg, &log, &req, "1.0.0",
+            input_hash,
+            &output2,
+            CertificateRequest {
+                lra: 7.5,
+                persona: &persona,
+                dsp_config: &cfg,
+                proof_log: &log,
+                req: &req,
+                system_version: "1.0.0",
+            },
         );
 
         assert_ne!(c1.output_pcm_hash, c2.output_pcm_hash);

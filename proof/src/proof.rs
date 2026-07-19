@@ -12,6 +12,18 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
+pub struct CertificateContext<'a> {
+    pub lra: f32,
+    pub persona: &'a PersonaConfig,
+    pub dsp_config: &'a DspConfig,
+    pub proof_log: &'a ProofLog,
+    pub project_id: &'a str,
+    pub track_id: &'a str,
+    pub rendered_at: &'a str,
+    pub system_version: &'a str,
+    pub preset_name: &'a str,
+}
+
 pub struct ExecutionProof;
 
 impl ExecutionProof {
@@ -23,15 +35,7 @@ impl ExecutionProof {
     pub fn generate(
         input_pcm_hash: String,
         output_pcm: &[f32],
-        lra: f32,
-        persona: &PersonaConfig,
-        dsp_config: &DspConfig,
-        proof_log: &ProofLog,
-        project_id: &str,
-        track_id: &str,
-        rendered_at: &str,
-        system_version: &str,
-        preset_name: &str,
+        ctx: CertificateContext,
     ) -> ExecutionCertificate {
         // Compute the output hash from the full
         // buffer, then delegate. Streaming paths
@@ -39,19 +43,7 @@ impl ExecutionProof {
         // generate_from_hash() directly.
         let output_pcm_hash = Self::hash_pcm(output_pcm);
         #[allow(clippy::too_many_arguments)]
-        Self::generate_from_hash(
-            input_pcm_hash,
-            output_pcm_hash,
-            lra,
-            persona,
-            dsp_config,
-            proof_log,
-            project_id,
-            track_id,
-            rendered_at,
-            system_version,
-            preset_name,
-        )
+        Self::generate_from_hash(input_pcm_hash, output_pcm_hash, ctx)
     }
 
     /// Build an ExecutionCertificate from an
@@ -69,42 +61,36 @@ impl ExecutionProof {
     pub fn generate_from_hash(
         input_pcm_hash: String,
         output_pcm_hash: String,
-        lra: f32,
-        persona: &PersonaConfig,
-        dsp_config: &DspConfig,
-        proof_log: &ProofLog,
-        project_id: &str,
-        track_id: &str,
-        rendered_at: &str,
-        system_version: &str,
-        preset_name: &str,
+        ctx: CertificateContext,
     ) -> ExecutionCertificate {
         // chaos_seed_hash: SHA-256 of compound string
         // Matches ChaosEngine::build_seed() input (S-006)
-        let chaos_compound = format!("{}:{}:{}", project_id, track_id, persona.id);
+        let chaos_compound = format!("{}:{}:{}", ctx.project_id, ctx.track_id, ctx.persona.id);
         let chaos_seed_hash = Self::sha256_hex(chaos_compound.as_bytes());
         ExecutionCertificate {
             version: "1.0".into(),
             input_pcm_hash,
-            persona_hash: Self::hash_json(persona),
-            intent_hash: proof_log
+            persona_hash: Self::hash_json(ctx.persona),
+            intent_hash: ctx
+                .proof_log
                 .intent
                 .as_ref()
                 .map(Self::hash_json)
                 .unwrap_or_else(|| "none".into()),
             chaos_seed_hash,
-            zone_resolutions_hash: proof_log
+            zone_resolutions_hash: ctx
+                .proof_log
                 .zone_adj
                 .as_ref()
                 .map(Self::hash_json)
                 .unwrap_or_else(|| "none".into()),
-            final_dsp_config_hash: Self::hash_json(dsp_config),
+            final_dsp_config_hash: Self::hash_json(ctx.dsp_config),
             output_pcm_hash,
-            lra,
-            rendered_at: rendered_at.into(),
-            system_version: system_version.into(),
-            persona_id: persona.id.clone(),
-            preset_name: preset_name.into(),
+            lra: ctx.lra,
+            rendered_at: ctx.rendered_at.into(),
+            system_version: ctx.system_version.into(),
+            persona_id: ctx.persona.id.clone(),
+            preset_name: ctx.preset_name.into(),
         }
     }
 
@@ -243,28 +229,32 @@ mod tests {
         let c1 = ExecutionProof::generate(
             input_hash.clone(),
             &o,
-            7.5, // plausible LRA — these tests exercise hash/signature logic, not LRA-specific behavior; confirmed via recon that lra isn't part of the signed payload (F-029)
-            &p,
-            &cfg,
-            &log,
-            "proj1",
-            "track1",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5, // plausible LRA — these tests exercise hash/signature logic, not LRA-specific behavior; confirmed via recon that lra isn't part of the signed payload (F-029)
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "proj1",
+                track_id: "track1",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         let c2 = ExecutionProof::generate(
             input_hash,
             &o,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "proj1",
-            "track1",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "proj1",
+                track_id: "track1",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         assert_eq!(c1.input_pcm_hash, c2.input_pcm_hash);
         assert_eq!(c1.persona_hash, c2.persona_hash);
@@ -281,28 +271,32 @@ mod tests {
         let c1 = ExecutionProof::generate(
             input_hash.clone(),
             &o,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "p",
-            "t",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "p",
+                track_id: "t",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         let c2 = ExecutionProof::generate(
             input_hash,
             &o2,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "p",
-            "t",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "p",
+                track_id: "t",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         assert_ne!(c1.output_pcm_hash, c2.output_pcm_hash);
     }
@@ -314,15 +308,17 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "p",
-            "t",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "p",
+                track_id: "t",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         assert!(ExecutionProof::verify(&cert, &i, &o, &p, &cfg).is_ok());
     }
@@ -334,15 +330,17 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "p",
-            "t",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "p",
+                track_id: "t",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         let mut wrong = o.clone();
         wrong[0] += 1.0;
@@ -366,15 +364,17 @@ mod tests {
         let cert = ExecutionProof::generate(
             input_hash,
             &o,
-            7.5,
-            &p,
-            &cfg,
-            &log,
-            "p",
-            "t",
-            "2026-05-27T00:00:00Z",
-            "1.0.0",
-            "spotify",
+            CertificateContext {
+                lra: 7.5,
+                persona: &p,
+                dsp_config: &cfg,
+                proof_log: &log,
+                project_id: "p",
+                track_id: "t",
+                rendered_at: "2026-05-27T00:00:00Z",
+                system_version: "1.0.0",
+                preset_name: "spotify",
+            },
         );
         let cert2: ExecutionCertificate =
             serde_json::from_str(&serde_json::to_string(&cert).unwrap()).unwrap();

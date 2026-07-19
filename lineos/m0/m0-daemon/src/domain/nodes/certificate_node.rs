@@ -74,12 +74,14 @@ pub fn run(
     let cert = aether_bridge::generate_certificate(
         input_pcm_hash,
         &post_master_samples,
-        telemetry_lra,
-        persona_config,
-        dsp_config,
-        proof_log,
-        aether_req,
-        env!("CARGO_PKG_VERSION"),
+        aether_bridge::CertificateRequest {
+            lra: telemetry_lra,
+            persona: persona_config,
+            dsp_config,
+            proof_log,
+            req: aether_req,
+            system_version: env!("CARGO_PKG_VERSION"),
+        },
     );
     let cert_json = serde_json::to_string(&cert).unwrap_or_default();
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
@@ -184,12 +186,14 @@ pub fn run_streaming(
     let cert = aether_bridge::generate_certificate_from_hash(
         input_pcm_hash,
         cert_data.output_sha256,
-        telemetry_lra,
-        persona_config,
-        dsp_config,
-        proof_log,
-        aether_req,
-        env!("CARGO_PKG_VERSION"),
+        aether_bridge::CertificateRequest {
+            lra: telemetry_lra,
+            persona: persona_config,
+            dsp_config,
+            proof_log,
+            req: aether_req,
+            system_version: env!("CARGO_PKG_VERSION"),
+        },
     );
     let cert_json = serde_json::to_string(&cert).unwrap_or_default();
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
