@@ -239,8 +239,8 @@ impl StftStreamContext {
 
 /// Streaming STFT Encoder.
 /// Modeled as an exact bit-identical streaming counterpart to StftEngine::forward().
-/// Memory profile: bounded. The carry buffer can reach up to FFT_SIZE + the 
-/// largest chunk length passed to feed_chunk. It is initialized with capacity 
+/// Memory profile: bounded. The carry buffer can reach up to FFT_SIZE + the
+/// largest chunk length passed to feed_chunk. It is initialized with capacity
 /// FFT_SIZE * 2 (will reallocate for larger chunks, but only once per maximum size).
 pub struct StreamingStftEncoder {
     engine: StftEngine,
@@ -384,12 +384,12 @@ mod streaming_tests {
             signal[..10].to_vec(),    // Tiny signal
             signal[..1023].to_vec(),  // Just under FFT_SIZE / 2
             signal[..1].to_vec(),     // One sample
-            // Empty signal derivation: 
-            // forward() pads FFT_SIZE/2 (1024) zeros at the start and end. 
+            // Empty signal derivation:
+            // forward() pads FFT_SIZE/2 (1024) zeros at the start and end.
             // Total padded length for empty signal (L=0) is 2048.
             // Loop condition `while pos + 2048 <= 2048` executes exactly once for pos=0.
             // So forward() yields exactly 1 frame of silence.
-            vec![], 
+            vec![],
         ];
 
         for sig in scenarios {
@@ -409,7 +409,9 @@ mod streaming_tests {
                 let mut online_frames = Vec::new();
                 let mut pos = 0;
                 for size in sizes {
-                    if pos >= sig.len() { break; }
+                    if pos >= sig.len() {
+                        break;
+                    }
                     let end = (pos + size).min(sig.len());
                     let chunk = &sig[pos..end];
                     online_frames.extend(streaming.feed_chunk(chunk));
@@ -421,14 +423,30 @@ mod streaming_tests {
                 online_frames.extend(streaming.finish());
 
                 assert_eq!(offline_n, online_frames.len(), "Frame count mismatch");
-                assert_eq!(offline_frames.len(), online_frames.len(), "Vector lengths mismatch");
+                assert_eq!(
+                    offline_frames.len(),
+                    online_frames.len(),
+                    "Vector lengths mismatch"
+                );
 
                 for (f_off, f_on) in offline_frames.iter().zip(online_frames.iter()) {
                     assert_eq!(f_off.len(), N_BINS);
                     assert_eq!(f_on.len(), N_BINS);
                     for b in 0..N_BINS {
-                        assert_eq!(f_off[b].re, f_on[b].re, "Mismatch at sig len={}, bin={}", sig.len(), b);
-                        assert_eq!(f_off[b].im, f_on[b].im, "Mismatch at sig len={}, bin={}", sig.len(), b);
+                        assert_eq!(
+                            f_off[b].re,
+                            f_on[b].re,
+                            "Mismatch at sig len={}, bin={}",
+                            sig.len(),
+                            b
+                        );
+                        assert_eq!(
+                            f_off[b].im,
+                            f_on[b].im,
+                            "Mismatch at sig len={}, bin={}",
+                            sig.len(),
+                            b
+                        );
                     }
                 }
             }
@@ -441,7 +459,10 @@ mod streaming_tests {
         let chunk = vec![0.0_f32; 100];
         for _ in 0..10000 {
             streaming.feed_chunk(&chunk);
-            assert!(streaming.carry.len() <= FFT_SIZE + 100, "Carry buffer exceeded bounds");
+            assert!(
+                streaming.carry.len() <= FFT_SIZE + 100,
+                "Carry buffer exceeded bounds"
+            );
         }
         let _ = streaming.finish();
     }

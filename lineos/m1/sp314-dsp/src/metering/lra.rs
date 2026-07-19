@@ -142,13 +142,13 @@ impl StreamingLraMeter {
     pub fn process_chunk(&mut self, left: &[f32], right: &[f32]) {
         let n = left.len().min(right.len());
         self.total_samples += n;
-        
+
         for i in 0..n {
             let fl = self.kf_l.process(left[i]);
             let fr = self.kf_r.process(right[i]);
             self.sum_sq += (fl * fl + fr * fr) * 0.5;
             self.hop_samples += 1;
-            
+
             if self.hop_samples == self.hop_len {
                 self.hop_energies.push(self.sum_sq);
                 self.sum_sq = 0.0;
@@ -289,15 +289,15 @@ mod tests {
         let mut full_signal_identical = Vec::with_capacity(max_len);
         let mut full_signal_left = Vec::with_capacity(max_len);
         let mut full_signal_right = Vec::with_capacity(max_len);
-        
+
         let mut prng = 12345u32;
         for i in 0..max_len {
             let t = i as f32 / sr as f32;
-            
+
             // Random noise for shared use
             prng = prng.wrapping_mul(1664525).wrapping_add(1013904223);
             let noise = (prng as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            
+
             // VARYING loudness fixture: alternating loud/quiet plus fully silent stretch.
             // - Fully silent stretch exercises the absolute gate (> -70.0).
             // - Quiet stretch exercises the relative gate (> gamma_r).
@@ -315,23 +315,27 @@ mod tests {
             };
             let sample_ident = (sine * 0.8 + noise * 0.2) * amp;
             full_signal_identical.push(sample_ident);
-            
+
             // Distinct L/R fixture
             let sine_l = libm::sinf(2.0 * core::f32::consts::PI * 300.0 * t);
             let sine_r = libm::sinf(2.0 * core::f32::consts::PI * 800.0 * t);
             let amp_l = if i < block_len * 2 { 0.6 } else { 0.1 };
-            let amp_r = if i > block_len && i < block_len * 3 { 0.9 } else { 0.01 };
+            let amp_r = if i > block_len && i < block_len * 3 {
+                0.9
+            } else {
+                0.01
+            };
             full_signal_left.push((sine_l * 0.9 + noise * 0.1) * amp_l);
             full_signal_right.push((sine_r * 0.7 + noise * 0.3) * amp_r);
         }
 
         let signal_lengths = [
-            block_len - 100,      // shorter than block_len (3s)
-            block_len,            // exactly block_len
+            block_len - 100,             // shorter than block_len (3s)
+            block_len,                   // exactly block_len
             block_len + sr as usize * 2, // a few seconds past block_len
             block_len * 2 + 1500, // non-integer number of hops (trailing partial hop discarded)
             block_len * 5,        // long-ish signal (~15s)
-            0                     // length 0
+            0,                    // length 0
         ];
 
         let chunk_sizes = [4800, 4801, 1024, 48000, 1];
@@ -377,7 +381,11 @@ mod tests {
             }
         };
 
-        run_matrix(&full_signal_identical, &full_signal_identical, "Identical L/R");
+        run_matrix(
+            &full_signal_identical,
+            &full_signal_identical,
+            "Identical L/R",
+        );
         run_matrix(&full_signal_left, &full_signal_right, "Distinct L/R");
     }
 }

@@ -155,7 +155,11 @@ impl StreamingSpatialAnalyzer {
         let alpha_80 = libm::expf(-2.0_f32 * core::f32::consts::PI * 80.0_f32 / sample_rate as f32);
 
         let stride = if let Some(n) = total_frames {
-            if n <= PCA_MAX_SAMPLES { 1 } else { n / PCA_MAX_SAMPLES }
+            if n <= PCA_MAX_SAMPLES {
+                1
+            } else {
+                n / PCA_MAX_SAMPLES
+            }
         } else {
             1
         };
@@ -350,7 +354,10 @@ mod tests {
         let mut idx = 0;
         while offset < n {
             let chunk_len = chunk_sizes[idx % chunk_sizes.len()].min(n - offset);
-            stream_mixed.feed_chunk(&left[offset..offset + chunk_len], &right[offset..offset + chunk_len]);
+            stream_mixed.feed_chunk(
+                &left[offset..offset + chunk_len],
+                &right[offset..offset + chunk_len],
+            );
             offset += chunk_len;
             idx += 1;
         }
@@ -413,8 +420,12 @@ mod tests {
         assert_eq!(online_1.sub_energy, online_2.sub_energy);
 
         let offline = SpatialPreAnalysis::analyze(&left, &right, sr);
-        assert!((offline.depth_score - online_1.depth_score).abs() < 0.05, 
-            "Adaptive depth_score deviated: offline={} online={}", offline.depth_score, online_1.depth_score);
+        assert!(
+            (offline.depth_score - online_1.depth_score).abs() < 0.05,
+            "Adaptive depth_score deviated: offline={} online={}",
+            offline.depth_score,
+            online_1.depth_score
+        );
     }
 
     #[test]
@@ -431,11 +442,19 @@ mod tests {
         for (lc, rc) in left.chunks(100).zip(right.chunks(100)) {
             streaming.feed_chunk(lc, rc);
             assert!(streaming.left_pca.len() <= PCA_MAX_SAMPLES);
-            assert_eq!(streaming.left_pca.capacity(), initial_capacity, "Capacity grew!");
+            assert_eq!(
+                streaming.left_pca.capacity(),
+                initial_capacity,
+                "Capacity grew!"
+            );
         }
 
         let final_len = streaming.left_pca.len();
-        assert!(final_len >= 512 && final_len <= PCA_MAX_SAMPLES, "Final PCA buffer len {} out of bounds", final_len);
+        assert!(
+            final_len >= 512 && final_len <= PCA_MAX_SAMPLES,
+            "Final PCA buffer len {} out of bounds",
+            final_len
+        );
         let _online = streaming.finish();
     }
 }
