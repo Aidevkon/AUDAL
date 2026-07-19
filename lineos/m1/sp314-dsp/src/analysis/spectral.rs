@@ -9,6 +9,7 @@
 
 use crate::stft::StftEngine;
 use crate::stft::N_BINS;
+use crate::stft::StreamingStftEncoder;
 
 use rustfft::{num_complex::Complex, FftPlanner};
 
@@ -212,5 +213,167 @@ mod band_energy_tests {
             in_band,
             out_band
         );
+    }
+}
+
+pub struct StreamingSpectralAnalyzer {
+    encoder: StreamingStftEncoder,
+    sample_rate: u32,
+    centroid_total: f32,
+    centroid_valid_frames: usize,
+    flatness_total: f32,
+    flatness_valid_frames: usize,
+    crest_total: f32,
+    crest_valid_frames: usize,
+    was_empty: bool,
+}
+
+impl StreamingSpectralAnalyzer {
+    pub fn new(sample_rate: u32) -> Self {
+        Self {
+            encoder: StreamingStftEncoder::new(),
+            sample_rate,
+            centroid_total: 0.0,
+            centroid_valid_frames: 0,
+            flatness_total: 0.0,
+            flatness_valid_frames: 0,
+            crest_total: 0.0,
+            crest_valid_frames: 0,
+            was_empty: true,
+        }
+    }
+
+    pub fn feed_chunk(&mut self, chunk: &[f32]) {
+        if !chunk.is_empty() {
+            self.was_empty = false;
+        }
+        let frames = self.encoder.feed_chunk(chunk);
+        for frame in frames {
+            self.process_frame(&frame);
+        }
+    }
+
+    fn process_frame(&mut self, frame: &[Complex<f32>]) {
+        use super::features::ANALYSIS_FFT_SIZE;
+        let sample_rate = self.sample_rate;
+        let bin_hz = sample_rate as f32 / (ANALYSIS_FFT_SIZE as f32 * 2.0);
+        let eps = 1e-10_f32;
+        let n_bins = N_BINS as f32;
+
+        let mut c_weighted_sum = 0.0_f32;
+        let mut c_mag_sum = 0.0_f32;
+        let mut f_log_sum = 0.0_f32;
+        let mut f_arith = 0.0_f32;
+        let mut cr_max_mag = 0.0_f32;
+        let mut cr_mag_sum = 0.0_f32;
+
+        for b in 0..N_BINS {
+            let re = frame[b].re;
+            let im = frame[b].im;
+            let mag = libm::sqrtf(re * re + im * im);
+            
+            let freq = b as f32 * bin_hz;
+            c_weighted_sum += freq * mag;
+            c_mag_sum += mag;
+            
+            f_log_sum += libm::logf(mag + eps);
+            f_arith += mag;
+            
+            if mag > cr_max_mag {
+                cr_max_mag = mag;
+            }
+            cr_mag_sum += mag;
+        }
+
+        if c_mag_sum > 1e-10 {
+            self.centroid_total += c_weighted_sum / c_mag_sum;
+            self.centroid_valid_frames += 1;
+        }
+
+        let f_geom = libm::expf(f_log_sum / n_bins);
+        let f_amean = f_arith / n_bins;
+        if f_amean > eps {
+            self.flatness_total += f_geom / f_amean;
+            self.flatness_valid_frames += 1;
+        }
+
+        let cr_mean = cr_mag_sum / n_bins;
+        if cr_mean > 1e-10 {
+            self.crest_total += 20.0 * libm::log10f(cr_max_mag / cr_mean);
+            self.crest_valid_frames += 1;
+        }
+    }
+
+    pub fn finish(mut self) -> (f32, f32, f32) {
+        if self.was_empty {
+            return (1000.0, 0.5, 10.0);
+        }
+        let encoder = std::mem::replace(&mut self.encoder, StreamingStftEncoder::new());
+        let frames = encoder.finish();
+        for frame in frames {
+            self.process_frame(&frame);
+        }
+        
+        let c = if self.centroid_valid_frames == 0 { 1000.0 } else { self.centroid_total / self.centroid_valid_frames as f32 };
+        let f = if self.flatness_valid_frames == 0 { 0.5 } else { (self.flatness_total / self.flatness_valid_frames as f32).clamp(0.0, 1.0) };
+        let cr = if self.crest_valid_frames == 0 { 10.0 } else { self.crest_total / self.crest_valid_frames as f32 };
+        
+        (c, f, cr)
+    }
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+
+    #[test]
+    fn streaming_spectral_matches_offline_reference() {
+        let sr = 48000;
+        let signal_lengths = [10240, 10000, 2048, 1023, 1, 0];
+        let chunk_sizes = [4096, 1024, 512, 513, 1];
+
+        let mut full_signal = vec![0.0_f32; 10240];
+        let mut prng = 12345u32;
+        for i in 0..full_signal.len() {
+            let t = i as f32 / sr as f32;
+            let sine = libm::sinf(2.0 * core::f32::consts::PI * 440.0 * t);
+            prng = prng.wrapping_mul(1664525).wrapping_add(1013904223);
+            let noise = (prng as f32 / u32::MAX as f32) * 2.0 - 1.0;
+            full_signal[i] = sine * 0.8 + noise * 0.2;
+        }
+
+        for &len in &signal_lengths {
+            let signal = &full_signal[..len];
+
+            let expected_c = spectral_centroid_hz(signal, sr);
+            let expected_f = spectral_flatness(signal);
+            let expected_cr = spectral_crest_factor_db(signal);
+
+            for &cs in &chunk_sizes {
+                let mut analyzer = StreamingSpectralAnalyzer::new(sr);
+                for chunk in signal.chunks(cs) {
+                    analyzer.feed_chunk(chunk);
+                }
+                let (c, f, cr) = analyzer.finish();
+                assert_eq!(c, expected_c, "Centroid mismatch (len={}, chunk={})", len, cs);
+                assert_eq!(f, expected_f, "Flatness mismatch (len={}, chunk={})", len, cs);
+                assert_eq!(cr, expected_cr, "Crest mismatch (len={}, chunk={})", len, cs);
+            }
+
+            let mut analyzer = StreamingSpectralAnalyzer::new(sr);
+            let mut pos = 0;
+            let mut chunk_idx = 0;
+            while pos < signal.len() {
+                let cs = chunk_sizes[chunk_idx % chunk_sizes.len()];
+                let end = (pos + cs).min(signal.len());
+                analyzer.feed_chunk(&signal[pos..end]);
+                pos = end;
+                chunk_idx += 1;
+            }
+            let (c, f, cr) = analyzer.finish();
+            assert_eq!(c, expected_c, "Centroid mismatch (len={}, chunk=mixed)", len);
+            assert_eq!(f, expected_f, "Flatness mismatch (len={}, chunk=mixed)", len);
+            assert_eq!(cr, expected_cr, "Crest mismatch (len={}, chunk=mixed)", len);
+        }
     }
 }
