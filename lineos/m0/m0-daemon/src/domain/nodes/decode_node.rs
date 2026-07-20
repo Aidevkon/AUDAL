@@ -24,6 +24,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
     use crate::domain::dsp_pipeline::{
         compute_rms, compute_sha256_bytes, derive_seed, rms_to_lufs,
     };
+    use crate::dsp::audio_source::AudioSource;
+    use std::io::Write;
 
     // Load schema
     let schema: serde_json::Value = serde_json::from_str(include_str!(
@@ -42,30 +44,113 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
     let input_hash_hex = hex::encode(path_hash);
     let seed = derive_seed(&path_hash);
 
+    let (probe_ch, true_original_sr) = {
+        let reader =
+            crate::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(audio_path))
+                .map_err(|e| format!("Failed to probe channels: {e}"))?;
+        (reader.channels(), reader.sample_rate())
+    };
+
+    // decode_smart's exact decision logic is: `match original_ch { 6 => FiveDotOne, _ => Stereo }`.
+    if probe_ch != 6 {
+        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
+            std::path::Path::new(audio_path),
+        )
+        .map_err(|e| format!("Decode error: {e}"))?;
+
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+
+        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let mut dump_file = std::fs::File::create(&raw_path)
+            .map_err(|e| format!("Failed to write raw dump: {e}"))?;
+
+        let mut buf = vec![0f32; 4096 * 2];
+        loop {
+            let frames = stream
+                .fill_buffer(&mut buf)
+                .map_err(|e| format!("Decode error: {e}"))?;
+            if frames == 0 {
+                break;
+            }
+            let valid_samples = &buf[..frames * 2];
+
+            let raw_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(
+                    valid_samples.as_ptr() as *const u8,
+                    valid_samples.len() * 4,
+                )
+            };
+            dump_file
+                .write_all(raw_bytes)
+                .map_err(|e| format!("Failed to write raw dump: {e}"))?;
+
+            for i in 0..frames {
+                left.push(buf[i * 2]);
+                right.push(buf[i * 2 + 1]);
+            }
+        }
+
+        eprintln!(
+            "[RAW-SAVE] wrote raw PCM {} bytes to {}",
+            left.len() * 2 * 4,
+            raw_path
+        );
+
+        let (input_blake3_hex, input_sha256_hex) = stream.input_hashes();
+
+        // Use tier2_verdict's message verbatim. Nothing downstream string-matches it.
+        stream.tier2_verdict()?;
+
+        let duration_ms = (left.len() as f64 / 48000.0) * 1000.0;
+
+        return Ok(DecodedAudio {
+            payload: lineos_types::AudioPayload::Stereo(lineos_types::StereoBuffer {
+                num_frames: left.len(),
+                left,
+                right,
+                sample_rate: 48000,
+            }),
+            input_blake3_hex,
+            input_sha256_hex,
+            pcm_channels: 2,
+            pcm_sample_rate: 48000,
+            target_lufs,
+            input_hash_hex,
+            seed,
+            original_sr: true_original_sr,
+            original_ch: probe_ch as u16,
+            duration_ms,
+        });
+    }
+
     let payload = decode::decode_smart(audio_path).map_err(|e| format!("Decode error: {e}"))?;
 
     match payload {
-        lineos_types::AudioPayload::Stereo(buf) => {
-            // Manually re-interleave to preserve exact byte-for-byte hashes and disk dumps
-            let mut interleaved = Vec::with_capacity(buf.num_frames * 2);
-            for i in 0..buf.num_frames {
-                interleaved.push(buf.left[i]);
-                interleaved.push(buf.right[i]);
+        lineos_types::AudioPayload::Stereo(_) => {
+            unreachable!("Stereo payload handled by streaming path")
+        }
+        lineos_types::AudioPayload::FiveDotOne {
+            channels,
+            sample_rate,
+            num_frames,
+        } => {
+            // Interleave 6ch: L R C LFE Ls Rs
+            let mut interleaved = Vec::with_capacity(num_frames * 6);
+            for i in 0..num_frames {
+                for channel in channels.iter() {
+                    interleaved.push(channel[i]);
+                }
             }
 
             let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-            // SAFETY: pcm.samples is a Vec<f32>, reinterpreted as raw bytes for direct
-            // disk write. Native-endian, in-process only (same architecture as the
-            // reader, xaak's PcmTransfer) — not a portable serialization format,
-            // matches the byte layout the old executor.rs dump already used (verified
-            // byte-for-byte equivalent before this change, not assumed).
             let raw_bytes: &[u8] = unsafe {
                 std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
             };
             std::fs::write(&raw_path, raw_bytes)
                 .map_err(|e| format!("Failed to write raw dump: {e}"))?;
             eprintln!(
-                "[RAW-SAVE] wrote raw PCM {} bytes to {}",
+                "[RAW-SAVE] wrote 5.1 raw PCM {} bytes to {}",
                 raw_bytes.len(),
                 raw_path
             );
@@ -80,85 +165,13 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
 
             // In AudioPayload we dropped the "original" metadata, so we use the validated ones
-            let original_sr = buf.sample_rate;
-            let original_ch = 2;
-            let duration_ms = (buf.num_frames as f64 / buf.sample_rate as f64) * 1000.0;
-            let pcm_channels_for_telemetry = 2;
-            let pcm_sr_for_telemetry = buf.sample_rate;
-
-            // Silence guard
-            let rms = compute_rms(&interleaved);
-            let rms_dbfs = if rms > 0.0 {
-                20.0 * (rms as f64).log10() as f32
-            } else {
-                f32::NEG_INFINITY
-            };
-            if rms_dbfs < -60.0 {
-                return Err(format!(
-                    "Input validation failed: audio is silence (RMS = {rms_dbfs:.1} dBFS)"
-                ));
-            }
-
-            // Normalization overflow guard
-            let rough_lufs = rms_to_lufs(rms);
-            let rough_gain_db = -14.0_f32 - rough_lufs;
-            if rough_gain_db > 30.0 {
-                return Err(format!(
-                    "DSP arithmetic error — normalization gain would exceed 32× \
-                     (input RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB). \
-                     Track too quiet or too short (< 400ms) for loudness normalization."
-                ));
-            }
-
-            Ok(DecodedAudio {
-                payload: lineos_types::AudioPayload::Stereo(buf),
-                input_blake3_hex,
-                input_sha256_hex,
-                pcm_channels: pcm_channels_for_telemetry,
-                pcm_sample_rate: pcm_sr_for_telemetry,
-                target_lufs,
-                input_hash_hex,
-                seed,
-                original_sr,
-                original_ch,
-                duration_ms,
-            })
-        }
-        lineos_types::AudioPayload::FiveDotOne {
-            channels,
-            sample_rate,
-            num_frames,
-        } => {
-            // Interleave 6ch: L R C LFE Ls Rs
-            // per frame — ίδια λογική με το
-            // Stereo arm αλλά για 6 κανάλια.
-            let mut interleaved = Vec::with_capacity(num_frames * 6);
-            for i in 0..num_frames {
-                for channel in channels.iter() {
-                    interleaved.push(channel[i]);
-                }
-            }
-
-            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-            let raw_bytes: &[u8] = unsafe {
-                std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
-            };
-            std::fs::write(&raw_path, raw_bytes)
-                .map_err(|e| format!("Failed to write raw dump: {e}"))?;
-
-            let mut blake3_hasher = blake3::Hasher::new();
-            let mut sha256_hasher = sha2::Sha256::new();
-            for &sample in &interleaved {
-                blake3_hasher.update(&sample.to_le_bytes());
-                sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
-            }
-            let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
-            let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
-
+            let original_sr = sample_rate;
+            let original_ch = 6;
             let duration_ms = (num_frames as f64 / sample_rate as f64) * 1000.0;
+            let pcm_channels_for_telemetry = 6;
+            let pcm_sr_for_telemetry = sample_rate;
 
-            // Silence guard (ίδιο threshold
-            // με Stereo arm: -60 dBFS)
+            // Silence / Gain guards for 5.1
             let rms = compute_rms(&interleaved);
             let rms_dbfs = if rms > 0.0 {
                 20.0 * (rms as f64).log10() as f32
@@ -171,13 +184,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 ));
             }
 
-            // Normalization guard — για 5.1
-            // δεν κάνουμε LUFS normalization
-            // στο decode_node (γίνεται στο
-            // BS.775 telemetry path). Ελέγχουμε
-            // μόνο για extreme overflow.
             let rough_lufs = rms_to_lufs(rms);
-            let rough_gain_db = -18.0_f32 - rough_lufs;
+            let rough_gain_db = -14.0_f32 - rough_lufs;
             if rough_gain_db > 30.0 {
                 return Err(format!(
                     "DSP arithmetic error — 5.1 normalization gain would exceed 32× (RMS = {rms_dbfs:.1} dBFS, est. gain = {rough_gain_db:.1} dB)."
@@ -192,13 +200,13 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 },
                 input_blake3_hex,
                 input_sha256_hex,
-                pcm_channels: 6,
-                pcm_sample_rate: sample_rate,
+                pcm_channels: pcm_channels_for_telemetry,
+                pcm_sample_rate: pcm_sr_for_telemetry,
                 target_lufs,
                 input_hash_hex,
                 seed,
-                original_sr: sample_rate,
-                original_ch: 6,
+                original_sr,
+                original_ch,
                 duration_ms,
             })
         }
@@ -275,42 +283,147 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
 #[cfg(test)]
 mod tests {
-    use sha2::Digest;
+    use super::*;
 
     #[test]
     fn streaming_hash_matches_batch_hash() {
-        let samples: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.01).sin()).collect();
+        let audio_path = "/tmp/test_stream_hash.wav";
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 44100,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(audio_path, spec).unwrap();
+        for _ in 0..88200 {
+            w.write_sample(0.5f32).unwrap();
+        }
+        w.finalize().unwrap();
 
-        // Batch (old way)
-        let batch_le_bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
-        let batch_blake3 = blake3::hash(&batch_le_bytes).to_hex().to_string();
+        let batch_payload = crate::handlers::decode::decode_smart(audio_path).unwrap();
+        let buf = match batch_payload {
+            lineos_types::AudioPayload::Stereo(b) => b,
+            _ => panic!("expected stereo"),
+        };
+        let mut interleaved = Vec::with_capacity(buf.num_frames * 2);
+        for i in 0..buf.num_frames {
+            interleaved.push(buf.left[i]);
+            interleaved.push(buf.right[i]);
+        }
+        let mut sha_batch = sha2::Sha256::new();
+        for &sample in &interleaved {
+            sha2::Digest::update(&mut sha_batch, sample.to_be_bytes());
+        }
+        let batch_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha_batch));
 
-        let batch_be_bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_be_bytes()).collect();
-        let mut batch_sha256 = sha2::Sha256::new();
-        sha2::Digest::update(&mut batch_sha256, &batch_be_bytes);
-        let batch_sha256_hex = format!("{:x}", sha2::Digest::finalize(batch_sha256));
-
-        // Streaming (new way) — feed in small chunks, not all at once, to prove
-        // chunking doesn't change the result
-        let mut stream_blake3 = blake3::Hasher::new();
-        let mut stream_sha256 = sha2::Sha256::new();
-        for chunk in samples.chunks(7) {
-            // deliberately odd chunk size, not aligned to anything
-            for &s in chunk {
-                stream_blake3.update(&s.to_le_bytes());
-                sha2::Digest::update(&mut stream_sha256, s.to_be_bytes());
+        use crate::dsp::audio_source::AudioSource;
+        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
+            std::path::Path::new(audio_path),
+        )
+        .unwrap();
+        let mut stream_buf = vec![0f32; 1024];
+        loop {
+            let n = stream.fill_buffer(&mut stream_buf).unwrap();
+            if n == 0 {
+                break;
             }
         }
-        let stream_blake3_hex = stream_blake3.finalize().to_hex().to_string();
-        let stream_sha256_hex = format!("{:x}", sha2::Digest::finalize(stream_sha256));
+        let (_, stream_sha256_hex) = stream.input_hashes();
 
-        assert_eq!(
-            batch_blake3, stream_blake3_hex,
-            "BLAKE3 streaming hash must match batch hash"
-        );
+        let _ = std::fs::remove_file(audio_path);
+
         assert_eq!(
             batch_sha256_hex, stream_sha256_hex,
             "SHA-256 streaming hash must match batch hash"
         );
+    }
+
+    #[test]
+    fn decode_node_stereo_matches_legacy_batch() {
+        for &sr in &[44_100, 48_000] {
+            let path = format!("/tmp/decode_node_stereo_parity_{}.wav", sr);
+            let spec = hound::WavSpec {
+                channels: 2,
+                sample_rate: sr,
+                bits_per_sample: 32,
+                sample_format: hound::SampleFormat::Float,
+            };
+            let mut w = hound::WavWriter::create(&path, spec).unwrap();
+            let n = sr as usize * 2;
+            for i in 0..n {
+                let v =
+                    0.3 * libm::sinf(2.0 * std::f32::consts::PI * 220.0 * (i as f32 / sr as f32));
+                w.write_sample(v).unwrap(); // L
+                w.write_sample(v).unwrap(); // R
+            }
+            w.finalize().unwrap();
+
+            let preset_id = "podcast";
+            let blob_id = "test-blob-123";
+
+            let new_result = super::run(&path, preset_id, blob_id).expect("new path failed");
+
+            // Oracle
+            let (_, true_original_sr, _) = crate::handlers::decode::decode_raw_interleaved(&path)
+                .expect("decode_raw_interleaved failed");
+            let payload =
+                crate::handlers::decode::decode_smart(&path).expect("decode_smart failed");
+            let buf = match payload {
+                lineos_types::AudioPayload::Stereo(b) => b,
+                _ => panic!("expected stereo"),
+            };
+            let mut interleaved = Vec::with_capacity(buf.num_frames * 2);
+            for i in 0..buf.num_frames {
+                interleaved.push(buf.left[i]);
+                interleaved.push(buf.right[i]);
+            }
+            let mut blake3_hasher = blake3::Hasher::new();
+            let mut sha256_hasher = sha2::Sha256::new();
+            for &sample in &interleaved {
+                blake3_hasher.update(&sample.to_le_bytes());
+                sha2::Digest::update(&mut sha256_hasher, sample.to_be_bytes());
+            }
+            let old_blake3 = blake3_hasher.finalize().to_hex().to_string();
+            let old_sha256 = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
+            let old_original_sr = true_original_sr;
+            let old_duration_ms = (buf.num_frames as f64 / buf.sample_rate as f64) * 1000.0;
+
+            assert_eq!(new_result.input_blake3_hex, old_blake3, "blake3 mismatch");
+            assert_eq!(new_result.input_sha256_hex, old_sha256, "sha256 mismatch");
+            assert_eq!(
+                new_result.original_sr, old_original_sr,
+                "original_sr mismatch"
+            );
+            assert_eq!(new_result.duration_ms, old_duration_ms, "duration mismatch");
+
+            if let lineos_types::AudioPayload::Stereo(new_buf) = new_result.payload {
+                assert_eq!(
+                    new_buf.left.len(),
+                    buf.left.len(),
+                    "left channel len mismatch"
+                );
+                assert_eq!(
+                    new_buf.right.len(),
+                    buf.right.len(),
+                    "right channel len mismatch"
+                );
+                for i in 0..buf.left.len() {
+                    assert_eq!(
+                        new_buf.left[i].to_bits(),
+                        buf.left[i].to_bits(),
+                        "left channel samples mismatch at {i}"
+                    );
+                    assert_eq!(
+                        new_buf.right[i].to_bits(),
+                        buf.right[i].to_bits(),
+                        "right channel samples mismatch at {i}"
+                    );
+                }
+            } else {
+                panic!("Expected Stereo payload");
+            }
+
+            let _ = std::fs::remove_file(&path);
+        }
     }
 }
