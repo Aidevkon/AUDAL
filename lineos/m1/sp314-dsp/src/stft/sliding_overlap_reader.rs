@@ -1,7 +1,10 @@
 //! SlidingOverlapReader — bounded-lookback wrapper over any AudioSource.
 //! Provides contiguous overlapping slices (history + new chunk) for DSP.
 
-use super::audio_source::AudioSource;
+pub trait ChunkSource {
+    fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize, String>;
+    fn channels(&self) -> usize;
+}
 
 pub struct OverlapChunk<'a> {
     pub signal: &'a [f32], // Mono downmix
@@ -12,7 +15,7 @@ pub struct OverlapChunk<'a> {
     pub end: usize,    // Global index of the end of the new data
 }
 
-pub struct SlidingOverlapReader<S: AudioSource> {
+pub struct SlidingOverlapReader<S: ChunkSource> {
     source: S,
     global_offset: usize,
     history_l: Vec<f32>,
@@ -23,7 +26,7 @@ pub struct SlidingOverlapReader<S: AudioSource> {
     max_history: usize,
 }
 
-impl<S: AudioSource> SlidingOverlapReader<S> {
+impl<S: ChunkSource> SlidingOverlapReader<S> {
     pub fn new(source: S, max_history: usize) -> Self {
         Self {
             source,
@@ -130,15 +133,9 @@ mod tests {
         call_idx: usize,
     }
 
-    impl AudioSource for MockSource {
-        fn sample_rate(&self) -> u32 {
-            48000
-        }
+    impl ChunkSource for MockSource {
         fn channels(&self) -> usize {
             2
-        }
-        fn total_frames_hint(&self) -> Option<u64> {
-            Some((self.data.len() / 2) as u64)
         }
         fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize, String> {
             if self.read_pos >= self.data.len() {

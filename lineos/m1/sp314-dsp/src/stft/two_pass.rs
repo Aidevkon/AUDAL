@@ -647,6 +647,152 @@ impl TwoPassEngine {
     /// Process with adaptive ducking_gain from Maestro.
     /// ducking_gain: [0.3, 1.0] — replaces COLLISION_DUCKING_GAIN.
     /// Use process_chunks for default behavior (ducking_gain=0.707).
+    /// Process audio from a streaming `ChunkSource` using macro-batching.
+    /// WHY NO SEAM RISK: Macro-batching introduces no seam risk because
+    /// SlidingOverlapReader is one continuous stream. Batching is purely a
+    /// Rayon parallelism grouping, not a reader boundary. The reader naturally
+    /// carries its history buffer across macro-batch boundaries, and process_single_chunk
+    /// relies purely on this history padding to warm up fresh DSP contexts per chunk.
+    pub fn process_stream_with_params<S: crate::stft::sliding_overlap_reader::ChunkSource, F>(
+        &mut self,
+        mut reader: crate::stft::sliding_overlap_reader::SlidingOverlapReader<S>,
+        scout: &ScoutResult,
+        ducking_gain: f32,
+        mut callback: F,
+    ) -> Result<RenderMetadata, StreamError>
+    where
+        F: FnMut(&FiveStemsChunk),
+    {
+        use rayon::prelude::*;
+
+        struct OwnedChunkData {
+            padded_chunk: Vec<f32>,
+            padded_left: Vec<f32>,
+            padded_right: Vec<f32>,
+            core_chunk: Vec<f32>,
+            pad_frames: usize,
+        }
+
+        let macro_batch_size = rayon::current_num_threads() * 2;
+        let mut frames_written = 0usize;
+        let mut voice_transient_sum = 0.0f32;
+        let mut drums_transient_sum = 0.0f32;
+        let mut chunk_count = 0usize;
+        let mut global_spatial_sums = [(0.0, 0.0, 0.0); 5];
+
+        loop {
+            // 1. Pull a macro-batch of owned chunks
+            let mut batch = Vec::with_capacity(macro_batch_size);
+            for _ in 0..macro_batch_size {
+                match reader.next_chunk(CHUNK_FRAMES) {
+                    Ok(Some(overlap_chunk)) => {
+                        let pad_frames = if overlap_chunk.start < overlap_chunk.offset {
+                            (overlap_chunk.offset - overlap_chunk.start + (FFT_SIZE / 2)) / HOP_SIZE
+                        } else {
+                            0
+                        };
+                        let new_len = overlap_chunk.end - overlap_chunk.offset;
+                        let offset_idx = overlap_chunk.offset - overlap_chunk.start;
+
+                        batch.push(OwnedChunkData {
+                            padded_chunk: overlap_chunk.signal.to_vec(),
+                            padded_left: overlap_chunk.left.to_vec(),
+                            padded_right: overlap_chunk.right.to_vec(),
+                            core_chunk: overlap_chunk.signal[offset_idx..offset_idx + new_len]
+                                .to_vec(),
+                            pad_frames,
+                        });
+                    }
+                    Ok(None) => break, // EOF
+                    Err(e) => return Err(StreamError::Io(e)),
+                }
+            }
+
+            if batch.is_empty() {
+                break; // EOF reached
+            }
+
+            // 2. Parallel Transform Phase (Heavy Math)
+            let parallel_results: Vec<ParallelChunkOut> = batch
+                .into_par_iter()
+                .map(|owned| {
+                    process_single_chunk(
+                        &self.nmf,
+                        scout,
+                        SingleChunkData {
+                            padded_chunk: &owned.padded_chunk,
+                            padded_left: &owned.padded_left,
+                            padded_right: &owned.padded_right,
+                            core_chunk: &owned.core_chunk,
+                            pad_frames: owned.pad_frames,
+                        },
+                    )
+                })
+                .collect();
+
+            // 3. Serial Stitch Phase (Stateful processing + callback)
+            for mut out in parallel_results {
+                if out.chunk_len == 0 {
+                    continue;
+                }
+
+                voice_transient_sum += out.voice_transient;
+                drums_transient_sum += out.drums_transient;
+                chunk_count += 1;
+
+                for (g, s) in global_spatial_sums.iter_mut().zip(&out.spatial_sums) {
+                    g.0 += s.0;
+                    g.1 += s.1;
+                    g.2 += s.2;
+                }
+
+                let collision = detect_collision(&out.stems.drums, &out.stems.bass);
+                let target_gain = if collision { ducking_gain } else { 1.0_f32 };
+                let alpha = COLLISION_SMOOTHING_ALPHA;
+
+                for s in out.stems.bass.iter_mut() {
+                    self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
+                    *s *= self.bass_ducking_gain;
+                }
+
+                frames_written += out.stems.voice.len();
+                callback(&out.stems);
+            }
+        }
+
+        let avg = chunk_count.max(1) as f32;
+        let mut final_spatial = [BandSpatialMetrics::default(); 5];
+        for i in 0..5 {
+            let den = global_spatial_sums[i].2.max(1e-10);
+            final_spatial[i].pan_mean = global_spatial_sums[i].0 / den;
+            final_spatial[i].pan_width = global_spatial_sums[i].1 / den;
+        }
+
+        eprintln!(
+            "[BAND-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_width,
+            final_spatial[1].pan_width,
+            final_spatial[2].pan_width,
+            final_spatial[3].pan_width,
+            final_spatial[4].pan_width
+        );
+        eprintln!(
+            "[BAND-MEAN] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            final_spatial[0].pan_mean,
+            final_spatial[1].pan_mean,
+            final_spatial[2].pan_mean,
+            final_spatial[3].pan_mean,
+            final_spatial[4].pan_mean
+        );
+
+        Ok(RenderMetadata {
+            frames_written,
+            voice_transient_density: voice_transient_sum / avg,
+            drums_transient_density: drums_transient_sum / avg,
+            spatial: final_spatial,
+        })
+    }
+
     pub fn process_slices_with_params<F>(
         &mut self,
         signal: &[f32],
@@ -1242,5 +1388,117 @@ mod tests {
 
         // Chunk sizes used — suppress unused warning.
         let _ = HOP_SIZE;
+    }
+
+    struct TestMemorySource {
+        data: Vec<f32>,
+        offset: usize,
+    }
+
+    impl crate::stft::sliding_overlap_reader::ChunkSource for TestMemorySource {
+        fn channels(&self) -> usize {
+            2
+        }
+        fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize, String> {
+            let remain = self.data.len() - self.offset;
+            if remain == 0 {
+                return Ok(0);
+            }
+            let to_read = remain.min(buffer.len());
+            buffer[..to_read].copy_from_slice(&self.data[self.offset..self.offset + to_read]);
+            self.offset += to_read;
+            Ok(to_read / 2)
+        }
+    }
+
+    #[test]
+    #[ignore = "slow (8s): proves macro-batch Rayon boundaries do not drop/duplicate history. Run manually via --ignored"]
+    fn test_streaming_seam_macro_batch() {
+        // rayon::current_num_threads() = 8 on this test machine (as probed earlier).
+        // macro_batch_size = 16. CHUNK_FRAMES = 81920.
+        // A single macro batch covers 1,310,720 frames (about 27 seconds).
+        // To span 2-3 macro-batch boundaries, we need > 2,621,440 frames.
+        // We'll use 3,000,000 frames (62.5 seconds of audio) to guarantee
+        // at least two Rayon macro-batch boundaries are crossed during processing.
+
+        let n_total = 3_000_000;
+
+        // DISTINGUISHABLE CONTENT for L/R
+        let left: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 100.0 + (100.0 * t);
+                libm::sinf(2.0 * core::f32::consts::PI * freq * t)
+            })
+            .collect();
+
+        let right: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 200.0 + (200.0 * t);
+                libm::sinf(2.0 * core::f32::consts::PI * freq * t)
+            })
+            .collect();
+
+        let signal: Vec<f32> = left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect();
+
+        let mut interleaved = Vec::with_capacity(n_total * 2);
+        for i in 0..n_total {
+            interleaved.push(left[i]);
+            interleaved.push(right[i]);
+        }
+
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+
+        // Run the OLD path to establish the exact reference
+        let mut old_voice = Vec::with_capacity(n_total);
+        let _ = engine
+            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, |chunk| {
+                old_voice.extend_from_slice(&chunk.voice);
+            })
+            .unwrap();
+
+        // Reset state
+        engine.bass_ducking_gain = 1.0;
+
+        // Run the NEW path
+        let mut new_voice = Vec::with_capacity(n_total);
+        use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
+        let source = TestMemorySource {
+            data: interleaved,
+            offset: 0,
+        };
+        let reader = SlidingOverlapReader::new(source, 10240);
+
+        let _ = engine
+            .process_stream_with_params(reader, &scout, 1.0, |chunk| {
+                new_voice.extend_from_slice(&chunk.voice);
+            })
+            .unwrap();
+
+        assert_eq!(
+            new_voice.len(),
+            n_total,
+            "Seam test lost or duplicated frames!"
+        );
+        assert_eq!(old_voice.len(), n_total, "Reference lost frames!");
+
+        // This is the critical proof: by comparing every single float of the 3 million frame
+        // output against the reference O(N) slice path, we prove that crossing multiple
+        // macro-batch boundaries (at Rayon thread boundaries) does not drop, duplicate,
+        // or misalign any DSP state/history.
+        for i in 0..n_total {
+            assert_eq!(
+                old_voice[i].to_bits(),
+                new_voice[i].to_bits(),
+                "Bit mismatch at frame {} (macro-batch seam glitch!)",
+                i
+            );
+        }
     }
 }

@@ -35,6 +35,11 @@ pub struct RenderInputs<'a> {
     pub original_left: &'a [f32],
     pub original_right: &'a [f32],
     pub original_sum_sq: f32,
+    pub stream_source: Option<
+        sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader<
+            sp314_orchestrator::raw_pcm_source::RawPcmFileSource,
+        >,
+    >,
 }
 
 // allow: 7 args — 3 are &mut output slices, deliberately positional
@@ -44,7 +49,7 @@ pub fn run(
     two_pass: &mut TwoPassEngine,
     scout: &ScoutResult,
     settings: &RenderSettings<'_>,
-    inputs: &RenderInputs<'_>,
+    mut inputs: RenderInputs<'_>,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
     mut spatial: Option<&mut SpatialSlicesMut<'_>>,
@@ -78,94 +83,90 @@ pub fn run(
         .unwrap_or_default();
     let mut write_offset = 0;
 
-    let mut _metadata = two_pass
-        .process_slices_with_params(
+    let original_sum_sq = inputs.original_sum_sq;
+
+    let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
+        let chunk_len = stems_chunk.voice.len();
+
+        let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();
+        let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
+        let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
+        let mh: Vec<f32> = stems_chunk
+            .harmonics
+            .iter()
+            .map(|s| s * mix.harmonics)
+            .collect();
+        let ma: Vec<f32> = stems_chunk
+            .ambience
+            .iter()
+            .map(|s| s * mix.ambience)
+            .collect();
+
+        h_voice
+            .update(unsafe { std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4) });
+        h_drums
+            .update(unsafe { std::slice::from_raw_parts(md.as_ptr() as *const u8, md.len() * 4) });
+        h_bass
+            .update(unsafe { std::slice::from_raw_parts(mb.as_ptr() as *const u8, mb.len() * 4) });
+        h_harmonics
+            .update(unsafe { std::slice::from_raw_parts(mh.as_ptr() as *const u8, mh.len() * 4) });
+        h_ambience
+            .update(unsafe { std::slice::from_raw_parts(ma.as_ptr() as *const u8, ma.len() * 4) });
+
+        let mut clean_voice = mv.clone();
+        if let Some(ref mut vg) = voice_graph_opt {
+            let mut v_right = clean_voice.clone();
+            let mut frame = 0;
+            while frame < chunk_len {
+                let end = (frame + 512).min(chunk_len);
+                vg.process_block(&mut clean_voice[frame..end], &mut v_right[frame..end]);
+                frame = end;
+            }
+            for i in 0..chunk_len {
+                clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
+            }
+        }
+
+        let stage =
+            FiveDotOneStage::render_chunk(&clean_voice, &md, &mb, &mh, &ma, &scout.assignments);
+        let mut stage = stage;
+        stage.apply_scales(scout.rear_scale, scout.lfe_scale);
+
+        if let Some(ref mut sp) = spatial {
+            use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
+            FiveDotOneRenderer::render_into(
+                &stage,
+                sp.l,
+                sp.r,
+                sp.c,
+                sp.lfe,
+                sp.ls,
+                sp.rs,
+                write_offset,
+            );
+        }
+
+        let (sp_l, sp_r) = StereoRenderer::render(&stage);
+
+        let end_offset = write_offset + sp_l.len();
+        left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
+        right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
+        write_offset = end_offset;
+    };
+
+    let mut _metadata = if let Some(reader) = inputs.stream_source.take() {
+        two_pass.process_stream_with_params(reader, scout, ducking_gain, callback)
+    } else {
+        two_pass.process_slices_with_params(
             mono,
             original_left,
             original_right,
             scout,
             ducking_gain,
-            |stems_chunk| {
-                let chunk_len = stems_chunk.voice.len();
-
-                let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();
-                let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
-                let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
-                let mh: Vec<f32> = stems_chunk
-                    .harmonics
-                    .iter()
-                    .map(|s| s * mix.harmonics)
-                    .collect();
-                let ma: Vec<f32> = stems_chunk
-                    .ambience
-                    .iter()
-                    .map(|s| s * mix.ambience)
-                    .collect();
-
-                h_voice.update(unsafe {
-                    std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4)
-                });
-                h_drums.update(unsafe {
-                    std::slice::from_raw_parts(md.as_ptr() as *const u8, md.len() * 4)
-                });
-                h_bass.update(unsafe {
-                    std::slice::from_raw_parts(mb.as_ptr() as *const u8, mb.len() * 4)
-                });
-                h_harmonics.update(unsafe {
-                    std::slice::from_raw_parts(mh.as_ptr() as *const u8, mh.len() * 4)
-                });
-                h_ambience.update(unsafe {
-                    std::slice::from_raw_parts(ma.as_ptr() as *const u8, ma.len() * 4)
-                });
-
-                let mut clean_voice = mv.clone();
-                if let Some(ref mut vg) = voice_graph_opt {
-                    let mut v_right = clean_voice.clone();
-                    let mut frame = 0;
-                    while frame < chunk_len {
-                        let end = (frame + 512).min(chunk_len);
-                        vg.process_block(&mut clean_voice[frame..end], &mut v_right[frame..end]);
-                        frame = end;
-                    }
-                    for i in 0..chunk_len {
-                        clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
-                    }
-                }
-
-                let stage = FiveDotOneStage::render_chunk(
-                    &clean_voice,
-                    &md,
-                    &mb,
-                    &mh,
-                    &ma,
-                    &scout.assignments,
-                );
-                let mut stage = stage;
-                stage.apply_scales(scout.rear_scale, scout.lfe_scale);
-
-                if let Some(ref mut sp) = spatial {
-                    use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
-                    FiveDotOneRenderer::render_into(
-                        &stage,
-                        sp.l,
-                        sp.r,
-                        sp.c,
-                        sp.lfe,
-                        sp.ls,
-                        sp.rs,
-                        write_offset,
-                    );
-                }
-
-                let (sp_l, sp_r) = StereoRenderer::render(&stage);
-
-                let end_offset = write_offset + sp_l.len();
-                left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
-                right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
-                write_offset = end_offset;
-            },
+            callback,
         )
-        .map_err(|e| format!("TwoPassEngine error: {e}"))?;
+    }
+    .map_err(|e| format!("TwoPassEngine error: {e}"))?;
 
     let voice_hex = format!("{:x}", h_voice.finalize());
     let drums_hex = format!("{:x}", h_drums.finalize());
@@ -179,7 +180,7 @@ pub fn run(
         format!("{:x}", hp.finalize())
     };
 
-    let original_rms = libm::sqrtf(inputs.original_sum_sq / (original_left.len() * 2) as f32);
+    let original_rms = libm::sqrtf(original_sum_sq / (original_left.len() * 2) as f32);
     let mix_rms = libm::sqrtf(
         left_slice
             .iter()

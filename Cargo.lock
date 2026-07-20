@@ -8024,6 +8024,7 @@ dependencies = [
  "serde_json",
  "sp314-dsp",
  "sp314-nodes",
+ "tempfile",
 ]
 
 [[package]]

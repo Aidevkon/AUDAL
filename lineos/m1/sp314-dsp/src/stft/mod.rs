@@ -314,6 +314,9 @@ pub use nmf::NmfEngine;
 pub mod two_pass;
 pub use two_pass::TwoPassEngine;
 
+pub mod sliding_overlap_reader;
+pub use sliding_overlap_reader::{ChunkSource, OverlapChunk, SlidingOverlapReader};
+
 #[cfg(test)]
 mod streaming_tests {
     use super::*;

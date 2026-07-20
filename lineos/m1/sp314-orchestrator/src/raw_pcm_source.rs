@@ -5,39 +5,25 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use super::audio_source::AudioSource;
-use super::standardized_stream::TARGET_SR;
+use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
 
 pub struct RawPcmFileSource {
     reader: BufReader<File>,
-    file_size_bytes: u64,
 }
 
 impl RawPcmFileSource {
     pub fn new(path: &Path) -> Result<Self, String> {
-        let file = File::open(path).map_err(|e| format!("Failed to open raw PCM file: {e}"))?;
-        let meta = file
-            .metadata()
-            .map_err(|e| format!("Failed to stat raw PCM file: {e}"))?;
+        let file =
+            File::open(path).map_err(|e| format!("Failed to open {}: {}", path.display(), e))?;
         Ok(Self {
             reader: BufReader::new(file),
-            file_size_bytes: meta.len(),
         })
     }
 }
 
-impl AudioSource for RawPcmFileSource {
-    fn sample_rate(&self) -> u32 {
-        TARGET_SR
-    }
-
+impl ChunkSource for RawPcmFileSource {
     fn channels(&self) -> usize {
         2 // Strict constraint for Music/Stereo path
-    }
-
-    fn total_frames_hint(&self) -> Option<u64> {
-        // file_size_bytes / (channels * sizeof(f32))
-        Some(self.file_size_bytes / (2 * 4))
     }
 
     fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize, String> {
@@ -147,14 +133,6 @@ mod tests {
     }
 
     #[test]
-    fn total_frames_hint_matches_metadata() {
-        let samples = vec![1.0, 2.0, 3.0, 4.0]; // 2 frames
-        let file = write_test_pattern(&samples);
-        let source = RawPcmFileSource::new(file.path()).unwrap();
-        assert_eq!(source.total_frames_hint(), Some(2));
-    }
-
-    #[test]
     fn fill_buffer_eof_behavior() {
         let samples = vec![1.0, 2.0]; // 1 frame
         let file = write_test_pattern(&samples);
@@ -188,5 +166,124 @@ mod tests {
             "Unexpected error message: {}",
             err_msg
         );
+    }
+
+    #[test]
+    fn test_streaming_bit_identity_oracle_real_file() {
+        use sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader;
+        use sp314_dsp::stft::two_pass::TwoPassEngine;
+        use std::io::Write;
+
+        let n_total = 200_000;
+
+        let left: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 440.0 + (500.0 * t);
+                (2.0 * core::f32::consts::PI * freq * t).sin()
+            })
+            .collect();
+
+        let right: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 880.0 + (1000.0 * t);
+                (2.0 * core::f32::consts::PI * freq * t).sin()
+            })
+            .collect();
+
+        // 1. Write exact byte pattern that decode_node.rs uses:
+        // interleaved f32.to_le_bytes(), L then R.
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        for i in 0..n_total {
+            temp_file.write_all(&left[i].to_le_bytes()).unwrap();
+            temp_file.write_all(&right[i].to_le_bytes()).unwrap();
+        }
+        let temp_path = temp_file.into_temp_path();
+
+        let signal: Vec<f32> = left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect();
+
+        // 2. OLD PATH (Slice-based)
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+
+        let mut old_voice = Vec::new();
+        let mut old_drums = Vec::new();
+        let mut old_bass = Vec::new();
+        let mut old_harmonics = Vec::new();
+        let mut old_ambience = Vec::new();
+
+        engine
+            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, |chunk| {
+                old_voice.extend_from_slice(&chunk.voice);
+                old_drums.extend_from_slice(&chunk.drums);
+                old_bass.extend_from_slice(&chunk.bass);
+                old_harmonics.extend_from_slice(&chunk.harmonics);
+                old_ambience.extend_from_slice(&chunk.ambience);
+            })
+            .unwrap();
+
+        // 3. NEW PATH (Streaming with real I/O)
+        let mut e_new = TwoPassEngine::new();
+        // Re-run scout to populate e_new.nmf exactly identical to e_old.
+        // This takes ~150ms and avoids accessing private fields or risking shared state.
+        let scout_new = e_new.scout(&signal, 48000);
+
+        let mut new_voice = Vec::new();
+        let mut new_drums = Vec::new();
+        let mut new_bass = Vec::new();
+        let mut new_harmonics = Vec::new();
+        let mut new_ambience = Vec::new();
+
+        let source = super::RawPcmFileSource::new(&temp_path).unwrap();
+        let reader = SlidingOverlapReader::new(source, 10240);
+
+        e_new
+            .process_stream_with_params(reader, &scout_new, 1.0, |chunk| {
+                new_voice.extend_from_slice(&chunk.voice);
+                new_drums.extend_from_slice(&chunk.drums);
+                new_bass.extend_from_slice(&chunk.bass);
+                new_harmonics.extend_from_slice(&chunk.harmonics);
+                new_ambience.extend_from_slice(&chunk.ambience);
+            })
+            .unwrap();
+
+        assert_eq!(old_voice.len(), new_voice.len(), "Length mismatch");
+        for i in 0..old_voice.len() {
+            assert_eq!(
+                old_voice[i].to_bits(),
+                new_voice[i].to_bits(),
+                "Bit mismatch in voice at {}",
+                i
+            );
+            assert_eq!(
+                old_drums[i].to_bits(),
+                new_drums[i].to_bits(),
+                "Bit mismatch in drums at {}",
+                i
+            );
+            assert_eq!(
+                old_bass[i].to_bits(),
+                new_bass[i].to_bits(),
+                "Bit mismatch in bass at {}",
+                i
+            );
+            assert_eq!(
+                old_harmonics[i].to_bits(),
+                new_harmonics[i].to_bits(),
+                "Bit mismatch in harmonics at {}",
+                i
+            );
+            assert_eq!(
+                old_ambience[i].to_bits(),
+                new_ambience[i].to_bits(),
+                "Bit mismatch in ambience at {}",
+                i
+            );
+        }
     }
 }
