@@ -14,6 +14,7 @@ pub mod wav_to_raw;
 pub mod lazy_reader;
 pub mod maestro;
 pub mod orchestrator;
+pub mod sliding_overlap_reader;
 
 pub mod signal_health;
 
