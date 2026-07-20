@@ -639,7 +639,7 @@ fn run_dsp_internal(
 
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)
-    let n_total = mono.len();
+    let n_total = chunk.left.len();
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
     let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
@@ -721,6 +721,25 @@ fn run_dsp_internal(
         // Stem DNA for spoken-word.
         ContentType::bypassed_render()
     } else {
+        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let stream_source = if std::path::Path::new(&raw_path).exists() {
+            eprintln!("[DEBUG] TAKING NEW STREAMING PATH: found {}", raw_path);
+            let source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(
+                std::path::Path::new(&raw_path),
+            )
+            .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
+            Some(sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240))
+        } else {
+            // A missing file here means decode_node.rs's Stereo path failed to write it,
+            // or the OS purged it. Silently falling back to slice logic would trigger an O(N)
+            // memory spike, defeating the streaming architecture. Fail loudly.
+            eprintln!("[DEBUG] HARD ERROR: raw path {} not found", raw_path);
+            return Err(format!(
+                "CRITICAL: Raw PCM dump {} not found for Music/Stereo path. Cannot proceed with O(1) streaming render.",
+                raw_path
+            ));
+        };
+
         crate::domain::nodes::render_node::run(
             &mut two_pass,
             &scout,
@@ -730,11 +749,12 @@ fn run_dsp_internal(
                 flavour_id: req.flavour_id.as_deref(),
                 sample_rate: chunk.sample_rate,
             },
-            &crate::domain::nodes::render_node::RenderInputs {
+            crate::domain::nodes::render_node::RenderInputs {
                 mono: &mono,
                 original_left: &chunk.left,
                 original_right: &chunk.right,
                 original_sum_sq: decoded.original_sum_sq,
+                stream_source,
             },
             &mut left_vec[..],
             &mut right_vec[..],

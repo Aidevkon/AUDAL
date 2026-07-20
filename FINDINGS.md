@@ -330,6 +330,12 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** My recommendation: Fix in Cycle 1 alongside F-036, since both touch the exact same chunk-boundary state logic in `process_chunks_with_params` and the subsequent test pass will verify both simultaneously.
 - **Context:** The streaming pipeline uses direct time-domain envelope masking (`apply_mask_to_chunk`), not Inverse STFT — there is no real OLA/ISTFT reconstruction anywhere in this path (the `OlaRingBuffer` struct exists but is dead code). Despite this, `two_pass.rs` unconditionally appends a 1024-sample all-zero `FiveStemsChunk` after the real chunk loop finishes, solely to match the byte-length the old ISTFT-based pipeline used to produce ("legacy OLA-tail compatibility hack"). This adds ~21.3ms of trailing silence to every single rendered master. It is not trimmed anywhere downstream — `frames_written` counts it as real audio and it lands directly in the output file on disk.
 
+### F-040 — n_total silently truncated all Music/Stereo final masters to 30s
+- **Status:** ACTIVE
+- **Component:** `lineos/m0/m0-daemon/src/domain/dsp_pipeline.rs`
+- **Trigger:** To be fixed immediately before A3 Step 1 commit.
+- **Context:** `dsp_pipeline.rs` used `mono.len()` (the 30s scout proxy length) instead of `chunk.left.len()` (the actual full track duration) to size `left_vec/right_vec` and set the processing boundaries. This was introduced in commit `0d90d21` (June 29, `lazy_scout`). This silently truncated the pre-allocated output buffers and the inner DSP loop to exactly 30 seconds regardless of the actual track length. Any track longer than 30s processed by the Music path produced a completely valid but brutally chopped 30s FLAC/WAV master file. It did not cause a panic or crash because all arrays (the proxy input and the destination vectors) were aligned to exactly 30s perfectly. The truncation was completely masked in CI because the existing integration test (`e2e_corpus_music_path_uses_30s_proxy`) only asserted the number of Markov transitions generated during the scout pass (which successfully proved the proxy was used) but never asserted the total audio duration or byte length of the final output payload.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
