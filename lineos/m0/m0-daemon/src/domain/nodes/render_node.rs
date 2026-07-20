@@ -34,6 +34,7 @@ pub struct RenderInputs<'a> {
     pub mono: &'a [f32],
     pub original_left: &'a [f32],
     pub original_right: &'a [f32],
+    pub original_sum_sq: f32,
 }
 
 // allow: 7 args — 3 are &mut output slices, deliberately positional
@@ -78,7 +79,7 @@ pub fn run(
     let mut write_offset = 0;
 
     let mut _metadata = two_pass
-        .process_chunks_with_params(
+        .process_slices_with_params(
             mono,
             original_left,
             original_right,
@@ -178,14 +179,7 @@ pub fn run(
         format!("{:x}", hp.finalize())
     };
 
-    let original_rms = libm::sqrtf(
-        original_left
-            .iter()
-            .zip(original_right.iter())
-            .map(|(l, r)| l * l + r * r)
-            .sum::<f32>()
-            / (original_left.len() * 2) as f32,
-    );
+    let original_rms = libm::sqrtf(inputs.original_sum_sq / (original_left.len() * 2) as f32);
     let mix_rms = libm::sqrtf(
         left_slice
             .iter()

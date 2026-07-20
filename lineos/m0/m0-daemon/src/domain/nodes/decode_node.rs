@@ -20,6 +20,7 @@ pub struct DecodedAudio {
     pub duration_ms: f64,
     #[allow(clippy::type_complexity)]
     pub beat_data: Option<(f32, Vec<u32>, Vec<u32>, Vec<u32>)>,
+    pub original_sum_sq: f32,
 }
 
 pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAudio, String> {
@@ -83,6 +84,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             .map_err(|e| format!("Failed to write raw dump: {e}"))?;
 
         let mut buf = vec![0f32; 4096 * 2];
+        let mut original_sum_sq = 0.0_f32;
         loop {
             let frames = stream
                 .fill_buffer(&mut buf)
@@ -107,10 +109,13 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             }
 
             for i in 0..frames {
-                left.push(buf[i * 2]);
-                right.push(buf[i * 2 + 1]);
+                let l = buf[i * 2];
+                let r = buf[i * 2 + 1];
+                original_sum_sq += l * l + r * r;
+                left.push(l);
+                right.push(r);
                 if let Some(mono) = mono_chunk.as_mut() {
-                    mono.push((buf[i * 2] + buf[i * 2 + 1]) * 0.5);
+                    mono.push((l + r) * 0.5);
                 }
             }
 
@@ -152,6 +157,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             original_ch: probe_ch as u16,
             duration_ms,
             beat_data,
+            original_sum_sq,
         });
     }
 
@@ -240,6 +246,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 original_ch,
                 duration_ms,
                 beat_data: None,
+                original_sum_sq: 0.0,
             })
         }
         lineos_types::AudioPayload::Stems {
@@ -309,6 +316,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 original_ch: 10,
                 duration_ms,
                 beat_data: None,
+                original_sum_sq: 0.0,
             })
         }
     }
@@ -517,5 +525,52 @@ mod tests {
         assert_eq!(streaming_beat.3, batch_beat.3, "transients_ms mismatch");
 
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn original_sum_sq_bit_identical() {
+        let path = "/tmp/test_original_sum_sq.wav";
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(path, spec).unwrap();
+        let sr = 48000_f32;
+        // write some non-trivial floating point data
+        for i in 0..10000 {
+            let t = i as f32 / sr;
+            w.write_sample(libm::sinf(t * 1000.0) * 0.5).unwrap();
+            w.write_sample(libm::cosf(t * 1500.0) * 0.25).unwrap();
+        }
+        w.finalize().unwrap();
+
+        let audio = run(path, "test", "blob").unwrap();
+        let payload = match audio.payload {
+            lineos_types::AudioPayload::Stereo(s) => s,
+            _ => panic!("Expected Stereo"),
+        };
+
+        let original_left = &payload.left;
+        let original_right = &payload.right;
+        let old_sum_sq = original_left
+            .iter()
+            .zip(original_right.iter())
+            .map(|(l, r)| l * l + r * r)
+            .sum::<f32>();
+
+        let old_rms = libm::sqrtf(old_sum_sq / (original_left.len() * 2) as f32);
+        let new_rms = libm::sqrtf(audio.original_sum_sq / (original_left.len() * 2) as f32);
+
+        assert_eq!(
+            old_rms.to_bits(),
+            new_rms.to_bits(),
+            "f32 bit-identity check failed! old_rms bits: {:032b}, new_rms bits: {:032b}",
+            old_rms.to_bits(),
+            new_rms.to_bits()
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 }

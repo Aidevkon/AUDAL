@@ -142,6 +142,217 @@ pub struct RenderMetadata {
     pub spatial: [BandSpatialMetrics; 5],
 }
 
+pub(crate) struct ParallelChunkOut {
+    pub stems: FiveStemsChunk,
+    pub voice_transient: f32,
+    pub drums_transient: f32,
+    pub chunk_len: usize,
+    pub spatial_sums: [(f32, f32, f32); 5], // [(pan_num, width_num, den); 5]
+}
+
+pub(crate) struct SingleChunkData<'a> {
+    pub padded_chunk: &'a [f32],
+    pub padded_left: &'a [f32],
+    pub padded_right: &'a [f32],
+    pub core_chunk: &'a [f32],
+    pub pad_frames: usize,
+}
+
+pub(crate) fn process_single_chunk(
+    nmf: &NmfEngine,
+    scout: &ScoutResult,
+    data: SingleChunkData<'_>,
+) -> ParallelChunkOut {
+    let mut stft_ctx = StreamingStftEncoder::new();
+    let mut hpss_ctx = HpssStreamContext::new();
+    let mut stft_l = StreamingStftEncoder::new();
+    let mut stft_r = StreamingStftEncoder::new();
+
+    let mut chunk_frames_cplx = stft_ctx.feed_chunk(data.padded_chunk);
+    chunk_frames_cplx.extend(stft_ctx.finish());
+    let chunk_frames: Vec<Vec<f32>> = chunk_frames_cplx
+        .into_iter()
+        .map(|f| {
+            f.into_iter()
+                .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
+                .collect()
+        })
+        .collect();
+
+    let mut core_frames_l_cplx = stft_l.feed_chunk(data.padded_left);
+    core_frames_l_cplx.extend(stft_l.finish());
+    let core_frames_l: Vec<Vec<f32>> = core_frames_l_cplx
+        .into_iter()
+        .map(|f| {
+            f.into_iter()
+                .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
+                .collect()
+        })
+        .collect();
+
+    let mut core_frames_r_cplx = stft_r.feed_chunk(data.padded_right);
+    core_frames_r_cplx.extend(stft_r.finish());
+    let core_frames_r: Vec<Vec<f32>> = core_frames_r_cplx
+        .into_iter()
+        .map(|f| {
+            f.into_iter()
+                .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
+                .collect()
+        })
+        .collect();
+
+    let n_frames = chunk_frames.len();
+    if n_frames == 0 {
+        return ParallelChunkOut {
+            stems: FiveStemsChunk {
+                voice: vec![],
+                drums: vec![],
+                bass: vec![],
+                harmonics: vec![],
+                ambience: vec![],
+            },
+            voice_transient: 0.0,
+            drums_transient: 0.0,
+            chunk_len: 0,
+            spatial_sums: [(0.0, 0.0, 0.0); 5],
+        };
+    }
+
+    let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
+    let h_chunk = nmf.transform(&scout.w, &chunk_frames);
+
+    let voice_mask = nmf.component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
+    let bass_mask = nmf.component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
+    let harm_mask = nmf.component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
+    let amb_mask = nmf.component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
+
+    let core_n_frames = n_frames.saturating_sub(data.pad_frames);
+    let core_voice_mask = if data.pad_frames < voice_mask.len() {
+        &voice_mask[data.pad_frames..]
+    } else {
+        &[]
+    };
+    let core_bass_mask = if data.pad_frames < bass_mask.len() {
+        &bass_mask[data.pad_frames..]
+    } else {
+        &[]
+    };
+    let core_harm_mask = if data.pad_frames < harm_mask.len() {
+        &harm_mask[data.pad_frames..]
+    } else {
+        &[]
+    };
+    let core_amb_mask = if data.pad_frames < amb_mask.len() {
+        &amb_mask[data.pad_frames..]
+    } else {
+        &[]
+    };
+    let core_mask_p = if data.pad_frames < mask_p.len() {
+        &mask_p[data.pad_frames..]
+    } else {
+        &[]
+    };
+
+    let core_frames_l = if data.pad_frames < core_frames_l.len() {
+        &core_frames_l[data.pad_frames..]
+    } else {
+        &[]
+    };
+    let core_frames_r = if data.pad_frames < core_frames_r.len() {
+        &core_frames_r[data.pad_frames..]
+    } else {
+        &[]
+    };
+
+    let voice_chunk = apply_mask_to_chunk(data.core_chunk, core_voice_mask, core_n_frames);
+    let bass_chunk = apply_mask_to_chunk(data.core_chunk, core_bass_mask, core_n_frames);
+    let harm_chunk = apply_mask_to_chunk(data.core_chunk, core_harm_mask, core_n_frames);
+    let amb_chunk = apply_mask_to_chunk(data.core_chunk, core_amb_mask, core_n_frames);
+
+    let drums_weights: Vec<f32> = (0..data.core_chunk.len())
+        .map(|i| {
+            let f = i * core_n_frames / data.core_chunk.len().max(1);
+            if f < core_mask_p.len() {
+                core_mask_p[f].iter().sum::<f32>() / N_BINS as f32
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let drums_chunk: Vec<f32> = data
+        .core_chunk
+        .iter()
+        .zip(drums_weights.iter())
+        .map(|(s, w)| s * w)
+        .collect();
+
+    let h_voice: Vec<f32> = (0..core_n_frames)
+        .map(|f| {
+            let real_f = f + data.pad_frames;
+            let idx = scout.voice_idx * n_frames + real_f;
+            if idx < h_chunk.len() {
+                h_chunk[idx]
+            } else {
+                0.0
+            }
+        })
+        .collect();
+
+    let v_transient = transient_density(&h_voice);
+    let d_transient = core_mask_p
+        .iter()
+        .map(|f| f.iter().sum::<f32>() / N_BINS as f32)
+        .sum::<f32>()
+        / core_n_frames.max(1) as f32;
+
+    let mut spatial_sums = [(0.0, 0.0, 0.0); 5]; // [(pan_num, width_num, den); 5]
+    for f in 0..core_n_frames {
+        if f >= core_frames_l.len() || f >= core_frames_r.len() {
+            continue;
+        }
+        for b in 0..N_BINS {
+            let x_l = core_frames_l[f][b];
+            let x_r = core_frames_r[f][b];
+            let amp = x_l + x_r;
+            if amp < 1e-6 {
+                continue;
+            }
+            let p = (x_r - x_l) / (amp + 1e-10_f32);
+            let p_abs = p.abs();
+
+            let band_idx = if b <= 10 {
+                0 // Lows (0 - 250 Hz)
+            } else if b <= 42 {
+                1 // Low-Mids (250 - 1000 Hz)
+            } else if b <= 170 {
+                2 // Mids (1000 - 4000 Hz)
+            } else if b <= 341 {
+                3 // High-Mids (4000 - 8000 Hz)
+            } else {
+                4 // Highs (8000+ Hz)
+            };
+
+            spatial_sums[band_idx].0 += p * amp;
+            spatial_sums[band_idx].1 += p_abs * amp;
+            spatial_sums[band_idx].2 += amp;
+        }
+    }
+
+    ParallelChunkOut {
+        stems: FiveStemsChunk {
+            voice: voice_chunk,
+            drums: drums_chunk,
+            bass: bass_chunk,
+            harmonics: harm_chunk,
+            ambience: amb_chunk,
+        },
+        voice_transient: v_transient,
+        drums_transient: d_transient,
+        chunk_len: data.core_chunk.len(),
+        spatial_sums,
+    }
+}
+
 pub struct TwoPassEngine {
     nmf: NmfEngine,
     /// Psychoacoustic Collision Matrix — smoothed ducking gain state.
@@ -436,7 +647,7 @@ impl TwoPassEngine {
     /// Process with adaptive ducking_gain from Maestro.
     /// ducking_gain: [0.3, 1.0] — replaces COLLISION_DUCKING_GAIN.
     /// Use process_chunks for default behavior (ducking_gain=0.707).
-    pub fn process_chunks_with_params<F>(
+    pub fn process_slices_with_params<F>(
         &mut self,
         signal: &[f32],
         left: &[f32],
@@ -471,14 +682,6 @@ impl TwoPassEngine {
         }
 
         // 2. Parallel Transform Phase (Heavy Math)
-        struct ParallelChunkOut {
-            stems: FiveStemsChunk,
-            voice_transient: f32,
-            drums_transient: f32,
-            chunk_len: usize,
-            spatial_sums: [(f32, f32, f32); 5], // [(pan_num, width_num, den); 5]
-        }
-
         let parallel_results: Vec<ParallelChunkOut> = chunk_inputs
             .into_par_iter()
             .map(|chunk_in| {
@@ -495,212 +698,24 @@ impl TwoPassEngine {
                 } else {
                     &[]
                 };
-
-                let mut stft_ctx = StreamingStftEncoder::new();
-                let mut hpss_ctx = HpssStreamContext::new();
-                let mut stft_l = StreamingStftEncoder::new();
-                let mut stft_r = StreamingStftEncoder::new();
-
-                let mut chunk_frames_cplx = stft_ctx.feed_chunk(padded_chunk);
-                chunk_frames_cplx.extend(stft_ctx.finish());
-                let chunk_frames: Vec<Vec<f32>> = chunk_frames_cplx
-                    .into_iter()
-                    .map(|f| {
-                        f.into_iter()
-                            .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
-                            .collect()
-                    })
-                    .collect();
-
-                let mut core_frames_l_cplx = stft_l.feed_chunk(padded_left);
-                core_frames_l_cplx.extend(stft_l.finish());
-                let core_frames_l: Vec<Vec<f32>> = core_frames_l_cplx
-                    .into_iter()
-                    .map(|f| {
-                        f.into_iter()
-                            .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
-                            .collect()
-                    })
-                    .collect();
-
-                let mut core_frames_r_cplx = stft_r.feed_chunk(padded_right);
-                core_frames_r_cplx.extend(stft_r.finish());
-                let core_frames_r: Vec<Vec<f32>> = core_frames_r_cplx
-                    .into_iter()
-                    .map(|f| {
-                        f.into_iter()
-                            .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
-                            .collect()
-                    })
-                    .collect();
-
-                let n_frames = chunk_frames.len();
-                if n_frames == 0 {
-                    return ParallelChunkOut {
-                        stems: FiveStemsChunk {
-                            voice: vec![],
-                            drums: vec![],
-                            bass: vec![],
-                            harmonics: vec![],
-                            ambience: vec![],
-                        },
-                        voice_transient: 0.0,
-                        drums_transient: 0.0,
-                        chunk_len: 0,
-                        spatial_sums: [(0.0, 0.0, 0.0); 5],
-                    };
-                }
-
-                // pad_frames is the number of frames we must discard from the start.
-                // Accounts for both HPSS history (10240 samples) and the StreamingStftEncoder's leading zero-pad (1024 samples).
+                let core_chunk = &signal[chunk_in.offset..chunk_in.end];
                 let pad_frames = if chunk_in.start < chunk_in.offset {
                     (chunk_in.offset - chunk_in.start + (FFT_SIZE / 2)) / HOP_SIZE
                 } else {
                     0
                 };
 
-                let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
-                let h_chunk = self.nmf.transform(&scout.w, &chunk_frames);
-
-                let voice_mask =
-                    self.nmf
-                        .component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
-                let bass_mask =
-                    self.nmf
-                        .component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
-                let harm_mask =
-                    self.nmf
-                        .component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
-                let amb_mask =
-                    self.nmf
-                        .component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
-
-                let core_n_frames = n_frames.saturating_sub(pad_frames);
-                let core_voice_mask = if pad_frames < voice_mask.len() {
-                    &voice_mask[pad_frames..]
-                } else {
-                    &[]
-                };
-                let core_bass_mask = if pad_frames < bass_mask.len() {
-                    &bass_mask[pad_frames..]
-                } else {
-                    &[]
-                };
-                let core_harm_mask = if pad_frames < harm_mask.len() {
-                    &harm_mask[pad_frames..]
-                } else {
-                    &[]
-                };
-                let core_amb_mask = if pad_frames < amb_mask.len() {
-                    &amb_mask[pad_frames..]
-                } else {
-                    &[]
-                };
-                let core_mask_p = if pad_frames < mask_p.len() {
-                    &mask_p[pad_frames..]
-                } else {
-                    &[]
-                };
-
-                let core_frames_l = if pad_frames < core_frames_l.len() {
-                    &core_frames_l[pad_frames..]
-                } else {
-                    &[]
-                };
-                let core_frames_r = if pad_frames < core_frames_r.len() {
-                    &core_frames_r[pad_frames..]
-                } else {
-                    &[]
-                };
-
-                let core_chunk = &signal[chunk_in.offset..chunk_in.end];
-
-                let voice_chunk = apply_mask_to_chunk(core_chunk, core_voice_mask, core_n_frames);
-                let bass_chunk = apply_mask_to_chunk(core_chunk, core_bass_mask, core_n_frames);
-                let harm_chunk = apply_mask_to_chunk(core_chunk, core_harm_mask, core_n_frames);
-                let amb_chunk = apply_mask_to_chunk(core_chunk, core_amb_mask, core_n_frames);
-
-                let drums_weights: Vec<f32> = (0..core_chunk.len())
-                    .map(|i| {
-                        let f = i * core_n_frames / core_chunk.len().max(1);
-                        if f < core_mask_p.len() {
-                            core_mask_p[f].iter().sum::<f32>() / N_BINS as f32
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect();
-                let drums_chunk: Vec<f32> = core_chunk
-                    .iter()
-                    .zip(drums_weights.iter())
-                    .map(|(s, w)| s * w)
-                    .collect();
-
-                let h_voice: Vec<f32> = (0..core_n_frames)
-                    .map(|f| {
-                        let real_f = f + pad_frames;
-                        let idx = scout.voice_idx * n_frames + real_f;
-                        if idx < h_chunk.len() {
-                            h_chunk[idx]
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect();
-
-                let v_transient = transient_density(&h_voice);
-                let d_transient = core_mask_p
-                    .iter()
-                    .map(|f| f.iter().sum::<f32>() / N_BINS as f32)
-                    .sum::<f32>()
-                    / core_n_frames.max(1) as f32;
-
-                let mut spatial_sums = [(0.0, 0.0, 0.0); 5]; // [(pan_num, width_num, den); 5]
-                for f in 0..core_n_frames {
-                    if f >= core_frames_l.len() || f >= core_frames_r.len() {
-                        continue;
-                    }
-                    for b in 0..N_BINS {
-                        let x_l = core_frames_l[f][b];
-                        let x_r = core_frames_r[f][b];
-                        let amp = x_l + x_r;
-                        if amp < 1e-6 {
-                            continue;
-                        }
-                        let p = (x_r - x_l) / (amp + 1e-10_f32);
-                        let p_abs = p.abs();
-
-                        let band_idx = if b <= 10 {
-                            0 // Lows (0 - 250 Hz)
-                        } else if b <= 42 {
-                            1 // Low-Mids (250 - 1000 Hz)
-                        } else if b <= 170 {
-                            2 // Mids (1000 - 4000 Hz)
-                        } else if b <= 341 {
-                            3 // High-Mids (4000 - 8000 Hz)
-                        } else {
-                            4 // Highs (8000+ Hz)
-                        };
-
-                        spatial_sums[band_idx].0 += p * amp;
-                        spatial_sums[band_idx].1 += p_abs * amp;
-                        spatial_sums[band_idx].2 += amp;
-                    }
-                }
-
-                ParallelChunkOut {
-                    stems: FiveStemsChunk {
-                        voice: voice_chunk,
-                        drums: drums_chunk,
-                        bass: bass_chunk,
-                        harmonics: harm_chunk,
-                        ambience: amb_chunk,
+                process_single_chunk(
+                    &self.nmf,
+                    scout,
+                    SingleChunkData {
+                        padded_chunk,
+                        padded_left,
+                        padded_right,
+                        core_chunk,
+                        pad_frames,
                     },
-                    voice_transient: v_transient,
-                    drums_transient: d_transient,
-                    chunk_len: core_chunk.len(),
-                    spatial_sums,
-                }
+                )
             })
             .collect();
 
@@ -785,7 +800,7 @@ impl TwoPassEngine {
     where
         F: FnMut(&FiveStemsChunk),
     {
-        self.process_chunks_with_params(
+        self.process_slices_with_params(
             signal,
             signal,
             signal,
@@ -1071,7 +1086,7 @@ mod tests {
 
         let mut total_output_samples = 0;
         let meta = engine
-            .process_chunks_with_params(&signal, &signal, &signal, &scout, 1.0, |chunk| {
+            .process_slices_with_params(&signal, &signal, &signal, &scout, 1.0, |chunk| {
                 total_output_samples += chunk.voice.len();
             })
             .unwrap();

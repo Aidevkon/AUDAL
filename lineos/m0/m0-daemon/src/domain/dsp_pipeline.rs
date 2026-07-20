@@ -734,6 +734,7 @@ fn run_dsp_internal(
                 mono: &mono,
                 original_left: &chunk.left,
                 original_right: &chunk.right,
+                original_sum_sq: decoded.original_sum_sq,
             },
             &mut left_vec[..],
             &mut right_vec[..],
