@@ -30,7 +30,8 @@ test-quality:
     cargo test -p m0d --test e2e_decoupled_fork
 
 test-all:
-    cargo test --workspace
+    cargo test --workspace -- --skip heap_is_scale_invariant
+    cargo test -p m0d --test e2e_episode_streaming heap_is_scale_invariant -- --test-threads=1
 
 ci: check check-cli fmt clippy test-unit test-quality test-all
     @echo "✅ All CI gates passed"

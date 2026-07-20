@@ -299,3 +299,80 @@ fn full_pipeline_heap_is_scale_invariant() {
         diff_mb
     );
 }
+
+#[test]
+#[ignore = "render_node.rs/process_chunks_with_params still requires \
+full-length chunk.left/chunk.right input and left_vec/right_vec output buffers. \
+Heap grows 33.55MB when duration doubles (+60s). \
+Remove #[ignore] when A3 (Sliding Window Streaming) lands, it should then pass."]
+fn music_pipeline_heap_is_scale_invariant() {
+    let sr = 48_000;
+
+    let wav_1m = "/tmp/music_full_1m.wav";
+    let wav_2m = "/tmp/music_full_2m.wav";
+    write_wav(&generate_podcast_fixture(sr, 60.0), sr, wav_1m);
+    write_wav(&generate_podcast_fixture(sr, 120.0), sr, wav_2m);
+
+    let run_pipeline = |path: &str, id: &str| {
+        let req = m0d::handlers::master::MasterRequest {
+            audio_path: path.to_string(),
+            preset_id: "spotify".to_string(),
+            flavour_id: None,
+            intent_tone: None,
+            intent_dynamics: None,
+            persona_id: None,
+            tone: None,
+            dynamics: None,
+            chaos_seed: None,
+            project_id: Some("default".to_string()),
+            track_id: Some(id.to_string()),
+            mix_levels: None,
+            preview_id: None,
+        };
+        let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
+            xaak::repo::DspState::default(),
+        ));
+        let state_tmp = tempfile::TempDir::new().unwrap();
+        m0d::domain::dsp_pipeline::run_dsp(
+            &req,
+            std::time::Instant::now(),
+            state,
+            None,
+            None,
+            id.to_string(),
+            state_tmp.path().to_str().unwrap(),
+        )
+        .expect("run_dsp failed")
+    };
+
+    let peak_1m = {
+        let _p = dhat::Profiler::builder().testing().build();
+        let _ = run_pipeline(wav_1m, "run-music-1m");
+        dhat::HeapStats::get().max_bytes
+    };
+
+    let peak_2m = {
+        let _p = dhat::Profiler::builder().testing().build();
+        let _ = run_pipeline(wav_2m, "run-music-2m");
+        dhat::HeapStats::get().max_bytes
+    };
+
+    let diff = peak_2m as i64 - peak_1m as i64;
+    let diff_mb = diff as f64 / 1_000_000.0;
+
+    eprintln!(
+        "music_pipeline heap (spotify): 1m={:.2}MB \
+         2m={:.2}MB diff={:.2}MB",
+        peak_1m as f64 / 1e6,
+        peak_2m as f64 / 1e6,
+        diff_mb
+    );
+
+    assert!(
+        diff_mb.abs() < 5.0,
+        "heap grew {:.2}MB when duration \
+         doubled — music pipeline is NOT \
+         scale-invariant",
+        diff_mb
+    );
+}

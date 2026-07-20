@@ -803,6 +803,7 @@ fn run_dsp_internal(
         &mut chunk.right,
         &mut left_vec[..],
         &mut right_vec[..],
+        scout_left,
         chunk.sample_rate,
         preset_id,
         target_lufs,

@@ -103,6 +103,7 @@ pub fn run(
     chunk_right: &mut Vec<f32>,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
+    scout_left: &[f32],
     sample_rate: u32,
     preset_id: &str,
     target_lufs: Option<f32>,
@@ -162,7 +163,7 @@ pub fn run(
 
     let corpus_out = crate::domain::nodes::corpus_node::run(
         streaming_features,
-        left_slice,
+        scout_left,
         &pre_analysis,
         blob_id,
         sample_rate,

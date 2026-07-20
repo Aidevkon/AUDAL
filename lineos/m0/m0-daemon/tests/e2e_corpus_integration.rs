@@ -105,3 +105,79 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     // Cleanup
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[tokio::test]
+async fn e2e_corpus_music_path_uses_30s_proxy() {
+    let sr = 48_000;
+    let dur_secs = 60.0;
+    let wav_path_rel = "/tmp/music_corpus_60s.wav";
+
+    let n = (sr as f32 * dur_secs) as usize;
+    let mut out = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let v = 0.5 * (2.0 * std::f32::consts::PI * 440.0 * t).sin();
+        out.push(v);
+        out.push(v);
+    }
+
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(wav_path_rel, spec).unwrap();
+    for &s in out.iter() {
+        w.write_sample(s).unwrap();
+    }
+    w.finalize().unwrap();
+
+    let req = MasterRequest {
+        audio_path: wav_path_rel.to_string(),
+        preset_id: "spotify".to_string(),
+        flavour_id: Some("e2e_preset".to_string()),
+        intent_tone: None,
+        intent_dynamics: None,
+        persona_id: Some("warm_analog".to_string()),
+        tone: None,
+        dynamics: None,
+        chaos_seed: Some(42),
+        project_id: Some("e2e_test_proj".to_string()),
+        track_id: Some("track_proxy".to_string()),
+        mix_levels: None,
+        preview_id: None,
+    };
+
+    let start = std::time::Instant::now();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
+        let dummy_head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
+        let state_tmp = tempfile::TempDir::new().unwrap();
+        run_dsp(
+            &req,
+            start,
+            dummy_head_state,
+            None,
+            None,
+            "".to_string(),
+            state_tmp.path().to_str().unwrap(),
+        )
+    })
+    .await;
+
+    let dsp_result = result.unwrap();
+    let (_blob, _, _path, user_model_opt) = dsp_result.unwrap();
+
+    let user_model = user_model_opt.unwrap();
+    let model = user_model.presets.get("e2e_preset").unwrap();
+    let voice_stem = model.stems.get("voice").unwrap();
+
+    println!(
+        "ACTUAL TRANSITIONS: {}",
+        voice_stem.transitions.n_transitions
+    );
+    assert_eq!(
+        voice_stem.transitions.n_transitions, 299,
+        "Music path corpus must be built from exactly the 30s scout proxy"
+    );
+}
