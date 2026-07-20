@@ -451,7 +451,7 @@ mod tests {
 
         let final_len = streaming.left_pca.len();
         assert!(
-            final_len >= 512 && final_len <= PCA_MAX_SAMPLES,
+            (512..=PCA_MAX_SAMPLES).contains(&final_len),
             "Final PCA buffer len {} out of bounds",
             final_len
         );

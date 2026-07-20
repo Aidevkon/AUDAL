@@ -185,7 +185,7 @@ mod streaming_tests {
             block_size * 4,
             block_size * 2,
             block_size * 3 + 1500, // non-multiple, tests discard of trailing partial block
-            block_size * 1 + 10,
+            block_size + 10,
             block_size - 1, // shorter than one block
             1,
             0,

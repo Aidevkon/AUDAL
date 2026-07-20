@@ -1091,8 +1091,8 @@ mod tests {
         let mut signal = vec![0.0f32; history_len + real_len];
 
         // 100Hz for history
-        for i in 0..history_len {
-            signal[i] = libm::sinf(2.0 * core::f32::consts::PI * 100.0 * i as f32 / 48000.0);
+        for (i, val) in signal.iter_mut().enumerate().take(history_len) {
+            *val = libm::sinf(2.0 * core::f32::consts::PI * 100.0 * i as f32 / 48000.0);
         }
         // 2000Hz for real data
         for i in 0..real_len {
@@ -1122,12 +1122,12 @@ mod tests {
         let frame0 = &core_frames[0];
 
         let mut energy_100hz = 0.0;
-        for b in 2..=6 {
-            energy_100hz += frame0[b];
+        for &val in frame0.iter().take(6 + 1).skip(2) {
+            energy_100hz += val;
         }
         let mut energy_2000hz = 0.0;
-        for b in 83..=87 {
-            energy_2000hz += frame0[b];
+        for &val in frame0.iter().take(87 + 1).skip(83) {
+            energy_2000hz += val;
         }
 
         assert!(
