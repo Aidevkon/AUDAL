@@ -4498,6 +4498,7 @@ dependencies = [
 name = "lineos-telemetry"
 version = "0.1.0"
 dependencies = [
+ "hound",
  "libm",
  "lineos-types",
  "serde",
