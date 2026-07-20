@@ -8,6 +8,7 @@ pub mod autotune;
 pub mod beat_detector;
 pub mod file_decoder;
 pub mod input_lufs;
+pub mod raw_pcm_source;
 pub mod wav_to_raw;
 
 pub mod lazy_reader;
