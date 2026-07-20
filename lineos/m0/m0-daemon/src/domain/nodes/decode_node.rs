@@ -18,9 +18,12 @@ pub struct DecodedAudio {
     pub original_sr: u32,
     pub original_ch: u16,
     pub duration_ms: f64,
+    #[allow(clippy::type_complexity)]
+    pub beat_data: Option<(f32, Vec<u32>, Vec<u32>, Vec<u32>)>,
 }
 
 pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAudio, String> {
+    use crate::domain::content_type::ContentTypeExt;
     use crate::domain::dsp_pipeline::{
         compute_rms, compute_sha256_bytes, derive_seed, rms_to_lufs,
     };
@@ -61,6 +64,20 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         let mut left = Vec::new();
         let mut right = Vec::new();
 
+        let mut streaming_beat: Option<crate::dsp::beat_detector::StreamingBeatDetector> =
+            if !crate::domain::content_type::ContentType::from_preset(preset_id).skip_stems() {
+                Some(crate::dsp::beat_detector::StreamingBeatDetector::new(
+                    crate::dsp::standardized_stream::TARGET_SR,
+                ))
+            } else {
+                None
+            };
+        let mut mono_chunk: Option<Vec<f32>> = if streaming_beat.is_some() {
+            Some(Vec::with_capacity(4096))
+        } else {
+            None
+        };
+
         let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
         let mut dump_file = std::fs::File::create(&raw_path)
             .map_err(|e| format!("Failed to write raw dump: {e}"))?;
@@ -85,9 +102,20 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 .write_all(raw_bytes)
                 .map_err(|e| format!("Failed to write raw dump: {e}"))?;
 
+            if let Some(mono) = mono_chunk.as_mut() {
+                mono.clear();
+            }
+
             for i in 0..frames {
                 left.push(buf[i * 2]);
                 right.push(buf[i * 2 + 1]);
+                if let Some(mono) = mono_chunk.as_mut() {
+                    mono.push((buf[i * 2] + buf[i * 2 + 1]) * 0.5);
+                }
+            }
+
+            if let Some(detector) = streaming_beat.as_mut() {
+                detector.feed_chunk(mono_chunk.as_ref().unwrap());
             }
         }
 
@@ -102,14 +130,16 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         // Use tier2_verdict's message verbatim. Nothing downstream string-matches it.
         stream.tier2_verdict()?;
 
-        let duration_ms = (left.len() as f64 / 48000.0) * 1000.0;
+        let duration_ms =
+            (left.len() as f64 / crate::dsp::standardized_stream::TARGET_SR as f64) * 1000.0;
+        let beat_data = streaming_beat.map(|d| d.finish());
 
         return Ok(DecodedAudio {
             payload: lineos_types::AudioPayload::Stereo(lineos_types::StereoBuffer {
                 num_frames: left.len(),
                 left,
                 right,
-                sample_rate: 48000,
+                sample_rate: crate::dsp::standardized_stream::TARGET_SR,
             }),
             input_blake3_hex,
             input_sha256_hex,
@@ -121,6 +151,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             original_sr: true_original_sr,
             original_ch: probe_ch as u16,
             duration_ms,
+            beat_data,
         });
     }
 
@@ -208,6 +239,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 original_sr,
                 original_ch,
                 duration_ms,
+                beat_data: None,
             })
         }
         lineos_types::AudioPayload::Stems {
@@ -276,6 +308,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 original_sr: sample_rate,
                 original_ch: 10,
                 duration_ms,
+                beat_data: None,
             })
         }
     }
@@ -425,5 +458,64 @@ mod tests {
 
             let _ = std::fs::remove_file(&path);
         }
+    }
+
+    #[test]
+    fn decode_node_streaming_beat_matches_batch() {
+        let sr = 48_000;
+        let path = format!("/tmp/decode_node_streaming_beat_{}.wav", sr);
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: sr,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(&path, spec).unwrap();
+        // Generate a 10s click track at 120BPM
+        let n = sr as usize * 10;
+        let interval_samples = (60.0 / 120.0 * sr as f32) as usize;
+        let mut pos = 0;
+        let mut audio = vec![0.0f32; n];
+        while pos + 20 < n {
+            for i in 0..20 {
+                audio[pos + i] = 0.9 * (1.0 - i as f32 / 20.0);
+            }
+            pos += interval_samples;
+        }
+        for &s in &audio {
+            w.write_sample(s).unwrap(); // L
+            w.write_sample(s).unwrap(); // R
+        }
+        w.finalize().unwrap();
+
+        let preset_id = "spotify"; // Music path -> skip_stems() is false
+        let blob_id = "test-blob-beat";
+
+        let new_result = super::run(&path, preset_id, blob_id).expect("new path failed");
+        let streaming_beat = new_result
+            .beat_data
+            .expect("Music path should populate beat_data");
+
+        // Oracle batch pass
+        let payload = crate::handlers::decode::decode_smart(&path).expect("decode_smart failed");
+        let buf = match payload {
+            lineos_types::AudioPayload::Stereo(b) => b,
+            _ => panic!("expected stereo"),
+        };
+        let mono_samples: Vec<f32> = buf
+            .left
+            .iter()
+            .zip(buf.right.iter())
+            .map(|(l, r)| (*l + *r) * 0.5)
+            .collect();
+        let detector = crate::dsp::beat_detector::BeatDetector::new(buf.sample_rate);
+        let batch_beat = detector.analyze(&mono_samples);
+
+        assert_eq!(streaming_beat.0, batch_beat.0, "BPM mismatch");
+        assert_eq!(streaming_beat.1, batch_beat.1, "beats_ms mismatch");
+        assert_eq!(streaming_beat.2, batch_beat.2, "downbeats_ms mismatch");
+        assert_eq!(streaming_beat.3, batch_beat.3, "transients_ms mismatch");
+
+        let _ = std::fs::remove_file(&path);
     }
 }

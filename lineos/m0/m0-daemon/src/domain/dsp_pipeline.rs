@@ -425,6 +425,7 @@ fn run_dsp_internal(
     let input_sha256_hex = decoded.input_sha256_hex;
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
+    let beat_data_opt = decoded.beat_data;
     let mut chunk = match decoded.payload {
         lineos_types::AudioPayload::Stereo(buf) => buf,
         lineos_types::AudioPayload::FiveDotOne {
@@ -590,14 +591,7 @@ fn run_dsp_internal(
     let (bpm, beats_ms, downbeats_ms, transients_ms) = if content_type.skip_stems() {
         (0.0_f32, vec![], vec![], vec![])
     } else {
-        let mono_samples: Vec<f32> = chunk
-            .left
-            .iter()
-            .zip(chunk.right.iter())
-            .map(|(l, r)| (*l + *r) * 0.5)
-            .collect();
-        let detector = crate::dsp::beat_detector::BeatDetector::new(chunk.sample_rate);
-        detector.analyze(&mono_samples)
+        beat_data_opt.unwrap_or_else(|| (0.0_f32, vec![], vec![], vec![]))
     };
     tracing::info!(
         "Rhythm Analysis: BPM = {:.1}, {} transients, {} downbeats",

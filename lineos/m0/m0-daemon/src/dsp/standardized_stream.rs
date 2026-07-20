@@ -43,7 +43,7 @@ use crate::dsp::lazy_reader::LazyAudioReader;
 use crate::dsp::signal_health::{DeadAirSummary, SignalHealthMonitor};
 
 // Must match decode_smart byte-for-byte.
-const TARGET_SR: u32 = 48_000;
+pub const TARGET_SR: u32 = 48_000;
 const SINC_LEN: usize = 256;
 const SINC_OVERSAMPLE: usize = 256;
 const RESAMPLE_CHUNK_FRAMES: usize = 1024;
