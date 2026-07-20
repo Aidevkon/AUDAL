@@ -198,70 +198,6 @@ impl StemFeatureAnalyzer {
         let n = a.len().min(b.len()).min(c.len()).min(d.len()).min(e.len());
         (0..n).map(|i| a[i] + b[i] + c[i] + d[i] + e[i]).collect()
     }
-
-    /// Analyze a stereo PCM signal — mix metrics only.
-    /// Stems (bass, vocals, drums, other) = StemMetrics::default().
-    /// Lightweight alternative to analyze() — no NMF/STFT separation.
-    /// TODO v2.0: Replace with real stem separation (S-001 FourStems)
-    ///            when stem separation is integrated into m0-daemon.
-    pub fn analyze_stereo(left: &[f32], right: &[f32], sample_rate: u32) -> StemFeatures {
-        use super::dynamics::{dynamic_range_db, rms_db};
-        use super::spectral::spectral_centroid_hz;
-        use super::stereo::{stereo_correlation, stereo_width};
-
-        if left.is_empty() || right.is_empty() {
-            return StemFeatures {
-                bass: StemMetrics::default(),
-                harmonics: StemMetrics::default(),
-                voice: StemMetrics::default(),
-                drums: StemMetrics::default(),
-                ambience: StemMetrics::default(),
-                mix: MixMetrics::default(),
-            };
-        }
-
-        // Mix centroid: average of L and R centroids (S-008)
-        let centroid = (spectral_centroid_hz(left, sample_rate)
-            + spectral_centroid_hz(right, sample_rate))
-            * 0.5;
-
-        // Integrated LUFS on stereo pair
-        let lufs = crate::metering::measure_integrated_lufs(left, right);
-
-        // RMS: average of L and R
-        let _rms = (rms_db(left) + rms_db(right)) * 0.5;
-
-        // Dynamic range: average of L and R channels
-        let dyn_range =
-            (dynamic_range_db(left, sample_rate) + dynamic_range_db(right, sample_rate)) * 0.5;
-
-        // Stereo metrics
-        let corr = stereo_correlation(left, right);
-        let width = stereo_width(left, right);
-
-        let mix = MixMetrics {
-            integrated_lufs: lufs,
-            true_peak_dbtp: measure_true_peak_dbtp(left, right),
-            loudness_range: measure_loudness_range(left, right, sample_rate),
-            stereo_correlation: corr,
-            stereo_width: width,
-            dynamic_range_db: dyn_range,
-            // Unavailable: analyze_stereo() skips
-            // NMF/STFT — no stem separation.
-            // Use analyze() for real ratios.
-            stem_energy_ratios: [0.0; 5],
-            spectral_centroid_hz: centroid,
-        };
-
-        StemFeatures {
-            bass: StemMetrics::default(),
-            harmonics: StemMetrics::default(),
-            voice: StemMetrics::default(),
-            drums: StemMetrics::default(),
-            ambience: StemMetrics::default(),
-            mix,
-        }
-    }
 }
 
 /// Streaming Stem Analyzer.
@@ -698,57 +634,6 @@ impl StreamingStemFeaturesAnalyzer {
 mod tests {
     use super::*;
     use crate::analysis::features::{MixMetrics, StemMetrics};
-
-    #[test]
-    fn analyze_stereo_mix_metrics_reasonable() {
-        // Sine-like signal: centroid should be above 0
-        let signal: Vec<f32> = (0..4800)
-            .map(|i| libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
-            .collect();
-        let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
-        assert!(result.mix.spectral_centroid_hz > 0.0);
-        assert!(result.mix.stereo_correlation > 0.99); // L==R
-        assert_eq!(result.mix.stem_energy_ratios, [0.0; 5]);
-    }
-
-    #[test]
-    fn test_analyze_stereo_true_peak() {
-        let gain = libm::powf(10.0, -1.0 / 20.0);
-        let signal: Vec<f32> = (0..4800)
-            .map(|i| gain * libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
-            .collect();
-
-        let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
-
-        assert!(
-            result.mix.true_peak_dbtp >= -2.0 && result.mix.true_peak_dbtp <= 0.0,
-            "True peak was {}",
-            result.mix.true_peak_dbtp
-        );
-
-        let silence = vec![0.0_f32; 100];
-        let silence_result = StemFeatureAnalyzer::analyze_stereo(&silence, &silence, 48000);
-        assert!(silence_result.mix.true_peak_dbtp <= -100.0);
-    }
-
-    #[test]
-    fn analyze_stereo_empty_returns_default() {
-        let result = StemFeatureAnalyzer::analyze_stereo(&[], &[], 48000);
-        assert_eq!(
-            result.mix.integrated_lufs,
-            MixMetrics::default().integrated_lufs
-        );
-    }
-
-    #[test]
-    fn analyze_stereo_stems_are_default() {
-        let signal = vec![0.1_f32; 4800];
-        let result = StemFeatureAnalyzer::analyze_stereo(&signal, &signal, 48000);
-        assert_eq!(result.bass, StemMetrics::default());
-        assert_eq!(result.harmonics, StemMetrics::default());
-        assert_eq!(result.drums, StemMetrics::default());
-        assert_eq!(result.ambience, StemMetrics::default());
-    }
 
     #[test]
     fn streaming_stem_matches_offline_reference() {
