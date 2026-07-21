@@ -426,8 +426,8 @@ fn run_dsp_internal(
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let beat_data_opt = decoded.beat_data;
-    let chunk = match decoded.payload {
-        lineos_types::AudioPayload::Stereo(buf) => buf,
+    match decoded.payload {
+        lineos_types::AudioPayload::Stereo(_) => {}
         lineos_types::AudioPayload::FiveDotOne {
             channels,
             sample_rate,
@@ -562,7 +562,7 @@ fn run_dsp_internal(
     // (streaming render), which will remove
     // the full upstream decode entirely for
     // large files.
-    let scout_frames = (chunk.sample_rate as usize) * 30;
+    let scout_frames = (decoded.pcm_sample_rate as usize) * 30;
     let total_frames = decoded.total_frames;
 
     let lazy_scout =
@@ -582,7 +582,7 @@ fn run_dsp_internal(
     let scout_right = &scout_right_owned[..];
 
     use sp314_dsp::analysis::PreAnalyzer;
-    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, chunk.sample_rate);
+    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, decoded.pcm_sample_rate);
     // Episode/spoken-word: skip beat
     // detection entirely. BPM and beat
     // grids are meaningless for voice
@@ -611,7 +611,7 @@ fn run_dsp_internal(
     let scout_out = crate::domain::nodes::scout_node::run(
         scout_left,
         scout_right,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
         &pre_analysis,
@@ -748,7 +748,7 @@ fn run_dsp_internal(
                 ducking_gain: final_ducking,
                 mix_levels: req.mix_levels.as_ref(),
                 flavour_id: req.flavour_id.as_deref(),
-                sample_rate: chunk.sample_rate,
+                sample_rate: decoded.pcm_sample_rate,
             },
             crate::domain::nodes::render_node::RenderInputs {
                 original_sum_sq: decoded.original_sum_sq,
@@ -766,7 +766,7 @@ fn run_dsp_internal(
         // Τρέξε conformance + export
         let spatial_blob = spatial_conformance_path(
             spatial_channels,
-            chunk.sample_rate,
+            decoded.pcm_sample_rate,
             n_total_with_tail,
             &format!("{blob_id}-spatial"),
             preset_id,
@@ -816,7 +816,7 @@ fn run_dsp_internal(
         &mut left_vec[..],
         &mut right_vec[..],
         scout_left,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         preset_id,
         target_lufs,
         req.flavour_id.as_deref().unwrap_or("warm"),
@@ -870,11 +870,11 @@ fn run_dsp_internal(
         &right_vec[..],
         file_path,
         &input_hash_hex,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         2,
         0, // duration_ms proxy
         target_lufs,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         elapsed,
         seed,
         preset_id,
