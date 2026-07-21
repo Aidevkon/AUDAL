@@ -486,11 +486,7 @@ mod tests {
             assert_eq!(new_result.duration_ms, old_duration_ms, "duration mismatch");
 
             let (dump_left, dump_right) = read_dump(blob_id);
-            assert_eq!(
-                dump_left.len(),
-                buf.left.len(),
-                "left channel len mismatch"
-            );
+            assert_eq!(dump_left.len(), buf.left.len(), "left channel len mismatch");
             assert_eq!(
                 dump_right.len(),
                 buf.right.len(),
