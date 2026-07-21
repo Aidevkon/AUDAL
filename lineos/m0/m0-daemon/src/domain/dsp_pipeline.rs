@@ -669,12 +669,15 @@ fn run_dsp_internal(
         .truncate(true)
         .open(&scratch_l_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
-    scratch_l_file.set_len((n_total_with_tail * 4) as u64)
+    scratch_l_file
+        .set_len((n_total_with_tail * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
-    let mut scratch_l_mmap =
-        unsafe { memmap2::MmapMut::map_mut(&scratch_l_file).map_err(|e| format!("Mmap failed: {e}"))? };
-    let scratch_l_view: &mut [f32] =
-        unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total_with_tail) };
+    let mut scratch_l_mmap = unsafe {
+        memmap2::MmapMut::map_mut(&scratch_l_file).map_err(|e| format!("Mmap failed: {e}"))?
+    };
+    let scratch_l_view: &mut [f32] = unsafe {
+        std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total_with_tail)
+    };
 
     let scratch_r_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-r-{}.pcm", blob_id));
     let scratch_r_file = std::fs::OpenOptions::new()
@@ -684,12 +687,15 @@ fn run_dsp_internal(
         .truncate(true)
         .open(&scratch_r_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
-    scratch_r_file.set_len((n_total_with_tail * 4) as u64)
+    scratch_r_file
+        .set_len((n_total_with_tail * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
-    let mut scratch_r_mmap =
-        unsafe { memmap2::MmapMut::map_mut(&scratch_r_file).map_err(|e| format!("Mmap failed: {e}"))? };
-    let scratch_r_view: &mut [f32] =
-        unsafe { std::slice::from_raw_parts_mut(scratch_r_mmap.as_mut_ptr() as *mut f32, n_total_with_tail) };
+    let mut scratch_r_mmap = unsafe {
+        memmap2::MmapMut::map_mut(&scratch_r_file).map_err(|e| format!("Mmap failed: {e}"))?
+    };
+    let scratch_r_view: &mut [f32] = unsafe {
+        std::slice::from_raw_parts_mut(scratch_r_mmap.as_mut_ptr() as *mut f32, n_total_with_tail)
+    };
 
     let repo_state = head_state.load_full();
     let final_ducking =

@@ -207,8 +207,13 @@ impl DspAdapter {
                 start = end;
             }
 
-            let left_src = left.to_vec();
-            let right_src = right.to_vec();
+            // F-043: plain borrows — the par_iter reads strictly
+            // precede the write-back (post-.collect()), so the
+            // clones shielded a hazard the borrow phases already
+            // exclude. Verified: no interleaving, no other
+            // left_src/right_src consumers.
+            let left_src: &[f32] = &left[..];
+            let right_src: &[f32] = &right[..];
 
             let processed_isp: Vec<(Vec<f32>, Vec<f32>)> = isp_chunks
                 .par_iter()
