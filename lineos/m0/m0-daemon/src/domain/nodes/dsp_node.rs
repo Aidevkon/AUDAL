@@ -121,10 +121,9 @@ pub fn run(
         pre_analysis.integrated_lufs,
         target_lufs.unwrap_or(-14.0),
     );
-    let _gain_linear = libm::powf(10.0_f32, autotune_result.pre_gain_db / 20.0_f32);
-    // F-042: pre_gain is computed but currently NOT applied on the
-    // Music path (dead-buffer application removed here); fix tracked
-    // as its own step — see register F-042.
+    let gain_linear = libm::powf(10.0_f32, autotune_result.pre_gain_db / 20.0_f32);
+    // F-042 fixed: applied as drive staging inside
+    // DspAdapter::master (see mod.rs).
 
     // Build intent + aether config via the
     // shared helper (also used by the Episode
@@ -176,6 +175,7 @@ pub fn run(
         &pre_analysis,
         &streaming_features.mix.stem_energy_ratios,
         Some(&dsp_config),
+        gain_linear,
     )
     .map_err(|e| format!("DSP pipeline error: {:?}", e))?;
     if dsp_start.elapsed().as_secs() > 300 {

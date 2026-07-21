@@ -68,6 +68,11 @@ impl DspAdapter {
 
     /// Master a stereo buffer using v3 engine.
     /// Replaces MasteringPipeline::master().
+    // allow: 8 args — mastering entry point; 2 are &mut audio slices,
+    // the rest are orthogonal config inputs (intent, rate, analysis,
+    // ratios, aether, drive). Grouping into a struct adds indirection
+    // without clarity; revisit if it grows again.
+    #[allow(clippy::too_many_arguments)]
     pub fn master(
         intent: &MasteringIntent,
         left: &mut [f32],
@@ -76,7 +81,24 @@ impl DspAdapter {
         _pre_analysis: &lineos_types::pre_analysis::PreAnalysisData,
         stem_ratios: &[f32; 5],
         aether_config: Option<&integration::config::DspConfig>,
+        pre_gain_linear: f32, // input drive staging; 1.0 = none
     ) -> Result<MasteringResult, DspError> {
+        // [F-042 FIX] Apply autotune pre-gain to drive the nonlinear
+        // graph stages.
+        // NOTE: 'pre_analysis.integrated_lufs' is currently derived
+        // from a 30s proxy. This +/-1-2 LU variance is perfectly
+        // acceptable for analog-style drive staging. It will naturally
+        // become 100% exact when Cycle 5 (Y-Shape streaming) shifts
+        // NMF to Pass 2, allowing Pass 1 to scan the full file O(1).
+        if (pre_gain_linear - 1.0).abs() > f32::EPSILON {
+            for s in left.iter_mut() {
+                *s *= pre_gain_linear;
+            }
+            for s in right.iter_mut() {
+                *s *= pre_gain_linear;
+            }
+        }
+
         // Build the configured graph.
         // Shared with the Episode streaming
         // path via build_graph_only() — one

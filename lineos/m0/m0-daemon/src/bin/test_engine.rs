@@ -97,6 +97,7 @@ fn main() {
         &pre_analysis,
         &[0.0; 5],
         None,
+        1.0, // gain applied upstream in this harness (pre-master loop above)
     )
     .expect("Mastering failed");
     assert_signal_integrity(&audio.left, "process_offline_l");

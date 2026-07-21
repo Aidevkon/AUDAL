@@ -89,6 +89,7 @@ pub fn autotune_dsp(audio: &StereoBuffer, intent: &MasteringIntent) -> AutotuneR
             &lineos_types::pre_analysis::PreAnalysisData::silent(),
             &[0.0; 5],
             None,
+            1.0, // no drive staging in this probe path (P37: possible v2 leftover)
         );
 
         // Measure output LUFS
