@@ -660,9 +660,36 @@ fn run_dsp_internal(
         .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut mmap =
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
-    // Allocate in-memory arrays for DSP (sp314-dsp requires planar arrays)
-    let mut left_vec = vec![0.0_f32; n_total_with_tail];
-    let mut right_vec = vec![0.0_f32; n_total_with_tail];
+    // Allocate file-backed mmaps for working storage
+    let scratch_l_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-l-{}.pcm", blob_id));
+    let scratch_l_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&scratch_l_path)
+        .map_err(|e| format!("Failed to create mapped file: {e}"))?;
+    scratch_l_file.set_len((n_total_with_tail * 4) as u64)
+        .map_err(|e| format!("Failed to set file len: {e}"))?;
+    let mut scratch_l_mmap =
+        unsafe { memmap2::MmapMut::map_mut(&scratch_l_file).map_err(|e| format!("Mmap failed: {e}"))? };
+    let scratch_l_view: &mut [f32] =
+        unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total_with_tail) };
+
+    let scratch_r_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-r-{}.pcm", blob_id));
+    let scratch_r_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&scratch_r_path)
+        .map_err(|e| format!("Failed to create mapped file: {e}"))?;
+    scratch_r_file.set_len((n_total_with_tail * 4) as u64)
+        .map_err(|e| format!("Failed to set file len: {e}"))?;
+    let mut scratch_r_mmap =
+        unsafe { memmap2::MmapMut::map_mut(&scratch_r_file).map_err(|e| format!("Mmap failed: {e}"))? };
+    let scratch_r_view: &mut [f32] =
+        unsafe { std::slice::from_raw_parts_mut(scratch_r_mmap.as_mut_ptr() as *mut f32, n_total_with_tail) };
 
     let repo_state = head_state.load_full();
     let final_ducking =
@@ -760,8 +787,8 @@ fn run_dsp_internal(
                 total_frames: decoded.total_frames,
                 stream_source,
             },
-            &mut left_vec[..],
-            &mut right_vec[..],
+            &mut scratch_l_view[..],
+            &mut scratch_r_view[..],
             spatial_slices.as_mut(),
         )?
     };
@@ -785,25 +812,22 @@ fn run_dsp_internal(
 
     eprintln!(
         "[BISECT-3-RENDER] L_rms={:.6} R_rms={:.6} ratio={:.4}",
-        rms(&left_vec),
-        rms(&right_vec),
-        rms(&right_vec) / rms(&left_vec).max(1e-9)
+        rms(&scratch_l_view[..]),
+        rms(&scratch_r_view[..]),
+        rms(&scratch_r_view[..]) / rms(&scratch_l_view[..]).max(1e-9)
     );
 
-    // Latency compensation: left-shift by STFT_FLUSH_TAIL to discard silence, then truncate.
-    left_vec.copy_within(STFT_FLUSH_TAIL.., 0);
-    left_vec.truncate(n_total);
-    right_vec.copy_within(STFT_FLUSH_TAIL.., 0);
-    right_vec.truncate(n_total);
+    let left_post = &mut scratch_l_view[STFT_FLUSH_TAIL..];
+    let right_post = &mut scratch_r_view[STFT_FLUSH_TAIL..];
 
     eprintln!(
         "[BISECT-4-TRIM] L_rms={:.6} R_rms={:.6} ratio={:.4}",
-        rms(&left_vec),
-        rms(&right_vec),
-        rms(&right_vec) / rms(&left_vec).max(1e-9)
+        rms(&left_post[..]),
+        rms(&right_post[..]),
+        rms(&right_post[..]) / rms(&left_post[..]).max(1e-9)
     );
 
-    profiler.mark_stage("Stem Engine", &left_vec[..]);
+    profiler.mark_stage("Stem Engine", &left_post[..]);
 
     // Markov spatial modulation (simplified — full in Phase 8)
     emit_progress("Spatial");
@@ -813,13 +837,13 @@ fn run_dsp_internal(
 
     // chunk.left  = left_slice;
     // chunk.right = right_slice;
-    profiler.mark_stage("Spatial", &left_vec[..]); // fixes stale hash of pre-render audio (F-041)
+    profiler.mark_stage("Spatial", &left_post[..]); // fixes stale hash of pre-render audio (F-041)
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
     emit_progress("Mastering");
     let dsp_out = crate::domain::nodes::dsp_node::run(
-        &mut left_vec[..],
-        &mut right_vec[..],
+        left_post,
+        right_post,
         scout_left,
         decoded.pcm_sample_rate,
         preset_id,
@@ -842,7 +866,7 @@ fn run_dsp_internal(
     let aether_req = dsp_out.aether_req;
     let lufs = dsp_out.lufs;
     let tp = dsp_out.true_peak;
-    profiler.mark_stage("Mastering", &left_vec[..]);
+    profiler.mark_stage("Mastering", &left_post[..]);
     let _dr = 10.0; // dynamic range proxy for v3
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
@@ -851,8 +875,8 @@ fn run_dsp_internal(
     let mmap_f32: &mut [f32] =
         unsafe { std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2) };
     for i in 0..n_total {
-        mmap_f32[i * 2] = left_vec[i];
-        mmap_f32[i * 2 + 1] = right_vec[i];
+        mmap_f32[i * 2] = left_post[i];
+        mmap_f32[i * 2 + 1] = right_post[i];
     }
 
     // Sync mapped file to disk before returning path
@@ -871,8 +895,8 @@ fn run_dsp_internal(
         &persona_config,
         &aether_req,
         &dsp_config,
-        &left_vec[..],
-        &right_vec[..],
+        &left_post[..],
+        &right_post[..],
         file_path,
         &input_hash_hex,
         decoded.pcm_sample_rate,
@@ -887,6 +911,9 @@ fn run_dsp_internal(
         n_total,
         processing_timeline,
     )?;
+
+    let _ = std::fs::remove_file(&scratch_l_path);
+    let _ = std::fs::remove_file(&scratch_r_path);
 
     Ok((
         cert_out.blob,
