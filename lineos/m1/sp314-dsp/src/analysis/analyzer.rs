@@ -63,18 +63,6 @@ impl StemFeatureAnalyzer {
             );
         }
 
-        // Mix: combine all stems
-        let mix_stereo = Self::combine_stereo_five(
-            &stems.bass,
-            &stems.harmonics,
-            &stems.voice,
-            &stems.drums,
-            &stems.ambience,
-        );
-        let mix_l: Vec<f32> = mix_stereo.iter().step_by(2).copied().collect();
-        let mix_r: Vec<f32> = mix_stereo.iter().skip(1).step_by(2).copied().collect();
-
-        // Mix centroid: energy-weighted average of stem centroids (S-008)
         // Mix centroid: energy-weighted average of stem centroids (S-008)
         let ratios = [
             bass_ratio,
@@ -103,14 +91,15 @@ impl StemFeatureAnalyzer {
         };
 
         let mix = MixMetrics {
-            integrated_lufs: measure_integrated_lufs(&mix_l, &mix_r),
-            true_peak_dbtp: measure_true_peak_dbtp(&mix_l, &mix_r),
-            loudness_range: measure_loudness_range(&mix_l, &mix_r, sample_rate),
-            stereo_correlation: stereo_correlation(&mix_l, &mix_r),
-            stereo_width: stereo_width(&mix_l, &mix_r),
-            dynamic_range_db: (dynamic_range_db(&mix_l, sample_rate)
-                + dynamic_range_db(&mix_r, sample_rate))
-                * 0.5,
+            // dead since Cycle 4a — no live reader on any path (Music scout,
+            // Stems arm, corpus, AetherBridge). Successor: the Y-trunk
+            // measures these on the raw pre-NMF signal (Cycle 5, P27).
+            integrated_lufs: 0.0,
+            true_peak_dbtp: 0.0,
+            loudness_range: 0.0,
+            stereo_correlation: 0.0,
+            stereo_width: 0.0,
+            dynamic_range_db: 0.0,
             stem_energy_ratios: [
                 bass_ratio,
                 harmonics_ratio,
@@ -192,11 +181,6 @@ impl StemFeatureAnalyzer {
             return 0.0;
         }
         (Self::stereo_energy(stem) / mix_energy).clamp(0.0, 1.0)
-    }
-
-    fn combine_stereo_five(a: &[f32], b: &[f32], c: &[f32], d: &[f32], e: &[f32]) -> Vec<f32> {
-        let n = a.len().min(b.len()).min(c.len()).min(d.len()).min(e.len());
-        (0..n).map(|i| a[i] + b[i] + c[i] + d[i] + e[i]).collect()
     }
 }
 
@@ -353,7 +337,6 @@ pub struct StreamingStemFeaturesAnalyzer {
     stem_vo: StreamingStemAnalyzer,
     stem_dr: StreamingStemAnalyzer,
     stem_am: StreamingStemAnalyzer,
-    mix_an: StreamingStemAnalyzer,
     /// Energy accumulators: folded over the INTERLEAVED sequence, one sample
     /// at a time — `sum += s * s` — to match `stereo_energy`'s left-fold.
     e_ba: f32,
@@ -365,8 +348,6 @@ pub struct StreamingStemFeaturesAnalyzer {
     scratch_l: Vec<f32>,
     /// Scratch: de-interleaved R channel (reused every feed_chunk, grown lazily).
     scratch_r: Vec<f32>,
-    /// Scratch: summed interleaved mix (reused every feed_chunk, grown lazily).
-    scratch_mix: Vec<f32>,
 }
 
 impl StreamingStemFeaturesAnalyzer {
@@ -378,7 +359,6 @@ impl StreamingStemFeaturesAnalyzer {
             stem_vo: StreamingStemAnalyzer::new(sample_rate),
             stem_dr: StreamingStemAnalyzer::new(sample_rate),
             stem_am: StreamingStemAnalyzer::new(sample_rate),
-            mix_an: StreamingStemAnalyzer::new(sample_rate),
             e_ba: 0.0,
             e_ha: 0.0,
             e_vo: 0.0,
@@ -386,7 +366,6 @@ impl StreamingStemFeaturesAnalyzer {
             e_am: 0.0,
             scratch_l: Vec::new(),
             scratch_r: Vec::new(),
-            scratch_mix: Vec::new(),
         }
     }
 
@@ -396,11 +375,6 @@ impl StreamingStemFeaturesAnalyzer {
     ///  - All five slices have exactly the same length `n`.
     ///  - `n` is even (complete L/R frame pairs).
     ///  - Order: [bass, harmonics, voice, drums, ambience], matching `FiveStems`.
-    ///
-    /// This mirrors `combine_stereo_five`'s behaviour: the mix is the
-    /// element-wise sum bass[i] + harmonics[i] + voice[i] + drums[i] +
-    /// ambience[i], and is truncated to `min(lengths)` — but since all five
-    /// slices must have equal length, that is just `n`.
     pub fn feed_chunk(&mut self, stems: [&[f32]; 5]) {
         let [ba, ha, vo, dr, am] = stems;
         let n = ba.len();
@@ -424,11 +398,7 @@ impl StreamingStemFeaturesAnalyzer {
             self.scratch_l.resize(n_frames, 0.0);
             self.scratch_r.resize(n_frames, 0.0);
         }
-        if self.scratch_mix.len() < n {
-            self.scratch_mix.resize(n, 0.0);
-        }
 
-        // Build summed mix interleaved chunk and feed all six analyzers.
         // Process each stem: fold energy over interleaved order, de-interleave,
         // feed its StreamingStemAnalyzer.
         {
@@ -497,19 +467,6 @@ impl StreamingStemFeaturesAnalyzer {
             self.stem_am
                 .feed_chunk(&self.scratch_l[..n_frames], &self.scratch_r[..n_frames]);
         }
-
-        // Build summed mix chunk: bass[i] + harmonics[i] + voice[i] + drums[i] + ambience[i]
-        // exactly matching combine_stereo_five's expression and iteration order.
-        for i in 0..n {
-            self.scratch_mix[i] = ba[i] + ha[i] + vo[i] + dr[i] + am[i];
-        }
-        // De-interleave mix into scratch_l / scratch_r and feed mix analyzer.
-        for f in 0..n_frames {
-            self.scratch_l[f] = self.scratch_mix[f * 2];
-            self.scratch_r[f] = self.scratch_mix[f * 2 + 1];
-        }
-        self.mix_an
-            .feed_chunk(&self.scratch_l[..n_frames], &self.scratch_r[..n_frames]);
     }
 
     /// Combine per-stem state into `StemFeatures` bit-identical to
@@ -597,18 +554,16 @@ impl StreamingStemFeaturesAnalyzer {
             1000.0
         };
 
-        // Assemble MixMetrics from mix analyzer's StemMetrics.
-        // Spectral outputs of mix_stem are discarded (MixMetrics has no
-        // waveform-derived centroid; centroid computed above from stem ratios).
-        let mix_stem = self.mix_an.finish();
         let mix = MixMetrics {
-            integrated_lufs: mix_stem.integrated_lufs,
-            true_peak_dbtp: mix_stem.true_peak_dbtp,
-            loudness_range: mix_stem.loudness_range,
-            stereo_correlation: mix_stem.stereo_correlation,
-            stereo_width: mix_stem.stereo_width,
-            // dynamic_range from left channel only — matches P3 in analyze().
-            dynamic_range_db: mix_stem.dynamic_range_db,
+            // dead since Cycle 4a — no live reader on any path (Music scout,
+            // Stems arm, corpus, AetherBridge). Successor: the Y-trunk
+            // measures these on the raw pre-NMF signal (Cycle 5, P27).
+            integrated_lufs: 0.0,
+            true_peak_dbtp: 0.0,
+            loudness_range: 0.0,
+            stereo_correlation: 0.0,
+            stereo_width: 0.0,
+            dynamic_range_db: 0.0,
             stem_energy_ratios: [
                 bass_ratio,
                 harmonics_ratio,
@@ -1076,12 +1031,14 @@ mod tests {
                             );
                         };
                     }
+                    // Inert fields since Cycle 4a.
                     chk!(integrated_lufs);
                     chk!(true_peak_dbtp);
                     chk!(loudness_range);
                     chk!(stereo_correlation);
                     chk!(stereo_width);
                     chk!(dynamic_range_db);
+
                     chk!(spectral_centroid_hz);
                     for idx in 0..5 {
                         assert_eq!(
