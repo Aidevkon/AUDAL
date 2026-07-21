@@ -301,11 +301,10 @@ fn full_pipeline_heap_is_scale_invariant() {
 }
 
 #[test]
-#[ignore = "Input side is streaming since A3 Step 1 (66c176b): heap diff fell \
-33.55MB -> 22.61MB (+60s), matching the output side's own cost \
-(left_vec/right_vec = 23.04MB/min). Remaining O(N): the full-length \
-output buffers and the post-render dsp_node/certificate passes over \
-them. Remove #[ignore] when A3 Steps 3-4 (streaming output) land."]
+#[ignore = "PASSING since A3 Steps 3a/3b (scratch mmaps + F-043 borrow fix): \
+1m=149.98MB 2m=149.98MB diff=0.00MB. Ignored for COST only (60s dhat \
+run), like the seam test — run explicitly via --ignored (no CI target runs it \
+yet — see register P36)."]
 fn music_pipeline_heap_is_scale_invariant() {
     let sr = 48_000;
 
