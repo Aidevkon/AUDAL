@@ -30,33 +30,23 @@ pub struct RenderSettings<'a> {
 }
 
 /// Immutable input audio for a single chunk.
-pub struct RenderInputs<'a> {
-    pub mono: &'a [f32],
-    pub original_left: &'a [f32],
-    pub original_right: &'a [f32],
+pub struct RenderInputs {
     pub original_sum_sq: f32,
-    pub stream_source: Option<
-        sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader<
-            sp314_orchestrator::raw_pcm_source::RawPcmFileSource,
-        >,
+    pub total_frames: usize,
+    pub stream_source: sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader<
+        sp314_orchestrator::raw_pcm_source::RawPcmFileSource,
     >,
 }
 
-// allow: 7 args — 3 are &mut output slices, deliberately positional
-// (grouping mutable slices behind a struct adds lifetime noise, not clarity)
-#[allow(clippy::too_many_arguments)]
 pub fn run(
     two_pass: &mut TwoPassEngine,
     scout: &ScoutResult,
     settings: &RenderSettings<'_>,
-    mut inputs: RenderInputs<'_>,
+    inputs: RenderInputs,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
     mut spatial: Option<&mut SpatialSlicesMut<'_>>,
 ) -> Result<(StemFingerprints, sp314_dsp::stft::two_pass::RenderMetadata), String> {
-    let mono = inputs.mono;
-    let original_left = inputs.original_left;
-    let original_right = inputs.original_right;
     let ducking_gain = settings.ducking_gain;
     let mix_levels = settings.mix_levels;
     let flavour_id = settings.flavour_id;
@@ -154,19 +144,9 @@ pub fn run(
         write_offset = end_offset;
     };
 
-    let mut _metadata = if let Some(reader) = inputs.stream_source.take() {
-        two_pass.process_stream_with_params(reader, scout, ducking_gain, callback)
-    } else {
-        two_pass.process_slices_with_params(
-            mono,
-            original_left,
-            original_right,
-            scout,
-            ducking_gain,
-            callback,
-        )
-    }
-    .map_err(|e| format!("TwoPassEngine error: {e}"))?;
+    let mut _metadata = two_pass
+        .process_stream_with_params(inputs.stream_source, scout, ducking_gain, callback)
+        .map_err(|e| format!("TwoPassEngine error: {e}"))?;
 
     let voice_hex = format!("{:x}", h_voice.finalize());
     let drums_hex = format!("{:x}", h_drums.finalize());
@@ -180,7 +160,7 @@ pub fn run(
         format!("{:x}", hp.finalize())
     };
 
-    let original_rms = libm::sqrtf(original_sum_sq / (original_left.len() * 2) as f32);
+    let original_rms = libm::sqrtf(original_sum_sq / (inputs.total_frames.max(1) * 2) as f32);
     let mix_rms = libm::sqrtf(
         left_slice
             .iter()

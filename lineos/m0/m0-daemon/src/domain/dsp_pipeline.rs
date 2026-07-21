@@ -426,7 +426,7 @@ fn run_dsp_internal(
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let beat_data_opt = decoded.beat_data;
-    let mut chunk = match decoded.payload {
+    let chunk = match decoded.payload {
         lineos_types::AudioPayload::Stereo(buf) => buf,
         lineos_types::AudioPayload::FiveDotOne {
             channels,
@@ -729,7 +729,7 @@ fn run_dsp_internal(
                 std::path::Path::new(&raw_path),
             )
             .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
-            Some(sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240))
+            sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240)
         } else {
             // A missing file here means decode_node.rs's Stereo path failed to write it,
             // or the OS purged it. Silently falling back to slice logic would trigger an O(N)
@@ -751,10 +751,8 @@ fn run_dsp_internal(
                 sample_rate: chunk.sample_rate,
             },
             crate::domain::nodes::render_node::RenderInputs {
-                mono: &mono,
-                original_left: &chunk.left,
-                original_right: &chunk.right,
                 original_sum_sq: decoded.original_sum_sq,
+                total_frames: decoded.total_frames,
                 stream_source,
             },
             &mut left_vec[..],
@@ -810,13 +808,11 @@ fn run_dsp_internal(
 
     // chunk.left  = left_slice;
     // chunk.right = right_slice;
-    profiler.mark_stage("Spatial", &chunk.left);
+    profiler.mark_stage("Spatial", &left_vec[..]); // fixes stale hash of pre-render audio (F-041)
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
     emit_progress("Mastering");
     let dsp_out = crate::domain::nodes::dsp_node::run(
-        &mut chunk.left,
-        &mut chunk.right,
         &mut left_vec[..],
         &mut right_vec[..],
         scout_left,
