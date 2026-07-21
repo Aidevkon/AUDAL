@@ -21,6 +21,9 @@ pub struct DecodedAudio {
     #[allow(clippy::type_complexity)]
     pub beat_data: Option<(f32, Vec<u32>, Vec<u32>, Vec<u32>)>,
     pub original_sum_sq: f32,
+    pub left_sum_sq: f32,
+    pub right_sum_sq: f32,
+    pub total_frames: usize,
 }
 
 pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAudio, String> {
@@ -85,6 +88,9 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
         let mut buf = vec![0f32; 4096 * 2];
         let mut original_sum_sq = 0.0_f32;
+        let mut left_sum_sq = 0.0_f32;
+        let mut right_sum_sq = 0.0_f32;
+        let mut total_frames: usize = 0;
         loop {
             let frames = stream
                 .fill_buffer(&mut buf)
@@ -107,11 +113,14 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             if let Some(mono) = mono_chunk.as_mut() {
                 mono.clear();
             }
+            total_frames += frames;
 
             for i in 0..frames {
                 let l = buf[i * 2];
                 let r = buf[i * 2 + 1];
                 original_sum_sq += l * l + r * r;
+                left_sum_sq += l * l;
+                right_sum_sq += r * r;
                 left.push(l);
                 right.push(r);
                 if let Some(mono) = mono_chunk.as_mut() {
@@ -134,6 +143,12 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
         // Use tier2_verdict's message verbatim. Nothing downstream string-matches it.
         stream.tier2_verdict()?;
+
+        debug_assert_eq!(
+            total_frames,
+            left.len(),
+            "total_frames MUST equal left.len() exactly"
+        );
 
         let duration_ms =
             (left.len() as f64 / crate::dsp::standardized_stream::TARGET_SR as f64) * 1000.0;
@@ -158,6 +173,9 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             duration_ms,
             beat_data,
             original_sum_sq,
+            left_sum_sq,
+            right_sum_sq,
+            total_frames,
         });
     }
 
@@ -208,6 +226,13 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             let pcm_channels_for_telemetry = 6;
             let pcm_sr_for_telemetry = sample_rate;
 
+            let mut left_sum_sq = 0.0_f32;
+            let mut right_sum_sq = 0.0_f32;
+            for (l, r) in channels[0].iter().zip(channels[1].iter()).take(num_frames) {
+                left_sum_sq += l * l;
+                right_sum_sq += r * r;
+            }
+
             // Silence / Gain guards for 5.1
             let rms = compute_rms(&interleaved);
             let rms_dbfs = if rms > 0.0 {
@@ -247,6 +272,9 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 duration_ms,
                 beat_data: None,
                 original_sum_sq: 0.0,
+                left_sum_sq,
+                right_sum_sq,
+                total_frames: num_frames,
             })
         }
         lineos_types::AudioPayload::Stems {
@@ -282,6 +310,24 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             let input_blake3_hex = blake3_hasher.finalize().to_hex().to_string();
             let input_sha256_hex = format!("{:x}", sha2::Digest::finalize(sha256_hasher));
             let duration_ms = (num_frames as f64 / sample_rate as f64) * 1000.0;
+
+            let mut left_sum_sq = 0.0_f32;
+            let mut right_sum_sq = 0.0_f32;
+            for i in 0..num_frames {
+                let l = voice.left[i]
+                    + drums.left[i]
+                    + bass.left[i]
+                    + harmonics.left[i]
+                    + ambience.left[i];
+                let r = voice.right[i]
+                    + drums.right[i]
+                    + bass.right[i]
+                    + harmonics.right[i]
+                    + ambience.right[i];
+                left_sum_sq += l * l;
+                right_sum_sq += r * r;
+            }
+
             let rms = compute_rms(&interleaved);
             let rms_dbfs = if rms > 0.0 {
                 20.0 * (rms as f64).log10() as f32
@@ -317,6 +363,9 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 duration_ms,
                 beat_data: None,
                 original_sum_sq: 0.0,
+                left_sum_sq,
+                right_sum_sq,
+                total_frames: num_frames,
             })
         }
     }
@@ -572,5 +621,61 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn channel_sum_sq_and_total_frames_bit_identical() {
+        let path = "/tmp/test_channel_sum_sq.wav";
+        let blob_id = "test-blob-sum-sq";
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(path, spec).unwrap();
+        let sr = 48000_f32;
+        // write some non-trivial floating point data
+        for i in 0..10000 {
+            let t = i as f32 / sr;
+            w.write_sample(libm::sinf(t * 1000.0) * 0.5).unwrap();
+            w.write_sample(libm::cosf(t * 1500.0) * 0.25).unwrap();
+        }
+        w.finalize().unwrap();
+
+        let audio = run(path, "test", blob_id).unwrap();
+        let payload = match audio.payload {
+            lineos_types::AudioPayload::Stereo(s) => s,
+            _ => panic!("Expected Stereo"),
+        };
+
+        assert_eq!(
+            audio.total_frames,
+            payload.left.len(),
+            "total_frames must exactly match left.len()"
+        );
+
+        let mut expected_left_sum_sq = 0.0_f32;
+        let mut expected_right_sum_sq = 0.0_f32;
+        for i in 0..payload.left.len() {
+            let l = payload.left[i];
+            let r = payload.right[i];
+            expected_left_sum_sq += l * l;
+            expected_right_sum_sq += r * r;
+        }
+
+        assert_eq!(
+            expected_left_sum_sq.to_bits(),
+            audio.left_sum_sq.to_bits(),
+            "f32 bit-identity check failed for left_sum_sq"
+        );
+        assert_eq!(
+            expected_right_sum_sq.to_bits(),
+            audio.right_sum_sq.to_bits(),
+            "f32 bit-identity check failed for right_sum_sq"
+        );
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(format!("/tmp/m0d-raw-{}.pcm", blob_id));
     }
 }
