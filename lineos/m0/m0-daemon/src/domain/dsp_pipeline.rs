@@ -427,12 +427,17 @@ fn run_dsp_internal(
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let beat_data_opt = decoded.beat_data;
     match decoded.payload {
-        lineos_types::AudioPayload::Stereo(_) => {}
-        lineos_types::AudioPayload::FiveDotOne {
+        // A3 1.2b: Stereo streaming path carries no payload; audio
+        // lives in the raw dump.
+        None => {}
+        Some(lineos_types::AudioPayload::Stereo(_)) => {
+            unreachable!("Stereo payload is never materialized on the streaming path (A3 1.2b)")
+        }
+        Some(lineos_types::AudioPayload::FiveDotOne {
             channels,
             sample_rate,
             num_frames,
-        } => {
+        }) => {
             let (blob, path, model) = spatial_conformance_path(
                 channels,
                 sample_rate,
@@ -446,7 +451,7 @@ fn run_dsp_internal(
             )?;
             return Ok((blob, None, path, model));
         }
-        lineos_types::AudioPayload::Stems {
+        Some(lineos_types::AudioPayload::Stems {
             voice,
             drums,
             bass,
@@ -454,7 +459,7 @@ fn run_dsp_internal(
             ambience,
             sample_rate,
             num_frames,
-        } => {
+        }) => {
             use sp314_dsp::analysis::StemFeatureAnalyzer;
             use sp314_dsp::spatial::channel_assign::StemChannelAssignments;
             use sp314_dsp::spatial::five_dot_one::{FiveDotOneStage, SpatialFirewall};

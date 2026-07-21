@@ -7,7 +7,7 @@ use sha2::Digest;
 
 /// Output of decode_node — everything downstream needs.
 pub struct DecodedAudio {
-    pub payload: lineos_types::AudioPayload,
+    pub payload: Option<lineos_types::AudioPayload>,
     pub input_blake3_hex: String,
     pub input_sha256_hex: String,
     pub pcm_channels: u16,    // Needed for Phase 9 Telemetry
@@ -65,9 +65,6 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         )
         .map_err(|e| format!("Decode error: {e}"))?;
 
-        let mut left = Vec::new();
-        let mut right = Vec::new();
-
         let mut streaming_beat: Option<crate::dsp::beat_detector::StreamingBeatDetector> =
             if !crate::domain::content_type::ContentType::from_preset(preset_id).skip_stems() {
                 Some(crate::dsp::beat_detector::StreamingBeatDetector::new(
@@ -121,8 +118,6 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 original_sum_sq += l * l + r * r;
                 left_sum_sq += l * l;
                 right_sum_sq += r * r;
-                left.push(l);
-                right.push(r);
                 if let Some(mono) = mono_chunk.as_mut() {
                     mono.push((l + r) * 0.5);
                 }
@@ -135,7 +130,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
         eprintln!(
             "[RAW-SAVE] wrote raw PCM {} bytes to {}",
-            left.len() * 2 * 4,
+            total_frames * 2 * 4,
             raw_path
         );
 
@@ -144,23 +139,14 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         // Use tier2_verdict's message verbatim. Nothing downstream string-matches it.
         stream.tier2_verdict()?;
 
-        debug_assert_eq!(
-            total_frames,
-            left.len(),
-            "total_frames MUST equal left.len() exactly"
-        );
-
         let duration_ms =
-            (left.len() as f64 / crate::dsp::standardized_stream::TARGET_SR as f64) * 1000.0;
+            (total_frames as f64 / crate::dsp::standardized_stream::TARGET_SR as f64) * 1000.0;
         let beat_data = streaming_beat.map(|d| d.finish());
 
         return Ok(DecodedAudio {
-            payload: lineos_types::AudioPayload::Stereo(lineos_types::StereoBuffer {
-                num_frames: left.len(),
-                left,
-                right,
-                sample_rate: crate::dsp::standardized_stream::TARGET_SR,
-            }),
+            // A3 1.2b: Stereo streaming path materializes no payload —
+            // audio lives in the raw dump (/tmp/m0d-raw-{blob_id}.pcm).
+            payload: None,
             input_blake3_hex,
             input_sha256_hex,
             pcm_channels: 2,
@@ -255,11 +241,11 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             }
 
             Ok(DecodedAudio {
-                payload: lineos_types::AudioPayload::FiveDotOne {
+                payload: Some(lineos_types::AudioPayload::FiveDotOne {
                     channels,
                     sample_rate,
                     num_frames,
-                },
+                }),
                 input_blake3_hex,
                 input_sha256_hex,
                 pcm_channels: pcm_channels_for_telemetry,
@@ -342,7 +328,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 ));
             }
             Ok(DecodedAudio {
-                payload: lineos_types::AudioPayload::Stems {
+                payload: Some(lineos_types::AudioPayload::Stems {
                     voice,
                     drums,
                     bass,
@@ -350,7 +336,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                     ambience,
                     sample_rate,
                     num_frames,
-                },
+                }),
                 input_blake3_hex,
                 input_sha256_hex,
                 pcm_channels: 10,
@@ -374,6 +360,19 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read_dump(blob_id: &str) -> (Vec<f32>, Vec<f32>) {
+        let path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let bytes = std::fs::read(&path).expect("raw dump must exist");
+        assert_eq!(bytes.len() % 8, 0, "dump must be whole frames");
+        let mut l = Vec::with_capacity(bytes.len() / 8);
+        let mut r = Vec::with_capacity(bytes.len() / 8);
+        for f in bytes.chunks_exact(8) {
+            l.push(f32::from_le_bytes([f[0], f[1], f[2], f[3]]));
+            r.push(f32::from_le_bytes([f[4], f[5], f[6], f[7]]));
+        }
+        (l, r)
+    }
 
     #[test]
     fn streaming_hash_matches_batch_hash() {
@@ -486,34 +485,32 @@ mod tests {
             );
             assert_eq!(new_result.duration_ms, old_duration_ms, "duration mismatch");
 
-            if let lineos_types::AudioPayload::Stereo(new_buf) = new_result.payload {
+            let (dump_left, dump_right) = read_dump(blob_id);
+            assert_eq!(
+                dump_left.len(),
+                buf.left.len(),
+                "left channel len mismatch"
+            );
+            assert_eq!(
+                dump_right.len(),
+                buf.right.len(),
+                "right channel len mismatch"
+            );
+            for i in 0..buf.left.len() {
                 assert_eq!(
-                    new_buf.left.len(),
-                    buf.left.len(),
-                    "left channel len mismatch"
+                    dump_left[i].to_bits(),
+                    buf.left[i].to_bits(),
+                    "left channel samples mismatch at {i}"
                 );
                 assert_eq!(
-                    new_buf.right.len(),
-                    buf.right.len(),
-                    "right channel len mismatch"
+                    dump_right[i].to_bits(),
+                    buf.right[i].to_bits(),
+                    "right channel samples mismatch at {i}"
                 );
-                for i in 0..buf.left.len() {
-                    assert_eq!(
-                        new_buf.left[i].to_bits(),
-                        buf.left[i].to_bits(),
-                        "left channel samples mismatch at {i}"
-                    );
-                    assert_eq!(
-                        new_buf.right[i].to_bits(),
-                        buf.right[i].to_bits(),
-                        "right channel samples mismatch at {i}"
-                    );
-                }
-            } else {
-                panic!("Expected Stereo payload");
             }
 
             let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(format!("/tmp/m0d-raw-{}.pcm", blob_id));
         }
     }
 
@@ -596,21 +593,16 @@ mod tests {
         w.finalize().unwrap();
 
         let audio = run(path, "test", "blob").unwrap();
-        let payload = match audio.payload {
-            lineos_types::AudioPayload::Stereo(s) => s,
-            _ => panic!("Expected Stereo"),
-        };
+        let (dump_left, dump_right) = read_dump("blob");
 
-        let original_left = &payload.left;
-        let original_right = &payload.right;
-        let old_sum_sq = original_left
+        let old_sum_sq = dump_left
             .iter()
-            .zip(original_right.iter())
+            .zip(dump_right.iter())
             .map(|(l, r)| l * l + r * r)
             .sum::<f32>();
 
-        let old_rms = libm::sqrtf(old_sum_sq / (original_left.len() * 2) as f32);
-        let new_rms = libm::sqrtf(audio.original_sum_sq / (original_left.len() * 2) as f32);
+        let old_rms = libm::sqrtf(old_sum_sq / (dump_left.len() * 2) as f32);
+        let new_rms = libm::sqrtf(audio.original_sum_sq / (dump_left.len() * 2) as f32);
 
         assert_eq!(
             old_rms.to_bits(),
@@ -621,6 +613,7 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file("/tmp/m0d-raw-blob.pcm");
     }
 
     #[test]
@@ -644,22 +637,19 @@ mod tests {
         w.finalize().unwrap();
 
         let audio = run(path, "test", blob_id).unwrap();
-        let payload = match audio.payload {
-            lineos_types::AudioPayload::Stereo(s) => s,
-            _ => panic!("Expected Stereo"),
-        };
+        let (dump_left, dump_right) = read_dump(blob_id);
 
         assert_eq!(
             audio.total_frames,
-            payload.left.len(),
+            dump_left.len(),
             "total_frames must exactly match left.len()"
         );
 
         let mut expected_left_sum_sq = 0.0_f32;
         let mut expected_right_sum_sq = 0.0_f32;
-        for i in 0..payload.left.len() {
-            let l = payload.left[i];
-            let r = payload.right[i];
+        for i in 0..dump_left.len() {
+            let l = dump_left[i];
+            let r = dump_right[i];
             expected_left_sum_sq += l * l;
             expected_right_sum_sq += r * r;
         }
