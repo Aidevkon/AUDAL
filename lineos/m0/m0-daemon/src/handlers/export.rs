@@ -257,25 +257,54 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         ));
     }
 
-    let raw_bytes =
-        std::fs::read(&blob.audio_path).map_err(|e| format!("Failed to read blob PCM: {e}"))?;
-    let samples = pcm_bytes_to_f32(&raw_bytes);
-
-    // De-interleave: L R C LFE Ls Rs
-    let num_frames = samples.len() / 6;
-    let mut channels: [Vec<f32>; 6] = std::array::from_fn(|_| Vec::with_capacity(num_frames));
-    for frame in 0..num_frames {
-        for ch in 0..6 {
-            channels[ch].push(samples[frame * 6 + ch]);
-        }
+    let meta =
+        std::fs::metadata(&blob.audio_path).map_err(|e| format!("Failed to stat blob PCM: {e}"))?;
+    let len_bytes = meta.len();
+    if len_bytes % (6 * 4) != 0 {
+        return Err("corrupt raw file: byte length not a multiple of 6ch f32 frames".into());
     }
+    let num_frames = (len_bytes / 24) as usize;
 
-    sp314_dsp::io::wav_writer::write_adm_bwf(
+    use sp314_dsp::io::wav_writer::{AdmBwfStreamWriter, AdmContainerFormat};
+    use std::io::Read;
+
+    // Riff32 for now (Bw64 pending consumer validation — P39)
+    let mut writer = AdmBwfStreamWriter::create(
         &path.to_string_lossy(),
-        &channels,
         blob.sample_rate,
         num_frames,
-    )
+        AdmContainerFormat::Riff32,
+    )?;
+
+    let file = std::fs::File::open(&blob.audio_path)
+        .map_err(|e| format!("Failed to open blob PCM: {e}"))?;
+    let mut reader = std::io::BufReader::new(file);
+
+    let bytes_per_chunk = 65536 * 24;
+    let mut chunk_bytes = vec![0u8; bytes_per_chunk];
+
+    loop {
+        let mut read_len = 0;
+        while read_len < chunk_bytes.len() {
+            let n = reader
+                .read(&mut chunk_bytes[read_len..])
+                .map_err(|e| format!("Read error: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            read_len += n;
+        }
+        if read_len == 0 {
+            break;
+        }
+        if read_len % 24 != 0 {
+            return Err("corrupt read: partial frame".to_string());
+        }
+        let chunk_f32 = pcm_bytes_to_f32(&chunk_bytes[..read_len]);
+        writer.write_interleaved_f32(&chunk_f32)?;
+    }
+
+    writer.finish()
 }
 
 /// Opus: stub — requires libopus-dev system library (Phase 11).
