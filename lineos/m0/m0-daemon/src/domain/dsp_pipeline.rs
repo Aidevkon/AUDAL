@@ -121,21 +121,9 @@ fn spatial_conformance_path(
         }
     }
 
-    // 4. Interleave 6ch και γράψε raw PCM dump
-    let mut interleaved = Vec::with_capacity(num_frames * 6);
-    // allow: 6ch interleave, column access across planar buffers
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..num_frames {
-        for ch in 0..6 {
-            interleaved.push(channels[ch][i]);
-        }
-    }
+    // 4. Interleave 6ch και γράψε raw PCM dump (chunked)
     let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-    let raw_bytes: &[u8] = unsafe {
-        std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
-    };
-    std::fs::write(&raw_path, raw_bytes)
-        .map_err(|e| format!("spatial: failed to write PCM dump: {e}"))?;
+    write_interleaved_dump(&channels, num_frames, &raw_path)?;
 
     // 5. Φτιάξε StoredBlob
     let blob = crate::blob_store::StoredBlob {
@@ -156,6 +144,49 @@ fn spatial_conformance_path(
     };
 
     Ok((blob, std::path::PathBuf::from(raw_path), None))
+}
+
+/// Extracted helper: incrementally interleaves and writes 6-channel planar
+/// data to disk using a bounded 65536-frame chunk buffer, avoiding a full-file
+/// allocation.
+fn write_interleaved_dump(
+    channels: &[Vec<f32>; 6],
+    num_frames: usize,
+    raw_path: &str,
+) -> Result<(), String> {
+    use std::io::Write;
+
+    let file = std::fs::File::create(raw_path)
+        .map_err(|e| format!("spatial: failed to create PCM dump: {e}"))?;
+    let mut writer = std::io::BufWriter::new(file);
+
+    const INTERLEAVE_CHUNK_FRAMES: usize = 65536;
+    let mut chunk: Vec<f32> = Vec::with_capacity(INTERLEAVE_CHUNK_FRAMES * 6);
+    let mut frame = 0;
+
+    while frame < num_frames {
+        let end = (frame + INTERLEAVE_CHUNK_FRAMES).min(num_frames);
+        chunk.clear();
+        // allow: 6ch interleave, column access across planar buffers
+        #[allow(clippy::needless_range_loop)]
+        for i in frame..end {
+            for ch in 0..6 {
+                chunk.push(channels[ch][i]);
+            }
+        }
+        let chunk_bytes: &[u8] =
+            unsafe { std::slice::from_raw_parts(chunk.as_ptr() as *const u8, chunk.len() * 4) };
+        writer
+            .write_all(chunk_bytes)
+            .map_err(|e| format!("spatial: failed to write PCM dump: {e}"))?;
+        frame = end;
+    }
+
+    writer
+        .flush()
+        .map_err(|e| format!("spatial: failed to flush PCM dump: {e}"))?;
+
+    Ok(())
 }
 
 #[inline(always)]
@@ -1205,5 +1236,44 @@ mod tests {
         let clamped_high: f32 = (5.0_f32).clamp(-40.0, 0.0);
         assert_eq!(clamped_low, -40.0);
         assert_eq!(clamped_high, 0.0);
+    }
+
+    #[test]
+    fn test_spatial_interleave_chunked_matches_batch() {
+        // Using 200_000 frames deliberately to cross the 65536 boundary
+        // ending with a partial tail (200000 % 65536 != 0)
+        let raw_path = "/tmp/test_m0d_raw_chunked.pcm";
+        let num_frames = 200_000;
+        let channels: [Vec<f32>; 6] = std::array::from_fn(|ch| {
+            (0..num_frames)
+                .map(|i| (i as f32 * 0.01 * (ch as f32 + 1.0)).sin() * 0.5)
+                .collect()
+        });
+
+        // Run chunked writer
+        super::write_interleaved_dump(&channels, num_frames, raw_path).unwrap();
+
+        // Build oracle (old batch style)
+        let mut interleaved = Vec::with_capacity(num_frames * 6);
+        // allow: oracle deliberately replicates the OLD batch
+        // interleave verbatim — index form is the point.
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..num_frames {
+            for ch in 0..6 {
+                interleaved.push(channels[ch][i]);
+            }
+        }
+        let raw_bytes_oracle: &[u8] = unsafe {
+            std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
+        };
+
+        let chunked_bytes = std::fs::read(raw_path).unwrap();
+        assert_eq!(
+            chunked_bytes.as_slice(),
+            raw_bytes_oracle,
+            "chunked dump must exactly match batch oracle"
+        );
+
+        let _ = std::fs::remove_file(raw_path);
     }
 }
