@@ -525,11 +525,15 @@ fn run_dsp_internal(
         }
     };
 
+    // [BISECT-1-DECODE] Values are bit-equivalent to rms(&chunk.left) iff
+    // rms() is sqrt(sum/len) over the same sequential order, which it is.
+    let left_rms = (decoded.left_sum_sq / decoded.total_frames.max(1) as f32).sqrt();
+    let right_rms = (decoded.right_sum_sq / decoded.total_frames.max(1) as f32).sqrt();
     eprintln!(
         "[BISECT-1-DECODE] L_rms={:.6} R_rms={:.6} ratio={:.4}",
-        rms(&chunk.left),
-        rms(&chunk.right),
-        rms(&chunk.right) / rms(&chunk.left).max(1e-9)
+        left_rms,
+        right_rms,
+        right_rms / left_rms.max(1e-9)
     );
 
     profiler.mark_stage_with_hash("Ingest", input_blake3_hex.clone());
@@ -559,23 +563,20 @@ fn run_dsp_internal(
     // the full upstream decode entirely for
     // large files.
     let scout_frames = (chunk.sample_rate as usize) * 30;
-    let total_frames = chunk.left.len();
+    let total_frames = decoded.total_frames;
 
     let lazy_scout =
         crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0);
 
+    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
     let (scout_left_owned, scout_right_owned): (Vec<f32>, Vec<f32>) =
         if let Some((l, r, _sr)) = lazy_scout {
             (l, r)
         } else if total_frames > scout_frames {
-            let start = (total_frames - scout_frames) / 2;
-            let end = start + scout_frames;
-            (
-                chunk.left[start..end].to_vec(),
-                chunk.right[start..end].to_vec(),
-            )
+            let start_frame = (total_frames - scout_frames) / 2;
+            read_scout_from_raw_dump(std::path::Path::new(&raw_path), start_frame, scout_frames)?
         } else {
-            (chunk.left.clone(), chunk.right.clone())
+            read_scout_from_raw_dump(std::path::Path::new(&raw_path), 0, scout_frames)?
         };
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
@@ -639,7 +640,7 @@ fn run_dsp_internal(
 
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)
-    let n_total = chunk.left.len();
+    let n_total = decoded.total_frames;
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
     let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
@@ -961,9 +962,111 @@ pub fn rms_to_lufs(rms: f32) -> f32 {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+fn read_scout_from_raw_dump(
+    raw_path: &std::path::Path,
+    start_frame: usize,
+    scout_frames: usize,
+) -> Result<(Vec<f32>, Vec<f32>), String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(raw_path).map_err(|e| {
+        format!(
+            "scout fallback: failed to open {}: {}",
+            raw_path.display(),
+            e
+        )
+    })?;
+
+    let file_len = file
+        .metadata()
+        .map_err(|e| format!("scout fallback metadata error: {}", e))?
+        .len();
+    let frame_bytes: u64 = 8; // 2 channels * 4 bytes
+
+    if file_len % frame_bytes != 0 {
+        return Err(format!(
+            "scout fallback: raw dump has partial frame — truncated/corrupt dump (len={})",
+            file_len
+        ));
+    }
+
+    let start_byte = (start_frame as u64) * frame_bytes;
+    if start_byte >= file_len {
+        return Err(format!(
+            "scout fallback: start_frame {} is beyond EOF",
+            start_frame
+        ));
+    }
+
+    file.seek(SeekFrom::Start(start_byte))
+        .map_err(|e| format!("scout fallback seek error: {}", e))?;
+
+    let max_read_bytes = file_len - start_byte;
+    let requested_bytes = (scout_frames as u64) * frame_bytes;
+    let bytes_to_read =
+        ((std::cmp::min(max_read_bytes, requested_bytes) / frame_bytes) * frame_bytes) as usize;
+    let actual_frames = bytes_to_read / 8; // (usize)
+
+    let mut raw_buf = vec![0u8; bytes_to_read];
+    file.read_exact(&mut raw_buf)
+        .map_err(|e| format!("scout fallback read error: {}", e))?;
+
+    let mut l = Vec::with_capacity(actual_frames);
+    let mut r = Vec::with_capacity(actual_frames);
+
+    for chunk in raw_buf.chunks_exact(8) {
+        let left_val = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let right_val = f32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);
+        l.push(left_val);
+        r.push(right_val);
+    }
+
+    Ok((l, r))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_read_scout_from_raw_dump() {
+        use std::io::Write;
+        let path = "/tmp/test_raw_scout_dump.pcm";
+        let mut f = std::fs::File::create(path).unwrap();
+        // 10 frames total (20 floats)
+        for i in 0..10 {
+            f.write_all(&(i as f32).to_le_bytes()).unwrap(); // L
+            f.write_all(&(-(i as f32)).to_le_bytes()).unwrap(); // R
+        }
+        f.flush().unwrap();
+
+        // Mid-window read (start=2, frames=3)
+        let (l, r) = read_scout_from_raw_dump(std::path::Path::new(path), 2, 3).unwrap();
+        assert_eq!(l, vec![2.0, 3.0, 4.0]);
+        assert_eq!(r, vec![-2.0, -3.0, -4.0]);
+
+        // Short/EOF read (start=8, frames=5, but only 2 frames left)
+        let (l2, r2) = read_scout_from_raw_dump(std::path::Path::new(path), 8, 5).unwrap();
+        assert_eq!(l2, vec![8.0, 9.0]);
+        assert_eq!(r2, vec![-8.0, -9.0]);
+
+        let _ = std::fs::remove_file(path);
+
+        // Truncated dump (10 full frames + 4 orphan bytes)
+        let path_trunc = "/tmp/test_raw_scout_trunc.pcm";
+        let mut f2 = std::fs::File::create(path_trunc).unwrap();
+        for i in 0..10 {
+            f2.write_all(&(i as f32).to_le_bytes()).unwrap(); // L
+            f2.write_all(&(-(i as f32)).to_le_bytes()).unwrap(); // R
+        }
+        f2.write_all(&11.0_f32.to_le_bytes()).unwrap(); // 4 orphan bytes
+        f2.flush().unwrap();
+
+        let trunc_res = read_scout_from_raw_dump(std::path::Path::new(path_trunc), 0, 5);
+        assert!(trunc_res.is_err());
+        assert!(trunc_res.unwrap_err().contains("partial frame"));
+
+        let _ = std::fs::remove_file(path_trunc);
+    }
 
     #[test]
     fn test_sha256_bytes_deterministic() {
