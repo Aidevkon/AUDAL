@@ -99,8 +99,6 @@ pub fn build_intent_and_config(
 #[allow(clippy::ptr_arg)]
 #[allow(clippy::too_many_arguments)]
 pub fn run(
-    chunk_left: &mut Vec<f32>,
-    chunk_right: &mut Vec<f32>,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
     scout_left: &[f32],
@@ -123,13 +121,10 @@ pub fn run(
         pre_analysis.integrated_lufs,
         target_lufs.unwrap_or(-14.0),
     );
-    let gain_linear = libm::powf(10.0_f32, autotune_result.pre_gain_db / 20.0_f32);
-    for s in chunk_left.iter_mut() {
-        *s *= gain_linear;
-    }
-    for s in chunk_right.iter_mut() {
-        *s *= gain_linear;
-    }
+    let _gain_linear = libm::powf(10.0_f32, autotune_result.pre_gain_db / 20.0_f32);
+    // F-042: pre_gain is computed but currently NOT applied on the
+    // Music path (dead-buffer application removed here); fix tracked
+    // as its own step — see register F-042.
 
     // Build intent + aether config via the
     // shared helper (also used by the Episode

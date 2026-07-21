@@ -426,13 +426,18 @@ fn run_dsp_internal(
     let _pcm_channels_for_telemetry = decoded.pcm_channels;
     let _pcm_sr_for_telemetry = decoded.pcm_sample_rate;
     let beat_data_opt = decoded.beat_data;
-    let mut chunk = match decoded.payload {
-        lineos_types::AudioPayload::Stereo(buf) => buf,
-        lineos_types::AudioPayload::FiveDotOne {
+    match decoded.payload {
+        // A3 1.2b: Stereo streaming path carries no payload; audio
+        // lives in the raw dump.
+        None => {}
+        Some(lineos_types::AudioPayload::Stereo(_)) => {
+            unreachable!("Stereo payload is never materialized on the streaming path (A3 1.2b)")
+        }
+        Some(lineos_types::AudioPayload::FiveDotOne {
             channels,
             sample_rate,
             num_frames,
-        } => {
+        }) => {
             let (blob, path, model) = spatial_conformance_path(
                 channels,
                 sample_rate,
@@ -446,7 +451,7 @@ fn run_dsp_internal(
             )?;
             return Ok((blob, None, path, model));
         }
-        lineos_types::AudioPayload::Stems {
+        Some(lineos_types::AudioPayload::Stems {
             voice,
             drums,
             bass,
@@ -454,7 +459,7 @@ fn run_dsp_internal(
             ambience,
             sample_rate,
             num_frames,
-        } => {
+        }) => {
             use sp314_dsp::analysis::StemFeatureAnalyzer;
             use sp314_dsp::spatial::channel_assign::StemChannelAssignments;
             use sp314_dsp::spatial::five_dot_one::{FiveDotOneStage, SpatialFirewall};
@@ -525,11 +530,15 @@ fn run_dsp_internal(
         }
     };
 
+    // [BISECT-1-DECODE] Values are bit-equivalent to rms(&chunk.left) iff
+    // rms() is sqrt(sum/len) over the same sequential order, which it is.
+    let left_rms = (decoded.left_sum_sq / decoded.total_frames.max(1) as f32).sqrt();
+    let right_rms = (decoded.right_sum_sq / decoded.total_frames.max(1) as f32).sqrt();
     eprintln!(
         "[BISECT-1-DECODE] L_rms={:.6} R_rms={:.6} ratio={:.4}",
-        rms(&chunk.left),
-        rms(&chunk.right),
-        rms(&chunk.right) / rms(&chunk.left).max(1e-9)
+        left_rms,
+        right_rms,
+        right_rms / left_rms.max(1e-9)
     );
 
     profiler.mark_stage_with_hash("Ingest", input_blake3_hex.clone());
@@ -558,30 +567,27 @@ fn run_dsp_internal(
     // (streaming render), which will remove
     // the full upstream decode entirely for
     // large files.
-    let scout_frames = (chunk.sample_rate as usize) * 30;
-    let total_frames = chunk.left.len();
+    let scout_frames = (decoded.pcm_sample_rate as usize) * 30;
+    let total_frames = decoded.total_frames;
 
     let lazy_scout =
         crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0);
 
+    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
     let (scout_left_owned, scout_right_owned): (Vec<f32>, Vec<f32>) =
         if let Some((l, r, _sr)) = lazy_scout {
             (l, r)
         } else if total_frames > scout_frames {
-            let start = (total_frames - scout_frames) / 2;
-            let end = start + scout_frames;
-            (
-                chunk.left[start..end].to_vec(),
-                chunk.right[start..end].to_vec(),
-            )
+            let start_frame = (total_frames - scout_frames) / 2;
+            read_scout_from_raw_dump(std::path::Path::new(&raw_path), start_frame, scout_frames)?
         } else {
-            (chunk.left.clone(), chunk.right.clone())
+            read_scout_from_raw_dump(std::path::Path::new(&raw_path), 0, scout_frames)?
         };
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
 
     use sp314_dsp::analysis::PreAnalyzer;
-    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, chunk.sample_rate);
+    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, decoded.pcm_sample_rate);
     // Episode/spoken-word: skip beat
     // detection entirely. BPM and beat
     // grids are meaningless for voice
@@ -610,7 +616,7 @@ fn run_dsp_internal(
     let scout_out = crate::domain::nodes::scout_node::run(
         scout_left,
         scout_right,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
         &pre_analysis,
@@ -639,7 +645,7 @@ fn run_dsp_internal(
 
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)
-    let n_total = chunk.left.len();
+    let n_total = decoded.total_frames;
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
     let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
@@ -728,7 +734,7 @@ fn run_dsp_internal(
                 std::path::Path::new(&raw_path),
             )
             .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
-            Some(sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240))
+            sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240)
         } else {
             // A missing file here means decode_node.rs's Stereo path failed to write it,
             // or the OS purged it. Silently falling back to slice logic would trigger an O(N)
@@ -747,13 +753,11 @@ fn run_dsp_internal(
                 ducking_gain: final_ducking,
                 mix_levels: req.mix_levels.as_ref(),
                 flavour_id: req.flavour_id.as_deref(),
-                sample_rate: chunk.sample_rate,
+                sample_rate: decoded.pcm_sample_rate,
             },
             crate::domain::nodes::render_node::RenderInputs {
-                mono: &mono,
-                original_left: &chunk.left,
-                original_right: &chunk.right,
                 original_sum_sq: decoded.original_sum_sq,
+                total_frames: decoded.total_frames,
                 stream_source,
             },
             &mut left_vec[..],
@@ -767,7 +771,7 @@ fn run_dsp_internal(
         // Τρέξε conformance + export
         let spatial_blob = spatial_conformance_path(
             spatial_channels,
-            chunk.sample_rate,
+            decoded.pcm_sample_rate,
             n_total_with_tail,
             &format!("{blob_id}-spatial"),
             preset_id,
@@ -809,17 +813,15 @@ fn run_dsp_internal(
 
     // chunk.left  = left_slice;
     // chunk.right = right_slice;
-    profiler.mark_stage("Spatial", &chunk.left);
+    profiler.mark_stage("Spatial", &left_vec[..]); // fixes stale hash of pre-render audio (F-041)
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
     emit_progress("Mastering");
     let dsp_out = crate::domain::nodes::dsp_node::run(
-        &mut chunk.left,
-        &mut chunk.right,
         &mut left_vec[..],
         &mut right_vec[..],
         scout_left,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         preset_id,
         target_lufs,
         req.flavour_id.as_deref().unwrap_or("warm"),
@@ -873,11 +875,11 @@ fn run_dsp_internal(
         &right_vec[..],
         file_path,
         &input_hash_hex,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         2,
         0, // duration_ms proxy
         target_lufs,
-        chunk.sample_rate,
+        decoded.pcm_sample_rate,
         elapsed,
         seed,
         preset_id,
@@ -961,9 +963,111 @@ pub fn rms_to_lufs(rms: f32) -> f32 {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+fn read_scout_from_raw_dump(
+    raw_path: &std::path::Path,
+    start_frame: usize,
+    scout_frames: usize,
+) -> Result<(Vec<f32>, Vec<f32>), String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(raw_path).map_err(|e| {
+        format!(
+            "scout fallback: failed to open {}: {}",
+            raw_path.display(),
+            e
+        )
+    })?;
+
+    let file_len = file
+        .metadata()
+        .map_err(|e| format!("scout fallback metadata error: {}", e))?
+        .len();
+    let frame_bytes: u64 = 8; // 2 channels * 4 bytes
+
+    if file_len % frame_bytes != 0 {
+        return Err(format!(
+            "scout fallback: raw dump has partial frame — truncated/corrupt dump (len={})",
+            file_len
+        ));
+    }
+
+    let start_byte = (start_frame as u64) * frame_bytes;
+    if start_byte >= file_len {
+        return Err(format!(
+            "scout fallback: start_frame {} is beyond EOF",
+            start_frame
+        ));
+    }
+
+    file.seek(SeekFrom::Start(start_byte))
+        .map_err(|e| format!("scout fallback seek error: {}", e))?;
+
+    let max_read_bytes = file_len - start_byte;
+    let requested_bytes = (scout_frames as u64) * frame_bytes;
+    let bytes_to_read =
+        ((std::cmp::min(max_read_bytes, requested_bytes) / frame_bytes) * frame_bytes) as usize;
+    let actual_frames = bytes_to_read / 8; // (usize)
+
+    let mut raw_buf = vec![0u8; bytes_to_read];
+    file.read_exact(&mut raw_buf)
+        .map_err(|e| format!("scout fallback read error: {}", e))?;
+
+    let mut l = Vec::with_capacity(actual_frames);
+    let mut r = Vec::with_capacity(actual_frames);
+
+    for chunk in raw_buf.chunks_exact(8) {
+        let left_val = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let right_val = f32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);
+        l.push(left_val);
+        r.push(right_val);
+    }
+
+    Ok((l, r))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_read_scout_from_raw_dump() {
+        use std::io::Write;
+        let path = "/tmp/test_raw_scout_dump.pcm";
+        let mut f = std::fs::File::create(path).unwrap();
+        // 10 frames total (20 floats)
+        for i in 0..10 {
+            f.write_all(&(i as f32).to_le_bytes()).unwrap(); // L
+            f.write_all(&(-(i as f32)).to_le_bytes()).unwrap(); // R
+        }
+        f.flush().unwrap();
+
+        // Mid-window read (start=2, frames=3)
+        let (l, r) = read_scout_from_raw_dump(std::path::Path::new(path), 2, 3).unwrap();
+        assert_eq!(l, vec![2.0, 3.0, 4.0]);
+        assert_eq!(r, vec![-2.0, -3.0, -4.0]);
+
+        // Short/EOF read (start=8, frames=5, but only 2 frames left)
+        let (l2, r2) = read_scout_from_raw_dump(std::path::Path::new(path), 8, 5).unwrap();
+        assert_eq!(l2, vec![8.0, 9.0]);
+        assert_eq!(r2, vec![-8.0, -9.0]);
+
+        let _ = std::fs::remove_file(path);
+
+        // Truncated dump (10 full frames + 4 orphan bytes)
+        let path_trunc = "/tmp/test_raw_scout_trunc.pcm";
+        let mut f2 = std::fs::File::create(path_trunc).unwrap();
+        for i in 0..10 {
+            f2.write_all(&(i as f32).to_le_bytes()).unwrap(); // L
+            f2.write_all(&(-(i as f32)).to_le_bytes()).unwrap(); // R
+        }
+        f2.write_all(&11.0_f32.to_le_bytes()).unwrap(); // 4 orphan bytes
+        f2.flush().unwrap();
+
+        let trunc_res = read_scout_from_raw_dump(std::path::Path::new(path_trunc), 0, 5);
+        assert!(trunc_res.is_err());
+        assert!(trunc_res.unwrap_err().contains("partial frame"));
+
+        let _ = std::fs::remove_file(path_trunc);
+    }
 
     #[test]
     fn test_sha256_bytes_deterministic() {

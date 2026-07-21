@@ -301,10 +301,11 @@ fn full_pipeline_heap_is_scale_invariant() {
 }
 
 #[test]
-#[ignore = "render_node.rs/process_chunks_with_params still requires \
-full-length chunk.left/chunk.right input and left_vec/right_vec output buffers. \
-Heap grows 33.55MB when duration doubles (+60s). \
-Remove #[ignore] when A3 (Sliding Window Streaming) lands, it should then pass."]
+#[ignore = "Input side is streaming since A3 Step 1 (66c176b): heap diff fell \
+33.55MB -> 22.61MB (+60s), matching the output side's own cost \
+(left_vec/right_vec = 23.04MB/min). Remaining O(N): the full-length \
+output buffers and the post-render dsp_node/certificate passes over \
+them. Remove #[ignore] when A3 Steps 3-4 (streaming output) land."]
 fn music_pipeline_heap_is_scale_invariant() {
     let sr = 48_000;
 
