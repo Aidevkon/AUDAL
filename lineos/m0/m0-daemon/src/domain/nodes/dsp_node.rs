@@ -96,12 +96,21 @@ pub fn build_intent_and_config(
     })
 }
 
+// F-044 tourniquet: proxy stems replace scout_left x5 on the
+// Music batch path. Temporary bridge — this data still comes
+// from the 30s scout proxy, not the full file. Retired when
+// Cycle 5's Y-trunk measures stems on the complete raw signal
+// (same lifecycle as F-042's pre_gain trade-off).
 #[allow(clippy::ptr_arg)]
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     left_slice: &mut [f32],
     right_slice: &mut [f32],
-    scout_left: &[f32],
+    proxy_voice: &[f32],
+    proxy_drums: &[f32],
+    proxy_bass: &[f32],
+    proxy_harmonics: &[f32],
+    proxy_ambience: &[f32],
     sample_rate: u32,
     preset_id: &str,
     target_lufs: Option<f32>,
@@ -157,10 +166,14 @@ pub fn run(
 
     let corpus_out = crate::domain::nodes::corpus_node::run(
         streaming_features,
-        scout_left,
+        proxy_voice,
+        proxy_drums,
+        proxy_bass,
+        proxy_harmonics,
+        proxy_ambience,
         &pre_analysis,
         blob_id,
-        sample_rate,
+        sample_rate / sp314_dsp::stft::two_pass::SCOUT_DOWNSAMPLE as u32,
         flavour_id,
         user_model,
     );

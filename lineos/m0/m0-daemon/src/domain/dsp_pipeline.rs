@@ -320,10 +320,14 @@ fn run_dsp_internal(
             .unwrap_or_else(|| lineos_corpus::store::UserMarkovModel::new(proj_id));
         let _corpus_out = crate::domain::nodes::corpus_node::run(
             &streaming_features,
-            &scout_left,
+            &scout_out.scout.proxy_voice,
+            &scout_out.scout.proxy_drums,
+            &scout_out.scout.proxy_bass,
+            &scout_out.scout.proxy_harmonics,
+            &scout_out.scout.proxy_ambience,
             &pre_analysis,
             &blob_id,
-            scout_sr,
+            scout_sr / sp314_dsp::stft::two_pass::SCOUT_DOWNSAMPLE as u32,
             flavour,
             user_model,
         );
@@ -881,7 +885,11 @@ fn run_dsp_internal(
     let dsp_out = crate::domain::nodes::dsp_node::run(
         left_post,
         right_post,
-        scout_left,
+        &scout.proxy_voice,
+        &scout.proxy_drums,
+        &scout.proxy_bass,
+        &scout.proxy_harmonics,
+        &scout.proxy_ambience,
         decoded.pcm_sample_rate,
         preset_id,
         target_lufs,
