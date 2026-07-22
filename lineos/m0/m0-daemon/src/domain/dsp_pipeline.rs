@@ -146,6 +146,52 @@ fn spatial_conformance_path(
     Ok((blob, std::path::PathBuf::from(raw_path), None))
 }
 
+// A4-i temporary read-back — A4-ii deletes this when
+// spatial_conformance_path goes two-pass streaming.
+fn read_dump_6ch(blob_id: &str, total_frames: usize) -> Result<[Vec<f32>; 6], String> {
+    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+    let bytes = std::fs::read(&raw_path).map_err(|e| format!("Failed to read raw dump: {e}"))?;
+
+    let expected_len = total_frames * 6 * 4;
+    if bytes.len() != expected_len {
+        return Err(format!(
+            "Raw dump length mismatch: expected {}, got {}",
+            expected_len,
+            bytes.len()
+        ));
+    }
+
+    let mut channels = [
+        Vec::with_capacity(total_frames),
+        Vec::with_capacity(total_frames),
+        Vec::with_capacity(total_frames),
+        Vec::with_capacity(total_frames),
+        Vec::with_capacity(total_frames),
+        Vec::with_capacity(total_frames),
+    ];
+
+    // Read 24 bytes (6 channels * 4 bytes/f32) per frame
+    // to strictly avoid unaligned pointer UB.
+    for frame in bytes.chunks_exact(24) {
+        channels[0].push(f32::from_le_bytes([frame[0], frame[1], frame[2], frame[3]]));
+        channels[1].push(f32::from_le_bytes([frame[4], frame[5], frame[6], frame[7]]));
+        channels[2].push(f32::from_le_bytes([
+            frame[8], frame[9], frame[10], frame[11],
+        ]));
+        channels[3].push(f32::from_le_bytes([
+            frame[12], frame[13], frame[14], frame[15],
+        ]));
+        channels[4].push(f32::from_le_bytes([
+            frame[16], frame[17], frame[18], frame[19],
+        ]));
+        channels[5].push(f32::from_le_bytes([
+            frame[20], frame[21], frame[22], frame[23],
+        ]));
+    }
+
+    Ok(channels)
+}
+
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
 /// data to disk using a bounded 65536-frame chunk buffer, avoiding a full-file
 /// allocation.
@@ -475,7 +521,25 @@ fn run_dsp_internal(
     match decoded.payload {
         // A3 1.2b: Stereo streaming path carries no payload; audio
         // lives in the raw dump.
-        None => {}
+        None => {
+            // 2ch None-payload falls through to the streaming Music flow
+            // below; 6ch takes the spatial route here (A4-i).
+            if decoded.pcm_channels == 6 {
+                let channels = read_dump_6ch(&blob_id, decoded.total_frames)?;
+                let (blob, path, model) = spatial_conformance_path(
+                    channels,
+                    decoded.pcm_sample_rate,
+                    decoded.total_frames,
+                    &blob_id,
+                    preset_id,
+                    &input_hash_hex,
+                    seed,
+                    &input_blake3_hex,
+                    &input_sha256_hex,
+                )?;
+                return Ok((blob, None, path, model));
+            }
+        }
         Some(lineos_types::AudioPayload::Stereo(_)) => {
             unreachable!("Stereo payload is never materialized on the streaming path (A3 1.2b)")
         }
