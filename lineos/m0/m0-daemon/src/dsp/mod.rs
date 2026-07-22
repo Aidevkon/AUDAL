@@ -16,6 +16,7 @@ pub mod orchestrator;
 
 pub mod signal_health;
 
+pub mod six_channel_stream;
 pub mod standardized_decoder;
 pub mod standardized_stream;
 
