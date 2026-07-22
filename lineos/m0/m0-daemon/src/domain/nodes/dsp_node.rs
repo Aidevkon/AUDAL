@@ -159,10 +159,21 @@ pub fn run(
     // Load UserMarkovModel from state dir
     let proj_id = project_id.unwrap_or("default");
     let model_path = format!("{}/user_model_{}.json", state_dir, proj_id);
-    let user_model = std::fs::read_to_string(&model_path)
+    let user_model = match std::fs::read_to_string(&model_path)
         .ok()
         .and_then(|json| lineos_corpus::store::UserMarkovModel::from_json(&json).ok())
-        .unwrap_or_else(|| lineos_corpus::store::UserMarkovModel::new(proj_id));
+    {
+        Some(m) if m.is_stale() => {
+            eprintln!(
+                "[corpus] model reset: schema {} < {} (F-044 stem-separation fix)",
+                m.schema,
+                lineos_corpus::store::CORPUS_SCHEMA
+            );
+            lineos_corpus::store::UserMarkovModel::new(proj_id)
+        }
+        Some(m) => m,
+        None => lineos_corpus::store::UserMarkovModel::new(proj_id),
+    };
 
     let corpus_out = crate::domain::nodes::corpus_node::run(
         streaming_features,

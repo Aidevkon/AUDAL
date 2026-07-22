@@ -49,11 +49,15 @@ impl PresetMarkovModel {
     }
 }
 
+pub const CORPUS_SCHEMA: u32 = 1;
+
 /// Per-user model store.
 /// One PresetMarkovModel per preset_id — isolated per genre.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UserMarkovModel {
     pub user_id: String,
+    #[serde(default)]
+    pub schema: u32,
     pub version: u32,
     pub presets: HashMap<String, PresetMarkovModel>,
     pub updated_at: u64,
@@ -63,10 +67,18 @@ impl UserMarkovModel {
     pub fn new(user_id: &str) -> Self {
         Self {
             user_id: user_id.to_string(),
+            schema: CORPUS_SCHEMA,
             version: 1,
             presets: HashMap::new(),
             updated_at: 0,
         }
+    }
+
+    /// True if this model predates the current corpus schema
+    /// (F-044: pre-stem-separation data) and must be discarded
+    /// rather than merged with new sessions.
+    pub fn is_stale(&self) -> bool {
+        self.schema < CORPUS_SCHEMA
     }
 
     /// Update model for a specific preset_id with new session data.
@@ -343,5 +355,23 @@ mod tests {
         assert!(all.contains_key("techno"));
         assert!(all.contains_key("podcast"));
         assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn test_schema_reset() {
+        // Schema-less JSON simulating a pre-existing file
+        let json = r#"{
+            "user_id": "test",
+            "version": 10,
+            "presets": {},
+            "updated_at": 12345
+        }"#;
+        let restored = UserMarkovModel::from_json(json).expect("deserialize failed");
+        assert!(restored.is_stale());
+        assert_eq!(restored.schema, 0);
+
+        let fresh = UserMarkovModel::new("test");
+        assert!(!fresh.is_stale());
+        assert_eq!(fresh.schema, CORPUS_SCHEMA);
     }
 }
