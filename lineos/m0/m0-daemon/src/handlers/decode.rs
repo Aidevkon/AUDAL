@@ -112,6 +112,9 @@ pub fn decode_smart(path: &str) -> Result<lineos_types::AudioPayload, DecodeErro
 
     match original_ch {
         6 => {
+            // A4-i: production 6ch routing now bypasses this arm
+            // (decode_node streams via StandardizedSixChannelStream);
+            // arm kept test-alive, deletion target at A4 close.
             // De-interleave into 6 discrete channels: [L, R, C, LFE, Ls, Rs]
             let frames = raw.len() / 6;
             let mut channels: [Vec<f32>; 6] = Default::default();

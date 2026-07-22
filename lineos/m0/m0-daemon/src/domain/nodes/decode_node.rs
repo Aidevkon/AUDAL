@@ -58,6 +58,72 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         (reader.channels(), reader.sample_rate())
     };
 
+    if probe_ch == 6 {
+        let mut stream = crate::dsp::six_channel_stream::StandardizedSixChannelStream::open(
+            std::path::Path::new(audio_path),
+        )
+        .map_err(|e| format!("Decode error: {e}"))?;
+
+        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let mut dump_file = std::fs::File::create(&raw_path)
+            .map_err(|e| format!("Failed to write raw dump: {e}"))?;
+
+        let mut buf = vec![0f32; 4096 * 6];
+        let mut left_sum_sq = 0.0_f32;
+        let mut right_sum_sq = 0.0_f32;
+        let mut total_frames: usize = 0;
+        loop {
+            let frames = stream
+                .fill_buffer(&mut buf)
+                .map_err(|e| format!("Decode error: {e}"))?;
+            if frames == 0 {
+                break;
+            }
+            let valid_samples = &buf[..frames * 6];
+
+            let raw_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(
+                    valid_samples.as_ptr() as *const u8,
+                    valid_samples.len() * 4,
+                )
+            };
+            std::io::Write::write_all(&mut dump_file, raw_bytes)
+                .map_err(|e| format!("Failed to write raw dump: {e}"))?;
+
+            total_frames += frames;
+
+            for i in 0..frames {
+                let l = buf[i * 6];
+                let r = buf[i * 6 + 1];
+                left_sum_sq += l * l;
+                right_sum_sq += r * r;
+            }
+        }
+
+        let (input_blake3_hex, input_sha256_hex) = stream.input_hashes();
+        let duration_ms =
+            (total_frames as f64 / crate::dsp::standardized_stream::TARGET_SR as f64) * 1000.0;
+
+        return Ok(DecodedAudio {
+            payload: None,
+            input_blake3_hex,
+            input_sha256_hex,
+            pcm_channels: 6,
+            pcm_sample_rate: crate::dsp::standardized_stream::TARGET_SR,
+            target_lufs,
+            input_hash_hex,
+            seed,
+            original_sr: true_original_sr,
+            original_ch: 6,
+            duration_ms,
+            beat_data: None,
+            original_sum_sq: 0.0,
+            left_sum_sq,
+            right_sum_sq,
+            total_frames,
+        });
+    }
+
     // decode_smart's exact decision logic is: `match original_ch { 6 => FiveDotOne, _ => Stereo }`.
     if probe_ch != 6 {
         let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
@@ -167,6 +233,9 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
 
     let payload = decode::decode_smart(audio_path).map_err(|e| format!("Decode error: {e}"))?;
 
+    // A4-i: unreachable from production (6ch intercepted upstream
+    // via StandardizedSixChannelStream); kept while decode_smart's
+    // 6ch tests live. Deletion target at A4 close.
     match payload {
         lineos_types::AudioPayload::Stereo(_) => {
             unreachable!("Stereo payload handled by streaming path")
