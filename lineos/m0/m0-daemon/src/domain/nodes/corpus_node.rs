@@ -13,9 +13,18 @@ pub struct CorpusOutput {
     pub user_model: UserMarkovModel,
 }
 
+// allow: 11 args — 5 are per-stem &[f32] audio slices (F-044
+// tourniquet), the rest orthogonal (features, analysis, ids,
+// model). Grouping into a struct adds indirection without
+// clarity at this call count; revisit if it grows again.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     streaming_features: &StemFeatures,
-    left_slice: &[f32],
+    voice: &[f32],
+    drums: &[f32],
+    bass: &[f32],
+    harmonics: &[f32],
+    ambience: &[f32],
     pre_analysis: &PreAnalysisData,
     blob_id: &str,
     sample_rate: u32,
@@ -26,11 +35,11 @@ pub fn run(
 
     let corpus_envelope = build_timeline(
         streaming_features,
-        left_slice,
-        left_slice,
-        left_slice,
-        left_slice,
-        left_slice,
+        voice,
+        drums,
+        bass,
+        harmonics,
+        ambience,
         pre_analysis,
         blob_id,
         sample_rate,

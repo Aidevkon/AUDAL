@@ -22,7 +22,7 @@ use lineos_types::StemFeatures;
 pub const CHUNK_FRAMES: usize = 65536;
 
 /// Downsample ratio for Pass 1 Scout proxy (~11kHz mono)
-const SCOUT_DOWNSAMPLE: usize = 4;
+pub const SCOUT_DOWNSAMPLE: usize = 4;
 
 const COLLISION_DRUMS_TRANSIENT_THRESHOLD: f32 = 0.25;
 const COLLISION_BASS_RMS_THRESHOLD_DB: f32 = -40.0;
@@ -110,6 +110,13 @@ pub struct ScoutResult {
     pub stem_mfccs: StemMfccs,
     /// NMF stem features from proxy
     pub features: StemFeatures,
+    /// 30s downsampled mono proxy stems (F-044: corpus per-stem
+    /// learning). Bounded — proxy scale, never full-file.
+    pub proxy_voice: Vec<f32>,
+    pub proxy_drums: Vec<f32>,
+    pub proxy_bass: Vec<f32>,
+    pub proxy_harmonics: Vec<f32>,
+    pub proxy_ambience: Vec<f32>,
 }
 
 /// Streaming error
@@ -566,7 +573,7 @@ impl TwoPassEngine {
 
         // StemFeatures from proxy
         let proxy_fivs = FiveStems {
-            voice: proxy_voice.clone(),
+            voice: proxy_voice,
             drums: proxy_drums,
             bass: proxy_bass,
             harmonics: proxy_harm,
@@ -588,9 +595,9 @@ impl TwoPassEngine {
         let (rear_scale, lfe_scale) = compute_firewall_scales(&proxy_fivs, &assignments);
 
         // Global RMS gain estimate from proxy
-        let proxy_mix_rms = if !proxy_voice.is_empty() {
-            let sq: f32 = proxy_voice.iter().map(|s| s * s).sum();
-            libm::sqrtf(sq / proxy_voice.len() as f32)
+        let proxy_mix_rms = if !proxy_fivs.voice.is_empty() {
+            let sq: f32 = proxy_fivs.voice.iter().map(|s| s * s).sum();
+            libm::sqrtf(sq / proxy_fivs.voice.len() as f32)
         } else {
             1.0
         };
@@ -620,6 +627,11 @@ impl TwoPassEngine {
             spatial_pre,
             stem_mfccs,
             features,
+            proxy_voice: proxy_fivs.voice,
+            proxy_drums: proxy_fivs.drums,
+            proxy_bass: proxy_fivs.bass,
+            proxy_harmonics: proxy_fivs.harmonics,
+            proxy_ambience: proxy_fivs.ambience,
         }
     }
 
