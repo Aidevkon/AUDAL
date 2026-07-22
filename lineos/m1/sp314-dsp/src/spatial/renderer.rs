@@ -28,11 +28,6 @@ impl StereoRenderer {
 pub struct FiveDotOneRenderer;
 
 impl FiveDotOneRenderer {
-    /// Direct 6-channel output
-    pub fn render(stage: FiveDotOneStage) -> [Vec<f32>; 6] {
-        [stage.l, stage.r, stage.c, stage.ls, stage.rs, stage.lfe]
-    }
-
     /// Write 6-channel stage output directly
     /// into pre-allocated mutable slices.
     /// Zero heap allocation — no intermediate Vec.
@@ -129,13 +124,5 @@ mod tests {
         let r1 = StereoRenderer::render(&stage1);
         let r2 = StereoRenderer::render(&stage2);
         assert_eq!(r1, r2);
-    }
-
-    #[test]
-    fn five_dot_one_renderer_has_six_channels() {
-        let stage = mock_stage();
-        let out = FiveDotOneRenderer::render(stage);
-        assert_eq!(out.len(), 6);
-        assert_eq!(out[0].len(), 100);
     }
 }
