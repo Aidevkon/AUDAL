@@ -31,5 +31,13 @@
     "antigravity.agent.context.maxTokens": 128000,
     "antigravity.agent.context.followImports": false,
     "antigravity.agent.context.includeTests": false,
-    "antigravity.agent.context.preferLocalSymbols": true
+    "antigravity.agent.context.preferLocalSymbols": true,
+    "files.watcherExclude": {
+        "**/target/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true
+    },
+    "search.exclude": {
+        "**/target/**": true
+    }
 }
