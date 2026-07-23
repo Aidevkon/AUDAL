@@ -274,12 +274,15 @@ pub async fn run(
                     // as P0's metrics.integrated_lufs — they SHOULD agree;
                     // Y2 reconciles. Autotune keeps using P0's value.
                     eprintln!(
-                        "[TRUNK] lufs={:?} p0_lufs={:?} crest={:.2} lra={:.2} noise_floor={:?}",
+                        "[TRUNK] lufs={:?} p0_lufs={:?} crest={:.2} lra={:.2} \
+                         noise_floor={:?} spectral={:?} td={:.2}",
                         trunk_report.integrated_lufs,
                         input_lufs,
                         trunk_report.crest_db,
                         trunk_report.lra,
                         trunk_report.noise_floor_dbfs,
+                        trunk_report.spectral_profile_db,
+                        trunk_report.transient_density,
                     );
                     profiler.mark_stage_with_hash("Trunk Pass", String::new());
 

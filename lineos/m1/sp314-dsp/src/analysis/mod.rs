@@ -11,7 +11,9 @@ pub mod stereo;
 
 pub use analyzer::StemFeatureAnalyzer;
 pub use features::{MixMetrics, StemFeatures, StemMetrics};
-pub use pre_analysis::{loudness_range_lu, spectral_profile_levels, spectral_slope, PreAnalyzer};
+pub use pre_analysis::{
+    loudness_range_lu, spectral_profile_levels, spectral_slope, Biquad, PreAnalyzer, BAND_EDGES,
+};
 pub mod phantom_master;
 pub use phantom_master::PhantomMaster;
 pub mod ear_fatigue;
