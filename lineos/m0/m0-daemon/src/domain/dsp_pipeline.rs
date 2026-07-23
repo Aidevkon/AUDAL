@@ -57,7 +57,7 @@ pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 // allow: 9 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
 #[allow(clippy::too_many_arguments)]
 fn spatial_conformance_path(
-    mut channels: [Vec<f32>; 6],
+    raw_path: &str,
     sample_rate: u32,
     num_frames: usize,
     blob_id: &str,
@@ -75,18 +75,84 @@ fn spatial_conformance_path(
     String,
 > {
     use sp314_dsp::limiter::true_peak::TruePeakDetector;
-    use sp314_dsp::metering::lufs::measure_integrated_lufs;
+    use sp314_dsp::metering::LufsMeter;
+    use std::fs::OpenOptions;
 
-    // 1. BS.775 downmix για LUFS measurement
-    const CSURR: f32 = 0.707;
-    let stereo_l: Vec<f32> = (0..num_frames)
-        .map(|i| channels[0][i] + CSURR * channels[2][i] + CSURR * channels[4][i])
-        .collect();
-    let stereo_r: Vec<f32> = (0..num_frames)
-        .map(|i| channels[1][i] + CSURR * channels[2][i] + CSURR * channels[5][i])
-        .collect();
+    // ── PASS 1 (measure, read-only): LUFS + per-channel TruePeak ──
+    const CHUNK_FRAMES: usize = 65536;
+    const CSURR: f32 = 0.707_f32;
+    const BYTES_PER_FRAME: usize = 6 * 4; // 6 channels × f32
 
-    let measured_lufs = measure_integrated_lufs(&stereo_l, &stereo_r);
+    let file_len = std::fs::metadata(raw_path)
+        .map_err(|e| format!("spatial_conformance: metadata {raw_path}: {e}"))?
+        .len();
+    let expected_len = (num_frames * BYTES_PER_FRAME) as u64;
+    if file_len != expected_len {
+        return Err(format!(
+            "spatial_conformance: file length mismatch: expected {expected_len}, got {file_len}"
+        ));
+    }
+
+    let mut lufs_meter = LufsMeter::new();
+    let mut detectors: [TruePeakDetector; 6] = std::array::from_fn(|_| TruePeakDetector::new());
+    let mut raw_max_tp = [0.0_f32; 6];
+
+    // Bounded scratch buffers, reused across chunks
+    let mut fold_l = Vec::with_capacity(CHUNK_FRAMES);
+    let mut fold_r = Vec::with_capacity(CHUNK_FRAMES);
+
+    {
+        use std::io::Read;
+        let file = std::fs::File::open(raw_path)
+            .map_err(|e| format!("spatial_conformance pass-1 open: {e}"))?;
+        let mut reader = std::io::BufReader::new(file);
+        let mut byte_buf = vec![0u8; CHUNK_FRAMES * BYTES_PER_FRAME];
+
+        loop {
+            let bytes_read = {
+                let mut total = 0;
+                while total < byte_buf.len() {
+                    match reader.read(&mut byte_buf[total..]) {
+                        Ok(0) => break,
+                        Ok(n) => total += n,
+                        Err(e) => return Err(format!("spatial_conformance pass-1 read: {e}")),
+                    }
+                }
+                total
+            };
+            if bytes_read == 0 {
+                break;
+            }
+
+            fold_l.clear();
+            fold_r.clear();
+
+            for frame in byte_buf[..bytes_read].chunks_exact(24) {
+                let s: [f32; 6] = std::array::from_fn(|ch| {
+                    f32::from_le_bytes([
+                        frame[ch * 4],
+                        frame[ch * 4 + 1],
+                        frame[ch * 4 + 2],
+                        frame[ch * 4 + 3],
+                    ])
+                });
+                // BS.775 stereo downmix for LUFS: L + 0.707·C + 0.707·Ls / R + 0.707·C + 0.707·Rs
+                fold_l.push(s[0] + CSURR * s[2] + CSURR * s[4]);
+                fold_r.push(s[1] + CSURR * s[2] + CSURR * s[5]);
+
+                for ch in 0..6 {
+                    let tp = detectors[ch].process(s[ch], s[ch]);
+                    raw_max_tp[ch] = raw_max_tp[ch].max(tp);
+                }
+            }
+
+            lufs_meter.process_chunk(&fold_l, &fold_r);
+        }
+    }
+
+    // measure_integrated_lufs returns -144.0 for silence/too-short;
+    // LufsMeter::finish() returns None. Mirror the monolithic behavior.
+    let measured_lufs = lufs_meter.finish().unwrap_or(-144.0_f32);
 
     // 2. Gain offset για Apple -18 LKFS target
     let gain_db = -18.0_f32 - measured_lufs;
@@ -98,32 +164,51 @@ fn spatial_conformance_path(
         ));
     }
 
-    for ch in channels.iter_mut() {
-        for s in ch.iter_mut() {
-            *s *= gain_linear;
-        }
+    // 3. Per-channel TruePeak scale (-1 dBTP ceiling)
+    //
+    // Linearity argument: the old code applied gain_linear to every
+    // sample first, THEN measured TruePeak on the gained signal to
+    // derive the scale. Because TruePeak is a linear measurement
+    // (the 4× polyphase FIR is linear), scaling the input by K
+    // scales the measured peak by K:
+    //   effective_tp[ch] = raw_max_tp[ch] * gain_linear
+    // This lets us measure the raw signal in Pass 1 and derive the
+    // combined multiplier without a second measurement pass.
+    let ceiling = 10.0_f32.powf(-1.0 / 20.0);
+    let mut total_mult = [0.0_f32; 6];
+    for ch in 0..6 {
+        let effective_tp = raw_max_tp[ch] * gain_linear;
+        let channel_scale = if effective_tp > ceiling {
+            ceiling / effective_tp
+        } else {
+            1.0_f32
+        };
+        total_mult[ch] = gain_linear * channel_scale;
     }
 
-    // 3. True Peak limiter per channel (-1 dBTP)
-    let ceiling = 10.0_f32.powf(-1.0 / 20.0);
-    for ch in channels.iter_mut() {
-        let mut detector = TruePeakDetector::new();
-        let mut max_tp = 0.0_f32;
-        for &s in ch.iter() {
-            let tp = detector.process(s, s);
-            max_tp = max_tp.max(tp);
-        }
-        if max_tp > ceiling {
-            let scale = ceiling / max_tp;
-            for s in ch.iter_mut() {
-                *s *= scale;
+    // ── PASS 2 (apply, in-place via mmap — episode_render.rs template) ──
+    {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(raw_path)
+            .map_err(|e| format!("spatial_conformance pass-2 open: {e}"))?;
+        let mut mmap = unsafe { memmap2::MmapMut::map_mut(&file) }
+            .map_err(|e| format!("spatial_conformance pass-2 mmap: {e}"))?;
+
+        // No pointer casts — read/write f32 via from_le_bytes/to_le_bytes.
+        // Only unsafe is the MmapMut::map_mut above.
+        for frame_bytes in mmap.chunks_exact_mut(24) {
+            for ch in 0..6 {
+                let b = &mut frame_bytes[ch * 4..ch * 4 + 4];
+                let v = f32::from_le_bytes(b.try_into().unwrap()) * total_mult[ch];
+                b.copy_from_slice(&v.to_le_bytes());
             }
         }
-    }
 
-    // 4. Interleave 6ch και γράψε raw PCM dump (chunked)
-    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-    write_interleaved_dump(&channels, num_frames, &raw_path)?;
+        mmap.flush()
+            .map_err(|e| format!("spatial_conformance pass-2 flush: {e}"))?;
+    }
 
     // 5. Φτιάξε StoredBlob
     let blob = crate::blob_store::StoredBlob {
@@ -137,59 +222,13 @@ fn spatial_conformance_path(
         preset_id: preset_id.to_string(),
         channels: 6,
         sample_rate,
-        audio_path: raw_path.clone().into(),
+        audio_path: std::path::PathBuf::from(raw_path),
         num_frames,
         pcm_blake3: Some(input_blake3_hex.to_string()),
         ..Default::default()
     };
 
     Ok((blob, std::path::PathBuf::from(raw_path), None))
-}
-
-// A4-i temporary read-back — A4-ii deletes this when
-// spatial_conformance_path goes two-pass streaming.
-fn read_dump_6ch(blob_id: &str, total_frames: usize) -> Result<[Vec<f32>; 6], String> {
-    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-    let bytes = std::fs::read(&raw_path).map_err(|e| format!("Failed to read raw dump: {e}"))?;
-
-    let expected_len = total_frames * 6 * 4;
-    if bytes.len() != expected_len {
-        return Err(format!(
-            "Raw dump length mismatch: expected {}, got {}",
-            expected_len,
-            bytes.len()
-        ));
-    }
-
-    let mut channels = [
-        Vec::with_capacity(total_frames),
-        Vec::with_capacity(total_frames),
-        Vec::with_capacity(total_frames),
-        Vec::with_capacity(total_frames),
-        Vec::with_capacity(total_frames),
-        Vec::with_capacity(total_frames),
-    ];
-
-    // Read 24 bytes (6 channels * 4 bytes/f32) per frame
-    // to strictly avoid unaligned pointer UB.
-    for frame in bytes.chunks_exact(24) {
-        channels[0].push(f32::from_le_bytes([frame[0], frame[1], frame[2], frame[3]]));
-        channels[1].push(f32::from_le_bytes([frame[4], frame[5], frame[6], frame[7]]));
-        channels[2].push(f32::from_le_bytes([
-            frame[8], frame[9], frame[10], frame[11],
-        ]));
-        channels[3].push(f32::from_le_bytes([
-            frame[12], frame[13], frame[14], frame[15],
-        ]));
-        channels[4].push(f32::from_le_bytes([
-            frame[16], frame[17], frame[18], frame[19],
-        ]));
-        channels[5].push(f32::from_le_bytes([
-            frame[20], frame[21], frame[22], frame[23],
-        ]));
-    }
-
-    Ok(channels)
 }
 
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
@@ -525,9 +564,9 @@ fn run_dsp_internal(
             // 2ch None-payload falls through to the streaming Music flow
             // below; 6ch takes the spatial route here (A4-i).
             if decoded.pcm_channels == 6 {
-                let channels = read_dump_6ch(&blob_id, decoded.total_frames)?;
+                let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
                 let (blob, path, model) = spatial_conformance_path(
-                    channels,
+                    &raw_path,
                     decoded.pcm_sample_rate,
                     decoded.total_frames,
                     &blob_id,
@@ -544,12 +583,14 @@ fn run_dsp_internal(
             unreachable!("Stereo payload is never materialized on the streaming path (A3 1.2b)")
         }
         Some(lineos_types::AudioPayload::FiveDotOne {
-            channels,
+            channels: _,
             sample_rate,
             num_frames,
         }) => {
+            // decode_node already wrote the raw 6ch dump for this blob_id
+            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
             let (blob, path, model) = spatial_conformance_path(
-                channels,
+                &raw_path,
                 sample_rate,
                 num_frames,
                 &blob_id,
@@ -834,9 +875,11 @@ fn run_dsp_internal(
 
     if needs_spatial && !sp_l.is_empty() {
         let spatial_channels: [Vec<f32>; 6] = [sp_l, sp_r, sp_c, sp_lfe, sp_ls, sp_rs];
-        // Τρέξε conformance + export
+        // Write planar channels to dump, then run conformance over the file
+        let spatial_raw_path = format!("/tmp/m0d-raw-{}-spatial.pcm", blob_id);
+        write_interleaved_dump(&spatial_channels, n_total_with_tail, &spatial_raw_path)?;
         let spatial_blob = spatial_conformance_path(
-            spatial_channels,
+            &spatial_raw_path,
             decoded.pcm_sample_rate,
             n_total_with_tail,
             &format!("{blob_id}-spatial"),
