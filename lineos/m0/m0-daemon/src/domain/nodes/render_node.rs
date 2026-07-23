@@ -8,17 +8,58 @@ use sp314_dsp::spatial::five_dot_one::FiveDotOneStage;
 use sp314_dsp::spatial::renderer::StereoRenderer;
 use sp314_dsp::stft::two_pass::{ScoutResult, TwoPassEngine};
 
-/// Mutable output slices for 6-channel
-/// spatial rendering. Passed by the caller
-/// (dsp_pipeline) which owns the allocations.
-/// Lifetime 'a tied to the output buffers.
-pub struct SpatialSlicesMut<'a> {
-    pub l: &'a mut [f32],
-    pub r: &'a mut [f32],
-    pub c: &'a mut [f32],
-    pub lfe: &'a mut [f32],
-    pub ls: &'a mut [f32],
-    pub rs: &'a mut [f32],
+/// Streaming 6-channel spatial dump writer.
+/// Replaces SpatialSlicesMut (A4-iii): the render
+/// callback writes interleaved 6ch PCM directly to
+/// disk instead of filling six Vec<f32> buffers.
+pub struct SpatialDumpWriter {
+    writer: std::io::BufWriter<std::fs::File>,
+    scratch: Vec<u8>, // bounded: chunk_len * 24, reused
+    pub frames_written: usize,
+}
+
+impl SpatialDumpWriter {
+    pub fn create(path: &str) -> Result<Self, String> {
+        let file = std::fs::File::create(path)
+            .map_err(|e| format!("SpatialDumpWriter: create {path}: {e}"))?;
+        Ok(Self {
+            writer: std::io::BufWriter::new(file),
+            scratch: Vec::new(),
+            frames_written: 0,
+        })
+    }
+
+    /// Interleave stage channels frame-by-frame (L R C LFE Ls Rs)
+    /// and write as explicit little-endian f32 bytes. Layout is
+    /// byte-identical to write_interleaved_dump on LE platforms;
+    /// on BE this is correct where the old unsafe cast would not be.
+    pub fn write_stage(&mut self, stage: &FiveDotOneStage) -> Result<(), String> {
+        use std::io::Write;
+        let n = stage.l.len();
+        self.scratch.clear();
+        self.scratch.reserve(n * 24);
+        for i in 0..n {
+            self.scratch.extend_from_slice(&stage.l[i].to_le_bytes());
+            self.scratch.extend_from_slice(&stage.r[i].to_le_bytes());
+            self.scratch.extend_from_slice(&stage.c[i].to_le_bytes());
+            self.scratch.extend_from_slice(&stage.lfe[i].to_le_bytes());
+            self.scratch.extend_from_slice(&stage.ls[i].to_le_bytes());
+            self.scratch.extend_from_slice(&stage.rs[i].to_le_bytes());
+        }
+        self.writer
+            .write_all(&self.scratch)
+            .map_err(|e| format!("SpatialDumpWriter: write: {e}"))?;
+        self.frames_written += n;
+        Ok(())
+    }
+
+    pub fn finish(mut self) -> Result<usize, String> {
+        use std::io::Write;
+        self.writer
+            .flush()
+            .map_err(|e| format!("SpatialDumpWriter: flush: {e}"))?;
+        Ok(self.frames_written)
+    }
 }
 
 /// Non-audio render configuration for a single chunk.
@@ -45,7 +86,7 @@ pub fn run(
     inputs: RenderInputs,
     left_slice: &mut [f32],
     right_slice: &mut [f32],
-    mut spatial: Option<&mut SpatialSlicesMut<'_>>,
+    mut spatial: Option<&mut SpatialDumpWriter>,
 ) -> Result<(StemFingerprints, sp314_dsp::stft::two_pass::RenderMetadata), String> {
     let ducking_gain = settings.ducking_gain;
     let mix_levels = settings.mix_levels;
@@ -74,6 +115,8 @@ pub fn run(
     let mut write_offset = 0;
 
     let original_sum_sq = inputs.original_sum_sq;
+    // Captured error from spatial I/O inside the infallible callback.
+    let mut spatial_err: Option<String> = None;
 
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
@@ -123,17 +166,11 @@ pub fn run(
         stage.apply_scales(scout.rear_scale, scout.lfe_scale);
 
         if let Some(ref mut sp) = spatial {
-            use sp314_dsp::spatial::renderer::FiveDotOneRenderer;
-            FiveDotOneRenderer::render_into(
-                &stage,
-                sp.l,
-                sp.r,
-                sp.c,
-                sp.lfe,
-                sp.ls,
-                sp.rs,
-                write_offset,
-            );
+            if spatial_err.is_none() {
+                if let Err(e) = sp.write_stage(&stage) {
+                    spatial_err = Some(e);
+                }
+            }
         }
 
         let (sp_l, sp_r) = StereoRenderer::render(&stage);
@@ -147,6 +184,10 @@ pub fn run(
     let mut _metadata = two_pass
         .process_stream_with_params(inputs.stream_source, scout, ducking_gain, callback)
         .map_err(|e| format!("TwoPassEngine error: {e}"))?;
+
+    if let Some(e) = spatial_err {
+        return Err(e);
+    }
 
     let voice_hex = format!("{:x}", h_voice.finalize());
     let drums_hex = format!("{:x}", h_drums.finalize());
