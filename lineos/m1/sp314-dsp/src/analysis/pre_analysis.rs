@@ -707,7 +707,7 @@ fn compute_resonant_peaks(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<
 
 // ── Zone Flags ──────────────────────────────────────────────────────────────
 
-fn compute_zone_flags(
+pub fn compute_zone_flags(
     profile: &[f32; 8],
     crest: f32,
     lra: f32,

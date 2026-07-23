@@ -25,14 +25,17 @@ const CHUNK_FRAMES: usize = 4096;
 pub struct InputMetrics {
     pub integrated_lufs: Option<f32>,
     pub true_peak_dbtp: f32,
-    /// Full-file, accurate BPM via StreamingBeatDetector — for
-    /// TELEMETRY/UI DISPLAY ONLY. Distinct from and unrelated to
-    /// PreAnalyzer's 30s-scout-based bpm (which drives real DSP
-    /// ducking-gain decisions in AutoTuningController and must
-    /// never be replaced or touched by this value — confirmed via
-    /// recon 2026-07-19 that the scout bpm is load-bearing for
-    /// audio output, this one is purely informational).
+    /// Full-file BPM via StreamingBeatDetector. Y2b promotes this
+    /// to the production ducking-gain path (replacing the 30s
+    /// scout proxy). The full-file value is more accurate and
+    /// computed in the same P0 pass — no additional decode.
     pub bpm: f32,
+    /// Beat timestamps in ms (full-file StreamingBeatDetector).
+    pub beats_ms: Vec<u32>,
+    /// Downbeat timestamps in ms (full-file StreamingBeatDetector).
+    pub downbeats_ms: Vec<u32>,
+    /// Onset timestamps in ms (full-file StreamingBeatDetector).
+    pub transients_ms: Vec<u32>,
 }
 
 /// Full-file input measurement — LUFS AND true peak, in one
@@ -65,10 +68,14 @@ pub fn measure_input_metrics(path: &std::path::Path) -> Result<InputMetrics, Str
         beat_detector.feed_chunk(&mono[..frames]);
     }
 
+    let (bpm, beats_ms, downbeats_ms, transients_ms) = beat_detector.finish();
     Ok(InputMetrics {
         integrated_lufs: lufs_meter.finish(),
         true_peak_dbtp: peak_meter.finish(),
-        bpm: beat_detector.finish().0,
+        bpm,
+        beats_ms,
+        downbeats_ms,
+        transients_ms,
     })
 }
 
@@ -151,10 +158,14 @@ pub fn pass0_decode_to_dump(
     // (input_hashes, expected_output_frames, into_dead_air).
     let std_decoder = tapped.into_inner();
 
+    let (bpm, beats_ms, downbeats_ms, transients_ms) = beat_detector.finish();
     let metrics = InputMetrics {
         integrated_lufs: lufs_meter.finish(),
         true_peak_dbtp: peak_meter.finish(),
-        bpm: beat_detector.finish().0,
+        bpm,
+        beats_ms,
+        downbeats_ms,
+        transients_ms,
     };
     Ok((metrics, std_decoder))
 }

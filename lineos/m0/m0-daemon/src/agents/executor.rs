@@ -178,57 +178,11 @@ pub async fn run(
                     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
                     let path = std::path::Path::new(&audio_path);
 
-                    // 1. Read the 30s scout sample
-                    let (left, right, sample_rate) =
-                        crate::dsp::lazy_reader::read_scout_sample(path, 30.0).ok_or_else(
-                            || ExecutorError::DspFailed("Failed to read 30s scout sample".into()),
-                        )?;
-
-                    // 2. Run PreAnalyzer
-                    let mut pre_analysis = sp314_dsp::analysis::pre_analysis::PreAnalyzer::run(
-                        &left,
-                        &right,
-                        sample_rate,
-                    );
-
-                    // 3. If content suggests Music (TODO: define genre/content-type decision), run BeatDetector
-                    // TODO: Decide if genre is Music before running BeatDetector
-                    let mono: Vec<f32> = left
-                        .iter()
-                        .zip(right.iter())
-                        .map(|(l, r)| (*l + *r) * 0.5)
-                        .collect();
-                    let beat_detector = crate::dsp::beat_detector::BeatDetector::new(sample_rate);
-                    let (bpm, beats_ms, downbeats_ms, transients_ms) = beat_detector.analyze(&mono);
-
-                    pre_analysis.bpm = bpm;
-                    pre_analysis.beats_ms = beats_ms;
-                    pre_analysis.downbeats_ms = downbeats_ms;
-                    pre_analysis.transients_ms = transients_ms;
-
-                    // 4. Print/log as a temporary checkpoint
-                    eprintln!(
-                        "RunStreaming PreAnalysis Checkpoint: genre={:?} bpm={}",
-                        pre_analysis.genre, pre_analysis.bpm
-                    );
-
-                    let scout_out = crate::domain::nodes::scout_node::run(
-                        &left,
-                        &right,
-                        sample_rate,
-                        "default",
-                        plan.flavour_id.as_deref().unwrap_or("default"),
-                        &pre_analysis,
-                    )
-                    .map_err(|e| ExecutorError::DspFailed(format!("scout failed: {e}")))?;
-                    let streaming_features = scout_out.scout.features.clone();
-                    profiler.mark_stage_with_hash("Scout/PreAnalysis", String::new());
+                    // ═══ P0: decode→dump + input metrics (one pass) ═══
+                    // Runs FIRST: trunk pass and render both read the dump.
 
                     // ═══ P0: decode→dump + input metrics (one pass) ═══
-                    // Must run FIRST: the trunk pass and render both read
-                    // the dump it writes. Nothing between P0 and the old
-                    // build_timeline_map consumed boundaries (recon-proven
-                    // 2026-07-23).
+
                     let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
                         lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
                     });
@@ -257,10 +211,7 @@ pub async fn run(
                     };
 
                     // ═══ Y1 Trunk Pass: segmentation + metering from dump ═══
-                    // Replaces build_timeline_map (which decoded the original
-                    // file into RAM). Reads the dump written by P0 above.
-                    // Produces boundaries + LUFS/crest/LRA/noise_floor in one
-                    // chunked pass — no additional decode of the original file.
+                    // Single-pass segmentation + full-file metering from dump.
                     let trunk_report =
                         sp314_orchestrator::trunk_pass::run_trunk_pass(
                             std::path::Path::new(&raw_tap_path),
@@ -269,12 +220,8 @@ pub async fn run(
                             ExecutorError::DspFailed(format!("trunk pass failed: {e}"))
                         })?;
                     let boundaries = trunk_report.boundaries;
-                    // Y2 consumers will use trunk metrics; for now log them.
-                    // NOTE: trunk LUFS measures the same standardized stream
-                    // as P0's metrics.integrated_lufs — they SHOULD agree;
-                    // Y2 reconciles. Autotune keeps using P0's value.
                     eprintln!(
-                        "[TRUNK] lufs={:?} p0_lufs={:?} crest={:.2} lra={:.2} \
+                        "[TRUNK-y2b] lufs={:?} p0_lufs={:?} crest={:.2} lra={:.2} \
                          noise_floor={:?} spectral={:?} td={:.2}",
                         trunk_report.integrated_lufs,
                         input_lufs,
@@ -285,6 +232,68 @@ pub async fn run(
                         trunk_report.transient_density,
                     );
                     profiler.mark_stage_with_hash("Trunk Pass", String::new());
+
+                    // ═══ Y2b: synthesize PreAnalysisData from trunk + P0 ═══
+                    // Full-file values replace the old 30s PreAnalyzer proxy.
+                    // Fields sourced from trunk_report or P0 metrics; fields
+                    // unused downstream default to silent/zero with comment.
+                    let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
+                        // From trunk_report (full-file):
+                        integrated_lufs: trunk_report.integrated_lufs.unwrap_or(-144.0),
+                        loudness_range: trunk_report.lra,
+                        global_crest_factor_db: trunk_report.crest_db,
+                        spectral_profile_db: trunk_report.spectral_profile_db,
+                        transient_density: trunk_report.transient_density,
+                        // From P0 metrics (full-file):
+                        true_peak_dbtp: metrics.true_peak_dbtp,
+                        bpm: metrics.bpm,
+                        beats_ms: metrics.beats_ms.clone(),
+                        downbeats_ms: metrics.downbeats_ms.clone(),
+                        transients_ms: metrics.transients_ms.clone(),
+                        // From trunk_report (computed live):
+                        zone_flags: sp314_dsp::analysis::pre_analysis::compute_zone_flags(
+                            &trunk_report.spectral_profile_db,
+                            trunk_report.crest_db,
+                            trunk_report.lra,
+                            1.0, // corr: unmeasured by trunk — 1.0 = "no phase issue"
+                            &[], // resonant peaks: unmeasured — empty = no resonance
+                        ),
+                        // Unused downstream per Y2 gap table (2026-07-23):
+                        dynamic_range_db: 0.0,
+                        spectral_rolloff_hz: 0.0,
+                        global_phase_correlation: 1.0,
+                        side_mid_ratio_db: -60.0,
+                        stereo_width: 0.0,
+                        band_phase_correlation: [1.0; 8],
+                        resonant_peaks_hz: vec![],
+                        genre: None, // trunk does not classify genre yet
+                    };
+
+                    // ═══ Scout: NMF + Maestro (on 30s audio slice) ═══
+                    // read_scout_sample STAYS: scout_node's TwoPassEngine
+                    // NMF needs the audio slices. PreAnalyzer + BeatDetector
+                    // on the slice are DEAD — replaced by synthesized struct.
+                    let (left, right, sample_rate) =
+                        crate::dsp::lazy_reader::read_scout_sample(path, 30.0).ok_or_else(
+                            || ExecutorError::DspFailed("Failed to read 30s scout sample".into()),
+                        )?;
+
+                    eprintln!(
+                        "RunStreaming Y2b Checkpoint: bpm={} td={:.2}",
+                        pre_analysis.bpm, pre_analysis.transient_density,
+                    );
+
+                    let scout_out = crate::domain::nodes::scout_node::run(
+                        &left,
+                        &right,
+                        sample_rate,
+                        "default",
+                        plan.flavour_id.as_deref().unwrap_or("default"),
+                        &pre_analysis,
+                    )
+                    .map_err(|e| ExecutorError::DspFailed(format!("scout failed: {e}")))?;
+                    let streaming_features = scout_out.scout.features.clone();
+                    profiler.mark_stage_with_hash("Scout/PreAnalysis", String::new());
 
                     // b. Build minimal ducking topology
                     let mut db =
