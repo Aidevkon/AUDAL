@@ -18,6 +18,7 @@
 
 pub const TARGET_SAMPLE_RATE: u32 = 48_000;
 pub const TARGET_CHANNELS: u16 = 2;
+// RAM-bound path — this cap is memory protection, not policy; the streaming caps live in stream_core.
 pub const MAX_DURATION_SECS: u64 = 720; // 12 minutes
 use crate::config::MAX_FILE_BYTES;
 

@@ -8,7 +8,8 @@ pub const TARGET_SR: u32 = 48_000;
 pub const SINC_LEN: usize = 256;
 pub const SINC_OVERSAMPLE: usize = 256;
 pub const RESAMPLE_CHUNK_FRAMES: usize = 1024;
-pub const MAX_DURATION_SECS: u64 = 720;
+// F-046: Streaming ceiling raised to 8 hours (28_800s).
+pub const MAX_DURATION_SECS: u64 = 28_800;
 pub const READ_FRAMES: usize = 4096;
 
 #[inline(always)]

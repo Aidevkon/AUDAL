@@ -8,6 +8,9 @@ pub const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
 
 pub const MAX_FILE_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
 
+/// MAX_STREAM_FILE_BYTES: 12GB headroom for streaming (an 8h 48k/32f stereo file is ~11GB)
+pub const MAX_STREAM_FILE_BYTES: u64 = 12 * 1024 * 1024 * 1024;
+
 #[derive(Debug, Clone)]
 pub struct M0Config {
     pub registry_path: String,

@@ -1,4 +1,3 @@
-
 //! StandardizedAudioStream — the "second floor"
 //! of the streaming pipeline.
 //!
@@ -42,7 +41,7 @@ use crate::dsp::stream_core::*;
 pub use crate::dsp::stream_core::TARGET_SR;
 
 // Same guards as decode_smart.
-use crate::config::MAX_FILE_BYTES;
+use crate::config::MAX_STREAM_FILE_BYTES;
 
 pub struct StandardizedAudioStream {
     core: StandardizedStreamCore<2>,
@@ -53,11 +52,11 @@ impl StandardizedAudioStream {
     pub fn open(path: &std::path::Path) -> Result<Self, String> {
         // File-size guard (metadata only).
         if let Ok(meta) = std::fs::metadata(path) {
-            if meta.len() > MAX_FILE_BYTES {
+            if meta.len() > MAX_STREAM_FILE_BYTES {
                 return Err(format!(
-                    "Input too large: {} bytes                      exceeds {}MB limit",
-                    meta.len(),
-                    MAX_FILE_BYTES / (1024 * 1024)
+                    "Input too long: file size {} MB exceeds streaming limit of {} MB",
+                    meta.len() / (1024 * 1024),
+                    MAX_STREAM_FILE_BYTES / (1024 * 1024)
                 ));
             }
         }
@@ -81,7 +80,7 @@ impl StandardizedAudioStream {
             let secs = frames / orig_sr.max(1) as u64;
             if secs > MAX_DURATION_SECS {
                 return Err(format!(
-                    "Input too long: {}s exceeds                      {}s (12min) limit",
+                    "Audio duration {}s exceeds max stream length {}s",
                     secs, MAX_DURATION_SECS
                 ));
             }
@@ -230,10 +229,10 @@ impl AudioSource for StandardizedAudioStream {
 
 #[cfg(test)]
 mod tests {
-    use blake3::Hasher as Blake3Hasher;
-    use sha2::{Digest, Sha256};
     use super::*;
     use crate::dsp::audio_source::AudioSource;
+    use blake3::Hasher as Blake3Hasher;
+    use sha2::{Digest, Sha256};
 
     /// Hash an interleaved f32 buffer exactly the
     /// way decode_node does: blake3 LE, sha256 BE.

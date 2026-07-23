@@ -1,4 +1,3 @@
-
 //! StandardizedSixChannelStream — the streaming resampler for 6ch audio.
 //!
 //! Wraps a LazyAudioReader and delivers clean, 48 kHz, 6-channel f32 PCM
@@ -11,9 +10,10 @@ use rubato::{SincFixedIn, SincInterpolationParameters, SincInterpolationType, Wi
 use crate::dsp::audio_source::AudioSource;
 use crate::dsp::stream_core::*;
 
+pub use crate::dsp::stream_core::StandardizedStreamCore;
 pub use crate::dsp::stream_core::TARGET_SR;
 
-use crate::config::MAX_FILE_BYTES;
+use crate::config::MAX_STREAM_FILE_BYTES;
 
 pub struct StandardizedSixChannelStream {
     core: StandardizedStreamCore<6>,
@@ -23,11 +23,11 @@ impl StandardizedSixChannelStream {
     pub fn open(path: &std::path::Path) -> Result<Self, String> {
         // File-size guard (metadata only).
         if let Ok(meta) = std::fs::metadata(path) {
-            if meta.len() > MAX_FILE_BYTES {
+            if meta.len() > MAX_STREAM_FILE_BYTES {
                 return Err(format!(
-                    "Input too large: {} bytes exceeds {}MB limit",
-                    meta.len(),
-                    MAX_FILE_BYTES / (1024 * 1024)
+                    "Input too long: file size {} MB exceeds streaming limit of {} MB",
+                    meta.len() / (1024 * 1024),
+                    MAX_STREAM_FILE_BYTES / (1024 * 1024)
                 ));
             }
         }
@@ -57,7 +57,7 @@ impl StandardizedSixChannelStream {
             let secs = frames / orig_sr.max(1) as u64;
             if secs > MAX_DURATION_SECS {
                 return Err(format!(
-                    "Input too long: {}s exceeds {}s (12min) limit",
+                    "Audio duration {}s exceeds max stream length {}s",
                     secs, MAX_DURATION_SECS
                 ));
             }
@@ -160,9 +160,9 @@ impl AudioSource for StandardizedSixChannelStream {
 
 #[cfg(test)]
 mod tests {
-    use sha2::Digest;
     use super::*;
     use crate::dsp::audio_source::AudioSource;
+    use sha2::Digest;
 
     fn write_wav_6ch(path: &str, sr: u32, secs: f32) {
         let spec = hound::WavSpec {
