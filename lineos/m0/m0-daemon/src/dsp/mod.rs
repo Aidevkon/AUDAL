@@ -19,6 +19,7 @@ pub mod signal_health;
 pub mod six_channel_stream;
 pub mod standardized_decoder;
 pub mod standardized_stream;
+pub mod stream_core;
 
 pub use audio_source::AudioSource;
 pub use maestro::{AutoTuningController, RenderParams};
