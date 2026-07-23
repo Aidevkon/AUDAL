@@ -16,7 +16,9 @@
 //! application are separate, later steps (Parts B-continued/C).
 
 use crate::dsp::audio_source::AudioSource;
+use crate::dsp::standardized_decoder::StandardizedDecoder;
 use crate::dsp::standardized_stream::StandardizedAudioStream;
+use sp314_orchestrator::decode_provider::TappedDecoder;
 
 const CHUNK_FRAMES: usize = 4096;
 
@@ -68,6 +70,93 @@ pub fn measure_input_metrics(path: &std::path::Path) -> Result<InputMetrics, Str
         true_peak_dbtp: peak_meter.finish(),
         bpm: beat_detector.finish().0,
     })
+}
+
+/// P0: decode→dump + input metrics in ONE pass.
+///
+/// Builds StandardizedDecoder → TappedDecoder (by value), streams the
+/// full file to the raw PCM dump at `raw_tap_path`, and simultaneously
+/// feeds LufsMeter + TruePeakMeter + StreamingBeatDetector on every
+/// chunk — eliminating the dedicated `measure_input_metrics` decode
+/// pass that previously ran separately in the RunStreaming path.
+///
+/// Returns `InputMetrics` (identical fields to `measure_input_metrics`)
+/// plus the owned `StandardizedDecoder` (needed downstream for
+/// `input_hashes`, `expected_output_frames`, `into_dead_air`).
+///
+/// A tap write failure is a HARD error: the dump is the artery for all
+/// downstream passes (Pass 1 trunk, Pass 2 render). This differs from
+/// `TappedDecoder`'s original best-effort policy, which was appropriate
+/// when the dump was an optional A/B monitoring artifact.
+///
+/// NOTE: TappedDecoder's native-endian cast (`from_raw_parts` on `&[f32]`
+/// → `&[u8]`) writes platform-endian bytes. On LE (x86-64/aarch64) this
+/// matches the f32 LE contract `RawPcmFileSource` expects. On BE it
+/// would silently produce a wrong dump — same latent issue as
+/// `write_interleaved_dump` (inherited, not introduced here).
+pub fn pass0_decode_to_dump(
+    audio_path: &std::path::Path,
+    raw_tap_path: &str,
+) -> Result<(InputMetrics, StandardizedDecoder), String> {
+    let std_decoder = StandardizedDecoder::open(audio_path)
+        .map_err(|e| format!("P0: standardized decode open failed: {e}"))?;
+
+    // TappedDecoder takes ownership of the decoder; we recover it
+    // via into_inner() after streaming, matching the executor's
+    // proven pattern (executor.rs:392 — main_decoder.into_inner()).
+    let tapped = TappedDecoder::new(std_decoder, raw_tap_path);
+
+    let mut lufs_meter = sp314_dsp::metering::LufsMeter::new();
+    let mut peak_meter = sp314_dsp::metering::true_peak_meter::TruePeakMeter::new();
+    let mut beat_detector = crate::dsp::beat_detector::StreamingBeatDetector::new(48_000);
+
+    // Scratch buffers — allocated once, reused per chunk.
+    let mut left = vec![0f32; CHUNK_FRAMES];
+    let mut right = vec![0f32; CHUNK_FRAMES];
+    let mut mono = vec![0f32; CHUNK_FRAMES];
+
+    use sp314_dsp::io::decode_types::DecodeChunk;
+    use sp314_orchestrator::decode_provider::DecodeProvider;
+
+    let (_sample_rate, _channels) = tapped
+        .stream_to(|chunk| -> Result<(), String> {
+            if let DecodeChunk::Samples(interleaved) = chunk {
+                let frames = interleaved.len() / 2;
+                // Grow scratch if a chunk is larger than CHUNK_FRAMES
+                // (unlikely — StandardizedDecoder uses 4096, but defensive).
+                if frames > left.len() {
+                    left.resize(frames, 0.0);
+                    right.resize(frames, 0.0);
+                    mono.resize(frames, 0.0);
+                }
+                for i in 0..frames {
+                    left[i] = interleaved[i * 2];
+                    right[i] = interleaved[i * 2 + 1];
+                    mono[i] = (left[i] + right[i]) * 0.5;
+                }
+                lufs_meter.process_chunk(&left[..frames], &right[..frames]);
+                peak_meter.process_chunk(&left[..frames], &right[..frames]);
+                beat_detector.feed_chunk(&mono[..frames]);
+            }
+            Ok(())
+        })
+        .map_err(|e| format!("P0: decode stream failed: {e}"))?;
+
+    // Tap failure is a HARD error — the dump is the artery.
+    if let Some(e) = tapped.take_tap_error() {
+        return Err(format!("P0: raw dump write failed ({}): {e}", raw_tap_path));
+    }
+
+    // Recover the owned StandardizedDecoder for downstream use
+    // (input_hashes, expected_output_frames, into_dead_air).
+    let std_decoder = tapped.into_inner();
+
+    let metrics = InputMetrics {
+        integrated_lufs: lufs_meter.finish(),
+        true_peak_dbtp: peak_meter.finish(),
+        bpm: beat_detector.finish().0,
+    };
+    Ok((metrics, std_decoder))
 }
 
 /// Backward-compatible wrapper — the original LUFS-only signature,

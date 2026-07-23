@@ -235,17 +235,26 @@ pub async fn run(
                         ExecutorError::DspFailed(format!("Failed to build timeline map: {}", e))
                     })?;
 
-                    // Full-file input LUFS measurement — the missing pre-gain
-                    // step for v3 (Parts A+B: LoudnessTarget::from_preset +
-                    // measure_input_lufs, combined here with the same closed-form
-                    // formula v2 uses). Runs on the ORIGINAL input (not the
-                    // standardized stream used for rendering) so it reflects the
-                    // true source material.
+                    // ═══ P0: decode→dump + input metrics (one pass) ═══
+                    // Replaces the former dedicated `measure_input_metrics`
+                    // decode pass (#2) and the render-time TappedDecoder
+                    // decode (#3) with a single StandardizedDecoder +
+                    // TappedDecoder pass that writes the raw PCM dump AND
+                    // feeds the LUFS/TruePeak/BPM meters simultaneously.
+                    // The dump file at `raw_tap_path` is now the artery:
+                    // all downstream passes (Pass 1 trunk analysis, Pass 2
+                    // render) will consume it. The StandardizedDecoder is
+                    // returned for its post-stream state (input_hashes,
+                    // expected_output_frames, dead_air).
                     let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
                         lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
                     });
-                    let metrics = crate::dsp::input_lufs::measure_input_metrics(path)
-                        .map_err(|e| ExecutorError::DspFailed(format!("input measurement failed: {e}")))?;
+                    let (metrics, p0_decoder) =
+                        crate::dsp::input_lufs::pass0_decode_to_dump(
+                            path,
+                            &raw_tap_path,
+                        )
+                        .map_err(ExecutorError::DspFailed)?;
                     let input_lufs = metrics.integrated_lufs;
 
                     let _ = progress_tx_clone.send(crate::app_state::MasteringProgress {
@@ -309,33 +318,26 @@ pub async fn run(
                             &tx_job,
                         );
 
-                    // 2. Construct fresh FileDecoder
-                    // Decoder stack: Tapped(Standardized(file)).
-                    // StandardizedDecoder guarantees 48k/stereo/
-                    // sanitized chunks (the same contract v2 and the
-                    // Episode path enforce) and computes the
-                    // input-identity hashes internally; TappedDecoder
-                    // tees those standardized chunks to the raw A/B
-                    // dump — so the A/B "raw" is exactly what entered
-                    // the DSP, which is the honest comparison.
-                    let std_decoder =
+                    // 2. Construct fresh render decoder
+                    // P0 already wrote the raw dump and drained a
+                    // StandardizedDecoder. The render path needs a
+                    // FRESH decode (the first decoder's stream is
+                    // exhausted). No TappedDecoder wrap — the dump
+                    // already exists on disk from P0.
+                    let render_decoder =
                         crate::dsp::standardized_decoder::StandardizedDecoder::open(
                             std::path::Path::new(&audio_path),
                         )
                         .map_err(|e| {
                             ExecutorError::DspFailed(format!(
-                                "standardized decode open failed: {e}"
+                                "render decode open failed: {e}"
                             ))
                         })?;
-                    let main_decoder = sp314_orchestrator::decode_provider::TappedDecoder::new(
-                        std_decoder,
-                        raw_tap_path.clone(),
-                    );
                     profiler.mark_stage_with_hash("Decode Setup", String::new());
 
                     // 3. Call run_streaming_pipeline_with_timeline
                     let frames_written = sp314_orchestrator::streaming_pipeline::run_streaming_pipeline_with_timeline(
-                        &main_decoder,
+                        &render_decoder,
                         &output_path,
                         &sp314_orchestrator::streaming_pipeline::StreamingConfig {
                             topology: &ducking_topology,
@@ -345,7 +347,7 @@ pub async fn run(
                             speech_gain: 1.0,
                             music_gain: 0.501,
                             pre_gain_linear,
-                            expected_output_frames: main_decoder.inner().expected_output_frames(),
+                            expected_output_frames: p0_decoder.expected_output_frames(),
                         },
                         sp314_orchestrator::streaming_pipeline::TimelinePlan {
                             boundaries,
@@ -359,11 +361,6 @@ pub async fn run(
                     })?;
                     profiler.mark_stage_with_hash("Streaming Render", String::new());
 
-                    if let Some(e) = main_decoder.take_tap_error() {
-                        eprintln!(
-                            "[V3] raw A/B tap failed (best-effort, master unaffected): {e}"
-                        );
-                    }
                     let mastered_raw_path =
                         std::path::PathBuf::from(format!("/tmp/m0d-mastered-{}.pcm", blob_id));
                     let measured =
@@ -383,13 +380,15 @@ pub async fn run(
                         )));
                     }
 
-                    let (_input_blake3, input_sha256) = main_decoder.inner().input_hashes();
-                    // main_decoder is no longer needed after this point —
-                    // consumed by value to extract the real dead-air
-                    // summary (previously deferred as Default::default()
-                    // because input_hashes() needed a live &self
-                    // reference first; now sequenced correctly).
-                    let dead_air = main_decoder.into_inner().into_dead_air();
+                    // Input-identity hashes come from the P0 decoder (it
+                    // streamed the same StandardizedAudioStream and hashed
+                    // it identically to what the old Tapped path did).
+                    let (_input_blake3, input_sha256) = p0_decoder.input_hashes();
+                    // p0_decoder consumed by value to extract the real
+                    // dead-air summary (previously deferred as
+                    // Default::default() because input_hashes() needed a
+                    // live &self reference first; now sequenced correctly).
+                    let dead_air = p0_decoder.into_dead_air();
 
                     let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
                         &plan.preset_id,
