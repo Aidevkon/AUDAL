@@ -318,21 +318,15 @@ pub async fn run(
                             &tx_job,
                         );
 
-                    // 2. Construct fresh render decoder
-                    // P0 already wrote the raw dump and drained a
-                    // StandardizedDecoder. The render path needs a
-                    // FRESH decode (the first decoder's stream is
-                    // exhausted). No TappedDecoder wrap — the dump
-                    // already exists on disk from P0.
+                    // 2. Construct dump-backed render decoder (P0-b)
+                    // The dump at raw_tap_path was fully written and
+                    // flushed by pass0_decode_to_dump (P0-a). Reading
+                    // it back eliminates the second decode of the
+                    // original file — decode count 2→1.
                     let render_decoder =
-                        crate::dsp::standardized_decoder::StandardizedDecoder::open(
-                            std::path::Path::new(&audio_path),
-                        )
-                        .map_err(|e| {
-                            ExecutorError::DspFailed(format!(
-                                "render decode open failed: {e}"
-                            ))
-                        })?;
+                        sp314_orchestrator::decode_provider::DumpDecodeProvider::new(
+                            raw_tap_path.clone(),
+                        );
                     profiler.mark_stage_with_hash("Decode Setup", String::new());
 
                     // 3. Call run_streaming_pipeline_with_timeline
