@@ -2,6 +2,9 @@ use crate::decode_provider::WholeBufferProvider;
 use lineos_corpus::scout::SegmentBoundary;
 use std::error::Error;
 
+/// Deprecated: production path now uses `trunk_pass::run_trunk_pass` which
+/// reads the raw PCM dump instead of decoding the original file into RAM.
+/// Kept alive for test compatibility (pass1_integration, streaming_integration).
 pub fn build_timeline_map(
     decoder: impl WholeBufferProvider,
 ) -> Result<Vec<SegmentBoundary>, Box<dyn Error>> {
