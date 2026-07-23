@@ -666,8 +666,10 @@ fn run_dsp_internal(
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
 
-    use sp314_dsp::analysis::PreAnalyzer;
-    let mut pre_analysis = PreAnalyzer::run(scout_left, scout_right, decoded.pcm_sample_rate);
+    let trunk_metrics =
+        sp314_orchestrator::trunk_pass::run_trunk_metrics(std::path::Path::new(&raw_path))
+            .map_err(|e| format!("Trunk metrics failed: {e}"))?;
+
     // Episode/spoken-word: skip beat
     // detection entirely. BPM and beat
     // grids are meaningless for voice
@@ -685,10 +687,36 @@ fn run_dsp_internal(
         transients_ms.len(),
         downbeats_ms.len()
     );
-    pre_analysis.bpm = bpm;
-    pre_analysis.beats_ms = beats_ms;
-    pre_analysis.downbeats_ms = downbeats_ms;
-    pre_analysis.transients_ms = transients_ms;
+
+    let zone_flags = sp314_dsp::analysis::pre_analysis::compute_zone_flags(
+        &trunk_metrics.spectral_profile_db,
+        trunk_metrics.crest_db,
+        trunk_metrics.lra,
+        trunk_metrics.global_phase_correlation,
+        &[], // resonant peaks: unmeasured — empty = no resonance
+    );
+
+    let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
+        integrated_lufs: trunk_metrics.integrated_lufs.unwrap_or(-144.0),
+        true_peak_dbtp: -144.0, // Unused downstream per Y2 gap table
+        loudness_range: trunk_metrics.lra,
+        dynamic_range_db: 0.0, // dead field
+        global_crest_factor_db: trunk_metrics.crest_db,
+        spectral_profile_db: trunk_metrics.spectral_profile_db,
+        spectral_rolloff_hz: 0.0, // dead field
+        transient_density: trunk_metrics.transient_density,
+        global_phase_correlation: trunk_metrics.global_phase_correlation,
+        side_mid_ratio_db: -60.0,         // dead field
+        stereo_width: 0.0,                // dead field
+        band_phase_correlation: [1.0; 8], // dead field
+        resonant_peaks_hz: vec![],        // dead field
+        zone_flags,
+        bpm,
+        beats_ms,
+        downbeats_ms,
+        transients_ms,
+        genre: None, // dead field
+    };
 
     // NODE 3: SCOUT (NMF + Maestro)
     // --- NODE 3: SCOUT PASS ---

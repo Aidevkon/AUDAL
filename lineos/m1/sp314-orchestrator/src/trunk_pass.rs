@@ -21,14 +21,26 @@ use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
 use std::path::Path;
 
 /// Metrics produced by the trunk pass.
-pub struct TrunkReport {
-    pub boundaries: Vec<SegmentBoundary>,
+pub struct TrunkMetrics {
     pub integrated_lufs: Option<f32>,
     pub crest_db: f32,
     pub lra: f32,
     pub noise_floor_dbfs: Option<f32>,
     pub spectral_profile_db: [f32; 8],
     pub transient_density: f32,
+    pub global_phase_correlation: f32,
+}
+
+pub struct TrunkReport {
+    pub boundaries: Vec<SegmentBoundary>,
+    pub metrics: TrunkMetrics,
+}
+
+impl std::ops::Deref for TrunkReport {
+    type Target = TrunkMetrics;
+    fn deref(&self) -> &Self::Target {
+        &self.metrics
+    }
 }
 
 // Mirror scan_file's constants exactly [scout_scanner.rs:6-7].
@@ -190,7 +202,15 @@ impl StreamingTransientDetector {
 ///
 /// The dump was written by pass0_decode_to_dump through StandardizedDecoder,
 /// which guarantees 48k/2ch by construction [standardized_decoder.rs:70].
+pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
+    run_trunk_internal(dump_path, false).map(|r| r.metrics)
+}
+
 pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
+    run_trunk_internal(dump_path, true)
+}
+
+fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkReport, String> {
     let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path)?;
     let srf = SAMPLE_RATE as f32;
     let nyq = srf / 2.0;
@@ -234,6 +254,11 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
 
     // === Transient density ===
     let mut transient_det = StreamingTransientDetector::new();
+
+    // === Phase Correlation ===
+    let mut corr_cross: f32 = 0.0;
+    let mut corr_sum_l: f32 = 0.0;
+    let mut corr_sum_r: f32 = 0.0;
 
     // === Scout windowing state ===
     // Mirrors scan_file's sequential loop [scout_scanner.rs:38-56]:
@@ -290,6 +315,10 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         //   let fr = bandpass_filter(right, lo, hi, srf);
         //   sum_sq += fl[i]*fl[i] + fr[i]*fr[i]   [pre_analysis.rs:490]
         for i in 0..frames {
+            corr_cross += l[i] * r[i];
+            corr_sum_l += l[i] * l[i];
+            corr_sum_r += r[i] * r[i];
+
             for band in bands.iter_mut() {
                 if !band.active {
                     continue;
@@ -337,35 +366,37 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         hist_mono.extend_from_slice(m);
 
         // --- Serve scout windows ---
-        let hist_end = hist_base + hist_mono.len();
-        while next_window_start + win_samples <= hist_end {
-            let local_start = next_window_start - hist_base;
-            let local_end = local_start + win_samples;
+        if do_segmentation {
+            let hist_end = hist_base + hist_mono.len();
+            while next_window_start + win_samples <= hist_end {
+                let local_start = next_window_start - hist_base;
+                let local_end = local_start + win_samples;
 
-            let start_sec = next_window_start as f32 / SAMPLE_RATE as f32;
-            let meas = scout.measure(
-                &hist_mono[local_start..local_end],
-                &hist_left[local_start..local_end],
-                &hist_right[local_start..local_end],
-                SAMPLE_RATE,
-            );
-            decisions.push((start_sec, compute_scout_decision(&meas)));
-            next_window_start += hop_samples;
-        }
+                let start_sec = next_window_start as f32 / SAMPLE_RATE as f32;
+                let meas = scout.measure(
+                    &hist_mono[local_start..local_end],
+                    &hist_left[local_start..local_end],
+                    &hist_right[local_start..local_end],
+                    SAMPLE_RATE,
+                );
+                decisions.push((start_sec, compute_scout_decision(&meas)));
+                next_window_start += hop_samples;
+            }
 
-        // --- Drain consumed history ---
-        let keep_from = if next_window_start >= win_samples {
-            next_window_start - win_samples + hop_samples
-        } else {
-            0
-        };
-        if keep_from > hist_base {
-            let drain_count = keep_from - hist_base;
-            if drain_count > 0 && drain_count <= hist_mono.len() {
-                hist_left.drain(..drain_count);
-                hist_right.drain(..drain_count);
-                hist_mono.drain(..drain_count);
-                hist_base = keep_from;
+            // --- Drain consumed history ---
+            let keep_from = if next_window_start >= win_samples {
+                next_window_start - win_samples + hop_samples
+            } else {
+                0
+            };
+            if keep_from > hist_base {
+                let drain_count = keep_from - hist_base;
+                if drain_count > 0 && drain_count <= hist_mono.len() {
+                    hist_left.drain(..drain_count);
+                    hist_right.drain(..drain_count);
+                    hist_mono.drain(..drain_count);
+                    hist_base = keep_from;
+                }
             }
         }
     }
@@ -395,16 +426,31 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
     // === Finish transient density ===
     let transient_density = transient_det.finish();
 
+    // === Finish phase correlation ===
+    let denom = (corr_sum_l * corr_sum_r).sqrt();
+    let global_phase_correlation = if denom < 1e-10 {
+        1.0
+    } else {
+        (corr_cross / denom).clamp(-1.0, 1.0)
+    };
+
     // === Segmentation ===
-    let boundaries = smooth_and_segment(&decisions);
+    let boundaries = if do_segmentation {
+        smooth_and_segment(&decisions)
+    } else {
+        Vec::new()
+    };
 
     Ok(TrunkReport {
         boundaries,
-        integrated_lufs,
-        crest_db,
-        lra,
-        noise_floor_dbfs: min_nondead_dbfs,
-        spectral_profile_db,
-        transient_density,
+        metrics: TrunkMetrics {
+            integrated_lufs,
+            crest_db,
+            lra,
+            noise_floor_dbfs: min_nondead_dbfs,
+            spectral_profile_db,
+            transient_density,
+            global_phase_correlation,
+        },
     })
 }

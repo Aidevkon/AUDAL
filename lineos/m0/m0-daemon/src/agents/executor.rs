@@ -219,7 +219,7 @@ pub async fn run(
                         .map_err(|e| {
                             ExecutorError::DspFailed(format!("trunk pass failed: {e}"))
                         })?;
-                    let boundaries = trunk_report.boundaries;
+                    let boundaries = trunk_report.boundaries.clone();
                     eprintln!(
                         "[TRUNK-y2b] lufs={:?} p0_lufs={:?} crest={:.2} lra={:.2} \
                          noise_floor={:?} spectral={:?} td={:.2}",
