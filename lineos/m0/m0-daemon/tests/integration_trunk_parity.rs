@@ -33,6 +33,19 @@ fn generate_fixture(path: &str) {
     writer.finalize().unwrap();
 }
 
+/// Build full left/right buffers from the fixture for PreAnalyzer comparison.
+fn read_full_buffers(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let mut reader = hound::WavReader::open(path).unwrap();
+    let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
+    let mut left = Vec::with_capacity(samples.len() / 2);
+    let mut right = Vec::with_capacity(samples.len() / 2);
+    for chunk in samples.chunks(2) {
+        left.push(chunk[0]);
+        right.push(chunk[1]);
+    }
+    (left, right)
+}
+
 #[test]
 fn test_trunk_parity() {
     let wav_path = "/tmp/test_trunk_parity.wav";
@@ -47,8 +60,8 @@ fn test_trunk_parity() {
     let boundaries_old = build_timeline_map(decoder).expect("old path failed");
 
     // Path B: New P0 -> Trunk Dump Reader
-    let (_metrics, _p0_decoder) = pass0_decode_to_dump(Path::new(wav_path), raw_path)
-        .expect("P0 dump failed");
+    let (_metrics, _p0_decoder) =
+        pass0_decode_to_dump(Path::new(wav_path), raw_path).expect("P0 dump failed");
     let report = run_trunk_pass(Path::new(raw_path)).expect("trunk pass failed");
     let boundaries_new = report.boundaries;
 
@@ -86,5 +99,40 @@ fn test_trunk_parity() {
     assert!(
         report.noise_floor_dbfs.is_some(),
         "Expected non-empty noise floor for non-silent signal"
+    );
+
+    // ═══ Y2a Oracle: spectral_profile_db + transient_density parity ═══
+    // Run PreAnalyzer on the FULL buffer (fits in RAM in test) and compare
+    // to trunk's streaming computation. Same input, same algorithm →
+    // should match within floating-point tolerance.
+    let (full_left, full_right) = read_full_buffers(wav_path);
+    let pre = sp314_dsp::analysis::pre_analysis::PreAnalyzer::run(&full_left, &full_right, 48_000);
+
+    // Spectral profile: within 0.1 dB per band
+    for (band, (trunk_db, pre_db)) in report
+        .spectral_profile_db
+        .iter()
+        .zip(pre.spectral_profile_db.iter())
+        .enumerate()
+    {
+        let delta = (trunk_db - pre_db).abs();
+        assert!(
+            delta < 0.1,
+            "Spectral band {} parity violation: trunk={:.4} pre={:.4} delta={:.4}",
+            band,
+            trunk_db,
+            pre_db,
+            delta
+        );
+    }
+
+    // Transient density: within 0.1 transients/sec
+    let td_delta = (report.transient_density - pre.transient_density).abs();
+    assert!(
+        td_delta < 0.1,
+        "Transient density parity violation: trunk={:.4} pre={:.4} delta={:.4}",
+        report.transient_density,
+        pre.transient_density,
+        td_delta
     );
 }

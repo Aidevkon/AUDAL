@@ -4,7 +4,7 @@
 //! `build_timeline_map` (WholeBufferProvider → full-file RAM decode → scan_file)
 //! and separate metering passes with ONE chunked read of the dump file
 //! (written by P0-a), producing boundaries + LUFS + crest + LRA + noise
-//! floor in a single linear scan.
+//! floor + spectral profile + transient density in a single linear scan.
 //!
 //! STRANGLER FIG: The measurement logic is IDENTICAL to scan_file's —
 //! same SegmentScout instance, same 5s windows, same 1s hops, same
@@ -13,6 +13,7 @@
 
 use lineos_corpus::scout::{compute_scout_decision, smooth_and_segment, SegmentBoundary};
 use sp314_dsp::analysis::dynamics::StreamingDynamicsAnalyzer;
+use sp314_dsp::analysis::pre_analysis::{butter_hp2, butter_lp2, Biquad, BAND_EDGES};
 use sp314_dsp::analysis::scout::SegmentScout;
 use sp314_dsp::metering::lra::StreamingLraMeter;
 use sp314_dsp::metering::LufsMeter;
@@ -26,6 +27,8 @@ pub struct TrunkReport {
     pub crest_db: f32,
     pub lra: f32,
     pub noise_floor_dbfs: Option<f32>,
+    pub spectral_profile_db: [f32; 8],
+    pub transient_density: f32,
 }
 
 // Mirror scan_file's constants exactly [scout_scanner.rs:6-7].
@@ -38,12 +41,159 @@ const CHUNK_FRAMES: usize = 4096;
 const DEAD_AIR_GATE_DBFS: f32 = -60.0;
 const NOISE_FLOOR_WINDOW: usize = 48_000; // 1s at 48kHz
 
+// ── Transient density constants ──────────────────────────────────────────────
+// Mirror compute_transient_density [pre_analysis.rs:548-550] exactly:
+//   fast_win = 0.010 * sr = 480 samples (10ms at 48kHz)
+//   slow_win = 0.100 * sr = 4800 samples (100ms at 48kHz)
+//   threshold_linear = 10^(6/20) ≈ 1.9953 (+6dB)
+const TD_FAST_WIN: usize = 480;
+const TD_SLOW_WIN: usize = 4800;
+
+/// 4th-order Butterworth bandpass filter (2×HP + 2×LP cascade).
+/// Same topology as `bandpass_filter` in pre_analysis.rs:399-413.
+struct BandpassFilter {
+    hp1: Biquad,
+    hp2: Biquad,
+    lp1: Biquad,
+    lp2: Biquad,
+}
+
+impl BandpassFilter {
+    fn new(lo: f32, hi: f32, sr: f32) -> Self {
+        Self {
+            hp1: butter_hp2(lo, sr),
+            hp2: butter_hp2(lo, sr),
+            lp1: butter_lp2(hi, sr),
+            lp2: butter_lp2(hi, sr),
+        }
+    }
+
+    /// Process one sample through the 4th-order bandpass cascade.
+    /// Mirrors bandpass_filter's per-sample chain exactly:
+    ///   y = hp1(x) → hp2 → lp1 → lp2  [pre_analysis.rs:407-410]
+    fn process(&mut self, x: f32) -> f32 {
+        let y = self.hp1.process(x);
+        let y = self.hp2.process(y);
+        let y = self.lp1.process(y);
+        self.lp2.process(y)
+    }
+}
+
+/// Streaming dual-moving-average transient detector.
+/// Mirrors `compute_transient_density` [pre_analysis.rs:543-585] line-for-line:
+///   - Rectified signal: |mono[i]|
+///   - fast MA: 10ms (480 samples) running average of rectified signal
+///   - slow MA: 100ms (4800 samples) running average of rectified signal
+///   - Onset: fast > slow * threshold (+6dB)
+///   - Count: false→true leading edges (after slow_win warm-up)
+///   - Density: count / ((total_samples - slow_win) / sr)
+struct StreamingTransientDetector {
+    fast_ring: Vec<f32>,
+    fast_pos: usize,
+    fast_sum: f32,
+    fast_filled: usize,
+    slow_ring: Vec<f32>,
+    slow_pos: usize,
+    slow_sum: f32,
+    slow_filled: usize,
+    threshold_linear: f32,
+    was_above: bool,
+    count: u32,
+    total_samples: usize,
+}
+
+impl StreamingTransientDetector {
+    fn new() -> Self {
+        // threshold_linear = 10^(6/20) ≈ 1.9953
+        // Mirrors compute_transient_density [pre_analysis.rs:550]:
+        //   let threshold_linear: f32 = libm::powf(10.0, 6.0 / 20.0);
+        // Pre-computed because libm is not a dep of sp314-orchestrator.
+        let threshold_linear: f32 = 1.995_262_3; // 10^0.3 exact to 7 sig figs
+        debug_assert!((threshold_linear - 10.0_f32.powf(6.0 / 20.0)).abs() < 1e-6);
+        Self {
+            fast_ring: vec![0.0; TD_FAST_WIN],
+            fast_pos: 0,
+            fast_sum: 0.0,
+            fast_filled: 0,
+            slow_ring: vec![0.0; TD_SLOW_WIN],
+            slow_pos: 0,
+            slow_sum: 0.0,
+            slow_filled: 0,
+            threshold_linear,
+            was_above: false,
+            count: 0,
+            total_samples: 0,
+        }
+    }
+
+    /// Feed one rectified mono sample.
+    /// Mirrors the per-sample loop in compute_transient_density
+    /// [pre_analysis.rs:571-578]:
+    ///   for i in slow_win..n {
+    ///       let fast = ma(i, fast_win);
+    ///       let slow = ma(i, slow_win);
+    ///       let is_above = fast > slow * threshold_linear;
+    ///       if is_above && !was_above { count += 1; }
+    ///       was_above = is_above;
+    ///   }
+    fn feed(&mut self, rect_sample: f32) {
+        self.total_samples += 1;
+
+        // Update fast ring (10ms MA)
+        self.fast_sum -= self.fast_ring[self.fast_pos];
+        self.fast_ring[self.fast_pos] = rect_sample;
+        self.fast_sum += rect_sample;
+        self.fast_pos = (self.fast_pos + 1) % TD_FAST_WIN;
+        if self.fast_filled < TD_FAST_WIN {
+            self.fast_filled += 1;
+        }
+
+        // Update slow ring (100ms MA)
+        self.slow_sum -= self.slow_ring[self.slow_pos];
+        self.slow_ring[self.slow_pos] = rect_sample;
+        self.slow_sum += rect_sample;
+        self.slow_pos = (self.slow_pos + 1) % TD_SLOW_WIN;
+        if self.slow_filled < TD_SLOW_WIN {
+            self.slow_filled += 1;
+        }
+
+        // Only start detection after slow_win samples are full,
+        // mirroring `for i in slow_win..n` [pre_analysis.rs:571].
+        if self.slow_filled < TD_SLOW_WIN {
+            return;
+        }
+
+        let fast_ma = self.fast_sum / self.fast_filled as f32;
+        let slow_ma = self.slow_sum / TD_SLOW_WIN as f32;
+
+        let is_above = fast_ma > slow_ma * self.threshold_linear;
+        if is_above && !self.was_above {
+            self.count += 1;
+        }
+        self.was_above = is_above;
+    }
+
+    /// Mirrors compute_transient_density [pre_analysis.rs:580-584]:
+    ///   let duration = (n - slow_win) as f32 / sample_rate as f32;
+    ///   count as f32 / duration
+    fn finish(&self) -> f32 {
+        let active_samples = self.total_samples.saturating_sub(TD_SLOW_WIN);
+        if active_samples == 0 {
+            return 0.0;
+        }
+        let duration = active_samples as f32 / SAMPLE_RATE as f32;
+        self.count as f32 / duration
+    }
+}
+
 /// Run the trunk pass on a raw PCM dump (interleaved f32, 48 kHz, stereo).
 ///
 /// The dump was written by pass0_decode_to_dump through StandardizedDecoder,
 /// which guarantees 48k/2ch by construction [standardized_decoder.rs:70].
 pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
     let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path)?;
+    let srf = SAMPLE_RATE as f32;
+    let nyq = srf / 2.0;
 
     // === Meters ===
     let mut lufs_meter = LufsMeter::new();
@@ -54,6 +204,36 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
     let mut nf_sum_sq: f32 = 0.0;
     let mut nf_count: usize = 0;
     let mut min_nondead_dbfs: Option<f32> = None;
+
+    // === 8-band spectral profile ===
+    // Mirrors spectral_profile_8band [pre_analysis.rs:469-499]:
+    //   Same BAND_EDGES, same 4th-order Butterworth bandpass (2×HP + 2×LP),
+    //   same RMS formula: sqrt(sum(l²+r²) / (2*N)).
+    //   Stateful filters carry state across chunks → bit-identical to
+    //   whole-buffer processing of the same signal.
+    struct BandState {
+        filter_l: BandpassFilter,
+        filter_r: BandpassFilter,
+        sum_sq: f64, // f64 accumulator to avoid precision loss on long files
+        active: bool,
+    }
+    let mut bands: Vec<BandState> = (0..8)
+        .map(|i| {
+            let lo = BAND_EDGES[i].max(1.0);
+            let hi = BAND_EDGES[i + 1].min(nyq - 1.0);
+            let active = lo < hi;
+            BandState {
+                filter_l: BandpassFilter::new(lo, hi, srf),
+                filter_r: BandpassFilter::new(lo, hi, srf),
+                sum_sq: 0.0,
+                active,
+            }
+        })
+        .collect();
+    let mut total_frames: usize = 0;
+
+    // === Transient density ===
+    let mut transient_det = StreamingTransientDetector::new();
 
     // === Scout windowing state ===
     // Mirrors scan_file's sequential loop [scout_scanner.rs:38-56]:
@@ -86,6 +266,7 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         if frames == 0 {
             break;
         }
+        total_frames += frames;
 
         // De-interleave + mono — formula mirrors scan_file's exactly:
         //   mono[i] = (l + r) * 0.5   [scout_scanner.rs:30]
@@ -102,6 +283,29 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         lufs_meter.process_chunk(l, r);
         dynamics.feed_chunk(m);
         lra_meter.process_chunk(l, r);
+
+        // --- 8-band spectral profile: filter + accumulate ---
+        // Mirrors spectral_profile_8band's per-sample chain:
+        //   let fl = bandpass_filter(left, lo, hi, srf);
+        //   let fr = bandpass_filter(right, lo, hi, srf);
+        //   sum_sq += fl[i]*fl[i] + fr[i]*fr[i]   [pre_analysis.rs:490]
+        for i in 0..frames {
+            for band in bands.iter_mut() {
+                if !band.active {
+                    continue;
+                }
+                let fl = band.filter_l.process(l[i]);
+                let fr = band.filter_r.process(r[i]);
+                band.sum_sq += (fl * fl + fr * fr) as f64;
+            }
+        }
+
+        // --- Transient density: feed rectified mono ---
+        // Mirrors compute_transient_density [pre_analysis.rs:553]:
+        //   let rect: Vec<f32> = mono.iter().map(|&s| libm::fabsf(s)).collect();
+        for &s in m.iter() {
+            transient_det.feed(s.abs());
+        }
 
         // --- Noise floor: 1s energy windows ---
         for &s in m.iter() {
@@ -133,16 +337,6 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         hist_mono.extend_from_slice(m);
 
         // --- Serve scout windows ---
-        // WINDOW-PARITY GUARANTEE: scan_file's loop condition is
-        //   `while start + win_samples <= mono_full.len()`  [scout_scanner.rs:43]
-        // Our equivalent: we only measure when the history contains a
-        // FULL window starting at next_window_start, and next_window_start
-        // advances by hop_samples (48_000) each time. The global offsets
-        // match scan_file's `start` variable exactly:
-        //   scan_file: start = 0, hop, 2*hop, ... while start + win <= N
-        //   trunk:     next_window_start = 0, hop, 2*hop, ... same condition
-        // The last partial window (< win_samples) is NOT measured, matching
-        // scan_file's behavior exactly.
         let hist_end = hist_base + hist_mono.len();
         while next_window_start + win_samples <= hist_end {
             let local_start = next_window_start - hist_base;
@@ -160,9 +354,6 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         }
 
         // --- Drain consumed history ---
-        // Everything before next_window_start - (win_samples - hop_samples)
-        // can never be needed again (the next window starts at
-        // next_window_start and looks back win_samples from there).
         let keep_from = if next_window_start >= win_samples {
             next_window_start - win_samples + hop_samples
         } else {
@@ -184,6 +375,26 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
     let (_rms_db, crest_db, _dyn_range) = dynamics.finish();
     let lra = lra_meter.finish();
 
+    // === Finish spectral profile ===
+    // Mirrors spectral_profile_8band [pre_analysis.rs:490-494]:
+    //   let rms = sqrtf(sum_sq / (2.0 * left.len() as f32));
+    //   if rms > 1e-20 { profile[i] = 20.0 * log10f(rms); }
+    let mut spectral_profile_db = [-144.0_f32; 8];
+    if total_frames > 0 {
+        for (i, band) in bands.iter().enumerate() {
+            if !band.active {
+                continue;
+            }
+            let rms = (band.sum_sq / (2.0 * total_frames as f64)).sqrt() as f32;
+            if rms > 1e-20 {
+                spectral_profile_db[i] = 20.0 * rms.log10();
+            }
+        }
+    }
+
+    // === Finish transient density ===
+    let transient_density = transient_det.finish();
+
     // === Segmentation ===
     let boundaries = smooth_and_segment(&decisions);
 
@@ -193,5 +404,7 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
         crest_db,
         lra,
         noise_floor_dbfs: min_nondead_dbfs,
+        spectral_profile_db,
+        transient_density,
     })
 }

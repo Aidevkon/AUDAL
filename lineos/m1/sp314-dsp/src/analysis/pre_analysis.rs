@@ -106,7 +106,7 @@ const N_PHASES: usize = 4;
 ///   [4] Mid-High 1000-2000Hz (articulation)
 ///   [5] HighMid  2000-4000Hz (presence/Byrne)
 ///   [6] Treble   4000-8000Hz
-const BAND_EDGES: [f32; 9] = [
+pub const BAND_EDGES: [f32; 9] = [
     20.0, 80.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 20000.0,
 ];
 
@@ -333,8 +333,10 @@ fn compute_lra(left: &[f32], right: &[f32]) -> f32 {
 
 // ── 6-Band Spectral Profile (Butterworth IIR) ────────────────────────────────
 
-/// 2nd-order Butterworth section (biquad) state
-struct Biquad {
+/// 2nd-order Butterworth section (biquad) state.
+/// Public so that streaming consumers (trunk_pass) can reuse the
+/// same coefficient math without forking it.
+pub struct Biquad {
     b0: f32,
     b1: f32,
     b2: f32,
@@ -345,7 +347,7 @@ struct Biquad {
 }
 
 impl Biquad {
-    fn process(&mut self, x: f32) -> f32 {
+    pub fn process(&mut self, x: f32) -> f32 {
         let y = self.b0 * x + self.w1;
         self.w1 = self.b1 * x - self.a1 * y + self.w2;
         self.w2 = self.b2 * x - self.a2 * y;
@@ -359,8 +361,9 @@ impl Biquad {
     }
 }
 
-/// Design 2nd-order Butterworth lowpass biquad
-fn butter_lp2(freq: f32, sr: f32) -> Biquad {
+/// Design 2nd-order Butterworth lowpass biquad.
+/// Public for streaming consumers (trunk_pass).
+pub fn butter_lp2(freq: f32, sr: f32) -> Biquad {
     let w0 = 2.0 * core::f32::consts::PI * freq / sr;
     let cs = libm::cosf(w0);
     let sn = libm::sinf(w0);
@@ -377,8 +380,9 @@ fn butter_lp2(freq: f32, sr: f32) -> Biquad {
     }
 }
 
-/// Design 2nd-order Butterworth highpass biquad
-fn butter_hp2(freq: f32, sr: f32) -> Biquad {
+/// Design 2nd-order Butterworth highpass biquad.
+/// Public for streaming consumers (trunk_pass).
+pub fn butter_hp2(freq: f32, sr: f32) -> Biquad {
     let w0 = 2.0 * core::f32::consts::PI * freq / sr;
     let cs = libm::cosf(w0);
     let sn = libm::sinf(w0);
