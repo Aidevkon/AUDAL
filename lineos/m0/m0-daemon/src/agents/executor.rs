@@ -224,28 +224,11 @@ pub async fn run(
                     let streaming_features = scout_out.scout.features.clone();
                     profiler.mark_stage_with_hash("Scout/PreAnalysis", String::new());
 
-                    // a. Build boundaries
-                    let decoder = crate::dsp::file_decoder::FileDecoder {
-                        path: audio_path.clone(),
-                    };
-                    let boundaries = sp314_orchestrator::pass1_pipeline::build_timeline_map(
-                        decoder,
-                    )
-                    .map_err(|e| {
-                        ExecutorError::DspFailed(format!("Failed to build timeline map: {}", e))
-                    })?;
-
                     // ═══ P0: decode→dump + input metrics (one pass) ═══
-                    // Replaces the former dedicated `measure_input_metrics`
-                    // decode pass (#2) and the render-time TappedDecoder
-                    // decode (#3) with a single StandardizedDecoder +
-                    // TappedDecoder pass that writes the raw PCM dump AND
-                    // feeds the LUFS/TruePeak/BPM meters simultaneously.
-                    // The dump file at `raw_tap_path` is now the artery:
-                    // all downstream passes (Pass 1 trunk analysis, Pass 2
-                    // render) will consume it. The StandardizedDecoder is
-                    // returned for its post-stream state (input_hashes,
-                    // expected_output_frames, dead_air).
+                    // Must run FIRST: the trunk pass and render both read
+                    // the dump it writes. Nothing between P0 and the old
+                    // build_timeline_map consumed boundaries (recon-proven
+                    // 2026-07-23).
                     let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
                         lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
                     });
@@ -272,6 +255,32 @@ pub async fn run(
                         }
                         None => 1.0,
                     };
+
+                    // ═══ Y1 Trunk Pass: segmentation + metering from dump ═══
+                    // Replaces build_timeline_map (which decoded the original
+                    // file into RAM). Reads the dump written by P0 above.
+                    // Produces boundaries + LUFS/crest/LRA/noise_floor in one
+                    // chunked pass — no additional decode of the original file.
+                    let trunk_report =
+                        sp314_orchestrator::trunk_pass::run_trunk_pass(
+                            std::path::Path::new(&raw_tap_path),
+                        )
+                        .map_err(|e| {
+                            ExecutorError::DspFailed(format!("trunk pass failed: {e}"))
+                        })?;
+                    let boundaries = trunk_report.boundaries;
+                    // Y2 consumers will use trunk metrics; for now log them.
+                    // NOTE: trunk LUFS measures the same standardized stream
+                    // as P0's metrics.integrated_lufs — they SHOULD agree;
+                    // Y2 reconciles. Autotune keeps using P0's value.
+                    eprintln!(
+                        "[TRUNK] lufs={:?} crest={:.2} lra={:.2} noise_floor={:?}",
+                        trunk_report.integrated_lufs,
+                        trunk_report.crest_db,
+                        trunk_report.lra,
+                        trunk_report.noise_floor_dbfs,
+                    );
+                    profiler.mark_stage_with_hash("Trunk Pass", String::new());
 
                     // b. Build minimal ducking topology
                     let mut db =

@@ -11,3 +11,4 @@ pub mod raw_pcm_source;
 pub mod seekable_provider;
 pub mod sparse_scout;
 pub mod streaming_pipeline;
+pub mod trunk_pass;

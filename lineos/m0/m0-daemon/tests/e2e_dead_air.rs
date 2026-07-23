@@ -111,8 +111,8 @@ async fn dead_air_reaches_the_real_certificate() {
     );
     assert_eq!(
         blob.processing_timeline.len(),
-        5,
-        "expected exactly 5 stages (Scout/PreAnalysis, Decode Setup, \
+        6,
+        "expected exactly 6 stages (Scout/PreAnalysis, Trunk Pass, Decode Setup, \
          Streaming Render, Verification Pass, Certificate Assembly), \
          got {}",
         blob.processing_timeline.len()
