@@ -234,6 +234,12 @@ fn spatial_conformance_path(
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
 /// data to disk using a bounded 65536-frame chunk buffer, avoiding a full-file
 /// allocation.
+/// A4-iii: test-only after SpatialDumpWriter replaced the production call site.
+/// Deletion candidate at A4-close.
+/// NOTE: the f32→u8 unsafe cast writes native-endian bytes — latent BE bug
+/// shared with the old spatial_conformance_path. Harmless on x86-64 (LE);
+/// fix if/when we target BE, or delete at A4-close.
+#[allow(dead_code)] // test-only since A4-iii; deletion candidate at A4-close
 fn write_interleaved_dump(
     channels: &[Vec<f32>; 6],
     num_frames: usize,
@@ -775,56 +781,19 @@ fn run_dsp_internal(
     let final_ducking =
         (render_params.ducking_gain / repo_state.ducking_depth).clamp(0.1_f32, 1.0_f32);
 
-    // Spatial output buffers —
-    // allocated only if preset needs spatial
+    // Spatial output —
+    // A4-iii: streaming dump writer replaces the six Vec<f32> allocations
     let needs_spatial = matches!(preset_id.as_str(), "spatial_upmix" | "pro_bundle_both");
-    let mut sp_l = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
+    let spatial_raw_path = format!("/tmp/m0d-raw-{}-spatial.pcm", blob_id);
+    let mut spatial_writer = if needs_spatial {
+        Some(crate::domain::nodes::render_node::SpatialDumpWriter::create(&spatial_raw_path)?)
     } else {
-        vec![]
-    };
-    let mut sp_r = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
-    } else {
-        vec![]
-    };
-    let mut sp_c = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
-    } else {
-        vec![]
-    };
-    let mut sp_lfe = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
-    } else {
-        vec![]
-    };
-    let mut sp_ls = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
-    } else {
-        vec![]
-    };
-    let mut sp_rs = if needs_spatial {
-        vec![0.0_f32; n_total_with_tail]
-    } else {
-        vec![]
+        None
     };
 
     let mut spatial_blob_out: Option<StoredBlob> = None;
 
     emit_progress("Stem Engine");
-
-    let mut spatial_slices = if needs_spatial {
-        Some(crate::domain::nodes::render_node::SpatialSlicesMut {
-            l: &mut sp_l,
-            r: &mut sp_r,
-            c: &mut sp_c,
-            lfe: &mut sp_lfe,
-            ls: &mut sp_ls,
-            rs: &mut sp_rs,
-        })
-    } else {
-        None
-    };
 
     let (fingerprints, spatial_metadata) = if content_type.skip_stems() {
         // Episode path: bypass stem
@@ -869,15 +838,17 @@ fn run_dsp_internal(
             },
             &mut scratch_l_view[..],
             &mut scratch_r_view[..],
-            spatial_slices.as_mut(),
+            spatial_writer.as_mut(),
         )?
     };
 
-    if needs_spatial && !sp_l.is_empty() {
-        let spatial_channels: [Vec<f32>; 6] = [sp_l, sp_r, sp_c, sp_lfe, sp_ls, sp_rs];
-        // Write planar channels to dump, then run conformance over the file
-        let spatial_raw_path = format!("/tmp/m0d-raw-{}-spatial.pcm", blob_id);
-        write_interleaved_dump(&spatial_channels, n_total_with_tail, &spatial_raw_path)?;
+    if let Some(writer) = spatial_writer {
+        let frames_written = writer.finish()?;
+        if frames_written != n_total_with_tail {
+            return Err(format!(
+                "spatial dump: expected {n_total_with_tail} frames, got {frames_written}"
+            ));
+        }
         let spatial_blob = spatial_conformance_path(
             &spatial_raw_path,
             decoded.pcm_sample_rate,
