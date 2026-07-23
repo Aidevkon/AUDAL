@@ -53,8 +53,43 @@ impl SpatialDumpWriter {
         Ok(())
     }
 
-    pub fn finish(mut self) -> Result<usize, String> {
+    /// Finalize the dump: if the engine emitted fewer frames than
+    /// `expected_frames`, pad with explicit zero-frames to reproduce
+    /// the implicit silent tail that the old Vec<f32> allocation
+    /// provided (the STFT engine does NOT emit flush-tail frames —
+    /// the trailing STFT_FLUSH_TAIL zeros came from vec![0.0; n]
+    /// initialization, confirmed by recon 2026-07-23).
+    ///
+    /// Over-emission (frames_written > expected_frames) is a hard
+    /// error — that indicates real engine/data corruption, not a
+    /// benign tail gap.
+    pub fn finish(mut self, expected_frames: usize) -> Result<usize, String> {
         use std::io::Write;
+        if self.frames_written > expected_frames {
+            return Err(format!(
+                "SpatialDumpWriter: over-emission: wrote {} frames but expected {}",
+                self.frames_written, expected_frames
+            ));
+        }
+        let deficit = expected_frames - self.frames_written;
+        if deficit > 0 {
+            // Write zero-frames in scratch-sized chunks to avoid a
+            // single huge allocation. 24 bytes per frame (6 × f32 LE).
+            const BYTES_PER_FRAME: usize = 24;
+            let chunk_frames = self.scratch.capacity().max(BYTES_PER_FRAME) / BYTES_PER_FRAME;
+            let zero_chunk_bytes = chunk_frames * BYTES_PER_FRAME;
+            self.scratch.clear();
+            self.scratch.resize(zero_chunk_bytes, 0u8);
+            let mut remaining = deficit;
+            while remaining > 0 {
+                let n = remaining.min(chunk_frames);
+                self.writer
+                    .write_all(&self.scratch[..n * BYTES_PER_FRAME])
+                    .map_err(|e| format!("SpatialDumpWriter: tail write: {e}"))?;
+                remaining -= n;
+            }
+            self.frames_written = expected_frames;
+        }
         self.writer
             .flush()
             .map_err(|e| format!("SpatialDumpWriter: flush: {e}"))?;

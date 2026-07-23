@@ -843,12 +843,7 @@ fn run_dsp_internal(
     };
 
     if let Some(writer) = spatial_writer {
-        let frames_written = writer.finish()?;
-        if frames_written != n_total_with_tail {
-            return Err(format!(
-                "spatial dump: expected {n_total_with_tail} frames, got {frames_written}"
-            ));
-        }
+        writer.finish(n_total_with_tail)?;
         let spatial_blob = spatial_conformance_path(
             &spatial_raw_path,
             decoded.pcm_sample_rate,
