@@ -77,4 +77,86 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         "Spatial blob: id={} channels={} sample_rate={} blob_type={}",
         blob.id, blob.channels, blob.sample_rate, blob.blob_type
     );
+
+    // (1) Run In-process MultichannelLufsMeter (Secondary Check)
+    use sp314_dsp::metering::MultichannelLufsMeter;
+    let mut meter = MultichannelLufsMeter::new();
+    for chunk in pcm_bytes.chunks_exact(24) {
+        let s: [f32; 6] = core::array::from_fn(|ch| {
+            f32::from_le_bytes(chunk[ch * 4..ch * 4 + 4].try_into().unwrap())
+        });
+        meter.process_frame(&s);
+    }
+    let mc_lufs = meter.finish().expect("Meter failed to compute LUFS");
+    let mc_delta = (mc_lufs - -18.0).abs();
+
+    // (2) Run FFMPEG Ground Truth (Primary Check)
+    let ffmpeg_status = std::process::Command::new("ffmpeg")
+        .arg("-version")
+        .output();
+    let mut ffmpeg_lufs: Option<f32> = None;
+
+    if ffmpeg_status.is_ok() {
+        let output = std::process::Command::new("ffmpeg")
+            .args([
+                "-f", "f32le", "-ar", "48000", "-ac", "6", "-i", &pcm_path, "-af", "ebur128", "-f",
+                "null", "-",
+            ])
+            .output()
+            .expect("Failed to execute ffmpeg");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut in_summary = false;
+
+        for line in stderr.lines() {
+            if line.contains("Summary:") {
+                in_summary = true;
+                continue;
+            }
+            if in_summary && line.contains("I:") && line.contains("LUFS") {
+                // e.g. "    I:         -18.0 LUFS"
+                if let Some(val_str) = line.split("LUFS").next() {
+                    if let Some(num_str) = val_str.split("I:").nth(1) {
+                        if let Ok(val) = num_str.trim().parse::<f32>() {
+                            ffmpeg_lufs = Some(val);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // (3) Print results and assert (primary first)
+    if let Some(ffmpeg_val) = ffmpeg_lufs {
+        let ffmpeg_delta = (ffmpeg_val - -18.0).abs();
+        println!(
+            "Oracle (ffmpeg ebur128): measured={:.2} LUFS, target=-18.0 (delta: {:.3})",
+            ffmpeg_val, ffmpeg_delta
+        );
+        println!(
+            "Oracle (in-process meter): measured={:.2} LUFS, target=-18.0 (delta: {:.3})",
+            mc_lufs, mc_delta
+        );
+
+        assert!(
+            ffmpeg_delta <= 0.5,
+            "FFMPEG normalization failed: expected -18.0 ±0.5, got {:.2}",
+            ffmpeg_val
+        );
+    } else {
+        println!(
+            "SKIP: ffmpeg not found in PATH or parsing failed, skipping primary oracle check."
+        );
+        println!(
+            "Oracle (in-process meter): measured={:.2} LUFS, target=-18.0 (delta: {:.3})",
+            mc_lufs, mc_delta
+        );
+    }
+
+    assert!(
+        mc_delta <= 0.5,
+        "In-process meter normalization failed: expected -18.0 ±0.5, got {:.2}",
+        mc_lufs
+    );
 }

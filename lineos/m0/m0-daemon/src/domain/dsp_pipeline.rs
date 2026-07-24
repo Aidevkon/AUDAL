@@ -77,12 +77,11 @@ fn spatial_conformance_path(
     String,
 > {
     use sp314_dsp::limiter::true_peak::TruePeakDetector;
-    use sp314_dsp::metering::LufsMeter;
+    use sp314_dsp::metering::MultichannelLufsMeter;
     use std::fs::OpenOptions;
 
     // ── PASS 1 (measure, read-only): LUFS + per-channel TruePeak ──
     const CHUNK_FRAMES: usize = 65536;
-    const CSURR: f32 = 0.707_f32;
     const BYTES_PER_FRAME: usize = 6 * 4; // 6 channels × f32
 
     let file_len = std::fs::metadata(raw_path)
@@ -95,13 +94,9 @@ fn spatial_conformance_path(
         ));
     }
 
-    let mut lufs_meter = LufsMeter::new();
+    let mut lufs_meter = MultichannelLufsMeter::new();
     let mut detectors: [TruePeakDetector; 6] = std::array::from_fn(|_| TruePeakDetector::new());
     let mut raw_max_tp = [0.0_f32; 6];
-
-    // Bounded scratch buffers, reused across chunks
-    let mut fold_l = Vec::with_capacity(CHUNK_FRAMES);
-    let mut fold_r = Vec::with_capacity(CHUNK_FRAMES);
 
     {
         use std::io::Read;
@@ -126,9 +121,6 @@ fn spatial_conformance_path(
                 break;
             }
 
-            fold_l.clear();
-            fold_r.clear();
-
             for frame in byte_buf[..bytes_read].chunks_exact(24) {
                 let s: [f32; 6] = std::array::from_fn(|ch| {
                     f32::from_le_bytes([
@@ -138,22 +130,19 @@ fn spatial_conformance_path(
                         frame[ch * 4 + 3],
                     ])
                 });
-                // BS.775 stereo downmix for LUFS: L + 0.707·C + 0.707·Ls / R + 0.707·C + 0.707·Rs
-                fold_l.push(s[0] + CSURR * s[2] + CSURR * s[4]);
-                fold_r.push(s[1] + CSURR * s[2] + CSURR * s[5]);
+
+                lufs_meter.process_frame(&s);
 
                 for ch in 0..6 {
                     let tp = detectors[ch].process(s[ch], s[ch]);
                     raw_max_tp[ch] = raw_max_tp[ch].max(tp);
                 }
             }
-
-            lufs_meter.process_chunk(&fold_l, &fold_r);
         }
     }
 
     // measure_integrated_lufs returns -144.0 for silence/too-short;
-    // LufsMeter::finish() returns None. Mirror the monolithic behavior.
+    // MultichannelLufsMeter::finish() returns None. Mirror the monolithic behavior.
     let measured_lufs = lufs_meter.finish().unwrap_or(-144.0_f32);
 
     // 2. Gain offset για Apple -18 LKFS target
