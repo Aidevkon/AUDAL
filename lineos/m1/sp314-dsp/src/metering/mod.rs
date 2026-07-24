@@ -12,5 +12,7 @@ pub use gating::{
 };
 pub use lufs::measure_integrated_lufs;
 pub mod lufs_meter;
+pub mod multichannel_lufs;
 pub mod true_peak_meter;
 pub use lufs_meter::LufsMeter;
+pub use multichannel_lufs::MultichannelLufsMeter;
