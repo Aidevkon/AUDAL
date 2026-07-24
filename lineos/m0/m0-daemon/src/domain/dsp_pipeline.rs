@@ -811,8 +811,9 @@ fn run_dsp_internal(
     // NODE 4: RENDER (mmap + process_chunks + spatial)
     // mmap stays here — render_node receives slices (no self-referential struct)
     let n_total = decoded.total_frames;
-    const STFT_FLUSH_TAIL: usize = 1024;
-    let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
+    // F-052: STFT_FLUSH_TAIL compensation (commit 9039dac) removed — the engine
+    // no longer emits head latency since the SlidingOverlapReader era. Proven by
+    // alignment oracle: impulse@24000 peaked at frame 23007 (= 24000−1024+smear).
     let file_path_raw = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
     let file_path =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(file_path_raw.clone()));
@@ -837,14 +838,13 @@ fn run_dsp_internal(
         .open(&scratch_l_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
     scratch_l_file
-        .set_len((n_total_with_tail * 4) as u64)
+        .set_len((n_total * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut scratch_l_mmap = unsafe {
         memmap2::MmapMut::map_mut(&scratch_l_file).map_err(|e| format!("Mmap failed: {e}"))?
     };
-    let scratch_l_view: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total_with_tail)
-    };
+    let scratch_l_view: &mut [f32] =
+        unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total) };
 
     let scratch_r_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-r-{}.pcm", blob_id));
     let scratch_r_file = std::fs::OpenOptions::new()
@@ -855,14 +855,13 @@ fn run_dsp_internal(
         .open(&scratch_r_path)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
     scratch_r_file
-        .set_len((n_total_with_tail * 4) as u64)
+        .set_len((n_total * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
     let mut scratch_r_mmap = unsafe {
         memmap2::MmapMut::map_mut(&scratch_r_file).map_err(|e| format!("Mmap failed: {e}"))?
     };
-    let scratch_r_view: &mut [f32] = unsafe {
-        std::slice::from_raw_parts_mut(scratch_r_mmap.as_mut_ptr() as *mut f32, n_total_with_tail)
-    };
+    let scratch_r_view: &mut [f32] =
+        unsafe { std::slice::from_raw_parts_mut(scratch_r_mmap.as_mut_ptr() as *mut f32, n_total) };
 
     let repo_state = head_state.load_full();
     let final_ducking =
@@ -930,11 +929,11 @@ fn run_dsp_internal(
     };
 
     if let Some(writer) = spatial_writer {
-        writer.finish(n_total_with_tail)?;
+        writer.finish(n_total)?;
         let spatial_blob = spatial_conformance_path(
             &spatial_raw_path,
             decoded.pcm_sample_rate,
-            n_total_with_tail,
+            n_total,
             &format!("{blob_id}-spatial"),
             preset_id,
             &input_hash_hex,
@@ -952,15 +951,9 @@ fn run_dsp_internal(
         rms(&scratch_r_view[..]) / rms(&scratch_l_view[..]).max(1e-9)
     );
 
-    let left_post = &mut scratch_l_view[STFT_FLUSH_TAIL..];
-    let right_post = &mut scratch_r_view[STFT_FLUSH_TAIL..];
-
-    eprintln!(
-        "[BISECT-4-TRIM] L_rms={:.6} R_rms={:.6} ratio={:.4}",
-        rms(&left_post[..]),
-        rms(&right_post[..]),
-        rms(&right_post[..]) / rms(&left_post[..]).max(1e-9)
-    );
+    // F-052: no head trim — left_post/right_post are the full views.
+    let left_post = &mut scratch_l_view[..];
+    let right_post = &mut scratch_r_view[..];
 
     profiler.mark_stage("Stem Engine", &left_post[..]);
 

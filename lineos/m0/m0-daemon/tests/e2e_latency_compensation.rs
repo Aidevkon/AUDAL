@@ -64,7 +64,8 @@ async fn test_e2e_latency_compensation() {
 
     // --- 1. Frame count guard ---
     let frames = data.len() / 2; // Stereo interleaved
-                                 // Regression guard: catches if STFT_FLUSH_TAIL trim (commit 9039dac) is ever reverted or an upstream node's tail size changes without updating the trim.
+                                 // Regression guard: the engine emits exactly n_total frames
+                                 // (F-052 removed the stale STFT_FLUSH_TAIL head trim).
     assert_eq!(
         frames, 144000,
         "Exported frame count must be EXACTLY the input frame count (144000) with no STFT tail."
@@ -84,7 +85,7 @@ async fn test_e2e_latency_compensation() {
     }
     assert!(
         leading_zero_count < 1000,
-        "Leading silence guard failed: {} consecutive near-zero samples at start (expected well under 1024, which was the old STFT_FLUSH_TAIL bug's signature — sound should start within the first ~700 samples based on today's empirical Hanning ramp-up measurement).",
+        "Leading silence guard failed: {} consecutive near-zero samples at start (expected well under 1024 — sound should start within the first few hundred samples).",
         leading_zero_count
     );
 }
