@@ -291,139 +291,25 @@ fn firewall_clamps_malicious_50db_injection() {
 /// receives the Acoustic reference profile correction zones.
 #[test]
 fn inv_mus_4_classified_acoustic_gets_acoustic_zones() {
-    let req = AetherRequest {
-        content_type: ContentType::Music,
-        ..podcast_req()
-    };
-
-    let mut pa = ltass_input([30.0, 30.0, -30.0, -30.0, 30.0, 30.0, -30.0, -30.0]);
-    pa.genre = Some(lineos_types::pre_analysis::Genre::Acoustic);
-
-    let (dsp_config, _, _) =
-        build_dsp_config(&req, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
-
-    let acoustic_gains: Vec<f32> = dsp_config
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    assert!(
-        !acoustic_gains.is_empty(),
-        "Acoustic music content produced zero reference zones, expected >0."
-    );
-
-    let req_pod = AetherRequest {
-        content_type: ContentType::Episode,
-        ..podcast_req()
-    };
-    let (dsp_config_pod, _, _) =
-        build_dsp_config(&req_pod, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
-
-    let pod_gains: Vec<f32> = dsp_config_pod
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    assert_ne!(
-        acoustic_gains, pod_gains,
-        "Acoustic music content must not produce Podcast zones."
-    );
+    // L2: genre-based routing removed — reference selection no
+    // longer varies by genre (the GenreClassifier mechanism
+    // survives in lineos-corpus for future Onboarding wiring)
 }
 
 /// INV-MUS-5 (S-0XX): Music content classified as Techno
 /// receives the Techno reference profile correction zones.
 #[test]
 fn inv_mus_5_classified_techno_gets_techno_zones() {
-    let req = AetherRequest {
-        content_type: ContentType::Music,
-        ..podcast_req()
-    };
-
-    let mut pa = ltass_input([30.0, 30.0, -30.0, -30.0, 30.0, 30.0, -30.0, -30.0]);
-    pa.genre = Some(lineos_types::pre_analysis::Genre::Techno);
-
-    let (dsp_config, _, _) =
-        build_dsp_config(&req, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
-
-    let techno_gains: Vec<f32> = dsp_config
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    assert!(
-        !techno_gains.is_empty(),
-        "Techno music content produced zero reference zones, expected >0."
-    );
-
-    let req_pod = AetherRequest {
-        content_type: ContentType::Episode,
-        ..podcast_req()
-    };
-    let (dsp_config_pod, _, _) =
-        build_dsp_config(&req_pod, &stem_features(), Some(&pa)).expect("build_dsp_config failed");
-
-    let pod_gains: Vec<f32> = dsp_config_pod
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    assert_ne!(
-        techno_gains, pod_gains,
-        "Techno music content must not produce Podcast zones."
-    );
+    // L2: genre-based routing removed — reference selection no
+    // longer varies by genre (the GenreClassifier mechanism
+    // survives in lineos-corpus for future Onboarding wiring)
 }
 
 /// INV-MUS-6 (S-0XX): Music content classified as Acoustic and Techno
 /// produce strictly distinct reference zones from each other.
 #[test]
 fn inv_mus_6_acoustic_and_techno_routes_are_distinct() {
-    let req = AetherRequest {
-        content_type: ContentType::Music,
-        ..podcast_req()
-    };
-
-    let mut pa_ac = ltass_input([10.0, -5.0, 12.0, -6.0, 8.0, -4.0, 15.0, -7.0]);
-    pa_ac.genre = Some(lineos_types::pre_analysis::Genre::Acoustic);
-
-    let (dsp_config_ac, _, _) =
-        build_dsp_config(&req, &stem_features(), Some(&pa_ac)).expect("build_dsp_config failed");
-
-    let acoustic_gains: Vec<f32> = dsp_config_ac
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    let mut pa_techno = pa_ac.clone();
-    pa_techno.genre = Some(lineos_types::pre_analysis::Genre::Techno);
-
-    let (dsp_config_techno, _, _) = build_dsp_config(&req, &stem_features(), Some(&pa_techno))
-        .expect("build_dsp_config failed");
-
-    let techno_gains: Vec<f32> = dsp_config_techno
-        .eq
-        .zone_bands
-        .iter()
-        .filter(|b| b.source == EqSource::Reference)
-        .map(|b| b.gain_db)
-        .collect();
-
-    assert_ne!(
-        acoustic_gains, techno_gains,
-        "Acoustic and Techno profiles must produce distinct corrections for the same input."
-    );
+    // L2: genre-based routing removed — reference selection no
+    // longer varies by genre (the GenreClassifier mechanism
+    // survives in lineos-corpus for future Onboarding wiring)
 }

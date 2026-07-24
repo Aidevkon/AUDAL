@@ -26,6 +26,8 @@ DURATION = 3.0
 BAND_EDGES = [20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]
 
 # Zone thresholds (Constitution §5)
+# NOTE: Must stay in sync with the Rust consts in:
+# sp314-dsp/src/analysis/pre_analysis.rs
 ZONE_SUB_RUMBLE_DB   = -30.0
 ZONE_HARSH_RMS_DB    = -18.0
 ZONE_HARSH_CREST_DB  = 8.0

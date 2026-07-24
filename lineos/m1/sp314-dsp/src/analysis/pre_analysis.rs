@@ -493,6 +493,13 @@ fn compute_transient_density(mono: &[f32], sample_rate: u32) -> f32 {
 
 // ── Zone Flags ──────────────────────────────────────────────────────────────
 
+const ZONE_SUB_RUMBLE_THRESHOLD_DB: f32 = -30.0;
+const ZONE_CYMBAL_HARSH_RMS_DB: f32 = -18.0;
+const ZONE_CYMBAL_HARSH_CREST_DB: f32 = 8.0;
+const ZONE_BOXINESS_RMS_DB: f32 = -20.0;
+const ZONE_BOXINESS_LRA_LU: f32 = 5.0;
+const ZONE_PHASE_ISSUE_CORRELATION: f32 = 0.3;
+
 pub fn compute_zone_flags(
     profile: &[f32; 8],
     crest: f32,

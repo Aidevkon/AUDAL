@@ -4,15 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 
-// ── Zone Threshold Constants (Constitution §5) ───────────────────────────────
-
-pub const ZONE_SUB_RUMBLE_THRESHOLD_DB: f32 = -30.0;
-pub const ZONE_CYMBAL_HARSH_RMS_DB: f32 = -18.0;
-pub const ZONE_CYMBAL_HARSH_CREST_DB: f32 = 8.0;
-pub const ZONE_BOXINESS_RMS_DB: f32 = -20.0;
-pub const ZONE_BOXINESS_LRA_LU: f32 = 5.0;
-pub const ZONE_PHASE_ISSUE_CORRELATION: f32 = 0.3;
-
 // ── Analysis Constants ───────────────────────────────────────────────────────
 
 /// Minimum input length for meaningful analysis. Shorter inputs
