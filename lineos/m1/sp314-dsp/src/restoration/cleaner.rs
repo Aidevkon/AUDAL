@@ -1,10 +1,11 @@
 // src/restoration/cleaner.rs
-// De-Hum + De-Ess chain.
+// De-Hum + Split-Band De-Ess chain.
 // Constitutional: libm only. Attack/release coefficients computed once in new().
 
 use super::biquad::{Biquad, FilterType};
 use super::gate::NoiseGate;
 use super::RestorationConfig;
+use crate::compressor::crossover::CrossoverLR4;
 use libm::{expf, fabsf, powf};
 
 pub struct RestorationChain {
@@ -14,10 +15,13 @@ pub struct RestorationChain {
     notch_150: Biquad,
     hum_enabled: bool,
 
-    // De-Ess
-    deess_hp: Biquad,
-    env_l: f32,
-    env_r: f32,
+    // Split-Band De-Ess (LR4 crossover at 6kHz)
+    // Two crossovers (one per channel) split the signal into low + high bands.
+    // Only the high band is ducked, preserving low/mid content (no music-bed pumping).
+    // A single linked envelope prevents stereo image wander.
+    deess_xover_l: CrossoverLR4,
+    deess_xover_r: CrossoverLR4,
+    env_deess: f32,
     deess_threshold: f32,
     deess_ratio: f32,
     deess_enabled: bool,
@@ -44,10 +48,12 @@ impl RestorationChain {
             notch_150: Biquad::new(FilterType::Notch, 150.0, 20.0, sample_rate),
             hum_enabled: config.hum_enabled,
 
-            // De-Esser: detects harsh frequencies above 6kHz
-            deess_hp: Biquad::new(FilterType::HighPass, 6000.0, 0.707, sample_rate),
-            env_l: 0.0,
-            env_r: 0.0,
+            // Split-Band De-Esser: LR4 crossover at 6kHz (one per channel).
+            // CrossoverLR4::new precomputes all biquad coefficients — zero
+            // per-sample allocation or trig calls.
+            deess_xover_l: CrossoverLR4::new(6000.0, sample_rate as u32),
+            deess_xover_r: CrossoverLR4::new(6000.0, sample_rate as u32),
+            env_deess: 0.0,
             deess_threshold: powf(10.0, -24.0 / 20.0), // -24 dBFS linear
             deess_ratio: 4.0,
             deess_enabled: config.deess_enabled,
@@ -95,39 +101,34 @@ impl RestorationChain {
                 r = r3;
             }
 
-            // 2. De-Ess (dynamic HF sidechain)
+            // 4. Split-Band De-Ess (LR4 crossover at 6kHz)
+            // SPLIT-BAND: only the HF band is ducked — low/mid content passes
+            //   through untouched, so music beds don't pump.
+            // LINKED STEREO: one envelope from max(|high_l|, |high_r|) drives
+            //   identical reduction on both channels — no image wander.
             if self.deess_enabled {
-                let (hf_l, hf_r) = self.deess_hp.process_stereo(l, r);
+                let (low_l, high_l) = self.deess_xover_l.process(l);
+                let (low_r, high_r) = self.deess_xover_r.process(r);
 
-                // Left envelope follower
-                let rect_l = fabsf(hf_l);
-                self.env_l = if rect_l > self.env_l {
-                    self.env_l + (rect_l - self.env_l) * (1.0 - self.attack_coef)
+                // Linked stereo detection: max of both HF bands
+                let rect = fabsf(high_l).max(fabsf(high_r));
+                self.env_deess = if rect > self.env_deess {
+                    self.env_deess + (rect - self.env_deess) * (1.0 - self.attack_coef)
                 } else {
-                    self.env_l + (rect_l - self.env_l) * (1.0 - self.release_coef)
+                    self.env_deess + (rect - self.env_deess) * (1.0 - self.release_coef)
                 };
 
-                if self.env_l > self.deess_threshold {
-                    let overshoot = self.env_l - self.deess_threshold;
-                    let reduction =
-                        1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
-                    l *= reduction;
-                }
-
-                // Right envelope follower
-                let rect_r = fabsf(hf_r);
-                self.env_r = if rect_r > self.env_r {
-                    self.env_r + (rect_r - self.env_r) * (1.0 - self.attack_coef)
+                // Single reduction applied identically to both HF bands
+                let reduction = if self.env_deess > self.deess_threshold {
+                    let overshoot = self.env_deess - self.deess_threshold;
+                    1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio))
                 } else {
-                    self.env_r + (rect_r - self.env_r) * (1.0 - self.release_coef)
+                    1.0
                 };
 
-                if self.env_r > self.deess_threshold {
-                    let overshoot = self.env_r - self.deess_threshold;
-                    let reduction =
-                        1.0 - (overshoot / (overshoot + self.deess_threshold * self.deess_ratio));
-                    r *= reduction;
-                }
+                // Reconstruct: low band untouched + ducked high band
+                l = low_l + high_l * reduction;
+                r = low_r + high_r * reduction;
             }
 
             left[i] = l;
@@ -139,10 +140,10 @@ impl RestorationChain {
         self.notch_50.reset();
         self.notch_100.reset();
         self.notch_150.reset();
-        self.deess_hp.reset();
+        self.deess_xover_l.reset();
+        self.deess_xover_r.reset();
         self.lowcut_hp.reset();
         self.gate.reset();
-        self.env_l = 0.0;
-        self.env_r = 0.0;
+        self.env_deess = 0.0;
     }
 }
