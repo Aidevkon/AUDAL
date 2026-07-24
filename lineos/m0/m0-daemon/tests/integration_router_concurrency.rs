@@ -1,4 +1,5 @@
 use axum::http::StatusCode;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::time::{Duration, Instant};
@@ -7,6 +8,12 @@ use tokio::time::{Duration, Instant};
 async fn test_router_concurrency_limit_applies_http_backpressure() {
     // 1. Force the router to use a max concurrency of 2 (isolated to this test binary)
     std::env::set_var("M0_MAX_CONCURRENT_JOBS", "2");
+
+    #[cfg(debug_assertions)]
+    {
+        m0d::handlers::dev_wait::MAX_IN_FLIGHT.store(0, Ordering::SeqCst);
+        m0d::handlers::dev_wait::CURRENT_IN_FLIGHT.store(0, Ordering::SeqCst);
+    }
 
     // 2. Setup the test router (requires audit log directory)
     let audit_dir = TempDir::new().unwrap();
@@ -34,14 +41,14 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
 
     let start = Instant::now();
 
-    // 5. Fire 4 parallel requests, each asking the server to sleep for 100ms
+    // 5. Fire 4 parallel requests, each asking the server to sleep for 200ms
     for _ in 0..4 {
         let url = format!("{}/dev/wait", base_url);
         let client_clone = client.clone();
         handles.push(tokio::spawn(async move {
             let res = client_clone
                 .post(&url)
-                .json(&serde_json::json!({ "ms": 100 }))
+                .json(&serde_json::json!({ "ms": 200 }))
                 .send()
                 .await
                 .unwrap();
@@ -55,39 +62,17 @@ async fn test_router_concurrency_limit_applies_http_backpressure() {
     }
 
     let elapsed = start.elapsed();
-    println!("elapsed: {:?}", elapsed);
+    println!("diagnostic elapsed: {:?}", elapsed);
 
-    // 7. Verify backpressure mathematically:
-    // If the limit (2) works, 4 requests of 100ms each will be processed in 2 batches.
-    // Batch 1 (2 reqs) finishes at 100ms.
-    // Batch 2 (2 reqs) finishes at 200ms.
-    // If backpressure failed, all 4 would run in parallel and finish in ~100ms.
-    assert!(
-        elapsed >= Duration::from_millis(200),
-        "MEASUREMENT FAILED: Expected elapsed time >= 200ms due to concurrency limit, but took {:?}",
-        elapsed
-    );
-
-    // Check it's not absurdly slow (fully sequential — all 4 requests
-    // one at a time — would take ~400ms, which would indicate the
-    // concurrency limit is silently 1 instead of 2). Widened from
-    // 350ms to 390ms (2026-07-19, F-033): observed a real false
-    // failure at 374ms during a loaded `just ci` run (correct
-    // backpressure behavior, just slower due to system load) — the
-    // original 350ms left almost no margin above the expected ~200ms
-    // correct case. 390ms keeps real detection power (still well
-    // below the ~400ms a fully-serial regression would produce) while
-    // giving load-induced jitter a realistic buffer. If this still
-    // proves flaky under heavier CI load, the CORRECT fix (not done
-    // here — requires production code) is a #[cfg(debug_assertions)]
-    // atomic in-flight counter the test can observe directly instead
-    // of inferring concurrency from wall-clock time.
-    assert!(
-        elapsed < Duration::from_millis(390),
-        "MEASUREMENT FAILED: Expected elapsed time < 390ms (2 parallel \
-         batches, allowing for system load), but took {:?} — if this is \
-         consistently close to 400ms, the concurrency limit may not be \
-         applying correctly",
-        elapsed
-    );
+    // 7. Verify backpressure via direct observation:
+    // With ConcurrencyLimit set to 2, exactly 2 requests can execute in parallel.
+    #[cfg(debug_assertions)]
+    {
+        let max_observed = m0d::handlers::dev_wait::MAX_IN_FLIGHT.load(Ordering::SeqCst);
+        assert_eq!(
+            max_observed, 2,
+            "MEASUREMENT FAILED: Expected max in-flight requests == 2, but observed {}",
+            max_observed
+        );
+    }
 }
