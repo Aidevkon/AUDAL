@@ -212,7 +212,7 @@ fn run_dsp_counts_dead_air_gaps() {
         "run_dsp failed for dead-air test: {:?}",
         result.err()
     );
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let count = blob.dead_air.total_count;
     let sec = blob.dead_air.total_sec;

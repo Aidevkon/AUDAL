@@ -27,6 +27,7 @@ pub fn run_dsp(
         Option<StoredBlob>,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
+        Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
     ),
     String,
 > {
@@ -300,6 +301,7 @@ fn run_dsp_internal(
         Option<StoredBlob>,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
+        Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
     ),
     String,
 > {
@@ -370,36 +372,105 @@ fn run_dsp_internal(
     if content_type == ContentType::Episode {
         emit_progress("Ingest");
 
-        // Analysis on a bounded 30s scout slice in
-        // the file's NATIVE sample rate.
-        let (scout_left, scout_right, scout_sr) =
-            crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0)
-                .ok_or_else(|| {
-                    "episode scout: could not read \
-                 audio"
-                        .to_string()
-                })?;
+        // ── Pass 0: decode → tee dump + input metrics ──
+        // StandardizedAudioStream delivers 48k/2ch; set_tap
+        // writes the dump byte-identical to the hash input
+        // stream (Y3-iii-a core tap contract).
+        let raw_path_str = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let raw_path_buf = std::path::PathBuf::from(&raw_path_str);
+        let raw_guard =
+            std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path_buf.clone()));
 
-        // TRUE fail-fast: reject a dead file on the
-        // already-in-RAM scout slice before paying for
-        // NMF/stem in scout_node. Same silence rule as
-        // the streaming tier1 shield (one source of
-        // truth). The streaming hook remains as the
-        // universal eject button for paths without a scout.
-        crate::dsp::signal_health::SignalHealthMonitor::check_scout_silence(
-            &scout_left,
-            &scout_right,
+        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
+            std::path::Path::new(audio_path),
         )?;
+        stream.set_tap(std::path::Path::new(&raw_path_str))?;
 
-        let mut pre_analysis =
-            sp314_dsp::analysis::PreAnalyzer::run(&scout_left, &scout_right, scout_sr);
-        pre_analysis.bpm = 0.0; // spoken word: no tempo
+        // Drain: discard samples (the tap persists them).
+        // Progressive tier1 replaces check_scout_silence:
+        // same validate_tier1_dbfs, same 30s EARLY_WINDOW_SECS,
+        // fires Err once the window fills with digital silence.
+        {
+            use crate::dsp::audio_source::AudioSource;
+            let mut scratch = vec![0f32; 4096 * 2];
+            loop {
+                let frames = stream.fill_buffer(&mut scratch)?;
+                if frames == 0 {
+                    break;
+                }
+                stream.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Progressive)?;
+            }
+        }
 
+        // Post-drain sequence — mirrors today's post-render
+        // order exactly (lines 499-510 before this rewire).
+        stream.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Final)?;
+        stream.tier2_verdict()?;
+        let (_input_blake3_hex, input_sha256_hex) = stream.input_hashes();
+        let dead_air = stream.into_dead_air();
+
+        // ── Trunk metrics from dump ──
+        let trunk_metrics = sp314_orchestrator::trunk_pass::run_trunk_metrics(&raw_path_buf)
+            .map_err(|e| format!("episode trunk metrics failed: {e}"))?;
+
+        eprintln!(
+            "[TRUNK-episode] lufs={:?} crest={:.2} lra={:.2} \
+             noise_floor={:?} spectral={:?} td={:.2}",
+            trunk_metrics.integrated_lufs,
+            trunk_metrics.crest_db,
+            trunk_metrics.lra,
+            trunk_metrics.noise_floor_dbfs,
+            trunk_metrics.spectral_profile_db,
+            trunk_metrics.transient_density,
+        );
+
+        // ── Scout slices from dump (30s @ 48k) ──
+        let scout_frames = 30 * 48_000;
+        let (scout_left, scout_right) = read_scout_from_raw_dump(&raw_path_buf, 0, scout_frames)?;
+
+        // ── Synthesized PreAnalysisData ──
+        // Mirrors the Music C-switch site (dsp_pipeline ~698-726)
+        // verbatim, adjusted solely for bpm=0.0 / empty beat
+        // vecs (spoken word).
+        let zone_flags = sp314_dsp::analysis::pre_analysis::compute_zone_flags(
+            &trunk_metrics.spectral_profile_db,
+            trunk_metrics.crest_db,
+            trunk_metrics.lra,
+            trunk_metrics.global_phase_correlation,
+            &[], // resonant peaks: unmeasured — empty = no resonance
+        );
+
+        let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
+            integrated_lufs: trunk_metrics.integrated_lufs.unwrap_or(-144.0),
+            true_peak_dbtp: -144.0, // Unused downstream per Y2 gap table
+            loudness_range: trunk_metrics.lra,
+            dynamic_range_db: 0.0, // dead field
+            global_crest_factor_db: trunk_metrics.crest_db,
+            spectral_profile_db: trunk_metrics.spectral_profile_db,
+            spectral_rolloff_hz: 0.0, // dead field
+            transient_density: trunk_metrics.transient_density,
+            global_phase_correlation: trunk_metrics.global_phase_correlation,
+            side_mid_ratio_db: -60.0,         // dead field
+            stereo_width: 0.0,                // dead field
+            band_phase_correlation: [1.0; 8], // dead field
+            resonant_peaks_hz: vec![],        // dead field
+            zone_flags,
+            bpm: 0.0,              // spoken word: no tempo
+            beats_ms: vec![],      // spoken word: no beats
+            downbeats_ms: vec![],  // spoken word: no downbeats
+            transients_ms: vec![], // spoken word: no onsets
+            genre: None,           // dead field
+        };
+
+        // ── Scout: NMF + Maestro ──
+        // NOTE: NMF now analyzes standardized 48k (was native SR)
+        // — deliberate. scout_node takes sample_rate as a param;
+        // feeding 48k data with 48k is self-consistent.
         emit_progress("Scout Pass");
         let scout_out = crate::domain::nodes::scout_node::run(
             &scout_left,
             &scout_right,
-            scout_sr,
+            48_000,
             req.project_id.as_deref().unwrap_or("default"),
             req.flavour_id.as_deref().unwrap_or("default"),
             &pre_analysis,
@@ -434,7 +505,7 @@ fn run_dsp_internal(
             &scout_out.scout.proxy_ambience,
             &pre_analysis,
             &blob_id,
-            scout_sr / sp314_dsp::stft::two_pass::SCOUT_DOWNSAMPLE as u32,
+            48_000 / sp314_dsp::stft::two_pass::SCOUT_DOWNSAMPLE as u32,
             flavour,
             user_model,
         );
@@ -452,62 +523,35 @@ fn run_dsp_internal(
             &pre_analysis,
         )?;
 
-        // Streaming decoder: delivers 48kHz stereo
-        // regardless of input SR/channels.
-        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
-            std::path::Path::new(audio_path),
-        )?;
-        let stream_sr = {
-            use crate::dsp::audio_source::AudioSource;
-            stream.sample_rate()
-        };
-
-        // BUGFIX (SR mismatch): build the graph for
-        // stream_sr (always 48000), NOT scout_sr.
-        // The legacy path built the graph at 48k but
-        // fed it native-rate samples from a non-
-        // resampling reader, shifting every EQ
-        // frequency (a 1kHz cut landed at ~918Hz on
-        // 44.1k input). StandardizedAudioStream
-        // guarantees 48k, so graph and audio match.
+        // ── Graph build: scout slices for routing LUFS ──
+        // build_graph_only uses left/right only for
+        // estimate_lufs (RMS-based ±6 LU routing). The scout
+        // slices (now 48k, was native SR) are the correct
+        // input — LUFS estimate shifts at most ~1 LU.
         let graph = crate::dsp::DspAdapter::build_graph_only(
             &icfg.intent,
             &scout_left,
             &scout_right,
-            stream_sr,
+            48_000, // stream_sr = 48k by construction
             &streaming_features.mix.stem_energy_ratios,
             Some(&icfg.dsp_config),
             512,
         )
         .map_err(|e| format!("episode graph build: {e:?}"))?;
 
+        // ── Render from dump ──
+        // Verdicts already ran in pass-0; DumpAudioSource has
+        // no health monitor. Pass a no-op closure.
         emit_progress("Mastering");
+        let mut dump_source = crate::dsp::dump_audio_source::DumpAudioSource::open(&raw_path_buf)?;
         let render_res = crate::domain::episode_render::run(
-            &mut stream,
+            &mut dump_source,
             &blob_id,
             graph,
             episode_target_lufs.unwrap_or(-16.0),
             &pre_analysis,
-            |s| s.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Progressive),
+            |_: &crate::dsp::dump_audio_source::DumpAudioSource| Ok(()),
         )?;
-
-        // Final tier checks at EOF: tier1 now also
-        // runs here (VerdictTiming::Final) so a short
-        // all-silent file (shorter than the early
-        // window, which the Progressive hook grace-
-        // periods) is still caught.
-        stream.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Final)?;
-        stream.tier2_verdict()?;
-
-        // Input identity hashes over the SAME 48k/
-        // stereo/sanitized samples the batch path
-        // hashes (proven bit-identical by the
-        // standardized_stream parity tests).
-        let (_input_blake3_hex, input_sha256_hex) = stream.input_hashes();
-        // Dead-air timeline events (non-fatal) —
-        // consumed here; certificate surfacing is
-        // wave 2.
-        let dead_air = stream.into_dead_air();
 
         let (fingerprints, spatial_metadata) = ContentType::bypassed_render();
         profiler.mark_stage_with_hash("Mastering", render_res.output_sha256.clone());
@@ -545,7 +589,13 @@ fn run_dsp_internal(
             cert_data,
         )?;
 
-        return Ok((cert_out.blob, None, cert_out.file_path, None));
+        return Ok((
+            cert_out.blob,
+            None,
+            cert_out.file_path,
+            None,
+            Some(raw_guard),
+        ));
     }
 
     // NODE 1: DECODE (Music only — Episode returned
@@ -589,7 +639,7 @@ fn run_dsp_internal(
                     &input_blake3_hex,
                     &input_sha256_hex,
                 )?;
-                return Ok((blob, None, path, model));
+                return Ok((blob, None, path, model, None));
             }
         }
         Some(lineos_types::AudioPayload::Stereo(_)) => {
@@ -613,7 +663,7 @@ fn run_dsp_internal(
                 &input_blake3_hex,
                 &input_sha256_hex,
             )?;
-            return Ok((blob, None, path, model));
+            return Ok((blob, None, path, model, None));
         }
     };
 
@@ -1009,6 +1059,7 @@ fn run_dsp_internal(
         spatial_blob_out,
         cert_out.file_path,
         dsp_out.user_model,
+        None,
     ))
 }
 

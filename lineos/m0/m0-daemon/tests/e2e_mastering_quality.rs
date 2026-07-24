@@ -119,7 +119,7 @@ fn inv_qa_1_output_integrity() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
     assert_eq!(blob.channels, 2);
 
     let out_l = read_raw_pcm_left(blob.audio_path.path());
@@ -160,7 +160,7 @@ fn inv_qa_2_crest_factor_survival() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_crest = crest_factor_db(&output_l);
@@ -214,7 +214,7 @@ fn inv_qa_3_spectral_balance() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_centroid = spectral_centroid_hz(&output_l, sr);
@@ -277,7 +277,7 @@ fn inv_qa_3_spectral_balance_20s() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_centroid = spectral_centroid_hz(&output_l, sr);
@@ -330,7 +330,7 @@ fn inv_qa_3_spectral_balance_full() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_centroid = spectral_centroid_hz(&output_l, sr);
@@ -407,7 +407,7 @@ fn inv_qa_4_compressor_is_active() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_rms = (output_l.iter().map(|s| s * s).sum::<f32>() / output_l.len() as f32).sqrt();
@@ -487,7 +487,7 @@ fn inv_qa_5_headroom_enforcement() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let output_l = read_raw_pcm_left(blob.audio_path.path());
     let output_crest = crest_factor_db(&output_l);
@@ -550,7 +550,7 @@ fn inv_qa_8_true_peak_ceiling() {
             state_tmp.path().to_str().unwrap(),
         );
         assert!(result.is_ok());
-        let (blob, _, _, _) = result.unwrap();
+        let (blob, _, _, _, _) = result.unwrap();
 
         let out_l = read_raw_pcm_left(blob.audio_path.path());
         let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -599,7 +599,7 @@ fn inv_qa_8_true_peak_ceiling() {
             state_tmp.path().to_str().unwrap(),
         );
         assert!(result.is_ok());
-        let (blob, _, _, _) = result.unwrap();
+        let (blob, _, _, _, _) = result.unwrap();
 
         let out_l = read_raw_pcm_left(blob.audio_path.path());
         let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -650,7 +650,7 @@ fn inv_qa_7_stereo_phase_coherence() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let out_l = read_raw_pcm_left(blob.audio_path.path());
     let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -788,7 +788,7 @@ fn inv_qa_9_multi_genre() {
             name,
             result.err()
         );
-        let (blob, _, _, _) = result.unwrap();
+        let (blob, _, _, _, _) = result.unwrap();
 
         let out_l = read_raw_pcm_left(blob.audio_path.path());
         let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -936,7 +936,7 @@ fn inv_qa_6_mud_correction() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     let out_l = read_raw_pcm_left(blob.audio_path.path());
     let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -1038,7 +1038,7 @@ fn inv_qa_10_overscale_stress() {
             name,
             result.err()
         );
-        let (blob, _, _, _) = result.unwrap();
+        let (blob, _, _, _, _) = result.unwrap();
 
         let out_l = read_raw_pcm_left(blob.audio_path.path());
         let out_r = read_raw_pcm_right(blob.audio_path.path());
@@ -1111,7 +1111,7 @@ fn inv_mus_2_podcast_bit_exactness() {
         state_tmp.path().to_str().unwrap(),
     );
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
-    let (blob, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _) = result.unwrap();
 
     // Verify EqSource::Reference is present in the DspConfig
     let config_json = blob

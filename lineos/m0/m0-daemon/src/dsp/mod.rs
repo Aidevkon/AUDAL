@@ -6,6 +6,7 @@
 pub mod audio_source;
 pub mod autotune;
 pub mod beat_detector;
+pub mod dump_audio_source;
 pub mod file_decoder;
 pub mod input_lufs;
 pub mod wav_to_raw;

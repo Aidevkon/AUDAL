@@ -76,7 +76,7 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
     // New architecture: run_dsp returns (blob, path, Option<UserMarkovModel>, StereoBuffer)
     // corpus_node is pure — no disk writes
     // Verify UserMarkovModel bubbled up through the pipeline
-    let (_blob, _, _path, user_model_opt) = dsp_result;
+    let (_blob, _, _path, user_model_opt, _) = dsp_result;
 
     assert!(
         user_model_opt.is_some(),
@@ -166,7 +166,7 @@ async fn e2e_corpus_music_path_uses_30s_proxy() {
     .await;
 
     let dsp_result = result.unwrap();
-    let (_blob, _, _path, user_model_opt) = dsp_result.unwrap();
+    let (_blob, _, _path, user_model_opt, _) = dsp_result.unwrap();
 
     let user_model = user_model_opt.unwrap();
     let model = user_model.presets.get("e2e_preset").unwrap();

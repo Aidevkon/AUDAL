@@ -361,9 +361,13 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         }
 
         // --- Append to scout history ---
-        hist_left.extend_from_slice(l);
-        hist_right.extend_from_slice(r);
-        hist_mono.extend_from_slice(m);
+        // F-051: metrics-only mode must not accumulate history
+        // — unbounded growth (C-switch regression, caught by the episode heap oracle).
+        if do_segmentation {
+            hist_left.extend_from_slice(l);
+            hist_right.extend_from_slice(r);
+            hist_mono.extend_from_slice(m);
+        }
 
         // --- Serve scout windows ---
         if do_segmentation {

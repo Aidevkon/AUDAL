@@ -83,7 +83,13 @@ pub async fn run(
                     Ok(Err(e)) => {
                         let _ = response.send(Err(ExecutorError::DspFailed(e)));
                     }
-                    Ok(Ok((blob, spatial_blob_opt, mastered_path, user_model_opt))) => {
+                    Ok(Ok((
+                        blob,
+                        spatial_blob_opt,
+                        mastered_path,
+                        user_model_opt,
+                        raw_guard_opt,
+                    ))) => {
                         // Executor: persist UserMarkovModel to ~/.creator_os/state/
                         // Zero file I/O in DSP layer — this is the correct layer
                         // Executor: persist UserMarkovModel — single overwrite
@@ -148,7 +154,7 @@ pub async fn run(
                             pcm_data: Some(mastered_path),
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,
-                            raw_pcm_data: None, // v2: raw dump lifecycle managed by dsp_pipeline
+                            raw_pcm_data: raw_guard_opt,
                         };
                         let _ = response.send(Ok(output));
                     }
