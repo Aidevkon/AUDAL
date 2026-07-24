@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 use sp314_dsp::restoration::{RestorationChain, RestorationConfig};
 use std::f32::consts::PI;
 
@@ -15,8 +16,8 @@ fn write_wav(name: &str, left: &[f32], right: &[f32]) {
         sample_format: hound::SampleFormat::Float,
     };
     let mut writer = hound::WavWriter::create(&path, spec).unwrap();
-    for i in 0..left.len() {
-        writer.write_sample(left[i]).unwrap();
+    for (i, left_val) in left.iter().enumerate() {
+        writer.write_sample(*left_val).unwrap();
         writer.write_sample(right[i]).unwrap();
     }
     writer.finalize().unwrap();
