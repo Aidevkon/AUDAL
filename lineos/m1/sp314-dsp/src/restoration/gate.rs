@@ -18,10 +18,12 @@ pub struct NoiseGate {
 }
 
 impl NoiseGate {
-    pub fn new(sample_rate: f32, pad_db_shift: f32) -> Self {
+    // gate_threshold_db is the absolute target threshold. The default (-45 dBFS)
+    // now lives in the orchestrator; the core only receives an absolute threshold.
+    // pad_db_shift remains as orthogonal headroom compensation.
+    pub fn new(sample_rate: f32, pad_db_shift: f32, gate_threshold_db: f32) -> Self {
         Self {
-            // -45 dBFS threshold — shifted by pad_db
-            threshold_linear: libm::powf(10.0, (-45.0 + pad_db_shift) / 20.0),
+            threshold_linear: libm::powf(10.0, (gate_threshold_db + pad_db_shift) / 20.0),
             attack_coef: expf(-1.0 / (sample_rate * 0.001)), // 1ms open
             release_coef: expf(-1.0 / (sample_rate * 0.100)), // 100ms close
             hold_samples: (sample_rate * 0.050) as usize,    // 50ms hold

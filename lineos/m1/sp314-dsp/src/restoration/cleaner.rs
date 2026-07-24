@@ -40,7 +40,14 @@ pub struct RestorationChain {
 }
 
 impl RestorationChain {
-    pub fn new(sample_rate: f32, config: RestorationConfig, pad_db_shift: f32) -> Self {
+    // gate_threshold_db: passed by orchestrator (which resolves noise_floor_dbfs.unwrap_or(-45.0)).
+    // The DSP core never knows the -45 default. pad_db_shift remains for headroom compensation.
+    pub fn new(
+        sample_rate: f32,
+        config: RestorationConfig,
+        pad_db_shift: f32,
+        gate_threshold_db: f32,
+    ) -> Self {
         Self {
             // High Q (20.0) — strictly targets hum without affecting bass
             notch_50: Biquad::new(FilterType::Notch, 50.0, 20.0, sample_rate),
@@ -63,7 +70,7 @@ impl RestorationChain {
             lowcut_enabled: config.lowcut_enabled,
 
             // Gate
-            gate: NoiseGate::new(sample_rate, pad_db_shift),
+            gate: NoiseGate::new(sample_rate, pad_db_shift, gate_threshold_db),
             gate_enabled: config.gate_enabled,
 
             // Precomputed once — 1ms attack, 50ms release
