@@ -60,6 +60,8 @@ pub struct StreamingConfig<'a> {
     /// default policy lives here in the orchestrator, never in
     /// the DSP core.
     pub noise_floor_dbfs: Option<f32>,
+    /// Bypass flag for A/B testing (Y4-c TODO: plumb to UI)
+    pub restoration_enabled: bool,
 }
 
 /// Multiply left/right buffers by a linear gain, in place.
@@ -197,6 +199,15 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut music_graph = DspGraph::from_topology(&music_topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
 
+    // The -45 default policy lives HERE, in the orchestrator, never in the DSP core.
+    let gate_threshold_db = config.noise_floor_dbfs.unwrap_or(-45.0);
+    let mut rest_chain = sp314_dsp::restoration::RestorationChain::new(
+        sample_rate as f32,
+        sp314_dsp::restoration::RestorationConfig::voice(),
+        0.0,
+        gate_threshold_db,
+    ); // 0.0 pad because streaming does not pre-pad
+
     // Precompute LTASS gains for the vocal graph ONCE for the whole file
     if let Some(pre) = pre_analysis {
         let profile = aether_bridge::reference_resolver::ReferenceProfile::load(
@@ -282,6 +293,8 @@ pub fn run_streaming_pipeline_with_timeline(
                                         ducking_node_id, e
                                     ))
                                 })?;
+                            // on Music->Speech entry, reset to avoid stale-state click
+                            rest_chain.reset();
                         }
                         SegmentType::Music => {
                             graph
@@ -344,6 +357,10 @@ pub fn run_streaming_pipeline_with_timeline(
 
                         apply_pre_gain(&mut v_bl, &mut v_br, config.pre_gain_linear);
                         apply_pre_gain(&mut m_bl, &mut m_br, config.pre_gain_linear);
+
+                        if seg_type == SegmentType::Speech && config.restoration_enabled {
+                            rest_chain.process(&mut v_bl, &mut v_br);
+                        }
 
                         vocal_graph.process_block(&mut v_bl, &mut v_br);
                         music_graph.process_block(&mut m_bl, &mut m_br);

@@ -58,6 +58,7 @@ fn streaming_pipeline_ducking_e2e() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -99,6 +100,7 @@ fn streaming_pipeline_ducking_e2e() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries,
@@ -221,6 +223,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries,
@@ -335,6 +338,7 @@ fn test_streaming_pipeline_jit_fallback() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: boundaries2,
@@ -396,6 +400,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -436,6 +441,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries,
@@ -633,6 +639,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -668,6 +675,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             pre_gain_linear: 2.0,
             expected_output_frames: None,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -830,6 +838,7 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             pre_gain_linear: 1.0,
             expected_output_frames: expected,
             noise_floor_dbfs: None,
+            restoration_enabled: false,
         },
         TimelinePlan {
             boundaries: vec![],
@@ -848,4 +857,109 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
     std::fs::remove_file(wav_path).ok();
     std::fs::remove_file(output_path).ok();
     std::fs::remove_file("/tmp/test_expected_frames_e2e_tap.pcm").ok();
+}
+
+#[test]
+fn test_restoration_speech_gated() {
+    use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+    let topology = dummy_ducking_topology();
+
+    let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+    let output_path = "/tmp/test_restoration_speech_gated.wav";
+
+    let boundaries = vec![
+        SegmentBoundary {
+            start_sec: 0.0,
+            end_sec: 1.0,
+            segment_type: SegmentType::Music,
+            avg_leaning: 0.1,
+            avg_confidence: 0.8,
+        },
+        SegmentBoundary {
+            start_sec: 1.0,
+            end_sec: 2.0,
+            segment_type: SegmentType::Speech,
+            avg_leaning: 0.5,
+            avg_confidence: 0.2,
+        }, // Hybrid -> dual graph engages -> restoration engages
+        SegmentBoundary {
+            start_sec: 2.0,
+            end_sec: 3.0,
+            segment_type: SegmentType::Music,
+            avg_leaning: 0.1,
+            avg_confidence: 0.8,
+        },
+    ];
+
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    let shadow_reader =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path)).unwrap();
+    let _worker_handle =
+        m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
+    let (_, flagged_indices) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
+    run_streaming_pipeline_with_timeline(
+        FileDecoder {
+            path: input_path.to_string(),
+        },
+        output_path,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+            pre_gain_linear: 1.0,
+            expected_output_frames: None,
+            noise_floor_dbfs: None,    // Exercises the -45 default gate
+            restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
+        },
+        TimelinePlan {
+            boundaries,
+            flagged_indices,
+            pre_analysis: None,
+        },
+        rx_res,
+    )
+    .unwrap();
+
+    let (stream_interleaved, _, _) =
+        m0d::handlers::decode::decode_raw_interleaved(output_path).unwrap();
+    let (input_interleaved, _, _) =
+        m0d::handlers::decode::decode_raw_interleaved(input_path).unwrap();
+    let stream_left: Vec<f32> = stream_interleaved.iter().step_by(2).copied().collect();
+    let input_left: Vec<f32> = input_interleaved.iter().step_by(2).copied().collect();
+
+    // (α) Music regions (0.0-1.0s and 2.0-3.0s):
+    // Fallback-graph output == input * gain. The RestorationChain never runs.
+    let mut mse_music1 = 0.0;
+    for i in 24000..48000 {
+        let diff = stream_left[i] - (input_left[i] * 0.501);
+        mse_music1 += diff * diff;
+    }
+    assert!(mse_music1 / 24000.0 < 1e-10, "Music region 1 altered!");
+
+    let mut mse_music2 = 0.0;
+    for i in 120000..144000 {
+        let diff = stream_left[i] - (input_left[i] * 0.501);
+        mse_music2 += diff * diff;
+    }
+    assert!(mse_music2 / 24000.0 < 1e-10, "Music region 2 altered!");
+
+    // (β) Speech region (1.0-2.0s):
+    // Dual graph engages. Assert the region differs from raw mix (chain ran).
+    let mut mse_speech = 0.0;
+    for i in 48000..96000 {
+        let diff = stream_left[i] - input_left[i];
+        mse_speech += diff * diff;
+    }
+    assert!(
+        mse_speech / 48000.0 > 1e-6,
+        "Speech region identical! Chain didn't run?"
+    );
+
+    std::fs::remove_file(output_path).ok();
 }

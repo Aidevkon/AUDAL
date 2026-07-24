@@ -354,6 +354,7 @@ pub async fn run(
                             pre_gain_linear,
                             expected_output_frames: p0_decoder.expected_output_frames(),
                             noise_floor_dbfs: trunk_report.noise_floor_dbfs,
+                            restoration_enabled: true, // Placeholder until Y4-c UI plumbing
                         },
                         sp314_orchestrator::streaming_pipeline::TimelinePlan {
                             boundaries,
