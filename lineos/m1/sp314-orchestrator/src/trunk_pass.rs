@@ -43,6 +43,50 @@ impl std::ops::Deref for TrunkReport {
     }
 }
 
+impl TrunkMetrics {
+    /// Constructs PreAnalysisData from TrunkMetrics, closing the drift
+    /// between the executor site and the dsp_pipeline sites (where the
+    /// executor site previously hardcoded correlation to 1.0).
+    pub fn to_pre_analysis(
+        &self,
+        true_peak_dbtp: f32,
+        bpm: f32,
+        beats_ms: Vec<u32>,
+        downbeats_ms: Vec<u32>,
+        transients_ms: Vec<u32>,
+    ) -> lineos_types::pre_analysis::PreAnalysisData {
+        let zone_flags = sp314_dsp::analysis::pre_analysis::compute_zone_flags(
+            &self.spectral_profile_db,
+            self.crest_db,
+            self.lra,
+            self.global_phase_correlation,
+            &[], // resonant peaks: unmeasured — empty = no resonance
+        );
+
+        lineos_types::pre_analysis::PreAnalysisData {
+            integrated_lufs: self.integrated_lufs.unwrap_or(-144.0),
+            true_peak_dbtp,
+            loudness_range: self.lra,
+            dynamic_range_db: 0.0, // dead field
+            global_crest_factor_db: self.crest_db,
+            spectral_profile_db: self.spectral_profile_db,
+            spectral_rolloff_hz: 0.0, // dead field
+            transient_density: self.transient_density,
+            global_phase_correlation: self.global_phase_correlation,
+            side_mid_ratio_db: -60.0,         // dead field
+            stereo_width: 0.0,                // dead field
+            band_phase_correlation: [1.0; 8], // dead field
+            resonant_peaks_hz: vec![],        // dead field
+            zone_flags,
+            bpm,
+            beats_ms,
+            downbeats_ms,
+            transients_ms,
+            genre: None, // dead field
+        }
+    }
+}
+
 // Mirror scan_file's constants exactly [scout_scanner.rs:6-7].
 const WINDOW_SECS: f32 = 5.0;
 const HOP_SECS: f32 = 1.0;

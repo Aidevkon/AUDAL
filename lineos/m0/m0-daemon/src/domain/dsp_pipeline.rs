@@ -432,35 +432,7 @@ fn run_dsp_internal(
         // Mirrors the Music C-switch site (dsp_pipeline ~698-726)
         // verbatim, adjusted solely for bpm=0.0 / empty beat
         // vecs (spoken word).
-        let zone_flags = sp314_dsp::analysis::pre_analysis::compute_zone_flags(
-            &trunk_metrics.spectral_profile_db,
-            trunk_metrics.crest_db,
-            trunk_metrics.lra,
-            trunk_metrics.global_phase_correlation,
-            &[], // resonant peaks: unmeasured — empty = no resonance
-        );
-
-        let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
-            integrated_lufs: trunk_metrics.integrated_lufs.unwrap_or(-144.0),
-            true_peak_dbtp: -144.0, // Unused downstream per Y2 gap table
-            loudness_range: trunk_metrics.lra,
-            dynamic_range_db: 0.0, // dead field
-            global_crest_factor_db: trunk_metrics.crest_db,
-            spectral_profile_db: trunk_metrics.spectral_profile_db,
-            spectral_rolloff_hz: 0.0, // dead field
-            transient_density: trunk_metrics.transient_density,
-            global_phase_correlation: trunk_metrics.global_phase_correlation,
-            side_mid_ratio_db: -60.0,         // dead field
-            stereo_width: 0.0,                // dead field
-            band_phase_correlation: [1.0; 8], // dead field
-            resonant_peaks_hz: vec![],        // dead field
-            zone_flags,
-            bpm: 0.0,              // spoken word: no tempo
-            beats_ms: vec![],      // spoken word: no beats
-            downbeats_ms: vec![],  // spoken word: no downbeats
-            transients_ms: vec![], // spoken word: no onsets
-            genre: None,           // dead field
-        };
+        let pre_analysis = trunk_metrics.to_pre_analysis(-144.0, 0.0, vec![], vec![], vec![]);
 
         // ── Scout: NMF + Maestro ──
         // NOTE: NMF now analyzes standardized 48k (was native SR)
@@ -745,35 +717,8 @@ fn run_dsp_internal(
         downbeats_ms.len()
     );
 
-    let zone_flags = sp314_dsp::analysis::pre_analysis::compute_zone_flags(
-        &trunk_metrics.spectral_profile_db,
-        trunk_metrics.crest_db,
-        trunk_metrics.lra,
-        trunk_metrics.global_phase_correlation,
-        &[], // resonant peaks: unmeasured — empty = no resonance
-    );
-
-    let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
-        integrated_lufs: trunk_metrics.integrated_lufs.unwrap_or(-144.0),
-        true_peak_dbtp: -144.0, // Unused downstream per Y2 gap table
-        loudness_range: trunk_metrics.lra,
-        dynamic_range_db: 0.0, // dead field
-        global_crest_factor_db: trunk_metrics.crest_db,
-        spectral_profile_db: trunk_metrics.spectral_profile_db,
-        spectral_rolloff_hz: 0.0, // dead field
-        transient_density: trunk_metrics.transient_density,
-        global_phase_correlation: trunk_metrics.global_phase_correlation,
-        side_mid_ratio_db: -60.0,         // dead field
-        stereo_width: 0.0,                // dead field
-        band_phase_correlation: [1.0; 8], // dead field
-        resonant_peaks_hz: vec![],        // dead field
-        zone_flags,
-        bpm,
-        beats_ms,
-        downbeats_ms,
-        transients_ms,
-        genre: None, // dead field
-    };
+    let pre_analysis =
+        trunk_metrics.to_pre_analysis(-144.0, bpm, beats_ms, downbeats_ms, transients_ms);
 
     // NODE 3: SCOUT (NMF + Maestro)
     // --- NODE 3: SCOUT PASS ---

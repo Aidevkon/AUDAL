@@ -247,37 +247,16 @@ pub async fn run(
                     // Full-file values replace the old 30s PreAnalyzer proxy.
                     // Fields sourced from trunk_report or P0 metrics; fields
                     // unused downstream default to silent/zero with comment.
-                    let pre_analysis = lineos_types::pre_analysis::PreAnalysisData {
-                        // From trunk_report (full-file):
-                        integrated_lufs: trunk_report.integrated_lufs.unwrap_or(-144.0),
-                        loudness_range: trunk_report.lra,
-                        global_crest_factor_db: trunk_report.crest_db,
-                        spectral_profile_db: trunk_report.spectral_profile_db,
-                        transient_density: trunk_report.transient_density,
-                        // From P0 metrics (full-file):
-                        true_peak_dbtp: metrics.true_peak_dbtp,
-                        bpm: metrics.bpm,
-                        beats_ms: metrics.beats_ms.clone(),
-                        downbeats_ms: metrics.downbeats_ms.clone(),
-                        transients_ms: metrics.transients_ms.clone(),
-                        // From trunk_report (computed live):
-                        zone_flags: sp314_dsp::analysis::pre_analysis::compute_zone_flags(
-                            &trunk_report.spectral_profile_db,
-                            trunk_report.crest_db,
-                            trunk_report.lra,
-                            1.0, // corr: unmeasured by trunk — 1.0 = "no phase issue"
-                            &[], // resonant peaks: unmeasured — empty = no resonance
-                        ),
-                        // Unused downstream per Y2 gap table (2026-07-23):
-                        dynamic_range_db: 0.0,
-                        spectral_rolloff_hz: 0.0,
-                        global_phase_correlation: 1.0,
-                        side_mid_ratio_db: -60.0,
-                        stereo_width: 0.0,
-                        band_phase_correlation: [1.0; 8],
-                        resonant_peaks_hz: vec![],
-                        genre: None, // trunk does not classify genre yet
-                    };
+                    // NAMED BEHAVIOR CHANGE: corr upgrades 1.0 -> trunk's real value
+                    // (zone_flags phase input + the field; safe — auto_carve reads
+                    // only cymbal/sub, gap-table proven; normal stereo corr ≈ 1.0 anyway).
+                    let pre_analysis = trunk_report.to_pre_analysis(
+                        metrics.true_peak_dbtp,
+                        metrics.bpm,
+                        metrics.beats_ms.clone(),
+                        metrics.downbeats_ms.clone(),
+                        metrics.transients_ms.clone(),
+                    );
 
                     // ═══ Scout: NMF + Maestro (on 30s audio slice) ═══
                     // read_scout_sample STAYS: scout_node's TwoPassEngine
