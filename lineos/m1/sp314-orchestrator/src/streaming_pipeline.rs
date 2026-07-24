@@ -55,6 +55,11 @@ pub struct StreamingConfig<'a> {
     /// stream produces, today's pre-fix behavior — passthrough
     /// files with no resampling have no artifact to trim anyway).
     pub expected_output_frames: Option<u64>,
+    /// Full-file noise floor from the trunk (Y1). None when
+    /// unmeasured. Y4-b's adaptive gate reads it; the -45 dBFS
+    /// default policy lives here in the orchestrator, never in
+    /// the DSP core.
+    pub noise_floor_dbfs: Option<f32>,
 }
 
 /// Multiply left/right buffers by a linear gain, in place.

@@ -57,6 +57,7 @@ fn streaming_pipeline_ducking_e2e() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -97,6 +98,7 @@ fn streaming_pipeline_ducking_e2e() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries,
@@ -218,6 +220,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries,
@@ -331,6 +334,7 @@ fn test_streaming_pipeline_jit_fallback() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: boundaries2,
@@ -391,6 +395,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -430,6 +435,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries,
@@ -626,6 +632,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             music_gain: 1.0,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -660,6 +667,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             music_gain: 1.0,
             pre_gain_linear: 2.0,
             expected_output_frames: None,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: boundaries.clone(),
@@ -821,6 +829,7 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             music_gain: 1.0,
             pre_gain_linear: 1.0,
             expected_output_frames: expected,
+            noise_floor_dbfs: None,
         },
         TimelinePlan {
             boundaries: vec![],
