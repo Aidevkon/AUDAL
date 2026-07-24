@@ -29,6 +29,7 @@ pub struct StandardizedStreamCore<const N: usize> {
     pub read_buf: Vec<f32>,
     pub reader_eof: bool,
     pub flushed: bool,
+    pub tap: Option<std::io::BufWriter<std::fs::File>>,
     pub blake3: Blake3Hasher,
     pub sha256: Sha256,
     pub health: Option<SignalHealthMonitor>,
@@ -57,12 +58,29 @@ impl<const N: usize> StandardizedStreamCore<N> {
             read_buf: Vec::new(),
             reader_eof: false,
             flushed: false,
+            tap: None,
             blake3: Blake3Hasher::new(),
             sha256: Sha256::new(),
             health,
             est_total_frames,
             expected_output_frames,
         }
+    }
+
+    pub fn set_tap(&mut self, path: &std::path::Path) -> Result<(), String> {
+        debug_assert!(
+            self.out_ring.is_empty(),
+            "tap must be set before any output"
+        );
+        debug_assert!(!self.flushed, "tap cannot be set on flushed stream");
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| format!("failed to open tap file: {e}"))?;
+        self.tap = Some(std::io::BufWriter::new(file));
+        Ok(())
     }
 
     pub fn push_input_frame(&mut self, frame: [f32; N]) {
@@ -105,24 +123,32 @@ impl<const N: usize> StandardizedStreamCore<N> {
                 .map_err(|e| format!("resample: {e}"))?;
 
             let out_arr: [Vec<f32>; N] = std::array::from_fn(|i| wave_out[i].clone());
-            self.push_output(&out_arr);
+            self.push_output(&out_arr)?;
         } else {
             let out_arr: [Vec<f32>; N] = std::array::from_fn(|i| wave_in[i].clone());
-            self.push_output(&out_arr);
+            self.push_output(&out_arr)?;
         }
         Ok(())
     }
 
-    pub fn push_output(&mut self, wave_out: &[Vec<f32>; N]) {
+    pub fn push_output(&mut self, wave_out: &[Vec<f32>; N]) -> Result<(), String> {
         if wave_out[0].is_empty() {
-            return;
+            return Ok(());
         }
         let frames = wave_out[0].len();
         let mut interleaved = Vec::with_capacity(frames * N);
         for i in 0..frames {
             for ch in 0..N {
                 let s = sanitize_sample(wave_out[ch][i]);
-                self.blake3.update(&s.to_le_bytes());
+                let bytes = s.to_le_bytes();
+                // Contract: The dump is BYTE-IDENTICAL to the blake3 input stream by construction.
+                // The core tap guarantees dump ≡ hash point.
+                if let Some(w) = self.tap.as_mut() {
+                    use std::io::Write;
+                    w.write_all(&bytes)
+                        .map_err(|e| format!("tap write error: {e}"))?;
+                }
+                self.blake3.update(&bytes);
                 self.sha256.update(s.to_be_bytes());
                 interleaved.push(s);
             }
@@ -131,6 +157,7 @@ impl<const N: usize> StandardizedStreamCore<N> {
             h.observe(&interleaved);
         }
         self.out_ring.extend(interleaved);
+        Ok(())
     }
 
     pub fn flush(&mut self) -> Result<(), String> {
@@ -145,9 +172,13 @@ impl<const N: usize> StandardizedStreamCore<N> {
             if let Ok(tail) = rs.process_partial::<Vec<f32>>(None, None) {
                 if !tail[0].is_empty() {
                     let out_arr: [Vec<f32>; N] = std::array::from_fn(|i| tail[i].clone());
-                    self.push_output(&out_arr);
+                    self.push_output(&out_arr)?;
                 }
             }
+        }
+        if let Some(w) = self.tap.as_mut() {
+            use std::io::Write;
+            w.flush().map_err(|e| format!("tap flush error: {e}"))?;
         }
         self.flushed = true;
         Ok(())
@@ -224,5 +255,51 @@ mod tests {
             "Flush did not drain all blocks (F-047 regression)"
         );
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_tap_equals_output() {
+        use crate::dsp::audio_source::AudioSource;
+        let uuid = uuid::Uuid::new_v4().to_string();
+        let path = format!("/tmp/m0d-test-tap-in-{}.wav", uuid);
+        let tap_path = format!("/tmp/m0d-test-tap-out-{}.pcm", uuid);
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(&path, spec).unwrap();
+        let test_frames = 5000;
+        for i in 0..test_frames * 2 {
+            w.write_sample((i as f32) / 10000.0).unwrap();
+        }
+        w.finalize().unwrap();
+
+        let mut stream = crate::dsp::standardized_stream::StandardizedAudioStream::open(
+            std::path::Path::new(&path),
+        )
+        .unwrap();
+        stream.set_tap(std::path::Path::new(&tap_path)).unwrap();
+
+        let mut collected = Vec::new();
+        let mut buf = vec![0.0; 1024 * 2];
+        while let Ok(frames) = stream.fill_buffer(&mut buf) {
+            if frames == 0 {
+                break;
+            }
+            collected.extend_from_slice(&buf[..frames * 2]);
+        }
+
+        let tap_bytes = std::fs::read(&tap_path).unwrap();
+        let mut expected_bytes = Vec::new();
+        for s in collected {
+            expected_bytes.extend_from_slice(&s.to_le_bytes());
+        }
+
+        assert_eq!(tap_bytes.len(), expected_bytes.len());
+        assert_eq!(tap_bytes, expected_bytes);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&tap_path);
     }
 }

@@ -125,6 +125,10 @@ impl StandardizedAudioStream {
         })
     }
 
+    pub fn set_tap(&mut self, path: &std::path::Path) -> Result<(), String> {
+        self.core.set_tap(path)
+    }
+
     /// Finalize input hashes (call after the
     /// stream is fully drained).
     pub fn input_hashes(&self) -> (String, String) {

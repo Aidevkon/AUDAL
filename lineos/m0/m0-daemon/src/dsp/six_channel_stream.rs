@@ -99,6 +99,10 @@ impl StandardizedSixChannelStream {
         })
     }
 
+    pub fn set_tap(&mut self, path: &std::path::Path) -> Result<(), String> {
+        self.core.set_tap(path)
+    }
+
     pub fn input_hashes(&self) -> (String, String) {
         self.core.input_hashes()
     }
