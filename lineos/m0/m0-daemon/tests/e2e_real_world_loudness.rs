@@ -68,7 +68,8 @@ async fn test_e2e_real_world_loudness() {
     let (_blob, _, exported_pcm_path, _) = dsp_result.unwrap();
 
     // Read the exported PCM file (raw f32 LE interleaved)
-    let file_bytes = std::fs::read(&exported_pcm_path).expect("Failed to read exported PCM file");
+    let file_bytes =
+        std::fs::read(exported_pcm_path.path()).expect("Failed to read exported PCM file");
     let mut left = Vec::new();
     let mut right = Vec::new();
 

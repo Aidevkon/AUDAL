@@ -186,17 +186,16 @@ pub async fn trigger_mastering(
                         };
                         state_bg.playback.load(transfer);
 
-                        let raw_transfer = xaak::PcmTransfer {
-                            pcm_path: std::path::PathBuf::from(format!(
-                                "/tmp/m0d-raw-{}.pcm",
-                                blob_id_str
-                            )),
-                            sample_rate: output.sample_rate,
-                            channels: 2,
-                            blob_id: b_id,
-                            num_frames: output.num_frames,
-                        };
-                        state_bg.playback.load_raw(raw_transfer);
+                        if let Some(raw_guard) = output.raw_pcm_data.take() {
+                            let raw_transfer = xaak::PcmTransfer {
+                                pcm_path: raw_guard,
+                                sample_rate: output.sample_rate,
+                                channels: 2,
+                                blob_id: b_id,
+                                num_frames: output.num_frames,
+                            };
+                            state_bg.playback.load_raw(raw_transfer);
+                        }
                     }
                 }
             }
@@ -332,29 +331,27 @@ pub async fn trigger_streaming(
                 let _ = state_bg.progress_tx.send(progress);
 
                 if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {
-                    let transfer = xaak::PcmTransfer {
-                        pcm_path: std::path::PathBuf::from(format!(
-                            "/tmp/m0d-mastered-{}.pcm",
-                            blob_id_str
-                        )),
-                        sample_rate: output.sample_rate,
-                        channels: 2,
-                        blob_id: b_id,
-                        num_frames: output.num_frames,
-                    };
-                    state_bg.playback.load(transfer);
+                    if let Some(mastered) = output.pcm_data.clone() {
+                        let transfer = xaak::PcmTransfer {
+                            pcm_path: mastered,
+                            sample_rate: output.sample_rate,
+                            channels: 2,
+                            blob_id: b_id,
+                            num_frames: output.num_frames,
+                        };
+                        state_bg.playback.load(transfer);
+                    }
 
-                    let raw_transfer = xaak::PcmTransfer {
-                        pcm_path: std::path::PathBuf::from(format!(
-                            "/tmp/m0d-raw-{}.pcm",
-                            blob_id_str
-                        )),
-                        sample_rate: output.sample_rate,
-                        channels: 2,
-                        blob_id: b_id,
-                        num_frames: output.num_frames,
-                    };
-                    state_bg.playback.load_raw(raw_transfer);
+                    if let Some(raw_guard) = output.raw_pcm_data.clone() {
+                        let raw_transfer = xaak::PcmTransfer {
+                            pcm_path: raw_guard,
+                            sample_rate: output.sample_rate,
+                            channels: 2,
+                            blob_id: b_id,
+                            num_frames: output.num_frames,
+                        };
+                        state_bg.playback.load_raw(raw_transfer);
+                    }
                 }
             }
             Ok(Err(e)) => {

@@ -99,7 +99,7 @@ pub async fn run(
                         let track_lufs = blob.loudness.integrated_lufs;
                         let track_tp = blob.loudness.true_peak_dbtp;
                         let track_blob = blob.id.clone();
-                        let track_path = blob.audio_path.to_string_lossy().to_string();
+                        let track_path = blob.audio_path.path().to_string_lossy().to_string();
                         let db_clone = db.clone();
                         tokio::spawn(async move {
                             let created_at = chrono::Utc::now().to_rfc3339();
@@ -148,6 +148,7 @@ pub async fn run(
                             pcm_data: Some(mastered_path),
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,
+                            raw_pcm_data: None, // v2: raw dump lifecycle managed by dsp_pipeline
                         };
                         let _ = response.send(Ok(output));
                     }
@@ -166,6 +167,9 @@ pub async fn run(
                 // anyway (MasterRequest never carried one for v2 either).
                 let output_path = format!("/tmp/m0d-v3-streaming-{}.wav", blob_id);
                 let raw_tap_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+                let raw_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
+                    std::path::PathBuf::from(&raw_tap_path),
+                ));
 
                 let path_hash =
                     crate::domain::dsp_pipeline::compute_sha256_bytes(audio_path.as_bytes());
@@ -379,6 +383,9 @@ pub async fn run(
 
                     let mastered_raw_path =
                         std::path::PathBuf::from(format!("/tmp/m0d-mastered-{}.pcm", blob_id));
+                    let mastered_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
+                        mastered_raw_path.clone(),
+                    ));
                     let measured =
                         crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)
                             .map_err(|e| {
@@ -438,7 +445,9 @@ pub async fn run(
                         &icfg.persona_config,
                         &icfg.aether_req,
                         &icfg.dsp_config,
-                        std::path::PathBuf::from(&output_path),
+                        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
+                            std::path::PathBuf::from(&output_path),
+                        )),
                         &input_hash_hex_path,
                         48_000,
                         cert_start.elapsed().as_millis() as u64,
@@ -457,11 +466,12 @@ pub async fn run(
                             job_id,
                             blob_id: blob_id.clone(),
                             status: "certified",
-                            pcm_data: Some(mastered_raw_path.clone()),
+                            pcm_data: Some(mastered_guard.clone()),
                             num_frames: measured.frames_written,
                             sample_rate: 48_000,
                             pcm_blake3: measured.pcm_blake3.clone(),
                             output_lufs: measured.output_lufs,
+                            raw_pcm_data: Some(raw_guard.clone()),
                         },
                         cert_out.blob,
                     ))

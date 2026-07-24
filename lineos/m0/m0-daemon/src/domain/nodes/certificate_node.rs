@@ -12,7 +12,7 @@ use lineos_types::pre_analysis::PreAnalysisData;
 
 pub struct CertificateOutput {
     pub blob: StoredBlob,
-    pub file_path: std::path::PathBuf,
+    pub file_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -29,7 +29,7 @@ pub fn run(
     dsp_config: &integration::config::DspConfig,
     left_slice: &[f32],
     right_slice: &[f32],
-    file_path: std::path::PathBuf,
+    file_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     input_hash_hex: &str,
     _original_sr: u32,
     _original_ch: u16,
@@ -89,6 +89,7 @@ pub fn run(
     let qr_base64 = crate::handlers::certificate::generate_qr_base64(
         blob_id,
         file_path
+            .path()
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown"),
@@ -163,7 +164,7 @@ pub fn run_streaming(
     persona_config: &aether::personas::config::PersonaConfig,
     aether_req: &aether_bridge::AetherRequest,
     dsp_config: &integration::config::DspConfig,
-    file_path: std::path::PathBuf,
+    file_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     input_hash_hex: &str,
     sample_rate: u32,
     elapsed_ms: u64,
@@ -201,6 +202,7 @@ pub fn run_streaming(
     let qr_base64 = crate::handlers::certificate::generate_qr_base64(
         blob_id,
         file_path
+            .path()
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown"),
@@ -253,7 +255,7 @@ fn assemble_blob(
     fingerprints: &StemFingerprints,
     spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
     persona_config: &aether::personas::config::PersonaConfig,
-    file_path: std::path::PathBuf,
+    file_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     input_hash_hex: &str,
     sample_rate: u32,
     channels: u16,

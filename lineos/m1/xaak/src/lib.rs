@@ -55,7 +55,7 @@ pub const TARGET_CHANNELS: u16 = 2;
 /// After this is passed to XaakKernel::load(), the caller must not
 /// access the samples — ownership is moved unconditionally (A-003 §2).
 pub struct PcmTransfer {
-    pub pcm_path: std::path::PathBuf,
+    pub pcm_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     pub sample_rate: u32,
     pub channels: u16,
     pub blob_id: Uuid,
@@ -76,6 +76,8 @@ pub struct XaakKernel {
     num_frames: usize,
     /// Authoritative PCM backing store — supports seek via slice offset.
     pcm: memmap2::Mmap,
+    /// F-050: RAII guard — keeps the file alive as long as the mmap exists.
+    _guard: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     /// Kept alive to hold the ring buffer while consumer exists.
     _producer: Option<Box<dyn std::any::Any + Send>>,
 }
@@ -86,7 +88,7 @@ impl XaakKernel {
     /// Emits A-003 §2 audit event: m0d.xaak_buffer_allocated.
     /// After this returns, the caller's samples field is consumed.
     pub fn load(transfer: PcmTransfer) -> Self {
-        let file = std::fs::File::open(&transfer.pcm_path).expect("Failed to open PCM file");
+        let file = std::fs::File::open(transfer.pcm_path.path()).expect("Failed to open PCM file");
         let mmap = unsafe { memmap2::Mmap::map(&file).expect("Failed to map PCM file") };
         // We use the actual valid frames, not the mapped file size
         let num_samples = transfer.num_frames * transfer.channels as usize;
@@ -115,6 +117,7 @@ impl XaakKernel {
             duration_ms,
             num_frames: transfer.num_frames,
             pcm: mmap,
+            _guard: transfer.pcm_path,
             _producer: None,
         }
     }
@@ -203,8 +206,10 @@ mod tests {
         let path = std::path::PathBuf::from(format!("/tmp/xaak-test-{}.pcm", uuid::Uuid::new_v4()));
         let file = std::fs::File::create(&path).unwrap();
         file.set_len((samples * 4) as u64).unwrap();
+        // Tests use ManagedPcm wrapping the real path so the file gets
+        // cleaned up when the test-owned Arc drops.
         PcmTransfer {
-            pcm_path: path,
+            pcm_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(path)),
             sample_rate: 48000,
             channels: 2,
             blob_id: uuid::Uuid::new_v4(),

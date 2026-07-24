@@ -203,7 +203,7 @@ fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(
 /// audio_bytes = raw f32 LE PCM bytes from GoldenBlob (Phase 2/10 note).
 /// Phase 11: replace with real FLAC encoder when sp314-dsp adds FLAC output.
 fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(&blob.audio_path)
+    let audio_bytes = std::fs::read(blob.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — mastering may have failed".into());
@@ -213,7 +213,7 @@ fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
 
 /// WAV: decode f32 LE PCM bytes → write 32-bit float WAV via hound.
 fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(&blob.audio_path)
+    let audio_bytes = std::fs::read(blob.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write WAV".into());
@@ -257,8 +257,8 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         ));
     }
 
-    let meta =
-        std::fs::metadata(&blob.audio_path).map_err(|e| format!("Failed to stat blob PCM: {e}"))?;
+    let meta = std::fs::metadata(blob.audio_path.path())
+        .map_err(|e| format!("Failed to stat blob PCM: {e}"))?;
     let len_bytes = meta.len();
     if len_bytes % (6 * 4) != 0 {
         return Err("corrupt raw file: byte length not a multiple of 6ch f32 frames".into());
@@ -276,7 +276,7 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         AdmContainerFormat::Riff32,
     )?;
 
-    let file = std::fs::File::open(&blob.audio_path)
+    let file = std::fs::File::open(blob.audio_path.path())
         .map_err(|e| format!("Failed to open blob PCM: {e}"))?;
     let mut reader = std::io::BufReader::new(file);
 
@@ -328,7 +328,7 @@ fn export_opus(_blob: &StoredBlob, _path: &Path) -> Result<(), String> {
 ///
 /// No DSP re-run — reads f32 LE PCM from Golden Blob, converts to BE in-place.
 fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(&blob.audio_path)
+    let audio_bytes = std::fs::read(blob.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write AIFF".into());
@@ -427,7 +427,7 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
         lame_init_params, lame_set_in_samplerate, lame_set_num_channels, lame_set_quality,
     };
 
-    let audio_bytes = std::fs::read(&blob.audio_path)
+    let audio_bytes = std::fs::read(blob.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write MP3".into());

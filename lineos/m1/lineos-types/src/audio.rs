@@ -82,3 +82,42 @@ impl AudioPayload {
         }
     }
 }
+
+/// F-050: RAII guard for raw and mastered PCM dumps on /tmp.
+///
+/// The dumps' lifetime binds to their readers via `Arc<ManagedPcm>`:
+/// every `blob_store.get()` / `PcmTransfer` clone extends the guard,
+/// and the file is deleted only when the last Arc drops.
+///
+/// The startup sweep in lib.rs (F-050α) acts as the crash backstop —
+/// it buries corpses from killed/crashed sessions that never got a
+/// clean Drop. This RAII guard handles the living-file lifecycle.
+///
+/// NOT Clone: a Drop owner must never be Clone — Arc<ManagedPcm>
+/// does all sharing. Cloning would create two owners each trying
+/// to delete the same file on drop.
+#[derive(Debug)]
+pub struct ManagedPcm(std::path::PathBuf);
+
+impl ManagedPcm {
+    pub fn new(path: std::path::PathBuf) -> Self {
+        Self(path)
+    }
+    pub fn path(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Default for ManagedPcm {
+    fn default() -> Self {
+        Self(std::path::PathBuf::new()) // empty path, deletes nothing
+    }
+}
+
+impl Drop for ManagedPcm {
+    fn drop(&mut self) {
+        if !self.0.as_os_str().is_empty() {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+}

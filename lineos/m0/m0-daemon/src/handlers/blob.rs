@@ -91,7 +91,7 @@ mod tests {
             cert_signature: None,
             processing_timeline: vec![],
             dead_air: Default::default(),
-            audio_path: std::path::PathBuf::from("/tmp/stub.pcm"),
+            audio_path: Default::default(), // ManagedPcm::default() — no file to delete
             sample_rate: 48000,
             channels: 2,
             num_frames: 48000,

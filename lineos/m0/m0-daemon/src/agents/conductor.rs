@@ -103,6 +103,7 @@ pub async fn run(
                                 pcm_data: dsp_output.pcm_data,
                                 num_frames: dsp_output.num_frames,
                                 sample_rate: dsp_output.sample_rate,
+                                raw_pcm_data: dsp_output.raw_pcm_data,
                             };
                             let _ = response.send(Ok(output));
                         }

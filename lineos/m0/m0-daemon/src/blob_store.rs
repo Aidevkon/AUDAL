@@ -85,7 +85,7 @@ pub struct StoredBlob {
     // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
     // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
     #[serde(skip)]
-    pub audio_path: std::path::PathBuf,
+    pub audio_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
     #[serde(skip)]
     pub sample_rate: u32, // always 48000 after Phase 7 decode
     #[serde(skip)]
@@ -173,6 +173,15 @@ pub struct BlobStore {
 }
 
 impl BlobStore {
+    /// DISK BACKSTOP, not lifecycle policy:
+    /// When sessions exist (Mastering Tinder / Git-for-Master), the AudioRepo/session
+    /// owns the raw's Arc and project-close is the real drop point; tinder variant
+    /// commits live in AudioRepo (params, not blobs) and are NEVER affected by this cap.
+    /// The Arc-sharing design is what makes tinder O(1) per swipe: all variants reference
+    /// the same raw ManagedPcm. This cap bounds intermediate disk leaks before the
+    /// session architecture ships.
+    const MAX_BLOBS: usize = 16;
+
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
@@ -182,6 +191,18 @@ impl BlobStore {
     pub fn insert(&self, blob: StoredBlob) {
         if let Ok(mut map) = self.inner.lock() {
             map.insert(blob.id.clone(), blob);
+
+            // Evict oldest when over cap (created_at is chrono RFC 3339 —
+            // ISO 8601 with UTC, lexicographically sortable).
+            if map.len() > Self::MAX_BLOBS {
+                let oldest_id = map
+                    .iter()
+                    .min_by_key(|(_, b)| &b.created_at)
+                    .map(|(id, _)| id.clone());
+                if let Some(id) = oldest_id {
+                    map.remove(&id);
+                }
+            }
         }
     }
 
@@ -258,7 +279,7 @@ mod tests {
             cert_signature: None,
             processing_timeline: vec![],
             dead_air: Default::default(),
-            audio_path: std::path::PathBuf::from("/tmp/stub.pcm"),
+            audio_path: Default::default(), // ManagedPcm::default() — no file to delete
             sample_rate: 48000,
             channels: 2,
             num_frames: 48000,

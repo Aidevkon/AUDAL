@@ -121,9 +121,11 @@ pub struct DspOutput {
     pub blob_id: String,
     pub lufs: f32,
     pub true_peak: f32,
-    pub pcm_data: Option<std::path::PathBuf>,
+    pub pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
     pub num_frames: usize,
     pub sample_rate: u32,
+    /// F-050: raw dump guard — cloned into PcmTransfer for xaak A/B.
+    pub raw_pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
 }
 
 /// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
@@ -142,9 +144,11 @@ pub struct MasteringOutput {
     pub job_id: String,
     pub blob_id: String,
     pub status: &'static str,
-    pub pcm_data: Option<std::path::PathBuf>,
+    pub pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
     pub num_frames: usize,
     pub sample_rate: u32,
+    /// F-050: raw dump guard — cloned into PcmTransfer for xaak A/B.
+    pub raw_pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
 }
 
 #[derive(Debug, Clone)]
@@ -184,7 +188,7 @@ pub struct StreamingOutput {
     pub job_id: String,
     pub blob_id: String,
     pub status: &'static str,
-    pub pcm_data: Option<std::path::PathBuf>,
+    pub pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
     pub num_frames: usize,
     pub sample_rate: u32,
     /// Real content hash of the mastered output (from the C1
@@ -196,6 +200,8 @@ pub struct StreamingOutput {
     /// unavailable to callers, forcing album cohesion to report the
     /// PRE-mastering measurement instead (found 2026-07-18).
     pub output_lufs: f32,
+    /// F-050: raw dump guard — cloned into PcmTransfer for xaak A/B.
+    pub raw_pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
 }
 
 /// Output for a single track in a batch job

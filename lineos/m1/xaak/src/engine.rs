@@ -365,7 +365,7 @@ mod tests {
         let file = std::fs::File::create(&path).unwrap();
         file.set_len((samples * 4) as u64).unwrap();
         PcmTransfer {
-            pcm_path: path,
+            pcm_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(path)),
             sample_rate: 48000,
             channels: 2,
             blob_id: uuid::Uuid::new_v4(),

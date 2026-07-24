@@ -12,6 +12,7 @@ use xaak::repo::DspState;
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 #[allow(deprecated)]
+#[allow(clippy::type_complexity)]
 pub fn run_dsp(
     req: &MasterRequest,
     start: Instant,
@@ -24,7 +25,7 @@ pub fn run_dsp(
     (
         StoredBlob,
         Option<StoredBlob>,
-        std::path::PathBuf,
+        std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
     String,
@@ -69,7 +70,7 @@ fn spatial_conformance_path(
 ) -> Result<
     (
         crate::blob_store::StoredBlob,
-        std::path::PathBuf,
+        std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
     String,
@@ -211,6 +212,9 @@ fn spatial_conformance_path(
     }
 
     // 5. Φτιάξε StoredBlob
+    let spatial_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
+        std::path::PathBuf::from(raw_path),
+    ));
     let blob = crate::blob_store::StoredBlob {
         id: blob_id.to_string(),
         version: "1.0".to_string(),
@@ -222,13 +226,13 @@ fn spatial_conformance_path(
         preset_id: preset_id.to_string(),
         channels: 6,
         sample_rate,
-        audio_path: std::path::PathBuf::from(raw_path),
+        audio_path: spatial_guard.clone(),
         num_frames,
         pcm_blake3: Some(input_blake3_hex.to_string()),
         ..Default::default()
     };
 
-    Ok((blob, std::path::PathBuf::from(raw_path), None))
+    Ok((blob, spatial_guard, None))
 }
 
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
@@ -281,6 +285,7 @@ fn write_interleaved_dump(
 }
 
 #[inline(always)]
+#[allow(clippy::type_complexity)]
 fn run_dsp_internal(
     req: &MasterRequest,
     start: Instant,
@@ -293,7 +298,7 @@ fn run_dsp_internal(
     (
         StoredBlob,
         Option<StoredBlob>,
-        std::path::PathBuf,
+        std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
     String,
@@ -526,7 +531,9 @@ fn run_dsp_internal(
             &icfg.persona_config,
             &icfg.aether_req,
             &icfg.dsp_config,
-            render_res.pcm_path.clone(),
+            std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
+                render_res.pcm_path.clone(),
+            )),
             &input_hash_hex,
             render_res.sample_rate,
             elapsed,
@@ -756,13 +763,15 @@ fn run_dsp_internal(
     let n_total = decoded.total_frames;
     const STFT_FLUSH_TAIL: usize = 1024;
     let n_total_with_tail = n_total + STFT_FLUSH_TAIL;
-    let file_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let file_path_raw = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let file_path =
+        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(file_path_raw.clone()));
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&file_path)
+        .open(&file_path_raw)
         .map_err(|e| format!("Failed to create mapped file: {e}"))?;
     file.set_len((n_total * 2 * 4) as u64)
         .map_err(|e| format!("Failed to set file len: {e}"))?;
