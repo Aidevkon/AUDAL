@@ -64,7 +64,7 @@ mod tests {
                 stereo_correlation: 0.94,
                 phase_coherence: 0.97,
                 stereo_width: 0.74,
-                dynamic_range_db: 9.5,
+                dynamic_range_db: 9.5, // TODO: wire real DR when this path carries trunk metrics (register item)
                 rms_db: -16.0,
                 spectral_centroid: 3200.0,
                 spectral_flatness: 0.12,

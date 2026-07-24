@@ -135,4 +135,14 @@ fn test_trunk_parity() {
         pre.transient_density,
         td_delta
     );
+
+    // Dynamic range: within 0.1 dB
+    let dr_delta = (report.dynamic_range_db - pre.dynamic_range_db).abs();
+    assert!(
+        dr_delta < 0.1,
+        "Dynamic range parity violation: trunk={:.4} pre={:.4} delta={:.4}",
+        report.dynamic_range_db,
+        pre.dynamic_range_db,
+        dr_delta
+    );
 }

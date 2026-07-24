@@ -29,6 +29,8 @@ pub struct TrunkMetrics {
     pub spectral_profile_db: [f32; 8],
     pub transient_density: f32,
     pub global_phase_correlation: f32,
+    /// 95th-5th percentile RMS block spread, 50ms blocks (the real broadcast DR metric)
+    pub dynamic_range_db: f32,
 }
 
 pub struct TrunkReport {
@@ -67,7 +69,7 @@ impl TrunkMetrics {
             integrated_lufs: self.integrated_lufs.unwrap_or(-144.0),
             true_peak_dbtp,
             loudness_range: self.lra,
-            dynamic_range_db: 0.0, // dead field
+            dynamic_range_db: self.dynamic_range_db,
             global_crest_factor_db: self.crest_db,
             spectral_profile_db: self.spectral_profile_db,
             transient_density: self.transient_density,
@@ -445,7 +447,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
 
     // === Finish meters ===
     let integrated_lufs = lufs_meter.finish();
-    let (_rms_db, crest_db, _dyn_range) = dynamics.finish();
+    let (_rms_db, crest_db, dyn_range) = dynamics.finish();
     let lra = lra_meter.finish();
 
     // === Finish spectral profile ===
@@ -493,6 +495,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
             spectral_profile_db,
             transient_density,
             global_phase_correlation,
+            dynamic_range_db: dyn_range,
         },
     })
 }

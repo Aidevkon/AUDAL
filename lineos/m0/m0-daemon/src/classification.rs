@@ -128,6 +128,7 @@ mod tests {
             spectral_profile_db: [sub_db, -20.0, -18.0, -15.0, mid_db, -18.0, -22.0, -30.0],
             transient_density: 0.5,
             global_phase_correlation: 1.0,
+            dynamic_range_db: 10.0,
         }
     }
 

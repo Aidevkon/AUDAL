@@ -276,6 +276,7 @@ fn assemble_blob(
     let cert_sig =
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, fingerprints);
 
+    // TODO: wire real DR when this path carries trunk metrics (register item)
     let dr = 10.0;
     let sc = 1.0;
 
