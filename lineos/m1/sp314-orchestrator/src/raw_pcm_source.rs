@@ -9,6 +9,7 @@ use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
 
 pub struct RawPcmFileSource {
     reader: BufReader<File>,
+    byte_buf: Vec<u8>,
 }
 
 impl RawPcmFileSource {
@@ -17,6 +18,7 @@ impl RawPcmFileSource {
             File::open(path).map_err(|e| format!("Failed to open {}: {}", path.display(), e))?;
         Ok(Self {
             reader: BufReader::new(file),
+            byte_buf: Vec::new(),
         })
     }
 }
@@ -40,17 +42,15 @@ impl ChunkSource for RawPcmFileSource {
             return Ok(0);
         }
 
-        // We read directly into the caller's f32 buffer by temporarily viewing
-        // it as a mutable byte slice. This exactly mirrors the unsafe cast used
-        // during writing in decode_node.rs and avoids an intermediate Vec<u8> allocation.
+        // Y3-iv-a: explicit LE decode — the dump is f32 LE by the write contract (core tap / TappedDecoder); the
+        // old native-endian pointer cast was correct only on LE hosts (latent-BE register item since P0-b).
         let byte_len = buffer.len() * 4;
-        let byte_buf: &mut [u8] =
-            unsafe { std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut u8, byte_len) };
+        self.byte_buf.resize(byte_len, 0);
 
         // Read up to byte_len bytes
         let mut total_read = 0;
         while total_read < byte_len {
-            match self.reader.read(&mut byte_buf[total_read..]) {
+            match self.reader.read(&mut self.byte_buf[total_read..]) {
                 Ok(0) => break, // EOF
                 Ok(n) => total_read += n,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
@@ -58,10 +58,15 @@ impl ChunkSource for RawPcmFileSource {
             }
         }
 
-        // Return number of frames read (which is total bytes read / 4 / channels)
-        // If we read a partial float, we drop the fractional part to maintain alignment,
-        // though our write pattern guarantees aligned 4-byte boundaries.
-        Ok(total_read / 4 / channels)
+        let frames_read = total_read / 4 / channels;
+        let valid_bytes = frames_read * channels * 4;
+
+        for (i, chunk) in self.byte_buf[..valid_bytes].chunks_exact(4).enumerate() {
+            buffer[i] = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+
+        // Return number of frames read
+        Ok(frames_read)
     }
 }
 
