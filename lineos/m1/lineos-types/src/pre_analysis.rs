@@ -90,22 +90,11 @@ pub struct PreAnalysisData {
     /// [7] Air      8000–20000 Hz
     pub spectral_profile_db: [f32; 8],
 
-    // ── Spectral Shape ──
-    pub spectral_rolloff_hz: f32,
-
     // ── Transient Profile ──
     pub transient_density: f32,
 
     // ── Spatial Health ──
     pub global_phase_correlation: f32,
-    pub side_mid_ratio_db: f32,
-    pub stereo_width: f32,
-
-    // ── Per-Band Phase Correlation (same 8 bands) ──
-    pub band_phase_correlation: [f32; 8],
-
-    // ── Resonant Peak Flags (Hz, sorted ascending, max 16) ──
-    pub resonant_peaks_hz: Vec<f32>,
 
     // ── Zone Activation ──
     pub zone_flags: ZoneActivationFlags,
@@ -115,9 +104,6 @@ pub struct PreAnalysisData {
     pub beats_ms: Vec<u32>,      // beat timestamps in ms
     pub downbeats_ms: Vec<u32>,  // downbeat timestamps in ms
     pub transients_ms: Vec<u32>, // onset timestamps in ms
-
-    // ── Semantic Classification ──
-    pub genre: Option<Genre>,
 }
 
 impl PreAnalysisData {
@@ -132,19 +118,13 @@ impl PreAnalysisData {
             dynamic_range_db: 0.0,
             global_crest_factor_db: 0.0,
             spectral_profile_db: [-144.0; 8],
-            spectral_rolloff_hz: 0.0,
             transient_density: 0.0,
             global_phase_correlation: 1.0,
-            side_mid_ratio_db: -60.0,
-            stereo_width: 0.0,
-            band_phase_correlation: [1.0; 8],
-            resonant_peaks_hz: vec![],
             zone_flags: ZoneActivationFlags::default(),
             bpm: 0.0,
             beats_ms: vec![],
             downbeats_ms: vec![],
             transients_ms: vec![],
-            genre: None,
         }
     }
 }

@@ -4,7 +4,6 @@
 // Rule:      libm only. No std::f32 trig/log. No rand.
 
 use crate::metering::{mean_square_to_lufs, KWeightingFilter};
-use crate::stft::StftEngine;
 use lineos_types::pre_analysis::*;
 
 // ── Polyphase FIR coefficients (from true_peak_fir.json, Blackman-Harris 71-tap) ──
@@ -130,7 +129,6 @@ impl PreAnalyzer {
 
         // Interleave for stereo helpers
         let global_phase_correlation = crate::analysis::stereo::stereo_correlation(left, right);
-        let stereo_width = (1.0_f32 - global_phase_correlation).clamp(0.0, 1.0);
 
         let mono: Vec<f32> = left
             .iter()
@@ -143,56 +141,15 @@ impl PreAnalyzer {
         // ── Group B: new implementations ──
         let true_peak_dbtp = true_peak_detect(left, right);
         let loudness_range = compute_lra(left, right);
-        let (spectral_profile_db, band_signals_l, band_signals_r) =
-            spectral_profile_8band(left, right, sample_rate);
-        let spectral_rolloff_hz = spectral_rolloff_85(left, right, sample_rate);
+        let spectral_profile_db = spectral_profile_8band(left, right, sample_rate);
         let transient_density = compute_transient_density(&mono, sample_rate);
-        let side_mid_ratio_db = compute_side_mid_ratio(left, right);
-        let band_phase_correlation = band_phase_correlation_8(&band_signals_l, &band_signals_r);
-        let resonant_peaks_hz = compute_resonant_peaks(left, right, sample_rate);
         let zone_flags = compute_zone_flags(
             &spectral_profile_db,
             global_crest_factor_db,
             loudness_range,
             global_phase_correlation,
-            &resonant_peaks_hz,
+            &[],
         );
-
-        // ── Group C: Semantic Classification ──
-        // Extract MFCC frames mirroring measure_corpus.rs exactly (FFT_SIZE, -60dB RMS silence exclusion).
-        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
-        let mut mfcc_frames = Vec::with_capacity(mono.len() / crate::stft::FFT_SIZE);
-        for chunk in mono.chunks(crate::stft::FFT_SIZE) {
-            if chunk.len() == crate::stft::FFT_SIZE {
-                let sum_sq: f32 = chunk.iter().map(|&x| x * x).sum();
-                let rms = libm::sqrtf(sum_sq / chunk.len() as f32);
-                let db = if rms > 1e-20 {
-                    20.0 * libm::log10f(rms)
-                } else {
-                    -144.0
-                };
-                if db >= -60.0 {
-                    let features = mfcc_analyzer.compute(chunk);
-                    mfcc_frames.push(features);
-                }
-            }
-        }
-
-        let genre = if mfcc_frames.is_empty() {
-            None
-        } else {
-            let mut mean = [0.0; lineos_corpus::mfcc::N_MFCC];
-            for frame in &mfcc_frames {
-                for i in 0..lineos_corpus::mfcc::N_MFCC {
-                    mean[i] += frame[i];
-                }
-            }
-            let count = mfcc_frames.len() as f32;
-            for m in mean.iter_mut() {
-                *m /= count;
-            }
-            lineos_corpus::classifier::GenreClassifier::classify(&mean)
-        };
 
         PreAnalysisData {
             integrated_lufs,
@@ -201,19 +158,13 @@ impl PreAnalyzer {
             dynamic_range_db,
             global_crest_factor_db,
             spectral_profile_db,
-            spectral_rolloff_hz,
             transient_density,
             global_phase_correlation,
-            side_mid_ratio_db,
-            stereo_width,
-            band_phase_correlation,
-            resonant_peaks_hz,
             zone_flags,
             bpm: 0.0,
             beats_ms: vec![],
             downbeats_ms: vec![],
             transients_ms: vec![],
-            genre,
         }
     }
 }
@@ -422,7 +373,7 @@ fn bandpass_filter(signal: &[f32], lo: f32, hi: f32, sr: f32) -> Vec<f32> {
 /// discarding the filtered-signal buffers the private fn also
 /// produces.
 pub fn spectral_profile_levels(left: &[f32], right: &[f32], sr: u32) -> [f32; 8] {
-    spectral_profile_8band(left, right, sr).0
+    spectral_profile_8band(left, right, sr)
 }
 
 /// Least-squares linear regression of spectral density against log frequency.
@@ -470,23 +421,15 @@ pub fn spectral_slope(levels_db: &[f32; 8]) -> f32 {
     (n * sum_xy - sum_x * sum_y) / denominator
 }
 
-fn spectral_profile_8band(
-    left: &[f32],
-    right: &[f32],
-    sr: u32,
-) -> ([f32; 8], Vec<Vec<f32>>, Vec<Vec<f32>>) {
+fn spectral_profile_8band(left: &[f32], right: &[f32], sr: u32) -> [f32; 8] {
     let srf = sr as f32;
     let nyq = srf / 2.0;
     let mut profile = [-144.0_f32; 8];
-    let mut bands_l = Vec::with_capacity(8);
-    let mut bands_r = Vec::with_capacity(8);
 
     for i in 0..8 {
         let lo = BAND_EDGES[i].max(1.0);
         let hi = BAND_EDGES[i + 1].min(nyq - 1.0);
         if lo >= hi {
-            bands_l.push(vec![0.0; left.len()]);
-            bands_r.push(vec![0.0; right.len()]);
             continue;
         }
         let fl = bandpass_filter(left, lo, hi, srf);
@@ -496,50 +439,8 @@ fn spectral_profile_8band(
         if rms > 1e-20 {
             profile[i] = 20.0 * libm::log10f(rms);
         }
-        bands_l.push(fl);
-        bands_r.push(fr);
     }
-    (profile, bands_l, bands_r)
-}
-
-// ── Spectral Rolloff (85%) ──────────────────────────────────────────────────
-
-fn spectral_rolloff_85(left: &[f32], right: &[f32], sr: u32) -> f32 {
-    let mono: Vec<f32> = left
-        .iter()
-        .zip(right.iter())
-        .map(|(&l, &r)| 0.5 * (l + r))
-        .collect();
-    let mut engine = StftEngine::new();
-    let (frames, n_frames) = engine.forward(&mono);
-    if n_frames == 0 {
-        return 0.0;
-    }
-
-    let n_bins = frames[0].len();
-    let mut avg_mag = vec![0.0_f32; n_bins];
-    for frame in &frames {
-        for (i, c) in frame.iter().enumerate() {
-            avg_mag[i] += libm::sqrtf(c.re * c.re + c.im * c.im);
-        }
-    }
-    for v in avg_mag.iter_mut() {
-        *v /= n_frames as f32;
-    }
-
-    let mut cumsum = 0.0_f32;
-    let total: f32 = avg_mag.iter().sum();
-    if total < 1e-20 {
-        return 0.0;
-    }
-    let target = 0.85 * total;
-    for (i, &m) in avg_mag.iter().enumerate() {
-        cumsum += m;
-        if cumsum >= target {
-            return i as f32 * sr as f32 / crate::stft::FFT_SIZE as f32;
-        }
-    }
-    sr as f32 / 2.0
+    profile
 }
 
 // ── Transient Density ───────────────────────────────────────────────────────
@@ -588,122 +489,7 @@ fn compute_transient_density(mono: &[f32], sample_rate: u32) -> f32 {
     count as f32 / duration
 }
 
-// ── Side/Mid Ratio ──────────────────────────────────────────────────────────
-
-fn compute_side_mid_ratio(left: &[f32], right: &[f32]) -> f32 {
-    let mut sum_m2 = 0.0_f32;
-    let mut sum_s2 = 0.0_f32;
-    for (&l, &r) in left.iter().zip(right.iter()) {
-        let m = 0.5 * (l + r);
-        let s = 0.5 * (l - r);
-        sum_m2 += m * m;
-        sum_s2 += s * s;
-    }
-    let n = left.len() as f32;
-    let rms_m = libm::sqrtf(sum_m2 / n);
-    let rms_s = libm::sqrtf(sum_s2 / n);
-    if rms_m < 1e-20 {
-        return -60.0;
-    }
-    let ratio = 20.0 * libm::log10f(rms_s / rms_m + 1e-30);
-    ratio.clamp(-60.0, 6.0)
-}
-
 // ── Per-Band Phase Correlation ──────────────────────────────────────────────
-
-fn phase_corr(left: &[f32], right: &[f32]) -> f32 {
-    let mut cross = 0.0_f32;
-    let mut sl = 0.0_f32;
-    let mut sr = 0.0_f32;
-    for (&l, &r) in left.iter().zip(right.iter()) {
-        cross += l * r;
-        sl += l * l;
-        sr += r * r;
-    }
-    let denom = libm::sqrtf(sl * sr);
-    if denom < 1e-10 {
-        return 1.0;
-    }
-    (cross / denom).clamp(-1.0, 1.0)
-}
-
-fn band_phase_correlation_8(bands_l: &[Vec<f32>], bands_r: &[Vec<f32>]) -> [f32; 8] {
-    let mut corrs = [1.0_f32; 8];
-    for i in 0..8 {
-        corrs[i] = phase_corr(&bands_l[i], &bands_r[i]);
-    }
-    corrs
-}
-
-// ── Resonant Peak Detection ─────────────────────────────────────────────────
-
-fn compute_resonant_peaks(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<f32> {
-    let mono: Vec<f32> = left
-        .iter()
-        .zip(right.iter())
-        .map(|(&l, &r)| 0.5 * (l + r))
-        .collect();
-    let mut engine = StftEngine::new();
-    let (frames, n_frames) = engine.forward(&mono);
-    if n_frames == 0 {
-        return vec![];
-    }
-
-    let n_bins = frames[0].len();
-    let mut avg_mag = vec![0.0_f32; n_bins];
-    for frame in &frames {
-        for (i, c) in frame.iter().enumerate() {
-            avg_mag[i] += libm::sqrtf(c.re * c.re + c.im * c.im);
-        }
-    }
-    for v in avg_mag.iter_mut() {
-        *v /= n_frames as f32;
-    }
-
-    // Magnitude floor
-    let peak_mag = avg_mag
-        .iter()
-        .copied()
-        .fold(0.0_f32, |a, b| if b > a { b } else { a });
-    let mag_floor = peak_mag * RESONANT_PEAK_MAG_FLOOR_RATIO;
-
-    let win = RESONANT_PEAK_WINDOW_BINS;
-    let mut raw_peaks: Vec<f32> = Vec::new();
-
-    for b in win..n_bins.saturating_sub(win) {
-        if avg_mag[b] < mag_floor {
-            continue;
-        }
-
-        // Local stats over ±win bins
-        let start = b - win;
-        let end = (b + win + 1).min(n_bins);
-        let local = &avg_mag[start..end];
-        let count = local.len() as f32;
-        let mu: f32 = local.iter().sum::<f32>() / count;
-        let var: f32 = local.iter().map(|&v| (v - mu) * (v - mu)).sum::<f32>() / count;
-        let sigma = libm::sqrtf(var);
-
-        if sigma > 1e-15 && avg_mag[b] > mu + RESONANT_PEAK_SIGMA * sigma {
-            let hz = b as f32 * sample_rate as f32 / crate::stft::FFT_SIZE as f32;
-            raw_peaks.push(hz);
-        }
-    }
-
-    raw_peaks.sort_by(|a, b| a.total_cmp(b));
-
-    // Thin: keep peaks > 10 Hz apart
-    let mut thinned: Vec<f32> = Vec::new();
-    for &p in &raw_peaks {
-        if thinned.last().is_none_or(|&prev| p - prev > 10.0) {
-            thinned.push(p);
-        }
-        if thinned.len() >= RESONANT_PEAK_MAX_COUNT {
-            break;
-        }
-    }
-    thinned
-}
 
 // ── Zone Flags ──────────────────────────────────────────────────────────────
 

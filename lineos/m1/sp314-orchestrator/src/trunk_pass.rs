@@ -70,19 +70,13 @@ impl TrunkMetrics {
             dynamic_range_db: 0.0, // dead field
             global_crest_factor_db: self.crest_db,
             spectral_profile_db: self.spectral_profile_db,
-            spectral_rolloff_hz: 0.0, // dead field
             transient_density: self.transient_density,
             global_phase_correlation: self.global_phase_correlation,
-            side_mid_ratio_db: -60.0,         // dead field
-            stereo_width: 0.0,                // dead field
-            band_phase_correlation: [1.0; 8], // dead field
-            resonant_peaks_hz: vec![],        // dead field
             zone_flags,
             bpm,
             beats_ms,
             downbeats_ms,
             transients_ms,
-            genre: None, // dead field
         }
     }
 }

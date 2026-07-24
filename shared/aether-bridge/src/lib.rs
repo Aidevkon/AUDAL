@@ -145,18 +145,7 @@ pub fn build_dsp_config(
         if req.content_type == ContentType::Episode {
             target_profile_id = Some(crate::reference_resolver::ProfileId::PodcastV1);
         } else if req.content_type == ContentType::Music {
-            if let Some(pa) = pre_analysis {
-                match pa.genre {
-                    Some(lineos_types::pre_analysis::Genre::Acoustic) => {
-                        target_profile_id =
-                            Some(crate::reference_resolver::ProfileId::MusicAcoustic);
-                    }
-                    Some(lineos_types::pre_analysis::Genre::Techno) => {
-                        target_profile_id = Some(crate::reference_resolver::ProfileId::MusicTechno);
-                    }
-                    None => {} // Unclassified music skips reference correction
-                }
-            }
+            // Unclassified music skips reference correction
         }
 
         if let Some(profile_id) = target_profile_id {

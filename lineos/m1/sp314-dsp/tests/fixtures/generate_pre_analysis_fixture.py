@@ -136,25 +136,6 @@ def compute_spectral_profile(left, right):
         bands.append(-144.0 if rms < 1e-20 else float(20*np.log10(rms)))
     return bands
 
-def compute_spectral_rolloff(left, right):
-    """85% energy rolloff frequency (Constitution §4.11)."""
-    mono = 0.5*(left + right)
-    # STFT with Hanning window
-    window = np.hanning(FFT_SIZE)
-    mags = []
-    pos = 0
-    while pos + FFT_SIZE <= len(mono):
-        frame = mono[pos:pos+FFT_SIZE] * window
-        spec = np.abs(np.fft.rfft(frame))
-        mags.append(spec)
-        pos += HOP_SIZE
-    if not mags: return 0.0
-    avg_mag = np.mean(mags, axis=0)
-    cumsum = np.cumsum(avg_mag)
-    total = cumsum[-1]
-    if total < 1e-20: return 0.0
-    idx = np.searchsorted(cumsum, 0.85 * total)
-    return float(idx * SR / FFT_SIZE)
 
 def compute_transient_density(left, right):
     """Dual MA envelope, +6dB threshold, events/sec (Constitution §4.6)."""
@@ -188,59 +169,6 @@ def compute_phase_correlation(left, right):
     if denom < 1e-10: return 1.0
     return float(np.clip(cross / denom, -1.0, 1.0))
 
-def compute_side_mid_ratio(left, right):
-    mid = 0.5*(left + right)
-    side = 0.5*(left - right)
-    rms_m = np.sqrt(np.mean(mid**2))
-    rms_s = np.sqrt(np.mean(side**2))
-    if rms_m < 1e-20: return -60.0
-    return float(np.clip(20*np.log10(rms_s / rms_m + 1e-30), -60.0, 6.0))
-
-def compute_band_phase_correlation(left, right):
-    """Per-band L/R correlation (Constitution §4.9)."""
-    nyq = SR / 2.0
-    corrs = []
-    for i in range(8):
-        lo = max(BAND_EDGES[i] / nyq, 0.001)
-        hi = min(BAND_EDGES[i+1] / nyq, 0.999)
-        if lo >= hi:
-            corrs.append(1.0); continue
-        sos = butter(4, [lo, hi], btype='bandpass', output='sos')
-        fl = sosfilt(sos, left)
-        fr = sosfilt(sos, right)
-        corrs.append(compute_phase_correlation(fl, fr))
-    return corrs
-
-def compute_resonant_peaks(left, right):
-    """STFT frame-averaged resonant peak detection (Constitution §4.10).
-    Requires both statistical outlier (>3σ) AND minimum absolute magnitude."""
-    mono = 0.5*(left + right)
-    window = np.hanning(FFT_SIZE)
-    mags = []
-    pos = 0
-    while pos + FFT_SIZE <= len(mono):
-        frame = mono[pos:pos+FFT_SIZE] * window
-        spec = np.abs(np.fft.rfft(frame))
-        mags.append(spec)
-        pos += HOP_SIZE
-    if not mags: return []
-    avg = np.mean(mags, axis=0)
-    n = len(avg)
-    # Minimum magnitude floor: bin must have meaningful energy
-    # to be considered a resonance (not noise floor artifacts)
-    mag_floor = np.max(avg) * 1e-3  # -60 dB below peak magnitude
-    peaks = []
-    for b in range(PEAK_WIN, n - PEAK_WIN):
-        if avg[b] < mag_floor:
-            continue
-        local = avg[max(0,b-PEAK_WIN):b+PEAK_WIN+1]
-        mu = np.mean(local)
-        sigma = np.std(local)
-        if sigma > 1e-15 and avg[b] > mu + PEAK_SIGMA * sigma:
-            hz = float(b * SR / FFT_SIZE)
-            peaks.append(hz)
-    peaks.sort()
-    return peaks[:MAX_PEAKS]
 
 def compute_zone_flags(profile, crest, lra, corr, peaks):
     return {
@@ -248,7 +176,7 @@ def compute_zone_flags(profile, crest, lra, corr, peaks):
         "zone_sub_rumble":      bool(profile[0] > ZONE_SUB_RUMBLE_DB),
         "zone_boxiness":        bool(profile[2] > ZONE_BOX_RMS_DB and lra < ZONE_BOX_LRA_LU),
         "zone_phase_issue":     bool(corr < ZONE_PHASE_CORR),
-        "zone_harsh_resonance": bool(any(2000 <= f <= 8000 for f in peaks)),
+        "zone_harsh_resonance": False,
     }
 
 # ── Signal generators ──────────────────────────────────────────────
@@ -312,14 +240,9 @@ def analyze(signal_id, left, right, fir_path):
     dyn      = compute_dynamic_range(left64)
     crest    = compute_crest_factor(left64, right64)
     profile  = compute_spectral_profile(left64, right64)
-    rolloff  = compute_spectral_rolloff(left64, right64)
     td       = compute_transient_density(left64, right64)
     corr     = compute_phase_correlation(left64, right64)
-    smr      = compute_side_mid_ratio(left64, right64)
-    width    = float(np.clip(1.0 - corr, 0.0, 1.0))
-    bpc      = compute_band_phase_correlation(left64, right64)
-    peaks    = compute_resonant_peaks(left64, right64)
-    flags    = compute_zone_flags(profile, crest, lra, corr, peaks)
+    flags    = compute_zone_flags(profile, crest, lra, corr, [])
 
     return {
         "signal_id":                signal_id,
@@ -332,13 +255,8 @@ def analyze(signal_id, left, right, fir_path):
         "dynamic_range_db":         round(dyn, 4),
         "global_crest_factor_db":   round(crest, 4),
         "spectral_profile_db":      [round(x, 4) for x in profile],
-        "spectral_rolloff_hz":      round(rolloff, 2),
         "transient_density":        round(td, 4),
         "global_phase_correlation": round(corr, 6),
-        "side_mid_ratio_db":        round(smr, 4),
-        "stereo_width":             round(width, 6),
-        "band_phase_correlation":   [round(x, 6) for x in bpc],
-        "resonant_peaks_hz":        [round(x, 2) for x in peaks],
         "zone_flags":               flags,
         "tolerances": {
             "integrated_lufs": 1.0,
@@ -347,12 +265,8 @@ def analyze(signal_id, left, right, fir_path):
             "dynamic_range_db": 1.0,
             "global_crest_factor_db": 0.5,
             "spectral_profile_db": 2.0,
-            "spectral_rolloff_hz": 200.0,
             "transient_density": 1.0,
             "global_phase_correlation": 0.05,
-            "side_mid_ratio_db": 1.0,
-            "stereo_width": 0.05,
-            "band_phase_correlation": 0.1,
         },
     }
 
@@ -385,8 +299,7 @@ def main():
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nWritten: {out_path}")
-    print(f"  {len(results)} test cases, "
-          f"{sum(len(r['resonant_peaks_hz']) for r in results)} total peaks")
+    print(f"  {len(results)} test cases")
 
 if __name__ == "__main__":
     main()

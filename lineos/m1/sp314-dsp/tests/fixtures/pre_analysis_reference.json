@@ -19,25 +19,8 @@
       -74.2157,
       -82.8551
     ],
-    "spectral_rolloff_hz": 1007.81,
     "transient_density": 0.0,
     "global_phase_correlation": 1.0,
-    "side_mid_ratio_db": -60.0,
-    "stereo_width": 0.0,
-    "band_phase_correlation": [
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0
-    ],
-    "resonant_peaks_hz": [
-      984.38,
-      1007.81
-    ],
     "zone_flags": {
       "zone_cymbal_harsh": false,
       "zone_sub_rumble": false,
@@ -52,12 +35,8 @@
       "dynamic_range_db": 1.0,
       "global_crest_factor_db": 0.5,
       "spectral_profile_db": 2.0,
-      "spectral_rolloff_hz": 200.0,
       "transient_density": 1.0,
-      "global_phase_correlation": 0.05,
-      "side_mid_ratio_db": 1.0,
-      "stereo_width": 0.05,
-      "band_phase_correlation": 0.1
+      "global_phase_correlation": 0.05
     }
   },
   {
@@ -80,24 +59,8 @@
       -18.1329,
       -13.4683
     ],
-    "spectral_rolloff_hz": 20390.62,
     "transient_density": 0.0,
     "global_phase_correlation": -0.000218,
-    "side_mid_ratio_db": 0.0019,
-    "stereo_width": 1.0,
-    "band_phase_correlation": [
-      0.084927,
-      -0.017459,
-      0.009734,
-      0.010986,
-      -0.001445,
-      0.00208,
-      0.007021,
-      -0.002392
-    ],
-    "resonant_peaks_hz": [
-      18023.44
-    ],
     "zone_flags": {
       "zone_cymbal_harsh": false,
       "zone_sub_rumble": false,
@@ -112,12 +75,8 @@
       "dynamic_range_db": 1.0,
       "global_crest_factor_db": 0.5,
       "spectral_profile_db": 2.0,
-      "spectral_rolloff_hz": 200.0,
       "transient_density": 1.0,
-      "global_phase_correlation": 0.05,
-      "side_mid_ratio_db": 1.0,
-      "stereo_width": 0.05,
-      "band_phase_correlation": 0.1
+      "global_phase_correlation": 0.05
     }
   },
   {
@@ -140,42 +99,14 @@
       -12.5343,
       -12.3971
     ],
-    "spectral_rolloff_hz": 19453.12,
     "transient_density": 0.0,
     "global_phase_correlation": 0.102818,
-    "side_mid_ratio_db": -0.864,
-    "stereo_width": 0.897182,
-    "band_phase_correlation": [
-      -0.996469,
-      -0.283814,
-      0.961937,
-      0.018666,
-      0.003256,
-      0.675173,
-      0.58581,
-      0.010098
-    ],
-    "resonant_peaks_hz": [
-      2484.38,
-      2507.81,
-      3000.0,
-      3492.19,
-      3515.62,
-      3984.38,
-      4007.81,
-      4500.0,
-      4992.19,
-      5015.62,
-      5484.38,
-      5507.81,
-      6000.0
-    ],
     "zone_flags": {
       "zone_cymbal_harsh": true,
       "zone_sub_rumble": true,
       "zone_boxiness": true,
       "zone_phase_issue": true,
-      "zone_harsh_resonance": true
+      "zone_harsh_resonance": false
     },
     "tolerances": {
       "integrated_lufs": 1.0,
@@ -184,12 +115,8 @@
       "dynamic_range_db": 1.0,
       "global_crest_factor_db": 0.5,
       "spectral_profile_db": 2.0,
-      "spectral_rolloff_hz": 200.0,
       "transient_density": 1.0,
-      "global_phase_correlation": 0.05,
-      "side_mid_ratio_db": 1.0,
-      "stereo_width": 0.05,
-      "band_phase_correlation": 0.1
+      "global_phase_correlation": 0.05
     }
   }
 ]

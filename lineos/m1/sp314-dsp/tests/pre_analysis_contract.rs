@@ -17,7 +17,6 @@ use std::fs;
 // ── Tolerances (approved by constitutional authority) ─────────────────────────
 
 const TOL_CORRELATION: f32 = 1e-6;
-const TOL_WIDTH: f32 = 1e-6;
 #[allow(dead_code)]
 const TOL_LUFS: f32 = 0.3;
 #[allow(dead_code)]
@@ -208,7 +207,6 @@ fn sine_1000_semantics() {
         "Sine should have near-zero transient density, got {}",
         result.transient_density
     );
-    assert_near("stereo_width", result.stereo_width, 0.0, TOL_WIDTH);
 
     // All zone flags must be false for a clean sine
     assert!(
@@ -293,128 +291,6 @@ fn deterministic_100_runs() {
             "Spectral profile not bit-identical on run {}",
             run
         );
-        assert_eq!(
-            result.resonant_peaks_hz, baseline.resonant_peaks_hz,
-            "Resonant peaks not bit-identical on run {}",
-            run
-        );
-    }
-}
-
-// ── Test 5: Resonant peaks invariants ────────────────────────────────────────
-
-#[test]
-fn resonant_peaks_invariants() {
-    let fixtures = load_fixture();
-    for case in &fixtures {
-        let peaks: Vec<f64> = case["resonant_peaks_hz"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_f64().unwrap())
-            .collect();
-
-        let sid = case["signal_id"].as_str().unwrap();
-
-        assert!(
-            peaks.len() <= 16,
-            "{}: too many peaks ({}), max 16",
-            sid,
-            peaks.len()
-        );
-
-        for (i, &p) in peaks.iter().enumerate() {
-            assert!(p > 0.0, "{}: peak[{}] = {} is not positive", sid, i, p);
-            if i > 0 {
-                assert!(
-                    p >= peaks[i - 1],
-                    "{}: peaks not sorted ascending: [{}]={} < [{}]={}",
-                    sid,
-                    i - 1,
-                    peaks[i - 1],
-                    i,
-                    p
-                );
-            }
-        }
-    }
-}
-
-// ── Test 6: Resonant peaks vs fixture ────────────────────────────────────────
-// Note: Rust problem_mix uses xorshift RNG, Python uses numpy.random.
-// Exact peak counts won't match. We verify structural invariants instead.
-
-#[test]
-fn resonant_peaks_vs_fixture() {
-    let (left, right) = gen_problem_mix();
-    let result = PreAnalyzer::run(&left, &right, SR);
-
-    // Must have peaks (the harsh cluster at 2.5k-6kHz guarantees this)
-    assert!(
-        !result.resonant_peaks_hz.is_empty(),
-        "problem_mix should produce resonant peaks"
-    );
-
-    // All peaks must be capped at 16
-    assert!(
-        result.resonant_peaks_hz.len() <= 16,
-        "Peaks should be capped at 16, got {}",
-        result.resonant_peaks_hz.len()
-    );
-
-    // All peaks must be sorted ascending and >10Hz apart (thinning)
-    for i in 1..result.resonant_peaks_hz.len() {
-        assert!(
-            result.resonant_peaks_hz[i] > result.resonant_peaks_hz[i - 1],
-            "Peaks not sorted at index {}",
-            i
-        );
-        assert!(
-            result.resonant_peaks_hz[i] - result.resonant_peaks_hz[i - 1] > 10.0,
-            "Peaks not thinned at index {}: {} and {}",
-            i,
-            result.resonant_peaks_hz[i - 1],
-            result.resonant_peaks_hz[i]
-        );
-    }
-
-    // Most peaks should be in the 2k-8k HighMid band (the harsh cluster)
-    let highmid_count = result
-        .resonant_peaks_hz
-        .iter()
-        .filter(|&&f| (2000.0..=8000.0).contains(&f))
-        .count();
-    assert!(
-        highmid_count > 0,
-        "problem_mix should have peaks in HighMid (2k-8kHz), got 0"
-    );
-}
-
-// ── Test 7: Band correlation in range ────────────────────────────────────────
-
-#[test]
-fn band_correlation_in_range() {
-    let fixtures = load_fixture();
-    for case in &fixtures {
-        let bpc: Vec<f64> = case["band_phase_correlation"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_f64().unwrap())
-            .collect();
-
-        let sid = case["signal_id"].as_str().unwrap();
-        assert_eq!(bpc.len(), 8, "{}: expected 8 band correlations", sid);
-
-        for (i, &c) in bpc.iter().enumerate() {
-            assert!(
-                (-1.0..=1.0).contains(&c),
-                "{}: band_phase_correlation[{}] = {} out of range [-1,1]",
-                sid,
-                i,
-                c
-            );
-        }
     }
 }
 
@@ -431,14 +307,7 @@ fn empty_input_silent() {
         result.global_phase_correlation,
         silent.global_phase_correlation
     );
-    assert_eq!(result.stereo_width, silent.stereo_width);
-    assert_eq!(result.side_mid_ratio_db, silent.side_mid_ratio_db);
     assert_eq!(result.spectral_profile_db, silent.spectral_profile_db);
-    assert_eq!(result.band_phase_correlation, silent.band_phase_correlation);
-    assert!(
-        result.resonant_peaks_hz.is_empty(),
-        "Empty input should have no peaks"
-    );
     assert_eq!(result.zone_flags, ZoneActivationFlags::default());
 }
 
@@ -463,12 +332,8 @@ fn short_input_silent() {
         result.global_phase_correlation.is_finite(),
         "Correlation is not finite"
     );
-    assert!(result.stereo_width.is_finite(), "Width is not finite");
     for (i, &v) in result.spectral_profile_db.iter().enumerate() {
         assert!(v.is_finite(), "spectral_profile_db[{}] is not finite", i);
-    }
-    for (i, &v) in result.band_phase_correlation.iter().enumerate() {
-        assert!(v.is_finite(), "band_phase_correlation[{}] is not finite", i);
     }
 }
 
@@ -679,48 +544,4 @@ fn loudness_range_contract() {
 
     assert!(lra_wrapper > 0.0, "LRA must be > 0.0");
     assert!(lra_wrapper.is_finite(), "LRA must be finite");
-}
-
-// ── Test 14: Genre Classification ────────────────────────────────────────────
-
-#[test]
-fn test_pre_analyzer_populates_genre() {
-    // 20s excerpt from BoDleasons - Our Journey.mp3 (middle of track, avoiding
-    // sparse intro), a gate-accepted IDM corpus track — see S-0XX corpus-manifest.json
-    // for full provenance.
-    let path = "tests/fixtures/bodleasons_mid.wav";
-    let mut reader = hound::WavReader::open(path).expect("Failed to open fixture");
-    let spec = reader.spec();
-
-    let mut left = Vec::new();
-    let mut right = Vec::new();
-    // Use the 16-bit integer conversion since real_world_60s.wav is 16-bit PCM.
-    let samples: Vec<i32> = reader.samples().map(|s| s.unwrap()).collect();
-
-    for chunk in samples.chunks(2) {
-        // Convert to f32 PCM [-1.0, 1.0]
-        left.push(chunk[0] as f32 / 32768.0);
-        right.push(chunk[1] as f32 / 32768.0);
-    }
-
-    let data = PreAnalyzer::run(&left, &right, spec.sample_rate);
-
-    println!("Genre for bodleasons_mid: {:?}", data.genre);
-    assert_eq!(
-        data.genre, None,
-        "bodleasons_mid.wav measures ~17.6 units from both Acoustic \
-         and Techno centroids (MAX_DISTANCE_THRESHOLD=4.0) via the \
-         real PreAnalyzer pipeline — genuinely out-of-bounds for \
-         both buckets today, not a misclassification. Historically \
-         asserted Idm before that bucket's retirement (lossy MP3 \
-         source); the underlying audio was never confirmed to match \
-         classifier.rs's separate hardcoded IDM test vector."
-    );
-
-    // Silence/short input case
-    let silent_data = PreAnalyzer::run(&[0.0; 100], &[0.0; 100], 48000);
-    assert_eq!(
-        silent_data.genre, None,
-        "Short/silent input should yield None genre"
-    );
 }
