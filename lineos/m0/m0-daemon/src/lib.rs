@@ -182,6 +182,35 @@ pub async fn run() -> Result<()> {
     let health_listener = tokio::net::TcpListener::bind(health_addr).await?;
     let mastering_listener = tokio::net::TcpListener::bind(mastering_addr).await?;
 
+    // F-050 startup sweep: orphaned dumps from dead sessions are buried at boot
+    // Placed post-bind (provably single-instance: a second daemon dies on the bind `?`)
+    // and pre-serve (no job can be running). This backstop complements the RAII
+    // ManagedPcm lifecycle plan (β/γ) - it buries only corpses from killed/crashed sessions.
+    if let Ok(entries) = std::fs::read_dir("/tmp") {
+        let mut removed_count = 0;
+        let mut freed_bytes = 0;
+        for entry in entries.flatten() {
+            if let Ok(name) = entry.file_name().into_string() {
+                if name.starts_with("m0d-") {
+                    if let Ok(meta) = entry.metadata() {
+                        freed_bytes += meta.len();
+                    }
+                    if std::fs::remove_file(entry.path()).is_ok() {
+                        removed_count += 1;
+                    }
+                }
+            }
+        }
+        if removed_count > 0 {
+            let mb = freed_bytes as f64 / 1_048_576.0;
+            tracing::info!(
+                "F-050 startup sweep: removed {} orphaned dump(s), freed {:.2} MB",
+                removed_count,
+                mb
+            );
+        }
+    }
+
     let mut rx_health = shutdown_rx.clone();
     let health_server =
         axum::serve(health_listener, health_app).with_graceful_shutdown(async move {
