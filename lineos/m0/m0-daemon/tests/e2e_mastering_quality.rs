@@ -95,6 +95,7 @@ fn make_req(path: &str) -> MasterRequest {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     }
 }
 
@@ -399,6 +400,7 @@ fn inv_qa_4_compressor_is_active() {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     };
 
     let result = run_dsp(

@@ -28,6 +28,7 @@ async fn test_e2e_latency_compensation() {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     };
 
     let start = Instant::now();

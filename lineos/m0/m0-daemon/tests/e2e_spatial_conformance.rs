@@ -44,6 +44,7 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     };
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));

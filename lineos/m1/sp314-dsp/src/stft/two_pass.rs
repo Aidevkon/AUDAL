@@ -698,6 +698,8 @@ impl TwoPassEngine {
         macro_router_enabled: bool,
         boundaries: &[SegmentBoundary],
         sample_rate: f32,
+        noise_floor_dbfs: Option<f32>,
+        mut vad_observer: Option<&mut dyn FnMut(crate::analysis::vad_model::VadObservation)>,
         mut callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -721,6 +723,19 @@ impl TwoPassEngine {
         let mut chunk_count = 0usize;
         let mut global_spatial_sums = [(0.0, 0.0, 0.0); 5];
 
+        let mut vad = if vad_observer.is_some() {
+            Some((
+                crate::analysis::vad_features::VadFeatureExtractor::new(),
+                crate::analysis::vad_model::VadClassifier::new(
+                    crate::analysis::vad_model::FixedPriors,
+                ),
+            ))
+        } else {
+            None
+        };
+        let mut vad_frame_index: u64 = 0;
+        let noise_floor = noise_floor_dbfs.unwrap_or(-144.0);
+
         loop {
             // 1. Pull a macro-batch of owned chunks
             let mut batch = Vec::with_capacity(macro_batch_size);
@@ -734,6 +749,38 @@ impl TwoPassEngine {
                         };
                         let new_len = overlap_chunk.end - overlap_chunk.offset;
                         let offset_idx = overlap_chunk.offset - overlap_chunk.start;
+
+                        if let Some((ext, clf)) = vad.as_mut() {
+                            let m = &overlap_chunk.signal[offset_idx..offset_idx + new_len];
+                            let l = &overlap_chunk.left[offset_idx..offset_idx + new_len];
+                            let r = &overlap_chunk.right[offset_idx..offset_idx + new_len];
+                            debug_assert_eq!(
+                                m.len(),
+                                l.len(),
+                                "Stage (b) Contract: mono and left must be aligned"
+                            );
+                            debug_assert_eq!(
+                                l.len(),
+                                r.len(),
+                                "Stage (b) Contract: left and right must be aligned"
+                            );
+                            for f in ext.process_chunk(m, l, r) {
+                                let d = clf.process(&f, noise_floor);
+                                if let Some(obs) = vad_observer.as_deref_mut() {
+                                    obs(crate::analysis::vad_model::VadObservation {
+                                        frame_index: vad_frame_index,
+                                        posterior: d.posterior,
+                                        is_speech: d.is_speech,
+                                        duck_gain: d.duck_gain,
+                                        rms_db: f.rms_db,
+                                        spectral_flatness: f.spectral_flatness,
+                                        mid_side_ratio: f.mid_side_ratio,
+                                        rms_delta_30ms: d.rms_delta_30ms,
+                                    });
+                                }
+                                vad_frame_index += 1;
+                            }
+                        }
 
                         batch.push(OwnedChunkData {
                             padded_chunk: overlap_chunk.signal.to_vec(),
@@ -1512,13 +1559,23 @@ mod tests {
 
         let mut captured_chunks = Vec::new();
         engine
-            .process_stream_with_params(reader, &scout, 1.0, true, &boundaries, 48000.0, |stems| {
-                captured_chunks.push((
-                    stems.voice.clone(),
-                    stems.drums.clone(),
-                    stems.bass.clone(),
-                ));
-            })
+            .process_stream_with_params(
+                reader,
+                &scout,
+                1.0,
+                true,
+                &boundaries,
+                48000.0,
+                None,
+                None::<&mut dyn FnMut(_)>,
+                |stems| {
+                    captured_chunks.push((
+                        stems.voice.clone(),
+                        stems.drums.clone(),
+                        stems.bass.clone(),
+                    ));
+                },
+            )
             .unwrap();
 
         assert_eq!(captured_chunks.len(), 2);
@@ -1621,9 +1678,19 @@ mod tests {
         let reader = SlidingOverlapReader::new(source, 10240);
 
         let _ = engine
-            .process_stream_with_params(reader, &scout, 1.0, false, &[], 48000.0, |chunk| {
-                new_voice.extend_from_slice(&chunk.voice);
-            })
+            .process_stream_with_params(
+                reader,
+                &scout,
+                1.0,
+                false,
+                &[],
+                48000.0,
+                None,
+                None::<&mut dyn FnMut(_)>,
+                |chunk| {
+                    new_voice.extend_from_slice(&chunk.voice);
+                },
+            )
             .unwrap();
 
         assert_eq!(
@@ -1642,6 +1709,120 @@ mod tests {
                 old_voice[i].to_bits(),
                 new_voice[i].to_bits(),
                 "Bit mismatch at frame {} (macro-batch seam glitch!)",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn oracle_vad_observe_only() {
+        let n_total = 25600; // 50 chunks of 512 roughly
+
+        let left: Vec<f32> = (0..n_total).map(|i| (i as f32 * 0.1).sin()).collect();
+        let right: Vec<f32> = (0..n_total).map(|i| (i as f32 * 0.2).cos()).collect();
+        let signal: Vec<f32> = left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect();
+
+        let mut interleaved = Vec::with_capacity(n_total * 2);
+        for i in 0..n_total {
+            interleaved.push(left[i]);
+            interleaved.push(right[i]);
+        }
+
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+
+        // Run with observer OFF
+        let mut off_voice = Vec::new();
+        use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
+        let reader_off = SlidingOverlapReader::new(
+            TestMemorySource {
+                data: interleaved.clone(),
+                offset: 0,
+            },
+            10240,
+        );
+        let _ = engine
+            .process_stream_with_params(
+                reader_off,
+                &scout,
+                1.0,
+                false,
+                &[],
+                48000.0,
+                None,
+                None::<&mut dyn FnMut(_)>,
+                |chunk| {
+                    off_voice.extend_from_slice(&chunk.voice);
+                },
+            )
+            .unwrap();
+
+        // Run with observer ON
+        let mut on_voice = Vec::new();
+        let reader_on = SlidingOverlapReader::new(
+            TestMemorySource {
+                data: interleaved,
+                offset: 0,
+            },
+            10240,
+        );
+        let mut indices = Vec::new();
+
+        let mut observer = |obs: crate::analysis::vad_model::VadObservation| {
+            indices.push(obs.frame_index);
+            assert!(!obs.posterior.is_nan(), "Posterior must not be NaN");
+            assert!(!obs.rms_db.is_nan(), "RMS must not be NaN");
+            assert!(!obs.duck_gain.is_nan(), "Duck gain must not be NaN");
+        };
+
+        let _ = engine
+            .process_stream_with_params(
+                reader_on,
+                &scout,
+                1.0,
+                false,
+                &[],
+                48000.0,
+                None,
+                Some(&mut observer),
+                |chunk| {
+                    on_voice.extend_from_slice(&chunk.voice);
+                },
+            )
+            .unwrap();
+
+        // 1. Assert frame_index is strictly sequential from 0
+        for (i, &idx) in indices.iter().enumerate() {
+            assert_eq!(
+                idx, i as u64,
+                "frame_index is not strictly sequential without gaps"
+            );
+        }
+
+        // 2. Assert count equals floor(total_output_frames / 480)
+        let sum_of_new_len = on_voice.len();
+        let expected_frames = sum_of_new_len / 480;
+        assert_eq!(
+            indices.len(),
+            expected_frames,
+            "Observation count does not equal floor(sum_of_new_len / 480)"
+        );
+
+        // 3. Assert Bit-Identical output
+        assert_eq!(
+            on_voice.len(),
+            off_voice.len(),
+            "Observer perturbed the output length"
+        );
+        for i in 0..on_voice.len() {
+            assert_eq!(
+                on_voice[i].to_bits(),
+                off_voice[i].to_bits(),
+                "Observer perturbed the output float bits at index {}",
                 i
             );
         }

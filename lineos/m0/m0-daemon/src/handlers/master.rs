@@ -37,6 +37,7 @@ pub struct MasterRequest {
     /// Phase 14: Enable restoration blocks (NoiseGate, etc.)
     pub restoration_enabled: Option<bool>,
     pub macro_router_enabled: Option<bool>,
+    pub vad_observe_enabled: Option<bool>,
 }
 
 /// Per-stem mix levels from 5.1 Spatial Mixer widget.

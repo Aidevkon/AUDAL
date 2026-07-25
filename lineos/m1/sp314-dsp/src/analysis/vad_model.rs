@@ -104,10 +104,22 @@ impl LikelihoodModel for FixedPriors {
     }
 }
 
+pub struct VadObservation {
+    pub frame_index: u64,
+    pub posterior: f32,
+    pub is_speech: bool,
+    pub duck_gain: f32,
+    pub rms_db: f32,
+    pub spectral_flatness: f32,
+    pub mid_side_ratio: f32,
+    pub rms_delta_30ms: f32,
+}
+
 pub struct VadDecision {
     pub posterior: f32,
     pub is_speech: bool,
     pub duck_gain: f32,
+    pub rms_delta_30ms: f32,
 }
 
 pub struct VadClassifier<M: LikelihoodModel> {
@@ -187,6 +199,7 @@ impl<M: LikelihoodModel> VadClassifier<M> {
             posterior,
             is_speech: self.is_speech,
             duck_gain: self.duck_gain,
+            rms_delta_30ms,
         }
     }
 }

@@ -107,6 +107,8 @@ pub struct RenderSettings<'a> {
     pub restoration_enabled: bool,
     pub macro_router_enabled: bool,
     pub boundaries: &'a [lineos_corpus::scout::SegmentBoundary],
+    pub vad_observe_enabled: bool,
+    pub blob_id: &'a str,
 }
 
 /// Immutable input audio for a single chunk.
@@ -251,6 +253,44 @@ pub fn run(
         write_offset = end_offset;
     };
 
+    let trace_path = format!("/tmp/vad-trace-{}.csv", settings.blob_id);
+    let mut observer_holder = if settings.vad_observe_enabled {
+        match std::fs::File::create(&trace_path) {
+            Ok(file) => {
+                let mut w = std::io::BufWriter::new(file);
+                use std::io::Write;
+                let _ = writeln!(w, "frame_index,time_sec,posterior,is_speech,duck_gain,rms_db,flatness,ms_ratio,rms_delta");
+                let sr = sample_rate as f64;
+                use sp314_dsp::analysis::vad_sensors::FRAME_SAMPLES;
+                Some(move |obs: sp314_dsp::analysis::vad_model::VadObservation| {
+                    let time_sec = obs.frame_index as f64 * FRAME_SAMPLES as f64 / sr;
+                    let _ = writeln!(
+                        w,
+                        "{},{:.2},{:.4},{},{:.4},{:.2},{:.4},{:.4},{:.4}",
+                        obs.frame_index,
+                        time_sec,
+                        obs.posterior,
+                        obs.is_speech,
+                        obs.duck_gain,
+                        obs.rms_db,
+                        obs.spectral_flatness,
+                        obs.mid_side_ratio,
+                        obs.rms_delta_30ms
+                    );
+                })
+            }
+            Err(e) => {
+                eprintln!("vad trace unavailable: {e}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let vad_observer: Option<&mut dyn FnMut(sp314_dsp::analysis::vad_model::VadObservation)> =
+        observer_holder.as_mut().map(|f| f as &mut dyn FnMut(_));
+
     let mut _metadata = two_pass
         .process_stream_with_params(
             inputs.stream_source,
@@ -259,6 +299,8 @@ pub fn run(
             settings.macro_router_enabled,
             settings.boundaries,
             settings.sample_rate as f32,
+            settings.noise_floor_dbfs,
+            vad_observer,
             callback,
         )
         .map_err(|e| format!("TwoPassEngine error: {e}"))?;

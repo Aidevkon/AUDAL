@@ -845,6 +845,8 @@ fn run_dsp_internal(
                 restoration_enabled: req.restoration_enabled.unwrap_or(false),
                 macro_router_enabled: req.macro_router_enabled.unwrap_or(false),
                 boundaries: &trunk_report.boundaries,
+                vad_observe_enabled: req.vad_observe_enabled.unwrap_or(false),
+                blob_id: &blob_id,
             },
             crate::domain::nodes::render_node::RenderInputs {
                 original_sum_sq: decoded.original_sum_sq,

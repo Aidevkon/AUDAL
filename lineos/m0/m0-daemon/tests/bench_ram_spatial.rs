@@ -47,6 +47,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             preview_id: None,
             restoration_enabled: None,
             macro_router_enabled: None,
+            vad_observe_enabled: None,
         };
 
         let _p = dhat::Profiler::builder().testing().build();
@@ -87,6 +88,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             preview_id: None,
             restoration_enabled: None,
             macro_router_enabled: None,
+            vad_observe_enabled: None,
         };
 
         let _p = dhat::Profiler::builder().testing().build();

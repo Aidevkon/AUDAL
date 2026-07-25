@@ -43,6 +43,7 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     };
 
     let start = Instant::now();
@@ -151,6 +152,7 @@ async fn e2e_corpus_music_path_uses_30s_proxy() {
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
+        vad_observe_enabled: None,
     };
 
     let start = std::time::Instant::now();
