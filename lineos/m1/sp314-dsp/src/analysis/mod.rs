@@ -26,3 +26,4 @@ pub use lineos_types::pre_analysis::Genre;
 pub mod scout;
 pub mod scout_scanner;
 pub mod stem_escalation;
+pub mod vad_sensors;
