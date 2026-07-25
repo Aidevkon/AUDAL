@@ -16,8 +16,8 @@ use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
 use crate::stft::stem_renderer::FiveStems;
 use crate::stft::{StreamingStftEncoder, FFT_SIZE, HOP_SIZE, N_BINS};
 use lineos_corpus::mfcc::MfccAnalyzer;
-use lineos_types::StemFeatures;
 use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+use lineos_types::StemFeatures;
 
 /// Constitutional chunk size — 65536 samples = ~1.37s at 48kHz
 pub const CHUNK_FRAMES: usize = 65536;
@@ -758,7 +758,14 @@ impl TwoPassEngine {
             let parallel_results: Vec<ParallelChunkOut> = batch
                 .into_par_iter()
                 .map(|mut owned| {
-                    if macro_router_enabled && Self::should_bypass_nmf(owned.offset, owned.core_chunk.len(), sample_rate, boundaries) {
+                    if macro_router_enabled
+                        && Self::should_bypass_nmf(
+                            owned.offset,
+                            owned.core_chunk.len(),
+                            sample_rate,
+                            boundaries,
+                        )
+                    {
                         let len = owned.core_chunk.len();
                         ParallelChunkOut {
                             stems: FiveStemsChunk {
@@ -1479,28 +1486,49 @@ mod tests {
 
         let mut engine = TwoPassEngine::new();
         let scout = engine.scout(&signal, 48000);
-        let source = TestMemorySource { data: interleaved, offset: 0 };
+        let source = TestMemorySource {
+            data: interleaved,
+            offset: 0,
+        };
         use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
         let reader = SlidingOverlapReader::new(source, 10240);
 
         let boundaries = vec![
-            SegmentBoundary { start_sec: 0.0, end_sec: 2.0, segment_type: SegmentType::Speech, avg_leaning: 0.0, avg_confidence: 0.8 },
-            SegmentBoundary { start_sec: 2.0, end_sec: 4.0, segment_type: SegmentType::Music, avg_leaning: 0.0, avg_confidence: 0.9 },
+            SegmentBoundary {
+                start_sec: 0.0,
+                end_sec: 2.0,
+                segment_type: SegmentType::Speech,
+                avg_leaning: 0.0,
+                avg_confidence: 0.8,
+            },
+            SegmentBoundary {
+                start_sec: 2.0,
+                end_sec: 4.0,
+                segment_type: SegmentType::Music,
+                avg_leaning: 0.0,
+                avg_confidence: 0.9,
+            },
         ];
 
         let mut captured_chunks = Vec::new();
-        engine.process_stream_with_params(reader, &scout, 1.0, true, &boundaries, 48000.0, |stems| {
-            captured_chunks.push((stems.voice.clone(), stems.drums.clone(), stems.bass.clone()));
-        }).unwrap();
+        engine
+            .process_stream_with_params(reader, &scout, 1.0, true, &boundaries, 48000.0, |stems| {
+                captured_chunks.push((
+                    stems.voice.clone(),
+                    stems.drums.clone(),
+                    stems.bass.clone(),
+                ));
+            })
+            .unwrap();
 
         assert_eq!(captured_chunks.len(), 2);
-        
+
         let chunk1_voice = &captured_chunks[0].0;
         assert_eq!(chunk1_voice.len(), CHUNK_FRAMES);
         assert_eq!(chunk1_voice[100], signal[100]); // raw value (with pad offset skipped by reader output)
         assert_eq!(captured_chunks[0].1[100], 0.0); // drums zeroed
         assert_eq!(captured_chunks[0].2[100], 0.0); // bass zeroed
-        
+
         let chunk2_voice = &captured_chunks[1].0;
         assert_eq!(chunk2_voice.len(), CHUNK_FRAMES);
         assert_ne!(chunk2_voice[100], signal[CHUNK_FRAMES + 100]); // nmf ran
