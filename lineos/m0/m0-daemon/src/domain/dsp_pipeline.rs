@@ -840,6 +840,8 @@ fn run_dsp_internal(
                 mix_levels: req.mix_levels.as_ref(),
                 flavour_id: req.flavour_id.as_deref(),
                 sample_rate: decoded.pcm_sample_rate,
+                noise_floor_dbfs: trunk_metrics.noise_floor_dbfs,
+                restoration_enabled: req.restoration_enabled.unwrap_or(false),
             },
             crate::domain::nodes::render_node::RenderInputs {
                 original_sum_sq: decoded.original_sum_sq,

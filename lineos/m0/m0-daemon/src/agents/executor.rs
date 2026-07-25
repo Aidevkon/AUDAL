@@ -51,6 +51,7 @@ pub async fn run(
                     track_id: None,
                     mix_levels: None,
                     preview_id: None,
+                    restoration_enabled: None,
                 };
 
                 let start = std::time::Instant::now();

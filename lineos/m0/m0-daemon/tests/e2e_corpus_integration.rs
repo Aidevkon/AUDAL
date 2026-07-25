@@ -41,6 +41,7 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
         track_id: Some("track_1".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let start = Instant::now();
@@ -147,6 +148,7 @@ async fn e2e_corpus_music_path_uses_30s_proxy() {
         track_id: Some("track_proxy".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let start = std::time::Instant::now();

@@ -34,6 +34,8 @@ pub struct MasterRequest {
     pub mix_levels: Option<MixLevels>,
     /// Phase 8a: preview session reference (future ScoutResult cache).
     pub preview_id: Option<String>,
+    /// Phase 14: Enable restoration blocks (NoiseGate, etc.)
+    pub restoration_enabled: Option<bool>,
 }
 
 /// Per-stem mix levels from 5.1 Spatial Mixer widget.

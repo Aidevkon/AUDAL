@@ -46,6 +46,7 @@ async fn test_e2e_alignment_oracle() {
         track_id: Some("track_latency".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let start = Instant::now();

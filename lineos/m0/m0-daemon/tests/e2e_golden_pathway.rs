@@ -26,6 +26,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
         track_id: Some("track_1".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let start = Instant::now();

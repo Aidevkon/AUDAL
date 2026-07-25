@@ -34,14 +34,7 @@ impl NoiseGate {
     }
 
     #[inline]
-    pub fn process_stereo(&mut self, left: f32, right: f32) -> (f32, f32) {
-        if !self.enabled {
-            return (left, right);
-        }
-
-        // Use max of L/R for detection (linked stereo gate)
-        let level = fabsf(left).max(fabsf(right));
-
+    fn compute_gain(&mut self, level: f32) -> f32 {
         let target_gain = if level >= self.threshold_linear {
             self.hold_counter = self.hold_samples; // reset hold
             1.0_f32
@@ -60,8 +53,32 @@ impl NoiseGate {
         };
 
         self.gain = self.gain + (target_gain - self.gain) * (1.0 - coef);
+        self.gain
+    }
 
-        (left * self.gain, right * self.gain)
+    #[inline]
+    pub fn process_stereo(&mut self, left: f32, right: f32) -> (f32, f32) {
+        if !self.enabled {
+            return (left, right);
+        }
+
+        // Use max of L/R for detection (linked stereo gate)
+        let level = fabsf(left).max(fabsf(right));
+        let gain = self.compute_gain(level);
+
+        (left * gain, right * gain)
+    }
+
+    #[inline]
+    pub fn process_mono(&mut self, sample: f32) -> f32 {
+        if !self.enabled {
+            return sample;
+        }
+
+        let level = fabsf(sample);
+        let gain = self.compute_gain(level);
+
+        sample * gain
     }
 
     pub fn reset(&mut self) {

@@ -103,6 +103,8 @@ pub struct RenderSettings<'a> {
     pub mix_levels: Option<&'a MixLevels>,
     pub flavour_id: Option<&'a str>,
     pub sample_rate: u32,
+    pub noise_floor_dbfs: Option<f32>,
+    pub restoration_enabled: bool,
 }
 
 /// Immutable input audio for a single chunk.
@@ -153,10 +155,26 @@ pub fn run(
     // Captured error from spatial I/O inside the infallible callback.
     let mut spatial_err: Option<String> = None;
 
+    let mut vocal_gate = sp314_dsp::restoration::gate::NoiseGate::new(
+        settings.sample_rate as f32,
+        0.0,
+        settings.noise_floor_dbfs.unwrap_or(-45.0),
+    );
+
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
 
-        let mv: Vec<f32> = stems_chunk.voice.iter().map(|s| s * mix.voice).collect();
+        let mv: Vec<f32> = stems_chunk
+            .voice
+            .iter()
+            .map(|s| {
+                let mut sample = *s;
+                if settings.restoration_enabled {
+                    sample = vocal_gate.process_mono(sample);
+                }
+                sample * mix.voice
+            })
+            .collect();
         let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
         let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
         let mh: Vec<f32> = stems_chunk

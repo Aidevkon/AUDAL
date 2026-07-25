@@ -39,6 +39,7 @@ async fn test_e2e_real_world_loudness() {
         track_id: Some("track_loudness".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let start = Instant::now();

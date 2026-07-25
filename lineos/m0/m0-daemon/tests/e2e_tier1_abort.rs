@@ -51,6 +51,7 @@ fn make_req(path: &str, preset: &str) -> MasterRequest {
         track_id: None,
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     }
 }
 

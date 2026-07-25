@@ -42,6 +42,7 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         track_id: Some("test-session-spatial-001".to_string()),
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));

@@ -338,3 +338,19 @@ fn deess_preserves_stereo_image() {
         max_ratio_err,
     );
 }
+
+#[test]
+fn noise_gate_mono_equals_stereo() {
+    let mut gate_stereo = NoiseGate::new(48000.0, -6.0_f32, -45.0_f32);
+    let mut gate_mono = NoiseGate::new(48000.0, -6.0_f32, -45.0_f32);
+
+    // Signal below threshold
+    let (l1, _) = gate_stereo.process_stereo(1e-6, 0.0);
+    let m1 = gate_mono.process_mono(1e-6);
+    assert_eq!(l1, m1, "Mono and stereo must match exactly on silence");
+
+    // Signal above threshold
+    let (l2, _) = gate_stereo.process_stereo(0.5, 0.0);
+    let m2 = gate_mono.process_mono(0.5);
+    assert_eq!(l2, m2, "Mono and stereo must match exactly on signal");
+}

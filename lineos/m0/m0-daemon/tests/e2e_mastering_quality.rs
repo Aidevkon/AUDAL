@@ -93,6 +93,7 @@ fn make_req(path: &str) -> MasterRequest {
         track_id: None,
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     }
 }
 
@@ -395,6 +396,7 @@ fn inv_qa_4_compressor_is_active() {
         track_id: None,
         mix_levels: None,
         preview_id: None,
+        restoration_enabled: None,
     };
 
     let result = run_dsp(
