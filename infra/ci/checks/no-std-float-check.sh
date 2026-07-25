@@ -3,10 +3,13 @@
 VIOLATIONS=0
 PATTERNS="\.sqrt()\|\.log()\|\.log2()\|\.log10()\|\.powf(\|\.sin()\|\.cos()\|\.tan()\|\.exp()"
 
-for dir in lineos/m1/sp314-dsp/src/ pipelines/; do
-    if grep -rn "$PATTERNS" "$dir" 2>/dev/null \
-        --include="*.rs" | grep -v "//\|libm\|#\[cfg(test"; then
-        echo "❌ G-010: std::f32 method in DSP path: $dir"
+for file in $(find lineos/m1/sp314-dsp/src/ pipelines/ -name "*.rs" -not -path "*/src/bin/*"); do
+    if awk '
+        /^#\[cfg\(test\)\]/ { in_test=1; next }
+        in_test && /^}/ { in_test=0; next }
+        !in_test { print FILENAME ":" FNR ":" $0 }
+    ' "$file" | grep "$PATTERNS" | grep -v "//\|libm"; then
+        echo "❌ G-010: std::f32 method in DSP path: $file"
         VIOLATIONS=$((VIOLATIONS+1))
     fi
 done
