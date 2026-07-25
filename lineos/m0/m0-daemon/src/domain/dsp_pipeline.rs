@@ -826,8 +826,10 @@ fn run_dsp_internal(
         let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
         let stream_source = if std::path::Path::new(&raw_path).exists() {
             eprintln!("[DEBUG] TAKING NEW STREAMING PATH: found {}", raw_path);
+            // 2 channels: StandardizedDecoder writes stereo f32 LE interleaved (Y3-iv-a).
             let source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(
                 std::path::Path::new(&raw_path),
+                2,
             )
             .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
             sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240)

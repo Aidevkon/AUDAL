@@ -251,7 +251,8 @@ pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
 }
 
 fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkReport, String> {
-    let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path)?;
+    // 2 channels: trunk dump is stereo f32 LE interleaved from StandardizedDecoder.
+    let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
     let srf = SAMPLE_RATE as f32;
     let nyq = srf / 2.0;
 

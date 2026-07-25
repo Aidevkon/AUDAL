@@ -10,22 +10,26 @@ use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
 pub struct RawPcmFileSource {
     reader: BufReader<File>,
     byte_buf: Vec<u8>,
+    /// Interleaved channel count (2 for stereo dumps, 6 for 5.1).
+    /// The raw dump is headerless, so the caller must specify it.
+    n_channels: usize,
 }
 
 impl RawPcmFileSource {
-    pub fn new(path: &Path) -> Result<Self, String> {
+    pub fn new(path: &Path, n_channels: usize) -> Result<Self, String> {
         let file =
             File::open(path).map_err(|e| format!("Failed to open {}: {}", path.display(), e))?;
         Ok(Self {
             reader: BufReader::new(file),
             byte_buf: Vec::new(),
+            n_channels,
         })
     }
 }
 
 impl ChunkSource for RawPcmFileSource {
     fn channels(&self) -> usize {
-        2 // Strict constraint for Music/Stereo path
+        self.n_channels
     }
 
     fn fill_buffer(&mut self, buffer: &mut [f32]) -> Result<usize, String> {
@@ -91,16 +95,17 @@ mod tests {
         let original_samples: Vec<f32> = (0..1000).map(|i| i as f32 * 0.1).collect();
         let file = write_test_pattern(&original_samples);
 
-        // Test with various chunk sizes (some aligned, some not)
-        // Channels is 2, so buffer length must be multiple of 2.
+        // Test with various chunk sizes (some aligned, some not).
+        // This test uses n_ch=2; buffer lengths must be multiples of 2.
+        let n_ch = 2usize;
         let chunk_sizes = vec![2, 4, 10, 100, 1000, 2000, 3];
 
         for &chunk_size in &chunk_sizes {
-            let mut source = RawPcmFileSource::new(file.path()).unwrap();
+            let mut source = RawPcmFileSource::new(file.path(), n_ch).unwrap();
             let mut all_read = Vec::new();
 
-            // Adjust chunk size if it's odd, since trait contract requires multiple of channels
-            let buf_size = if chunk_size % 2 != 0 {
+            // Adjust chunk size if it's not a multiple of channels
+            let buf_size = if chunk_size % n_ch != 0 {
                 chunk_size + 1
             } else {
                 chunk_size
@@ -112,7 +117,7 @@ mod tests {
                 if frames == 0 {
                     break;
                 }
-                all_read.extend_from_slice(&buf[..frames * 2]);
+                all_read.extend_from_slice(&buf[..frames * n_ch]);
             }
 
             assert_eq!(
@@ -139,9 +144,9 @@ mod tests {
 
     #[test]
     fn fill_buffer_eof_behavior() {
-        let samples = vec![1.0, 2.0]; // 1 frame
+        let samples = vec![1.0, 2.0]; // 1 frame, 2ch
         let file = write_test_pattern(&samples);
-        let mut source = RawPcmFileSource::new(file.path()).unwrap();
+        let mut source = RawPcmFileSource::new(file.path(), 2).unwrap();
 
         let mut buf = vec![0.0; 2];
         let frames = source.fill_buffer(&mut buf).unwrap();
@@ -155,11 +160,12 @@ mod tests {
         let frames_eof2 = source.fill_buffer(&mut buf).unwrap();
         assert_eq!(frames_eof2, 0);
     }
+
     #[test]
     fn fill_buffer_invalid_size_returns_error() {
-        let samples = vec![1.0, 2.0]; // 1 frame
+        let samples = vec![1.0, 2.0]; // 1 frame, 2ch
         let file = write_test_pattern(&samples);
-        let mut source = RawPcmFileSource::new(file.path()).unwrap();
+        let mut source = RawPcmFileSource::new(file.path(), 2).unwrap();
 
         let mut buf = vec![0.0; 3]; // Not a multiple of channels (2)
         let result = source.fill_buffer(&mut buf);
@@ -244,7 +250,7 @@ mod tests {
         let mut new_harmonics = Vec::new();
         let mut new_ambience = Vec::new();
 
-        let source = super::RawPcmFileSource::new(&temp_path).unwrap();
+        let source = super::RawPcmFileSource::new(&temp_path, 2).unwrap();
         let reader = SlidingOverlapReader::new(source, 10240);
 
         e_new
@@ -290,5 +296,59 @@ mod tests {
                 i
             );
         }
+    }
+
+    #[test]
+    fn six_channel_reads_correctly() {
+        // 6ch oracle: proves channels()==6, is_multiple_of(6) alignment,
+        // frames_read = total_read / 4 / 6, and the LE decode loop —
+        // all correct for N≠2. Uses write_test_pattern (raw f32 LE, no header).
+        //
+        // Layout: 3 frames × 6 channels = 18 interleaved samples.
+        // Frame 0: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+        // Frame 1: [6.0, 7.0, 8.0, 9.0, 10.0, 11.0]
+        // Frame 2: [12.0, 13.0, 14.0, 15.0, 16.0, 17.0]
+        let samples: Vec<f32> = (0..18).map(|i| i as f32).collect();
+        let file = write_test_pattern(&samples);
+
+        let mut source = RawPcmFileSource::new(file.path(), 6).unwrap();
+        assert_eq!(source.channels(), 6); // channels() returns the injected value
+
+        // Fill 2 frames (12 slots = 2 × 6ch)
+        let mut buf = vec![0.0f32; 12];
+        let frames = source.fill_buffer(&mut buf).unwrap();
+        assert_eq!(frames, 2, "expected 2 frames from a 12-slot buffer");
+        for (i, (&got, &expected)) in buf[..12].iter().zip(samples[..12].iter()).enumerate() {
+            assert_eq!(
+                got.to_bits(),
+                expected.to_bits(),
+                "bit mismatch at sample {i} in first fill"
+            );
+        }
+
+        // Fill remaining 1 frame (buf still 12 slots, only 6 samples left on disk)
+        let frames2 = source.fill_buffer(&mut buf).unwrap();
+        assert_eq!(frames2, 1, "expected 1 frame for the 3rd frame");
+        for (i, (&got, &expected)) in buf[..6].iter().zip(samples[12..18].iter()).enumerate() {
+            assert_eq!(
+                got.to_bits(),
+                expected.to_bits(),
+                "bit mismatch at sample {i} in second fill"
+            );
+        }
+
+        // EOF
+        let frames3 = source.fill_buffer(&mut buf).unwrap();
+        assert_eq!(frames3, 0, "expected 0 frames at EOF");
+
+        // Misaligned buffer for a 6ch source must error with the parametric message.
+        // Note: source is at EOF, but fill_buffer checks alignment BEFORE attempting
+        // reads, so the error is returned regardless of stream position.
+        let mut bad_buf = vec![0.0f32; 5]; // 5 is not a multiple of 6
+        let err = source.fill_buffer(&mut bad_buf).unwrap_err();
+        assert!(
+            err.contains("is not a multiple of 6 channels"),
+            "unexpected error: {err}"
+        );
     }
 }
