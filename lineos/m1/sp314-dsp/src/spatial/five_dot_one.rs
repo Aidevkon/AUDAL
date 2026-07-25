@@ -34,8 +34,8 @@ impl SpatialFirewall {
             rear_energy_sq += stage.ls[i] * stage.ls[i] + stage.rs[i] * stage.rs[i];
         }
 
-        let front_energy = front_energy_sq.sqrt();
-        let rear_energy = rear_energy_sq.sqrt();
+        let front_energy = libm::sqrtf(front_energy_sq);
+        let rear_energy = libm::sqrtf(rear_energy_sq);
 
         if front_energy > 1e-6 && rear_energy > 1e-6 {
             let ratio = rear_energy / front_energy;
@@ -49,7 +49,7 @@ impl SpatialFirewall {
         }
 
         // Clamp LFE ≤ -6dB (INV-SP-6)
-        let max_lfe_linear = 10.0_f32.powf(self.max_lfe_db / 20.0);
+        let max_lfe_linear = libm::powf(10.0_f32, self.max_lfe_db / 20.0);
         let mut lfe_max = 0.0_f32;
         for i in 0..len {
             lfe_max = lfe_max.max(stage.lfe[i].abs());

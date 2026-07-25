@@ -40,13 +40,13 @@ impl AllPassFilter {
     /// Update filter coefficients without clearing the state.
     pub fn update_coefficients(&mut self, freq_hz: f32, q: f32, sample_rate: u32) {
         let w0 = 2.0 * core::f32::consts::PI * freq_hz / sample_rate as f32;
-        let alpha = w0.sin() / (2.0 * q);
+        let alpha = libm::sinf(w0) / (2.0 * q);
 
         let b0 = 1.0 - alpha;
-        let b1 = -2.0 * w0.cos();
+        let b1 = -2.0 * libm::cosf(w0);
         let b2 = 1.0 + alpha;
         let a0 = 1.0 + alpha;
-        let a1 = -2.0 * w0.cos();
+        let a1 = -2.0 * libm::cosf(w0);
         let a2 = 1.0 - alpha;
 
         // Normalize

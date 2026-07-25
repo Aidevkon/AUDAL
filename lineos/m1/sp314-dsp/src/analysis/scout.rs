@@ -77,7 +77,7 @@ impl SegmentScout {
             dist_techno_sq += d_t * d_t;
             dist_acoustic_sq += d_a * d_a;
         }
-        let mfcc_dist_b = dist_techno_sq.sqrt().min(dist_acoustic_sq.sqrt());
+        let mfcc_dist_b = libm::sqrtf(dist_techno_sq).min(libm::sqrtf(dist_acoustic_sq));
 
         // Axis C: Crest Factor
         let crest_c = crate::analysis::dynamics::crest_factor_db(mono);

@@ -163,7 +163,8 @@ pub fn measure_band_energy_hz(signal: &[f32], sample_rate: u32, low_hz: f32, hig
         .iter()
         .enumerate()
         .map(|(i, &s)| {
-            let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32).cos());
+            let w =
+                0.5 * (1.0 - libm::cosf(2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32));
             Complex { re: s * w, im: 0.0 }
         })
         .collect();
@@ -187,7 +188,7 @@ pub fn measure_band_energy_hz(signal: &[f32], sample_rate: u32, low_hz: f32, hig
         .map(|c| c.norm_sqr() / (n_f * n_f))
         .sum();
 
-    energy.sqrt()
+    libm::sqrtf(energy)
 }
 
 #[cfg(test)]

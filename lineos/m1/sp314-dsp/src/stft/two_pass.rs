@@ -57,11 +57,12 @@ impl StemMfccs {
     /// L2 distance between two MFCC vectors.
     /// Used to measure timbral similarity/difference.
     pub fn distance(a: &[f32; 13], b: &[f32; 13]) -> f32 {
-        a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| (x - y).powi(2))
-            .sum::<f32>()
-            .sqrt()
+        libm::sqrtf(
+            a.iter()
+                .zip(b.iter())
+                .map(|(x, y)| (x - y).powi(2))
+                .sum::<f32>(),
+        )
     }
 
     /// Bass vs Drums timbral distance.
@@ -990,21 +991,21 @@ fn compute_firewall_scales(stems: &FiveStems, assignments: &StemChannelAssignmen
     }
 
     // Compute rear scale
-    let front_e: f32 = stage
+    let front_e_sq: f32 = stage
         .l
         .iter()
         .zip(stage.r.iter())
         .zip(stage.c.iter())
         .map(|((l, r), c)| l * l + r * r + c * c)
-        .sum::<f32>()
-        .sqrt();
-    let rear_e: f32 = stage
+        .sum::<f32>();
+    let front_e = libm::sqrtf(front_e_sq);
+    let rear_e_sq: f32 = stage
         .ls
         .iter()
         .zip(stage.rs.iter())
         .map(|(l, r)| l * l + r * r)
-        .sum::<f32>()
-        .sqrt();
+        .sum::<f32>();
+    let rear_e = libm::sqrtf(rear_e_sq);
     let rear_scale = if front_e > 1e-6 && rear_e > 1e-6 {
         let ratio = rear_e / front_e;
         if ratio > firewall.max_rear_energy {

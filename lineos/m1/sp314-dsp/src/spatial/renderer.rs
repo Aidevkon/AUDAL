@@ -13,7 +13,7 @@ impl StereoRenderer {
         let c_gain = 0.707_f32;
         let s_gain = 0.707_f32;
         // lfe_blend = LFE * 0.316 (-10dB)
-        let lfe_gain = 10.0_f32.powf(-10.0 / 20.0);
+        let lfe_gain = libm::powf(10.0_f32, -10.0 / 20.0);
 
         for i in 0..len {
             let lfe_blend = stage.lfe[i] * lfe_gain;

@@ -7,7 +7,7 @@ impl SilenceCut {
     /// Returns: Vec<(start_index, end_index)>
     pub fn detect(audio: &[f32], sample_rate: u32) -> Vec<(usize, usize)> {
         let mut regions = Vec::new();
-        let threshold_amp = 10.0f32.powf(-60.0 / 20.0);
+        let threshold_amp = libm::powf(10.0f32, -60.0 / 20.0);
         let min_samples = (sample_rate as f32 * 0.200) as usize; // 200ms
 
         let block_size = 512;
@@ -24,7 +24,7 @@ impl SilenceCut {
             for &sample in block {
                 sum_sq += sample * sample;
             }
-            let rms = (sum_sq / block_size as f32).sqrt();
+            let rms = libm::sqrtf(sum_sq / block_size as f32);
 
             if rms < threshold_amp {
                 if !in_silence {
@@ -59,8 +59,8 @@ impl BreathCut {
     /// Detects breath regions: RMS -60 to -30 dBFS + high ZCR.
     pub fn detect(audio: &[f32], sample_rate: u32) -> Vec<(usize, usize)> {
         let mut regions = Vec::new();
-        let lower_amp = 10.0f32.powf(-60.0 / 20.0);
-        let upper_amp = 10.0f32.powf(-30.0 / 20.0);
+        let lower_amp = libm::powf(10.0f32, -60.0 / 20.0);
+        let upper_amp = libm::powf(10.0f32, -30.0 / 20.0);
         let min_samples = (sample_rate as f32 * 0.050) as usize; // arbitrary min length for breath
 
         let block_size = 512;
@@ -82,7 +82,7 @@ impl BreathCut {
                     zcr += 1;
                 }
             }
-            let rms = (sum_sq / block_size as f32).sqrt();
+            let rms = libm::sqrtf(sum_sq / block_size as f32);
             let zcr_rate = zcr as f32 / block_size as f32;
 
             // High ZCR is typically > 0.05 for high-frequency noise like breath
