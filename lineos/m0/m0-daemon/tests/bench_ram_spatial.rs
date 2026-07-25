@@ -45,8 +45,8 @@ fn bench_decoupled_fork_ram_and_latency() {
             track_id: Some("test-bench-stereo-001".to_string()),
             mix_levels: None,
             preview_id: None,
-        restoration_enabled: None,
-    };
+            restoration_enabled: None,
+        };
 
         let _p = dhat::Profiler::builder().testing().build();
         let t0 = Instant::now();
@@ -84,8 +84,8 @@ fn bench_decoupled_fork_ram_and_latency() {
             track_id: Some("test-bench-spatial-002".to_string()),
             mix_levels: None,
             preview_id: None,
-        restoration_enabled: None,
-    };
+            restoration_enabled: None,
+        };
 
         let _p = dhat::Profiler::builder().testing().build();
         let t0 = Instant::now();

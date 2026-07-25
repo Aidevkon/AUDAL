@@ -354,3 +354,46 @@ fn noise_gate_mono_equals_stereo() {
     let m2 = gate_mono.process_mono(0.5);
     assert_eq!(l2, m2, "Mono and stereo must match exactly on signal");
 }
+
+#[test]
+fn glue_bus_lpf_and_pad_attenuates_correctly() {
+    let sample_rate = 48000.0_f32;
+    let coeffs = sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, sample_rate as f64);
+    const GLUE_PAD_LINEAR: f32 = 0.125_892_54;
+    let settle = 500;
+    let window = 500;
+
+    // Test A: 1kHz (passband) → passes LPF, hit only by -18dB pad
+    let mut state_a = sp314_dsp::masking_eq::biquad::BiquadState::default();
+    let mut max_low = 0.0_f32;
+    for i in 0..(settle + window) {
+        let t = i as f32 / sample_rate;
+        let s = libm::sinf(2.0 * core::f32::consts::PI * 1000.0 * t);
+        let out =
+            sp314_dsp::masking_eq::biquad::process_tdf2(s, &coeffs, &mut state_a) * GLUE_PAD_LINEAR;
+        if i >= settle {
+            max_low = max_low.max(libm::fabsf(out));
+        }
+    }
+    assert!(
+        max_low > GLUE_PAD_LINEAR * 0.95 && max_low < GLUE_PAD_LINEAR * 1.05,
+        "low-freq peak {max_low} not ~pad {GLUE_PAD_LINEAR}"
+    );
+
+    // Test B: 16kHz (stopband, ~1.4 oct above 6kHz) → cut by LPF + pad
+    let mut state_b = sp314_dsp::masking_eq::biquad::BiquadState::default();
+    let mut max_high = 0.0_f32;
+    for i in 0..(settle + window) {
+        let t = i as f32 / sample_rate;
+        let s = libm::sinf(2.0 * core::f32::consts::PI * 16000.0 * t);
+        let out =
+            sp314_dsp::masking_eq::biquad::process_tdf2(s, &coeffs, &mut state_b) * GLUE_PAD_LINEAR;
+        if i >= settle {
+            max_high = max_high.max(libm::fabsf(out));
+        }
+    }
+    assert!(
+        max_high < max_low * 0.30,
+        "high-freq peak {max_high} not attenuated vs low {max_low}"
+    );
+}

@@ -161,6 +161,11 @@ pub fn run(
         settings.noise_floor_dbfs.unwrap_or(-45.0),
     );
 
+    const GLUE_PAD_LINEAR: f32 = 0.125_892_54; // 10^(-18/20)
+    let glue_lpf_coeffs =
+        sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, settings.sample_rate as f64);
+    let mut glue_lpf_state = sp314_dsp::masking_eq::biquad::BiquadState::default();
+
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
 
@@ -185,7 +190,17 @@ pub fn run(
         let ma: Vec<f32> = stems_chunk
             .ambience
             .iter()
-            .map(|s| s * mix.ambience)
+            .map(|s| {
+                let mut sample = *s;
+                if settings.restoration_enabled {
+                    sample = sp314_dsp::masking_eq::biquad::process_tdf2(
+                        sample,
+                        &glue_lpf_coeffs,
+                        &mut glue_lpf_state,
+                    ) * GLUE_PAD_LINEAR;
+                }
+                sample * mix.ambience
+            })
             .collect();
 
         h_voice
