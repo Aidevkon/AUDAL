@@ -119,7 +119,7 @@ pub(crate) fn build_windowed_stem(
     events
 }
 
-fn features_for<'a>(stem: &str, f: &'a StemFeatures) -> &'a StemMetrics {
+pub(crate) fn features_for<'a>(stem: &str, f: &'a StemFeatures) -> &'a StemMetrics {
     match stem {
         "voice" => &f.voice,
         "drums" => &f.drums,

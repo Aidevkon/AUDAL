@@ -26,13 +26,16 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::{
-    builder::classify_for_stem, // single source of truth — no local copy
+    builder::{classify_for_stem, features_for}, // single sources of truth — no local copies
     contract::{EnrichedAttributes, RiskFlags},
     features::StateFeatures,
     inference::StemMarkovModel,
     mfcc::MfccAnalyzer,
     model::{normalize_rows, EmissionHistogram, TransitionMatrix}, // normalize_rows: single source
+    store::PresetMarkovModel,
 };
+use lineos_types::pre_analysis::PreAnalysisData;
+use lineos_types::StemFeatures;
 
 /// Incremental builder for one stem's Markov model.
 ///
@@ -236,6 +239,132 @@ impl PerStemBuilder {
             transitions,
             emissions,
             n_sessions: 1,
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Stage 2: StreamingCorpusBuilder — 5-stem orchestrator
+// ══════════════════════════════════════════════════════════════════
+
+/// Canonical stem index mapping — matches builder.rs:148-162 stem_pairs and
+/// store.rs:13 STEM_TYPES exactly.
+/// 0=voice, 1=drums, 2=bass, 3=harmonics, 4=ambience.
+pub const STEM_NAMES: [&str; 5] = ["voice", "drums", "bass", "harmonics", "ambience"];
+
+/// 5-stem streaming orchestrator.
+///
+/// Wraps 5 PerStemBuilders sharing one MfccAnalyzer.
+/// `finish(preset_id)` produces a PresetMarkovModel bit-identical to:
+///   `build_timeline(...) → CorpusEnvelope → PresetMarkovModel::new(id).train(&envelope)`
+///
+/// Per-stem audio is pushed independently via `push_chunk_for_stem(stem_idx, &[f32])`.
+/// Stems advance at their own pace — no lockstep required.
+pub struct StreamingCorpusBuilder {
+    /// voice=0, drums=1, bass=2, harmonics=3, ambience=4
+    builders: [PerStemBuilder; 5],
+    /// Shared across all 5 stems — stateless per window (proven Stage 1).
+    mfcc: MfccAnalyzer,
+}
+
+impl StreamingCorpusBuilder {
+    /// Construct from the same inputs batch `build_timeline` receives.
+    ///
+    /// Derives all 5 base_attrs and the shared base_risk upfront — EXACTLY as
+    /// builder.rs:169-194. Equivalence is line-verifiable:
+    ///
+    /// builder.rs field                      streaming.rs (m = features_for(name, features))
+    /// ─────────────────────────────────── ─────────────────────────────────────────────────
+    /// rms_db: features_for(n,f).rms_db    m.rms_db
+    /// crest_factor_db: features_for(n,f)  m.crest_factor_db
+    /// transient_density: *td              m.transient_density  (td ≡ m.transient_density)
+    /// spectral_centroid: …_hz             m.spectral_centroid_hz
+    /// lufs_integrated: pre_analysis.…     pre_analysis.integrated_lufs  (global, all stems)
+    /// spectral_flatness: features_for(…)  m.spectral_flatness
+    ///
+    /// base_risk identical for all 5 stems (no stem-specific zone flags):
+    ///   artifact_risk  = 0.0  (always)
+    ///   sibilance_risk = zone_cymbal_harsh ? 0.7 : 0.0
+    ///   phase_issue    = zone_phase_issue  ? 0.8 : 0.0
+    ///   sub_rumble     = zone_sub_rumble   ? 1.0 : 0.0
+    pub fn new(features: &StemFeatures, pre_analysis: &PreAnalysisData, sample_rate: u32) -> Self {
+        // Mirrors builder.rs:177-194 — identical flag mapping, identical float literals.
+        let base_risk = RiskFlags {
+            artifact_risk: 0.0,
+            sibilance_risk: if pre_analysis.zone_flags.zone_cymbal_harsh {
+                0.7
+            } else {
+                0.0
+            },
+            phase_issue: if pre_analysis.zone_flags.zone_phase_issue {
+                0.8
+            } else {
+                0.0
+            },
+            sub_rumble: if pre_analysis.zone_flags.zone_sub_rumble {
+                1.0
+            } else {
+                0.0
+            },
+        };
+
+        // Mirrors builder.rs:166-208: one PerStemBuilder per stem, same order.
+        // Array::map iterates in index order — STEM_NAMES[0..4] == stem_pairs[0..4].
+        let builders = STEM_NAMES.map(|name| {
+            let m = features_for(name, features); // single source of truth: builder::features_for
+            let base_attrs = EnrichedAttributes {
+                rms_db: m.rms_db,
+                crest_factor_db: m.crest_factor_db,
+                transient_density: m.transient_density, // td for PerStemBuilder = same value
+                spectral_centroid: m.spectral_centroid_hz,
+                lufs_integrated: pre_analysis.integrated_lufs, // global — same for all 5 stems
+                spectral_flatness: m.spectral_flatness,
+            };
+            // m.transient_density == *td in builder.rs stem_pairs (identical derivation)
+            PerStemBuilder::new(
+                name,
+                base_attrs,
+                base_risk.clone(),
+                m.transient_density,
+                sample_rate,
+            )
+        });
+
+        Self {
+            builders,
+            mfcc: MfccAnalyzer::new(),
+        }
+    }
+
+    /// Push a chunk of audio for one stem.
+    ///
+    /// `stem_idx`: 0=voice, 1=drums, 2=bass, 3=harmonics, 4=ambience (STEM_NAMES order).
+    ///
+    /// Borrow-checker: `self.builders[stem_idx]` borrows the `builders` field via
+    /// IndexMut, and `&mut self.mfcc` borrows the `mfcc` field. These are disjoint
+    /// named struct fields — Rust NLL allows simultaneous mutable borrows of different
+    /// fields. No split_at_mut needed.
+    pub fn push_chunk_for_stem(&mut self, stem_idx: usize, samples: &[f32]) {
+        self.builders[stem_idx].push_chunk(samples, &mut self.mfcc);
+    }
+
+    /// Consume the orchestrator and produce a PresetMarkovModel.
+    ///
+    /// Equivalent output to:
+    ///   `build_timeline → CorpusEnvelope → PresetMarkovModel::new(id).train(&envelope)`
+    ///
+    /// HashMap keys are canonical stem name strings matching store.rs:40's insertion keys.
+    pub fn finish(self, preset_id: &str) -> PresetMarkovModel {
+        let stems: HashMap<String, StemMarkovModel> = self
+            .builders
+            .into_iter()
+            .zip(STEM_NAMES.iter())
+            .map(|(builder, &name)| (name.to_string(), builder.finish()))
+            .collect();
+
+        PresetMarkovModel {
+            preset_id: preset_id.to_string(),
+            stems,
         }
     }
 }
@@ -562,6 +691,176 @@ mod tests {
                 s.transitions.states
             );
             assert_models_identical(&batch, &s, &format!("observed_only/chunk={chunk_size}"));
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Stage 2 oracle — 5-stem StreamingCorpusBuilder bit-identical to batch
+    // ══════════════════════════════════════════════════════════════════
+
+    use crate::{builder::build_timeline, store::PresetMarkovModel};
+    use lineos_types::{
+        analysis::{StemFeatures, StemMetrics},
+        pre_analysis::{PreAnalysisData, ZoneActivationFlags},
+    };
+
+    /// Batch reference: build_timeline → envelope → PresetMarkovModel::train.
+    /// Mirrors corpus_node.rs exactly.
+    fn batch_preset_model(
+        features: &StemFeatures,
+        signals: [&[f32]; 5],
+        pre_analysis: &PreAnalysisData,
+        sample_rate: u32,
+    ) -> PresetMarkovModel {
+        let [voice, drums, bass, harmonics, ambience] = signals;
+        let envelope = build_timeline(
+            features,
+            voice,
+            drums,
+            bass,
+            harmonics,
+            ambience,
+            pre_analysis,
+            "test-oracle",
+            sample_rate,
+            "warm",
+        );
+        let mut preset = PresetMarkovModel::new("test");
+        preset.train(&envelope);
+        preset
+    }
+
+    /// Streaming path at a given chunk size.
+    fn streaming_preset_model(
+        features: &StemFeatures,
+        signals: [&[f32]; 5],
+        pre_analysis: &PreAnalysisData,
+        sample_rate: u32,
+        chunk_size: usize,
+    ) -> PresetMarkovModel {
+        let mut builder = StreamingCorpusBuilder::new(features, pre_analysis, sample_rate);
+        for (idx, signal) in signals.iter().enumerate() {
+            for chunk in signal.chunks(chunk_size) {
+                builder.push_chunk_for_stem(idx, chunk);
+            }
+        }
+        builder.finish("test")
+    }
+
+    /// Assert two PresetMarkovModels are bit-identical across all 5 stems.
+    fn assert_presets_identical(batch: &PresetMarkovModel, streaming: &PresetMarkovModel) {
+        assert_eq!(batch.preset_id, streaming.preset_id, "preset_id mismatch");
+        assert_eq!(
+            batch.stems.len(),
+            streaming.stems.len(),
+            "stem count mismatch (batch={} streaming={})",
+            batch.stems.len(),
+            streaming.stems.len(),
+        );
+        for name in STEM_NAMES {
+            let b = batch
+                .stems
+                .get(name)
+                .unwrap_or_else(|| panic!("batch missing stem '{name}'"));
+            let s = streaming
+                .stems
+                .get(name)
+                .unwrap_or_else(|| panic!("streaming missing stem '{name}'"));
+            assert_models_identical(b, s, &format!("5stem/{name}"));
+        }
+    }
+
+    /// StemFeatures with DISTINCT scalars per stem.
+    /// If push_chunk_for_stem mis-routes base_attrs (e.g. voice attrs on drums),
+    /// emission histogram bins will differ (spectral_centroid, spectral_flatness,
+    /// rms_db all feed EmissionHistogram::observe) and the oracle catches it.
+    fn make_distinct_features() -> StemFeatures {
+        let mk = |rms_db: f32, centroid: f32, flatness: f32, td: f32| StemMetrics {
+            rms_db,
+            spectral_centroid_hz: centroid,
+            spectral_flatness: flatness,
+            transient_density: td,
+            crest_factor_db: 10.0 + rms_db.abs() * 0.1,
+            ..StemMetrics::default()
+        };
+        StemFeatures {
+            voice: mk(-18.0, 1800.0, 0.15, 0.05),
+            drums: mk(-12.0, 3500.0, 0.40, 0.45),
+            bass: mk(-22.0, 200.0, 0.05, 0.08),
+            harmonics: mk(-25.0, 2200.0, 0.30, 0.10),
+            ambience: mk(-35.0, 4000.0, 0.60, 0.20),
+            mix: Default::default(),
+        }
+    }
+
+    fn make_pre_analysis_with_flags() -> PreAnalysisData {
+        PreAnalysisData {
+            integrated_lufs: -14.0,
+            zone_flags: ZoneActivationFlags {
+                zone_cymbal_harsh: true,
+                zone_sub_rumble: true,
+                ..ZoneActivationFlags::default()
+            },
+            ..PreAnalysisData::silent()
+        }
+    }
+
+    fn make_5stem_signals(sample_rate: u32) -> [Vec<f32>; 5] {
+        let make = |amplitude: f32| {
+            let total = sample_rate as usize * 3;
+            let half = total / 2;
+            let mut sig = vec![0.0f32; total];
+            for s in sig.iter_mut().take(half) {
+                *s = amplitude;
+            }
+            sig
+        };
+        [make(0.5), make(0.8), make(0.3), make(0.15), make(0.05)]
+    }
+
+    #[test]
+    fn streaming_corpus_5stem_matches_batch_chunk_777() {
+        let sr = 48_000u32;
+        let features = make_distinct_features();
+        let pre = make_pre_analysis_with_flags();
+        let sigs = make_5stem_signals(sr);
+        let sig_refs: [&[f32]; 5] = [&sigs[0], &sigs[1], &sigs[2], &sigs[3], &sigs[4]];
+
+        let batch = batch_preset_model(&features, sig_refs, &pre, sr);
+        let streaming = streaming_preset_model(&features, sig_refs, &pre, sr, 777);
+        assert_presets_identical(&batch, &streaming);
+    }
+
+    #[test]
+    fn streaming_corpus_5stem_chunk_size_invariant() {
+        let sr = 48_000u32;
+        let features = make_distinct_features();
+        let pre = make_pre_analysis_with_flags();
+        let sigs = make_5stem_signals(sr);
+        let sig_refs: [&[f32]; 5] = [&sigs[0], &sigs[1], &sigs[2], &sigs[3], &sigs[4]];
+
+        let batch = batch_preset_model(&features, sig_refs, &pre, sr);
+        for chunk_size in [1usize, 777, 4800, 999_999] {
+            let s = streaming_preset_model(&features, sig_refs, &pre, sr, chunk_size);
+            assert_presets_identical(&batch, &s);
+        }
+    }
+
+    #[test]
+    fn streaming_corpus_routing_guard() {
+        let sr = 48_000u32;
+        let features = make_distinct_features();
+        let pre = make_pre_analysis_with_flags();
+        let sigs = make_5stem_signals(sr);
+        let sig_refs: [&[f32]; 5] = [&sigs[0], &sigs[1], &sigs[2], &sigs[3], &sigs[4]];
+
+        let batch = batch_preset_model(&features, sig_refs, &pre, sr);
+        let streaming = streaming_preset_model(&features, sig_refs, &pre, sr, 777);
+
+        for (idx, name) in STEM_NAMES.iter().enumerate() {
+            let b = batch.stems.get(*name).unwrap();
+            let s = streaming.stems.get(*name).unwrap();
+            assert_models_identical(b, s, &format!("routing/{name}(idx={idx})"));
         }
     }
 }
