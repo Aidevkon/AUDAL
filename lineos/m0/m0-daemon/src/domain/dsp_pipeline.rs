@@ -99,40 +99,28 @@ fn spatial_conformance_path(
     let mut raw_max_tp = [0.0_f32; 6];
 
     {
-        use std::io::Read;
-        let file = std::fs::File::open(raw_path)
-            .map_err(|e| format!("spatial_conformance pass-1 open: {e}"))?;
-        let mut reader = std::io::BufReader::new(file);
-        let mut byte_buf = vec![0u8; CHUNK_FRAMES * BYTES_PER_FRAME];
+        // RawPcmFileSource handles LE decode (same f32::from_le_bytes as the
+        // inline loop it replaces) — per-frame values are bit-identical.
+        use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
+        let mut source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(
+            std::path::Path::new(raw_path),
+            6, // 6-channel 5.1 interleaved dump
+        )
+        .map_err(|e| format!("spatial_conformance pass-1 open: {e}"))?;
+        let mut flat_buf = vec![0.0f32; CHUNK_FRAMES * 6]; // same 65536-frame granularity
 
         loop {
-            let bytes_read = {
-                let mut total = 0;
-                while total < byte_buf.len() {
-                    match reader.read(&mut byte_buf[total..]) {
-                        Ok(0) => break,
-                        Ok(n) => total += n,
-                        Err(e) => return Err(format!("spatial_conformance pass-1 read: {e}")),
-                    }
-                }
-                total
-            };
-            if bytes_read == 0 {
+            let frames = source
+                .fill_buffer(&mut flat_buf)
+                .map_err(|e| format!("spatial_conformance pass-1 read: {e}"))?;
+            if frames == 0 {
                 break;
             }
-
-            for frame in byte_buf[..bytes_read].chunks_exact(24) {
-                let s: [f32; 6] = std::array::from_fn(|ch| {
-                    f32::from_le_bytes([
-                        frame[ch * 4],
-                        frame[ch * 4 + 1],
-                        frame[ch * 4 + 2],
-                        frame[ch * 4 + 3],
-                    ])
-                });
-
+            for frame_samples in flat_buf[..frames * 6].chunks_exact(6) {
+                // Owned copy: TryFrom<&[f32]> for [f32; 6] — infallible (chunks_exact(6)).
+                // 6 × f32 = 24 bytes; trivial stack copy, no lifetime complication.
+                let s = <[f32; 6]>::try_from(frame_samples).unwrap();
                 lufs_meter.process_frame(&s);
-
                 for ch in 0..6 {
                     let tp = detectors[ch].process(s[ch], s[ch]);
                     raw_max_tp[ch] = raw_max_tp[ch].max(tp);
