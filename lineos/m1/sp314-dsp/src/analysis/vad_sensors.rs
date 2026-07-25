@@ -39,11 +39,11 @@ impl RmsDeltaSensor {
         }
     }
 
-    pub fn process(&mut self, frame: &[f32]) -> f32 {
+    pub fn process(&mut self, frame: &[f32]) -> (f32, f32) {
         let r = rms_db(frame);
         let delta = r - self.prev_rms_db;
         self.prev_rms_db = r;
-        delta
+        (r, delta)
     }
 }
 
@@ -214,15 +214,15 @@ mod tests {
             .collect();
 
         // 1. Silence -> Loud transition (from -144 floor)
-        let d1 = sensor.process(&tone);
+        let (_, d1) = sensor.process(&tone);
         assert!(d1 > 100.0, "Large positive delta on onset");
 
         // 2. Steady tone
-        let d2 = sensor.process(&tone);
+        let (_, d2) = sensor.process(&tone);
         assert!(libm::fabsf(d2) < 0.1, "Near zero delta on steady state");
 
         // 3. Loud -> Silence transition
-        let d3 = sensor.process(&silence);
+        let (_, d3) = sensor.process(&silence);
         assert!(d3 < -100.0, "Large negative delta on offset");
     }
 
