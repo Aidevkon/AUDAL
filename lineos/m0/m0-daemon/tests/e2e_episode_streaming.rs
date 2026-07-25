@@ -252,6 +252,7 @@ fn full_pipeline_heap_is_scale_invariant() {
             mix_levels: None,
             preview_id: None,
             restoration_enabled: None,
+            macro_router_enabled: None,
         };
         let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
             xaak::repo::DspState::default(),
@@ -330,6 +331,7 @@ fn music_pipeline_heap_is_scale_invariant() {
             mix_levels: None,
             preview_id: None,
             restoration_enabled: None,
+            macro_router_enabled: None,
         };
         let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
             xaak::repo::DspState::default(),

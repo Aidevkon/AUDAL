@@ -52,6 +52,7 @@ fn make_req(path: &str, preset: &str) -> MasterRequest {
         mix_levels: None,
         preview_id: None,
         restoration_enabled: None,
+        macro_router_enabled: None,
     }
 }
 

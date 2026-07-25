@@ -47,6 +47,7 @@ async fn test_e2e_alignment_oracle() {
         mix_levels: None,
         preview_id: None,
         restoration_enabled: None,
+        macro_router_enabled: None,
     };
 
     let start = Instant::now();

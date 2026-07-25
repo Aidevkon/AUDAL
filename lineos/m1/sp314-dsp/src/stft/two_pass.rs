@@ -17,6 +17,7 @@ use crate::stft::stem_renderer::FiveStems;
 use crate::stft::{StreamingStftEncoder, FFT_SIZE, HOP_SIZE, N_BINS};
 use lineos_corpus::mfcc::MfccAnalyzer;
 use lineos_types::StemFeatures;
+use lineos_corpus::scout::{SegmentBoundary, SegmentType};
 
 /// Constitutional chunk size — 65536 samples = ~1.37s at 48kHz
 pub const CHUNK_FRAMES: usize = 65536;
@@ -652,6 +653,28 @@ impl TwoPassEngine {
 
     // ── Pass 2 — process_chunks ──────────────────────────────────────
 
+    fn should_bypass_nmf(
+        offset: usize,
+        chunk_frames: usize,
+        sample_rate: f32,
+        boundaries: &[SegmentBoundary],
+    ) -> bool {
+        let start_sec = offset as f32 / sample_rate;
+        let end_sec = (offset + chunk_frames) as f32 / sample_rate;
+
+        let mut found_any = false;
+        for b in boundaries {
+            let intersects = start_sec < b.end_sec && end_sec > b.start_sec;
+            if intersects {
+                found_any = true;
+                if b.avg_confidence < 0.4 || b.segment_type != SegmentType::Speech {
+                    return false;
+                }
+            }
+        }
+        found_any
+    }
+
     /// Pass 2: chunk-by-chunk processing with locked ScoutResult.
     /// Callback receives FiveStemsChunk per chunk.
     /// All DSP context is stateful across chunks.
@@ -666,11 +689,15 @@ impl TwoPassEngine {
     /// Rayon parallelism grouping, not a reader boundary. The reader naturally
     /// carries its history buffer across macro-batch boundaries, and process_single_chunk
     /// relies purely on this history padding to warm up fresh DSP contexts per chunk.
+    #[allow(clippy::too_many_arguments)]
     pub fn process_stream_with_params<S: crate::stft::sliding_overlap_reader::ChunkSource, F>(
         &mut self,
         mut reader: crate::stft::sliding_overlap_reader::SlidingOverlapReader<S>,
         scout: &ScoutResult,
         ducking_gain: f32,
+        macro_router_enabled: bool,
+        boundaries: &[SegmentBoundary],
+        sample_rate: f32,
         mut callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -684,6 +711,7 @@ impl TwoPassEngine {
             padded_right: Vec<f32>,
             core_chunk: Vec<f32>,
             pad_frames: usize,
+            offset: usize,
         }
 
         let macro_batch_size = rayon::current_num_threads() * 2;
@@ -714,6 +742,7 @@ impl TwoPassEngine {
                             core_chunk: overlap_chunk.signal[offset_idx..offset_idx + new_len]
                                 .to_vec(),
                             pad_frames,
+                            offset: overlap_chunk.offset,
                         });
                     }
                     Ok(None) => break, // EOF
@@ -728,18 +757,35 @@ impl TwoPassEngine {
             // 2. Parallel Transform Phase (Heavy Math)
             let parallel_results: Vec<ParallelChunkOut> = batch
                 .into_par_iter()
-                .map(|owned| {
-                    process_single_chunk(
-                        &self.nmf,
-                        scout,
-                        SingleChunkData {
-                            padded_chunk: &owned.padded_chunk,
-                            padded_left: &owned.padded_left,
-                            padded_right: &owned.padded_right,
-                            core_chunk: &owned.core_chunk,
-                            pad_frames: owned.pad_frames,
-                        },
-                    )
+                .map(|mut owned| {
+                    if macro_router_enabled && Self::should_bypass_nmf(owned.offset, owned.core_chunk.len(), sample_rate, boundaries) {
+                        let len = owned.core_chunk.len();
+                        ParallelChunkOut {
+                            stems: FiveStemsChunk {
+                                voice: std::mem::take(&mut owned.core_chunk),
+                                drums: vec![0.0; len],
+                                bass: vec![0.0; len],
+                                harmonics: vec![0.0; len],
+                                ambience: vec![0.0; len],
+                            },
+                            voice_transient: 0.0,
+                            drums_transient: 0.0,
+                            chunk_len: len,
+                            spatial_sums: [(0.0, 0.0, 0.0); 5],
+                        }
+                    } else {
+                        process_single_chunk(
+                            &self.nmf,
+                            scout,
+                            SingleChunkData {
+                                padded_chunk: &owned.padded_chunk,
+                                padded_left: &owned.padded_left,
+                                padded_right: &owned.padded_right,
+                                core_chunk: &owned.core_chunk,
+                                pad_frames: owned.pad_frames,
+                            },
+                        )
+                    }
                 })
                 .collect();
 
@@ -1403,6 +1449,64 @@ mod tests {
         let _ = HOP_SIZE;
     }
 
+    #[test]
+    fn macro_router_bypasses_nmf_on_high_conf_speech() {
+        let n_total = CHUNK_FRAMES * 2;
+        let left: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 100.0 + (100.0 * t);
+                libm::sinf(2.0 * core::f32::consts::PI * freq * t)
+            })
+            .collect();
+        let right: Vec<f32> = (0..n_total)
+            .map(|i| {
+                let t = i as f32 / 48000.0;
+                let freq = 200.0 + (200.0 * t);
+                libm::sinf(2.0 * core::f32::consts::PI * freq * t)
+            })
+            .collect();
+        let signal: Vec<f32> = left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect();
+        let mut interleaved = Vec::with_capacity(n_total * 2);
+        for i in 0..n_total {
+            interleaved.push(left[i]);
+            interleaved.push(right[i]);
+        }
+
+        let mut engine = TwoPassEngine::new();
+        let scout = engine.scout(&signal, 48000);
+        let source = TestMemorySource { data: interleaved, offset: 0 };
+        use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
+        let reader = SlidingOverlapReader::new(source, 10240);
+
+        let boundaries = vec![
+            SegmentBoundary { start_sec: 0.0, end_sec: 2.0, segment_type: SegmentType::Speech, avg_leaning: 0.0, avg_confidence: 0.8 },
+            SegmentBoundary { start_sec: 2.0, end_sec: 4.0, segment_type: SegmentType::Music, avg_leaning: 0.0, avg_confidence: 0.9 },
+        ];
+
+        let mut captured_chunks = Vec::new();
+        engine.process_stream_with_params(reader, &scout, 1.0, true, &boundaries, 48000.0, |stems| {
+            captured_chunks.push((stems.voice.clone(), stems.drums.clone(), stems.bass.clone()));
+        }).unwrap();
+
+        assert_eq!(captured_chunks.len(), 2);
+        
+        let chunk1_voice = &captured_chunks[0].0;
+        assert_eq!(chunk1_voice.len(), CHUNK_FRAMES);
+        assert_eq!(chunk1_voice[100], signal[100]); // raw value (with pad offset skipped by reader output)
+        assert_eq!(captured_chunks[0].1[100], 0.0); // drums zeroed
+        assert_eq!(captured_chunks[0].2[100], 0.0); // bass zeroed
+        
+        let chunk2_voice = &captured_chunks[1].0;
+        assert_eq!(chunk2_voice.len(), CHUNK_FRAMES);
+        assert_ne!(chunk2_voice[100], signal[CHUNK_FRAMES + 100]); // nmf ran
+        assert_ne!(captured_chunks[1].1[100], 0.0); // drums has signal
+    }
+
     struct TestMemorySource {
         data: Vec<f32>,
         offset: usize,
@@ -1489,7 +1593,7 @@ mod tests {
         let reader = SlidingOverlapReader::new(source, 10240);
 
         let _ = engine
-            .process_stream_with_params(reader, &scout, 1.0, |chunk| {
+            .process_stream_with_params(reader, &scout, 1.0, false, &[], 48000.0, |chunk| {
                 new_voice.extend_from_slice(&chunk.voice);
             })
             .unwrap();

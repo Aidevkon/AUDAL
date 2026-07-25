@@ -672,9 +672,10 @@ fn run_dsp_internal(
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
 
-    let trunk_metrics =
-        sp314_orchestrator::trunk_pass::run_trunk_metrics(std::path::Path::new(&raw_path))
-            .map_err(|e| format!("Trunk metrics failed: {e}"))?;
+    let trunk_report =
+        sp314_orchestrator::trunk_pass::run_trunk_pass(std::path::Path::new(&raw_path))
+            .map_err(|e| format!("Trunk Pass failed: {e}"))?;
+    let trunk_metrics = &trunk_report.metrics;
 
     // Episode/spoken-word: skip beat
     // detection entirely. BPM and beat
@@ -842,6 +843,8 @@ fn run_dsp_internal(
                 sample_rate: decoded.pcm_sample_rate,
                 noise_floor_dbfs: trunk_metrics.noise_floor_dbfs,
                 restoration_enabled: req.restoration_enabled.unwrap_or(false),
+                macro_router_enabled: req.macro_router_enabled.unwrap_or(false),
+                boundaries: &trunk_report.boundaries,
             },
             crate::domain::nodes::render_node::RenderInputs {
                 original_sum_sq: decoded.original_sum_sq,

@@ -32,6 +32,7 @@ fn e2e_stereo_input_spatial_upmix_produces_both_blobs() {
         mix_levels: None,
         preview_id: None,
         restoration_enabled: None,
+        macro_router_enabled: None,
     };
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
@@ -112,6 +113,7 @@ fn e2e_stereo_master_preset_no_spatial_blob() {
         mix_levels: None,
         preview_id: None,
         restoration_enabled: None,
+        macro_router_enabled: None,
     };
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));
@@ -164,6 +166,7 @@ fn e2e_pro_bundle_both_produces_both_blobs() {
         mix_levels: None,
         preview_id: None,
         restoration_enabled: None,
+        macro_router_enabled: None,
     };
 
     let head_state = Arc::new(ArcSwap::from_pointee(DspState::default()));

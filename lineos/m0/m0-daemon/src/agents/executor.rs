@@ -52,6 +52,7 @@ pub async fn run(
                     mix_levels: None,
                     preview_id: None,
                     restoration_enabled: None,
+                    macro_router_enabled: None,
                 };
 
                 let start = std::time::Instant::now();

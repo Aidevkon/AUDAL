@@ -105,6 +105,8 @@ pub struct RenderSettings<'a> {
     pub sample_rate: u32,
     pub noise_floor_dbfs: Option<f32>,
     pub restoration_enabled: bool,
+    pub macro_router_enabled: bool,
+    pub boundaries: &'a [lineos_corpus::scout::SegmentBoundary],
 }
 
 /// Immutable input audio for a single chunk.
@@ -250,7 +252,15 @@ pub fn run(
     };
 
     let mut _metadata = two_pass
-        .process_stream_with_params(inputs.stream_source, scout, ducking_gain, callback)
+        .process_stream_with_params(
+            inputs.stream_source,
+            scout,
+            ducking_gain,
+            settings.macro_router_enabled,
+            settings.boundaries,
+            settings.sample_rate as f32,
+            callback,
+        )
         .map_err(|e| format!("TwoPassEngine error: {e}"))?;
 
     if let Some(e) = spatial_err {
