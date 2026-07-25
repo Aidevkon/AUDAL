@@ -138,7 +138,7 @@ impl TransitionMatrix {
 
 /// Normalize each row to sum to 1.0.
 /// Rows with all-zero counts get uniform distribution.
-fn normalize_rows(counts: &[Vec<usize>]) -> Vec<Vec<f32>> {
+pub(crate) fn normalize_rows(counts: &[Vec<usize>]) -> Vec<Vec<f32>> {
     counts
         .iter()
         .map(|row| {

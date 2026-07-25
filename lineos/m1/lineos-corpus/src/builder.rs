@@ -3,7 +3,7 @@ use lineos_types::analysis::{StemFeatures, StemMetrics};
 use lineos_types::pre_analysis::PreAnalysisData;
 
 /// Classify state from window metrics — per stem type
-fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
+pub(crate) fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
     match stem_type {
         "voice" => {
             if rms_db < -50.0 {
@@ -64,7 +64,7 @@ fn classify_for_stem(stem_type: &str, rms_db: f32, td: f32) -> &'static str {
 
 // allow: 8 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
 #[allow(clippy::too_many_arguments)]
-fn build_windowed_stem(
+pub(crate) fn build_windowed_stem(
     signal: &[f32],
     stem_type: &str,
     session_id: &str,
