@@ -32,3 +32,5 @@ lineos/m1/sp314-dsp/tests/outputs/
 
 # BS.1770-4 LUFS oracle fixtures (generated, seeded — see fixtures/README.md)
 lineos/m0/m0-daemon/tests/fixtures/lufs_*.wav
+
+scripts/dom_inspector/
