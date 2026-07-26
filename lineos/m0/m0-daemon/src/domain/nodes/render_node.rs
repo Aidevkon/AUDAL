@@ -259,14 +259,14 @@ pub fn run(
             Ok(file) => {
                 let mut w = std::io::BufWriter::new(file);
                 use std::io::Write;
-                let _ = writeln!(w, "frame_index,time_sec,posterior,is_speech,duck_gain,rms_db,flatness,ms_ratio,rms_delta");
+                let _ = writeln!(w, "frame_index,time_sec,posterior,is_speech,duck_gain,rms_db,flatness,ms_ratio,rms_delta,noise_floor_dbfs");
                 let sr = sample_rate as f64;
                 use sp314_dsp::analysis::vad_sensors::FRAME_SAMPLES;
                 Some(move |obs: sp314_dsp::analysis::vad_model::VadObservation| {
                     let time_sec = obs.frame_index as f64 * FRAME_SAMPLES as f64 / sr;
                     let _ = writeln!(
                         w,
-                        "{},{:.2},{:.4},{},{:.4},{:.2},{:.4},{:.4},{:.4}",
+                        "{},{:.2},{:.4},{},{:.4},{:.2},{:.4},{:.4},{:.4},{:.2}",
                         obs.frame_index,
                         time_sec,
                         obs.posterior,
@@ -275,7 +275,8 @@ pub fn run(
                         obs.rms_db,
                         obs.spectral_flatness,
                         obs.mid_side_ratio,
-                        obs.rms_delta_30ms
+                        obs.rms_delta_30ms,
+                        obs.noise_floor_dbfs
                     );
                 })
             }

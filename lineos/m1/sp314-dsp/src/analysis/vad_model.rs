@@ -2,14 +2,8 @@ use crate::analysis::vad_features::VadFeatures;
 
 // --- Module-Level Constants ---
 
-pub const K_SNR: f32 = 0.4;
+pub const K_SNR: f32 = 0.15;
 pub const SNR_CENTER: f32 = 6.0;
-
-pub const FLAT_MU_SPEECH: f32 = 0.25;
-pub const FLAT_SIG_SPEECH: f32 = 0.12;
-pub const FLAT_MU_NOISE: f32 = 0.80;
-pub const FLAT_SIG_NOISE: f32 = 0.15;
-pub const FLAT_LOG_SIG_RATIO: f32 = 0.22314355;
 
 pub const MS_SCALE_SPEECH: f32 = 0.15;
 pub const MS_MU_NOISE: f32 = 0.6;
@@ -77,29 +71,61 @@ impl LikelihoodModel for FixedPriors {
 
         // --- (a) SNR ---
         let snr = f.rms_db - ctx.noise_floor_dbfs;
-        let l_snr = (K_SNR * (snr - SNR_CENTER)).clamp(-5.0, 5.0);
+        // SNR separates signal from SILENCE, not speech from music.
+        // Measured: music sat 17.35 dB above its floor, speech 6.59. Its remaining job is keeping room tone out.
+        let l_snr = (K_SNR * (snr - SNR_CENTER)).clamp(-1.0, 1.0);
 
-        // --- (b) Spectral Flatness ---
-        let z_s_flat = (f.spectral_flatness - FLAT_MU_SPEECH) / FLAT_SIG_SPEECH;
-        let z_n_flat = (f.spectral_flatness - FLAT_MU_NOISE) / FLAT_SIG_NOISE;
-        let l_flat = (0.5 * (z_n_flat * z_n_flat) - 0.5 * (z_s_flat * z_s_flat)
-            + FLAT_LOG_SIG_RATIO)
-            .clamp(-5.0, 5.0);
+        // --- (b) Spectral Flatness (Bimodal Non-Speech) ---
+        // speech: recentred on the MEASURED median, not the guess
+        // (Measured speech IQR was 0.082-0.299 => sigma ~0.16. Kept at 0.10 deliberately to preserve music penalty).
+        const FLAT_MU_SPEECH: f32 = 0.16;
+        const FLAT_SIG_SPEECH: f32 = 0.10;
+        const LN_SIG_SPEECH: f32 = -std::f32::consts::LN_10; // ln(0.10)
+
+        // non-speech is bimodal: tonal music at one end,
+        // broadband hiss at the other, speech sits BETWEEN them
+        const FLAT_MU_TONAL: f32 = 0.03;
+        const FLAT_SIG_TONAL: f32 = 0.025;
+        const LN_SIG_TONAL: f32 = -3.688879; // ln(0.025)
+
+        const FLAT_MU_HISS: f32 = 0.80;
+        const FLAT_SIG_HISS: f32 = 0.15;
+        const LN_SIG_HISS: f32 = -1.897_12; // ln(0.15)
+
+        let x = f.spectral_flatness;
+        let z_s = (x - FLAT_MU_SPEECH) / FLAT_SIG_SPEECH;
+        let z_t = (x - FLAT_MU_TONAL) / FLAT_SIG_TONAL;
+        let z_h = (x - FLAT_MU_HISS) / FLAT_SIG_HISS;
+
+        // best-fitting non-speech component wins
+        let (z_n, log_sig_n) = if z_t * z_t <= z_h * z_h {
+            (z_t, LN_SIG_TONAL)
+        } else {
+            (z_h, LN_SIG_HISS)
+        };
+
+        // now the primary separator
+        let l_flat =
+            (0.5 * z_n * z_n - 0.5 * z_s * z_s + log_sig_n - LN_SIG_SPEECH).clamp(-8.0, 8.0);
 
         // --- (c) Side/Mid Ratio ---
         let r = f.mid_side_ratio.clamp(0.0, 1.0);
         let z_ms_noise = (r - MS_MU_NOISE) / MS_SIG_NOISE;
+        // medians 0.338 vs 0.297 — no separation on this material
         let l_ms =
-            (-(r / MS_SCALE_SPEECH) + 0.5 * (z_ms_noise * z_ms_noise) + MS_NORM).clamp(-4.0, 4.0);
+            (-(r / MS_SCALE_SPEECH) + 0.5 * (z_ms_noise * z_ms_noise) + MS_NORM).clamp(-0.5, 0.5);
 
         // --- (d) |ΔRMS| over 30ms ---
         let z_s_drms = (ctx.rms_delta_30ms - DRMS_MU_SPEECH) / DRMS_SIG_SPEECH;
         let z_n_drms = (ctx.rms_delta_30ms - DRMS_MU_NOISE) / DRMS_SIG_NOISE;
+        // medians 1.169 vs 1.147 — no separation on this material
         let l_drms = (0.5 * (z_n_drms * z_n_drms) - 0.5 * (z_s_drms * z_s_drms)
             + DRMS_LOG_SIG_RATIO)
-            .clamp(-3.0, 3.0);
+            .clamp(-0.5, 0.5);
 
         // The clamps on the individual terms ARE the weighting policy, tunable by ear.
+        // Which sensor we trust came from measurement, not intuition.
+        // l_ms and l_drms are clamped tight so their constant bias cannot outvote flatness.
         l_snr + l_flat + l_ms + l_drms
     }
 }
@@ -113,6 +139,7 @@ pub struct VadObservation {
     pub spectral_flatness: f32,
     pub mid_side_ratio: f32,
     pub rms_delta_30ms: f32,
+    pub noise_floor_dbfs: f32,
 }
 
 pub struct VadDecision {
@@ -242,6 +269,57 @@ mod tests {
 
         assert!(l2 > l1, "SNR +10 should increase log-odds");
         assert!(l3 > l2, "SNR +20 should further increase log-odds");
+    }
+
+    #[test]
+    fn oracle_music_vs_speech() {
+        let mut ctx = VadContext {
+            noise_floor_dbfs: 0.0,
+            rms_delta_30ms: 1.147,
+        };
+
+        let mut f_speech = dummy_features();
+        f_speech.spectral_flatness = 0.164;
+        f_speech.rms_db = 6.59;
+        f_speech.mid_side_ratio = 0.297;
+        let l_speech = FixedPriors.log_odds(&f_speech, &ctx);
+
+        ctx.rms_delta_30ms = 1.169;
+        let mut f_music = dummy_features();
+        f_music.spectral_flatness = 0.024;
+        f_music.rms_db = 17.35;
+        f_music.mid_side_ratio = 0.338;
+        let l_music = FixedPriors.log_odds(&f_music, &ctx);
+
+        assert!(l_speech > 0.0, "Speech log-odds {} should be > 0", l_speech);
+        assert!(l_music < 0.0, "Music log-odds {} should be < 0", l_music);
+    }
+
+    #[test]
+    fn oracle_flatness_trimodal() {
+        let ctx = VadContext {
+            noise_floor_dbfs: 0.0,
+            rms_delta_30ms: 0.2,
+        };
+        let mut f = dummy_features();
+        f.rms_db = 6.0; // SNR = 6.0 => l_snr = 0.0
+
+        f.spectral_flatness = 0.03;
+        let l_tonal = FixedPriors.log_odds(&f, &ctx);
+
+        f.spectral_flatness = 0.16;
+        let l_speech = FixedPriors.log_odds(&f, &ctx);
+
+        f.spectral_flatness = 0.80;
+        let l_hiss = FixedPriors.log_odds(&f, &ctx);
+
+        assert!(l_tonal < 0.0, "Tonal music should be < 0 (was {})", l_tonal);
+        assert!(l_speech > 0.0, "Speech should be > 0 (was {})", l_speech);
+        assert!(
+            l_hiss < 0.0,
+            "Broadband hiss should be < 0 (was {})",
+            l_hiss
+        );
     }
 
     #[test]
