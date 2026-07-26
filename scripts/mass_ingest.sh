@@ -34,7 +34,7 @@ for file in "$AUDIO_DIR"/*.wav "$AUDIO_DIR"/*.mp3 "$AUDIO_DIR"/*.flac; do
     
     response=$(curl -s -X POST "http://127.0.0.1:7402/master" \
         -H "Content-Type: application/json" \
-        -d "{\"audio_path\":\"$abs_file\",\"preset_id\":\"spotify\",\"flavour_id\":\"broadcast\",\"intent_warmth\":0.5,\"intent_punch\":0.5,\"intent_space\":0.5,\"intent_loudness\":0.5}" \
+        -d "{\"audioPath\":\"$abs_file\",\"presetId\":\"spotify\",\"flavourId\":\"broadcast\",\"intentTone\":0.5,\"intentDynamics\":0.5}" \
         --max-time 120 2>/dev/null)
     
     if echo "$response" | grep -q "blob_id"; then
