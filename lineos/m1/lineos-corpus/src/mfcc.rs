@@ -177,6 +177,42 @@ impl MfccAnalyzer {
         let log_energies = self.filterbank.apply(&self.power);
         dct(&log_energies)
     }
+
+    /// Compute 13 MFCC coefficients over a signal by averaging non-overlapping
+    /// FFT_SIZE frames.
+    pub fn compute_windowed(&mut self, signal: &[f32]) -> [f32; N_MFCC] {
+        if signal.len() <= FFT_SIZE {
+            return self.compute(signal);
+        }
+
+        let mut sum = [0.0f32; N_MFCC];
+        let mut count = 0;
+        let hop = FFT_SIZE; // non-overlapping
+
+        let mut start = 0;
+        // Note: this drops the tail of the signal. For a 5s window, 234 frames
+        // cover 239,616 of 240,000 samples (dropping ~0.16%, which is fine).
+        // For shorter windows (e.g. 100ms corpus windows) this drops ~15%.
+        while start + FFT_SIZE <= signal.len() {
+            let chunk = &signal[start..start + FFT_SIZE];
+            let mfcc = self.compute(chunk);
+            for i in 0..N_MFCC {
+                sum[i] += mfcc[i];
+            }
+            count += 1;
+            start += hop;
+        }
+
+        if count == 0 {
+            return self.compute(signal);
+        }
+
+        let inv = 1.0 / count as f32;
+        for i in 0..N_MFCC {
+            sum[i] *= inv;
+        }
+        sum
+    }
 }
 
 impl Default for MfccAnalyzer {
