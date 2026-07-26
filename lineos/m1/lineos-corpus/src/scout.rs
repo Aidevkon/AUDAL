@@ -170,19 +170,13 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
     for &(t, ref dec) in decisions {
         let prev_activation = activation;
         activation += dec.confidence * (dec.leaning_score - activation);
+        // segment_type comes from the SMOOTHED activation while avg_leaning averages
+        // the RAW per-window values. They are different quantities and can legitimately
+        // disagree at a boundary. That is by design.
 
-        // We accumulate before the split check so the window that causes the crossing
-        // is included in the previous segment? Wait. The window that pushes it over
-        // the edge technically belongs to the *new* state. Let's accumulate it into
-        // the *current* state before checking the boundary, then reset. This is fine.
-        sum_leaning += dec.leaning_score;
-        sum_confidence += dec.confidence;
-        window_count += 1;
+        let crossed = (prev_activation < 0.5) != (activation < 0.5);
 
-        let crossed_to_speech = prev_activation < 0.5 && activation >= 0.5;
-        let crossed_to_music = prev_activation >= 0.5 && activation < 0.5;
-
-        if crossed_to_speech || crossed_to_music {
+        if crossed && window_count > 0 {
             // Emit previous segment
             let avg_leaning = sum_leaning / window_count as f32;
             let avg_confidence = sum_confidence / window_count as f32;
@@ -196,7 +190,7 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
             });
 
             // Reset for new segment
-            current_type = if crossed_to_speech {
+            current_type = if activation >= 0.5 {
                 SegmentType::Speech
             } else {
                 SegmentType::Music
@@ -208,6 +202,11 @@ pub fn smooth_and_segment(decisions: &[(f32, ScoutDecision)]) -> Vec<SegmentBoun
             sum_confidence = 0.0;
             window_count = 0;
         }
+
+        // the window now goes into whichever segment it belongs to
+        sum_leaning += dec.leaning_score;
+        sum_confidence += dec.confidence;
+        window_count += 1;
     }
 
     // Emit final segment
@@ -615,5 +614,29 @@ mod tests {
             "Music centroid confidence should be ~1.0 (on-axis, penalty=1), got {}",
             d.confidence
         );
+    }
+
+    #[test]
+    fn test_accumulation_off_by_one() {
+        let mut decisions = Vec::new();
+        // 5 windows of pure Music
+        for i in 0..5 {
+            decisions.push((i as f32, mk_dec(0.0, 1.0)));
+        }
+        // 5 windows of pure Speech
+        for i in 5..10 {
+            decisions.push((i as f32, mk_dec(1.0, 1.0)));
+        }
+        
+        let segments = smooth_and_segment(&decisions);
+        assert_eq!(segments.len(), 2);
+        
+        let m_seg = &segments[0];
+        assert_eq!(m_seg.segment_type, SegmentType::Music);
+        assert!((m_seg.avg_leaning - 0.0).abs() < 0.01, "First segment contaminated by second segment's leaning! Got {}", m_seg.avg_leaning);
+        
+        let s_seg = &segments[1];
+        assert_eq!(s_seg.segment_type, SegmentType::Speech);
+        assert!((s_seg.avg_leaning - 1.0).abs() < 0.01, "Second segment avg leaning should be 1.0, got {}", s_seg.avg_leaning);
     }
 }
