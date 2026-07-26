@@ -336,6 +336,46 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** To be fixed immediately before A3 Step 1 commit.
 - **Context:** `dsp_pipeline.rs` used `mono.len()` (the 30s scout proxy length) instead of `chunk.left.len()` (the actual full track duration) to size `left_vec/right_vec` and set the processing boundaries. This was introduced in commit `0d90d21` (June 29, `lazy_scout`). This silently truncated the pre-allocated output buffers and the inner DSP loop to exactly 30 seconds regardless of the actual track length. Any track longer than 30s processed by the Music path produced a completely valid but brutally chopped 30s FLAC/WAV master file. It did not cause a panic or crash because all arrays (the proxy input and the destination vectors) were aligned to exactly 30s perfectly. The truncation was completely masked in CI because the existing integration test (`e2e_corpus_music_path_uses_30s_proxy`) only asserted the number of Markov transitions generated during the scout pass (which successfully proved the proxy was used) but never asserted the total audio duration or byte length of the final output payload.
 
+### F-041 — Micro-VAD Scout classifier non-functional & audited feature replacement
+- **Status:** ACTIVE
+- **Component:** `m0-daemon/src/dsp/sparse_scout.rs`, `sp314-dsp/src/analysis/`, `genre_centroids_generated.rs`
+- **Trigger:** Before attempting to wire or re-enable the Micro-VAD Scout / Macro-Scout Router bypass.
+- **Context:** A comprehensive empirical audit across 170 audio files (130 consistently-extracted tracks + 40 held-out tracks) revealed:
+
+  1. THE SCOUT IS NON-FUNCTIONAL: All four legacy axes clamp to zero on real audio material because every threshold sits above the range the audio actually occupies (variance_a 500 vs measured 100-550; crest 14 vs 9.6-19.7; correlation 0.85 vs 0.43-0.96; mfcc_dist 3.2 vs 1.2-4.7). All four therefore "agree", and confidence — which measures agreement, not certainty — reads 0.99. Every file classifies as Music. Source of thresholds: "hand-tuned on 4 flight clips", never verified. Consequence: The Macro-Scout Router (4e3c0fd) requires Speech with confidence >= 0.4 and never receives it, so it never bypasses and always runs NMF — inert, not harmful.
+
+  2. FOUR AXES MEASURED AND REJECTED:
+     - variance_a: unbounded ms², one speech pause swallows the window; within-file range 311 to 164022 on a single file.
+     - CV of inter-onset intervals at FLUX_THRESHOLD 0.20: measures timing regularity (programmed vs performed). 90% on the old corpus but 5 of 9 classical pieces land on the speech side. Note FLUX_THRESHOLD 0.01 fires ~8 onsets/sec on everything — it measures spectral flicker, not rhythm. 0.20 gives 4-5/sec.
+     - envelope modulation 3-6 Hz: speech peaks at 0.88 Hz (0.59 after log) — the phrase rate, not the syllabic rate. Envelope spectra fall off 1/f and the syllabic bump is never the global maximum.
+     - MFCC mean distance: c0 correlates with mean volume at r=0.9996. It was ranking by loudness. Removing c0 drops accuracy to 70%.
+
+  3. WHAT WORKS: (CV at FLUX_THRESHOLD 0.20, frame-level cepstral flux over c1..c12 with 1024-sample frames and 512 hop).
+     - Exact formulas: 
+       • CV = std(IOI) / mean(IOI) for STFT spectral flux onsets > 0.20 in 5s windows.
+       • Cepstral Flux = mean_n sqrt( sum_{k=1}^{12} (c_k[n] - c_k[n-1])^2 ) using 1024-sample STFT frames with 512 hop.
+     - Locked Centroids & Pooled Stds (trained on 130 files):
+       • CV: Music Mean = 0.4375, Speech Mean = 0.6855, Pooled Std = 0.1536
+       • Flux: Music Mean = 1.3387, Speech Mean = 1.7242, Pooled Std = 0.1738
+     - Measured Accuracy:
+       • 86.11% window accuracy (85.39% Music, 86.83% Speech) on the 130-file training set.
+       • 78.65% window accuracy (76.74% Music, 80.57% Speech) on the 40 old files (clean untouched held-out set).
+     - Per-file agreement is U-shaped: 83.7% of training files and 67.5% of held-out files sit in the 70-100% agreement bins (71 Music & 16 Speech in 90-100% for Set A; 10 Music & 11 Speech in 90-100% for Set B). Errors are per-file (inherently ambiguous tracks), not per-window jitter, so short spans can be trusted.
+     - The two axes fail in opposite directions: classical music has low flux and high CV; percussive music has high flux and low CV; speech is the only class that is high on both.
+
+  4. MEASUREMENT ARTIFACTS FOUND:
+     - MfccAnalyzer::compute keeps only the first FFT_SIZE (1024) samples. The Scout feeds it 240,000 (keeps 0.4%); the corpus builder feeds it 4,800 (keeps 21%). compute_windowed exists (f5ec4cc) but cannot be wired until the centroids in genre_centroids_generated.rs are regenerated with matching semantics — they were produced by measure_corpus using the truncated compute.
+     - The 38-track corpus those centroids came from is gone; it lived outside the repo.
+     - Any level or dynamics feature is invalid on /tmp/diverse_corpus: those 40 files were cut with -t 30 and NO -ss, so they are file openings — fade-ins and intros. One file measured 230 dB depth from a silent tail and inflated a pooled std to the point where a third axis contributed nothing.
+
+  5. REUSABLE TOOLING:
+     - scripts/gate_corpus.py: mechanical admission control (fake-stereo detection, run-length clipping, envelope-correlation duplicate detection).
+     - Leave-One-Source-Out (LOSO) cross-validation: never classify a file using a centroid its own source (album/show) helped build.
+
+  6. WHAT REMAINS:
+     - The speech side has 26 sources against 104 music, and the four music failures are all vocal-dominant tracks (acapella, solo voice, whispered pop, rap) — the classifier says "voice" because there is voice. For the router this errs safely: a wrong "music" runs NMF as today, a wrong "speech" would bypass and be audible.
+
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
