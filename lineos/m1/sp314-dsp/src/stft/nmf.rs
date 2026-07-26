@@ -664,7 +664,7 @@ pub fn find_most_diverse_window(
     }
 
     // Compute spectral flux
-    let mut detector = SpectralFluxDetector::new();
+    let mut detector = SpectralFluxDetector::new(0.01_f32);
     let (flux, _) = detector.detect(signal);
 
     // Edge case: flat signal (silence)

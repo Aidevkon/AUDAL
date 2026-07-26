@@ -1,5 +1,5 @@
 use crate::analysis::scout::SegmentScout;
-use lineos_corpus::scout::{compute_scout_decision, ScoutDecision};
+use lineos_corpus::scout::ScoutDecision;
 
 // PROVISIONAL: validated via Flights 9-12 to provide stable rhythm/timbre
 // tracking and robust confidence-collapse at boundaries.
@@ -43,13 +43,22 @@ pub fn scan_file(left: &[f32], right: &[f32], sample_rate: u32) -> Vec<(f32, Sco
     while start + win_samples <= mono_full.len() {
         let end = start + win_samples;
         let mono_slice = &mono_full[start..end];
-        let left_slice = &left[start..end];
-        let right_slice = &right[start..end];
+        let _left_slice = &left[start..end];
+        let _right_slice = &right[start..end];
 
         let start_sec = start as f32 / sample_rate as f32;
 
-        let meas = scout.measure(mono_slice, left_slice, right_slice, sample_rate);
-        let decision = compute_scout_decision(&meas);
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfccs = Vec::new();
+        let mut f = 0;
+        while f + 1024 <= mono_slice.len() {
+            mfccs.push(mfcc_analyzer.compute(&mono_slice[f..f + 1024]));
+            f += 512;
+        }
+        let cepstral_flux = lineos_corpus::scout::compute_cepstral_flux(&mfccs);
+
+        let meas = scout.measure(mono_slice, cepstral_flux, sample_rate);
+        let decision = lineos_corpus::scout::compute_scout_decision(&meas);
 
         decisions.push((start_sec, decision));
         start += hop_samples;
@@ -134,11 +143,14 @@ mod tests {
                 );
             }
             // IDM region is ~17s to 35s. We check windows that start after 18s.
+            // The router bypasses ONLY when leaning > 0.5 AND confidence >= 0.4.
+            // No window in the music region should trigger a bypass.
             if t > 18.0 {
+                let would_bypass = decision.leaning_score > 0.5 && decision.confidence >= 0.4;
                 assert!(
-                    decision.leaning_score < 0.3,
-                    "Music region leaning too high at {:.1}s",
-                    t
+                    !would_bypass,
+                    "Music region would trigger bypass at {:.1}s (lean={:.3}, conf={:.3})",
+                    t, decision.leaning_score, decision.confidence
                 );
             }
         }

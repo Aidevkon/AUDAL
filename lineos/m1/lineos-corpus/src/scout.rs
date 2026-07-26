@@ -13,60 +13,106 @@
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScoutMeasurements {
-    pub variance_a: f32,
-    pub mfcc_dist_b: f32,
-    pub crest_c: f32,
-    pub correlation_d: f32,
+    pub cv_ioi: f32,
+    pub cepstral_flux: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScoutDecision {
     pub leaning_score: f32, // 0.0 = Music, 1.0 = Speech
-    pub confidence: f32,    // 0.0 = Unsure (axes split), 1.0 = Certain (axes agree)
-    pub per_axis_normalized: [f32; 4],
+    pub confidence: f32,    // 0.0 = Unsure, 1.0 = Certain
 }
 
-// PROVISIONAL — hand-tuned on 4 flight clips (Flights 4-8),
-// NOT corpus-calibrated. Awaiting M2 corpus for real tuning.
-const WEIGHT_A: f32 = 0.40;
-const WEIGHT_B: f32 = 0.15;
-const WEIGHT_C: f32 = 0.10;
-const WEIGHT_D: f32 = 0.35;
+pub fn mfcc_euclidean_distance(a: &[f32; 13], b: &[f32; 13]) -> f32 {
+    let mut sq_diff = 0.0;
+    for j in 1..13 {
+        let diff = b[j] - a[j];
+        sq_diff += diff * diff;
+    }
+    libm::sqrtf(sq_diff)
+}
+
+pub fn compute_cepstral_flux(mfccs: &[[f32; 13]]) -> f32 {
+    if mfccs.len() < 2 {
+        return 0.0;
+    }
+    let mut sum_dist = 0.0;
+    for i in 1..mfccs.len() {
+        sum_dist += mfcc_euclidean_distance(&mfccs[i - 1], &mfccs[i]);
+    }
+    sum_dist / (mfccs.len() - 1) as f32
+}
+
+// F-041 Evaluated Centroids
+const MUSIC_CV: f32 = 0.4375;
+#[allow(dead_code)]
+const SPEECH_CV: f32 = 0.6855;
+const CV_POOLED_STD: f32 = 0.1536;
+
+const MUSIC_FLUX: f32 = 1.3387;
+#[allow(dead_code)]
+const SPEECH_FLUX: f32 = 1.7242;
+const FLUX_POOLED_STD: f32 = 0.1738;
+
+// Precomputed Z-space projection constants
+const DELTA_CV: f32 = 1.61458;
+const DELTA_FLUX: f32 = 2.21807;
+const DELTA_SQ: f32 = 7.52673;
+
+// Z-clamp: bounds each axis so one wild coordinate cannot dominate the
+// dot product. Without this, a bimodal IOI distribution (silence + burst)
+// can produce cv_ioi > 1.0, which is 5+ sigma past the music centroid —
+// more extreme than speech ever is, yet the unclamped projection would
+// read "maximally speech" with high confidence.
+const Z_CLAMP: f32 = 3.0;
+
+// Perpendicular distance penalty: addresses the known limitation of
+// projection — a point unlike anything in training can project far along
+// the centroid axis and would otherwise read confident. The penalty
+// multiplies confidence by (1 - d_perp²/R²).clamp(0,1), so points far
+// off-axis get their confidence suppressed while on-axis points are
+// unaffected.
+// R=3.0 chosen by measurement: speech d_perp p90=1.577, max=2.285,
+// so 3.0 clears real speech while suppressing off-axis anomalies.
+// R=2.0 costs 6 useful speech files; R=4.0 lets music_11 back in.
+const PERP_R_SQ: f32 = 9.0;
 
 pub fn compute_scout_decision(m: &ScoutMeasurements) -> ScoutDecision {
-    let norm_a = ((m.variance_a - 500.0) / 2500.0).clamp(0.0, 1.0);
-    let norm_b = ((m.mfcc_dist_b - 3.2) / 1.0).clamp(0.0, 1.0);
-    let norm_c = ((m.crest_c - 14.0) / 4.0).clamp(0.0, 1.0);
-    let norm_d = ((m.correlation_d - 0.85) / 0.13).clamp(0.0, 1.0);
-
-    // Mono input needs no special handling: when correlation reads ~1.0
-    // on genuine mono music, Axis D disagrees with A/B/C, the
-    // axis-variance confidence collapses automatically (mono music ->
-    // low confidence, correctly flagged uncertain), while mono speech
-    // (all axes agree) stays high-confidence. The disagreement metric IS
-    // the mono handler.
-    let per_axis_normalized = [norm_a, norm_b, norm_c, norm_d];
-
-    let leaning_score =
-        (norm_a * WEIGHT_A) + (norm_b * WEIGHT_B) + (norm_c * WEIGHT_C) + (norm_d * WEIGHT_D);
-
-    // Compute population variance of the 4 normalized values.
-    let mean = (norm_a + norm_b + norm_c + norm_d) / 4.0;
-    let mut sum_sq_diff = 0.0;
-    for &val in &per_axis_normalized {
-        let diff = val - mean;
-        sum_sq_diff += diff * diff;
+    if m.cv_ioi.is_nan()
+        || m.cepstral_flux.is_nan()
+        || m.cv_ioi.is_infinite()
+        || m.cepstral_flux.is_infinite()
+    {
+        return ScoutDecision {
+            leaning_score: 0.5,
+            confidence: 0.0,
+        };
     }
-    let variance = sum_sq_diff / 4.0;
 
-    let max_variance = 0.25;
-    let normalized_variance = (variance / max_variance).clamp(0.0, 1.0);
-    let confidence = 1.0 - normalized_variance;
+    // B: Clamp each z-score to [-Z_CLAMP, Z_CLAMP] before projecting.
+    let p_cv = ((m.cv_ioi - MUSIC_CV) / CV_POOLED_STD).clamp(-Z_CLAMP, Z_CLAMP);
+    let p_flux = ((m.cepstral_flux - MUSIC_FLUX) / FLUX_POOLED_STD).clamp(-Z_CLAMP, Z_CLAMP);
+
+    // Project onto the delta line: t = ((p - c_music) · delta) / |delta|²
+    let t = ((p_cv * DELTA_CV) + (p_flux * DELTA_FLUX)) / DELTA_SQ;
+    let leaning_score = t.clamp(0.0, 1.0);
+
+    // Symmetric confidence, peaking at endpoints and 0 at midpoint
+    let conf_raw = (libm::fabsf(t - 0.5) * 2.0).clamp(0.0, 1.0);
+
+    // C: Perpendicular distance penalty — suppress confidence for points
+    // far from the centroid axis.
+    let proj_cv = t * DELTA_CV;
+    let proj_flux = t * DELTA_FLUX;
+    let perp_cv = p_cv - proj_cv;
+    let perp_flux = p_flux - proj_flux;
+    let d_perp_sq = perp_cv * perp_cv + perp_flux * perp_flux;
+    let penalty = (1.0 - d_perp_sq / PERP_R_SQ).clamp(0.0, 1.0);
+    let confidence = conf_raw * penalty;
 
     ScoutDecision {
         leaning_score,
         confidence,
-        per_axis_normalized,
     }
 }
 
@@ -249,104 +295,92 @@ mod tests {
 
     #[test]
     fn test_speech_high_confidence() {
-        // ACTUAL numbers from Flight 4: pure speech (ishaiaTEST.mp3)
+        // Was: encoding pure speech from Flight 4 using variance_a, etc.
+        // Now: encoding the exact speech centroid on the new axes.
         let m = ScoutMeasurements {
-            variance_a: 7591.0,
-            mfcc_dist_b: 4.17,
-            crest_c: 16.62,
-            correlation_d: 0.998,
+            cv_ioi: 0.6855,
+            cepstral_flux: 1.7242,
         };
         let decision = compute_scout_decision(&m);
-        assert!(decision.leaning_score > 0.8);
-        assert!(decision.confidence > 0.8);
+        assert!((decision.leaning_score - 1.0).abs() < 0.01);
+        assert!((decision.confidence - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn test_music_high_confidence() {
-        // ACTUAL numbers from Flight 4: pure IDM (Databend.mp3)
+        // Was: encoding pure IDM music from Flight 4 using low variance/crest.
+        // Now: encoding the exact music centroid on the new axes.
         let m = ScoutMeasurements {
-            variance_a: 142.0,
-            mfcc_dist_b: 1.89,
-            crest_c: 12.81,
-            correlation_d: 0.8451,
+            cv_ioi: 0.4375,
+            cepstral_flux: 1.3387,
         };
         let decision = compute_scout_decision(&m);
-        assert!(decision.leaning_score < 0.2);
-        assert!(decision.confidence > 0.8);
+        assert!((decision.leaning_score - 0.0).abs() < 0.01);
+        assert!((decision.confidence - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn test_hybrid_ad_low_confidence() {
-        // PROVISIONAL/SIMULATED numbers encoding the A8 phenomenon.
-        // Flight 8 was aborted before final AD measurements were pulled,
-        // so these numbers are carefully chosen to exactly represent the
-        // A8 2-2 axis split (Rhythm/Stereo = Music, MFCC/Crest = Speech)
-        // to prove the confidence collapses to 0.0 under max variance.
+        // Was: encoding a 2-2 axis split (Rhythm/Stereo = Music, MFCC/Crest = Speech) to force low confidence.
+        // Now: encoding the exact midpoint between the centroids, where the projection t=0.5.
         let m = ScoutMeasurements {
-            variance_a: 150.0,   // Low -> norm 0.0 (like Music)
-            correlation_d: 0.70, // Low -> norm 0.0 (like Music)
-            mfcc_dist_b: 4.5,    // High -> norm 1.0 (like Speech)
-            crest_c: 18.0,       // High -> norm 1.0 (like Speech)
+            cv_ioi: 0.5615,
+            cepstral_flux: 1.53145,
         };
-
         let decision = compute_scout_decision(&m);
-
-        // The A8 property: a split 2-2 vote MUST yield low confidence,
-        // regardless of where the exact leaning_score lands.
-        assert!(
-            decision.confidence < 0.05,
-            "Hybrid ad (A8) with split axes must yield near-zero confidence, got {}",
-            decision.confidence
-        );
+        assert!((decision.leaning_score - 0.5).abs() < 0.01);
+        assert!((decision.confidence - 0.0).abs() < 0.01);
     }
 
     #[test]
-    fn test_mono_music_low_confidence() {
-        // Mono music (correlation 1.0) with low variance, low dist, low crest.
+    fn test_nan_input_low_confidence() {
+        // Was: encoding mono music (correlation_d 1.0) with low variance to force a confidence collapse.
+        // Now: encoding a NaN input (which occurs when onsets < 3) to verify fallback handles it securely.
         let m = ScoutMeasurements {
-            variance_a: 142.0,
-            mfcc_dist_b: 1.89,
-            crest_c: 12.81,
-            correlation_d: 1.0,
+            cv_ioi: f32::NAN,
+            cepstral_flux: 1.5,
         };
         let decision = compute_scout_decision(&m);
-
-        // Must stay music-leaning (Axis D pushes it up, but A/B/C pull it down)
-        assert!(
-            decision.leaning_score < 0.5,
-            "Mono music should lean music, got {}",
-            decision.leaning_score
-        );
-        // Confidence collapses because D (1.0) disagrees with A/B/C (~0.0)
-        assert!(
-            decision.confidence < 0.4,
-            "Confidence should collapse for mono music, got {}",
-            decision.confidence
-        );
+        assert_eq!(decision.leaning_score, 0.5);
+        assert_eq!(decision.confidence, 0.0);
     }
 
     #[test]
-    fn test_mono_speech_still_works() {
-        // Mono speech (correlation 1.0) with high variance, high dist, high crest.
+    fn test_infinity_input_low_confidence() {
+        // Was: encoding mono speech (correlation_d 1.0) with high variance to prove it didn't collapse.
+        // Now: encoding an Infinity input to verify fallback handles it securely.
         let m = ScoutMeasurements {
-            variance_a: 7591.0,
-            mfcc_dist_b: 4.17,
-            crest_c: 16.62,
-            correlation_d: 1.0,
+            cv_ioi: 1.5,
+            cepstral_flux: f32::INFINITY,
         };
         let decision = compute_scout_decision(&m);
+        assert_eq!(decision.leaning_score, 0.5);
+        assert_eq!(decision.confidence, 0.0);
+    }
 
-        // Must stay speech-leaning
-        assert!(
-            decision.leaning_score > 0.8,
-            "Mono speech should remain high leaning"
-        );
-        // Confidence must be high (NOT capped) because all 4 axes agree
-        assert!(
-            decision.confidence > 0.8,
-            "Mono speech confidence should be high, got {}",
-            decision.confidence
-        );
+    #[test]
+    fn test_compute_cepstral_flux_constant() {
+        let mfccs = [[1.0; 13], [1.0; 13], [1.0; 13]];
+        assert_eq!(compute_cepstral_flux(&mfccs), 0.0);
+    }
+
+    #[test]
+    fn test_compute_cepstral_flux_alternating() {
+        let mut v1 = [0.0; 13];
+        let mut v2 = [0.0; 13];
+        v1[1] = 3.0; // diff = 3
+        v2[1] = 7.0; // diff = 4 -> sq = 16 -> sqrt = 4
+                     // The distance is exactly 4.0
+        let mfccs = [v1, v2, v1, v2];
+        assert_eq!(compute_cepstral_flux(&mfccs), 4.0);
+    }
+
+    #[test]
+    fn test_compute_cepstral_flux_short() {
+        let mfccs = [[1.0; 13]];
+        assert_eq!(compute_cepstral_flux(&mfccs), 0.0);
+        let mfccs_empty: [[f32; 13]; 0] = [];
+        assert_eq!(compute_cepstral_flux(&mfccs_empty), 0.0);
     }
 
     // --- Part B: smooth_and_segment tests ---
@@ -355,7 +389,6 @@ mod tests {
         ScoutDecision {
             leaning_score,
             confidence,
-            per_axis_normalized: [0.0; 4],
         }
     }
 
@@ -514,5 +547,73 @@ mod tests {
         ];
         let flags = flag_escalation_candidates(&boundaries);
         assert_eq!(flags, vec![1, 3]);
+    }
+
+    // --- Part D: Z-clamp + Perpendicular penalty oracle tests ---
+
+    #[test]
+    fn test_off_axis_anomaly_suppressed() {
+        // The 21.0s anomaly from clip_transition_st.wav: bimodal IOI gives
+        // cv_ioi=1.293 (z=5.57 unclamped), flux=1.279 (z=-0.34). Without
+        // the clamp+penalty this reads leaning=1.0, confidence=1.0. With
+        // B+C it must have leaning > 0.5 (still projects speech-ward) but
+        // confidence < 0.1 (d_perp ≈ 2.63, penalty ≈ 0.23).
+        let m = ScoutMeasurements {
+            cv_ioi: 1.293,
+            cepstral_flux: 1.279,
+        };
+        let d = compute_scout_decision(&m);
+        assert!(
+            d.leaning_score > 0.5,
+            "Off-axis point should still lean speech-ward, got {}",
+            d.leaning_score
+        );
+        assert!(
+            d.confidence < 0.1,
+            "Off-axis anomaly confidence must be suppressed below 0.1, got {}",
+            d.confidence
+        );
+    }
+
+    #[test]
+    fn test_speech_centroid_unaffected_by_penalty() {
+        // The speech centroid sits ON the axis: d_perp = 0, penalty = 1.0.
+        // Confidence must remain 1.0.
+        let m = ScoutMeasurements {
+            cv_ioi: SPEECH_CV,
+            cepstral_flux: SPEECH_FLUX,
+        };
+        let d = compute_scout_decision(&m);
+        assert!(
+            (d.leaning_score - 1.0).abs() < 0.01,
+            "Speech centroid leaning should be ~1.0, got {}",
+            d.leaning_score
+        );
+        assert!(
+            (d.confidence - 1.0).abs() < 0.01,
+            "Speech centroid confidence should be ~1.0 (on-axis, penalty=1), got {}",
+            d.confidence
+        );
+    }
+
+    #[test]
+    fn test_music_centroid_unaffected_by_penalty() {
+        // The music centroid sits ON the axis: d_perp = 0, penalty = 1.0.
+        // Confidence must remain 1.0.
+        let m = ScoutMeasurements {
+            cv_ioi: MUSIC_CV,
+            cepstral_flux: MUSIC_FLUX,
+        };
+        let d = compute_scout_decision(&m);
+        assert!(
+            (d.leaning_score - 0.0).abs() < 0.01,
+            "Music centroid leaning should be ~0.0, got {}",
+            d.leaning_score
+        );
+        assert!(
+            (d.confidence - 1.0).abs() < 0.01,
+            "Music centroid confidence should be ~1.0 (on-axis, penalty=1), got {}",
+            d.confidence
+        );
     }
 }

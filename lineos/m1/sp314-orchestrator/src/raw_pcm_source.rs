@@ -244,11 +244,11 @@ mod tests {
         // This takes ~150ms and avoids accessing private fields or risking shared state.
         let scout_new = e_new.scout(&signal, 48000);
 
-        let mut new_voice = Vec::new();
-        let mut new_drums = Vec::new();
-        let mut new_bass = Vec::new();
-        let mut new_harmonics = Vec::new();
-        let mut new_ambience = Vec::new();
+        let mut new_voice: Vec<f32> = Vec::new();
+        let mut new_drums: Vec<f32> = Vec::new();
+        let mut new_bass: Vec<f32> = Vec::new();
+        let mut new_harmonics: Vec<f32> = Vec::new();
+        let mut new_ambience: Vec<f32> = Vec::new();
 
         let source = super::RawPcmFileSource::new(&temp_path, 2).unwrap();
         let reader = SlidingOverlapReader::new(source, 10240);

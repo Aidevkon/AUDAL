@@ -321,6 +321,13 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
     // Next window start as a global sample offset.
     let mut next_window_start: usize = 0;
 
+    // === Scout MFCC Tracking State ===
+    let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+    let mut mfcc_prev: Option<[f32; 13]> = None;
+    let mut flux_distances = std::collections::VecDeque::<f32>::with_capacity(467);
+    let mut flux_running_sum: f64 = 0.0;
+    let mut next_mfcc_frame_start: usize = 0;
+
     // === Scratch buffers ===
     let mut interleaved = vec![0f32; CHUNK_FRAMES * 2];
     let mut left_chunk = vec![0f32; CHUNK_FRAMES];
@@ -413,15 +420,40 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         // --- Serve scout windows ---
         if do_segmentation {
             let hist_end = hist_base + hist_mono.len();
+
+            // --- Compute O(1) MFCC distance ring ---
+            while next_mfcc_frame_start + 1024 <= hist_end {
+                let local_start = next_mfcc_frame_start - hist_base;
+                let mfcc_curr = mfcc_analyzer.compute(&hist_mono[local_start..local_start + 1024]);
+
+                if let Some(prev) = mfcc_prev {
+                    let dist = lineos_corpus::scout::mfcc_euclidean_distance(&prev, &mfcc_curr);
+                    flux_distances.push_back(dist);
+                    flux_running_sum += dist as f64;
+
+                    // 5 seconds = 467 frames -> 466 distances max.
+                    if flux_distances.len() > 466 {
+                        let oldest = flux_distances.pop_front().unwrap();
+                        flux_running_sum -= oldest as f64;
+                    }
+                }
+                mfcc_prev = Some(mfcc_curr);
+                next_mfcc_frame_start += 512;
+            }
+
             while next_window_start + win_samples <= hist_end {
                 let local_start = next_window_start - hist_base;
                 let local_end = local_start + win_samples;
 
                 let start_sec = next_window_start as f32 / SAMPLE_RATE as f32;
+                let cepstral_flux = if flux_distances.is_empty() {
+                    0.0
+                } else {
+                    (flux_running_sum / flux_distances.len() as f64) as f32
+                };
                 let meas = scout.measure(
                     &hist_mono[local_start..local_end],
-                    &hist_left[local_start..local_end],
-                    &hist_right[local_start..local_end],
+                    cepstral_flux,
                     SAMPLE_RATE,
                 );
                 decisions.push((start_sec, compute_scout_decision(&meas)));
@@ -429,11 +461,12 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
             }
 
             // --- Drain consumed history ---
-            let keep_from = if next_window_start >= win_samples {
+            let mut keep_from = if next_window_start >= win_samples {
                 next_window_start - win_samples + hop_samples
             } else {
                 0
             };
+            keep_from = keep_from.min(next_mfcc_frame_start);
             if keep_from > hist_base {
                 let drain_count = keep_from - hist_base;
                 if drain_count > 0 && drain_count <= hist_mono.len() {

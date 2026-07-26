@@ -52,7 +52,7 @@ fn spectral_flux_detects_correct_beats() {
     add_snare(&mut signal, 500, 0.7_f32, 20.0_f32, &mut seed);
     add_snare(&mut signal, 1500, 0.7_f32, 20.0_f32, &mut seed);
 
-    let mut detector = SpectralFluxDetector::new();
+    let mut detector = SpectralFluxDetector::new(0.01_f32);
     let (flux_norm, beats) = detector.detect(&signal);
 
     println!("Detected beats: {:?}", beats);

@@ -5,18 +5,20 @@ pub const FLUX_MIN_DISTANCE: usize = 10; // frames (~100ms)
 
 pub struct SpectralFluxDetector {
     engine: StftEngine,
+    pub threshold: f32,
 }
 
 impl Default for SpectralFluxDetector {
     fn default() -> Self {
-        Self::new()
+        Self::new(0.01_f32)
     }
 }
 
 impl SpectralFluxDetector {
-    pub fn new() -> Self {
+    pub fn new(threshold: f32) -> Self {
         Self {
             engine: StftEngine::new(),
+            threshold,
         }
     }
 
@@ -61,7 +63,7 @@ impl SpectralFluxDetector {
 
         // Use signed arithmetic for min_distance check
         for t in 1..n_frames.saturating_sub(1) {
-            if flux_norm[t] >= FLUX_THRESHOLD
+            if flux_norm[t] >= self.threshold
                 && flux_norm[t] > flux_norm[t - 1]
                 && flux_norm[t] > flux_norm[t + 1]
             {
