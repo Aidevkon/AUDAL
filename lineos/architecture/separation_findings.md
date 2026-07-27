@@ -32,3 +32,29 @@ ENTRY — On the stereo path, separation is equivalent to a shelf EQ.
   What the separation is genuinely required for, as opposed to
   involved in: the 5.1 render, the MaskingEQ ratios, and the corpus
   features. The stereo output is not on that list.
+
+ENTRY — THE SPATIAL STAGE PRODUCES NO WIDTH, AND ITS OUTPUT IS NOT
+  CONSUMED. FiveDotOneStage::render_chunk contains
+  "r[i] = l[i]" and "rs[i] = ls[i]" — the front and rear pairs are
+  assigned identical values by construction. Measured on a music
+  render: correlation L/R = 1.0000, Ls/Rs = 1.0000. Six channels
+  carrying three distinct signals. The side/width parameter in
+  StemChannelAssignments is computed and never referenced in either
+  render path.
+  Channel balance is also inverted for its stated purpose: centre
+  sits 14 dB below the front pair (-35.73 against -21.34), so
+  dialogue does not land where 5.1 expects it.
+  The six-channel dump is written before the normalizer, read back,
+  level-corrected, and registered in the blob store — then nothing
+  requests it. It is not in DspOutput, not in the certificate, and
+  the frontend has no way to name the blob. It is produced and
+  discarded on every music render.
+  The placements themselves react to the separation's mechanics
+  rather than to the music: bass_lfe switches on
+  bass.spectral_centroid_hz < 80, and the "bass" stem is by
+  definition the lowest-centroid spectral slice, so the rule behaves
+  as a fixed low shelf.
+
+  Not repaired. Recorded so the cost of the spatial subsystem is
+  known: it consumes CPU on every music render and delivers nothing
+  that reaches a listener.
