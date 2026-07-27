@@ -94,10 +94,9 @@ impl Flavor {
                 ],
                 "edges": [
                     { "source": "Input", "target": "eq_mud", "modulation_type": "audio" },
-                    { "source": "eq_mud", "target": "gain_makeup", "modulation_type": "audio" },
                     { "source": "eq_mud", "target": "ambience_reverb", "modulation_type": "audio" },
                     { "source": "ambience_reverb", "target": "ambience_width", "modulation_type": "audio" },
-                    { "source": "ambience_width", "target": "Output", "modulation_type": "audio" },
+                    { "source": "ambience_width", "target": "gain_makeup", "modulation_type": "audio" },
                     { "source": "gain_makeup", "target": "Output", "modulation_type": "audio" }
                 ]
             }),

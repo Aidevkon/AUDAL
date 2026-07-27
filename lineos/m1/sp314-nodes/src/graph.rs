@@ -48,6 +48,8 @@ pub struct DspGraph {
     pub debug_sq_l: HashMap<String, f64>,
     #[cfg(debug_assertions)]
     pub debug_sq_r: HashMap<String, f64>,
+    #[cfg(debug_assertions)]
+    pub debug_peaks: HashMap<String, f32>,
     pub debug_frames: usize,
     block_size: usize,
     sample_rate: u32,
@@ -84,7 +86,7 @@ impl DspGraph {
 
         // 1. Create nodes
         for t_node in &topology.nodes {
-            let node: Box<dyn DspNode> = match t_node.node_type.as_str() {
+            let mut node: Box<dyn DspNode> = match t_node.node_type.as_str() {
                 "Input" => Box::new(InputNode),
                 "Output" => Box::new(OutputNode),
                 "Gain" => {
@@ -266,12 +268,15 @@ impl DspGraph {
             };
 
             if let Some(obj) = t_node.parameters.as_object() {
-                for param_name in obj.keys() {
+                for (param_name, val) in obj.iter() {
                     if !node.has_parameter(param_name) {
                         return Err(GraphError::UnknownParameter {
                             node_id: t_node.node_id.clone(),
                             parameter: param_name.clone(),
                         });
+                    }
+                    if let Some(f) = val.as_f64() {
+                        node.set_parameter_no_glide(param_name, f as f32);
                     }
                 }
             }
@@ -365,6 +370,8 @@ impl DspGraph {
             debug_sq_l: HashMap::new(),
             #[cfg(debug_assertions)]
             debug_sq_r: HashMap::new(),
+            #[cfg(debug_assertions)]
+            debug_peaks: HashMap::new(),
             debug_frames: 0,
             block_size,
             sample_rate,
@@ -463,6 +470,16 @@ impl DspGraph {
                     .sum();
                 *self.debug_sq_l.entry(node_id.clone()).or_insert(0.0) += sq_l;
                 *self.debug_sq_r.entry(node_id.clone()).or_insert(0.0) += sq_r;
+                
+                let mut max_p = 0.0_f32;
+                for i in 0..self.block_size {
+                    if buf_l[i].abs() > max_p { max_p = buf_l[i].abs(); }
+                    if buf_r[i].abs() > max_p { max_p = buf_r[i].abs(); }
+                }
+                let entry = self.debug_peaks.entry(node_id.clone()).or_insert(0.0);
+                if max_p > *entry {
+                    *entry = max_p;
+                }
             }
 
             if node_type == "Output" {
@@ -472,6 +489,12 @@ impl DspGraph {
             }
         }
         self.debug_frames += self.block_size;
+        for (id, (l, r)) in &self.buffers {
+            let mut max = 0.0_f32;
+            for i in 0..self.block_size { if l[i].abs() > max { max = l[i].abs(); } if r[i].abs() > max { max = r[i].abs(); } }
+            let e = self.debug_peaks.entry(id.clone()).or_insert(0.0);
+            if max > *e { *e = max; }
+        }
     }
 
     pub fn reset(&mut self) {
