@@ -170,17 +170,33 @@ pub fn run(
         sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, settings.sample_rate as f64);
     let mut glue_lpf_state = sp314_dsp::masking_eq::biquad::BiquadState::default();
 
-    let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
+    let mut csv_file = std::fs::OpenOptions::new().append(true).create(true).open("/tmp/stem_energies.csv").unwrap();
+    let mut callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
+        let mut e_v = 0.0_f32;
+        let mut e_d = 0.0_f32;
+        let mut e_b = 0.0_f32;
+        let mut e_h = 0.0_f32;
+        let mut e_a = 0.0_f32;
+        for i in 0..chunk_len {
+            e_v += stems_chunk.voice[i] * stems_chunk.voice[i];
+            e_d += stems_chunk.drums[i] * stems_chunk.drums[i];
+            e_b += stems_chunk.bass[i] * stems_chunk.bass[i];
+            e_h += stems_chunk.harmonics[i] * stems_chunk.harmonics[i];
+            e_a += stems_chunk.ambience[i] * stems_chunk.ambience[i];
+        }
+        use std::io::Write;
+        writeln!(csv_file, "{:.6},{:.6},{:.6},{:.6},{:.6}", e_v, e_d, e_b, e_h, e_a).ok();
 
         let mv: Vec<f32> = stems_chunk
             .voice
             .iter()
             .map(|s| {
                 let mut sample = *s;
-                if settings.restoration_enabled {
-                    sample = vocal_gate.process_mono(sample);
-                }
+                // temporarily disable restoration for pure spatial gain measurement
+                // if settings.restoration_enabled {
+                //     sample = vocal_gate.process_mono(sample);
+                // }
                 sample * mix.voice
             })
             .collect();
@@ -196,13 +212,13 @@ pub fn run(
             .iter()
             .map(|s| {
                 let mut sample = *s;
-                if settings.restoration_enabled {
-                    sample = sp314_dsp::masking_eq::biquad::process_tdf2(
-                        sample,
-                        &glue_lpf_coeffs,
-                        &mut glue_lpf_state,
-                    ) * GLUE_PAD_LINEAR;
-                }
+                // if settings.restoration_enabled {
+                //     sample = sp314_dsp::masking_eq::biquad::process_tdf2(
+                //         sample,
+                //         &glue_lpf_coeffs,
+                //         &mut glue_lpf_state,
+                //     ) * GLUE_PAD_LINEAR;
+                // }
                 sample * mix.ambience
             })
             .collect();
@@ -250,6 +266,8 @@ pub fn run(
         let end_offset = write_offset + sp_l.len();
         left_slice[write_offset..end_offset].copy_from_slice(&sp_l);
         right_slice[write_offset..end_offset].copy_from_slice(&sp_r);
+
+
         write_offset = end_offset;
     };
 
