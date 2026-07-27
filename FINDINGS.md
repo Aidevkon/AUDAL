@@ -390,6 +390,18 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
   Not resolved. Recorded so that nothing else is built on the assumption that voice means voice.
 
+### F-042 — On the stereo path, separation is equivalent to a shelf EQ
+- **Status:** PARKED
+- **Component:** `sp314-dsp/src/spatial/stereo.rs`
+- **Trigger:** Revisit when attempting to optimize or redesign the stereo downmix for music or speech.
+- **Context:** Comparing a normal render against the same file forced through `skip_stems` yields a high correlation (0.86 for speech/classical, 0.65 for music). The spectral difference is a monotonic tilt (+3.66 dB at 63 Hz falling to -0.94 dB at 16 kHz). Applying a matching low-shelf to the unseparated render raises the correlation to >0.95. The entire audible contribution of NMF, HPSS, and the spatial stage on stereo output is reproducible with a two-pole filter, likely because the "bass" component (lfe_weight 0.8) gains low-frequency energy by construction. Separation is only genuinely required for the 5.1 render, MaskingEQ ratios, and corpus features, not for the stereo output.
+
+### F-043 — The spatial stage produces no width, and its output is not consumed
+- **Status:** PARKED (Not repaired. Recorded so the cost of the spatial subsystem is known)
+- **Component:** `sp314-dsp/src/spatial/five_dot_one.rs`
+- **Trigger:** Revisit before investing any further effort in 5.1 upmixing or spatial widening.
+- **Context:** `FiveDotOneStage::render_chunk` and `StereoRenderer` assign identical values to front (`r[i] = l[i]`) and rear (`rs[i] = ls[i]`) pairs by construction. Measured on a music render: correlation L/R = 1.0000, Ls/Rs = 1.0000. Every stem lands perfectly centered regardless of its assignment. The `side/width` parameter is never referenced. Furthermore, the 5.1 channel balance is inverted for its stated purpose: center sits 14 dB below the front pair (-35.73 against -21.34), so dialogue does not land where 5.1 expects it. The six-channel dump is written, level-corrected, and registered in the blob store—but is never requested, not included in `DspOutput`, and not in the certificate. It consumes CPU on every music render and delivers nothing that reaches a listener. Placements react to the separation's mechanics rather than the music (e.g., `bass_lfe` acts as a fixed low shelf based on the lowest-centroid slice).
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
