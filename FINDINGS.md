@@ -375,6 +375,20 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   6. WHAT REMAINS:
      - The speech side has 26 sources against 104 music, and the four music failures are all vocal-dominant tracks (acapella, solo voice, whispered pop, rap) — the classifier says "voice" because there is voice. For the router this errs safely: a wrong "music" runs NMF as today, a wrong "speech" would bypass and be audible.
 
+### F-024 — THE STEM NAMES DO NOT MATCH THEIR CONTENTS ON SPOKEN MATERIAL.
+- **Status:** PARKED
+- **Component:** sp314-dsp / orchestrator
+- **Trigger:** Music bus / VAD
+- **Context:** Measured at HEAD across five podcast files: drums 38-44%, voice 15-18%. Two pure music files as control: drums 45-48%. The split is structural, not content-driven — HPSS routes every consonant, plosive and breath into the percussive stem, leaving the voice stem holding only sustained vowels.
+
+  Consequences for what is already shipped and what was planned:
+   - the Vocal Bus gate (7164cbb) operates on roughly 16% of the speech energy. Consonants pass ungated through the drums stem.
+   - the Music Bus as designed would attenuate drums, i.e. attenuate the speaker's consonants. Ducking would make speech mumble — the opposite of its purpose.
+   - the Macro-Scout Router's bypass places the full mix in voice, which is arguably more correct than the normal path for speech, and that inconsistency is itself worth noting.
+
+  On the arithmetic, since it misled us repeatedly: the NMF component masks sum to 1.0 in MAGNITUDE, and reconstruction happens in the complex domain, so stems recombine by amplitude with phase — they add coherently or cancel depending on it. The sum of individual stem energies is therefore not comparable to the input energy and never was. Any future measurement of reconstruction fidelity must compare the energy of the summed waveform against the input, not the sum of the stems' energies.
+
+  Not resolved. Recorded so that nothing else is built on the assumption that voice means voice.
 
 ---
 
