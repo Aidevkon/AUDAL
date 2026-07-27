@@ -18,6 +18,24 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ## ACTIVE / PARKED
 
+### F-044 — Every audiobook render sums the signal with itself
+- **Status:** ACTIVE
+- **Component:** `pipelines/pipelineforge/src/flavor.rs` (LufsNormalization), `sp314-nodes/src/graph.rs`
+- **Trigger:** Revisit before adjusting levels or repairing clipping on the audiobook path.
+- **Context:** The LufsNormalization topology splits after eq_mud into two branches — gain_makeup and ambience_reverb -> ambience_width — and both terminate at Output. DspGraph sums multiple inputs into an accumulator. ReverbNode with mix = 0.0 outputs dry * 1.0, and WidthNode with decorrelation and side_gain_db at 0.0 is likewise a passthrough. So Output receives two identical copies and produces 2 x dry, a gain of 6.02 dB with no comb filtering since neither branch adds latency. It is invisible because episode_render measures LUFS on the graph output and applies a static correction in Pass 3, so the level comes back. What does not come back is the headroom: material peaking near -1 dBFS reaches roughly +5 dBFS inside the graph before that correction, ahead of the limiter.
+
+### F-045 — MaskingEQ runs a full analysis to apply 0.0 dB on the audiobook path
+- **Status:** ACTIVE
+- **Component:** `sp314-nodes/src/nodes/masking_eq.rs`, `sp314-dsp/src/masking_eq/mod.rs`
+- **Trigger:** Revisit when wiring the LTASS correction or optimizing the audiobook path.
+- **Context:** eq_mud is a MaskingEqNode. Its correction derives from stem_ratios, which do not exist when skip_stems is set, so every band resolves to 0.0 dB. The node nevertheless performs a 1024-point FFT and a psychoacoustic masking pass every 512 samples, then runs all eight biquads per sample. On an eight-hour audiobook that is millions of operations producing no change. It is also the node the LTASS chain should replace, since it occupies exactly the position the correction needs.
+
+### F-046 — The LTASS correction is computed and discarded
+- **Status:** ACTIVE
+- **Component:** `aether-bridge/src/reference_resolver.rs`, `m0-daemon/src/dsp/mod.rs`
+- **Trigger:** Revisit when wiring the EQ correction to the node graph.
+- **Context:** aether-bridge resolves PodcastV1, measures the full file through eight 4th-order Butterworth bands in trunk_pass, mean-centres against the Byrne targets over the six measured bands, clamps to the profile's g_max_db, and produces eight ZoneAdjustment values. Measured on a real podcast clip: +2.04, -3.02, +1.66, +1.04, +0.38, -2.10, -6.00, -1.14 dB, with the 6 kHz band hitting the clamp. Those values reach DspConfig.eq.zone_bands and stop there. apply_topology_overrides carries Compressor and Ambience parameters to their nodes but the eq mapping is an open TODO, and MaskingEqNode has an empty PARAMS list with set_parameter always returning false, so it has no surface to receive them. Verified by rendering the same file with the gains forced to zero: correlation 1.00000, spectral difference 0.00 dB in every band.
+
 ### F-001 — Aether Black pipeline lacks unified documentation
 - **Status:** PARKED (large, needs own session)
 - **Component:** `aether/markov/*`, `aether/chaos/*`, `spec/locked/S-009*`
