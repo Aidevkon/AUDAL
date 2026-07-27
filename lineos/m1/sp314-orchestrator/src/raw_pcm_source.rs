@@ -254,7 +254,7 @@ mod tests {
         let reader = SlidingOverlapReader::new(source, 10240);
 
         e_new
-            .process_stream_with_params(reader, &scout_new, 1.0, |chunk| {
+            .process_stream_with_params(reader, &scout_new, 1.0, false, &[], 1.0, None, None, |chunk| {
                 new_voice.extend_from_slice(&chunk.voice);
                 new_drums.extend_from_slice(&chunk.drums);
                 new_bass.extend_from_slice(&chunk.bass);
