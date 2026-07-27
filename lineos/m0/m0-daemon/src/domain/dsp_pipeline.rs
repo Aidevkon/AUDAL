@@ -346,7 +346,7 @@ fn run_dsp_internal(
     // This early return sits BEFORE NODE 1, so the
     // legacy full-file decode below runs only for
     // Music.
-    if content_type == ContentType::Episode {
+    if content_type.skip_stems() {
         emit_progress("Ingest");
 
         // ── Pass 0: decode → tee dump + input metrics ──
