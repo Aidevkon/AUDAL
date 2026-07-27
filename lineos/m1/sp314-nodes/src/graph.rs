@@ -488,13 +488,6 @@ impl DspGraph {
                 right.copy_from_slice(&buf_r[..len]);
             }
         }
-        self.debug_frames += self.block_size;
-        for (id, (l, r)) in &self.buffers {
-            let mut max = 0.0_f32;
-            for i in 0..self.block_size { if l[i].abs() > max { max = l[i].abs(); } if r[i].abs() > max { max = r[i].abs(); } }
-            let e = self.debug_peaks.entry(id.clone()).or_insert(0.0);
-            if max > *e { *e = max; }
-        }
     }
 
     pub fn reset(&mut self) {
