@@ -434,6 +434,25 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 - **Trigger:** Revisit before investing any further effort in 5.1 upmixing or spatial widening.
 - **Context:** `FiveDotOneStage::render_chunk` and `StereoRenderer` assign identical values to front (`r[i] = l[i]`) and rear (`rs[i] = ls[i]`) pairs by construction. Measured on a music render: correlation L/R = 1.0000, Ls/Rs = 1.0000. Every stem lands perfectly centered regardless of its assignment. The `side/width` parameter is never referenced. Furthermore, the 5.1 channel balance is inverted for its stated purpose: center sits 14 dB below the front pair (-35.73 against -21.34), so dialogue does not land where 5.1 expects it. The six-channel dump is written, level-corrected, and registered in the blob store—but is never requested, not included in `DspOutput`, and not in the certificate. It consumes CPU on every music render and delivers nothing that reaches a listener. Placements react to the separation's mechanics rather than the music (e.g., `bass_lfe` acts as a fixed low shelf based on the lowest-centroid slice).
 
+### F-047 — THE PODCAST REFERENCE TARGET DESCRIBES A DIFFERENT RECORDING CONDITION THAN THE MATERIAL IT CORRECTS.
+- **Status:** ACTIVE
+- **Component:** `aether-bridge/src/reference_resolver.rs`, `shared/schema/reference-profiles/podcast-v1.json`
+- **Trigger:** Revisit before altering targets or addressing LTASS miscalibrations.
+- **Context:** podcast-v1's spectral target comes from Byrne et al. 1994, which measured free-field speech. The material it corrects is close-mic podcast and audiobook recording. Measured on three known-good speech files, the deviations are systematic and directional:
+
+    band 0  Sub      20-80 Hz    +3.48 dB   proximity effect
+    band 2  LowMid   250-500     -2.99
+    band 3  MidLow   500-1000    -3.61      free-field midrange
+    band 6  Treble   4-8k        +3.98      synthetic extrapolation
+
+  Bands 1, 4 and 5 pass. The failures are not a measurement artefact: a mean-centring test moved every band by an identical -1.386 dB, confirming the normalisation cannot selectively shift one band, and the biases point in opposite directions, which a global error cannot produce.
+
+  Band 6 is separately explained. Byrne's data stops at 2520 Hz, so bands 6 and 7 are a -4 dB/oct extension flagged SUPPLEMENTARY_SOURCE_DERIVED in the JSON. It was chosen deliberately dark to avoid boosting hiss and overshot: measured on real speech, 51-66% of band 6 energy sits in the lower half, 4-6 kHz, which is presence and consonant definition rather than sibilance. The correction cuts 4-6 dB there on every speech file, dulling the voice by default. The three files' implied targets cluster at -5.51 dB against the profile's -9.49.
+
+  Since 993f7cd wired the correction into the graph, all four of these are audible on every audiobook render.
+
+  Not resolved. Three files is not a corpus and the numbers here are a direction, not a calibration. The options are a corrected target measured from close-mic speech, a per-band g_max that limits correction where the target is least certain, or excluding the derived bands. All three need more material than we have.
+
 ---
 
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
