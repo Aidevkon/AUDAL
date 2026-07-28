@@ -431,6 +431,39 @@ mod tests {
     }
 
     #[test]
+    fn dead_zone_overrides_g_max() {
+        let p = load();
+        let mut signal = p.spectral_target;
+        // Extreme input deviation, far above g_max_db
+        signal[6] += 20.0; // want cut
+        signal[7] -= 20.0; // want boost
+        
+        let mut dead_zone = [0.0; 8];
+        dead_zone[6] = 99.0;
+        dead_zone[7] = 99.0;
+        
+        let gains = ReferenceResolver::compute_gains(
+            &signal,
+            &p.spectral_target,
+            p.g_max_db,
+            &dead_zone,
+        );
+        
+        assert_eq!(gains[6], 0.0, "Band 6 should have zero gain due to dead_zone");
+        assert_eq!(gains[7], 0.0, "Band 7 should have zero gain due to dead_zone");
+        
+        // Ensure other bands are unaffected and clamp to g_max correctly if they had deviation
+        signal[0] += 20.0;
+        let gains2 = ReferenceResolver::compute_gains(
+            &signal,
+            &p.spectral_target,
+            p.g_max_db,
+            &dead_zone,
+        );
+        assert_eq!(gains2[0], -p.g_max_db, "Band 0 should clamp to -g_max_db");
+    }
+
+    #[test]
     fn parse_new_music_profiles() {
         let acoustic_str =
             include_str!("../../../lineos/shared/schema/reference-profiles/music-acoustic-v1.json");

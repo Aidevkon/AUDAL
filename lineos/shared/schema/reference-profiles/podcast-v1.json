@@ -7,8 +7,9 @@
 
   "g_max_db": 6.0,
   "_g_max_db_comment": "placeholder — refined during tuning; per-profile clamp",
-  "dead_zone_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "dead_zone_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 99.0, 99.0],
   "_dead_zone_db_comment": "deviations <= dead_zone are ignored; 0.0 = off. Music profiles will set these from measured per-band corpus σ",
+  "_dead_zone_db_bands_6_7_rationale": "bands 6 and 7 carry no measured target — Byrne stops at 2520 Hz and these two are a -4 dB/oct extrapolation. Correcting toward a guess cut 4-6 dB from 4-8 kHz on every speech file, which measurement showed is more than half presence rather than sibilance, and which listening confirmed dulls consonants and narrows the stereo image. A dead zone above g_max_db disables correction there without changing the resolver.",
   "corpus": {
     "source": "byrne-1994",
     "version": "n/a"
