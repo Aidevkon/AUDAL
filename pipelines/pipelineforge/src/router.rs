@@ -39,6 +39,11 @@ impl Router {
             flavors.push(Flavor::MonoSafeMaster);
         }
 
+        // Stage 4b: Reference correction (before loudness)
+        if conditions.has(&EngineerCondition::ReferenceProfileResolved) {
+            flavors.push(Flavor::LtassCorrection);
+        }
+
         // Stage 5: Loudness (always last)
         flavors.push(Flavor::LufsNormalization);
 

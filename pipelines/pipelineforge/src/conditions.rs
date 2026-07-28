@@ -26,6 +26,10 @@ pub enum EngineerCondition {
     // Technical problems
     DcOffsetDetected, // DC offset present
     MainsHumDetected, // 50/60Hz mains hum
+
+    // Routing facts — not detected audio problems; set by the
+    // caller from resolved upstream state.
+    ReferenceProfileResolved,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

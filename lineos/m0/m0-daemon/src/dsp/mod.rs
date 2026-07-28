@@ -55,7 +55,15 @@ impl DspAdapter {
         aether_config: Option<&integration::config::DspConfig>,
         block_size: usize,
     ) -> Result<sp314_nodes::graph::DspGraph, DspError> {
-        let conditions = Self::intent_to_conditions(intent, left, right, sample_rate);
+        let mut conditions = Self::intent_to_conditions(intent, left, right, sample_rate);
+        // The reference resolver populates zone_bands only when a
+        // profile resolved for this content. Non-empty bands are
+        // therefore the signal that reference correction applies.
+        if aether_config.is_some_and(|c| !c.eq.zone_bands.is_empty()) {
+            conditions
+                .conditions
+                .push(EngineerCondition::ReferenceProfileResolved);
+        }
         let topology_json = Pipelineforge::forge(&conditions)
             .map_err(|e| DspError::ForgeError(format!("{:?}", e)))?;
         let mut topology = DspTopology::from_json(&topology_json)
@@ -323,12 +331,20 @@ impl DspAdapter {
         topology: &mut DspTopology,
         config: &integration::config::DspConfig,
     ) {
+        // Merger prefixes every node id with "f{i}_", so exact equality
+        // never matches. Strip the leading flavour segment and compare
+        // the remainder. This is deliberately not a suffix test:
+        // "f0_ltass_band_3" matches "ltass_band_3" while
+        // "f0_ltass_band_30" does not.
+        let id_matches =
+            |full: &str, want: &str| -> bool { full.split_once('_').map(|(_, r)| r) == Some(want) };
+
         let topology_set_param = |nodes: &mut Vec<sp314_nodes::topology::TopologyNode>,
                                   node_id: &str,
                                   param: &str,
                                   val: f32| {
             for node in nodes.iter_mut() {
-                if node.node_id == node_id {
+                if id_matches(&node.node_id, node_id) {
                     if let Some(obj) = node.parameters.as_object_mut() {
                         obj.insert(param.into(), serde_json::json!(val));
                     }
@@ -386,6 +402,62 @@ impl DspAdapter {
         } else {
             topology_set_param(&mut topology.nodes, "ambience_reverb", "mix", 0.0);
             topology_set_param(&mut topology.nodes, "ambience_width", "decorrelation", 0.0);
+        }
+
+        // LTASS_CFS duplicates REF_CFS from aether-bridge/src/lib.rs:132.
+        // Promoting it to a shared const would need pipelineforge to
+        // depend on aether-bridge, and m0-daemon depends on both — the
+        // duplication is deliberate and both sites must move together.
+        const LTASS_CFS: [f32; 8] = [50.0, 150.0, 350.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0];
+
+        if !config.eq.zone_bands.is_empty() {
+            // Build the per-band target from the resolver's output.
+            // zone_bands are filtered to |gain_db| > 0.1 in aether-bridge,
+            // so absent frequencies stay at 0.0.
+            let mut target = [0.0f32; 8];
+            for band in &config.eq.zone_bands {
+                if let Some(i) = LTASS_CFS
+                    .iter()
+                    .position(|&f| (f - band.center_hz).abs() < 1.0)
+                {
+                    target[i] = band.gain_db;
+                }
+            }
+
+            // Inverse of the filter interaction matrix, computed from the
+            // RBJ peaking response at Q = 1.0, fs = 48000, evaluated at the
+            // eight LTASS_CFS frequencies. Row i column j is how much of
+            // band j's gain must be removed from band i to cancel its skirt.
+            // Regenerating this requires rerunning compute_ainv.py in the
+            // scratch dir; it is valid only for Q = 1.0 at 48 kHz. The
+            // pipeline resamples everything to TARGET_SR = 48000
+            // (standardized_stream.rs:46), so the fixed matrix is exact for
+            // all inputs.
+            #[rustfmt::skip]
+            const A_INV: [[f32; 8]; 8] = [
+                [ 1.015516, -0.126734,  0.006471, -0.000985,  0.000086, -0.000015,  0.000001, -0.000000],
+                [-0.126734,  1.065134, -0.232219,  0.018031, -0.002903,  0.000272, -0.000039,  0.000002],
+                [ 0.006471, -0.232219,  1.125672, -0.294387,  0.029469, -0.004493,  0.000381, -0.000037],
+                [-0.000985,  0.018031, -0.294387,  1.183255, -0.356109,  0.035759, -0.004797,  0.000267],
+                [ 0.000086, -0.002903,  0.029469, -0.356109,  1.211057, -0.350587,  0.031474, -0.002893],
+                [-0.000015,  0.000272, -0.004493,  0.035759, -0.350587,  1.191587, -0.317378,  0.017796],
+                [ 0.000001, -0.000039,  0.000381, -0.004797,  0.031474, -0.317378,  1.129959, -0.213450],
+                [-0.000000,  0.000002, -0.000037,  0.000267, -0.002893,  0.017796, -0.213450,  1.042_03],
+            ];
+
+            // The resolver already clamps its output to the profile's
+            // g_max_db, but compensation can push a band past it. Clamp
+            // again after solving. podcast-v1 uses 6.0; the music profiles
+            // use 2.5 and would need this value passed in rather than
+            // hardcoded when reference correction reaches the music path.
+            const G_MAX_DB: f32 = 6.0;
+
+            for (i, row) in A_INV.iter().enumerate() {
+                let compensated: f32 = row.iter().zip(target.iter()).map(|(&a, &t)| a * t).sum();
+                let clamped = compensated.clamp(-G_MAX_DB, G_MAX_DB);
+                let node_id = format!("ltass_band_{i}");
+                topology_set_param(&mut topology.nodes, &node_id, "gain_db", clamped);
+            }
         }
     }
 
@@ -472,4 +544,135 @@ pub enum DspError {
     TopologyError(String),
     GraphError(String),
     ProcessError(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Proves that apply_topology_overrides writes the correct A_INV-compensated
+    /// gains into the ltass_band_i nodes after the Merger prefixes their IDs.
+    ///
+    /// This is pure arithmetic — no audio fixture, no floating-point measurement
+    /// noise. It validates two things independently:
+    ///   1. id_matches strips the "f{j}_" prefix correctly so the right nodes are found.
+    ///   2. The A_INV matrix multiplication produces the expected compensated gains.
+    ///
+    /// If this passes, those two facts are proved. If it fails, the audio test
+    /// was never going to tell us where the bug was.
+    ///
+    /// Expected: x = A_INV @ target, target = podcast corrections.
+    /// Computed by scratch/compute_ainv.py. Tolerance: 0.001 dB (arithmetic).
+    #[test]
+    fn ltass_gain_write_exact() {
+        // x = A_INV @ [2.04, -3.02, 1.66, 1.04, 0.38, -2.10, -6.00, -1.14]
+        // from compute_ainv.py forward section (Q = 1.0, fs = 48 kHz).
+        const EXPECTED: [f32; 8] = [
+            2.464165, -3.843418, 2.295347, 0.503499, 0.698397, -0.722693, -5.862202, 0.054525,
+        ];
+
+        // Minimal ConditionSet: only ReferenceProfileResolved so that
+        // LtassCorrection is the only non-baseline flavour in the topology
+        // (plus the always-present LufsNormalization).
+        let conditions = ConditionSet {
+            conditions: vec![EngineerCondition::ReferenceProfileResolved],
+            sample_rate: 48_000,
+            target_lufs: -16.0,
+        };
+
+        let topology_json = Pipelineforge::forge(&conditions).expect("Pipelineforge::forge failed");
+
+        let mut topology =
+            DspTopology::from_json(&topology_json).expect("DspTopology::from_json failed");
+
+        // Build DspConfig with the eight measured podcast corrections.
+        let zone_bands = [
+            (50.0_f32, 2.04_f32),
+            (150.0, -3.02),
+            (350.0, 1.66),
+            (750.0, 1.04),
+            (1500.0, 0.38),
+            (3000.0, -2.10),
+            (6000.0, -6.00),
+            (12000.0, -1.14),
+        ]
+        .iter()
+        .map(|&(cf, gain)| integration::config::ZoneBand {
+            center_hz: cf,
+            gain_db: gain,
+            q: 0.707,
+            source: aether::semantic::zone::EqSource::Reference,
+        })
+        .collect::<Vec<_>>();
+
+        let config = integration::config::DspConfig {
+            eq: integration::config::DspEqConfig {
+                low_shelf_gain_db: 0.0,
+                low_shelf_freq_hz: 100.0,
+                high_shelf_gain_db: 0.0,
+                high_shelf_freq_hz: 10_000.0,
+                zone_bands,
+            },
+            dynamics: integration::config::DspDynamicsConfig {
+                comp_threshold_db: -18.0,
+                comp_ratio: 4.0,
+                comp_attack_ms: 10.0,
+                comp_release_ms: 100.0,
+            },
+            sat: integration::config::DspSatConfig {
+                drive: 0.0,
+                mix: 0.0,
+            },
+            stereo: integration::config::DspStereoConfig { width: 1.0 },
+            ambience: None,
+            persona_id: "test".into(),
+            chaos_seed: 0,
+            instrument_deltas: Default::default(),
+        };
+
+        // Apply overrides — this is the function under test.
+        DspAdapter::apply_topology_overrides(&mut topology, &config);
+
+        // Read gain_db back from each ltass_band_i node.
+        // The Merger prefixes IDs with "f{j}_"; id_matches strips that prefix.
+        for (i, &expected_val) in EXPECTED.iter().enumerate() {
+            let want = format!("ltass_band_{i}");
+            let node = topology
+                .nodes
+                .iter()
+                .find(|n| n.node_id.split_once('_').map(|(_, r)| r) == Some(want.as_str()))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{want} not found in merged topology. \
+                         Is LtassCorrection being inserted when \
+                         ReferenceProfileResolved is set? \
+                         Node IDs present: {:?}",
+                        topology
+                            .nodes
+                            .iter()
+                            .map(|n| &n.node_id)
+                            .collect::<Vec<_>>()
+                    )
+                });
+
+            let got = node
+                .parameters
+                .get("gain_db")
+                .and_then(|v| v.as_f64())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{want}: gain_db parameter missing. \
+                         Parameters present: {:?}",
+                        node.parameters
+                    )
+                }) as f32;
+
+            assert!(
+                (got - expected_val).abs() < 0.001,
+                "{want}: gain_db = {got:.6} dB, expected {expected_val:.6} dB, \
+                 diff = {:+.6} dB",
+                got - expected_val
+            );
+        }
+    }
 }

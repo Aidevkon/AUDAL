@@ -27,6 +27,7 @@ impl Pipelineforge {
                 crate::flavor::Flavor::PresenceAndAir => "PresenceAndAir",
                 crate::flavor::Flavor::AntiPumpStabilization => "AntiPumpStabilization",
                 crate::flavor::Flavor::MonoSafeMaster => "MonoSafeMaster",
+                crate::flavor::Flavor::LtassCorrection => "LtassCorrection",
                 crate::flavor::Flavor::LufsNormalization => "LufsNormalization",
                 crate::flavor::Flavor::DcRemoval => "DcRemoval",
                 crate::flavor::Flavor::HumRemoval => "HumRemoval",

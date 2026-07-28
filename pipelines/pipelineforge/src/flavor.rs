@@ -7,6 +7,7 @@ pub enum Flavor {
     PresenceAndAir,
     AntiPumpStabilization,
     MonoSafeMaster,
+    LtassCorrection,
     LufsNormalization,
     DcRemoval,
     HumRemoval,
@@ -82,7 +83,34 @@ impl Flavor {
                     { "source": "ms_decode", "target": "Output", "modulation_type": "audio" }
                 ]
             }),
+            Flavor::LtassCorrection => json!({
+                "topology_id": "ltass_correction",
+                "nodes": [
+                    { "node_id": "Input",        "node_type": "Input",        "parameters": {} },
+                    { "node_id": "ltass_band_0", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":    50.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_1", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":   150.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_2", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":   350.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_3", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":   750.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_4", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":  1500.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_5", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":  3000.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_6", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz":  6000.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "ltass_band_7", "node_type": "BiquadFilter", "parameters": { "filter_type": 3.0, "freq_hz": 12000.0, "q": 1.0, "gain_db": 0.0 } },
+                    { "node_id": "Output",       "node_type": "Output",       "parameters": {} }
+                ],
+                "edges": [
+                    { "source": "Input",        "target": "ltass_band_0", "modulation_type": "audio" },
+                    { "source": "ltass_band_0", "target": "ltass_band_1", "modulation_type": "audio" },
+                    { "source": "ltass_band_1", "target": "ltass_band_2", "modulation_type": "audio" },
+                    { "source": "ltass_band_2", "target": "ltass_band_3", "modulation_type": "audio" },
+                    { "source": "ltass_band_3", "target": "ltass_band_4", "modulation_type": "audio" },
+                    { "source": "ltass_band_4", "target": "ltass_band_5", "modulation_type": "audio" },
+                    { "source": "ltass_band_5", "target": "ltass_band_6", "modulation_type": "audio" },
+                    { "source": "ltass_band_6", "target": "ltass_band_7", "modulation_type": "audio" },
+                    { "source": "ltass_band_7", "target": "Output",       "modulation_type": "audio" }
+                ]
+            }),
             Flavor::LufsNormalization => json!({
+
                 "topology_id": "lufs_norm",
                 "nodes": [
                     { "node_id": "Input", "node_type": "Input", "parameters": {} },
