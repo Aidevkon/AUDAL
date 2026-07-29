@@ -454,7 +454,36 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   Not resolved. Three files is not a corpus and the numbers here are a direction, not a calibration. The options are a corrected target measured from close-mic speech, a per-band g_max that limits correction where the target is least certain, or excluding the derived bands. All three need more material than we have.
 
 ---
+### F-048 — The brickwall limiter enforces sample peak, not true peak
+- **Status:** ACTIVE
+- **Component:** `sp314-dsp/src/limiter/core.rs`, `sp314-dsp/src/limiter/delay.rs`
+- **Trigger:** Before any release that claims a true-peak ceiling, and before re-pinning `inv_qa_8_true_peak_ceiling` or `inv_mus_2_podcast_bit_exactness`.
+- **Context:** `BrickwallLimiter` computes a correct true-peak estimate and then discards it. In `process()`:
 
+      current_peak   = true_peak.process(l, r)        // correct, but this sample
+                                                      // exits the delay line 240
+                                                      // samples from now
+      delayed_peak   = max(delay_l.max_abs(),         // raw magnitude of the
+                           delay_r.max_abs())         // sample exiting NOW
+      sidechain_peak = max(current_peak, delayed_peak)
+
+  The estimate is made for the incoming sample but never travels with it through the delay line. When a sample is finally scaled, only its raw magnitude survives, so the limiter behaves as a sample-peak limiter despite `true_peak_enabled: true`.
+  Measured in isolation, ceiling -1.0 dBTP, no pipeline:
+
+      sine 997Hz 0dBFS    +0.0004 -> -0.9996   holds
+      sine 19kHz phased   +0.0000 -> -1.0000   holds
+      sine 12kHz phased   +0.1088 -> +0.1088   untouched
+      sine 12kHz +6dB     +6.1294 -> +1.6907   over by 2.69
+      impulses +3.5dB     +3.5218 -> -1.0000   holds
+
+  The cases that hold are exactly those where sample peak equals true peak. 12 kHz at 48 k is four samples per cycle; a 45-degree phase puts every sample at 0.707 (-3.01 dB) while the crest between them reaches 0 dB. The sidechain sees -3.01, calls it safe, applies nothing. In the +6 dB case the reduction is -4.42 dB, matching the sample peak; true-peak-driven reduction would have been -7.13 dB.
+  This is not a regression. `fb53431` (topology parameters were ignored) raised the signal 2.75 dB and made it visible; the defect predates it. Measured across four commits: `21d92b4` -3.04 PASS, `fb53431` -0.29 FAIL, `eabacbd` -0.17 FAIL. At `21d92b4` the test passed with 2 dB of headroom — it passed because the limiter never had to engage, not because it worked. Same shape as F-052.
+  Consequence beyond the failing test: `certificate_node.rs` sets `clip_free: true_peak <= -1.0`, so every master with energy near Nyquist/4 is certified as clipped. No users today, so this is wrong data rather than a live problem.
+  Guarded by `sp314-dsp/tests/limiter_true_peak_oracle.rs` (`d5933e5`): one `#[ignore]`d test asserting what it should do, one running test pinning what it does, which fails the moment the defect is fixed.
+  Fix direction, not yet attempted: the delay line must carry true-peak estimates alongside samples, so the sidechain reads the estimate belonging to the sample being scaled. Every pinned output hash will change.
+  Separately, `inv_qa_8_true_peak_ceiling` contradicts itself — doc says -1.0 dBTP, print says -1.0, assert says -0.5, message says "-0.5 dBFS". Every schema profile specifies `true_peak_ceiling_dbtp: -1.0`. The test needs its own cleanup.
+
+---
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
 
 | ID | One-line summary | Commit |
