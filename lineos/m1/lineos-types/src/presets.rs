@@ -30,6 +30,16 @@ pub struct DeliverySpec {
     pub target_lufs: f32,
     pub max_true_peak_db: f32,
     pub max_lra_lu: Option<f32>,
+    /// ACX specifies loudness as an RMS window, not a LUFS target — the only
+    /// spec here that does. None means the platform has no RMS opinion, which
+    /// is every platform but one. Verified against ACX's published submission
+    /// requirements, 2026-07-29.
+    pub rms_window_db: Option<(f32, f32)>,
+    /// Maximum permitted noise floor, dBFS RMS. Also ACX-only today. This is
+    /// the requirement that actually rejects files: gain moves the signal and
+    /// the floor together, so a recording whose SNR is too low cannot be
+    /// rescued by mastering at all.
+    pub max_noise_floor_db: Option<f32>,
 }
 
 impl From<DeliverySpec> for LoudnessTarget {
@@ -48,6 +58,8 @@ pub const SPOTIFY: DeliverySpec = DeliverySpec {
     target_lufs: -14.0,
     max_true_peak_db: -1.0,
     max_lra_lu: None,
+    rms_window_db: None,
+    max_noise_floor_db: None,
 };
 
 pub const YOUTUBE: DeliverySpec = DeliverySpec {
@@ -55,6 +67,8 @@ pub const YOUTUBE: DeliverySpec = DeliverySpec {
     target_lufs: -14.0,
     max_true_peak_db: -1.0,
     max_lra_lu: None,
+    rms_window_db: None,
+    max_noise_floor_db: None,
 };
 
 pub const BROADCAST: DeliverySpec = DeliverySpec {
@@ -62,6 +76,8 @@ pub const BROADCAST: DeliverySpec = DeliverySpec {
     target_lufs: -23.0,
     max_true_peak_db: -1.0,
     max_lra_lu: Some(20.0),
+    rms_window_db: None,
+    max_noise_floor_db: None,
 };
 
 pub const PODCAST: DeliverySpec = DeliverySpec {
@@ -69,6 +85,36 @@ pub const PODCAST: DeliverySpec = DeliverySpec {
     target_lufs: -16.0,
     max_true_peak_db: -1.0,
     max_lra_lu: None,
+    rms_window_db: None,
+    max_noise_floor_db: None,
+};
+
+/// ACX (Audiobook Creation Exchange — the submission path to Audible).
+///
+/// The only spec here that is not LUFS-based. Verified against ACX's published
+/// submission requirements, 2026-07-29:
+///   RMS between -23 and -18 dBFS, peak no higher than -3 dB,
+///   noise floor no higher than -60 dBFS RMS.
+///
+/// target_lufs below is a STARTING PROXY, not a requirement — ACX states no
+/// LUFS figure. -20.5 is the middle of the RMS window, used only to give the
+/// existing LUFS-based gain stage something to aim at; the RMS window is what
+/// decides pass or fail. The two measurements are not interchangeable: LUFS is
+/// K-weighted and gates out silence, so a narration file sitting at -20.5 dB
+/// RMS overall will not read -20.5 LUFS, and by how much depends on how much
+/// of the file is pause. That offset needs measuring on real narration before
+/// this number is trusted for anything.
+///
+/// max_true_peak_db is set to ACX's -3. ACX states it as a peak value and the
+/// community reads it as sample peak; the engine enforces true peak, which is
+/// stricter. Erring on the strict side is deliberate.
+pub const ACX: DeliverySpec = DeliverySpec {
+    platform: "acx",
+    target_lufs: -20.5,
+    max_true_peak_db: -3.0,
+    max_lra_lu: None,
+    rms_window_db: Some((-23.0, -18.0)),
+    max_noise_floor_db: Some(-60.0),
 };
 
 pub struct PresetEntry {
@@ -104,9 +150,20 @@ pub static CATALOGUE: &[PresetEntry] = &[
     },
     PresetEntry {
         id: "podcast",
-        aliases: &["spoken_word", "episode", "acx", "apple_podcasts"],
+        aliases: &["spoken_word", "episode", "apple_podcasts"],
         content: ContentKind::Episode,
         delivery: PODCAST,
+    },
+    PresetEntry {
+        id: "acx",
+        // No "audiobook" alias. Audiobook is the content kind; ACX is one
+        // destination for it, with its own numbers. Findaway, Kobo and Google
+        // Play take audiobooks too and do not share this spec. Aliasing the
+        // genre to one distributor is the same conflation this catalogue was
+        // built to undo.
+        aliases: &[],
+        content: ContentKind::Episode,
+        delivery: ACX,
     },
 ];
 
@@ -142,7 +199,6 @@ mod tests {
             ("podcast", -16.0, -1.0, None, "podcast"),
             ("spoken_word", -16.0, -1.0, None, "podcast"),
             ("episode", -16.0, -1.0, None, "podcast"),
-            ("acx", -16.0, -1.0, None, "podcast"),
             ("apple_podcasts", -16.0, -1.0, None, "podcast"),
         ] {
             let d = lookup(id).unwrap().delivery;
@@ -150,7 +206,46 @@ mod tests {
             assert_eq!(d.max_true_peak_db, peak, "{id} peak");
             assert_eq!(d.max_lra_lu, lra, "{id} lra");
             assert_eq!(d.platform, platform, "{id} platform");
+            assert!(d.rms_window_db.is_none(), "{id} should have no RMS window");
+            assert!(
+                d.max_noise_floor_db.is_none(),
+                "{id} should have no floor limit"
+            );
         }
+    }
+
+    /// ACX is the one spec that is not LUFS-based, so it gets its own test
+    /// rather than a row in the table above. These three numbers are the whole
+    /// requirement, verified against ACX's published submission requirements
+    /// on 2026-07-29. If they change, a lot downstream changes with them.
+    #[test]
+    fn acx_carries_the_published_requirements() {
+        let d = lookup("acx").unwrap().delivery;
+        assert_eq!(d.rms_window_db, Some((-23.0, -18.0)), "RMS window");
+        assert_eq!(d.max_true_peak_db, -3.0, "peak ceiling");
+        assert_eq!(d.max_noise_floor_db, Some(-60.0), "noise floor");
+        assert_eq!(d.platform, "acx");
+
+        // The proxy target sits inside the window it stands in for. It is not
+        // a requirement and the comment on ACX says why; this only checks it
+        // has not drifted somewhere absurd.
+        let (lo, hi) = d.rms_window_db.unwrap();
+        assert!(
+            d.target_lufs > lo && d.target_lufs < hi,
+            "proxy target {} outside the RMS window it approximates",
+            d.target_lufs
+        );
+    }
+
+    /// acx used to be an alias of podcast, which meant an audiobook was
+    /// mastered to -16 LUFS with a -1 dB ceiling and shipped to a spec that
+    /// asks for neither. It is its own entry now.
+    #[test]
+    fn acx_is_not_podcast() {
+        let acx = lookup("acx").unwrap();
+        let pod = lookup("podcast").unwrap();
+        assert_ne!(acx.delivery, pod.delivery);
+        assert_eq!(acx.content, pod.content, "both are still speech");
     }
 
     /// The constructors are thin wrappers now; this proves they stayed thin.
