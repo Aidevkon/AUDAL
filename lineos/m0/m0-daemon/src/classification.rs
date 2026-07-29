@@ -122,6 +122,10 @@ mod tests {
     ) -> sp314_orchestrator::trunk_pass::TrunkMetrics {
         sp314_orchestrator::trunk_pass::TrunkMetrics {
             integrated_lufs: Some(-16.0),
+            // Not read by guess_content_type; placeholder like the other
+            // fixed fields below. Added because TrunkMetrics gained the
+            // field (rms_db was previously discarded in trunk_pass.rs).
+            rms_db: -18.0,
             crest_db,
             lra,
             noise_floor_dbfs: Some(-60.0),
