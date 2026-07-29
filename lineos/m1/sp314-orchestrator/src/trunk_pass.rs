@@ -23,6 +23,11 @@ use std::path::Path;
 /// Metrics produced by the trunk pass.
 pub struct TrunkMetrics {
     pub integrated_lufs: Option<f32>,
+    /// Whole-file RMS in dBFS, unweighted — plain average level, not LUFS.
+    /// Needed for ACX's RMS-window requirement (-23..-18 dB), which is a
+    /// different measurement than LUFS: LUFS is K-weighted and gates out
+    /// silence, RMS is not. Do not substitute one for the other.
+    pub rms_db: f32,
     pub crest_db: f32,
     pub lra: f32,
     pub noise_floor_dbfs: Option<f32>,
@@ -481,7 +486,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
 
     // === Finish meters ===
     let integrated_lufs = lufs_meter.finish();
-    let (_rms_db, crest_db, dyn_range) = dynamics.finish();
+    let (rms_db, crest_db, dyn_range) = dynamics.finish();
     let lra = lra_meter.finish();
 
     // === Finish spectral profile ===
@@ -523,6 +528,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         boundaries,
         metrics: TrunkMetrics {
             integrated_lufs,
+            rms_db,
             crest_db,
             lra,
             noise_floor_dbfs: min_nondead_dbfs,
