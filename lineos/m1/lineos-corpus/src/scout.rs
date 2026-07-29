@@ -627,16 +627,24 @@ mod tests {
         for i in 5..10 {
             decisions.push((i as f32, mk_dec(1.0, 1.0)));
         }
-        
+
         let segments = smooth_and_segment(&decisions);
         assert_eq!(segments.len(), 2);
-        
+
         let m_seg = &segments[0];
         assert_eq!(m_seg.segment_type, SegmentType::Music);
-        assert!((m_seg.avg_leaning - 0.0).abs() < 0.01, "First segment contaminated by second segment's leaning! Got {}", m_seg.avg_leaning);
-        
+        assert!(
+            (m_seg.avg_leaning - 0.0).abs() < 0.01,
+            "First segment contaminated by second segment's leaning! Got {}",
+            m_seg.avg_leaning
+        );
+
         let s_seg = &segments[1];
         assert_eq!(s_seg.segment_type, SegmentType::Speech);
-        assert!((s_seg.avg_leaning - 1.0).abs() < 0.01, "Second segment avg leaning should be 1.0, got {}", s_seg.avg_leaning);
+        assert!(
+            (s_seg.avg_leaning - 1.0).abs() < 0.01,
+            "Second segment avg leaning should be 1.0, got {}",
+            s_seg.avg_leaning
+        );
     }
 }

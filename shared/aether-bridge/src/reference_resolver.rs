@@ -266,7 +266,26 @@ mod tests {
 
         assert_eq!(p.normalization_band_count, 6);
         assert!((p.g_max_db - 6.0).abs() < 1e-6);
-        assert_eq!(p.dead_zone_db, [0.0; 8]);
+        // A dead zone at or above this exceeds any achievable |target - signal|,
+        // so compute_gains always takes the zero branch. g_max_db plays no part:
+        // it lives only in the else-branch, which a disabled band never reaches.
+        // 60.0 is a floor, not a tuning value — real band deviations are tens of
+        // dB at most, and the shipped disable value is 99.0.
+        const DEAD_ZONE_DISABLED_FLOOR_DB: f32 = 60.0;
+
+        for k in 0..=5 {
+            assert!(
+                p.dead_zone_db[k] < DEAD_ZONE_DISABLED_FLOOR_DB,
+                "band {k} must stay correctable"
+            );
+        }
+        for k in 6..=7 {
+            assert!(
+                p.dead_zone_db[k] >= DEAD_ZONE_DISABLED_FLOOR_DB,
+                "band {k} disabled: F-047 (correcting toward the -4 dB/oct \
+                 extrapolation dulls consonants)"
+            );
+        }
         assert_eq!(p.corpus.source, "byrne-1994");
         assert_eq!(p.corpus.version, "n/a");
 
@@ -437,29 +456,27 @@ mod tests {
         // Extreme input deviation, far above g_max_db
         signal[6] += 20.0; // want cut
         signal[7] -= 20.0; // want boost
-        
+
         let mut dead_zone = [0.0; 8];
         dead_zone[6] = 99.0;
         dead_zone[7] = 99.0;
-        
-        let gains = ReferenceResolver::compute_gains(
-            &signal,
-            &p.spectral_target,
-            p.g_max_db,
-            &dead_zone,
+
+        let gains =
+            ReferenceResolver::compute_gains(&signal, &p.spectral_target, p.g_max_db, &dead_zone);
+
+        assert_eq!(
+            gains[6], 0.0,
+            "Band 6 should have zero gain due to dead_zone"
         );
-        
-        assert_eq!(gains[6], 0.0, "Band 6 should have zero gain due to dead_zone");
-        assert_eq!(gains[7], 0.0, "Band 7 should have zero gain due to dead_zone");
-        
+        assert_eq!(
+            gains[7], 0.0,
+            "Band 7 should have zero gain due to dead_zone"
+        );
+
         // Ensure other bands are unaffected and clamp to g_max correctly if they had deviation
         signal[0] += 20.0;
-        let gains2 = ReferenceResolver::compute_gains(
-            &signal,
-            &p.spectral_target,
-            p.g_max_db,
-            &dead_zone,
-        );
+        let gains2 =
+            ReferenceResolver::compute_gains(&signal, &p.spectral_target, p.g_max_db, &dead_zone);
         assert_eq!(gains2[0], -p.g_max_db, "Band 0 should clamp to -g_max_db");
     }
 

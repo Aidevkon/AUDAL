@@ -470,11 +470,15 @@ impl DspGraph {
                     .sum();
                 *self.debug_sq_l.entry(node_id.clone()).or_insert(0.0) += sq_l;
                 *self.debug_sq_r.entry(node_id.clone()).or_insert(0.0) += sq_r;
-                
+
                 let mut max_p = 0.0_f32;
                 for i in 0..self.block_size {
-                    if buf_l[i].abs() > max_p { max_p = buf_l[i].abs(); }
-                    if buf_r[i].abs() > max_p { max_p = buf_r[i].abs(); }
+                    if buf_l[i].abs() > max_p {
+                        max_p = buf_l[i].abs();
+                    }
+                    if buf_r[i].abs() > max_p {
+                        max_p = buf_r[i].abs();
+                    }
                 }
                 let entry = self.debug_peaks.entry(node_id.clone()).or_insert(0.0);
                 if max_p > *entry {
