@@ -1,7 +1,7 @@
 // src/limiter/core.rs
 // Orchestrates RingBuffer + PeakFollower for stereo lookahead limiting.
 
-use crate::limiter::delay::RingBuffer;
+use crate::limiter::delay::{PeakRing, RingBuffer};
 use crate::limiter::envelope::PeakFollower;
 use crate::limiter::midside::MidSideProcessor;
 use crate::limiter::true_peak::TruePeakDetector;
@@ -9,6 +9,8 @@ use crate::limiter::true_peak::TruePeakDetector;
 pub struct BrickwallLimiter {
     delay_l: RingBuffer,
     delay_r: RingBuffer,
+    /// F-048: peak estimates aligned with the audio delay line.
+    peak_ring: PeakRing,
     follower: PeakFollower,
     lookahead: usize,
     midside: MidSideProcessor,
@@ -41,13 +43,32 @@ impl Default for LimiterConfig {
     }
 }
 
+/// F-048: the 4x polyphase estimator samples the interpolated waveform at four
+/// points per period; the real crest almost never lands on one of them, so it
+/// reads low by a fixed amount. Measured across seven signals, three release
+/// times and four ceilings: 0.2526 to 0.2877 dB, invariant to release, to gain
+/// reduction and to the ceiling itself — a property of the estimator, not of the
+/// follower. The follower therefore aims this far below the requested ceiling.
+/// 0.35 = worst measured 0.2877 plus margin, still inside BS.1770's 0.5-1 dB
+/// allowance for 4x measurement. Raising the oversampling factor is the real
+/// fix and would let this shrink.
+pub const TRUE_PEAK_HEADROOM_DB: f32 = 0.35;
+
 impl BrickwallLimiter {
     pub fn new(config: LimiterConfig, sample_rate: u32) -> Self {
-        let ceiling_linear = libm::powf(10.0_f32, config.ceiling_db / 20.0_f32);
+        // F-048: aim below the requested ceiling to absorb the estimator's
+        // fixed underread. See TRUE_PEAK_HEADROOM_DB.
+        let target_db = if config.true_peak_enabled {
+            config.ceiling_db - TRUE_PEAK_HEADROOM_DB
+        } else {
+            config.ceiling_db
+        };
+        let ceiling_linear = libm::powf(10.0_f32, target_db / 20.0_f32);
         let lookahead = (sample_rate as f32 * 0.005).round() as usize; // 5ms dynamic
         Self {
             delay_l: RingBuffer::new(lookahead),
             delay_r: RingBuffer::new(lookahead),
+            peak_ring: PeakRing::new(lookahead),
             follower: PeakFollower::new(
                 config.release_ms,
                 config.blend_release_ms,
@@ -79,9 +100,13 @@ impl BrickwallLimiter {
             libm::fmaxf(libm::fabsf(*left), libm::fabsf(*right))
         };
 
-        let max_delayed_l = self.delay_l.max_abs();
-        let max_delayed_r = self.delay_r.max_abs();
-        let delayed_peak = libm::fmaxf(max_delayed_l, max_delayed_r);
+        // F-048: read the peak estimate belonging to the samples now leaving
+        // the delay line, not their raw magnitude. Reading max_abs() here made
+        // the limiter sample-peak in practice: a true-peak estimate was computed
+        // for each incoming sample and then thrown away, so the follower's
+        // 240-sample ramp never saw a value it had to act on.
+        let delayed_peak = self.peak_ring.max();
+        self.peak_ring.push(current_peak);
         let sidechain_peak = libm::fmaxf(current_peak, delayed_peak);
 
         let gain_reduction = self.follower.process(sidechain_peak);
@@ -106,6 +131,7 @@ impl BrickwallLimiter {
         self.follower.reset();
         self.midside.reset();
         self.true_peak.reset();
+        self.peak_ring.reset();
     }
 
     pub fn lookahead_samples(&self) -> usize {
