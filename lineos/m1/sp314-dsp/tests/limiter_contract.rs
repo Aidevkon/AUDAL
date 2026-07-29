@@ -77,7 +77,17 @@ fn limiter_peak_follower_stereo_linked() {
     }
     // At exactly 240, the impulse (0, 1) exits.
     assert_eq!(out_l, 0.0);
-    assert_abs_diff_eq!(out_r, DEFAULT_CEILING_LINEAR, epsilon = 1e-4);
+    // F-048: the follower now targets ceiling - TRUE_PEAK_HEADROOM_DB, and the
+    // sidechain reads a true-peak estimate rather than the raw magnitude. For an
+    // isolated impulse the 18-tap interpolation reads above 1.0, so the exact
+    // output is not derivable from the ceiling alone. What must hold is the
+    // contract: the peak comes down, and it lands at or below the ceiling.
+    assert!(
+        out_r <= DEFAULT_CEILING_LINEAR,
+        "peak not limited to ceiling: {out_r} > {DEFAULT_CEILING_LINEAR}"
+    );
+    assert!(out_r > 0.5, "peak over-attenuated: {out_r}");
+    let gain_applied = out_r; // input was exactly 1.0
 
     // Now test stereo link: left channel has a smaller signal, but should be reduced by the same amount.
     limiter.reset();
@@ -89,9 +99,11 @@ fn limiter_peak_follower_stereo_linked() {
         out_r = 0.0;
         limiter.process(&mut out_l, &mut out_r);
     }
-    // The gain reduction is determined by the max (which is 1.0).
-    // The GR is 0.9441. So left should be 0.5 * 0.9441.
-    assert_abs_diff_eq!(out_l, 0.5 * DEFAULT_CEILING_LINEAR, epsilon = 1e-4);
+    // THIS is the stereo link: gain is driven by the louder channel (1.0) and
+    // applied identically to both, so the quieter one keeps its 0.5 ratio.
+    // Asserted against the gain measured above, not against a pinned constant.
+    assert_abs_diff_eq!(out_l, 0.5 * gain_applied, epsilon = 1e-4);
+    assert_abs_diff_eq!(out_r, gain_applied, epsilon = 1e-4);
 }
 
 #[test]

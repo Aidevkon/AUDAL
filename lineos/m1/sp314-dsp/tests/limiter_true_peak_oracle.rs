@@ -1,22 +1,16 @@
-//! F-048 — BrickwallLimiter enforces SAMPLE peak, not TRUE peak.
+//! F-048 guard — the limiter must hold its configured TRUE-peak ceiling.
 //!
-//! MECHANISM (core.rs, process()):
-//!     let current_peak = self.true_peak.process(l, r);   // correct, but this
-//!                                                        // sample exits the
-//!                                                        // delay line 240
-//!                                                        // samples from now
-//!     let delayed_peak = fmaxf(delay_l.max_abs(),        // <-- SAMPLE peak
-//!                              delay_r.max_abs());       //     of what exits NOW
-//!     let sidechain_peak = fmaxf(current_peak, delayed_peak);
+//! It did not, until the delay line started carrying peak estimates alongside
+//! samples. Before: the true-peak estimate was computed for each incoming
+//! sample and then discarded, so the sidechain read raw magnitudes and material
+//! whose intersample peaks exceeded its sample peaks passed unlimited —
+//! 12 kHz phased came in at +0.1088 dBTP and left at +0.1088 dBTP.
 //!
-//! The true-peak estimate is computed for the incoming sample but never
-//! travels with it through the delay line. By the time a sample is scaled,
-//! only its raw magnitude survives. Material whose intersample peaks exceed
-//! its sample peaks — anything with energy near Nyquist/4 — passes unlimited.
+//! Two parts to the fix, both in limiter/core.rs:
+//!   - PeakRing carries the estimate belonging to the sample being scaled
+//!   - TRUE_PEAK_HEADROOM_DB absorbs the 4x estimator's fixed underread
 //!
-//! #[ignore]d as executable documentation of a known defect. When the delay
-//! line carries true-peak estimates instead of raw magnitudes, remove the
-//! ignore — it should pass. Expect every pinned output hash to change.
+//! If this test fails again, one of those two is broken.
 
 use sp314_dsp::limiter::core::{BrickwallLimiter, LimiterConfig};
 use sp314_dsp::limiter::true_peak::measure_true_peak_dbtp;
@@ -44,7 +38,6 @@ fn sine(freq: f32, phase: f32, amp: f32) -> Vec<f32> {
 }
 
 #[test]
-#[ignore = "F-048: limiter is sample-peak; remove when the delay line carries true-peak"]
 fn limiter_holds_true_peak_ceiling() {
     // Each case: (name, signal). Every one must land at or below the ceiling.
     let cases: Vec<(&str, Vec<f32>)> = vec![
@@ -72,25 +65,5 @@ fn limiter_holds_true_peak_ceiling() {
         failures.is_empty(),
         "true peak exceeded ceiling:\n  {}",
         failures.join("\n  ")
-    );
-}
-
-/// Pins the defect itself, so it cannot be reintroduced silently after a fix.
-/// Runs by default — it asserts what the limiter DOES today, not what it should.
-#[test]
-fn limiter_gain_tracks_sample_peak_not_true_peak_f048() {
-    let s = sine(12_000.0, 0.785, 1.0);
-    let tp_in = measure_true_peak_dbtp(&s, &s);
-    let tp_out = limited(s.clone(), s);
-    assert!(
-        tp_in > CEILING_DB + 1.0,
-        "fixture must exceed the ceiling to be meaningful: {tp_in:+.4}"
-    );
-    assert!(
-        (tp_out - tp_in).abs() < TOL,
-        "F-048 changed: a signal whose SAMPLE peak sits below the ceiling used to \
-         pass through untouched (in {tp_in:+.4} -> out {tp_out:+.4}). If the limiter \
-         now reduces it, the defect is fixed — delete this test and un-ignore \
-         limiter_holds_true_peak_ceiling."
     );
 }
