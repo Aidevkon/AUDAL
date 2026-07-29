@@ -23,6 +23,7 @@ pub mod mastering;
 pub mod metrics;
 pub mod onboarding;
 pub mod pre_analysis;
+pub mod presets;
 pub mod telemetry;
 pub use telemetry::RealtimeFrame;
 
@@ -65,3 +66,4 @@ pub use mastering::MasteringIntent;
 pub use metrics::{Ebu128Measurement, LufsReport};
 pub use onboarding::{OnboardingState, PlatformTarget, TasteProfile, Vision, WizardState};
 pub use pre_analysis::{Genre, PreAnalysisData, ZoneActivationFlags};
+pub use presets::{ContentKind, DeliverySpec, PresetEntry};
