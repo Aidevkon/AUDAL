@@ -16,36 +16,16 @@ pub struct LoudnessTarget {
 /// Well-known platform targets.
 impl LoudnessTarget {
     pub fn spotify() -> Self {
-        Self {
-            target_lufs: -14.0,
-            max_true_peak_db: -1.0,
-            max_lra_lu: None,
-            platform: "spotify".into(),
-        }
+        crate::presets::SPOTIFY.into()
     }
     pub fn youtube() -> Self {
-        Self {
-            target_lufs: -14.0,
-            max_true_peak_db: -1.0,
-            max_lra_lu: None,
-            platform: "youtube".into(),
-        }
+        crate::presets::YOUTUBE.into()
     }
     pub fn broadcast() -> Self {
-        Self {
-            target_lufs: -23.0,
-            max_true_peak_db: -1.0,
-            max_lra_lu: Some(20.0),
-            platform: "broadcast".into(),
-        }
+        crate::presets::BROADCAST.into()
     }
     pub fn podcast() -> Self {
-        Self {
-            target_lufs: -16.0,
-            max_true_peak_db: -1.0,
-            max_lra_lu: None,
-            platform: "podcast".into(),
-        }
+        crate::presets::PODCAST.into()
     }
 
     /// Resolve a preset_id string to its LoudnessTarget. Mirrors
@@ -59,12 +39,14 @@ impl LoudnessTarget {
     /// already relied on, so this is a strict improvement, not a
     /// behavior change for the unknown-preset case.
     pub fn from_preset(preset_id: &str) -> Self {
-        match preset_id {
-            "spotify" | "spotifyv3" | "streaming" => Self::spotify(),
-            "youtube" => Self::youtube(),
-            "broadcast" | "broadcastvideo" | "atscA85" => Self::broadcast(),
-            "podcast" | "spoken_word" | "episode" | "acx" | "apple_podcasts" => Self::podcast(),
-            _ => Self::spotify(),
+        // The list this used to carry inline now lives in presets::CATALOGUE,
+        // shared with m0-daemon's ContentType::from_preset. The spotify()
+        // fallback for unknown ids is unchanged; callers that need to tell
+        // "unknown" from "spotify" should call presets::lookup directly and
+        // decide for themselves.
+        match crate::presets::lookup(preset_id) {
+            Some(entry) => entry.delivery.into(),
+            None => Self::spotify(),
         }
     }
 }

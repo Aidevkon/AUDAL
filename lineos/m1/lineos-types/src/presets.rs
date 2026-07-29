@@ -123,30 +123,43 @@ pub fn lookup(preset_id: &str) -> Option<&'static PresetEntry> {
 mod tests {
     use super::*;
 
-    /// Parity with the code this replaces. If these drift, the consolidation
-    /// step that follows would silently change behaviour.
+    /// The numbers themselves, written out. This test began as a parity check
+    /// against the four hardcoded constructors it replaced; once those became
+    /// delegates to these constants the comparison compared the table to
+    /// itself. What is worth pinning now is the values, so a careless edit to
+    /// the table shows up as a failing assert rather than as a quietly
+    /// different master.
     #[test]
-    fn catalogue_matches_current_loudness_targets() {
-        for (id, expected) in [
-            ("spotify", LoudnessTarget::spotify()),
-            ("spotifyv3", LoudnessTarget::spotify()),
-            ("streaming", LoudnessTarget::spotify()),
-            ("youtube", LoudnessTarget::youtube()),
-            ("broadcast", LoudnessTarget::broadcast()),
-            ("broadcastvideo", LoudnessTarget::broadcast()),
-            ("atscA85", LoudnessTarget::broadcast()),
-            ("podcast", LoudnessTarget::podcast()),
-            ("spoken_word", LoudnessTarget::podcast()),
-            ("episode", LoudnessTarget::podcast()),
-            ("acx", LoudnessTarget::podcast()),
-            ("apple_podcasts", LoudnessTarget::podcast()),
+    fn catalogue_values_are_what_we_think_they_are() {
+        for (id, lufs, peak, lra, platform) in [
+            ("spotify", -14.0, -1.0, None, "spotify"),
+            ("spotifyv3", -14.0, -1.0, None, "spotify"),
+            ("streaming", -14.0, -1.0, None, "spotify"),
+            ("youtube", -14.0, -1.0, None, "youtube"),
+            ("broadcast", -23.0, -1.0, Some(20.0), "broadcast"),
+            ("broadcastvideo", -23.0, -1.0, Some(20.0), "broadcast"),
+            ("atscA85", -23.0, -1.0, Some(20.0), "broadcast"),
+            ("podcast", -16.0, -1.0, None, "podcast"),
+            ("spoken_word", -16.0, -1.0, None, "podcast"),
+            ("episode", -16.0, -1.0, None, "podcast"),
+            ("acx", -16.0, -1.0, None, "podcast"),
+            ("apple_podcasts", -16.0, -1.0, None, "podcast"),
         ] {
-            let got: LoudnessTarget = lookup(id).unwrap().delivery.into();
-            assert_eq!(got.target_lufs, expected.target_lufs, "{id} lufs");
-            assert_eq!(got.max_true_peak_db, expected.max_true_peak_db, "{id} peak");
-            assert_eq!(got.max_lra_lu, expected.max_lra_lu, "{id} lra");
-            assert_eq!(got.platform, expected.platform, "{id} platform");
+            let d = lookup(id).unwrap().delivery;
+            assert_eq!(d.target_lufs, lufs, "{id} lufs");
+            assert_eq!(d.max_true_peak_db, peak, "{id} peak");
+            assert_eq!(d.max_lra_lu, lra, "{id} lra");
+            assert_eq!(d.platform, platform, "{id} platform");
         }
+    }
+
+    /// The constructors are thin wrappers now; this proves they stayed thin.
+    #[test]
+    fn constructors_delegate_to_the_table() {
+        assert_eq!(LoudnessTarget::spotify().target_lufs, SPOTIFY.target_lufs);
+        assert_eq!(LoudnessTarget::youtube().target_lufs, YOUTUBE.target_lufs);
+        assert_eq!(LoudnessTarget::broadcast().max_lra_lu, BROADCAST.max_lra_lu);
+        assert_eq!(LoudnessTarget::podcast().platform, PODCAST.platform);
     }
 
     #[test]

@@ -25,25 +25,26 @@ pub trait ContentTypeExt {
 
 impl ContentTypeExt for ContentType {
     fn from_preset(preset_id: &str) -> Self {
-        match preset_id {
-            "podcast" | "spoken_word" | "episode" | "acx" | "apple_podcasts" => Self::Episode,
-            // Known, valid Music-tier presets (same list as
-            // LoudnessTarget::from_preset in lineos-types/src/config.rs)
-            // — listed explicitly so they're recognized, not silently
-            // caught by the fallback below.
-            "spotify" | "spotifyv3" | "streaming" | "youtube" | "broadcast" | "broadcastvideo"
-            | "atscA85" => Self::Music,
-            // Deliberately NOT included here: flavour_id strings
-            // (warm_analog, club_punch, etc — a completely different
-            // namespace, xaak/src/flavours.rs) and intent-knob values.
-            // If one of those ever reaches this function, that IS a
-            // real bug elsewhere (wrong field passed to the wrong
-            // place) and should be visible below, not silently
-            // absorbed as if it were a valid-but-unrecognized preset.
-            _ => {
+        // The list lives in lineos_types::presets::CATALOGUE now, shared with
+        // LoudnessTarget::from_preset. Behaviour is unchanged: a recognised id
+        // maps to its ContentKind, anything else warns and falls to Music.
+        //
+        // What changed is that the fallback can now say WHY. lookup() returning
+        // None means the string is not a preset at all — a flavour id from
+        // xaak/src/flavours.rs, an intent-knob value, or a typo. Before, an
+        // unrecognised string and a genuine Music preset were indistinguishable
+        // once this function returned (F-024).
+        match lineos_types::presets::lookup(preset_id) {
+            Some(entry) => match entry.content {
+                lineos_types::presets::ContentKind::Episode => Self::Episode,
+                lineos_types::presets::ContentKind::Music => Self::Music,
+            },
+            None => {
                 tracing::warn!(
                     preset_id = %preset_id,
-                    "Unknown preset_id in ContentType::from_preset, defaulting to Music"
+                    "preset_id is not in the catalogue — not a delivery target. \
+                     Check whether a flavour_id or intent value was passed here \
+                     by mistake. Defaulting to Music."
                 );
                 Self::Music
             }
