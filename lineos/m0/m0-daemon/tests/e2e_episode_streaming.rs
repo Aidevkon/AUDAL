@@ -87,6 +87,14 @@ fn render_episode(
 
 // ── TEST 1: first floor produces a valid
 //    master ───────────────────────────────
+// dhat is process-global: one profiler per process. The two heap tests
+// below each construct one, so under the default parallel test runner
+// whichever starts second panics ("profiler already running") — the
+// victim alternates between runs. They serialize on this lock.
+// into_inner() on poison: if one test panics mid-profile, the other
+// should still run, not inherit the poisoning.
+static HEAP_PROFILER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn episode_render_produces_valid_master() {
     let sr = 48_000;
@@ -169,6 +177,7 @@ fn episode_render_is_deterministic() {
 //    (scale-invariant heap) ────────────────
 #[test]
 fn episode_render_heap_is_scale_invariant() {
+    let _guard = HEAP_PROFILER_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let sr = 48_000;
 
     let wav_1m = "/tmp/ep_ram_1m.wav";
@@ -221,14 +230,18 @@ fn episode_render_heap_is_scale_invariant() {
 // decode_node still loads the entire file into
 // RAM before episode_render runs, so the full
 // pipeline is O(N) in heap even though the
-// render layer is O(1). This test is left
-// #[ignore]d as executable documentation of
-// the remaining work: streaming decode.
+// render layer is O(1).
 //
-// When decode streaming lands (Phase 8 second
-// floor), remove #[ignore] — it should pass.
+// NOTE: the comment here used to say this test
+// is #[ignore]d — it is not (the attribute is
+// absent), it runs and passes. Whether it was
+// un-ignored deliberately when part of the
+// decode work landed, or never ignored at all,
+// the git history knows; the comment was stale
+// either way.
 #[test]
 fn full_pipeline_heap_is_scale_invariant() {
+    let _guard = HEAP_PROFILER_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let sr = 48_000;
 
     let wav_1m = "/tmp/ep_full_1m.wav";
