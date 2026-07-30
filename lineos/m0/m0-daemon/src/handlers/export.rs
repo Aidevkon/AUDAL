@@ -421,6 +421,283 @@ fn f64_to_80bit_extended(val: f64) -> [u8; 10] {
 ///
 /// Quality preset 2: mastering grade (0=best, 9=worst).
 /// No DSP re-run — reads stored f32 LE PCM bytes from the Golden Blob.
+pub fn export_mp3_acx(
+    blob: &StoredBlob,
+    path: &Path,
+) -> Result<sp314_dsp::analysis::acx_check::AcxCheckReport, String> {
+    use lame_sys::{
+        lame_encode_buffer_ieee_float, lame_encode_flush_nogap, lame_init, lame_init_params,
+        lame_set_VBR, lame_set_brate, lame_set_in_samplerate, lame_set_mode, lame_set_num_channels,
+        lame_set_out_samplerate, lame_set_quality, vbr_mode, MPEG_mode,
+    };
+    use rubato::{
+        Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+    };
+    use sp314_dsp::analysis::acx_check::AcxCheckAnalyzer;
+    use sp314_dsp::metering::true_peak_meter::TruePeakMeter;
+    use symphonia::core::codecs::DecoderOptions;
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let audio_bytes = std::fs::read(blob.audio_path.path())
+        .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
+    if audio_bytes.is_empty() {
+        return Err("No audio bytes in file — cannot write MP3".into());
+    }
+
+    // 1. Read blob PCM, de-interleave to planar 2ch.
+    let pcm = pcm_bytes_to_f32(&audio_bytes);
+    let channels = blob.channels.max(1) as usize;
+    if channels != 2 {
+        return Err(format!("Expected 2 channels, found {channels}"));
+    }
+
+    let half = pcm.len() / 2;
+    let mut planar = [Vec::with_capacity(half), Vec::with_capacity(half)];
+    for chunk in pcm.chunks_exact(2) {
+        planar[0].push(chunk[0]);
+        planar[1].push(chunk[1]);
+    }
+
+    // 2. Resample 48000 -> 44100
+    let original_sr = 48000;
+    let target_sr = 44100;
+    let ratio = target_sr as f64 / original_sr as f64;
+    let params = SincInterpolationParameters {
+        sinc_len: 256, // SINC_LEN
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256, // SINC_OVERSAMPLE
+        window: WindowFunction::BlackmanHarris2,
+    };
+    let mut resampler = SincFixedIn::<f32>::new(
+        ratio, 2.0, params, 4096, // RESAMPLE_CHUNK_FRAMES
+        2,
+    )
+    .map_err(|e| format!("Resampler init: {e}"))?;
+
+    let total_frames = planar[0].len();
+    let mut pos = 0_usize;
+    let mut resampled_planar: Vec<Vec<f32>> = vec![Vec::new(); 2];
+
+    while pos < total_frames {
+        let end = (pos + 4096).min(total_frames);
+        let chunk_len = end - pos;
+        let wave_in: Vec<Vec<f32>> = if chunk_len == 4096 {
+            planar.iter().map(|ch| ch[pos..end].to_vec()).collect()
+        } else {
+            planar
+                .iter()
+                .map(|ch| {
+                    let mut v = ch[pos..end].to_vec();
+                    v.resize(4096, 0.0);
+                    v
+                })
+                .collect()
+        };
+
+        let mut wave_out = resampler
+            .process(&wave_in, None)
+            .map_err(|e| format!("Resample chunk failed: {e}"))?;
+
+        let valid_out_frames = (chunk_len as f64 * ratio).round() as usize;
+        for c in 0..2 {
+            wave_out[c].truncate(valid_out_frames);
+            resampled_planar[c].extend_from_slice(&wave_out[c]);
+        }
+        pos += chunk_len;
+    }
+
+    // 3. Downmix to mono (l+r)*0.5
+    // Note: Stereo delivery is a future option, mono is the norm for ACX.
+    let mut mono: Vec<f32> = resampled_planar[0]
+        .iter()
+        .zip(resampled_planar[1].iter())
+        .map(|(l, r)| (l + r) * 0.5)
+        .collect();
+
+    // 4. True peak check on 44.1k mono signal
+    let mut tp_meter = TruePeakMeter::new();
+    for chunk in mono.chunks(4096) {
+        tp_meter.process_chunk(chunk, chunk);
+    }
+    let tp_db = tp_meter.finish();
+
+    if tp_db > -3.0 {
+        // static gain trim to bring it to -3.05
+        let diff_db = -3.05 - tp_db;
+        tracing::info!("Applying ACX True Peak trim of {} dB", diff_db);
+        let gain = libm::powf(10.0, diff_db / 20.0);
+        for s in mono.iter_mut() {
+            *s *= gain;
+        }
+    }
+
+    // 5. AcxCheckAnalyzer
+    let mut acx = AcxCheckAnalyzer::new(target_sr as u32);
+    for chunk in mono.chunks(4096) {
+        acx.feed_chunk(chunk);
+    }
+    let report = acx.finish();
+
+    // 6. LAME encode
+    let gfp = unsafe { lame_init() };
+    if gfp.is_null() {
+        return Err("MP3: lame_init() returned NULL".into());
+    }
+    struct LameGuard(lame_sys::lame_t);
+    impl Drop for LameGuard {
+        fn drop(&mut self) {
+            unsafe {
+                lame_sys::lame_close(self.0);
+            }
+        }
+    }
+    let _guard = LameGuard(gfp);
+
+    unsafe {
+        lame_set_num_channels(gfp, 1);
+        lame_set_in_samplerate(gfp, target_sr as std::os::raw::c_int);
+        lame_set_out_samplerate(gfp, target_sr as std::os::raw::c_int); // EXPLICIT - never let LAME pick
+        lame_set_mode(gfp, MPEG_mode::MONO);
+        lame_set_VBR(gfp, vbr_mode::vbr_off);
+        lame_set_brate(gfp, 192);
+        lame_set_quality(gfp, 2);
+        if lame_init_params(gfp) < 0 {
+            return Err("lame_init_params failed".into());
+        }
+    }
+
+    let mut out_file =
+        std::fs::File::create(path).map_err(|e| format!("Could not create output file: {e}"))?;
+
+    use std::io::Write;
+    let chunk_size = 8192;
+    let mut mp3buf = vec![0u8; chunk_size + chunk_size / 4 + 7200];
+
+    for chunk in mono.chunks(chunk_size) {
+        let written = unsafe {
+            lame_encode_buffer_ieee_float(
+                gfp,
+                chunk.as_ptr(),
+                // Same pointer for both: the installed header (lame.h:756-758)
+                // documents nothing about NULL for mono — "as
+                // lame_encode_buffer, but for floats" — so we do not hand a C
+                // library a NULL it never promised to tolerate. With
+                // num_channels=1 + MONO the right buffer is unused; pointing
+                // it at the same valid data costs nothing and is safe under
+                // every reading of the API.
+                chunk.as_ptr(),
+                chunk.len() as std::os::raw::c_int,
+                mp3buf.as_mut_ptr(),
+                mp3buf.len() as std::os::raw::c_int,
+            )
+        };
+        if written < 0 {
+            return Err("lame_encode_buffer_ieee_float failed".into());
+        }
+        if written > 0 {
+            out_file
+                .write_all(&mp3buf[..written as usize])
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    let written = unsafe {
+        lame_encode_flush_nogap(
+            gfp,
+            mp3buf.as_mut_ptr(),
+            mp3buf.len() as std::os::raw::c_int,
+        )
+    };
+    if written > 0 {
+        out_file
+            .write_all(&mp3buf[..written as usize])
+            .map_err(|e| e.to_string())?;
+    }
+    out_file.flush().map_err(|e| e.to_string())?;
+
+    // 7. symphonia decode-back
+    {
+        let file =
+            std::fs::File::open(path).map_err(|e| format!("Could not open encoded file: {e}"))?;
+        let mss = MediaSourceStream::new(Box::new(file), Default::default());
+        let mut hint = Hint::new();
+        hint.with_extension("mp3");
+
+        let format_opts = FormatOptions {
+            enable_gapless: true,
+            ..Default::default()
+        };
+        let probed = symphonia::default::get_probe()
+            .format(&hint, mss, &format_opts, &MetadataOptions::default())
+            .map_err(|e| format!("Symphonia probe error: {e}"))?;
+
+        let mut format = probed.format;
+        let track = format
+            .tracks()
+            .iter()
+            .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+            .ok_or_else(|| "No audio track found".to_string())?;
+
+        let track_id = track.id;
+        let dec_sr = track.codec_params.sample_rate.unwrap_or(0);
+        let dec_ch = track
+            .codec_params
+            .channels
+            .map(|c| c.count() as u16)
+            .unwrap_or(0);
+
+        if dec_sr != target_sr as u32 {
+            return Err(format!("Expected {} Hz, found {}", target_sr, dec_sr));
+        }
+        if dec_ch != 1 {
+            return Err(format!("Expected 1 channel, found {}", dec_ch));
+        }
+
+        let mut decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &DecoderOptions::default())
+            .map_err(|e| format!("Codec not supported: {e}"))?;
+
+        let mut decoded_frames = 0;
+        loop {
+            let packet = match format.next_packet() {
+                Ok(p) => p,
+                Err(symphonia::core::errors::Error::IoError(ref e))
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    break
+                }
+                Err(_) => break, // simplify
+            };
+            if packet.track_id() != track_id {
+                continue;
+            }
+            match decoder.decode(&packet) {
+                Ok(audio_buf) => decoded_frames += audio_buf.capacity(),
+                _ => continue,
+            }
+        }
+
+        let expected_frames = mono.len();
+        let diff_frames = (decoded_frames as i64 - expected_frames as i64).abs();
+        let diff_sec = diff_frames as f64 / target_sr as f64;
+
+        // MP3 codec padding makes exact-length impossible
+        if diff_sec > 0.1 {
+            return Err(format!(
+                "Duration mismatch: expected {} frames, got {} (diff {}s)",
+                expected_frames, decoded_frames, diff_sec
+            ));
+        }
+    }
+
+    // 8. Return report
+    Ok(report)
+}
+
 fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     use lame_sys::{
         lame_close, lame_encode_buffer_interleaved_ieee_float, lame_encode_flush_nogap, lame_init,
