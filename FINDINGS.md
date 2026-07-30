@@ -484,6 +484,17 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   Separately, `inv_qa_8_true_peak_ceiling` contradicts itself — doc says -1.0 dBTP, print says -1.0, assert says -0.5, message says "-0.5 dBFS". Every schema profile specifies `true_peak_ceiling_dbtp: -1.0`. The test needs its own cleanup.
 
 ---
+
+### F-049 — butter_hp2/butter_lp2 are resonant (Q=1.414), not the Butterworth their comments claim
+- **Status:** ACTIVE — deliberately not fixed; pinned oracle guards against a drive-by "fix"
+- **Component:** `sp314-dsp/src/analysis/pre_analysis.rs` (butter_hp2, butter_lp2); consumers `spectral_profile_8band`, `trunk_pass::BandpassFilter`; asymmetric consumer `aether-bridge` ReferenceResolver
+- **Trigger:** Before reopening F-047, and before ANY change to butter_hp2/butter_lp2 or the 8-band spectral profile path. The pinned oracle `sp314-dsp/tests/recon_butter_q_response.rs` fails on any Q change and points here.
+- **Context:** Both designers compute `alpha = sn / (2.0 * SQRT_2)`, which under RBJ semantics (alpha = sin(w0)/2Q) is Q = 1.414 — a resonant filter — while the adjacent comment says "Q = sqrt(2)/2" (0.707, Butterworth). SQRT_2 where FRAC_1_SQRT_2 was intended. Introduced in ecd7895 (2026-05-30, RFC-008 phases 1-5); code and comment arrived together, never different since. Isolated: restoration/biquad.rs and masking_eq/biquad.rs take Q explicitly and their callers pass 0.707 correctly.
+  Measured (recon 2026-07-30, empirical sine sweep, HP@1kHz/48k): the current HP peaks +3.56 dB at 1.2x cutoff where corrected-Q is flat (<=0.1 dB passband ripple); at the corner the current filter reads +6.02 dB hotter than true Butterworth. The LP mirrors it (+3.56 dB at 0.9x cutoff). The 8-band bandpass cascades 2xHP + 2xLP, so band-edge inflation compounds to roughly +7 dB worst case near each band edge.
+  Blast radius, measured not assumed: both profile paths (offline spectral_profile_8band, streaming trunk BandpassFilter) use the same wrong-Q filters, so profile-vs-profile comparisons self-cancel. Exactly one asymmetric consumer exists: ReferenceResolver compares filter-measured signal profiles against externally-sourced Byrne LTASS targets (podcast-v1.json) that never passed through these filters. What survives to the EQ gains is only the DIFFERENTIAL band-edge inflation left after the 6-band mean-centering in aether-bridge/src/lib.rs, and the final gains are clamped to +-g_max_db (6.0) with dead zones disabling bands 6-7 — bounded damage, but its per-band magnitude on real speech is UNMEASURED. Plausible contributor to the F-047 systematic deviations; NOT established. Establishing it means re-measuring the three F-047 files through corrected-Q filters and comparing the deviation tables — that experiment belongs to the F-047 reopening, with profile re-measurement as its own oracle set.
+  `butter_hp2_q` (explicit Q, added in c5d801c for the ACX analyzer's 8th-order cascade) is the correct-semantics designer; new code should use it and state its Q.
+
+---
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
 
 | ID | One-line summary | Commit |
