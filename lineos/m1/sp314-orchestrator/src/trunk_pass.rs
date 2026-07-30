@@ -28,6 +28,14 @@ pub struct TrunkMetrics {
     /// different measurement than LUFS: LUFS is K-weighted and gates out
     /// silence, RMS is not. Do not substitute one for the other.
     pub rms_db: f32,
+    /// 5th percentile of 50ms-block RMS across the whole file, from the same
+    /// StreamingDynamicsAnalyzer pass. NOT gated to non-speech regions — it is
+    /// the quietest-5%-of-blocks number, not "the room tone between phrases".
+    /// In continuous speech with few pauses this may read as the softest
+    /// syllable rather than the ambient floor ACX means. Unverified as an ACX
+    /// noise-floor proxy; do not surface it to a user as a pass/fail number
+    /// without checking it against real accepted/rejected ACX files first.
+    pub acx_noise_floor_proxy_db: f32,
     pub crest_db: f32,
     pub lra: f32,
     pub noise_floor_dbfs: Option<f32>,
@@ -486,7 +494,13 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
 
     // === Finish meters ===
     let integrated_lufs = lufs_meter.finish();
-    let (rms_db, crest_db, dyn_range) = dynamics.finish();
+    let dyn_result = dynamics.finish();
+    let (rms_db, crest_db, dyn_range) = (
+        dyn_result.rms_db,
+        dyn_result.crest_db,
+        dyn_result.dyn_range_db,
+    );
+    let acx_noise_floor_proxy_db = dyn_result.p5_block_rms_db;
     let lra = lra_meter.finish();
 
     // === Finish spectral profile ===
@@ -529,6 +543,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         metrics: TrunkMetrics {
             integrated_lufs,
             rms_db,
+            acx_noise_floor_proxy_db,
             crest_db,
             lra,
             noise_floor_dbfs: min_nondead_dbfs,

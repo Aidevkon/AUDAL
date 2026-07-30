@@ -137,9 +137,14 @@ impl StreamingDynamicsAnalyzer {
         }
     }
 
-    pub fn finish(mut self) -> (f32, f32, f32) {
+    pub fn finish(mut self) -> DynamicsResult {
         if self.global_count == 0 {
-            return (-144.0, 10.0, 0.0);
+            return DynamicsResult {
+                rms_db: -144.0,
+                crest_db: 10.0,
+                dyn_range_db: 0.0,
+                p5_block_rms_db: -144.0,
+            };
         }
 
         let global_mean_sq = self.global_sum_sq / self.global_count as f32;
@@ -156,18 +161,39 @@ impl StreamingDynamicsAnalyzer {
             20.0 * libm::log10f(self.global_peak / crest_rms)
         };
 
-        let final_dyn_rng = if self.block_rms.is_empty() {
-            0.0
+        let (final_dyn_rng, p5_block_rms_db) = if self.block_rms.is_empty() {
+            (0.0, -144.0)
         } else {
             self.block_rms.sort_by(|a, b| a.total_cmp(b));
             let n = self.block_rms.len();
             let p95 = self.block_rms[(n * 95 / 100).min(n - 1)];
             let p5 = self.block_rms[(n * 5 / 100).min(n - 1)];
-            p95 - p5
+            (p95 - p5, p5)
         };
-
-        (final_rms, final_crest, final_dyn_rng)
+        DynamicsResult {
+            rms_db: final_rms,
+            crest_db: final_crest,
+            dyn_range_db: final_dyn_rng,
+            p5_block_rms_db,
+        }
     }
+}
+
+/// Output of a completed StreamingDynamicsAnalyzer pass.
+///
+/// p5_block_rms_db is the 5th percentile of 50ms-block RMS values across the
+/// whole file — NOT gated to non-speech regions, NOT the same thing as ACX's
+/// noise floor requirement. It is the quietest-5%-of-blocks number, which in
+/// continuous speech with few pauses may read as "the softest syllable" rather
+/// than "the room tone between phrases". Whether it correlates well enough
+/// with the real ACX measurement to be used as a proxy is unverified — this
+/// struct only exposes the number; the judgment call belongs to the caller.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DynamicsResult {
+    pub rms_db: f32,
+    pub crest_db: f32,
+    pub dyn_range_db: f32,
+    pub p5_block_rms_db: f32,
 }
 
 #[cfg(test)]
@@ -225,7 +251,8 @@ mod streaming_tests {
                 for chunk in signal.chunks(cs) {
                     analyzer.feed_chunk(chunk);
                 }
-                let (rms, crest, dyn_rng) = analyzer.finish();
+                let result = analyzer.finish();
+                let (rms, crest, dyn_rng) = (result.rms_db, result.crest_db, result.dyn_range_db);
 
                 assert_eq!(
                     rms, expected_rms,
@@ -254,7 +281,8 @@ mod streaming_tests {
                 pos = end;
                 chunk_idx += 1;
             }
-            let (rms, crest, dyn_rng) = analyzer.finish();
+            let result = analyzer.finish();
+            let (rms, crest, dyn_rng) = (result.rms_db, result.crest_db, result.dyn_range_db);
 
             assert_eq!(rms, expected_rms, "RMS mismatch (len={}, chunk=mixed)", len);
             assert_eq!(
