@@ -126,6 +126,9 @@ mod tests {
             // fixed fields below. Added because TrunkMetrics gained the
             // field (rms_db was previously discarded in trunk_pass.rs).
             rms_db: -18.0,
+            // Same placeholder rationale. TrunkMetrics gained this field for
+            // an ACX noise-floor proxy unrelated to Speech/Music guessing.
+            acx_noise_floor_proxy_db: -60.0,
             crest_db,
             lra,
             noise_floor_dbfs: Some(-60.0),

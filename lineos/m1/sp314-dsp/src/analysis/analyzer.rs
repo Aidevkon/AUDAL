@@ -257,8 +257,12 @@ impl StreamingStemAnalyzer {
         let lufs = self.lufs.finish().unwrap_or(-144.0);
         let lra = self.lra.finish();
 
-        let (dyn_rms_l, dyn_crest_l, dyn_rng_l) = self.dyn_l.finish();
-        let (dyn_rms_r, dyn_crest_r, dyn_rng_r) = self.dyn_r.finish();
+        let dyn_l = self.dyn_l.finish();
+        let dyn_r = self.dyn_r.finish();
+        let (dyn_rms_l, dyn_crest_l, dyn_rng_l) =
+            (dyn_l.rms_db, dyn_l.crest_db, dyn_l.dyn_range_db);
+        let (dyn_rms_r, dyn_crest_r, dyn_rng_r) =
+            (dyn_r.rms_db, dyn_r.crest_db, dyn_r.dyn_range_db);
 
         let (spec_c_l, spec_f_l, spec_cr_l) = self.spec_l.finish();
         let (spec_c_r, spec_f_r, spec_cr_r) = self.spec_r.finish();
