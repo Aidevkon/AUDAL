@@ -387,8 +387,27 @@ fn run_dsp_internal(
         let dead_air = stream.into_dead_air();
 
         // ── Trunk metrics from dump ──
-        let trunk_metrics = sp314_orchestrator::trunk_pass::run_trunk_metrics(&raw_path_buf)
-            .map_err(|e| format!("episode trunk metrics failed: {e}"))?;
+        // The delivery spec decides whether the ACX check runs — not the
+        // preset string. Any preset whose spec carries a noise-floor limit
+        // gets the measurement; today that is only "acx".
+        let wants_acx = lineos_types::presets::lookup(preset_id)
+            .map(|e| e.delivery.max_noise_floor_db.is_some())
+            .unwrap_or(false);
+        let trunk_metrics = if wants_acx {
+            sp314_orchestrator::trunk_pass::run_trunk_metrics_with_acx(&raw_path_buf)
+        } else {
+            sp314_orchestrator::trunk_pass::run_trunk_metrics(&raw_path_buf)
+        }
+        .map_err(|e| format!("episode trunk metrics failed: {e}"))?;
+        if let Some(acx) = &trunk_metrics.acx {
+            eprintln!(
+                "[TRUNK-episode] acx check: peak={:.2} rms={:.2} floor={:?} passes={}",
+                acx.sample_peak_db,
+                acx.rms_db,
+                acx.noise_floor_db,
+                acx.passes_acx()
+            );
+        }
 
         eprintln!(
             "[TRUNK-episode] lufs={:?} crest={:.2} lra={:.2} \
@@ -511,6 +530,7 @@ fn run_dsp_internal(
             pcm_blake3: render_res.pcm_blake3.clone(),
             output_sha256: render_res.output_sha256.clone(),
             dead_air,
+            acx: trunk_metrics.acx,
         };
 
         let cert_out = crate::domain::nodes::certificate_node::run_streaming(

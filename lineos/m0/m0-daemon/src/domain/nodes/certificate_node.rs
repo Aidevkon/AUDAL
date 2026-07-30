@@ -124,6 +124,7 @@ pub fn run(
         telemetry_short_term,
         telemetry_momentary,
         crate::dsp::signal_health::DeadAirSummary::default(),
+        None, // ACX check never runs on the Music path
     )
 }
 
@@ -137,6 +138,9 @@ pub struct StreamingCertData {
     pub pcm_blake3: String,
     pub output_sha256: String,
     pub dead_air: crate::dsp::signal_health::DeadAirSummary,
+    /// ACX delivery check from the trunk pass — Some only when the preset's
+    /// DeliverySpec carries a noise-floor limit. None = not measured.
+    pub acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
 }
 
 /// Certificate node for the Episode streaming
@@ -236,6 +240,7 @@ pub fn run_streaming(
         telemetry_short_term,
         telemetry_momentary,
         cert_data.dead_air,
+        cert_data.acx,
     )
 }
 
@@ -272,6 +277,7 @@ fn assemble_blob(
     telemetry_short_term: f32,
     telemetry_momentary: f32,
     dead_air: crate::dsp::signal_health::DeadAirSummary,
+    acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
 ) -> Result<CertificateOutput, String> {
     let cert_sig =
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, fingerprints);
@@ -314,6 +320,10 @@ fn assemble_blob(
             apple_podcasts_compliant: platform_ok(lufs, -16.0, true_peak),
             broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
             tidal_compliant: platform_ok(lufs, -14.0, true_peak),
+            acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
+            acx_rms_db: acx.map(|a| a.rms_db),
+            acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
+            acx_compliant: acx.map(|a| a.passes_acx()),
         },
         quality: StoredQuality {
             stereo_correlation: sc,

@@ -423,6 +423,9 @@ pub async fn run(
                         pcm_blake3: measured.pcm_blake3.clone(),
                         output_sha256: measured.output_sha256.clone(),
                         dead_air,
+                        // Agent path calls run_trunk_pass (no ACX variant);
+                        // not measured here, and None is honest about that.
+                        acx: None,
                     };
                     let cert_out = crate::domain::nodes::certificate_node::run_streaming(
                         &blob_id,

@@ -113,6 +113,18 @@ pub struct StoredLoudness {
     pub apple_podcasts_compliant: bool,
     pub broadcast_compliant: bool,
     pub tidal_compliant: bool,
+    /// ACX audiobook delivery check (sample peak <= -3 dB, RMS -23..-18,
+    /// quietest-500ms noise floor <= -60 dB — the Audacity ACX Check
+    /// method, validated against an independent oracle 2026-07-30).
+    /// None = not measured (non-ACX preset), which is NOT a pass.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acx_sample_peak_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acx_rms_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acx_noise_floor_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acx_compliant: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -237,7 +249,6 @@ mod tests {
                 momentary_lufs: -12.0,
                 true_peak_dbtp: -1.0,
                 lra: 8.0,
-                noise_floor_dbfs: None,
                 k_weighted: true,
                 ebu_r128_target_lufs: -23.0,
                 ebu_r128_compliant: false,
@@ -247,6 +258,7 @@ mod tests {
                 apple_podcasts_compliant: false,
                 broadcast_compliant: false,
                 tidal_compliant: true,
+                ..Default::default()
             },
             quality: StoredQuality {
                 stereo_correlation: 0.94,
