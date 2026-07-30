@@ -69,6 +69,8 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 
 - Ο "D2 noise-floor estimator" ΔΕΝ είναι "spectral minimum tracking" όπως γράφτηκε στο Y-plan (εκτός repo): είναι time-domain, ελάχιστο RMS σε 1s παράθυρα πάνω από -60 dB dead-air gate, content-unaware (μπορεί να διαβάσει απαλή λέξη αντί για room tone). Το σωστό ACX noise floor είναι ο AcxCheckAnalyzer (quietest sliding 500ms, validated).
 - Το `full_pipeline_heap` test ΔΕΝ είναι #[ignore]d — το ef4472d το un-ignore-αρε σκόπιμα (streaming decode προσγειώθηκε) αλλά το σχόλιο έμεινε stale ΚΑΙ η dhat προειδοποίηση μέσα στο ignore message χάθηκε μαζί του → η race που κλείσαμε στο c39cc57. Μάθημα: γνώση που ζει μόνο μέσα σε attribute πεθαίνει μαζί του.
+- export.rs resample loop (export_mp3_acx): per-chunk truncate σε round(chunk×ratio) — πιθανή απώλεια ±1 frame/chunk (~0.7ms/12s), συμμετρική με ingest αν κάνει το ίδιο. Αόρατο στο 100ms tolerance, σημείωση μόνο.
+- Το γενικό export_mp3 ΔΕΝ έχει κανένα test που να ανοίγει το αρχείο του (recon 2026-07-30) — τι πραγματικά βγάζει (bitrate mode, rate) παραμένει αμέτρητο. Υπόθεση: VBR-ish/48k. Αν ποτέ γίνει user-facing υπόσχεση, μέτρα πρώτα.
 
 ## Κανόνες εργασίας με agents (P44+)
 
