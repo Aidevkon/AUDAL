@@ -1,6 +1,7 @@
 // analysis/mod.rs — S-002 Stem Feature Analyzer
 // Authority: spec/locked/S-002_stem_feature_analyzer.md v1.1
 
+pub mod acx_check;
 pub mod analyzer;
 pub mod dynamics;
 pub mod features;

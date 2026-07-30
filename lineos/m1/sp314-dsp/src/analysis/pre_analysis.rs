@@ -350,6 +350,33 @@ pub fn butter_hp2(freq: f32, sr: f32) -> Biquad {
     }
 }
 
+/// 2nd-order highpass with an EXPLICIT Q, RBJ semantics: alpha = sin(w0)/(2Q).
+/// For building higher-order Butterworth cascades where each section carries
+/// its own Q (acx_check's 8th-order HP: Q = 0.5098, 0.6013, 0.9000, 2.5629).
+///
+/// NOTE, recorded as a finding and deliberately NOT fixed here: the two
+/// designers above divide by (2.0 * SQRT_2), which under RBJ semantics is
+/// Q = 1.414 (resonant, ~+3.6 dB peak near cutoff) — while their comments
+/// claim Q = sqrt(2)/2 = 0.707 (Butterworth). SQRT_2 where FRAC_1_SQRT_2 was
+/// intended. Every spectral profile in the repo was measured through those
+/// filters, so changing them is its own investigation, not a drive-by edit.
+pub fn butter_hp2_q(freq: f32, sr: f32, q: f32) -> Biquad {
+    let w0 = 2.0 * core::f32::consts::PI * freq / sr;
+    let cs = libm::cosf(w0);
+    let sn = libm::sinf(w0);
+    let alpha = sn / (2.0 * q);
+    let a0 = 1.0 + alpha;
+    Biquad {
+        b0: ((1.0 + cs) / 2.0) / a0,
+        b1: -(1.0 + cs) / a0,
+        b2: ((1.0 + cs) / 2.0) / a0,
+        a1: (-2.0 * cs) / a0,
+        a2: (1.0 - alpha) / a0,
+        w1: 0.0,
+        w2: 0.0,
+    }
+}
+
 /// Apply 4th-order bandpass (cascade of 2x HP + 2x LP) to extract a band
 fn bandpass_filter(signal: &[f32], lo: f32, hi: f32, sr: f32) -> Vec<f32> {
     let mut hp1 = butter_hp2(lo, sr);
