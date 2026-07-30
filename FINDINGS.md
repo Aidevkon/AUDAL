@@ -495,6 +495,14 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   `butter_hp2_q` (explicit Q, added in c5d801c for the ACX analyzer's 8th-order cascade) is the correct-semantics designer; new code should use it and state its Q.
 
 ---
+
+### F-050 — 45 hardcoded /tmp/ paths in tests: cross-process collisions
+- **Status:** ACTIVE — mechanical fix deferred to its own session
+- **Component:** m0-daemon test code in 8 files: standardized_stream.rs, input_lufs.rs, six_channel_stream.rs, decode_node.rs, dsp_pipeline.rs, lazy_reader.rs, stream_core.rs, wav_to_raw.rs (tests within src/, plus tests/)
+- **Trigger:** Before setting up parallel CI runners sharing /tmp, and whenever a test fails with file-not-found or corrupt-WAV symptoms on fixture paths while another cargo test process is running.
+- **Context:** Agent recon 2026-07-30: 45 hardcoded /tmp/ fixture paths, zero use of the tempfile crate in tests even though tempfile already sits in the dependencies. Names are unique PER TEST, so a single cargo test run cannot collide with itself — the collision is BETWEEN two cargo test processes writing the same absolute paths (half-written WAV -> symphonia "No such file or directory"/corrupt header on the other side). This stopped being theoretical the day dev+agent parallel test runs became the routine workflow: it fired twice within one hour on 2026-07-30 (m0d WAV fixtures, initially misread as "a parallel race condition" in an agent report). Two files are only partially exposed: decode_node.rs interpolates blob ids and stream_core.rs uses a uuid for one path (safe) but keeps one fixed name (f047_dummy.wav). Fix is mechanical — tempfile::TempDir per test — and well-suited to an agent under a per-file write contract; 45 sites is a session of its own, not a drive-by. Distribution table in the 2026-07-30 transcript.
+
+---
 ## RESOLVED THIS SESSION (for traceability — see git log for full detail)
 
 | ID | One-line summary | Commit |
