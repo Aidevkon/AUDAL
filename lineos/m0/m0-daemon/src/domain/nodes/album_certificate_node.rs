@@ -98,20 +98,7 @@ mod tests {
             preset_id: "preset".to_string(),
             loudness: crate::blob_store::StoredLoudness {
                 integrated_lufs: lufs,
-                short_term_lufs: 0.0,
-                momentary_lufs: 0.0,
-                true_peak_dbtp: 0.0,
-                lra: 0.0,
-                noise_floor_dbfs: None,
-                k_weighted: false,
-                ebu_r128_target_lufs: 0.0,
-                ebu_r128_compliant: false,
-                spotify_compliant: false,
-                youtube_compliant: false,
-                apple_music_compliant: false,
-                apple_podcasts_compliant: false,
-                broadcast_compliant: false,
-                tidal_compliant: false,
+                ..Default::default()
             },
             quality: crate::blob_store::StoredQuality {
                 stereo_correlation: 0.0,

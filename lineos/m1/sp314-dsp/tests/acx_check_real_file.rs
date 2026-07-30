@@ -90,13 +90,21 @@ fn acx_check_real_file() {
     let report = analyzer.finish();
     println!("samples fed: {n} ({secs:.1} s)");
     println!("\n=== AcxCheckAnalyzer ===");
-    println!("sample peak : {:>8.2} dBFS   (ACX limit: <= -3.0)", report.sample_peak_db);
-    println!("RMS         : {:>8.2} dBFS   (ACX window: -23.0 .. -18.0)", report.rms_db);
+    println!(
+        "sample peak : {:>8.2} dBFS   (ACX limit: <= -3.0)",
+        report.sample_peak_db
+    );
+    println!(
+        "RMS         : {:>8.2} dBFS   (ACX window: -23.0 .. -18.0)",
+        report.rms_db
+    );
     match report.noise_floor_db {
         Some(nf) => println!("noise floor : {:>8.2} dBFS   (ACX limit: <= -60.0)", nf),
         None => println!("noise floor :     None   (file under 1 s)"),
     }
     println!("passes_acx  : {}", report.passes_acx());
-    println!("\ncompare RMS/peak against:  ffmpeg -i {path} -af astats=metadata=1:reset=0 -f null -");
+    println!(
+        "\ncompare RMS/peak against:  ffmpeg -i {path} -af astats=metadata=1:reset=0 -f null -"
+    );
     println!("compare noise floor against: Audacity -> Analyze -> ACX Check");
 }

@@ -44,6 +44,10 @@ pub struct TrunkMetrics {
     pub global_phase_correlation: f32,
     /// 95th-5th percentile RMS block spread, 50ms blocks (the real broadcast DR metric)
     pub dynamic_range_db: f32,
+    /// Present only when the caller asked for the ACX delivery check
+    /// (run_trunk_metrics_with_acx). None means "not measured", never
+    /// "passed" — consumers must not treat absence as compliance.
+    pub acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
 }
 
 pub struct TrunkReport {
@@ -256,14 +260,26 @@ impl StreamingTransientDetector {
 /// The dump was written by pass0_decode_to_dump through StandardizedDecoder,
 /// which guarantees 48k/2ch by construction [standardized_decoder.rs:70].
 pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
-    run_trunk_internal(dump_path, false).map(|r| r.metrics)
+    run_trunk_internal(dump_path, false, false).map(|r| r.metrics)
+}
+
+/// Same single pass, plus the ACX delivery check (sample peak, DC-removed
+/// RMS, quietest-500ms noise floor — see sp314_dsp::analysis::acx_check).
+/// Costs one extra HP cascade + window min per mono sample; callers that
+/// aren't delivering to ACX use run_trunk_metrics and pay nothing.
+pub fn run_trunk_metrics_with_acx(dump_path: &Path) -> Result<TrunkMetrics, String> {
+    run_trunk_internal(dump_path, false, true).map(|r| r.metrics)
 }
 
 pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
-    run_trunk_internal(dump_path, true)
+    run_trunk_internal(dump_path, true, false)
 }
 
-fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkReport, String> {
+fn run_trunk_internal(
+    dump_path: &Path,
+    do_segmentation: bool,
+    with_acx: bool,
+) -> Result<TrunkReport, String> {
     // 2 channels: trunk dump is stereo f32 LE interleaved from StandardizedDecoder.
     let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
     let srf = SAMPLE_RATE as f32;
@@ -346,6 +362,16 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
     let mut left_chunk = vec![0f32; CHUNK_FRAMES];
     let mut right_chunk = vec![0f32; CHUNK_FRAMES];
     let mut mono_chunk = vec![0f32; CHUNK_FRAMES];
+    // The dump is 48k/2ch by construction [standardized_decoder.rs:70];
+    // measured on real narration: resampling 44.1k->48k moves the three
+    // ACX numbers by <=0.05 dB near the -60 limit (0.31 dB at -94).
+    let mut acx_analyzer = if with_acx {
+        Some(sp314_dsp::analysis::acx_check::AcxCheckAnalyzer::new(
+            48_000,
+        ))
+    } else {
+        None
+    };
 
     loop {
         let frames = source.fill_buffer(&mut interleaved)?;
@@ -368,6 +394,9 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         // --- Feed full-file meters ---
         lufs_meter.process_chunk(l, r);
         dynamics.feed_chunk(m);
+        if let Some(acx) = acx_analyzer.as_mut() {
+            acx.feed_chunk(m);
+        }
         lra_meter.process_chunk(l, r);
 
         // --- 8-band spectral profile: filter + accumulate ---
@@ -501,6 +530,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
         dyn_result.dyn_range_db,
     );
     let acx_noise_floor_proxy_db = dyn_result.p5_block_rms_db;
+    let acx = acx_analyzer.map(|a| a.finish());
     let lra = lra_meter.finish();
 
     // === Finish spectral profile ===
@@ -544,6 +574,7 @@ fn run_trunk_internal(dump_path: &Path, do_segmentation: bool) -> Result<TrunkRe
             integrated_lufs,
             rms_db,
             acx_noise_floor_proxy_db,
+            acx,
             crest_db,
             lra,
             noise_floor_dbfs: min_nondead_dbfs,
