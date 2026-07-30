@@ -1080,7 +1080,22 @@ fn inv_qa_10_overscale_stress() {
 
 /// INV-MUS-2 / S-0XX P1: Podcast path bit-exactness enforcement.
 /// This test pins the exact SHA-256 output of the podcast/Episode path
-/// (`from_preset("podcast")` → Episode, stem-bypass pipeline) at commit abfd1002a1bd08eed7c730f523a4067f9b849f98.
+/// (`from_preset("podcast")` → Episode, stem-bypass pipeline).
+///
+/// PIN HISTORY:
+/// - Original pin at abfd1002a1bd08eed7c730f523a4067f9b849f98 (5d068539...).
+/// - Broken by c885826 ("libm replaces std::f32 in 18 production sites") —
+///   a deliberate, justified move to platform-independent math whose
+///   expected consequence is an LSB-level float drift and therefore a new
+///   hash. The re-pin should have happened in that commit and was missed;
+///   the red sat unexplained for five days.
+/// - Re-pinned 2026-07-30 (5c7be22a...) after verifying the current output
+///   on its own merits, not to silence the red: -16.1 LUFS on the -16
+///   target, 0 NaN, 0 clipping, negligible DC (ffmpeg astats + loudnorm).
+///   True peak reads -14 dBTP against the -1 ceiling — expected, not a
+///   gap: the fixture is a static two-sine mix with near-zero crest, so
+///   the limiter never engages here. Limiter behaviour is inv_qa_8's job,
+///   not this pin's.
 /// It also asserts that >= 1 `EqSource::Reference` zone was produced in the DspConfig.
 ///
 /// The writer (episode_render.rs mmap) was verified metadata-static (headerless raw PCM)
@@ -1141,7 +1156,7 @@ fn inv_mus_2_podcast_bit_exactness() {
     let hash = hex::encode(Sha256::digest(&bytes));
 
     assert_eq!(
-        hash, "5d06853916e295b7e0fd4a2d60aa83d60f3787ce3d50a432f3e0aaae84f5ace5",
+        hash, "5c7be22a0b7cbbf228bfdc254743ba5f029e5aaf460167657113274738df99ff",
         "Output PCM hash mismatch!"
     );
 }
