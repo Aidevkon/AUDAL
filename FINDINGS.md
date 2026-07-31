@@ -41,6 +41,14 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
+**NEXT FREE: F-061** — this line is the ONLY allocator. Taking a number =
+incrementing this line IN THE SAME COMMIT that introduces the finding.
+Session notes / registers use R-prefixed numbers (R-01...) for local
+findings; graduation into this file assigns a fresh F-number and the
+register keeps the "R-0X -> F-0YY" mapping. Agents (and reviewers) never
+issue F-numbers — they report candidate findings; the human baptizes,
+after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
+
 ### F-044 — Every audiobook render sums the signal with itself
 - **Status:** RESOLVED (fb53431)
 - **Component:** `pipelines/pipelineforge/src/flavor.rs` (LufsNormalization), `sp314-nodes/src/graph.rs`

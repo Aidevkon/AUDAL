@@ -73,6 +73,10 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - Το γενικό export_mp3 ΔΕΝ έχει κανένα test που να ανοίγει το αρχείο του (recon 2026-07-30) — τι πραγματικά βγάζει (bitrate mode, rate) παραμένει αμέτρητο. Υπόθεση: VBR-ish/48k. Αν ποτέ γίνει user-facing υπόσχεση, μέτρα πρώτα.
 
 ## Κανόνες εργασίας με agents (P44+)
+- F-NUMBERS: agents δεν εκδίδουν ΠΟΤΕ. Αναφέρουν "candidate finding" με
+  περιγραφή· ο άνθρωπος βαφτίζει από το NEXT FREE του FINDINGS.md, αφού
+  πρώτα grep -rn το υποψήφιο νούμερο (το F-052 collision της 31/07
+  κόστισε rename μέσα σε μία μέρα — ο grep είναι δύο δευτερόλεπτα).
 
 - P44 (μετά από 2 παραβιάσεις): agent προτείνει mutations, άνθρωπος εκτελεί. Εξαίρεση: ρητό γραπτό write contract με ονομαστική λίστα αρχείων, verify steps, και STOP πριν από commit — δούλεψε καθαρά 3 φορές (Default::default cleanup, acx_nf_oracle promotion, e2e_acx_certificate).
 - Agent recon χωρίς το chat context ΔΕΝ ξέρει τι έγινε στη σημερινή συνεδρία — δώσε του "state of the repo" section στο prompt, αλλιώς θα προτείνει δουλειά που έγινε (συνέβη: πρότεινε το ACX wiring μία ώρα αφού είχε γίνει merge).
