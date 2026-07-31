@@ -41,7 +41,7 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-061** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-062** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
@@ -526,6 +526,32 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
   `butter_hp2_q` (explicit Q, added in c5d801c for the ACX analyzer's 8th-order cascade) is the correct-semantics designer; new code should use it and state its Q.
 
 ---
+
+### F-061 — The new Micro-VAD fails its first measurement on real audio
+- **Status:** ACTIVE — measured 2026-07-31, harness in
+  tests/vad_validation_real.rs (VADVAL| lines, machine-parsable)
+- **Component:** sp314-dsp analysis/{vad_sensors,vad_features,vad_model}
+- **Context:** First-ever run of the FixedPriors classifier against real
+  material (it only ever ran on Music-preset renders in production —
+  never on narration, its actual target). Three fixtures, three
+  failures: (1) real music (bodleasons_mid) reads 97.5% is_speech
+  frames, mean posterior 0.71 — the F-041 pattern reproduced by a
+  zero-shared-code reimplementation; (2) INVERSION on narration: quiet
+  windows read HIGHER speech posterior than speech itself (dream:
+  NONSPEECH mean 0.96 vs SPEECH 0.55; crossing: 0.77 vs 0.53) — a
+  sign-flipped term or broken near-silence edge case, findable;
+  (3) hysteresis never exits (ENTER 0.70/EXIT 0.30, posteriors hover
+  0.4+): is_speech 100% on all three files. Also noted: only 3.5 of
+  the "5 sensors" participate in the model (transient density and MFCC
+  extracted, unused), and mono input pins the M/S term to a constant
+  pro-speech bias. Hypotheses TO MEASURE next (per-term likelihood
+  breakdown, no fixes before it): file-level floor anchored to
+  near-digital-silence tail making room tone read as high SNR;
+  flatness epsilon behavior on near-silence; the mono M/S bias.
+  Consequence, and the point of the doctrine: the Guided NMF gate, the
+  duck curve producer, and the ControlBus all wait on this — nothing
+  downstream trusts these posteriors until this finding closes with
+  measurements.
 
 ### F-060 — Tier-2 persist is O(N) inside the render path
 <!-- was F-052 for one day (commit 4031573); renamed on collision with the head-trim F-052 already living in code since 35a05a7 -->
