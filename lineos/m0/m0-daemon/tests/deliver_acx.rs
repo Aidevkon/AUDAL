@@ -155,6 +155,9 @@ fn test_deliver_e2e_small() {
     let manifest_str = std::fs::read_to_string(&manifest_path).unwrap();
     assert!(manifest_str.contains("noise_floor_db"));
     assert!(manifest_str.contains("rms_spread_db"));
+    assert!(manifest_str.contains("head_quiet_secs"));
+    assert!(manifest_str.contains("tail_quiet_secs"));
+    assert!(manifest_str.contains("head room tone"));
 
     let _ = std::fs::remove_file(pcm1);
     let _ = std::fs::remove_file(pcm2);

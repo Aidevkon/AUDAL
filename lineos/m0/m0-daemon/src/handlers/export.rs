@@ -421,10 +421,69 @@ fn f64_to_80bit_extended(val: f64) -> [u8; 10] {
 ///
 /// Quality preset 2: mastering grade (0=best, 9=worst).
 /// No DSP re-run — reads stored f32 LE PCM bytes from the Golden Blob.
-pub fn export_mp3_acx(
-    blob: &StoredBlob,
-    path: &Path,
-) -> Result<sp314_dsp::analysis::acx_check::AcxCheckReport, String> {
+pub struct AcxExportOutcome {
+    pub report: sp314_dsp::analysis::acx_check::AcxCheckReport,
+    pub head_quiet_secs: f32,
+    pub tail_quiet_secs: f32,
+}
+
+/// Duration in seconds of contiguous sub-threshold signal at each end.
+/// Windows of 100 ms RMS; a window counts as "quiet" below -50 dBFS.
+/// Measures PRESENCE OF QUIET (room tone qualifies), not dead silence
+/// — gated/denoised masters still measure correctly. Scan from each
+/// end until the first non-quiet window; partial trailing window
+/// (< 100 ms) is ignored.
+pub fn edge_quiet_secs(mono: &[f32], sample_rate: u32) -> (f32, f32) {
+    let window_len = (sample_rate / 10) as usize; // 100 ms
+    if window_len == 0 || mono.is_empty() {
+        return (0.0, 0.0);
+    }
+    let mut head_windows = 0;
+    for w in mono.chunks(window_len) {
+        if w.len() < window_len {
+            break;
+        }
+        let sum_sq: f64 = w.iter().map(|&s| (s as f64) * (s as f64)).sum();
+        let rms = (sum_sq / window_len as f64).sqrt() as f32;
+        let dbfs = if rms > 1e-10 {
+            20.0 * rms.log10()
+        } else {
+            -200.0
+        };
+        if dbfs < -50.0 {
+            head_windows += 1;
+        } else {
+            break;
+        }
+    }
+
+    let num_full = mono.len() / window_len;
+    if head_windows == num_full {
+        return ((head_windows as f32) * 0.1, 0.0);
+    }
+
+    let mut tail_windows = 0;
+    for i in (0..num_full).rev() {
+        let start = i * window_len;
+        let w = &mono[start..start + window_len];
+        let sum_sq: f64 = w.iter().map(|&s| (s as f64) * (s as f64)).sum();
+        let rms = (sum_sq / window_len as f64).sqrt() as f32;
+        let dbfs = if rms > 1e-10 {
+            20.0 * rms.log10()
+        } else {
+            -200.0
+        };
+        if dbfs < -50.0 {
+            tail_windows += 1;
+        } else {
+            break;
+        }
+    }
+
+    ((head_windows as f32) * 0.1, (tail_windows as f32) * 0.1)
+}
+
+pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome, String> {
     use lame_sys::{
         lame_encode_buffer_ieee_float, lame_encode_flush_nogap, lame_init, lame_init_params,
         lame_set_VBR, lame_set_brate, lame_set_in_samplerate, lame_set_mode, lame_set_num_channels,
@@ -694,8 +753,14 @@ pub fn export_mp3_acx(
         }
     }
 
+    let (head_quiet_secs, tail_quiet_secs) = edge_quiet_secs(&mono, target_sr as u32);
+
     // 8. Return report
-    Ok(report)
+    Ok(AcxExportOutcome {
+        report,
+        head_quiet_secs,
+        tail_quiet_secs,
+    })
 }
 
 fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
