@@ -314,7 +314,9 @@ mod tests {
         // 44.1k → triggers resample + ring +
         // EOF zero-pad + tail flush. The hardest
         // path. Must be bit-identical to batch.
-        let path = "/tmp/std_parity_44k.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("std_parity_44k.wav");
+        let path = path.to_str().unwrap();
         write_wav(path, 44_100, 3.7);
 
         let (b_blake, b_sha) = batch_hashes(path);
@@ -330,14 +332,15 @@ mod tests {
             "sha256 mismatch: streaming resample \
              is not bit-identical to batch"
         );
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn parity_passthrough_48k() {
         // 48k → resampler is None (passthrough).
         // Exercises the no-resample path.
-        let path = "/tmp/std_parity_48k.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("std_parity_48k.wav");
+        let path = path.to_str().unwrap();
         write_wav(path, 48_000, 3.3);
 
         let (b_blake, b_sha) = batch_hashes(path);
@@ -345,7 +348,6 @@ mod tests {
 
         assert_eq!(b_blake, s_blake, "blake3 mismatch on 48k passthrough");
         assert_eq!(b_sha, s_sha, "sha256 mismatch on 48k passthrough");
-        let _ = std::fs::remove_file(path);
     }
 
     /// Write a MONO wav — the most common
@@ -373,7 +375,9 @@ mod tests {
         // mono→stereo normalize path AND the
         // resampler. The most common real
         // podcast upload. Must match batch.
-        let path = "/tmp/std_parity_mono44.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("std_parity_mono44.wav");
+        let path = path.to_str().unwrap();
         write_wav_mono(path, 44_100, 3.5);
 
         let (b_blake, b_sha) = batch_hashes(path);
@@ -385,7 +389,6 @@ mod tests {
              mono→stereo path diverges from batch"
         );
         assert_eq!(b_sha, s_sha, "sha256 mismatch on mono 44.1k");
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -393,7 +396,9 @@ mod tests {
         // Mono 48k: mono→stereo normalize with
         // NO resampler (passthrough). Isolates
         // the channel path from the resample path.
-        let path = "/tmp/std_parity_mono48.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("std_parity_mono48.wav");
+        let path = path.to_str().unwrap();
         write_wav_mono(path, 48_000, 3.5);
 
         let (b_blake, b_sha) = batch_hashes(path);
@@ -401,14 +406,15 @@ mod tests {
 
         assert_eq!(b_blake, s_blake, "blake3 mismatch on mono 48k passthrough");
         assert_eq!(b_sha, s_sha, "sha256 mismatch on mono 48k");
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn parity_downsample_96k() {
         // 96k → 48k: ratio < 1 (downsample).
         // Different resampler regime than upsample.
-        let path = "/tmp/std_parity_96k.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("std_parity_96k.wav");
+        let path = path.to_str().unwrap();
         write_wav(path, 96_000, 2.5);
 
         let (b_blake, b_sha) = batch_hashes(path);
@@ -416,6 +422,5 @@ mod tests {
 
         assert_eq!(b_blake, s_blake, "blake3 mismatch on 96k downsample");
         assert_eq!(b_sha, s_sha, "sha256 mismatch on 96k downsample");
-        let _ = std::fs::remove_file(path);
     }
 }

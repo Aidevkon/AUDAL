@@ -557,7 +557,9 @@ mod tests {
 
     #[test]
     fn test_decode_invalid_format() {
-        let path = "/tmp/test_decode_not_audio_p7.txt";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path_buf = tmp.path().join("test_decode_not_audio_p7.txt");
+        let path = path_buf.to_str().unwrap();
         std::fs::write(path, b"not audio data at all").unwrap();
         let result = decode_audio(path);
         assert!(result.is_err(), "Non-audio file must produce an error");

@@ -354,7 +354,9 @@ mod tests {
 
     #[test]
     fn streaming_hash_matches_batch_hash() {
-        let audio_path = "/tmp/test_stream_hash.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let audio_path_buf = tmp.path().join("test_stream_hash.wav");
+        let audio_path = audio_path_buf.to_str().unwrap();
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 44100,
@@ -397,8 +399,6 @@ mod tests {
         }
         let (_, stream_sha256_hex) = stream.input_hashes();
 
-        let _ = std::fs::remove_file(audio_path);
-
         assert_eq!(
             batch_sha256_hex, stream_sha256_hex,
             "SHA-256 streaming hash must match batch hash"
@@ -407,8 +407,12 @@ mod tests {
 
     #[test]
     fn decode_node_stereo_matches_legacy_batch() {
+        let tmp = tempfile::TempDir::new().unwrap();
         for &sr in &[44_100, 48_000] {
-            let path = format!("/tmp/decode_node_stereo_parity_{}.wav", sr);
+            let path_buf = tmp
+                .path()
+                .join(format!("decode_node_stereo_parity_{}.wav", sr));
+            let path = path_buf.to_str().unwrap();
             let spec = hound::WavSpec {
                 channels: 2,
                 sample_rate: sr,
@@ -483,15 +487,18 @@ mod tests {
                 );
             }
 
-            let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(format!("/tmp/m0d-raw-{}.pcm", blob_id));
         }
     }
 
     #[test]
     fn decode_node_streaming_beat_matches_batch() {
+        let tmp = tempfile::TempDir::new().unwrap();
         let sr = 48_000;
-        let path = format!("/tmp/decode_node_streaming_beat_{}.wav", sr);
+        let path_buf = tmp
+            .path()
+            .join(format!("decode_node_streaming_beat_{}.wav", sr));
+        let path = path_buf.to_str().unwrap();
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: sr,
@@ -543,13 +550,13 @@ mod tests {
         assert_eq!(streaming_beat.1, batch_beat.1, "beats_ms mismatch");
         assert_eq!(streaming_beat.2, batch_beat.2, "downbeats_ms mismatch");
         assert_eq!(streaming_beat.3, batch_beat.3, "transients_ms mismatch");
-
-        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn original_sum_sq_bit_identical() {
-        let path = "/tmp/test_original_sum_sq.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path_buf = tmp.path().join("test_original_sum_sq.wav");
+        let path = path_buf.to_str().unwrap();
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 48000,
@@ -586,13 +593,14 @@ mod tests {
             new_rms.to_bits()
         );
 
-        let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file("/tmp/m0d-raw-blob.pcm");
     }
 
     #[test]
     fn channel_sum_sq_and_total_frames_bit_identical() {
-        let path = "/tmp/test_channel_sum_sq.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path_buf = tmp.path().join("test_channel_sum_sq.wav");
+        let path = path_buf.to_str().unwrap();
         let blob_id = "test-blob-sum-sq";
         let spec = hound::WavSpec {
             channels: 2,
@@ -639,7 +647,6 @@ mod tests {
             "f32 bit-identity check failed for right_sum_sq"
         );
 
-        let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file(format!("/tmp/m0d-raw-{}.pcm", blob_id));
     }
 }

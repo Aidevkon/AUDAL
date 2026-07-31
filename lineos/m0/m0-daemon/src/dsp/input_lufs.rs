@@ -203,7 +203,9 @@ mod tests {
         // not just an early slice — verified by asserting a finite,
         // sane result rather than None (which would indicate a
         // premature/empty read).
-        let wav_path = "/tmp/test_input_lufs.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_input_lufs.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
         let n = 48_000 * 2;
         let src: Vec<f32> = (0..n)
             .flat_map(|i| {
@@ -229,7 +231,6 @@ mod tests {
             result.true_peak_dbtp
         );
         assert!(result.bpm >= 0.0, "BPM should be non-negative");
-        let _ = std::fs::remove_file(wav_path);
     }
 
     #[test]
@@ -238,7 +239,9 @@ mod tests {
         // should agree with a direct LufsMeter pass over the same
         // samples (proves the de-interleave/chunking here introduces
         // no measurement drift).
-        let wav_path = "/tmp/test_input_lufs_ref.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_input_lufs_ref.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
         let n = 48_000 * 2;
         let src: Vec<f32> = (0..n)
             .flat_map(|i| {
@@ -270,13 +273,14 @@ mod tests {
             "standardized-stream measurement must match direct TruePeakMeter to 3 decimals"
         );
         assert!(via_helper.bpm >= 0.0, "BPM should be non-negative");
-        let _ = std::fs::remove_file(wav_path);
     }
 
     #[test]
     fn too_short_for_gating_returns_none_not_error() {
         // 100ms — below EBU R128's 400ms gating minimum.
-        let wav_path = "/tmp/test_input_lufs_short.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_input_lufs_short.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
         let n = 4_800 * 2;
         let src: Vec<f32> = (0..n)
             .flat_map(|i| {
@@ -296,12 +300,13 @@ mod tests {
             "true peak is always valid"
         );
         assert_eq!(result.bpm, 0.0, "BPM should be 0.0 for audio too short");
-        let _ = std::fs::remove_file(wav_path);
     }
 
     #[test]
     fn wrapper_preserves_lufs_exactly() {
-        let wav_path = "/tmp/test_input_lufs_wrapper.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_input_lufs_wrapper.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
         let n = 48_000 * 2;
         let src: Vec<f32> = (0..n)
             .flat_map(|i| {
@@ -320,7 +325,6 @@ mod tests {
             from_metrics, from_wrapper,
             "wrapper should be a transparent passthrough"
         );
-        let _ = std::fs::remove_file(wav_path);
     }
 
     #[test]
@@ -329,7 +333,9 @@ mod tests {
         // test yesterday (7e32e32) — sharp, precisely-timed transients
         // at a known BPM, a much stronger signal than a continuous tone
         // for validating tempo detection specifically.
-        let wav_path = "/tmp/test_input_metrics_bpm.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_input_metrics_bpm.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
         let sr = 48_000u32;
         let bpm_target = 120.0f32;
         let duration_secs = 8.0f32;
@@ -365,7 +371,5 @@ mod tests {
             bpm_target,
             result.bpm
         );
-
-        let _ = std::fs::remove_file(wav_path);
     }
 }
