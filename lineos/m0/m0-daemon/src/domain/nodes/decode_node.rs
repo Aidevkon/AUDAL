@@ -64,7 +64,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         )
         .map_err(|e| format!("Decode error: {e}"))?;
 
-        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let raw_path_buf = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+        let raw_path = raw_path_buf.to_string_lossy().into_owned();
         let mut dump_file = std::fs::File::create(&raw_path)
             .map_err(|e| format!("Failed to write raw dump: {e}"))?;
 
@@ -145,7 +146,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
             None
         };
 
-        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+        let raw_path_buf = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+        let raw_path = raw_path_buf.to_string_lossy().into_owned();
         let mut dump_file = std::fs::File::create(&raw_path)
             .map_err(|e| format!("Failed to write raw dump: {e}"))?;
 
@@ -253,7 +255,8 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
                 }
             }
 
-            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+            let raw_path_buf = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+            let raw_path = raw_path_buf.to_string_lossy().into_owned();
             let raw_bytes: &[u8] = unsafe {
                 std::slice::from_raw_parts(interleaved.as_ptr() as *const u8, interleaved.len() * 4)
             };

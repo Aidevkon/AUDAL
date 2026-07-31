@@ -59,7 +59,7 @@ pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
 // allow: 9 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
 #[allow(clippy::too_many_arguments)]
 fn spatial_conformance_path(
-    raw_path: &str,
+    raw_path: &std::path::Path,
     sample_rate: u32,
     num_frames: usize,
     blob_id: &str,
@@ -85,7 +85,7 @@ fn spatial_conformance_path(
     const BYTES_PER_FRAME: usize = 6 * 4; // 6 channels × f32
 
     let file_len = std::fs::metadata(raw_path)
-        .map_err(|e| format!("spatial_conformance: metadata {raw_path}: {e}"))?
+        .map_err(|e| format!("spatial_conformance: metadata {}: {e}", raw_path.display()))?
         .len();
     let expected_len = (num_frames * BYTES_PER_FRAME) as u64;
     if file_len != expected_len {
@@ -190,9 +190,8 @@ fn spatial_conformance_path(
     }
 
     // 5. Φτιάξε StoredBlob
-    let spatial_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
-        std::path::PathBuf::from(raw_path),
-    ));
+    let spatial_guard =
+        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path.to_path_buf()));
     let blob = crate::blob_store::StoredBlob {
         id: blob_id.to_string(),
         version: "1.0".to_string(),
@@ -353,8 +352,8 @@ fn run_dsp_internal(
         // StandardizedAudioStream delivers 48k/2ch; set_tap
         // writes the dump byte-identical to the hash input
         // stream (Y3-iii-a core tap contract).
-        let raw_path_str = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-        let raw_path_buf = std::path::PathBuf::from(&raw_path_str);
+        let raw_path_buf = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+        let raw_path_str = raw_path_buf.to_string_lossy().into_owned();
         let raw_guard =
             std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path_buf.clone()));
 
@@ -596,7 +595,7 @@ fn run_dsp_internal(
             // 2ch None-payload falls through to the streaming Music flow
             // below; 6ch takes the spatial route here (A4-i).
             if decoded.pcm_channels == 6 {
-                let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+                let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
                 let (blob, path, model) = spatial_conformance_path(
                     &raw_path,
                     decoded.pcm_sample_rate,
@@ -620,7 +619,7 @@ fn run_dsp_internal(
             num_frames,
         }) => {
             // decode_node already wrote the raw 6ch dump for this blob_id
-            let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+            let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
             let (blob, path, model) = spatial_conformance_path(
                 &raw_path,
                 sample_rate,
@@ -679,22 +678,21 @@ fn run_dsp_internal(
     let lazy_scout =
         crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0);
 
-    let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+    let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
     let (scout_left_owned, scout_right_owned): (Vec<f32>, Vec<f32>) =
         if let Some((l, r, _sr)) = lazy_scout {
             (l, r)
         } else if total_frames > scout_frames {
             let start_frame = (total_frames - scout_frames) / 2;
-            read_scout_from_raw_dump(std::path::Path::new(&raw_path), start_frame, scout_frames)?
+            read_scout_from_raw_dump(&raw_path, start_frame, scout_frames)?
         } else {
-            read_scout_from_raw_dump(std::path::Path::new(&raw_path), 0, scout_frames)?
+            read_scout_from_raw_dump(&raw_path, 0, scout_frames)?
         };
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
 
-    let trunk_report =
-        sp314_orchestrator::trunk_pass::run_trunk_pass(std::path::Path::new(&raw_path))
-            .map_err(|e| format!("Trunk Pass failed: {e}"))?;
+    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(&raw_path)
+        .map_err(|e| format!("Trunk Pass failed: {e}"))?;
     let trunk_metrics = &trunk_report.metrics;
 
     // Episode/spoken-word: skip beat
@@ -757,7 +755,7 @@ fn run_dsp_internal(
     // F-052: STFT_FLUSH_TAIL compensation (commit 9039dac) removed — the engine
     // no longer emits head latency since the SlidingOverlapReader era. Proven by
     // alignment oracle: impulse@24000 peaked at frame 23007 (= 24000−1024+smear).
-    let file_path_raw = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let file_path_raw = crate::spool::spool_dir().join(format!("m0d-mastering-{}.pcm", blob_id));
     let file_path =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(file_path_raw.clone()));
     let file = std::fs::OpenOptions::new()
@@ -772,7 +770,8 @@ fn run_dsp_internal(
     let mut mmap =
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
     // Allocate file-backed mmaps for working storage
-    let scratch_l_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-l-{}.pcm", blob_id));
+    let scratch_l_path = crate::spool::spool_dir().join(format!("m0d-scratch-l-{}.pcm", blob_id));
+    let _scratch_l_guard = lineos_types::audio::ManagedPcm::new(scratch_l_path.clone());
     let scratch_l_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -789,7 +788,8 @@ fn run_dsp_internal(
     let scratch_l_view: &mut [f32] =
         unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total) };
 
-    let scratch_r_path = std::path::PathBuf::from(format!("/tmp/m0d-scratch-r-{}.pcm", blob_id));
+    let scratch_r_path = crate::spool::spool_dir().join(format!("m0d-scratch-r-{}.pcm", blob_id));
+    let _scratch_r_guard = lineos_types::audio::ManagedPcm::new(scratch_r_path.clone());
     let scratch_r_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -813,9 +813,14 @@ fn run_dsp_internal(
     // Spatial output —
     // A4-iii: streaming dump writer replaces the six Vec<f32> allocations
     let needs_spatial = matches!(preset_id.as_str(), "spatial_upmix" | "pro_bundle_both");
-    let spatial_raw_path = format!("/tmp/m0d-raw-{}-spatial.pcm", blob_id);
+    let spatial_raw_path =
+        crate::spool::spool_dir().join(format!("m0d-raw-{}-spatial.pcm", blob_id));
     let mut spatial_writer = if needs_spatial {
-        Some(crate::domain::nodes::render_node::SpatialDumpWriter::create(&spatial_raw_path)?)
+        Some(
+            crate::domain::nodes::render_node::SpatialDumpWriter::create(
+                &spatial_raw_path.to_string_lossy(),
+            )?,
+        )
     } else {
         None
     };
@@ -832,24 +837,24 @@ fn run_dsp_internal(
         // Stem DNA for spoken-word.
         ContentType::bypassed_render()
     } else {
-        let raw_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
-        let stream_source = if std::path::Path::new(&raw_path).exists() {
-            eprintln!("[DEBUG] TAKING NEW STREAMING PATH: found {}", raw_path);
+        let stream_source = if raw_path.exists() {
+            eprintln!("[DEBUG] TAKING NEW STREAMING PATH: found {:?}", raw_path);
             // 2 channels: StandardizedDecoder writes stereo f32 LE interleaved (Y3-iv-a).
-            let source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(
-                std::path::Path::new(&raw_path),
-                2,
-            )
-            .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
+            let source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(&raw_path, 2)
+                .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
             sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240)
         } else {
             // A missing file here means decode_node.rs's Stereo path failed to write it,
             // or the OS purged it. Silently falling back to slice logic would trigger an O(N)
             // memory spike, defeating the streaming architecture. Fail loudly.
-            eprintln!("[DEBUG] HARD ERROR: raw path {} not found", raw_path);
+            eprintln!(
+                "[dsp_pipeline] ERROR: raw path {} not found",
+                raw_path.display()
+            );
             return Err(format!(
-                "CRITICAL: Raw PCM dump {} not found for Music/Stereo path. Cannot proceed with O(1) streaming render.",
-                raw_path
+                "CRITICAL: Raw PCM dump {} not found for Music/Stereo pipeline. \
+                 Was it created by decode_node?",
+                raw_path.display()
             ));
         };
 
@@ -994,9 +999,6 @@ fn run_dsp_internal(
         n_total,
         processing_timeline,
     )?;
-
-    let _ = std::fs::remove_file(&scratch_l_path);
-    let _ = std::fs::remove_file(&scratch_r_path);
 
     Ok((
         cert_out.blob,

@@ -86,7 +86,7 @@ where
     })? as usize;
 
     // ── Pre-allocate output PCM file ──
-    let pcm_path = std::path::PathBuf::from(format!("/tmp/m0d-mastering-{}.pcm", blob_id));
+    let pcm_path = crate::spool::spool_dir().join(format!("m0d-mastering-{}.pcm", blob_id));
     let file = OpenOptions::new()
         .read(true)
         .write(true)

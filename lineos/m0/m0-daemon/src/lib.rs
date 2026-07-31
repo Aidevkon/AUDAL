@@ -24,6 +24,7 @@ mod marketplace;
 mod policy;
 mod realtime_bridge;
 mod registry;
+pub mod spool;
 
 use anyhow::Result;
 use app_state::AppState;
@@ -65,6 +66,7 @@ pub async fn run() -> Result<()> {
 
     // ── Read env overrides ────────────────────────────────────────────────────
     let config = std::sync::Arc::new(crate::config::M0Config::from_env());
+    crate::spool::init_spool_dir(std::path::PathBuf::from(&config.spool_path));
 
     let gate = HealthGate::new();
 
@@ -186,12 +188,28 @@ pub async fn run() -> Result<()> {
     // Placed post-bind (provably single-instance: a second daemon dies on the bind `?`)
     // and pre-serve (no job can be running). This backstop complements the RAII
     // ManagedPcm lifecycle plan (β/γ) - it buries only corpses from killed/crashed sessions.
+    let mut removed_count = 0;
+    let mut freed_bytes = 0;
+
+    // (a) wipe ALL regular files directly inside the spool dir (it holds only transient files by contract)
+    if let Ok(entries) = std::fs::read_dir(&config.spool_path) {
+        for entry in entries.flatten() {
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    freed_bytes += meta.len();
+                    if std::fs::remove_file(entry.path()).is_ok() {
+                        removed_count += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // (b) legacy pass over /tmp/m0d-* AND /tmp/vad-trace-* (can be deleted in future release)
     if let Ok(entries) = std::fs::read_dir("/tmp") {
-        let mut removed_count = 0;
-        let mut freed_bytes = 0;
         for entry in entries.flatten() {
             if let Ok(name) = entry.file_name().into_string() {
-                if name.starts_with("m0d-") {
+                if name.starts_with("m0d-") || name.starts_with("vad-trace-") {
                     if let Ok(meta) = entry.metadata() {
                         freed_bytes += meta.len();
                     }
@@ -201,14 +219,15 @@ pub async fn run() -> Result<()> {
                 }
             }
         }
-        if removed_count > 0 {
-            let mb = freed_bytes as f64 / 1_048_576.0;
-            tracing::info!(
-                "F-050 startup sweep: removed {} orphaned dump(s), freed {:.2} MB",
-                removed_count,
-                mb
-            );
-        }
+    }
+
+    if removed_count > 0 {
+        let mb = freed_bytes as f64 / 1_048_576.0;
+        tracing::info!(
+            "F-050 startup sweep: removed {} orphaned dump(s), freed {:.2} MB",
+            removed_count,
+            mb
+        );
     }
 
     let mut rx_health = shutdown_rx.clone();

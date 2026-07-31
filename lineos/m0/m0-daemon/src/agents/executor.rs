@@ -174,8 +174,14 @@ pub async fn run(
                 // supplies this: an unsanitized caller-supplied path was a
                 // trust/traversal gap, and the UI has no concept of this field
                 // anyway (MasterRequest never carried one for v2 either).
-                let output_path = format!("/tmp/m0d-v3-streaming-{}.wav", blob_id);
-                let raw_tap_path = format!("/tmp/m0d-raw-{}.pcm", blob_id);
+                let output_path = crate::spool::spool_dir()
+                    .join(format!("m0d-v3-streaming-{}.wav", blob_id))
+                    .to_string_lossy()
+                    .into_owned();
+                let raw_tap_path = crate::spool::spool_dir()
+                    .join(format!("m0d-raw-{}.pcm", blob_id))
+                    .to_string_lossy()
+                    .into_owned();
                 let raw_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
                     std::path::PathBuf::from(&raw_tap_path),
                 ));
@@ -372,7 +378,7 @@ pub async fn run(
                     profiler.mark_stage_with_hash("Streaming Render", String::new());
 
                     let mastered_raw_path =
-                        std::path::PathBuf::from(format!("/tmp/m0d-mastered-{}.pcm", blob_id));
+                        crate::spool::spool_dir().join(format!("m0d-mastered-{}.pcm", blob_id));
                     let mastered_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
                         mastered_raw_path.clone(),
                     ));
