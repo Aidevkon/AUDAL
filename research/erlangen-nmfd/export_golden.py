@@ -8,6 +8,10 @@ from libnmfd.core.nmf import nmf
 from libnmfd.core.nmfconv import nmfd
 from libnmfd.dsp.transforms import forward_stft
 
+def export_bin(name, arr):
+    arr = np.ascontiguousarray(arr).astype('<f8', copy=False)
+    arr.tofile(name + ".bin")
+
 def generate_golden():
     # 2. Deterministic fixture
     rng = np.random.default_rng(314159)
@@ -25,6 +29,7 @@ def generate_golden():
     Y, A, F = forward_stft(x, block_size=1024, hop_size=512)
     # A is magnitude
     np.save("V.npy", A.astype(np.float64))
+    export_bin("V", A)
     
     params = {
         "stft": {
@@ -50,7 +55,22 @@ def generate_golden():
             "nmfd_V (List of approximated component spectrograms -> np.ndarray)",
             "cost_func (np.ndarray - approximation quality per iteration)",
             "tensor_W (np.ndarray - the template tensor)"
-        ]
+        ],
+        "bin_format": {
+            "dtype": "f64-le",
+            "layout": "C-order row-major",
+            "dims": {
+                "V": [A.shape[0], A.shape[1]],
+                "init_W_nmf": [A.shape[0], 4],
+                "init_H": [4, A.shape[1]],
+                "nmf_W": [A.shape[0], 4],
+                "nmf_H": [4, A.shape[1]],
+                "init_W_nmfd": [A.shape[0], 4, 8],
+                "nmfd_H": [4, A.shape[1]],
+                "nmfd_tensor_W": [A.shape[0], 4, 8],
+                "nmfd_V": [A.shape[0], 4, A.shape[1]]
+            }
+        }
     }
     with open("params.json", "w") as f:
         json.dump(params, f, indent=4)
@@ -69,9 +89,20 @@ def generate_golden():
     # nmf needs one matrix (num_bins, K)
     init_W_nmf = rng.random((num_bins, K))
     
-    np.save("init_W_nmfd.npy", np.array(init_W_nmfd, dtype=np.float64))
+    init_W_nmfd_stack = np.array(init_W_nmfd, dtype=np.float64)
+    # the list of K arrays of shape (num_bins, num_template_frames) becomes (K, num_bins, num_template_frames).
+    # wait, tensor_W has shape (num_bins, R, T). Let's reshape it to match nmfd_tensor_W.
+    init_W_nmfd_tensor = np.zeros((num_bins, K, num_template_frames), dtype=np.float64)
+    for r in range(K):
+        init_W_nmfd_tensor[:, r, :] = init_W_nmfd[r]
+    
+    np.save("init_W_nmfd.npy", init_W_nmfd_stack)
     np.save("init_W_nmf.npy", init_W_nmf.astype(np.float64))
     np.save("init_H.npy", init_H.astype(np.float64))
+    
+    export_bin("init_W_nmfd", init_W_nmfd_tensor)
+    export_bin("init_W_nmf", init_W_nmf)
+    export_bin("init_H", init_H)
     
     # 5. Run BOTH
     W_nmf, H_nmf, cost_nmf = nmf(A, num_comp=K, cost_func='KLDiv', num_iter=20, init_W=init_W_nmf, init_H=init_H.copy())
@@ -82,16 +113,27 @@ def generate_golden():
     # nmfd returns: W, H, nmfd_V, cost_func, tensor_W
     W_out, H_out, nmfd_V_out, cost_func_out, tensor_W_out = nmfd_ret
     
+    nmfd_V_tensor = np.array(nmfd_V_out, dtype=np.float64) # shape: (K, num_bins, num_frames)
+    # Re-order nmfd_V_tensor to (num_bins, K, num_frames)
+    nmfd_V_tensor = np.transpose(nmfd_V_tensor, (1, 0, 2))
+    
     np.save("nmfd_W.npy", np.array(W_out, dtype=np.float64))
     np.save("nmfd_H.npy", H_out.astype(np.float64))
-    np.save("nmfd_V.npy", np.array(nmfd_V_out, dtype=np.float64))
+    np.save("nmfd_V.npy", nmfd_V_tensor)
     np.save("nmfd_cost.npy", cost_func_out.astype(np.float64))
     np.save("nmfd_tensor_W.npy", tensor_W_out.astype(np.float64))
 
+    export_bin("nmfd_H", H_out)
+    export_bin("nmfd_tensor_W", tensor_W_out)
+    export_bin("nmfd_V", nmfd_V_tensor)
+    
     # Also save nmf just in case
     np.save("nmf_W.npy", W_nmf.astype(np.float64))
     np.save("nmf_H.npy", H_nmf.astype(np.float64))
     np.save("nmf_cost.npy", cost_nmf)
+    
+    export_bin("nmf_W", W_nmf)
+    export_bin("nmf_H", H_nmf)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "run":
@@ -101,7 +143,7 @@ if __name__ == "__main__":
         # compute hashes
         hashes = {}
         for f in sorted(os.listdir(".")):
-            if f.endswith(".npy") or f == "fixture.wav":
+            if f.endswith(".npy") or f.endswith(".bin") or f == "fixture.wav":
                 with open(f, "rb") as file:
                     hashes[f] = hashlib.sha256(file.read()).hexdigest()
         print(json.dumps(hashes, indent=2))

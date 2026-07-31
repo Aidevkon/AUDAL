@@ -22,5 +22,50 @@
         "nmfd_V (List of approximated component spectrograms -> np.ndarray)",
         "cost_func (np.ndarray - approximation quality per iteration)",
         "tensor_W (np.ndarray - the template tensor)"
-    ]
+    ],
+    "bin_format": {
+        "dtype": "f64-le",
+        "layout": "C-order row-major",
+        "dims": {
+            "V": [
+                513,
+                130
+            ],
+            "init_W_nmf": [
+                513,
+                4
+            ],
+            "init_H": [
+                4,
+                130
+            ],
+            "nmf_W": [
+                513,
+                4
+            ],
+            "nmf_H": [
+                4,
+                130
+            ],
+            "init_W_nmfd": [
+                513,
+                4,
+                8
+            ],
+            "nmfd_H": [
+                4,
+                130
+            ],
+            "nmfd_tensor_W": [
+                513,
+                4,
+                8
+            ],
+            "nmfd_V": [
+                513,
+                4,
+                130
+            ]
+        }
+    }
 }

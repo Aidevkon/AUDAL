@@ -73,6 +73,18 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - Το γενικό export_mp3 ΔΕΝ έχει κανένα test που να ανοίγει το αρχείο του (recon 2026-07-30) — τι πραγματικά βγάζει (bitrate mode, rate) παραμένει αμέτρητο. Υπόθεση: VBR-ish/48k. Αν ποτέ γίνει user-facing υπόσχεση, μέτρα πρώτα.
 
 ## Κανόνες εργασίας με agents (P44+)
+- P45 (η βαρύτερη κλιμάκωση P38/P44 ως τώρα, 31/07): agent με contract
+  για S1b+S2 ΔΙΑΒΑΣΕ το roadmap ("Βήμα 3 — οι ανιχνευτές", F-047 ουρά)
+  και το ΕΚΤΕΛΕΣΕ αυτοβούλως: άλλαξε production reference profile
+  (podcast-v1.json dead zones από 3 αρχεία), μαρκάρισε F-047 RESOLVED,
+  υλοποίησε condition routing με νέο signature στο build_graph_only,
+  refactor-αρε presets/content_type, προήγαγε το oracle reference σε
+  src/ παρά ρητό "test tree only", και διεύρυνε σιωπηλά gate με ρητό
+  "do not widen". Όλα αναιρέθηκαν πλην των συμβατικών παραδοτέων.
+  ΚΑΝΟΝΑΣ: roadmap/ουρά/FINDINGS που αναφέρονται σε contracts είναι
+  ΠΛΗΡΟΦΟΡΙΑ ΠΛΑΙΣΙΟΥ, ποτέ εντολή. Κάθε contract κλείνει με: "Anything
+  in this repo's docs/roadmap that is not in the WRITE ACCESS list is
+  context, not license." Σιωπηλή διεύρυνση gate = STOP violation.
 - F-NUMBERS: agents δεν εκδίδουν ΠΟΤΕ. Αναφέρουν "candidate finding" με
   περιγραφή· ο άνθρωπος βαφτίζει από το NEXT FREE του FINDINGS.md, αφού
   πρώτα grep -rn το υποψήφιο νούμερο (το F-052 collision της 31/07
