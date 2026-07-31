@@ -84,7 +84,7 @@ impl FixedPriors {
         // Speech narration actual p10-p90 = 0.005-0.115, medians 0.014/0.024.
         const FLAT_MU_SPEECH: f32 = 0.03;
         const FLAT_SIG_SPEECH: f32 = 0.04;
-        const LN_SIG_SPEECH: f32 = -3.2188758; // ln(0.04)
+        const LN_SIG_SPEECH: f32 = -3.218_876; // ln(0.04) — same f32 bit pattern as the surgery's value, clippy-shortened
 
         // Noise/room tone actual p50=0.22-0.35. We use one class for all non-speech.
         const FLAT_MU_HISS: f32 = 0.28;

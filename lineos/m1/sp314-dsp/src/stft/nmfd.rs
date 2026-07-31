@@ -70,6 +70,7 @@ pub(crate) fn conv_model(
 }
 
 // nmfd from nmfconv.py:161
+#[allow(clippy::too_many_arguments)] // explicit dims are the contract: no params struct, no silent 'cleanup' (S4 doctrine)
 pub fn nmfd(
     v: &[f64],
     init_w: &[f64],
@@ -268,6 +269,7 @@ pub(crate) fn conv_model_f32(
     lamb
 }
 
+#[allow(clippy::too_many_arguments)] // explicit dims are the contract: no params struct, no silent 'cleanup' (S4 doctrine)
 pub fn nmfd_f32_seq(
     v: &[f32],
     init_w: &[f32],
@@ -391,6 +393,7 @@ pub fn nmfd_f32_seq(
     (tensor_w, h, final_cost)
 }
 
+#[allow(clippy::too_many_arguments)] // explicit dims are the contract: no params struct, no silent 'cleanup' (S4 doctrine)
 pub fn nmfd_f32(
     v: &[f32],
     init_w: &[f32],
