@@ -44,6 +44,7 @@ async fn test_e2e_latency_compensation() {
             None,
             "".to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         )
     })
     .await;
@@ -55,7 +56,7 @@ async fn test_e2e_latency_compensation() {
     // Must succeed
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
 
-    let (_blob, _, exported_pcm_path, _, _) = dsp_result.unwrap();
+    let (_blob, _, exported_pcm_path, _, _, _artifacts) = dsp_result.unwrap();
 
     // Read the exported PCM file (raw f32 LE interleaved)
     let file_bytes =

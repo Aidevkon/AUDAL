@@ -23,6 +23,7 @@ pub struct M0Config {
     pub certs_path: String,
     pub state_path: String,
     pub spool_path: String,
+    pub masters_path: String,
 }
 
 impl M0Config {
@@ -55,6 +56,8 @@ impl M0Config {
                 .unwrap_or_else(|_| format!("{home}/.creator_os/state")),
             spool_path: std::env::var("M0_SPOOL_PATH")
                 .unwrap_or_else(|_| format!("{home}/.creator_os/spool")),
+            masters_path: std::env::var("M0_MASTERS_PATH")
+                .unwrap_or_else(|_| format!("{home}/.creator_os/masters")),
         }
     }
 }

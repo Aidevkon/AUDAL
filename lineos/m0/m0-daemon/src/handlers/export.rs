@@ -199,16 +199,19 @@ fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(
     }
 }
 
-/// FLAC: write audio_bytes directly — zero re-encoding.
-/// audio_bytes = raw f32 LE PCM bytes from GoldenBlob (Phase 2/10 note).
-/// Phase 11: replace with real FLAC encoder when sp314-dsp adds FLAC output.
-fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
+/// FLAC export — real encoding via io_flac (Phase 11 debt closed).
+/// Shares the Tier-2 persist path's encoder: one encoder, two consumers.
+/// 24-bit, deterministic round-half-even quantization, no dither — see
+/// io_flac.rs for the rationale. (The old body dumped raw f32 bytes
+/// under a .flac name; no FLAC reader could open it.)
+pub fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     let audio_bytes = std::fs::read(blob.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — mastering may have failed".into());
     }
-    std::fs::write(path, &audio_bytes).map_err(|e| format!("FLAC write failed: {e}"))
+    let pcm = pcm_bytes_to_f32(&audio_bytes);
+    crate::io_flac::encode_f32_flac_24(&pcm, blob.sample_rate, blob.channels, path)
 }
 
 /// WAV: decode f32 LE PCM bytes → write 32-bit float WAV via hound.

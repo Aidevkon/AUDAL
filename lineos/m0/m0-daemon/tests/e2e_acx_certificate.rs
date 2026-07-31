@@ -69,7 +69,7 @@ fn run_pipeline(wav_path: &str, preset: &str, track_id: &str) -> m0d::blob_store
         xaak::repo::DspState::default(),
     ));
     let state_tmp = tempfile::TempDir::new().unwrap();
-    let (blob, _, _, _, _) = m0d::domain::dsp_pipeline::run_dsp(
+    let (blob, _, _, _, _, _artifacts) = m0d::domain::dsp_pipeline::run_dsp(
         &req,
         std::time::Instant::now(),
         state,
@@ -77,6 +77,7 @@ fn run_pipeline(wav_path: &str, preset: &str, track_id: &str) -> m0d::blob_store
         None,
         format!("acx-e2e-{}", track_id),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     )
     .expect("run_dsp failed");
     blob

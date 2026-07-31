@@ -11,6 +11,13 @@ use xaak::repo::DspState;
 /// Invoke sp314-dsp MasteringPipeline and assemble StoredBlob.
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
+use std::path::PathBuf;
+
+#[derive(Debug, Default)]
+pub struct RenderArtifacts {
+    pub persisted_master: Option<PathBuf>,
+}
+
 #[allow(deprecated)]
 #[allow(clippy::type_complexity)]
 pub fn run_dsp(
@@ -21,6 +28,7 @@ pub fn run_dsp(
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
     state_dir: &str,
+    masters_dir: &str,
 ) -> Result<
     (
         StoredBlob,
@@ -28,6 +36,7 @@ pub fn run_dsp(
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
         Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
+        RenderArtifacts,
     ),
     String,
 > {
@@ -39,6 +48,7 @@ pub fn run_dsp(
         progress_map,
         job_id,
         state_dir,
+        masters_dir,
     )
 }
 
@@ -271,6 +281,7 @@ fn run_dsp_internal(
     progress_map: Option<Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>>,
     job_id: String,
     state_dir: &str,
+    masters_dir: &str,
 ) -> Result<
     (
         StoredBlob,
@@ -278,6 +289,7 @@ fn run_dsp_internal(
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
         Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
+        RenderArtifacts,
     ),
     String,
 > {
@@ -557,12 +569,46 @@ fn run_dsp_internal(
             cert_data,
         )?;
 
+        let mut persisted_master = None;
+        if let (Some(project_id), Some(track_id)) =
+            (req.project_id.as_deref(), req.track_id.as_deref())
+        {
+            let project_dir = std::path::Path::new(masters_dir)
+                .join(project_id.replace('/', "").replace('\\', ""));
+            let _ = std::fs::create_dir_all(&project_dir);
+            let track_safe = track_id.replace('/', "").replace('\\', "");
+            let flac_path = project_dir.join(format!("{track_safe}.flac"));
+
+            if let Ok(file) = std::fs::File::open(&render_res.pcm_path) {
+                if let Ok(mmap) = unsafe { memmap2::MmapOptions::new().map(&file) } {
+                    let mmap_f32: &[f32] = unsafe {
+                        std::slice::from_raw_parts(mmap.as_ptr() as *const f32, mmap.len() / 4)
+                    };
+                    if let Err(e) = crate::io_flac::encode_f32_flac_24(
+                        mmap_f32,
+                        render_res.sample_rate,
+                        2,
+                        &flac_path,
+                    ) {
+                        tracing::warn!(
+                            "Failed to persist master FLAC to {}: {}",
+                            flac_path.display(),
+                            e
+                        );
+                    } else {
+                        persisted_master = Some(flac_path);
+                    }
+                }
+            }
+        }
+
         return Ok((
             cert_out.blob,
             None,
             cert_out.file_path,
             None,
             Some(raw_guard),
+            RenderArtifacts { persisted_master },
         ));
     }
 
@@ -607,7 +653,16 @@ fn run_dsp_internal(
                     &input_blake3_hex,
                     &input_sha256_hex,
                 )?;
-                return Ok((blob, None, path, model, None));
+                return Ok((
+                    blob,
+                    None,
+                    path,
+                    model,
+                    None,
+                    RenderArtifacts {
+                        persisted_master: None,
+                    },
+                ));
             }
         }
         Some(lineos_types::AudioPayload::Stereo(_)) => {
@@ -631,7 +686,16 @@ fn run_dsp_internal(
                 &input_blake3_hex,
                 &input_sha256_hex,
             )?;
-            return Ok((blob, None, path, model, None));
+            return Ok((
+                blob,
+                None,
+                path,
+                model,
+                None,
+                RenderArtifacts {
+                    persisted_master: None,
+                },
+            ));
         }
     };
 
@@ -967,6 +1031,32 @@ fn run_dsp_internal(
         mmap_f32[i * 2 + 1] = right_post[i];
     }
 
+    // Persist Tier-2 Master if project_id and track_id are present
+    let mut persisted_master = None;
+    if let (Some(project_id), Some(track_id)) = (req.project_id.as_deref(), req.track_id.as_deref())
+    {
+        let project_dir =
+            std::path::Path::new(masters_dir).join(project_id.replace('/', "").replace('\\', ""));
+        let _ = std::fs::create_dir_all(&project_dir);
+        let track_safe = track_id.replace('/', "").replace('\\', "");
+        let flac_path = project_dir.join(format!("{track_safe}.flac"));
+
+        if let Err(e) = crate::io_flac::encode_f32_flac_24(
+            &mmap_f32[..n_total * 2],
+            decoded.pcm_sample_rate,
+            2,
+            &flac_path,
+        ) {
+            tracing::warn!(
+                "Failed to persist master FLAC to {}: {}",
+                flac_path.display(),
+                e
+            );
+        } else {
+            persisted_master = Some(flac_path);
+        }
+    }
+
     // Sync mapped file to disk before returning path
     mmap.flush().unwrap_or_default();
 
@@ -1006,6 +1096,7 @@ fn run_dsp_internal(
         cert_out.file_path,
         dsp_out.user_model,
         None,
+        RenderArtifacts { persisted_master },
     ))
 }
 

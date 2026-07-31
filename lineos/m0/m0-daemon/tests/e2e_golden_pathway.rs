@@ -44,6 +44,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
             None,
             "".to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         )
     })
     .await;
@@ -55,7 +56,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     // Must succeed
     assert!(dsp_result.is_ok(), "run_dsp failed: {:?}", dsp_result.err());
 
-    let (blob, _, _, _, _) = dsp_result.unwrap();
+    let (blob, _, _, _, _, _artifacts) = dsp_result.unwrap();
 
     // Verify properties
     assert_eq!(

@@ -79,6 +79,7 @@ fn test_run_dsp_aborts_on_digital_silence() {
         None,
         "qa-abort".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     // Assert it fails due to digital silence
@@ -113,6 +114,7 @@ fn test_run_dsp_passes_healthy_podcast() {
         None,
         "qa-healthy".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(
@@ -156,6 +158,7 @@ fn test_run_dsp_passes_real_mp3_podcast() {
         None,
         "qa-real-mp3".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(
@@ -208,6 +211,7 @@ fn run_dsp_counts_dead_air_gaps() {
         None,
         "qa-dead-air".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(
@@ -215,7 +219,7 @@ fn run_dsp_counts_dead_air_gaps() {
         "run_dsp failed for dead-air test: {:?}",
         result.err()
     );
-    let (blob, _, _, _, _) = result.unwrap();
+    let (blob, _, _, _, _, _artifacts) = result.unwrap();
 
     let count = blob.dead_air.total_count;
     let sec = blob.dead_air.total_sec;
