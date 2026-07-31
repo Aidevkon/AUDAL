@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-mod nmfd_ref;
+use sp314_dsp::stft::nmfd;
 
 // We use hardcoded consts pointing to research/erlangen-nmfd/params.json
 const NUM_BINS: usize = 513;
@@ -55,12 +55,12 @@ pub fn max_rel_err(a: &[f64], b: &[f64]) -> f64 {
 #[test]
 fn test_nmfd_golden_master() {
     let v = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
-    let v_sum: f64 = nmfd_ref::pairwise_sum(&v);
+    let v_sum: f64 = nmfd::pairwise_sum(&v);
     println!("Rust V.sum(): {:.10}", v_sum);
     let init_w = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
     let init_h = load_bin("init_H.bin", K * NUM_FRAMES);
 
-    let (w_out, h_out, cost_out) = nmfd_ref::nmfd(
+    let (w_out, h_out, cost_out) = nmfd::nmfd(
         &v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, NUM_ITER,
     );
 
@@ -115,7 +115,7 @@ fn test_nmfd_drift_diagnostic() {
     println!("Iteration | Max Rel Err W | Max Rel Err H");
     for i in 1..=NUM_ITER {
         let (w_out, h_out, _) =
-            nmfd_ref::nmfd(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, i);
+            nmfd::nmfd(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, i);
         let err_w = max_rel_err(&w_out, &expected_w);
         let err_h = max_rel_err(&h_out, &expected_h);
         println!("{:>9} | {:>13.4e} | {:>13.4e}", i, err_w, err_h);
@@ -136,7 +136,7 @@ fn nmfd_iter1_exactness() {
     let ref_h = load_bin("iter1_H.bin", K * NUM_FRAMES);
 
     let (w_out, h_out, _cost) =
-        nmfd_ref::nmfd(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 1);
+        nmfd::nmfd(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 1);
 
     let gate = |ours: &[f64], theirs: &[f64], name: &str| {
         let mut worst = 0.0f64;

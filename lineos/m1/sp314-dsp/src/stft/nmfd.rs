@@ -1,6 +1,9 @@
-// Math reference port from libnmfd/core/nmfconv.py (v1.0.0)
-// This is an exact f64 translation of their MU algorithm. Do not "improve".
-
+//! Math reference port from libnmfd/core/nmfconv.py (v1.0.0)
+//! Golden-master provenance: research/erlangen-nmfd/*.bin (f64 LE, C-order)
+//! libnmfd line refs are included in comments.
+//! f64 REFERENCE path — the oracle's target; f32 production variant lives beside it (P2)
+//!
+//! This is an exact f64 translation of their MU algorithm. Do not "improve".
 // libnmfd/utils/__init__.py
 pub const EPS: f64 = 2.220446049250313e-16; // 2.0 ** -52
 
@@ -8,7 +11,7 @@ pub const EPS: f64 = 2.220446049250313e-16; // 2.0 ** -52
 // nmfconv.py:416-422
 // if shift_amount < 0: shifted[:, num_cols + shift_amount: num_cols] = 0
 // elif shift_amount > 0: shifted[:, 0: shift_amount] = 0
-pub fn shift_operator(a: &[f64], r: usize, m: usize, shift: isize) -> Vec<f64> {
+pub(crate) fn shift_operator(a: &[f64], r: usize, m: usize, shift: isize) -> Vec<f64> {
     let mut shifted = vec![0.0; r * m];
     for row in 0..r {
         for col in 0..m {
@@ -31,7 +34,7 @@ pub fn pairwise_sum(arr: &[f64]) -> f64 {
 }
 
 // conv_model from nmfconv.py:341
-pub fn conv_model(
+pub(crate) fn conv_model(
     w: &[f64],
     h: &[f64],
     num_bins: usize,
