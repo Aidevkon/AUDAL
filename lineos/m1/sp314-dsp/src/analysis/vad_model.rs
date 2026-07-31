@@ -70,50 +70,44 @@ impl FixedPriors {
         }
 
         // --- (a) SNR ---
-        let snr = f.rms_db - ctx.noise_floor_dbfs;
+        // S3: clamp noise_floor to >= -70.0 dBFS (digital silence is not a room).
+        // Measured floor was -94.85 which produced meaningless 64 dB SNR values.
+        let effective_floor = ctx.noise_floor_dbfs.max(-70.0);
+        let snr = f.rms_db - effective_floor;
         // SNR separates signal from SILENCE, not speech from music.
         // Measured: music sat 17.35 dB above its floor, speech 6.59. Its remaining job is keeping room tone out.
         let l_snr = (K_SNR * (snr - SNR_CENTER)).clamp(-1.0, 1.0);
 
         // --- (b) Spectral Flatness (Bimodal Non-Speech) ---
-        // speech: recentred on the MEASURED median, not the guess
-        // (Measured speech IQR was 0.082-0.299 => sigma ~0.16. Kept at 0.10 deliberately to preserve music penalty).
-        const FLAT_MU_SPEECH: f32 = 0.16;
-        const FLAT_SIG_SPEECH: f32 = 0.10;
-        const LN_SIG_SPEECH: f32 = -std::f32::consts::LN_10; // ln(0.10)
+        // S1: Retuned from measured distributions (VADVAL FLATRAW).
+        // Speech narration actual p10-p90 = 0.005-0.115, medians 0.014/0.024.
+        const FLAT_MU_SPEECH: f32 = 0.03;
+        const FLAT_SIG_SPEECH: f32 = 0.04;
+        const LN_SIG_SPEECH: f32 = -3.2188758; // ln(0.04)
 
-        // non-speech is bimodal: tonal music at one end,
-        // broadband hiss at the other, speech sits BETWEEN them
-        const FLAT_MU_TONAL: f32 = 0.03;
-        const FLAT_SIG_TONAL: f32 = 0.025;
-        const LN_SIG_TONAL: f32 = -3.688879; // ln(0.025)
-
-        const FLAT_MU_HISS: f32 = 0.80;
-        const FLAT_SIG_HISS: f32 = 0.15;
-        const LN_SIG_HISS: f32 = -1.897_12; // ln(0.15)
+        // Noise/room tone actual p50=0.22-0.35. We use one class for all non-speech.
+        const FLAT_MU_HISS: f32 = 0.28;
+        const FLAT_SIG_HISS: f32 = 0.08;
+        const LN_SIG_HISS: f32 = -2.5257286; // ln(0.08)
 
         let x = f.spectral_flatness;
         let z_s = (x - FLAT_MU_SPEECH) / FLAT_SIG_SPEECH;
-        let z_t = (x - FLAT_MU_TONAL) / FLAT_SIG_TONAL;
-        let z_h = (x - FLAT_MU_HISS) / FLAT_SIG_HISS;
-
-        // best-fitting non-speech component wins
-        let (z_n, log_sig_n) = if z_t * z_t <= z_h * z_h {
-            (z_t, LN_SIG_TONAL)
-        } else {
-            (z_h, LN_SIG_HISS)
-        };
+        let z_n = (x - FLAT_MU_HISS) / FLAT_SIG_HISS;
+        let log_sig_n = LN_SIG_HISS;
 
         // now the primary separator
         let l_flat =
             (0.5 * z_n * z_n - 0.5 * z_s * z_s + log_sig_n - LN_SIG_SPEECH).clamp(-8.0, 8.0);
 
         // --- (c) Side/Mid Ratio ---
-        let r = f.mid_side_ratio.clamp(0.0, 1.0);
-        let z_ms_noise = (r - MS_MU_NOISE) / MS_SIG_NOISE;
-        // medians 0.338 vs 0.297 — no separation on this material
-        let l_ms =
-            (-(r / MS_SCALE_SPEECH) + 0.5 * (z_ms_noise * z_ms_noise) + MS_NORM).clamp(-0.5, 0.5);
+        // S2 mono abstention: mono input carries no spatial evidence
+        let l_ms = if f.mid_side_ratio < 1e-6 {
+            0.0
+        } else {
+            let r = f.mid_side_ratio.clamp(0.0, 1.0);
+            let z_ms_noise = (r - MS_MU_NOISE) / MS_SIG_NOISE;
+            (-(r / MS_SCALE_SPEECH) + 0.5 * (z_ms_noise * z_ms_noise) + MS_NORM).clamp(-0.5, 0.5)
+        };
 
         // --- (d) |ΔRMS| over 30ms ---
         let z_s_drms = (ctx.rms_delta_30ms - DRMS_MU_SPEECH) / DRMS_SIG_SPEECH;
@@ -286,15 +280,19 @@ mod tests {
         };
 
         let mut f_speech = dummy_features();
-        f_speech.spectral_flatness = 0.164;
+        // VADVAL FLATRAW measured narration speech median: ~0.014-0.024
+        f_speech.spectral_flatness = 0.02;
         f_speech.rms_db = 6.59;
         f_speech.mid_side_ratio = 0.297;
         let l_speech = FixedPriors.log_odds(&f_speech, &ctx);
 
         ctx.rms_delta_30ms = 1.169;
         let mut f_music = dummy_features();
-        f_music.spectral_flatness = 0.024;
-        f_music.rms_db = 17.35;
+        // pure-tonal music is the flatness term's documented blind spot (F-061 / bimodal test);
+        // this oracle guards the TYPICAL music case, measured from bodleasons_mid.
+        // VADVAL measured MUSIC: FLATRAW p50 ~0.16, SNR p50 ~10.9
+        f_music.spectral_flatness = 0.16;
+        f_music.rms_db = 10.9;
         f_music.mid_side_ratio = 0.338;
         let l_music = FixedPriors.log_odds(&f_music, &ctx);
 
@@ -303,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn oracle_flatness_trimodal() {
+    fn oracle_flatness_bimodal() {
         let ctx = VadContext {
             noise_floor_dbfs: 0.0,
             rms_delta_30ms: 0.2,
@@ -311,21 +309,30 @@ mod tests {
         let mut f = dummy_features();
         f.rms_db = 6.0; // SNR = 6.0 => l_snr = 0.0
 
+        // Measured room tone/hiss p50 is ~0.28
+        f.spectral_flatness = 0.28;
+        let l_hiss = FixedPriors.log_odds(&f, &ctx);
+
+        // VADVAL FLATRAW measured narration speech median: ~0.014-0.024
+        f.spectral_flatness = 0.02;
+        let l_speech = FixedPriors.log_odds(&f, &ctx);
+
+        // Documented limitation: tonal content at 0.03 reads speech-like BY DESIGN of this term alone.
+        // Measured reality says close-mic narration and pure tones are indistinguishable on flatness;
+        // disambiguation is the transient-density sensor's future job (F-061).
         f.spectral_flatness = 0.03;
         let l_tonal = FixedPriors.log_odds(&f, &ctx);
 
-        f.spectral_flatness = 0.16;
-        let l_speech = FixedPriors.log_odds(&f, &ctx);
-
-        f.spectral_flatness = 0.80;
-        let l_hiss = FixedPriors.log_odds(&f, &ctx);
-
-        assert!(l_tonal < 0.0, "Tonal music should be < 0 (was {})", l_tonal);
         assert!(l_speech > 0.0, "Speech should be > 0 (was {})", l_speech);
         assert!(
             l_hiss < 0.0,
             "Broadband hiss should be < 0 (was {})",
             l_hiss
+        );
+        assert!(
+            l_tonal > 0.0,
+            "Tonal music falsely reads as speech on flatness alone (was {})",
+            l_tonal
         );
     }
 
@@ -376,7 +383,8 @@ mod tests {
         };
 
         let f_speech = VadFeatures {
-            spectral_flatness: 0.25,
+            // VADVAL FLATRAW measured narration speech median: ~0.014-0.024
+            spectral_flatness: 0.02,
             rms_db: -20.0,
             rms_delta_db: 1.0,
             mid_side_ratio: 0.0,
@@ -387,7 +395,7 @@ mod tests {
         let p_speech = 1.0 / (1.0 + libm::expf(-l_speech / FixedPriors.temperature()));
 
         let f_hiss = VadFeatures {
-            spectral_flatness: 0.85,
+            spectral_flatness: 0.28,
             rms_db: -58.0,
             rms_delta_db: 0.1,
             mid_side_ratio: 0.5,
