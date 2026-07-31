@@ -52,8 +52,8 @@ pub trait LikelihoodModel {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FixedPriors;
 
-impl LikelihoodModel for FixedPriors {
-    fn log_odds(&self, f: &VadFeatures, ctx: &VadContext) -> f32 {
+impl FixedPriors {
+    pub fn log_odds_terms(&self, f: &VadFeatures, ctx: &VadContext) -> [f32; 4] {
         // ROBUSTNESS GUARD
         if f.rms_db.is_nan()
             || f.rms_db.is_infinite()
@@ -66,7 +66,7 @@ impl LikelihoodModel for FixedPriors {
             || ctx.rms_delta_30ms.is_nan()
             || ctx.rms_delta_30ms.is_infinite()
         {
-            return 0.0;
+            return [0.0; 4];
         }
 
         // --- (a) SNR ---
@@ -126,7 +126,14 @@ impl LikelihoodModel for FixedPriors {
         // The clamps on the individual terms ARE the weighting policy, tunable by ear.
         // Which sensor we trust came from measurement, not intuition.
         // l_ms and l_drms are clamped tight so their constant bias cannot outvote flatness.
-        l_snr + l_flat + l_ms + l_drms
+        [l_snr, l_flat, l_ms, l_drms]
+    }
+}
+
+impl LikelihoodModel for FixedPriors {
+    fn log_odds(&self, f: &VadFeatures, ctx: &VadContext) -> f32 {
+        let terms = self.log_odds_terms(f, ctx);
+        terms[0] + terms[1] + terms[2] + terms[3]
     }
 }
 

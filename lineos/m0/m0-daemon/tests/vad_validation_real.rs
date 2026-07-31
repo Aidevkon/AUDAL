@@ -67,7 +67,12 @@ fn weak_labels(mono: &[f32], sr: u32) -> (Vec<Label>, f32) {
     (labels, floor_db)
 }
 
-fn run_vad(mono: &[f32], left: &[f32], right: &[f32], floor_db: f32) -> Vec<(f32, bool)> {
+fn run_vad(
+    mono: &[f32],
+    left: &[f32],
+    right: &[f32],
+    floor_db: f32,
+) -> Vec<(f32, bool, [f32; 4], f32)> {
     let mut extractor = VadFeatureExtractor::new();
     let mut classifier = VadClassifier::new(FixedPriors);
     let mut results = Vec::new();
@@ -82,7 +87,13 @@ fn run_vad(mono: &[f32], left: &[f32], right: &[f32], floor_db: f32) -> Vec<(f32
         let feats = extractor.process_chunk(m_slab, l_slab, r_slab);
         for f in feats {
             let decision = classifier.process(&f, floor_db);
-            results.push((decision.posterior, decision.is_speech));
+            let ctx = sp314_dsp::analysis::vad_model::VadContext {
+                noise_floor_dbfs: floor_db,
+                rms_delta_30ms: decision.rms_delta_30ms,
+            };
+            let terms = FixedPriors.log_odds_terms(&f, &ctx);
+            let snr = f.rms_db - floor_db;
+            results.push((decision.posterior, decision.is_speech, terms, snr));
         }
     }
     results
@@ -115,12 +126,33 @@ fn print_stats(name: &str, class_name: &str, mut posts: Vec<f32>, right_side_is_
     );
 }
 
-fn report(name: &str, labels: Option<&[Label]>, frames: &[(f32, bool)]) {
+fn report(
+    name: &str,
+    labels: Option<&[Label]>,
+    frames: &[(f32, bool, [f32; 4], f32)],
+    floor_db: f32,
+) {
+    println!("VADVAL|{}|FLOOR_DB|{:.2}", name, floor_db);
+
     let mut window_posteriors = Vec::new();
+    let mut window_frames = Vec::new();
     for chunk in frames.chunks(10) {
-        let avg: f32 = chunk.iter().map(|(p, _)| p).sum::<f32>() / chunk.len() as f32;
+        let avg: f32 = chunk.iter().map(|(p, ..)| p).sum::<f32>() / chunk.len() as f32;
         window_posteriors.push(avg);
+        window_frames.push(chunk);
     }
+
+    let mut class_frames = std::collections::HashMap::new();
+    let mut add_frames = |class: &str, window_idx: usize| {
+        let e = class_frames
+            .entry(class.to_string())
+            .or_insert_with(Vec::new);
+        for f in window_frames[window_idx] {
+            e.push(*f);
+        }
+    };
+
+    let mut nonspeech_windows = Vec::new();
 
     if let Some(lbls) = labels {
         let mut speech_posts = Vec::new();
@@ -130,11 +162,22 @@ fn report(name: &str, labels: Option<&[Label]>, frames: &[(f32, bool)]) {
         let n = lbls.len().min(window_posteriors.len());
         for i in 0..n {
             let p = window_posteriors[i];
-            match lbls[i] {
-                Label::Speech => speech_posts.push(p),
-                Label::NonSpeech => non_speech_posts.push(p),
-                Label::Unlabeled => unlabeled_count += 1,
-            }
+            let class = match lbls[i] {
+                Label::Speech => {
+                    speech_posts.push(p);
+                    "SPEECH"
+                }
+                Label::NonSpeech => {
+                    non_speech_posts.push(p);
+                    nonspeech_windows.push((i, p));
+                    "NONSPEECH"
+                }
+                Label::Unlabeled => {
+                    unlabeled_count += 1;
+                    "UNLABELED"
+                }
+            };
+            add_frames(class, i);
         }
 
         print_stats(name, "SPEECH", speech_posts, true);
@@ -142,6 +185,57 @@ fn report(name: &str, labels: Option<&[Label]>, frames: &[(f32, bool)]) {
         println!("VADVAL|{}|UNLABELED|count={}", name, unlabeled_count);
     } else {
         print_stats(name, "MUSIC", window_posteriors.clone(), false);
+        for i in 0..window_posteriors.len() {
+            add_frames("MUSIC", i);
+        }
+    }
+
+    nonspeech_windows.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    for (i, _) in nonspeech_windows.iter().take(20) {
+        add_frames("NONSPEECH_TOP20", *i);
+    }
+
+    for class in ["SPEECH", "NONSPEECH", "MUSIC", "NONSPEECH_TOP20"] {
+        if let Some(fs) = class_frames.get(class) {
+            if fs.is_empty() {
+                continue;
+            }
+            let mut sum_snr = 0.0;
+            let mut sum_flat = 0.0;
+            let mut sum_ms = 0.0;
+            let mut sum_drms = 0.0;
+            let mut snrs = Vec::new();
+
+            for &(_, _, terms, snr) in fs {
+                sum_snr += terms[0];
+                sum_flat += terms[1];
+                sum_ms += terms[2];
+                sum_drms += terms[3];
+                snrs.push(snr);
+            }
+
+            let count = fs.len() as f32;
+            let m_snr = sum_snr / count;
+            let m_flat = sum_flat / count;
+            let m_ms = sum_ms / count;
+            let m_drms = sum_drms / count;
+            let m_total = m_snr + m_flat + m_ms + m_drms;
+
+            println!(
+                "VADVAL|{}|TERMS|{}|l_snr={:.4}|l_flat={:.4}|l_ms={:.4}|l_drms={:.4}|total={:.4}",
+                name, class, m_snr, m_flat, m_ms, m_drms, m_total
+            );
+
+            snrs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let c = snrs.len();
+            let p10 = snrs[(c as f32 * 0.1).floor() as usize];
+            let p50 = snrs[(c as f32 * 0.5).floor() as usize];
+            let p90 = snrs[(c as f32 * 0.9).floor() as usize];
+            println!(
+                "VADVAL|{}|SNR|{}|p10={:.4}|p50={:.4}|p90={:.4}",
+                name, class, p10, p50, p90
+            );
+        }
     }
 
     let mut hist = [0usize; 10];
@@ -160,7 +254,7 @@ fn report(name: &str, labels: Option<&[Label]>, frames: &[(f32, bool)]) {
     }
     println!();
 
-    let is_speech_count = frames.iter().filter(|(_, is_sp)| *is_sp).count();
+    let is_speech_count = frames.iter().filter(|(_, is_sp, ..)| *is_sp).count();
     let is_speech_pct = (is_speech_count as f32 / frames.len() as f32) * 100.0;
     println!("VADVAL|{}|IS_SPEECH_FRAMES|pct={:.1}%", name, is_speech_pct);
 }
@@ -201,7 +295,7 @@ fn vad_narration_dream() {
         labels.iter().any(|&l| l != Label::Unlabeled),
         "must have labeled windows"
     );
-    report("dream", Some(&labels), &frames);
+    report("dream", Some(&labels), &frames, floor_db);
 }
 
 #[test]
@@ -220,7 +314,7 @@ fn vad_narration_crossing() {
         labels.iter().any(|&l| l != Label::Unlabeled),
         "must have labeled windows"
     );
-    report("crossing", Some(&labels), &frames);
+    report("crossing", Some(&labels), &frames, floor_db);
 }
 
 #[test]
@@ -231,5 +325,5 @@ fn vad_music_negative() {
     let (_, floor_db) = weak_labels(&mono, 48000);
     let frames = run_vad(&mono, &left, &right, floor_db);
     assert!(!frames.is_empty(), "must have frames");
-    report("music_negative", None, &frames);
+    report("music_negative", None, &frames, floor_db);
 }
