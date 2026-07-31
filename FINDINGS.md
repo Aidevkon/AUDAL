@@ -496,6 +496,25 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ---
 
+### F-052 — Tier-2 persist is O(N) inside the render path
+- **Status:** OPEN — measured, deliberate, chunked encode pending
+- **Component:** io_flac.rs / dsp_pipeline.rs persist blocks
+- **Context:** encode_f32_flac_24 quantizes the ENTIRE master into a
+  Vec<i32> (4 bytes/sample: ~23MB/min stereo 48k) before encoding, on
+  top of the mmap'd f32 read. Caught by
+  full_pipeline_heap_is_scale_invariant the first time the whole
+  workspace ran after tier 2 (1m=102MB vs 2m=177MB — the test did its
+  job; the ids in its request came from the batch test-migration script,
+  accidentally turning the heap guard into the first measurement of
+  persist cost). An 8-hour audiobook render would transiently allocate
+  ~1.4GB. Decision: heap tests run with project/track ids = None (they
+  guard the O(1) core; persist is an O(N) side-operation by design for
+  now). The debt: chunked FLAC encode — feed flacenc block-wise instead
+  of one Vec. Needs API recon first (does MemSource/encode_with_
+  fixed_block_size accept incremental feeding, or do we build per-block
+  Streams?). Until then: persist cost is linear, documented, and OFF in
+  every heap-measured path.
+
 ### F-051 — Track records were written by the wrong path with fake data
 - **Status:** RESOLVED (fe0f209, as part of F-050 tier 2)
 - **Component:** agents/executor.rs (old site, deleted), handlers/master.rs (new site)
