@@ -418,6 +418,7 @@ impl TwoPassEngine {
 
         // STFT on proxy
         let t_stft = std::time::Instant::now();
+        // scout-resident by design: this IS the NMF W-fit window (nmfd_streaming_spec.md §2 — W fits on scout, never in-stream)
         let mut ctx = StreamingStftEncoder::new();
         let mut frames_cplx = ctx.feed_chunk(&proxy);
         frames_cplx.extend(ctx.finish());
@@ -567,6 +568,7 @@ impl TwoPassEngine {
         let proxy_stereo_l = proxy_voice.clone();
         let proxy_stereo_r = proxy_voice.clone();
 
+        // scout-resident by design: outputs steer Pass-2 (rear/lfe scales); a full-file version is a Cycle-5 question
         let spatial_pre = SpatialPreAnalysis::analyze(
             &proxy_stereo_l,
             &proxy_stereo_r,
@@ -588,6 +590,7 @@ impl TwoPassEngine {
         };
 
         use crate::analysis::StemFeatureAnalyzer;
+        // scout-resident by design: centroid/flatness feed corpus features; full-file spectral truth is TrunkMetrics' 8-band profile (Cycle 4b decision 2026-07-31)
         let features =
             StemFeatureAnalyzer::analyze(&proxy_fivs, sample_rate / SCOUT_DOWNSAMPLE as u32);
 

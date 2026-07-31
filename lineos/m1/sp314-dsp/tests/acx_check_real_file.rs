@@ -105,7 +105,7 @@ fn acx_check_real_file() {
     println!("passes_acx  : {}", report.passes_acx());
     if let Some(start) = report.quietest_window_start_frame {
         println!(
-        "quietest 500ms window starts at frame {} = {:.1} s (at the fed stream's rate)",
+            "quietest 500ms window starts at frame {} = {:.1} s (at the fed stream's rate)",
             start,
             start as f32 / spec.sample_rate as f32
         );

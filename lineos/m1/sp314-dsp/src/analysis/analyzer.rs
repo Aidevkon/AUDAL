@@ -10,8 +10,7 @@ use super::spectral::{spectral_centroid_hz, spectral_crest_factor_db, spectral_f
 use super::stereo::{stereo_correlation, stereo_width};
 use crate::limiter::true_peak::measure_true_peak_dbtp;
 use crate::limiter::true_peak::TruePeakDetector;
-use crate::metering::lra::measure_loudness_range;
-use crate::metering::lra::StreamingLraMeter;
+// Removed StreamingLraMeter import from analyzer (moved to trunk)
 use crate::metering::lufs_meter::LufsMeter;
 use crate::metering::measure_integrated_lufs;
 use crate::stft::stem_renderer::FiveStems;
@@ -96,6 +95,7 @@ impl StemFeatureAnalyzer {
             // measures these on the raw pre-NMF signal (Cycle 5, P27).
             integrated_lufs: 0.0,
             true_peak_dbtp: 0.0,
+            // TrunkMetrics.lra is the live source for loudness range
             loudness_range: 0.0,
             stereo_correlation: 0.0,
             stereo_width: 0.0,
@@ -161,7 +161,8 @@ impl StemFeatureAnalyzer {
             spectral_crest_factor: spec_crest,
             integrated_lufs: lufs,
             true_peak_dbtp: measure_true_peak_dbtp(&l, &r),
-            loudness_range: measure_loudness_range(&l, &r, sample_rate),
+            // TrunkMetrics.lra is the live source for loudness range; scout stems pass 0.0
+            loudness_range: 0.0,
             rms_db: rms,
             stereo_correlation: corr,
             stereo_width: width,
@@ -193,7 +194,6 @@ pub struct StreamingStemAnalyzer {
     dyn_l: StreamingDynamicsAnalyzer,
     dyn_r: StreamingDynamicsAnalyzer,
     lufs: LufsMeter,
-    lra: StreamingLraMeter,
     tp_detector: TruePeakDetector,
     tp_max: f32,
     corr_cross: f32,
@@ -210,7 +210,6 @@ impl StreamingStemAnalyzer {
             dyn_l: StreamingDynamicsAnalyzer::new(sample_rate),
             dyn_r: StreamingDynamicsAnalyzer::new(sample_rate),
             lufs: LufsMeter::new(),
-            lra: StreamingLraMeter::new(sample_rate),
             tp_detector: TruePeakDetector::new(),
             tp_max: 0.0,
             corr_cross: 0.0,
@@ -232,7 +231,6 @@ impl StreamingStemAnalyzer {
         self.dyn_l.feed_chunk(left);
         self.dyn_r.feed_chunk(right);
         self.lufs.process_chunk(left, right);
-        self.lra.process_chunk(left, right);
 
         let n = left.len().min(right.len());
         for i in 0..n {
@@ -255,7 +253,8 @@ impl StreamingStemAnalyzer {
         }
 
         let lufs = self.lufs.finish().unwrap_or(-144.0);
-        let lra = self.lra.finish();
+        // TrunkMetrics.lra is the live source for loudness range
+        let lra = 0.0;
 
         let dyn_l = self.dyn_l.finish();
         let dyn_r = self.dyn_r.finish();
