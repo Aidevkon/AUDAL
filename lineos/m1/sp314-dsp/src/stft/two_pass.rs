@@ -14,7 +14,7 @@ use crate::spatial::SpatialPreAnalysis;
 use crate::stft::hpss::HpssStreamContext;
 use crate::stft::nmf::{NmfEngine, N_COMPONENTS};
 use crate::stft::stem_renderer::FiveStems;
-use crate::stft::{StreamingStftEncoder, FFT_SIZE, HOP_SIZE, N_BINS};
+use crate::stft::{StftEngine, StreamingStftEncoder, FFT_SIZE, HOP_SIZE, N_BINS};
 use lineos_corpus::mfcc::MfccAnalyzer;
 use lineos_corpus::scout::{SegmentBoundary, SegmentType};
 use lineos_types::StemFeatures;
@@ -1165,6 +1165,121 @@ fn apply_mask_to_chunk(chunk: &[f32], mask: &[Vec<f32>], n_frames: usize) -> Vec
         .zip(weights.iter())
         .map(|(s, w)| s * w)
         .collect()
+}
+
+/// Cross-chunk OLA state for spectral reconstruction.
+/// Size: FFT_SIZE/2 = 1024 f32 = 4096 bytes per stem.
+/// One instance per stem that uses spectral masking.
+pub struct SpectralOlaState {
+    /// Tail from previous chunk's iSTFT output, to be added
+    /// to the start of the next chunk's output.
+    pub overlap: Vec<f32>,
+}
+
+impl SpectralOlaState {
+    pub fn new() -> Self {
+        Self {
+            overlap: vec![0.0_f32; FFT_SIZE / 2],
+        }
+    }
+
+    /// Mix previous overlap into `output`, save the new tail.
+    /// Returns the clean, overlap-corrected samples.
+    pub fn process(&mut self, output: &[f32]) -> Vec<f32> {
+        let overlap_len = self.overlap.len();
+        let out_len = output.len();
+        let mut result = output.to_vec();
+
+        let mix_len = overlap_len.min(out_len);
+        for (r, o) in result[..mix_len].iter_mut().zip(&self.overlap[..mix_len]) {
+            *r += o;
+        }
+
+        if out_len >= overlap_len {
+            self.overlap
+                .copy_from_slice(&result[out_len - overlap_len..]);
+            result.truncate(out_len - overlap_len);
+        } else {
+            self.overlap[..out_len].copy_from_slice(&result);
+            self.overlap[out_len..].fill(0.0_f32);
+            result.clear();
+        }
+        result
+    }
+
+    pub fn flush(&self) -> Vec<f32> {
+        self.overlap.clone()
+    }
+}
+
+/// Spectral reconstruction: Y_stem[k,t] = mask[k,t] * X[k,t], then iSTFT.
+///
+/// Unlike `apply_mask_to_chunk` (which collapses each mask frame to a single
+/// broadband scalar), this preserves per-bin spectral separation through
+/// proper complex masking + inverse STFT + overlap-add.
+///
+/// ## STFT parameters (must match analysis side):
+///   FFT_SIZE = 2048, HOP_SIZE = 512, N_BINS = 1025
+///   Window: periodic Hann, w[n] = 0.5 - 0.5*cos(2πn/N)
+///
+/// ## COLA verification (periodic Hann, R=512, N=2048, overlap=75%):
+///   Σ_m w²[n - mR] = constant for all n.
+///   For periodic Hann with N/R = 4 (75% overlap):
+///     w²[n] + w²[n-R] + w²[n-2R] + w²[n-3R]
+///     = 0.25*(1-cos(θ))² summed at 4 phases spaced π/2 apart
+///     = 4 * 3/8 = 3/2 = 1.5  (proven by trig identity)
+///   StftEngine::inverse normalizes by window_sum = Σ w²,
+///   so the WOLA denominator is 1.5 everywhere in steady state.
+///
+/// ## Memory per chunk:
+///   Complex STFT bins: n_frames * N_BINS * 8 bytes (Complex<f32>)
+///   For CHUNK_FRAMES=65536: n_frames ≈ (65536 + 2*1024) / 512 ≈ 132
+///   → 132 * 1025 * 8 ≈ 1.08 MB per complex STFT
+///   Masked copy: same → ~1.08 MB
+///   Total ~2.2 MB per stem call (transient, freed after iSTFT)
+///
+/// ## Cross-chunk state:
+///   SpectralOlaState holds 1024 f32 = 4 KB overlap tail per stem.
+pub fn apply_spectral_mask_to_chunk(
+    complex_frames: &[Vec<rustfft::num_complex::Complex<f32>>],
+    mask: &[Vec<f32>],
+    output_len: usize,
+) -> Vec<f32> {
+    use rustfft::num_complex::Complex;
+
+    let n_frames = complex_frames.len();
+    if n_frames == 0 || mask.is_empty() || output_len == 0 {
+        return vec![0.0; output_len];
+    }
+
+    // Apply mask in spectral domain: Y[k,t] = mask[k,t] * X[k,t]
+    let masked_frames: Vec<Vec<Complex<f32>>> = complex_frames
+        .iter()
+        .enumerate()
+        .map(|(t, frame)| {
+            let mask_frame = if t < mask.len() {
+                &mask[t]
+            } else {
+                &mask[mask.len() - 1]
+            };
+            frame
+                .iter()
+                .enumerate()
+                .map(|(b, &x)| {
+                    let m = if b < mask_frame.len() {
+                        mask_frame[b]
+                    } else {
+                        0.0
+                    };
+                    Complex::new(x.re * m, x.im * m)
+                })
+                .collect()
+        })
+        .collect();
+
+    // iSTFT via StftEngine::inverse (WOLA with window² normalization)
+    let mut engine = StftEngine::new();
+    engine.inverse(&masked_frames, output_len)
 }
 
 /// Compute transient density — deterministic, INV-AB-1.
