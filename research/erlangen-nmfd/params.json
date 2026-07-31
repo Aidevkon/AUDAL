@@ -1,0 +1,26 @@
+{
+    "stft": {
+        "block_size": 1024,
+        "hop_size": 512,
+        "win": "np.hanning(1024)",
+        "reconst_mirror": true,
+        "append_frames": true
+    },
+    "nmf": {
+        "num_comp": 4,
+        "num_iter": 20,
+        "cost_func": "KLDiv"
+    },
+    "nmfd": {
+        "num_comp": 4,
+        "num_template_frames": 8,
+        "num_iter": 20
+    },
+    "nmfd_returns": [
+        "W (List of Tensors -> np.ndarray)",
+        "H (np.ndarray - Activation matrix)",
+        "nmfd_V (List of approximated component spectrograms -> np.ndarray)",
+        "cost_func (np.ndarray - approximation quality per iteration)",
+        "tensor_W (np.ndarray - the template tensor)"
+    ]
+}
