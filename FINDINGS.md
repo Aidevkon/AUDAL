@@ -544,6 +544,24 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
   (F-049 pattern). Downstream unblock: narration-grade posteriors are
   now good enough for the duck-curve producer and Guided NMF gating
   on SPEECH material; music-heavy material waits on 2c.
+- **2c CLOSED (the l_rate audition), 2026-07-31:** the ritual worked
+  in both directions in one cycle — Phase M's per-frame percentiles
+  read all zeros and nearly buried a LIVING sensor (wrong instrument
+  for discrete events; the direct-drive probe measured dream at 11.5
+  transients/s, bodleasons 5/s, state persisting). The rate-at-window
+  feature showed a 5x median split (SPEECH p50 5-6/s vs MUSIC_MISSED
+  p50 1) AND the trap: near-silence reads rate 3-10/s (ratio-based
+  detector fires on flutter) — a naive term would have resurrected
+  the inversion. Term as shipped: rolling-1s ring (abstain until
+  full), SNR<6dB abstention (pinned oracle — cannot be loosened
+  silently), measured two-class ratio, clamp ±1.5. Music is_speech
+  68.3% -> 62.1%, narration untouched-and-improved. The 6->4dB
+  abstention experiment measured INDIFFERENCE (unchanged at the
+  decimal) — reverted; constants without earned reasons don't change.
+  THE RESIDUAL'S MEASURED SHAPE: tonal + low-SNR + low-rate windows,
+  indistinguishable from quiet speech by every amplitude-blind sensor
+  owned. 62.1% = the 4.5-sensor baseline; disambiguation from here
+  needs richer evidence (MFCC/learned) — Y7, with a number attached.
 - **Originally:** ACTIVE — measured 2026-07-31, harness in
   tests/vad_validation_real.rs (VADVAL| lines, machine-parsable)
 - **Component:** sp314-dsp analysis/{vad_sensors,vad_features,vad_model}
