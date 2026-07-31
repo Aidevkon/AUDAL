@@ -268,3 +268,38 @@ fn test_nmfd_f32_determinism() {
         );
     }
 }
+
+#[test]
+fn test_nmfd_f32_par_vs_seq() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let init_w_f64 = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
+    let init_h_f64 = load_bin("init_H.bin", K * NUM_FRAMES);
+
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let init_w: Vec<f32> = init_w_f64.iter().map(|&x| x as f32).collect();
+    let init_h: Vec<f32> = init_h_f64.iter().map(|&x| x as f32).collect();
+
+    let start_seq = std::time::Instant::now();
+    let (_, h_seq, _) =
+        nmfd::nmfd_f32_seq(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 20);
+    let dur_seq = start_seq.elapsed();
+
+    let start_par = std::time::Instant::now();
+    let (_, h_par, _) = nmfd::nmfd_f32(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 20);
+    let dur_par = start_par.elapsed();
+
+    println!("Seq time: {:?}", dur_seq);
+    println!("Par time: {:?}", dur_par);
+    println!(
+        "Speedup: {:.2}x",
+        dur_seq.as_secs_f64() / dur_par.as_secs_f64()
+    );
+
+    for (a, b) in h_seq.iter().zip(h_par.iter()) {
+        assert_eq!(
+            a.to_bits(),
+            b.to_bits(),
+            "Par vs Seq broken: H bytes differ"
+        );
+    }
+}
