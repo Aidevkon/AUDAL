@@ -5,10 +5,12 @@ pub mod acx_check;
 pub mod analyzer;
 pub mod dynamics;
 pub mod features;
+pub mod onset_flux;
 pub mod pre_analysis;
 pub mod sdr;
 pub mod spectral;
 pub mod stereo;
+pub mod superflux_weights;
 
 pub use analyzer::StemFeatureAnalyzer;
 pub use features::{MixMetrics, StemFeatures, StemMetrics};

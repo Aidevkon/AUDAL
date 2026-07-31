@@ -1,0 +1,1 @@
+{"n_fft": 2048, "hop_length": 512, "n_mels": 24, "sr": 48000, "gamma": 10.0, "matrix_shape": [24, 1688], "envelope_shape": [1688], "mel_basis_shape": [24, 1025]}
