@@ -225,7 +225,9 @@ mod tests {
 
     #[test]
     fn f047_regression_guard_flush_drains_multiple_blocks() {
-        let path = "/tmp/f047_dummy.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path_buf = tmp.path().join("f047_dummy.wav");
+        let path = path_buf.to_str().unwrap();
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 48000,
@@ -254,15 +256,17 @@ mod tests {
             5000,
             "Flush did not drain all blocks (F-047 regression)"
         );
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn test_tap_equals_output() {
         use crate::dsp::audio_source::AudioSource;
+        let tmp = tempfile::TempDir::new().unwrap();
         let uuid = uuid::Uuid::new_v4().to_string();
-        let path = format!("/tmp/m0d-test-tap-in-{}.wav", uuid);
-        let tap_path = format!("/tmp/m0d-test-tap-out-{}.pcm", uuid);
+        let path_buf = tmp.path().join(format!("m0d-test-tap-in-{}.wav", uuid));
+        let path = path_buf.to_str().unwrap();
+        let tap_path_buf = tmp.path().join(format!("m0d-test-tap-out-{}.pcm", uuid));
+        let tap_path = tap_path_buf.to_str().unwrap();
         let spec = hound::WavSpec {
             channels: 2,
             sample_rate: 48000,
@@ -299,7 +303,5 @@ mod tests {
 
         assert_eq!(tap_bytes.len(), expected_bytes.len());
         assert_eq!(tap_bytes, expected_bytes);
-        let _ = std::fs::remove_file(&path);
-        let _ = std::fs::remove_file(&tap_path);
     }
 }

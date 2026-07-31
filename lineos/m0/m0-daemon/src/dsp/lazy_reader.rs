@@ -442,7 +442,9 @@ mod tests {
 
     #[test]
     fn fill_buffer_reads_all_frames() {
-        let path = std::path::Path::new("/tmp/lazy_reader_test_basic.wav");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_basic.wav");
+        let path = std::path::Path::new(&wav_path);
         write_test_wav(path, 48000, 5.0);
 
         let mut reader = LazyAudioReader::open(path).unwrap();
@@ -472,12 +474,13 @@ mod tests {
             expected,
             diff
         );
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn fill_buffer_rejects_bad_length() {
-        let path = std::path::Path::new("/tmp/lazy_reader_test_bad.wav");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_bad.wav");
+        let path = std::path::Path::new(&wav_path);
         write_test_wav(path, 48000, 1.0);
         let mut reader = LazyAudioReader::open(path).unwrap();
         let mut buf = vec![0.0_f32; 3]; // not
@@ -485,12 +488,13 @@ mod tests {
                                         // of 2
         let result = reader.fill_buffer(&mut buf);
         assert!(result.is_err());
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn seek_approximate_moves_position() {
-        let path = std::path::Path::new("/tmp/lazy_reader_test_seek.wav");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_seek.wav");
+        let path = std::path::Path::new(&wav_path);
         write_test_wav(path, 48000, 10.0);
 
         let mut reader = LazyAudioReader::open(path).unwrap();
@@ -532,12 +536,13 @@ mod tests {
              on a 10s file",
             total
         );
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn fill_buffer_preserves_waveform_shape() {
-        let path = std::path::Path::new("/tmp/lazy_reader_test_shape.wav");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_shape.wav");
+        let path = std::path::Path::new(&wav_path);
         write_test_wav(path, 48000, 2.0);
 
         let mut reader = LazyAudioReader::open(path).unwrap();
@@ -621,12 +626,13 @@ mod tests {
             crossings,
             expected_crossings
         );
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn seek_exact_frame_lands_precisely() {
-        let path = std::path::Path::new("/tmp/lazy_reader_test_exact.wav");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_exact.wav");
+        let path = std::path::Path::new(&wav_path);
         write_test_wav(path, 48000, 10.0);
 
         let target_frame = 240_135u64; // ~5.003s,
@@ -674,7 +680,6 @@ mod tests {
             actual,
             diff
         );
-        let _ = std::fs::remove_file(path);
     }
 
     fn write_test_flac(path: &str, sr: u32, dur_secs: f32) {
@@ -692,7 +697,9 @@ mod tests {
 
     #[test]
     fn fill_buffer_preserves_waveform_flac() {
-        let path = "/tmp/lazy_reader_test_shape.flac";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_test_shape.flac");
+        let path = wav_path.to_str().unwrap();
         write_test_flac(path, 48000, 3.0);
 
         let mut reader = LazyAudioReader::open(std::path::Path::new(path)).unwrap();
@@ -767,8 +774,6 @@ mod tests {
             crossings,
             expected_crossings
         );
-
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -828,10 +833,13 @@ mod tests {
 
     #[test]
     fn probe_duration_hint_availability() {
-        for (label, path) in [
-            ("wav", "/tmp/lazy_reader_probe.wav"),
-            ("flac", "/tmp/lazy_reader_probe.flac"),
-        ] {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let w_path = tmp.path().join("lazy_reader_probe.wav");
+        let f_path = tmp.path().join("lazy_reader_probe.flac");
+        let w_path_str = w_path.to_str().unwrap();
+        let f_path_str = f_path.to_str().unwrap();
+
+        for (label, path) in [("wav", w_path_str), ("flac", f_path_str)] {
             if label == "wav" {
                 write_test_wav(std::path::Path::new(path), 48000, 3.0);
             } else {
@@ -843,7 +851,6 @@ mod tests {
                 label,
                 reader.total_frames_hint()
             );
-            let _ = std::fs::remove_file(path);
         }
 
         let mp3_path = std::path::Path::new("/home/aidevcon/Music/liquid .mp3");
@@ -855,7 +862,9 @@ mod tests {
 
     #[test]
     fn read_scout_sample_matches_full_decode_slice() {
-        let path = "/tmp/lazy_reader_scout_parity.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_scout_parity.wav");
+        let path = wav_path.to_str().unwrap();
         let sr = 48000u32;
         let dur = 90.0_f32; // 90s file, scout
                             // wants 30s from
@@ -920,8 +929,6 @@ mod tests {
              max_diff={:.6}",
             max_diff
         );
-
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -929,7 +936,9 @@ mod tests {
         // File shorter than scout window (30s)
         // should return the whole file, not
         // panic or truncate weirdly.
-        let path = "/tmp/lazy_reader_scout_short.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path = tmp.path().join("lazy_reader_scout_short.wav");
+        let path = wav_path.to_str().unwrap();
         write_test_wav(std::path::Path::new(path), 48000, 5.0);
         let (left, _right, _sr) = read_scout_sample(std::path::Path::new(path), 30.0).unwrap();
         let expected = (48000.0_f32 * 5.0) as usize;
@@ -941,6 +950,5 @@ mod tests {
             left.len(),
             expected
         );
-        let _ = std::fs::remove_file(path);
     }
 }

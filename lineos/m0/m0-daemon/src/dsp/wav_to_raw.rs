@@ -138,8 +138,11 @@ mod tests {
 
     #[test]
     fn wav_to_raw_roundtrip_is_bit_identical() {
-        let wav_path = "/tmp/test_w2r.wav";
-        let raw_path = std::path::Path::new("/tmp/test_w2r.pcm");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_w2r.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
+        let raw_path_buf = tmp.path().join("test_w2r.pcm");
+        let raw_path = std::path::Path::new(&raw_path_buf);
         let src: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.001).sin()).collect();
         write_test_wav(wav_path, &src);
 
@@ -153,14 +156,15 @@ mod tests {
             .map(|b| f32::from_ne_bytes([b[0], b[1], b[2], b[3]]))
             .collect();
         assert_eq!(round, src, "raw dump must be bit-identical to source");
-        let _ = std::fs::remove_file(wav_path);
-        let _ = std::fs::remove_file(raw_path);
     }
 
     #[test]
     fn measured_pass_matches_reference_hashes_and_peak() {
-        let wav_path = "/tmp/test_w2r_m.wav";
-        let raw_path = std::path::Path::new("/tmp/test_w2r_m.pcm");
+        let tmp = tempfile::TempDir::new().unwrap();
+        let wav_path_buf = tmp.path().join("test_w2r_m.wav");
+        let wav_path = wav_path_buf.to_str().unwrap();
+        let raw_path_buf = tmp.path().join("test_w2r_m.pcm");
+        let raw_path = std::path::Path::new(&raw_path_buf);
         // 2 seconds of audio so LUFS gating has material (>400ms)
         let n = 96000 * 2;
         let src: Vec<f32> = (0..n).map(|i| 0.5 * (i as f32 * 0.01).sin()).collect();
@@ -183,7 +187,5 @@ mod tests {
         let peak_ref_db = 20.0 * peak_ref.log10();
         assert!((m.true_peak_dbtp - peak_ref_db).abs() < 1e-4);
         assert!(m.output_lufs.is_finite(), "2s of audio must yield LUFS");
-        let _ = std::fs::remove_file(wav_path);
-        let _ = std::fs::remove_file(raw_path);
     }
 }

@@ -1141,8 +1141,10 @@ mod tests {
 
     #[test]
     fn test_read_scout_from_raw_dump() {
+        let tmp = tempfile::TempDir::new().unwrap();
         use std::io::Write;
-        let path = "/tmp/test_raw_scout_dump.pcm";
+        let path_buf = tmp.path().join("test_raw_scout_dump.pcm");
+        let path = path_buf.to_str().unwrap();
         let mut f = std::fs::File::create(path).unwrap();
         // 10 frames total (20 floats)
         for i in 0..10 {
@@ -1164,7 +1166,8 @@ mod tests {
         let _ = std::fs::remove_file(path);
 
         // Truncated dump (10 full frames + 4 orphan bytes)
-        let path_trunc = "/tmp/test_raw_scout_trunc.pcm";
+        let path_trunc_buf = tmp.path().join("test_raw_scout_trunc.pcm");
+        let path_trunc = path_trunc_buf.to_str().unwrap();
         let mut f2 = std::fs::File::create(path_trunc).unwrap();
         for i in 0..10 {
             f2.write_all(&(i as f32).to_le_bytes()).unwrap(); // L
@@ -1176,8 +1179,6 @@ mod tests {
         let trunc_res = read_scout_from_raw_dump(std::path::Path::new(path_trunc), 0, 5);
         assert!(trunc_res.is_err());
         assert!(trunc_res.unwrap_err().contains("partial frame"));
-
-        let _ = std::fs::remove_file(path_trunc);
     }
 
     #[test]
@@ -1289,7 +1290,9 @@ mod tests {
     fn test_spatial_interleave_chunked_matches_batch() {
         // Using 200_000 frames deliberately to cross the 65536 boundary
         // ending with a partial tail (200000 % 65536 != 0)
-        let raw_path = "/tmp/test_m0d_raw_chunked.pcm";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let raw_path_buf = tmp.path().join("test_m0d_raw_chunked.pcm");
+        let raw_path = raw_path_buf.to_str().unwrap();
         let num_frames = 200_000;
         let channels: [Vec<f32>; 6] = std::array::from_fn(|ch| {
             (0..num_frames)
@@ -1320,7 +1323,5 @@ mod tests {
             raw_bytes_oracle,
             "chunked dump must exactly match batch oracle"
         );
-
-        let _ = std::fs::remove_file(raw_path);
     }
 }

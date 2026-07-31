@@ -257,7 +257,9 @@ mod tests {
 
     #[test]
     fn six_channel_parity_passthrough_48k() {
-        let path = "/tmp/six_parity_48k.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("six_parity_48k.wav");
+        let path = path.to_str().unwrap();
         write_wav_6ch(path, 48_000, 3.3);
 
         let (b_blake, b_sha, _batch_samples) = batch_decode_6ch(path);
@@ -266,12 +268,13 @@ mod tests {
         assert_eq!(total_frames, (48000.0 * 3.3) as usize, "Exact 48k frames");
         assert_eq!(b_blake, s_blake, "blake3 mismatch on 48k passthrough");
         assert_eq!(b_sha, s_sha, "sha256 mismatch on 48k passthrough");
-        let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn six_channel_parity_resampled_44k() {
-        let path = "/tmp/six_parity_44k.wav";
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("six_parity_44k.wav");
+        let path = path.to_str().unwrap();
         write_wav_6ch(path, 44_100, 3.7);
 
         let (_b_blake, _b_sha, batch_samples) = batch_decode_6ch(path);
@@ -307,7 +310,5 @@ mod tests {
             stream_rms,
             error
         );
-
-        let _ = std::fs::remove_file(path);
     }
 }
