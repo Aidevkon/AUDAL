@@ -31,6 +31,7 @@ pub struct VadContext {
     pub noise_floor_dbfs: f32,
     /// |rms_t - rms_{t-3}|, computed by the classifier from its own ring
     pub rms_delta_30ms: f32,
+    pub transient_rate: Option<f32>,
 }
 
 pub trait LikelihoodModel {
@@ -53,7 +54,7 @@ pub trait LikelihoodModel {
 pub struct FixedPriors;
 
 impl FixedPriors {
-    pub fn log_odds_terms(&self, f: &VadFeatures, ctx: &VadContext) -> [f32; 4] {
+    pub fn log_odds_terms(&self, f: &VadFeatures, ctx: &VadContext) -> [f32; 5] {
         // ROBUSTNESS GUARD
         if f.rms_db.is_nan()
             || f.rms_db.is_infinite()
@@ -66,7 +67,7 @@ impl FixedPriors {
             || ctx.rms_delta_30ms.is_nan()
             || ctx.rms_delta_30ms.is_infinite()
         {
-            return [0.0; 4];
+            return [0.0; 5];
         }
 
         // --- (a) SNR ---
@@ -120,14 +121,39 @@ impl FixedPriors {
         // The clamps on the individual terms ARE the weighting policy, tunable by ear.
         // Which sensor we trust came from measurement, not intuition.
         // l_ms and l_drms are clamped tight so their constant bias cannot outvote flatness.
-        [l_snr, l_flat, l_ms, l_drms]
+
+        // --- (e) Transient Rate (Rolling 1s) ---
+        // ABSTAIN (0.0) when snr_db < 6.0 — measured: dream quiet shows
+        // rate p50=3/p90=10 because the ratio-based detector fires on
+        // near-silence flutter (RATERAW|dream|NONSPEECH).
+        let l_rate = if snr < 6.0 {
+            0.0
+        } else if let Some(rate) = ctx.transient_rate {
+            // speech: N(mu=5.5, sig=3.5)
+            // music:  N(mu=1.0, sig=1.5)
+            const RATE_MU_SPEECH: f32 = 5.5;
+            const RATE_SIG_SPEECH: f32 = 3.5;
+            const RATE_MU_MUSIC: f32 = 1.0;
+            const RATE_SIG_MUSIC: f32 = 1.5;
+
+            let z_s = (rate - RATE_MU_SPEECH) / RATE_SIG_SPEECH;
+            let z_m = (rate - RATE_MU_MUSIC) / RATE_SIG_MUSIC;
+            const RATE_LN_SIG_RATIO: f32 = -0.84729786; // ln(1.5) - ln(3.5)
+
+            (0.5 * (z_m * z_m) - 0.5 * (z_s * z_s) + RATE_LN_SIG_RATIO).clamp(-1.5, 1.5)
+        } else {
+            // Abstain during the first second warmup (until ring is full)
+            0.0
+        };
+
+        [l_snr, l_flat, l_ms, l_drms, l_rate]
     }
 }
 
 impl LikelihoodModel for FixedPriors {
     fn log_odds(&self, f: &VadFeatures, ctx: &VadContext) -> f32 {
         let terms = self.log_odds_terms(f, ctx);
-        terms[0] + terms[1] + terms[2] + terms[3]
+        terms[0] + terms[1] + terms[2] + terms[3] + terms[4]
     }
 }
 
@@ -148,6 +174,7 @@ pub struct VadDecision {
     pub is_speech: bool,
     pub duck_gain: f32,
     pub rms_delta_30ms: f32,
+    pub transient_rate: Option<f32>,
 }
 
 pub struct VadClassifier<M: LikelihoodModel> {
@@ -155,6 +182,9 @@ pub struct VadClassifier<M: LikelihoodModel> {
     rms_ring: [f32; 3],
     ring_filled: usize,
     ring_idx: usize,
+    transient_ring: [i32; 100],
+    trans_ring_idx: usize,
+    trans_ring_filled: usize,
     pub is_speech: bool,
     hold_counter: usize,
     pub duck_gain: f32,
@@ -167,6 +197,9 @@ impl<M: LikelihoodModel> VadClassifier<M> {
             rms_ring: [0.0; 3],
             ring_filled: 0,
             ring_idx: 0,
+            transient_ring: [0; 100],
+            trans_ring_idx: 0,
+            trans_ring_filled: 0,
             is_speech: false,
             hold_counter: 0,
             duck_gain: 0.0,
@@ -194,9 +227,23 @@ impl<M: LikelihoodModel> VadClassifier<M> {
             self.ring_filled += 1;
         }
 
+        let trans_count = (f.transient_density * 0.01).round() as i32;
+        self.transient_ring[self.trans_ring_idx] = trans_count;
+        self.trans_ring_idx = (self.trans_ring_idx + 1) % 100;
+        if self.trans_ring_filled < 100 {
+            self.trans_ring_filled += 1;
+        }
+
+        let transient_rate = if self.trans_ring_filled == 100 {
+            Some(self.transient_ring.iter().sum::<i32>() as f32)
+        } else {
+            None
+        };
+
         let ctx = VadContext {
             noise_floor_dbfs,
             rms_delta_30ms,
+            transient_rate,
         };
 
         let log_odds = self.model.log_odds(f, &ctx);
@@ -228,6 +275,7 @@ impl<M: LikelihoodModel> VadClassifier<M> {
             is_speech: self.is_speech,
             duck_gain: self.duck_gain,
             rms_delta_30ms,
+            transient_rate,
         }
     }
 }
@@ -254,6 +302,7 @@ mod tests {
         let ctx = VadContext {
             noise_floor_dbfs: -60.0,
             rms_delta_30ms: 1.0,
+            transient_rate: None,
         };
 
         let mut f_floor = dummy_features();
@@ -276,7 +325,8 @@ mod tests {
     fn oracle_music_vs_speech() {
         let mut ctx = VadContext {
             noise_floor_dbfs: 0.0,
-            rms_delta_30ms: 1.147,
+            rms_delta_30ms: DRMS_MU_NOISE,
+            transient_rate: None,
         };
 
         let mut f_speech = dummy_features();
@@ -301,10 +351,74 @@ mod tests {
     }
 
     #[test]
+    fn oracle_rate_positive() {
+        let mut f = dummy_features();
+        f.rms_db = -30.0;
+        let ctx = VadContext {
+            noise_floor_dbfs: -60.0,
+            rms_delta_30ms: DRMS_MU_SPEECH,
+            transient_rate: Some(6.0),
+        };
+        let terms = FixedPriors.log_odds_terms(&f, &ctx);
+        assert!(
+            terms[4] > 0.0,
+            "rate 6 at snr 30 should be positive, got {}",
+            terms[4]
+        );
+    }
+
+    #[test]
+    fn oracle_rate_negative() {
+        let mut f = dummy_features();
+        f.rms_db = -30.0;
+        let ctx = VadContext {
+            noise_floor_dbfs: -60.0,
+            rms_delta_30ms: DRMS_MU_SPEECH,
+            transient_rate: Some(1.0),
+        };
+        let terms = FixedPriors.log_odds_terms(&f, &ctx);
+        assert!(
+            terms[4] < 0.0,
+            "rate 1 at snr 30 should be negative, got {}",
+            terms[4]
+        );
+    }
+
+    #[test]
+    fn oracle_rate_abstain_snr() {
+        let mut f = dummy_features();
+        f.rms_db = -58.0;
+        let ctx = VadContext {
+            noise_floor_dbfs: -60.0, // snr = 2.0 < 6.0
+            rms_delta_30ms: DRMS_MU_SPEECH,
+            transient_rate: Some(10.0),
+        };
+        let terms = FixedPriors.log_odds_terms(&f, &ctx);
+        assert_eq!(
+            terms[4], 0.0,
+            "rate 10 at snr 2 should exactly abstain (0.0)"
+        );
+    }
+
+    #[test]
+    fn oracle_rate_abstain_warmup() {
+        let mut f = dummy_features();
+        f.rms_db = -30.0;
+        let ctx = VadContext {
+            noise_floor_dbfs: -60.0, // snr = 30.0 >= 6.0
+            rms_delta_30ms: DRMS_MU_SPEECH,
+            transient_rate: None,
+        };
+        let terms = FixedPriors.log_odds_terms(&f, &ctx);
+        assert_eq!(terms[4], 0.0, "warmup (None) should exactly abstain (0.0)");
+    }
+
+    #[test]
     fn oracle_flatness_bimodal() {
         let ctx = VadContext {
             noise_floor_dbfs: 0.0,
             rms_delta_30ms: 0.2,
+            transient_rate: None,
         };
         let mut f = dummy_features();
         f.rms_db = 6.0; // SNR = 6.0 => l_snr = 0.0
@@ -341,6 +455,7 @@ mod tests {
         let ctx = VadContext {
             noise_floor_dbfs: -60.0,
             rms_delta_30ms: 1.0,
+            transient_rate: None,
         };
 
         let mut f_speech = dummy_features();
@@ -362,6 +477,7 @@ mod tests {
         let ctx = VadContext {
             noise_floor_dbfs: -60.0,
             rms_delta_30ms: 1.0,
+            transient_rate: None,
         };
 
         let mut f_center = dummy_features();
@@ -380,6 +496,7 @@ mod tests {
         let ctx = VadContext {
             noise_floor_dbfs: -60.0,
             rms_delta_30ms: 0.5,
+            transient_rate: None,
         };
 
         let f_speech = VadFeatures {

@@ -72,7 +72,7 @@ fn run_vad(
     left: &[f32],
     right: &[f32],
     floor_db: f32,
-) -> Vec<(f32, bool, [f32; 4], f32, f32)> {
+) -> Vec<(f32, bool, [f32; 5], f32, f32, f32)> {
     let mut extractor = VadFeatureExtractor::new();
     let mut classifier = VadClassifier::new(FixedPriors);
     let mut results = Vec::new();
@@ -90,11 +90,20 @@ fn run_vad(
             let ctx = sp314_dsp::analysis::vad_model::VadContext {
                 noise_floor_dbfs: floor_db,
                 rms_delta_30ms: decision.rms_delta_30ms,
+                transient_rate: decision.transient_rate,
             };
             let terms = FixedPriors.log_odds_terms(&f, &ctx);
             let snr = f.rms_db - floor_db;
             let flat = f.spectral_flatness;
-            results.push((decision.posterior, decision.is_speech, terms, snr, flat));
+            let trans = f.transient_density;
+            results.push((
+                decision.posterior,
+                decision.is_speech,
+                terms,
+                snr,
+                flat,
+                trans,
+            ));
         }
     }
     results
@@ -130,7 +139,7 @@ fn print_stats(name: &str, class_name: &str, mut posts: Vec<f32>, right_side_is_
 fn report(
     name: &str,
     labels: Option<&[Label]>,
-    frames: &[(f32, bool, [f32; 4], f32, f32)],
+    frames: &[(f32, bool, [f32; 5], f32, f32, f32)],
     floor_db: f32,
 ) {
     println!("VADVAL|{}|FLOOR_DB|{:.2}", name, floor_db);
@@ -143,7 +152,28 @@ fn report(
         window_frames.push(chunk);
     }
 
+    let num_windows = window_frames.len();
+    let mut window_rates = vec![0.0f32; num_windows];
+    let mut window_transient_counts = vec![0i32; num_windows];
+    for (i, chunk) in window_frames.iter().enumerate() {
+        let mut count = 0;
+        for &(_, _, _, _, _, trans) in *chunk {
+            count += (trans * 0.01).round() as i32;
+        }
+        window_transient_counts[i] = count;
+    }
+    for i in 0..num_windows {
+        let start = i.saturating_sub(4);
+        let end = (i + 5).min(num_windows);
+        let mut sum = 0;
+        for j in start..end {
+            sum += window_transient_counts[j];
+        }
+        window_rates[i] = sum as f32; // sum of counts over ~10 windows (1s) = rate (Hz)
+    }
+
     let mut class_frames = std::collections::HashMap::new();
+    let mut class_rates = std::collections::HashMap::new();
     let mut add_frames = |class: &str, window_idx: usize| {
         let e = class_frames
             .entry(class.to_string())
@@ -151,6 +181,10 @@ fn report(
         for f in window_frames[window_idx] {
             e.push(*f);
         }
+        let r = class_rates
+            .entry(class.to_string())
+            .or_insert_with(Vec::new);
+        r.push(window_rates[window_idx]);
     };
 
     let mut nonspeech_windows = Vec::new();
@@ -188,6 +222,9 @@ fn report(
         print_stats(name, "MUSIC", window_posteriors.clone(), false);
         for i in 0..window_posteriors.len() {
             add_frames("MUSIC", i);
+            if window_posteriors[i] > 0.5 {
+                add_frames("MUSIC_MISSED", i);
+            }
         }
     }
 
@@ -196,7 +233,13 @@ fn report(
         add_frames("NONSPEECH_TOP20", *i);
     }
 
-    for class in ["SPEECH", "NONSPEECH", "MUSIC", "NONSPEECH_TOP20"] {
+    for class in [
+        "SPEECH",
+        "NONSPEECH",
+        "MUSIC",
+        "MUSIC_MISSED",
+        "NONSPEECH_TOP20",
+    ] {
         if let Some(fs) = class_frames.get(class) {
             if fs.is_empty() {
                 continue;
@@ -205,16 +248,20 @@ fn report(
             let mut sum_flat = 0.0;
             let mut sum_ms = 0.0;
             let mut sum_drms = 0.0;
+            let mut sum_rate = 0.0;
             let mut snrs = Vec::new();
             let mut flats = Vec::new();
+            let mut trans_vals = Vec::new();
 
-            for &(_, _, terms, snr, flat) in fs {
+            for &(_, _, terms, snr, flat, trans) in fs {
                 sum_snr += terms[0];
                 sum_flat += terms[1];
                 sum_ms += terms[2];
                 sum_drms += terms[3];
+                sum_rate += terms[4];
                 snrs.push(snr);
                 flats.push(flat);
+                trans_vals.push(trans);
             }
 
             let count = fs.len() as f32;
@@ -222,11 +269,12 @@ fn report(
             let m_flat = sum_flat / count;
             let m_ms = sum_ms / count;
             let m_drms = sum_drms / count;
-            let m_total = m_snr + m_flat + m_ms + m_drms;
+            let m_rate = sum_rate / count;
+            let m_total = m_snr + m_flat + m_ms + m_drms + m_rate;
 
             println!(
-                "VADVAL|{}|TERMS|{}|l_snr={:.4}|l_flat={:.4}|l_ms={:.4}|l_drms={:.4}|total={:.4}",
-                name, class, m_snr, m_flat, m_ms, m_drms, m_total
+                "VADVAL|{}|TERMS|{}|l_snr={:.4}|l_flat={:.4}|l_ms={:.4}|l_drms={:.4}|l_rate={:.4}|total={:.4}",
+                name, class, m_snr, m_flat, m_ms, m_drms, m_rate, m_total
             );
 
             snrs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -247,6 +295,28 @@ fn report(
                 "VADVAL|{}|FLATRAW|{}|p10={:.4}|p50={:.4}|p90={:.4}",
                 name, class, p10_flat, p50_flat, p90_flat
             );
+
+            trans_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let p10_trans = trans_vals[(c as f32 * 0.1).floor() as usize];
+            let p50_trans = trans_vals[(c as f32 * 0.5).floor() as usize];
+            let p90_trans = trans_vals[(c as f32 * 0.9).floor() as usize];
+            println!(
+                "VADVAL|{}|TRANSRAW|{}|p10={:.4}|p50={:.4}|p90={:.4}",
+                name, class, p10_trans, p50_trans, p90_trans
+            );
+        }
+        if let Some(mut rates) = class_rates.remove(class) {
+            if !rates.is_empty() {
+                rates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                let c = rates.len();
+                let p10_rate = rates[(c as f32 * 0.1).floor() as usize];
+                let p50_rate = rates[(c as f32 * 0.5).floor() as usize];
+                let p90_rate = rates[(c as f32 * 0.9).floor() as usize];
+                println!(
+                    "VADVAL|{}|RATERAW|{}|p10={:.4}|p50={:.4}|p90={:.4}",
+                    name, class, p10_rate, p50_rate, p90_rate
+                );
+            }
         }
     }
 
@@ -338,4 +408,84 @@ fn vad_music_negative() {
     let frames = run_vad(&mono, &left, &right, floor_db);
     assert!(!frames.is_empty(), "must have frames");
     report("music_negative", None, &frames, floor_db);
+}
+
+#[test]
+#[ignore]
+fn vad_transient_probe() {
+    use sp314_dsp::analysis::vad_sensors::TransientSensor;
+
+    let dream_url = "https://github.com/voxserv/audio_quality_testing_samples/raw/master/mono_44100/156550__acclivity__a-dream-within-a-dream.wav";
+    let dream_path = "/tmp/narration_dream.wav";
+    if !ensure_downloaded(dream_url, dream_path) {
+        return;
+    }
+    let (dream_mono, _, _) = prepare(dream_path);
+    let dream_2s = &dream_mono[..96000.min(dream_mono.len())];
+
+    let bod_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav");
+    let (bod_mono, _, _) = prepare(bod_path.to_str().unwrap());
+    let bod_2s = &bod_mono[..96000.min(bod_mono.len())];
+
+    for (name, slice) in [("dream", dream_2s), ("bodleasons", bod_2s)] {
+        let mut s_whole = TransientSensor::new();
+        let whole2s = s_whole.process(slice);
+
+        let mut s_chopped = TransientSensor::new();
+        let mut chopped_sum = 0;
+        let mut frames_firing = 0;
+        for chunk in slice.chunks(480) {
+            let r = s_chopped.process(chunk);
+            if r > 0.0 {
+                frames_firing += 1;
+                // rate * duration = count in frame
+                chopped_sum += (r * (chunk.len() as f32 / 48000.0)).round() as i32;
+            }
+        }
+        println!(
+            "VADVAL|PROBE|{}|whole2s={:.4}|chopped_sum={}|frames_firing={}",
+            name, whole2s, chopped_sum, frames_firing
+        );
+    }
+
+    // Replicate MAs for dream
+    let mut ring = vec![0.0f32; 4800];
+    let mut pos = 0;
+    let mut fast_sum = 0.0;
+    let mut slow_sum = 0.0;
+    let mut max_ratio_per_frame = Vec::new();
+    for chunk in dream_2s.chunks(480) {
+        let mut max_ratio = 0.0f32;
+        for &s in chunk {
+            let rect = libm::fabsf(s);
+            let old_slow = ring[pos];
+            let fast_idx = (pos + 4800 - 480) % 4800;
+            let old_fast = ring[fast_idx];
+            slow_sum += rect - old_slow;
+            fast_sum += rect - old_fast;
+            ring[pos] = rect;
+            pos = (pos + 1) % 4800;
+            let fast_ma = fast_sum / 480.0;
+            let slow_ma = (slow_sum / 4800.0).max(1e-9);
+            let ratio = fast_ma / slow_ma;
+            if ratio > max_ratio {
+                max_ratio = ratio;
+            }
+        }
+        max_ratio_per_frame.push(max_ratio);
+    }
+
+    max_ratio_per_frame.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let c = max_ratio_per_frame.len();
+    let p50 = max_ratio_per_frame[(c as f32 * 0.5).floor() as usize];
+    let p90 = max_ratio_per_frame[(c as f32 * 0.9).floor() as usize];
+    let max_r = max_ratio_per_frame.last().copied().unwrap_or(0.0);
+    println!(
+        "VADVAL|PROBE|dream|ratio_p50={:.4}|ratio_p90={:.4}|ratio_max={:.4}|threshold={:.4}",
+        p50,
+        p90,
+        max_r,
+        sp314_dsp::analysis::vad_sensors::TRANSIENT_THRESHOLD
+    );
 }
