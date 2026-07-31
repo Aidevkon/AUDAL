@@ -253,7 +253,7 @@ pub fn run(
         write_offset = end_offset;
     };
 
-    let trace_path = format!("/tmp/vad-trace-{}.csv", settings.blob_id);
+    let trace_path = crate::spool::spool_dir().join(format!("vad-trace-{}.csv", settings.blob_id));
     let mut observer_holder = if settings.vad_observe_enabled {
         match std::fs::File::create(&trace_path) {
             Ok(file) => {
