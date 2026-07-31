@@ -496,6 +496,23 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ---
 
+### F-051 — Track records were written by the wrong path with fake data
+- **Status:** RESOLVED (fe0f209, as part of F-050 tier 2)
+- **Component:** agents/executor.rs (old site, deleted), handlers/master.rs (new site)
+- **Context:** The only CREATE tracks write in the codebase lived in the
+  agent executor with hardcoded project_id 'default', flavour 'neutral',
+  duration_ms 0, and manual string escaping — while the HTTP /master
+  path (the one the frontend and the delivery stage depend on) wrote NO
+  Track record at all. Discovered during tier-2 recon when the persist
+  design needed the write site. Consequence before the fix: the delivery
+  stage (3bcacfe) queried tracks by project_id and could never find real
+  ones. Fix: the executor block is deleted (ExecutionPlan carries no
+  project/track ids — it never had real data to write); the write moved
+  to handlers/master.rs where the request's ids, the persisted master
+  path, and real lufs/true_peak/duration are all in scope, using .bind()
+  parameterization instead of format!-escaping. One write site, correct
+  data.
+
 ### F-050 — hardcoded /tmp/ paths: test side RESOLVED, production side OPEN
 - **Status:** SPLIT — test side RESOLVED (tempfile migration, 9 files / 46
   paths, one straggler beyond the original recon's 45-in-8 count, zero
@@ -505,8 +522,32 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
   writes vad-trace CSVs — all to bare /tmp. Different risk than the test
   collisions (blob ids unique, no cross-process clash): no cleanup on
   failed renders (/tmp litter), tmpfs RAM pressure for GB-scale dumps on
-  RAM-backed /tmp, loss on reboot. Needs a managed spool dir with a
-  cleanup policy — its own design, not a drive-by.
+  RAM-backed /tmp, loss on reboot. RESOLVED in two steps: tiers 1+3
+  (cc1c78a — spool dir + RAII scratch guards) and tier 2 (fe0f209 —
+  persistent masters): renders carrying project_id+track_id FLAC-encode
+  the master to masters_path/<project>/<track>.flac via
+  io_flac::encode_f32_flac_24 (24-bit, deterministic round-half-even,
+  NO dither — reproducibility over -144 dB theoretical purity; a test
+  pins encode-twice-same-bytes), outside spool/ManagedPcm/sweep, never
+  auto-deleted. Track.audio_path points at the durable file; delivery
+  survives restarts with zero deliver.rs changes.
+  Accepted rough edges, deliberately recorded: (1) the persist block
+  exists TWICE — full-file path and O(1) streaming fast path (the acx
+  preset takes the latter, discovered by the persist test) — pending
+  extraction into a shared helper; (2) FLAC decode returns block-padded
+  length (+<4096 frames of trailing zeros) — harmless for MP3 delivery
+  (drowns in the codec's own padding), but any future consumer doing
+  exact-length math must truncate to the Track's real frame count;
+  (3) project/track id sanitization strips path separators rather than
+  rejecting them — two ids differing only in slashes collide;
+  (4) retention is 'never auto-delete' by design — when disks fill, the
+  answer is UI visibility of masters size, not silent deletion; project
+  delete (when it exists) removes the folder.
+  Process lesson from the four-phase run: phase gates listed named test
+  suites and missed that a suite OUTSIDE the list wouldn't even compile
+  (RenderArtifacts lacked Debug; e2e_tier1_abort caught it at workspace
+  time). Every multi-phase contract now gates on
+  cargo build --all-targets, not just named suites.
 - **Original status:** ACTIVE — mechanical fix deferred to its own session
 - **Component:** m0-daemon test code in 8 files: standardized_stream.rs, input_lufs.rs, six_channel_stream.rs, decode_node.rs, dsp_pipeline.rs, lazy_reader.rs, stream_core.rs, wav_to_raw.rs (tests within src/, plus tests/)
 - **Trigger:** Before setting up parallel CI runners sharing /tmp, and whenever a test fails with file-not-found or corrupt-WAV symptoms on fixture paths while another cargo test process is running.
