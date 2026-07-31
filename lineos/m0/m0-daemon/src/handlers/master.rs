@@ -147,6 +147,12 @@ pub async fn trigger_mastering(
 
     let state_bg = state.clone();
     let session_bg = session_id.clone();
+    let bg_project_id = req.project_id.clone();
+    let bg_track_id = req.track_id.clone();
+    let bg_flavour_id = req
+        .flavour_id
+        .clone()
+        .unwrap_or_else(|| "neutral".to_string());
 
     tokio::spawn(async move {
         if state_bg.operator.dispatch(intent).await.is_err() {
@@ -178,6 +184,45 @@ pub async fn trigger_mastering(
                         bpm: None,
                     },
                 );
+
+                if let (Some(persisted_path), Some(project_id), Some(track_id)) =
+                    (output.persisted_master.take(), bg_project_id, bg_track_id)
+                {
+                    let track_lufs = output.lufs;
+                    let track_tp = output.true_peak;
+                    let track_blob = output.blob_id.clone();
+                    let track_path = persisted_path.to_string_lossy().to_string();
+                    let duration_ms = (output.num_frames as u64 * 1000) / output.sample_rate as u64;
+                    let db_clone = state_bg.db.clone();
+                    let created_at = chrono::Utc::now().to_rfc3339();
+
+                    tokio::spawn(async move {
+                        let sql = "CREATE tracks CONTENT {
+                            blob_id: $blob_id,
+                            audio_path: $audio_path,
+                            lufs: $lufs,
+                            true_peak: $true_peak,
+                            created_at: $created_at,
+                            project_id: $project_id,
+                            track_id: $track_id,
+                            flavour_id: $flavour_id,
+                            duration_ms: $duration_ms
+                        }";
+
+                        let _ = db_clone
+                            .query(sql)
+                            .bind(("blob_id", track_blob))
+                            .bind(("audio_path", track_path))
+                            .bind(("lufs", track_lufs))
+                            .bind(("true_peak", track_tp))
+                            .bind(("created_at", created_at))
+                            .bind(("project_id", project_id))
+                            .bind(("track_id", track_id))
+                            .bind(("flavour_id", bg_flavour_id))
+                            .bind(("duration_ms", duration_ms))
+                            .await;
+                    });
+                }
 
                 if let Some(path) = output.pcm_data.take() {
                     if let Ok(b_id) = uuid::Uuid::parse_str(&blob_id_str) {

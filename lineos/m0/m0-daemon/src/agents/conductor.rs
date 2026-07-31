@@ -41,6 +41,7 @@ pub async fn run(
         progress_tx,
         progress_map.clone(),
         config.state_path.clone(),
+        config.masters_path.clone(),
     ));
 
     while let Some(intent) = rx.recv().await {
@@ -104,6 +105,9 @@ pub async fn run(
                                 num_frames: dsp_output.num_frames,
                                 sample_rate: dsp_output.sample_rate,
                                 raw_pcm_data: dsp_output.raw_pcm_data,
+                                lufs: dsp_output.lufs,
+                                true_peak: dsp_output.true_peak,
+                                persisted_master: dsp_output.persisted_master,
                             };
                             let _ = response.send(Ok(output));
                         }

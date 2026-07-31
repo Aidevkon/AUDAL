@@ -17,11 +17,12 @@ use xaak::repo::DspState;
 pub async fn run(
     mut rx: mpsc::Receiver<Intent>,
     head_state_ptr: Arc<ArcSwap<DspState>>,
-    db: crate::db::DbConn,
+    _db: crate::db::DbConn,
     blob_store: crate::blob_store::BlobStore,
     progress_tx: tokio::sync::broadcast::Sender<crate::app_state::MasteringProgress>,
     progress_map: Arc<dashmap::DashMap<String, crate::app_state::MasteringProgress>>,
     state_dir: String,
+    masters_dir: String,
 ) {
     while let Some(intent) = rx.recv().await {
         match intent {
@@ -64,6 +65,7 @@ pub async fn run(
                 let p_map = progress_map.clone();
                 let j_id = plan.session_id.clone();
                 let s_dir = state_dir.clone();
+                let m_dir = masters_dir.clone();
                 let result = tokio::task::spawn_blocking(move || {
                     crate::domain::dsp_pipeline::run_dsp(
                         &req,
@@ -73,6 +75,7 @@ pub async fn run(
                         Some(p_map),
                         j_id,
                         &s_dir,
+                        &m_dir,
                     )
                 })
                 .await;
@@ -92,6 +95,7 @@ pub async fn run(
                         mastered_path,
                         user_model_opt,
                         raw_guard_opt,
+                        artifacts,
                     ))) => {
                         // Executor: persist UserMarkovModel to ~/.creator_os/state/
                         // Zero file I/O in DSP layer — this is the correct layer
@@ -104,33 +108,8 @@ pub async fn run(
                             }
                         }
 
-                        // Persist Track to SurrealDB
-                        let track_lufs = blob.loudness.integrated_lufs;
-                        let track_tp = blob.loudness.true_peak_dbtp;
-                        let track_blob = blob.id.clone();
-                        let track_path = blob.audio_path.path().to_string_lossy().to_string();
-                        let db_clone = db.clone();
-                        tokio::spawn(async move {
-                            let created_at = chrono::Utc::now().to_rfc3339();
-                            let aql = format!(
-                                "CREATE tracks CONTENT {{ \
-                                    blob_id: '{}', \
-                                    audio_path: '{}', \
-                                    lufs: {}, \
-                                    true_peak: {}, \
-                                    created_at: '{}', \
-                                    project_id: 'default', \
-                                    flavour_id: 'neutral', \
-                                    duration_ms: 0 \
-                                }}",
-                                track_blob.replace('\'', "\\'"),
-                                track_path.replace('\'', "\\'"),
-                                track_lufs,
-                                track_tp,
-                                created_at,
-                            );
-                            let _ = db_clone.query(aql).await;
-                        });
+                        // Track write removed here — ExecutionPlan lacks project_id/track_id.
+                        // Moved to the HTTP handler that calls run_dsp/handles the request.
 
                         blob_store.insert(blob.clone());
 
@@ -158,6 +137,7 @@ pub async fn run(
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,
                             raw_pcm_data: raw_guard_opt,
+                            persisted_master: artifacts.persisted_master,
                         };
                         let _ = response.send(Ok(output));
                     }

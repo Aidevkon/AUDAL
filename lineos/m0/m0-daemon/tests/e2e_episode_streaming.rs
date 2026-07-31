@@ -280,6 +280,7 @@ fn full_pipeline_heap_is_scale_invariant() {
             None,
             id.to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         )
         .expect("run_dsp failed")
     };
@@ -360,6 +361,7 @@ fn music_pipeline_heap_is_scale_invariant() {
             None,
             id.to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         )
         .expect("run_dsp failed")
     };

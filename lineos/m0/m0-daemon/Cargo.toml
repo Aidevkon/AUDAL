@@ -49,6 +49,7 @@ rubato       = "0.15"   # SincFixedIn resampling → 48000 Hz
 # Phase 10: Audio export — WAV + FLAC
 # Authority: Phase 10 task-decomposition §Library Decisions
 hound        = "3.5"    # WAV write — pure Rust, MIT
+flacenc      = "0.3.1"  # FLAC encode
 # Opus: requires libopus-dev (C library). Wired in Phase 11.
 # audiopus = "0.3.0-rc.0"
 # Phase 12A: xaak PCM kernel (Amendment A-003 §1)

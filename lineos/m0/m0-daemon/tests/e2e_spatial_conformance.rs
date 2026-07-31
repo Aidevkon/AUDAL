@@ -59,11 +59,12 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         None, // progress_map
         "job-spatial-test".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
 
-    let (blob, _spatial, _path, _model, _) = result.unwrap();
+    let (blob, _spatial, _path, _model, _, _artifacts) = result.unwrap();
 
     assert_eq!(blob.channels, 6, "Expected 6 channels in spatial blob");
     assert_eq!(

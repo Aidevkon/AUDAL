@@ -62,6 +62,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             None,
             "job-bench-stereo".to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         );
         stereo_time = t0.elapsed();
         let stats = dhat::HeapStats::get();
@@ -103,6 +104,7 @@ fn bench_decoupled_fork_ram_and_latency() {
             None,
             "job-bench-spatial".to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         );
         spatial_time = t0.elapsed();
         let stats = dhat::HeapStats::get();

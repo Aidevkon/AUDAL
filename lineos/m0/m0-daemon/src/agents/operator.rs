@@ -126,6 +126,7 @@ pub struct DspOutput {
     pub sample_rate: u32,
     /// F-050: raw dump guard — cloned into PcmTransfer for xaak A/B.
     pub raw_pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
+    pub persisted_master: Option<std::path::PathBuf>,
 }
 
 /// Analysis result from Executor pre-pass (decode + PreAnalyzer only)
@@ -149,6 +150,9 @@ pub struct MasteringOutput {
     pub sample_rate: u32,
     /// F-050: raw dump guard — cloned into PcmTransfer for xaak A/B.
     pub raw_pcm_data: Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
+    pub lufs: f32,
+    pub true_peak: f32,
+    pub persisted_master: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -429,6 +433,7 @@ pub fn spawn_agents(
         progress_tx,
         progress_map,
         config.state_path.clone(),
+        config.masters_path.clone(),
     ));
     let wizard = tokio::spawn(crate::agents::wizard::run(wizard_rx));
 

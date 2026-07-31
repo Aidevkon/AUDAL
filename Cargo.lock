@@ -4647,6 +4647,7 @@ dependencies = [
  "dashmap 6.2.1",
  "dhat",
  "ed25519-dalek",
+ "flacenc",
  "futures-util",
  "hex",
  "hound",

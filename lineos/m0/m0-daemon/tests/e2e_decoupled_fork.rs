@@ -48,11 +48,12 @@ fn e2e_stereo_input_spatial_upmix_produces_both_blobs() {
         None, // progress_map
         "job-decoupled-test".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
 
-    let (stereo_blob, spatial_blob_opt, _path, _model, _) = result.unwrap();
+    let (stereo_blob, spatial_blob_opt, _path, _model, _, _artifacts) = result.unwrap();
 
     // Fork A — stereo πάντα
     assert_eq!(
@@ -130,11 +131,12 @@ fn e2e_stereo_master_preset_no_spatial_blob() {
         None, // progress_map
         "job-decoupled-test-no-spatial".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
 
     assert!(result.is_ok(), "run_dsp failed: {:?}", result.err());
 
-    let (_stereo, spatial_opt, _, _, _) = result.unwrap();
+    let (_stereo, spatial_opt, _, _, _, _artifacts) = result.unwrap();
 
     assert!(
         spatial_opt.is_none(),
@@ -184,10 +186,11 @@ fn e2e_pro_bundle_both_produces_both_blobs() {
         None, // progress_map
         "job-decoupled-test-pro-bundle".to_string(),
         state_tmp.path().to_str().unwrap(),
+        "/tmp",
     );
     assert!(result.is_ok());
 
-    let (stereo_blob, spatial_blob_opt, _path, _model, _) = result.unwrap();
+    let (stereo_blob, spatial_blob_opt, _path, _model, _, _artifacts) = result.unwrap();
 
     // Fork A: stereo master
     assert_eq!(stereo_blob.channels, 2);

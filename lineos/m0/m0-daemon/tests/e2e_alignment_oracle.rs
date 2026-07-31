@@ -64,12 +64,13 @@ async fn test_e2e_alignment_oracle() {
             None,
             "".to_string(),
             state_tmp.path().to_str().unwrap(),
+            "/tmp",
         )
     })
     .await;
 
     let dsp_result = result.unwrap();
-    let (_blob, _, exported_pcm_path, _, _) = dsp_result.unwrap();
+    let (_blob, _, exported_pcm_path, _, _, _artifacts) = dsp_result.unwrap();
 
     let file_bytes =
         std::fs::read(exported_pcm_path.path()).expect("Failed to read exported PCM file");

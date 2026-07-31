@@ -19,6 +19,7 @@ pub mod domain;
 pub mod dsp;
 pub mod handlers;
 mod health;
+pub mod io_flac;
 pub mod jini;
 mod marketplace;
 mod policy;
@@ -67,6 +68,15 @@ pub async fn run() -> Result<()> {
     // ── Read env overrides ────────────────────────────────────────────────────
     let config = std::sync::Arc::new(crate::config::M0Config::from_env());
     crate::spool::init_spool_dir(std::path::PathBuf::from(&config.spool_path));
+
+    // Create masters_path at startup (NOT wiped — this is persistent tier-2 storage)
+    if let Err(e) = std::fs::create_dir_all(&config.masters_path) {
+        tracing::warn!(
+            "Failed to create masters path {}: {}",
+            config.masters_path,
+            e
+        );
+    }
 
     let gate = HealthGate::new();
 
