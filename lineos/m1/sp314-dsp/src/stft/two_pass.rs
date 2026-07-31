@@ -273,10 +273,13 @@ pub(crate) fn process_single_chunk(
         &[]
     };
 
-    let voice_chunk = apply_mask_to_chunk(data.core_chunk, core_voice_mask, core_n_frames);
-    let bass_chunk = apply_mask_to_chunk(data.core_chunk, core_bass_mask, core_n_frames);
-    let harm_chunk = apply_mask_to_chunk(data.core_chunk, core_harm_mask, core_n_frames);
-    let amb_chunk = apply_mask_to_chunk(data.core_chunk, core_amb_mask, core_n_frames);
+    let mut engine = crate::stft::StftEngine::new();
+    let core_frames_cplx = engine.forward(data.core_chunk).0;
+
+    let voice_chunk = apply_spectral_mask_to_chunk(&core_frames_cplx, core_voice_mask, data.core_chunk.len());
+    let bass_chunk = apply_spectral_mask_to_chunk(&core_frames_cplx, core_bass_mask, data.core_chunk.len());
+    let harm_chunk = apply_spectral_mask_to_chunk(&core_frames_cplx, core_harm_mask, data.core_chunk.len());
+    let amb_chunk = apply_spectral_mask_to_chunk(&core_frames_cplx, core_amb_mask, data.core_chunk.len());
 
     let drums_weights: Vec<f32> = (0..data.core_chunk.len())
         .map(|i| {

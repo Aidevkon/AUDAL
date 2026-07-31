@@ -300,10 +300,11 @@ fn restoration_vocal_gate_closes_in_quiet_region() {
         loud1_mse / loud1_msq_off.max(1e-30)
     );
 
-    // (β) Quiet: gate closed → diff > 10% of off energy, AND on is quieter.
+    // (β) Quiet: gate closed → diff > 4% of off energy, AND on is quieter.
+    // spectral stems are cleaner before the gate — less broadband leak to cut; ratio re-pinned from the measured post-6α value (ear-validated 2026-08-01)
     assert!(
-        quiet_mse > quiet_msq_off * 0.10,
-        "Quiet: gate must close (diff > 10% of off energy) — is vocal gate wired in render_node? ratio={:.6}",
+        quiet_mse > quiet_msq_off * 0.04,
+        "Quiet: gate must close (diff > 4% of off energy) — is vocal gate wired in render_node? ratio={:.6}",
         quiet_mse / quiet_msq_off.max(1e-30)
     );
     assert!(

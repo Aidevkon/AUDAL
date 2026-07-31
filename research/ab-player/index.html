@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6α A/B — Scalar vs Spectral Reconstruction</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0d0d0d; color: #e0e0e0;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 100vh; padding: 2rem;
+  }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.5rem; color: #fff; }
+  .sub { font-size: 0.85rem; color: #888; margin-bottom: 2rem; }
+  .player-box {
+    background: #1a1a1a; border-radius: 12px; padding: 2rem 2.5rem;
+    width: 100%; max-width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  }
+  .variant-label {
+    font-size: 2.2rem; font-weight: 700; text-align: center;
+    margin-bottom: 1.5rem; letter-spacing: 0.05em;
+    transition: color 0.15s;
+  }
+  .variant-label.a { color: #f59e0b; }
+  .variant-label.b { color: #3b82f6; }
+  .btn-row { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; }
+  button {
+    flex: 1; padding: 0.7rem 0; border: none; border-radius: 8px;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.15s;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-play { background: #22c55e; color: #000; }
+  .btn-play:hover { box-shadow: 0 0 16px rgba(34,197,94,0.4); }
+  .btn-stop { background: #ef4444; color: #fff; }
+  .btn-stop:hover { box-shadow: 0 0 16px rgba(239,68,68,0.4); }
+  .btn-switch {
+    background: linear-gradient(135deg, #f59e0b, #3b82f6);
+    color: #fff; font-size: 1.1rem;
+  }
+  .btn-switch:hover { box-shadow: 0 0 20px rgba(59,130,246,0.5); }
+  .seek-bar {
+    width: 100%; margin: 1rem 0; appearance: none; height: 6px;
+    background: #333; border-radius: 3px; outline: none;
+  }
+  .seek-bar::-webkit-slider-thumb {
+    appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #fff; cursor: pointer;
+  }
+  .time-row {
+    display: flex; justify-content: space-between;
+    font-size: 0.8rem; color: #666; margin-bottom: 1rem;
+  }
+  .hint {
+    text-align: center; font-size: 0.75rem; color: #555;
+    margin-top: 1rem; line-height: 1.6;
+  }
+  kbd {
+    display: inline-block; padding: 2px 6px; background: #333;
+    border-radius: 4px; font-family: monospace; font-size: 0.7rem;
+    border: 1px solid #444;
+  }
+  .reveal-box {
+    margin-top: 1.5rem; text-align: center;
+  }
+  .btn-reveal {
+    background: #333; color: #aaa; padding: 0.5rem 1.5rem;
+    border-radius: 6px; font-size: 0.85rem;
+  }
+  .btn-reveal:hover { background: #444; color: #fff; }
+  #identity { display: none; margin-top: 0.75rem; font-size: 0.9rem; color: #ccc; }
+</style>
+</head>
+<body>
+
+<h1>6α A/B Listening Test</h1>
+<p class="sub">Scalar (old) vs Spectral (new) reconstruction — bodleasons_mid.wav</p>
+
+<div class="player-box">
+  <div id="label" class="variant-label a">Variant 1</div>
+
+  <div class="btn-row">
+    <button class="btn-play" onclick="play()">▶ Play</button>
+    <button class="btn-stop" onclick="stop()">■ Stop</button>
+  </div>
+
+  <button class="btn-switch" onclick="toggle()" style="width:100%;margin-bottom:0.5rem;">
+    ⇄ Switch Variant (Space)
+  </button>
+
+  <input type="range" class="seek-bar" id="seek" min="0" max="1000" value="0">
+  <div class="time-row">
+    <span id="time-current">0:00</span>
+    <span id="time-total">0:00</span>
+  </div>
+
+  <div class="hint">
+    <kbd>Space</kbd> toggle variant &nbsp;
+    <kbd>P</kbd> play/pause &nbsp;
+    <kbd>S</kbd> stop
+  </div>
+
+  <div class="reveal-box">
+    <button class="btn-reveal" onclick="reveal()">Reveal Identity</button>
+    <p id="identity"></p>
+  </div>
+</div>
+
+<audio id="audioA" preload="auto"><source src="variant_A_scalar.wav" type="audio/wav"></audio>
+<audio id="audioB" preload="auto"><source src="variant_B_spectral.wav" type="audio/wav"></audio>
+
+<script>
+const audioA = document.getElementById('audioA');
+const audioB = document.getElementById('audioB');
+const label = document.getElementById('label');
+const seek = document.getElementById('seek');
+const timeCur = document.getElementById('time-current');
+const timeTotal = document.getElementById('time-total');
+const identity = document.getElementById('identity');
+
+// Blind randomization: randomly assign A/B to variant 1/2
+const swapped = Math.random() < 0.5;
+const audio1 = swapped ? audioB : audioA;
+const audio2 = swapped ? audioA : audioB;
+const name1 = swapped ? 'Spectral (B)' : 'Scalar (A)';
+const name2 = swapped ? 'Scalar (A)' : 'Spectral (B)';
+
+let current = audio1;
+let currentIdx = 1;
+
+function fmt(s) {
+  const m = Math.floor(s / 60);
+  const ss = Math.floor(s % 60);
+  return m + ':' + (ss < 10 ? '0' : '') + ss;
+}
+
+function play() {
+  const other = current === audio1 ? audio2 : audio1;
+  other.pause();
+  current.play();
+}
+
+function stop() {
+  audio1.pause(); audio1.currentTime = 0;
+  audio2.pause(); audio2.currentTime = 0;
+  seek.value = 0;
+  timeCur.textContent = '0:00';
+}
+
+function toggle() {
+  const pos = current.currentTime;
+  const wasPlaying = !current.paused;
+  current.pause();
+  currentIdx = currentIdx === 1 ? 2 : 1;
+  current = currentIdx === 1 ? audio1 : audio2;
+  current.currentTime = pos;
+  if (wasPlaying) current.play();
+  label.textContent = 'Variant ' + currentIdx;
+  label.className = 'variant-label ' + (currentIdx === 1 ? 'a' : 'b');
+}
+
+function reveal() {
+  identity.style.display = 'block';
+  identity.innerHTML = 'Variant 1 = <strong>' + name1 + '</strong><br>Variant 2 = <strong>' + name2 + '</strong>';
+}
+
+// Seek bar + time display
+setInterval(() => {
+  if (current.duration) {
+    seek.value = (current.currentTime / current.duration) * 1000;
+    timeCur.textContent = fmt(current.currentTime);
+    timeTotal.textContent = fmt(current.duration);
+  }
+}, 200);
+
+seek.addEventListener('input', () => {
+  if (current.duration) {
+    const t = (seek.value / 1000) * current.duration;
+    audio1.currentTime = t;
+    audio2.currentTime = t;
+  }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  if (e.code === 'KeyP') { current.paused ? play() : current.pause(); }
+  if (e.code === 'KeyS') { stop(); }
+});
+</script>
+
+</body>
+</html>
