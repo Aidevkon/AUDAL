@@ -352,6 +352,14 @@ fn mastering_router(state: AppState, config: &crate::config::M0Config) -> axum::
         )
         .route("/projects/:id", get(handlers::projects::get_project))
         .route("/projects/:id/tracks", get(handlers::projects::list_tracks))
+        .route(
+            "/projects/:id/deliver",
+            post(handlers::deliver::post_deliver),
+        )
+        .route(
+            "/projects/:id/deliver/plan",
+            post(handlers::deliver::post_deliver_plan),
+        )
         .route("/mix/state", get(handlers::mix::get_state))
         .route("/mix/commit", post(handlers::mix::post_commit))
         .route("/mix/checkout", post(handlers::mix::post_checkout))
