@@ -124,6 +124,8 @@ pub struct StoredLoudness {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acx_noise_floor_db: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acx_quietest_window_start_frame: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acx_compliant: Option<bool>,
 }
 

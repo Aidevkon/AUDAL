@@ -323,6 +323,7 @@ fn assemble_blob(
             acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
             acx_rms_db: acx.map(|a| a.rms_db),
             acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
+            acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
             acx_compliant: acx.map(|a| a.passes_acx()),
         },
         quality: StoredQuality {

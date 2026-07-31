@@ -62,6 +62,12 @@ pub struct AcxCheckReport {
     /// RMS of the quietest sliding 500 ms (100 ms hop) after HP8 @ 10 Hz.
     /// None: input shorter than 1 s, matching the plugin's refusal.
     pub noise_floor_db: Option<f32>,
+    /// The start position of the quietest 500 ms window used for the noise floor,
+    /// in samples at the analyzer's rate. Note: if the analyzer runs at 44.1kHz
+    /// in the export path vs 48kHz in the trunk, this sample count is relative
+    /// to THAT specific stream's sample rate.
+    /// None: input shorter than 1 s.
+    pub quietest_window_start_frame: Option<usize>,
 }
 
 impl AcxCheckReport {
@@ -130,6 +136,7 @@ impl AcxCheckAnalyzer {
                 sample_peak_db: -144.0,
                 rms_db: -144.0,
                 noise_floor_db: None,
+                quietest_window_start_frame: None,
             };
         }
         let mean = self.sum / self.count as f64;
@@ -139,23 +146,32 @@ impl AcxCheckAnalyzer {
         let mean_sq = (self.sum_sq / self.count as f64 - mean * mean).max(0.0);
         let rms = libm::sqrt(mean_sq) as f32;
 
-        let noise_floor_db = if self.sub_mean_sqs.len() < MIN_SUB_BLOCKS {
-            None
-        } else {
-            // sliding 500 ms window = mean of 5 consecutive sub-block mean
-            // squares (equal-length blocks, so the means average exactly)
-            let min_window = self
-                .sub_mean_sqs
-                .windows(WINDOW_SUB_BLOCKS)
-                .map(|w| w.iter().sum::<f32>() / WINDOW_SUB_BLOCKS as f32)
-                .fold(f32::MAX, f32::min);
-            Some(to_db(libm::sqrtf(min_window)))
-        };
+        let (noise_floor_db, quietest_window_start_frame) =
+            if self.sub_mean_sqs.len() < MIN_SUB_BLOCKS {
+                (None, None)
+            } else {
+                // sliding 500 ms window = mean of 5 consecutive sub-block mean
+                // squares (equal-length blocks, so the means average exactly)
+                let mut min_window = f32::MAX;
+                let mut min_idx = 0;
+                for (i, w) in self.sub_mean_sqs.windows(WINDOW_SUB_BLOCKS).enumerate() {
+                    let sum = w.iter().sum::<f32>() / WINDOW_SUB_BLOCKS as f32;
+                    if sum < min_window {
+                        min_window = sum;
+                        min_idx = i;
+                    }
+                }
+                (
+                    Some(to_db(libm::sqrtf(min_window))),
+                    Some(min_idx * self.sub_block_size),
+                )
+            };
 
         AcxCheckReport {
             sample_peak_db: to_db(peak),
             rms_db: to_db(rms),
             noise_floor_db,
+            quietest_window_start_frame,
         }
     }
 }
@@ -292,5 +308,49 @@ mod tests {
         // and each failure mode flips it
         let loud = feed_all(&sine(997.0, 1.0, 2.0));
         assert!(!loud.passes_acx());
+    }
+    #[test]
+    fn oracle_quietest_window_position() {
+        let mut seed = 42u32;
+        let mut sig = Vec::new();
+        // Loud 0-2s
+        sig.extend(sine(
+            997.0,
+            libm::powf(10.0, -10.0 / 20.0) * core::f32::consts::SQRT_2,
+            2.0,
+        ));
+        // -70 dB noise 2-2.5s
+        sig.extend(noise(-70.0, 0.5, &mut seed));
+        // Loud 2.5-4s
+        sig.extend(sine(
+            997.0,
+            libm::powf(10.0, -10.0 / 20.0) * core::f32::consts::SQRT_2,
+            1.5,
+        ));
+
+        let r = feed_all(&sig);
+        let start_frame = r.quietest_window_start_frame.expect("long enough");
+        let start_sec = start_frame as f32 / SR as f32;
+
+        // Position lands inside [2.0s, 2.5s] ±1 window hop (100ms = 0.1s)
+        // Since the quiet part is exactly 500ms (the window length) at 2.0s,
+        // the start should be very close to 2.0s.
+        assert!(
+            start_sec >= 1.9 && start_sec <= 2.1,
+            "quiet window started at {}s, expected around 2.0s",
+            start_sec
+        );
+
+        // All-loud signal => position is Some (the least-loud window) consistent with floor
+        let loud_sig = sine(
+            997.0,
+            libm::powf(10.0, -10.0 / 20.0) * core::f32::consts::SQRT_2,
+            4.0,
+        );
+        let r_loud = feed_all(&loud_sig);
+        assert!(
+            r_loud.quietest_window_start_frame.is_some(),
+            "all loud signal must return Some position"
+        );
     }
 }
