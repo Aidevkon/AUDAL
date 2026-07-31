@@ -260,7 +260,7 @@ fn full_pipeline_heap_is_scale_invariant() {
             tone: None,
             dynamics: None,
             chaos_seed: None,
-            // F-052: ids stay None in this binary — Some(project)+Some(track)
+            // F-060: ids stay None in this binary — Some(project)+Some(track)
             // triggers the tier-2 FLAC persist, an O(N) side-operation
             // that would (and did: 1m=102MB vs 2m=177MB) break the
             // heap scale-invariance these tests guard. Persist cost is
@@ -346,7 +346,7 @@ fn music_pipeline_heap_is_scale_invariant() {
             tone: None,
             dynamics: None,
             chaos_seed: None,
-            // F-052: None on purpose — see comment at the other builder.
+            // F-060: None on purpose — see comment at the other builder.
             project_id: None,
             track_id: None,
             mix_levels: None,

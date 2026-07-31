@@ -18,6 +18,29 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ## ACTIVE / PARKED
 
+## NUMBER DISAMBIGUATION (recon 2026-07-31)
+
+Two numbering streams ran in parallel — this file (repo registry) and the
+session register (off-repo notes) — and code comments carry BOTH. Git
+messages are immutable; code references are numerous and correct in their
+own context. Policy: NO mass renumbering. This table resolves every
+ambiguous number once; readers hitting an F-number in code/history check
+here first. The one exception: F-052(persist), one day old, renamed to
+F-060 (cheap, and it collided instantly).
+
+| # | In THIS file (registry) | In code/history it may also mean |
+|---|---|---|
+| F-024 | from_preset silent catch-all (content_type.rs, measure_corpus.rs) | Stem names ≠ contents on spoken material (739d721; the HPSS/separation finding) |
+| F-041 | Micro-VAD Scout non-functional (scout.rs, 0bcb3f1) | Spatial stage hashed pre-render audio (dsp_pipeline.rs:988) |
+| F-042 | Stereo separation ≡ shelf EQ | Autotune pre_gain lost on Music path (dsp/mod.rs, dsp_node.rs) |
+| F-043 | Spatial stage produces no width | master's to_vec clones → borrows (dsp/mod.rs:243, heap fix) |
+| F-044 | Audiobook render sums signal with itself | Corpus per-stem proxy / scout-mix-×5 placeholder fix (corpus_node, store.rs, two_pass.rs) |
+| F-046 | LTASS correction computed and discarded (993f7cd) | Streaming ceiling raised to 8h (stream_core.rs:11) |
+| F-047 | Podcast reference target ≠ recording condition (reference_resolver.rs) | Flush drain regression guard (stream_core.rs:167,257) |
+| F-048 | Limiter enforced sample peak not true peak (9aa91dc) | Same finding — off-repo notes call it F-053 |
+| F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
+| F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
+
 ### F-044 — Every audiobook render sums the signal with itself
 - **Status:** RESOLVED (fb53431)
 - **Component:** `pipelines/pipelineforge/src/flavor.rs` (LufsNormalization), `sp314-nodes/src/graph.rs`
@@ -496,7 +519,8 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ---
 
-### F-052 — Tier-2 persist is O(N) inside the render path
+### F-060 — Tier-2 persist is O(N) inside the render path
+<!-- was F-052 for one day (commit 4031573); renamed on collision with the head-trim F-052 already living in code since 35a05a7 -->
 - **Status:** OPEN — measured, deliberate, chunked encode pending
 - **Component:** io_flac.rs / dsp_pipeline.rs persist blocks
 - **Context:** encode_f32_flac_24 quantizes the ENTIRE master into a
