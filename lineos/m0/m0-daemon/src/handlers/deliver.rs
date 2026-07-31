@@ -284,6 +284,8 @@ pub struct ManifestEntry {
     pub rms_db: f32,
     pub noise_floor_db: f32,
     pub passes_acx: bool,
+    pub head_quiet_secs: f32,
+    pub tail_quiet_secs: f32,
 }
 
 #[derive(Serialize)]
@@ -356,8 +358,8 @@ pub fn run_deliver_core(
         let blob = build_minimal_blob(&plan_entry.audio_path);
         let final_path = book_dir.join(&plan_entry.filename);
 
-        let report = match export_mp3_acx(&blob, &final_path) {
-            Ok(r) => r,
+        let outcome = match export_mp3_acx(&blob, &final_path) {
+            Ok(o) => o,
             Err(e) => {
                 return Err(vec![format!(
                     "export_mp3_acx failed for track {}: {}",
@@ -373,10 +375,12 @@ pub fn run_deliver_core(
             role: plan_entry.role.clone(),
             filename: plan_entry.filename.clone(),
             duration_ms: plan_entry.duration_ms,
-            sample_peak_db: report.sample_peak_db,
-            rms_db: report.rms_db,
-            noise_floor_db: report.noise_floor_db.unwrap_or_default(),
-            passes_acx: report.passes_acx(),
+            sample_peak_db: outcome.report.sample_peak_db,
+            rms_db: outcome.report.rms_db,
+            noise_floor_db: outcome.report.noise_floor_db.unwrap_or_default(),
+            passes_acx: outcome.report.passes_acx(),
+            head_quiet_secs: outcome.head_quiet_secs,
+            tail_quiet_secs: outcome.tail_quiet_secs,
         });
     }
 
@@ -403,6 +407,33 @@ pub fn run_deliver_core(
             "RMS spread across chapters is {:.1} dB (> 4.0 dB)",
             rms_spread
         ));
+    }
+
+    for e in &manifest_entries {
+        if e.role == "chapter" || e.role.ends_with("credits") || e.role == "retail_sample" {
+            if e.head_quiet_secs < 0.5 {
+                warnings.push(format!(
+                    "{}: head room tone {:.2}s < 0.5s (ACX wants 0.5-1s)",
+                    e.filename, e.head_quiet_secs
+                ));
+            } else if e.head_quiet_secs > 1.0 {
+                warnings.push(format!(
+                    "{}: head room tone {:.2}s > 1.0s (ACX wants 0.5-1s)",
+                    e.filename, e.head_quiet_secs
+                ));
+            }
+            if e.tail_quiet_secs < 1.0 {
+                warnings.push(format!(
+                    "{}: tail room tone {:.2}s < 1.0s (ACX wants 1-5s)",
+                    e.filename, e.tail_quiet_secs
+                ));
+            } else if e.tail_quiet_secs > 5.0 {
+                warnings.push(format!(
+                    "{}: tail room tone {:.2}s > 5.0s (ACX wants 1-5s)",
+                    e.filename, e.tail_quiet_secs
+                ));
+            }
+        }
     }
 
     let roles: HashSet<&str> = manifest_entries.iter().map(|e| e.role.as_str()).collect();

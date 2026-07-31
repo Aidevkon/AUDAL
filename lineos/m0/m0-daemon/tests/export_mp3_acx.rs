@@ -70,11 +70,22 @@ fn test_export_mp3_acx() {
     generate_test_pcm(&pcm_path);
     let blob = make_blob(pcm_path.clone());
 
-    let report = export_mp3_acx(&blob, &out_path).expect("export_mp3_acx failed");
+    let outcome = export_mp3_acx(&blob, &out_path).expect("export_mp3_acx failed");
 
     assert!(
-        report.noise_floor_db.is_some(),
+        outcome.report.noise_floor_db.is_some(),
         "noise floor should be populated"
+    );
+
+    assert!(
+        (outcome.head_quiet_secs - 0.0).abs() <= 0.15,
+        "head_quiet should be ~0.0, got {}",
+        outcome.head_quiet_secs
+    );
+    assert!(
+        (outcome.tail_quiet_secs - 1.0).abs() <= 0.15,
+        "tail_quiet should be ~1.0, got {}",
+        outcome.tail_quiet_secs
     );
 
     let meta = std::fs::metadata(&out_path).expect("output file missing");
@@ -139,4 +150,24 @@ fn test_export_mp3_acx_ffprobe() {
 
     let _ = std::fs::remove_file(pcm_path);
     let _ = std::fs::remove_file(out_path);
+}
+
+#[test]
+fn test_edge_quiet_secs() {
+    let sr = 44100;
+    let head_frames = (0.7 * sr as f32) as usize;
+    let body_frames = (2.0 * sr as f32) as usize;
+    let tail_frames = (1.5 * sr as f32) as usize;
+
+    let mut mono = Vec::new();
+    // 0.7s of -60 dBFS (amplitude 0.001)
+    mono.resize(head_frames, 0.001);
+    // 2s of -20 dBFS (amplitude 0.1)
+    mono.resize(head_frames + body_frames, 0.1);
+    // 1.5s of -60 dBFS (amplitude 0.001)
+    mono.resize(head_frames + body_frames + tail_frames, 0.001);
+
+    let (head, tail) = m0d::handlers::export::edge_quiet_secs(&mono, sr);
+    assert!((head - 0.7).abs() <= 0.15, "expected ~0.7, got {}", head);
+    assert!((tail - 1.5).abs() <= 0.15, "expected ~1.5, got {}", tail);
 }
