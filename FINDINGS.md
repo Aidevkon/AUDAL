@@ -528,7 +528,23 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 ---
 
 ### F-061 — The new Micro-VAD fails its first measurement on real audio
-- **Status:** ACTIVE — measured 2026-07-31, harness in
+- **Status:** NARRATION SIDE RESOLVED (e230b09) / music baseline OPEN.
+  Surgery (constants from measured distributions, mono M/S abstention,
+  -70 dBFS floor sanity) judged by the same harness that convicted the
+  old model: NONSPEECH posterior 0.96->0.019 (inversion dead), SPEECH
+  pct_right 45/36 -> 95.6/95.0, hysteresis exits. Music: mean 0.71->
+  0.39, is_speech frames 97.5%->68.3% — the residual is the flatness
+  term's DOCUMENTED tonal blind spot (IDM tonal passages at flatness
+  ~0.04) amplified by the sticky ENTER/EXIT gate, recorded as the
+  3.5-sensor baseline. Next measured step (2c): audition the
+  transient-density sensor as a likelihood term via the same
+  FLATRAW-style ritual — distributions first, term second, pct_right
+  verdict third. Four oracle tests rewritten from imaginary to
+  measured fixtures; oracle_flatness_bimodal ASSERTS the blind spot
+  (F-049 pattern). Downstream unblock: narration-grade posteriors are
+  now good enough for the duck-curve producer and Guided NMF gating
+  on SPEECH material; music-heavy material waits on 2c.
+- **Originally:** ACTIVE — measured 2026-07-31, harness in
   tests/vad_validation_real.rs (VADVAL| lines, machine-parsable)
 - **Component:** sp314-dsp analysis/{vad_sensors,vad_features,vad_model}
 - **Context:** First-ever run of the FixedPriors classifier against real
