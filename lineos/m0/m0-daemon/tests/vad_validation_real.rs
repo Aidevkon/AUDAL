@@ -72,7 +72,7 @@ fn run_vad(
     left: &[f32],
     right: &[f32],
     floor_db: f32,
-) -> Vec<(f32, bool, [f32; 4], f32)> {
+) -> Vec<(f32, bool, [f32; 4], f32, f32)> {
     let mut extractor = VadFeatureExtractor::new();
     let mut classifier = VadClassifier::new(FixedPriors);
     let mut results = Vec::new();
@@ -93,7 +93,8 @@ fn run_vad(
             };
             let terms = FixedPriors.log_odds_terms(&f, &ctx);
             let snr = f.rms_db - floor_db;
-            results.push((decision.posterior, decision.is_speech, terms, snr));
+            let flat = f.spectral_flatness;
+            results.push((decision.posterior, decision.is_speech, terms, snr, flat));
         }
     }
     results
@@ -129,7 +130,7 @@ fn print_stats(name: &str, class_name: &str, mut posts: Vec<f32>, right_side_is_
 fn report(
     name: &str,
     labels: Option<&[Label]>,
-    frames: &[(f32, bool, [f32; 4], f32)],
+    frames: &[(f32, bool, [f32; 4], f32, f32)],
     floor_db: f32,
 ) {
     println!("VADVAL|{}|FLOOR_DB|{:.2}", name, floor_db);
@@ -205,13 +206,15 @@ fn report(
             let mut sum_ms = 0.0;
             let mut sum_drms = 0.0;
             let mut snrs = Vec::new();
+            let mut flats = Vec::new();
 
-            for &(_, _, terms, snr) in fs {
+            for &(_, _, terms, snr, flat) in fs {
                 sum_snr += terms[0];
                 sum_flat += terms[1];
                 sum_ms += terms[2];
                 sum_drms += terms[3];
                 snrs.push(snr);
+                flats.push(flat);
             }
 
             let count = fs.len() as f32;
@@ -228,12 +231,21 @@ fn report(
 
             snrs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let c = snrs.len();
-            let p10 = snrs[(c as f32 * 0.1).floor() as usize];
-            let p50 = snrs[(c as f32 * 0.5).floor() as usize];
-            let p90 = snrs[(c as f32 * 0.9).floor() as usize];
+            let p10_snr = snrs[(c as f32 * 0.1).floor() as usize];
+            let p50_snr = snrs[(c as f32 * 0.5).floor() as usize];
+            let p90_snr = snrs[(c as f32 * 0.9).floor() as usize];
             println!(
                 "VADVAL|{}|SNR|{}|p10={:.4}|p50={:.4}|p90={:.4}",
-                name, class, p10, p50, p90
+                name, class, p10_snr, p50_snr, p90_snr
+            );
+
+            flats.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let p10_flat = flats[(c as f32 * 0.1).floor() as usize];
+            let p50_flat = flats[(c as f32 * 0.5).floor() as usize];
+            let p90_flat = flats[(c as f32 * 0.9).floor() as usize];
+            println!(
+                "VADVAL|{}|FLATRAW|{}|p10={:.4}|p50={:.4}|p90={:.4}",
+                name, class, p10_flat, p50_flat, p90_flat
             );
         }
     }

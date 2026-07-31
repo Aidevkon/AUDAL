@@ -552,6 +552,21 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
   duck curve producer, and the ControlBus all wait on this — nothing
   downstream trusts these posteriors until this finding closes with
   measurements.
+- **Mechanism CLOSED (27129cb + this commit), 2026-07-31:** the l_flat
+  Gaussians are tuned to an imaginary world. Measured raw flatness:
+  real narration 0.014-0.024 (lands on the model's FLAT_MU_TONAL=0.03,
+  so speech gets scored as "music"), room tone 0.20-0.35 (lands near
+  FLAT_MU_SPEECH=0.16, so silence gets scored as speech at +6.8/+7.4
+  log-odds, near the 8.0 clamp). No measurement pathology: the sensor's
+  distributions separate the classes cleanly (speech 0.01-0.09, quiet
+  0.18-0.37) — only the interpreter's constants are wrong. Same DNA as
+  F-047: paper-derived constants vs measured reality. Fix design:
+  retune the three Gaussians FROM the harness's FLATRAW distributions
+  (self-calibrating loop), l_ms abstains when side energy ~0 (mono),
+  l_snr floor gets a sanity clamp (digital-silence floors of -95 dB
+  produce meaningless 64 dB "SNR" magnitudes). Acceptance = the SAME
+  harness: NONSPEECH mean posterior < 0.3, music is_speech% collapses
+  from 97.5, pct_right inverts. Surgery is its own contract.
 
 ### F-060 — Tier-2 persist is O(N) inside the render path
 <!-- was F-052 for one day (commit 4031573); renamed on collision with the head-trim F-052 already living in code since 35a05a7 -->
