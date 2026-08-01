@@ -10,41 +10,6 @@ const SR_IN: u32 = 16_000;
 const SR_OUT: u32 = 48_000;
 const EPS: f32 = 1e-10;
 
-fn hz_to_mel(hz: f32) -> f32 {
-    2595.0 * (1.0 + hz / 700.0).log10()
-}
-fn mel_to_hz(mel: f32) -> f32 {
-    700.0 * (10.0_f32.powf(mel / 2595.0) - 1.0)
-}
-
-fn create_mel_filterbank(sr: f32, n_fft: usize, n_mels: usize) -> Vec<Vec<f32>> {
-    let n_bins = n_fft / 2 + 1;
-    let min_mel = hz_to_mel(0.0);
-    let max_mel = hz_to_mel(sr / 2.0);
-    let mel_points: Vec<f32> = (0..(n_mels + 2))
-        .map(|i| min_mel + i as f32 * (max_mel - min_mel) / (n_mels + 1) as f32)
-        .collect();
-    let hz_points: Vec<f32> = mel_points.into_iter().map(mel_to_hz).collect();
-
-    let bin_freqs: Vec<f32> = (0..n_bins).map(|i| i as f32 * sr / n_fft as f32).collect();
-
-    let mut fbank = vec![vec![0.0f32; n_bins]; n_mels];
-    for i in 0..n_mels {
-        let f_m_minus = hz_points[i];
-        let f_m = hz_points[i + 1];
-        let f_m_plus = hz_points[i + 2];
-        for b in 0..n_bins {
-            let freq = bin_freqs[b];
-            if freq >= f_m_minus && freq <= f_m {
-                fbank[i][b] = (freq - f_m_minus) / (f_m - f_m_minus);
-            } else if freq >= f_m && freq <= f_m_plus {
-                fbank[i][b] = (f_m_plus - freq) / (f_m_plus - f_m);
-            }
-        }
-    }
-    fbank
-}
-
 fn resample(input: &[f32]) -> Vec<f32> {
     let mut resampler = FastFixedIn::<f32>::new(
         SR_OUT as f64 / SR_IN as f64,
@@ -130,16 +95,16 @@ fn test_w_speech_fit() {
         }
     }
 
-    let n_mels = 128;
-    let fbank = create_mel_filterbank(SR_OUT as f32, (N_BINS - 1) * 2, n_mels);
+    let n_mels = sp314_dsp::analysis::mel_128::MEL_BANDS;
     let mut mel_v = vec![0.0f32; n_mels * num_frames];
-    for m in 0..n_mels {
-        for f in 0..num_frames {
-            let mut sum = 0.0;
-            for b in 0..N_BINS {
-                sum += fbank[m][b] * magnitude_frames[b * num_frames + f];
-            }
-            mel_v[m * num_frames + f] = sum;
+    for f in 0..num_frames {
+        let mut frame = [0.0; sp314_dsp::stft::N_BINS];
+        for b in 0..sp314_dsp::stft::N_BINS {
+            frame[b] = magnitude_frames[b * num_frames + f];
+        }
+        let folded = sp314_dsp::analysis::mel_128::fold_to_mel(&frame);
+        for m in 0..n_mels {
+            mel_v[m * num_frames + f] = folded[m];
         }
     }
 
@@ -252,13 +217,14 @@ fn test_w_speech_fit() {
         }
     }
     let mut mel_m = vec![0.0f32; n_mels * frames_m.len()];
-    for m in 0..n_mels {
-        for f in 0..frames_m.len() {
-            let mut sum = 0.0;
-            for b in 0..N_BINS {
-                sum += fbank[m][b] * mag_m[b * frames_m.len() + f];
-            }
-            mel_m[m * frames_m.len() + f] = sum;
+    for f in 0..frames_m.len() {
+        let mut frame = [0.0; sp314_dsp::stft::N_BINS];
+        for b in 0..sp314_dsp::stft::N_BINS {
+            frame[b] = mag_m[b * frames_m.len() + f];
+        }
+        let folded = sp314_dsp::analysis::mel_128::fold_to_mel(&frame);
+        for m in 0..n_mels {
+            mel_m[m * frames_m.len() + f] = folded[m];
         }
     }
 

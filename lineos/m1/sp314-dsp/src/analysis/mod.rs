@@ -5,6 +5,7 @@ pub mod acx_check;
 pub mod analyzer;
 pub mod dynamics;
 pub mod features;
+pub mod mel_128;
 pub mod onset_flux;
 pub mod pre_analysis;
 pub mod sdr;
