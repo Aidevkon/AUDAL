@@ -462,6 +462,82 @@ impl TwoPassEngine {
         let w_proxy = self.nmf.fit(&proxy_frames);
         eprintln!("[PERF] nmf_fit={}ms", t_fit.elapsed().as_millis());
 
+        // ── NMFD fit (Rung-C) on FULL-RATE proxy ───────────────────────
+        let t_nmfd = std::time::Instant::now();
+        let nmfd_n_mels = crate::analysis::mel_128::MEL_BANDS;
+
+        let chunk_size = 48000;
+        let mut nmfd_ctx = StreamingStftEncoder::new();
+        let mut mel_v_fm = Vec::with_capacity(nmfd_n_mels * (signal.len() / 512 + 2));
+        let mut nmfd_n_frames = 0;
+
+        for chunk in signal.chunks(chunk_size) {
+            let frames_cplx = nmfd_ctx.feed_chunk(chunk);
+            for f in 0..frames_cplx.len() {
+                let mut frame = [0.0_f32; N_BINS];
+                for b in 0..N_BINS {
+                    let c = frames_cplx[f][b];
+                    frame[b] = libm::sqrtf(c.re * c.re + c.im * c.im);
+                }
+                mel_v_fm.extend_from_slice(&crate::analysis::mel_128::fold_to_mel(&frame));
+                nmfd_n_frames += 1;
+            }
+        }
+        let finish_cplx = nmfd_ctx.finish();
+        for f in 0..finish_cplx.len() {
+            let mut frame = [0.0_f32; N_BINS];
+            for b in 0..N_BINS {
+                let c = finish_cplx[f][b];
+                frame[b] = libm::sqrtf(c.re * c.re + c.im * c.im);
+            }
+            mel_v_fm.extend_from_slice(&crate::analysis::mel_128::fold_to_mel(&frame));
+            nmfd_n_frames += 1;
+        }
+
+        let mut mel_v = vec![0.0_f32; nmfd_n_mels * nmfd_n_frames];
+        for f in 0..nmfd_n_frames {
+            for m in 0..nmfd_n_mels {
+                mel_v[m * nmfd_n_frames + f] = mel_v_fm[f * nmfd_n_mels + m];
+            }
+        }
+
+        let nmfd_tau = 8;
+        let nmfd_k = 4;
+        let nmfd_num_iter = 12;
+        let nmfd_seed = 314159;
+
+        let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
+        let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
+
+        let mut lcg_state: u32 = nmfd_seed;
+        let mut next_rand = || -> f32 {
+            lcg_state = lcg_state.wrapping_mul(1664525).wrapping_add(1013904223);
+            (lcg_state as f32) / (u32::MAX as f32)
+        };
+
+        for x in init_w.iter_mut() {
+            *x = next_rand();
+        }
+        for x in init_h.iter_mut() {
+            *x = next_rand();
+        }
+
+        let (nmfd_tensor_w, _final_h, nmfd_cost) = crate::stft::nmfd::nmfd_f32(
+            &mel_v,
+            &init_w,
+            &init_h,
+            nmfd_n_mels,
+            nmfd_k,
+            nmfd_n_frames,
+            nmfd_tau,
+            nmfd_num_iter,
+        );
+        eprintln!(
+            "[PERF] SCOUTFIT|ms={}|cost={}",
+            t_nmfd.elapsed().as_millis(),
+            nmfd_cost
+        );
+
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
         // No floating-point interpolation needed — direct index lookup.
@@ -637,8 +713,8 @@ impl TwoPassEngine {
 
         ScoutResult {
             w,
-            tensor_w: vec![0.0; N_BINS * N_COMPONENTS * 8], // flat fallback for now
-            tau: 8,
+            tensor_w: nmfd_tensor_w,
+            tau: nmfd_tau,
             proxy_rms,
             voice_idx,
             bass_idx,
