@@ -234,10 +234,50 @@ pub(crate) fn process_single_chunk(
     let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
     let h_chunk = nmf.transform(&scout.w, &chunk_frames);
 
-    let voice_mask = nmf.component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS);
-    let bass_mask = nmf.component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS);
-    let harm_mask = nmf.component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS);
-    let amb_mask = nmf.component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS);
+    const USE_NMFD: bool = false;
+    let (voice_mask, bass_mask, harm_mask, amb_mask) = if USE_NMFD {
+        (
+            nmf.nmfd_component_mask_chunk(
+                scout.voice_idx,
+                &h_chunk,
+                &scout.tensor_w,
+                n_frames,
+                N_BINS,
+                scout.tau,
+            ),
+            nmf.nmfd_component_mask_chunk(
+                scout.bass_idx,
+                &h_chunk,
+                &scout.tensor_w,
+                n_frames,
+                N_BINS,
+                scout.tau,
+            ),
+            nmf.nmfd_component_mask_chunk(
+                scout.harmonics_idx,
+                &h_chunk,
+                &scout.tensor_w,
+                n_frames,
+                N_BINS,
+                scout.tau,
+            ),
+            nmf.nmfd_component_mask_chunk(
+                scout.ambience_idx,
+                &h_chunk,
+                &scout.tensor_w,
+                n_frames,
+                N_BINS,
+                scout.tau,
+            ),
+        )
+    } else {
+        (
+            nmf.component_mask_chunk(scout.voice_idx, &h_chunk, n_frames, N_BINS),
+            nmf.component_mask_chunk(scout.bass_idx, &h_chunk, n_frames, N_BINS),
+            nmf.component_mask_chunk(scout.harmonics_idx, &h_chunk, n_frames, N_BINS),
+            nmf.component_mask_chunk(scout.ambience_idx, &h_chunk, n_frames, N_BINS),
+        )
+    };
 
     let core_n_frames = n_frames.saturating_sub(data.pad_frames);
     let core_voice_mask = if data.pad_frames < voice_mask.len() {
@@ -502,7 +542,12 @@ impl TwoPassEngine {
         }
 
         let nmfd_tau = 8;
-        let nmfd_k = 4;
+
+        // fit_protocol_v2: K=5 (one shared tensor across 5 semantic roles),
+        // 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
+        // NOTE: The w_speech fit (used elsewhere) stays its own K=4 world.
+        // Speech templates and the render tensor are different jobs.
+        let nmfd_k = N_COMPONENTS; // 5
         let nmfd_num_iter = 12;
         let nmfd_seed = 314159;
 
