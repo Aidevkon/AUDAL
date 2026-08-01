@@ -1,3 +1,5 @@
+pub mod crossfade;
+
 pub struct SilenceCut;
 pub struct BreathCut;
 pub struct CrossfadeHeal;
