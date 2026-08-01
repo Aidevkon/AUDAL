@@ -54,7 +54,7 @@ fn render_ab_variant() {
         .collect();
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono, SR);
+    let scout = engine.scout(&mono, SR, None, None);
 
     let mut output_left = Vec::with_capacity(mono.len());
     let mut output_right = Vec::with_capacity(mono.len());

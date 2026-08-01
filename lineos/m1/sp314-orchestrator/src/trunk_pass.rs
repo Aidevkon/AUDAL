@@ -281,7 +281,7 @@ fn run_trunk_internal(
     with_acx: bool,
 ) -> Result<TrunkReport, String> {
     // 2 channels: trunk dump is stereo f32 LE interleaved from StandardizedDecoder.
-    let mut source = crate::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
+    let mut source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
     let srf = SAMPLE_RATE as f32;
     let nyq = srf / 2.0;
 
@@ -423,7 +423,7 @@ fn run_trunk_internal(
         // Mirrors compute_transient_density [pre_analysis.rs:553]:
         //   let rect: Vec<f32> = mono.iter().map(|&s| libm::fabsf(s)).collect();
         for &s in m.iter() {
-            transient_det.feed(s.abs());
+            transient_det.feed(f32::abs(s));
         }
 
         // --- Noise floor: 1s energy windows ---

@@ -112,7 +112,7 @@ fn spatial_conformance_path(
         // RawPcmFileSource handles LE decode (same f32::from_le_bytes as the
         // inline loop it replaces) — per-frame values are bit-identical.
         use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
-        let mut source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(
+        let mut source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(
             std::path::Path::new(raw_path),
             6, // 6-channel 5.1 interleaved dump
         )
@@ -904,7 +904,7 @@ fn run_dsp_internal(
         let stream_source = if raw_path.exists() {
             eprintln!("[DEBUG] TAKING NEW STREAMING PATH: found {:?}", raw_path);
             // 2 channels: StandardizedDecoder writes stereo f32 LE interleaved (Y3-iv-a).
-            let source = sp314_orchestrator::raw_pcm_source::RawPcmFileSource::new(&raw_path, 2)
+            let source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(&raw_path, 2)
                 .map_err(|e| format!("Failed to open raw PCM dump: {e}"))?;
             sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader::new(source, 10240)
         } else {

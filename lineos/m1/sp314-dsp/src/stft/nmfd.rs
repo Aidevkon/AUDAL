@@ -394,6 +394,97 @@ pub fn nmfd_f32_seq(
 }
 
 #[allow(clippy::too_many_arguments)] // explicit dims are the contract: no params struct, no silent 'cleanup' (S4 doctrine)
+pub fn nmfd_f32_h_only(
+    v: &[f32],
+    tensor_w: &[f32],
+    init_h: &[f32],
+    num_bins: usize,
+    k: usize,
+    num_frames: usize,
+    t_frames: usize,
+    num_iter: usize,
+) -> (Vec<f32>, f32) {
+    let mut h = init_h.to_vec();
+
+    let v_sum: f32 = pairwise_sum_f32(v);
+    let v_tmp_denom = EPS_F32 + v_sum;
+    let mut v_tmp = vec![0.0; num_bins * num_frames];
+    for i in 0..(num_bins * num_frames) {
+        v_tmp[i] = v[i] / v_tmp_denom;
+    }
+
+    let mut final_cost = 0.0;
+
+    for _iter in 0..num_iter {
+        let lambda = conv_model_f32(tensor_w, &h, num_bins, k, t_frames, num_frames);
+
+        let mut cost_mat = vec![0.0; num_bins * num_frames];
+        for i in 0..(num_bins * num_frames) {
+            let lam = lambda[i];
+            cost_mat[i] = v_tmp[i] * (1.0 + v_tmp[i] / (lam + EPS_F32)).ln() - v_tmp[i] + lam;
+        }
+        final_cost = pairwise_sum_f32(&cost_mat) / (num_bins * num_frames) as f32;
+
+        let mut q = vec![0.0; num_bins * num_frames];
+        for i in 0..(num_bins * num_frames) {
+            q[i] = v_tmp[i] / (lambda[i] + EPS_F32);
+        }
+
+        let mut all_shifted_q = Vec::with_capacity(t_frames);
+        for tau in 0..t_frames {
+            all_shifted_q.push(shift_operator_f32(
+                &q,
+                num_bins,
+                num_frames,
+                -(tau as isize),
+            ));
+        }
+
+        let h_updates: Vec<Vec<f32>> = (0..k)
+            .into_par_iter()
+            .map(|r| {
+                let mut tensor_w_r = vec![0.0; num_bins * t_frames];
+                for bin in 0..num_bins {
+                    for tau in 0..t_frames {
+                        tensor_w_r[bin * t_frames + tau] =
+                            tensor_w[(bin * k * t_frames) + (r * t_frames) + tau];
+                    }
+                }
+
+                let mut mult_h_r = vec![0.0; num_frames];
+
+                for tau in 0..t_frames {
+                    let shifted_q = &all_shifted_q[tau];
+
+                    let mut w_col_sum = 0.0;
+                    for bin in 0..num_bins {
+                        w_col_sum += tensor_w_r[bin * t_frames + tau];
+                    }
+                    let den_h = w_col_sum + EPS_F32;
+
+                    for m in 0..num_frames {
+                        let mut sum_w_q = 0.0_f32;
+                        for bin in 0..num_bins {
+                            sum_w_q = tensor_w_r[bin * t_frames + tau]
+                                .mul_add(shifted_q[bin * num_frames + m], sum_w_q);
+                        }
+                        mult_h_r[m] += sum_w_q / den_h;
+                    }
+                }
+                mult_h_r
+            })
+            .collect();
+
+        for r in 0..k {
+            for m in 0..num_frames {
+                h[r * num_frames + m] *= h_updates[r][m] / (t_frames as f32);
+            }
+        }
+    }
+
+    (h, final_cost)
+}
+
 pub fn nmfd_f32(
     v: &[f32],
     init_w: &[f32],

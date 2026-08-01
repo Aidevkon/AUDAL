@@ -35,9 +35,9 @@ use lineos_types::MasteringIntent;
 use m0d::domain::nodes::render_node::{run, RenderInputs, RenderSettings};
 use m0d::dsp::DspAdapter;
 use m0d::handlers::master::MixLevels;
+use sp314_dsp::stft::raw_pcm_source::RawPcmFileSource;
 use sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader;
 use sp314_dsp::stft::two_pass::TwoPassEngine;
-use sp314_orchestrator::raw_pcm_source::RawPcmFileSource;
 use tempfile::NamedTempFile;
 
 const SR: u32 = 48_000;
@@ -108,7 +108,7 @@ fn render_once(
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono, SR);
+    let scout = engine.scout(&mono, SR, None, None);
 
     let source = RawPcmFileSource::new(pcm_path, 2).unwrap();
     let stream_source = SlidingOverlapReader::new(source, 10240);

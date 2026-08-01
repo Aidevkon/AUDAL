@@ -303,3 +303,72 @@ fn test_nmfd_f32_par_vs_seq() {
         );
     }
 }
+
+#[test]
+fn test_nmfd_f32_h_only_characterization() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let init_w_f64 = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
+    let init_h_f64 = load_bin("init_H.bin", K * NUM_FRAMES);
+
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let init_w: Vec<f32> = init_w_f64.iter().map(|&x| x as f32).collect();
+    let init_h: Vec<f32> = init_h_f64.iter().map(|&x| x as f32).collect();
+
+    // The full NMFD computes Q from W_0, then updates W before H uses it.
+    // h_only with any single W cannot reproduce that interleave — h_only is the
+    // textbook frozen-W transform, a distinct legitimate mode, NOT a slice of the full update.
+    let (w_out_full, h_out_full, _) =
+        nmfd::nmfd_f32(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 1);
+
+    let (h_out_h_only, _) = nmfd::nmfd_f32_h_only(
+        &v,
+        &w_out_full,
+        &init_h,
+        NUM_BINS,
+        K,
+        NUM_FRAMES,
+        T_FRAMES,
+        1,
+    );
+
+    let mut byte_equal = true;
+    for (a, b) in h_out_full.iter().zip(h_out_h_only.iter()) {
+        if a.to_bits() != b.to_bits() {
+            byte_equal = false;
+            break;
+        }
+    }
+    println!("h_only byte-equal to full with W fed back: {}", byte_equal);
+
+    // Gate a: Determinism
+    let (h_out_h_only2, _) = nmfd::nmfd_f32_h_only(
+        &v,
+        &w_out_full,
+        &init_h,
+        NUM_BINS,
+        K,
+        NUM_FRAMES,
+        T_FRAMES,
+        1,
+    );
+    for (a, b) in h_out_h_only.iter().zip(h_out_h_only2.iter()) {
+        assert_eq!(a.to_bits(), b.to_bits(), "h_only determinism broken");
+    }
+
+    // Gate b: Convergence over 12 iterations using golden 20-iter W
+    let golden_w_f64 = load_bin("nmfd_tensor_W.bin", NUM_BINS * K * T_FRAMES);
+    let golden_w: Vec<f32> = golden_w_f64.iter().map(|&x| x as f32).collect();
+
+    let (_, cost_iter1) =
+        nmfd::nmfd_f32_h_only(&v, &golden_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 1);
+    let (_, cost_iter12) = nmfd::nmfd_f32_h_only(
+        &v, &golden_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 12,
+    );
+
+    assert!(
+        cost_iter12 < cost_iter1,
+        "h_only did not converge: iter12 cost ({}) >= iter1 cost ({})",
+        cost_iter12,
+        cost_iter1
+    );
+}

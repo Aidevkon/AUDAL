@@ -318,6 +318,9 @@ pub use two_pass::TwoPassEngine;
 pub mod sliding_overlap_reader;
 pub use sliding_overlap_reader::{ChunkSource, OverlapChunk, SlidingOverlapReader};
 
+pub mod raw_pcm_source;
+pub use raw_pcm_source::RawPcmFileSource;
+
 #[cfg(test)]
 mod streaming_tests {
     use super::*;

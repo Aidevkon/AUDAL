@@ -116,7 +116,7 @@ pub struct RenderInputs {
     pub original_sum_sq: f32,
     pub total_frames: usize,
     pub stream_source: sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader<
-        sp314_orchestrator::raw_pcm_source::RawPcmFileSource,
+        sp314_dsp::stft::raw_pcm_source::RawPcmFileSource,
     >,
 }
 

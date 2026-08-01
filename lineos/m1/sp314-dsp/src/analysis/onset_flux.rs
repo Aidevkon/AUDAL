@@ -1,7 +1,7 @@
 //! Böck & Widmer 2013, clean-room, librosa oracle, NEVER derived from madmom source.
 //! SuperFlux: Maximum Filter Vibrato Suppression for Onset Detection.
 
-use super::superflux_weights::{MEL_BASIS, MEL_BANDS};
+use super::superflux_weights::{MEL_BANDS, MEL_BASIS};
 
 pub struct SuperFluxOnset {
     /// Past max-filtered spectrum at t - 1 (lag=1)
@@ -50,7 +50,7 @@ impl SuperFluxOnset {
         for i in 0..MEL_BANDS {
             s_log[i] = (1.0 + self.gamma * s_mel[i]).ln();
         }
-        
+
         s_log
     }
 
@@ -61,11 +61,19 @@ impl SuperFluxOnset {
         for i in 0..MEL_BANDS {
             let left = if i == 0 { s_log[1] } else { s_log[i - 1] };
             let center = s_log[i];
-            let right = if i == MEL_BANDS - 1 { s_log[MEL_BANDS - 2] } else { s_log[i + 1] };
-            
+            let right = if i == MEL_BANDS - 1 {
+                s_log[MEL_BANDS - 2]
+            } else {
+                s_log[i + 1]
+            };
+
             let mut m = left;
-            if center > m { m = center; }
-            if right > m { m = right; }
+            if center > m {
+                m = center;
+            }
+            if right > m {
+                m = right;
+            }
             s_ref[i] = m;
         }
 
@@ -77,7 +85,7 @@ impl SuperFluxOnset {
                 onset_strength += diff;
             }
         }
-        
+
         // Librosa averages across frequency bands by default.
         onset_strength /= MEL_BANDS as f32;
 

@@ -29,7 +29,7 @@ pub fn run(
     let scout_slice = &mono;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(scout_slice, sample_rate);
+    let scout = engine.scout(scout_slice, sample_rate, None, None);
 
     // Maestro — compute adaptive ducking_gain based on rhythm
     let render_params = AutoTuningController::compute_render_params(pre_analysis);

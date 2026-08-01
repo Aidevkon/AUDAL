@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
+use crate::stft::sliding_overlap_reader::ChunkSource;
 
 pub struct RawPcmFileSource {
     reader: BufReader<File>,
@@ -24,6 +24,52 @@ impl RawPcmFileSource {
             byte_buf: Vec::new(),
             n_channels,
         })
+    }
+
+    pub fn read_window(&self, start_frame: usize, len_frames: usize) -> Vec<f32> {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut mono = Vec::new();
+
+        if let Ok(mut cloned_file) = self.reader.get_ref().try_clone() {
+            let channels = self.n_channels;
+            let byte_offset = (start_frame * channels * 4) as u64;
+
+            if cloned_file.seek(SeekFrom::Start(byte_offset)).is_err() {
+                return mono;
+            }
+
+            let bytes_to_read = len_frames * channels * 4;
+            let mut byte_buf = vec![0u8; bytes_to_read];
+
+            let mut total_read = 0;
+            while total_read < bytes_to_read {
+                match cloned_file.read(&mut byte_buf[total_read..]) {
+                    Ok(0) => break,
+                    Ok(n) => total_read += n,
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
+                }
+            }
+
+            let actual_frames = total_read / (4 * channels);
+            mono.reserve_exact(actual_frames);
+
+            for frame in 0..actual_frames {
+                let mut sum = 0.0;
+                for c in 0..channels {
+                    let idx = (frame * channels + c) * 4;
+                    let val = f32::from_le_bytes([
+                        byte_buf[idx],
+                        byte_buf[idx + 1],
+                        byte_buf[idx + 2],
+                        byte_buf[idx + 3],
+                    ]);
+                    sum += val;
+                }
+                mono.push(sum / channels as f32);
+            }
+        }
+        mono
     }
 }
 
@@ -181,8 +227,8 @@ mod tests {
 
     #[test]
     fn test_streaming_bit_identity_oracle_real_file() {
-        use sp314_dsp::stft::sliding_overlap_reader::SlidingOverlapReader;
-        use sp314_dsp::stft::two_pass::TwoPassEngine;
+        use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
+        use crate::stft::two_pass::TwoPassEngine;
         use std::io::Write;
 
         let n_total = 200_000;
@@ -220,7 +266,7 @@ mod tests {
 
         // 2. OLD PATH (Slice-based)
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000);
+        let scout = engine.scout(&signal, 48000, None, None);
 
         let mut old_voice = Vec::new();
         let mut old_drums = Vec::new();
@@ -242,7 +288,7 @@ mod tests {
         let mut e_new = TwoPassEngine::new();
         // Re-run scout to populate e_new.nmf exactly identical to e_old.
         // This takes ~150ms and avoids accessing private fields or risking shared state.
-        let scout_new = e_new.scout(&signal, 48000);
+        let scout_new = e_new.scout(&signal, 48000, None, None);
 
         let mut new_voice: Vec<f32> = Vec::new();
         let mut new_drums: Vec<f32> = Vec::new();
