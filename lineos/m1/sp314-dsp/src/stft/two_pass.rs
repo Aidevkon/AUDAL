@@ -543,45 +543,126 @@ impl TwoPassEngine {
 
         let nmfd_tau = 8;
 
-        // fit_protocol_v2: K=5 (one shared tensor across 5 semantic roles),
-        // 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
-        // NOTE: The w_speech fit (used elsewhere) stays its own K=4 world.
-        // Speech templates and the render tensor are different jobs.
-        let nmfd_k = N_COMPONENTS; // 5
+        // fit_protocol_v3: K=8 (4 frozen slots seeded from LibriSpeech w_speech_v1.bin,
+        // 4 free slots seeded randomly), 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
+        let nmfd_k = 8;
+        let nmfd_frozen_k = 4;
         let nmfd_num_iter = 12;
         let nmfd_seed = 314159;
 
         let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
         let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
 
+        // 1. Load w_speech_v1.bin (the K=4 LibriSpeech tensor; 8kHz limit noted)
+        let w_speech_path = format!("{}/../../../research/w-speech/w_speech_v1.bin", env!("CARGO_MANIFEST_DIR"));
+        let mut f = std::fs::File::open(&w_speech_path).unwrap();
+        let mut buf = Vec::new();
+        std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
+        let mut w_speech = vec![0.0_f32; 128 * 4 * 8];
+        for i in 0..128 * 4 * 8 {
+            w_speech[i] = f32::from_le_bytes(buf[i*4..(i+1)*4].try_into().unwrap());
+        }
+
+        // 2. Fill slots 0-3 frozen
+        for m in 0..128 {
+            for r in 0..4 {
+                for tau in 0..nmfd_tau {
+                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
+                }
+            }
+        }
+
+        // 3. Seed 4 free slots randomly
         let mut lcg_state: u32 = nmfd_seed;
         let mut next_rand = || -> f32 {
             lcg_state = lcg_state.wrapping_mul(1664525).wrapping_add(1013904223);
             (lcg_state as f32) / (u32::MAX as f32)
         };
 
-        for x in init_w.iter_mut() {
-            *x = next_rand();
+        for m in 0..128 {
+            for r in 4..8 {
+                for tau in 0..nmfd_tau {
+                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = next_rand();
+                }
+            }
         }
         for x in init_h.iter_mut() {
             *x = next_rand();
         }
 
-        let (nmfd_tensor_w, _final_h, nmfd_cost) = crate::stft::nmfd::nmfd_f32(
-            &mel_v,
-            &init_w,
-            &init_h,
-            nmfd_n_mels,
-            nmfd_k,
-            nmfd_n_frames,
-            nmfd_tau,
-            nmfd_num_iter,
-        );
+        let mut current_w = init_w.clone();
+        let mut current_h = init_h.clone();
+        let mut final_cost = 0.0;
+        for iter in 1..=nmfd_num_iter {
+            let (next_w, next_h, cost) = crate::stft::nmfd::nmfd_f32_partial_frozen(
+                &mel_v,
+                &current_w,
+                &current_h,
+                nmfd_n_mels,
+                nmfd_frozen_k,
+                nmfd_k,
+                nmfd_n_frames,
+                nmfd_tau,
+                1,
+            );
+            current_w = next_w;
+            current_h = next_h;
+            final_cost = cost;
+            println!("SCOUTFIT_ITER|iter={}|cost={:.8e}", iter, cost);
+        }
+        let nmfd_tensor_w = current_w;
+
         eprintln!(
             "[PERF] SCOUTFIT|ms={}|cost={}",
             t_nmfd.elapsed().as_millis(),
-            nmfd_cost
+            final_cost
         );
+
+        // ── Free Slots Semantic Assignment (Report Only) ───────────────────────────────
+        let free_start = 4;
+        let free_count = 4;
+        let mut free_flatness = [0.0f32; 4];
+        let mut free_centroids = [0.0f32; 4];
+
+        for i in 0..free_count {
+            let c = free_start + i;
+            let mut log_sum = 0.0f32;
+            let mut arith = 0.0f32;
+            let mut sum_mw = 0.0f32;
+            let eps = 1e-10f32;
+            
+            for m in 0..128 {
+                let mut avg_t = 0.0_f32;
+                for t in 0..nmfd_tau {
+                    avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                }
+                avg_t /= nmfd_tau as f32;
+                
+                log_sum += libm::logf(avg_t + eps);
+                arith += avg_t;
+                sum_mw += m as f32 * avg_t;
+            }
+            let geom = libm::expf(log_sum / 128.0);
+            let mean = arith / 128.0;
+            free_flatness[i] = if mean > eps { (geom / mean).clamp(0.0, 1.0) } else { 0.0 };
+            free_centroids[i] = if mean > eps { sum_mw / arith } else { 0.0 };
+        }
+
+        let ambience_idx_free = (0..free_count)
+            .max_by(|&a, &b| free_flatness[a].partial_cmp(&free_flatness[b]).unwrap())
+            .unwrap_or(0);
+        let remaining_free: Vec<usize> = (0..free_count).filter(|&i| i != ambience_idx_free).collect();
+        let mut sorted_by_centroid = remaining_free.clone();
+        sorted_by_centroid.sort_by(|&a, &b| free_centroids[a].partial_cmp(&free_centroids[b]).unwrap());
+
+        let bass_idx_free = sorted_by_centroid[0];
+        let drums_idx_free = sorted_by_centroid[1];
+        let harmonics_idx_free = sorted_by_centroid[2];
+
+        println!("FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}", bass_idx_free + 4, free_centroids[bass_idx_free], free_flatness[bass_idx_free]);
+        println!("FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}", drums_idx_free + 4, free_centroids[drums_idx_free], free_flatness[drums_idx_free]);
+        println!("FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}", harmonics_idx_free + 4, free_centroids[harmonics_idx_free], free_flatness[harmonics_idx_free]);
+        println!("FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}", ambience_idx_free + 4, free_centroids[ambience_idx_free], free_flatness[ambience_idx_free]);
 
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
