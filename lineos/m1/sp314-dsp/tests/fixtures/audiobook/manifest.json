@@ -1,0 +1,81 @@
+{
+  "resampler": "rubato SincFixedIn",
+  "hashes": {
+    "mix_1_snr-15.flac": {
+      "hash": "c3ee526e8c697fb185127ff8671d316b3e1d506187f12e8abca37284cc98c6c5",
+      "music_gain_linear": 0.07735428214073181,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -36.224609375,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_1_snr-25.flac": {
+      "hash": "73ef2545167d7f8f7d1509c91084fb3cb6d47c93cfef6f6892844b41db4094fe",
+      "music_gain_linear": 0.024461571127176285,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -46.224609375,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_1_snr-6.flac": {
+      "hash": "4b5e6286d4024bf07f0127a88e82ad0a5f8995de3a6189b1a7c283763c8942af",
+      "music_gain_linear": 0.2180139571428299,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -27.224611282348633,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_2_snr-15.flac": {
+      "hash": "65560d5d8b2d5ae8d9671d8087d965833a85eb6ad769479a6a42bd0cdd615905",
+      "music_gain_linear": 0.08124276250600815,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -35.506080627441406,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_2_snr-25.flac": {
+      "hash": "f06d8e3de601de45248dad7318d9a1dcb1bd8f85d1eeb5d73ece6588005d09fc",
+      "music_gain_linear": 0.025691216811537743,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -45.506080627441406,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_2_snr-6.flac": {
+      "hash": "f3df38fd83a99beebe207f046e3ac0be9a7b90e5ff75312f42de79213125c331",
+      "music_gain_linear": 0.22897326946258545,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -26.506078720092773,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_3_snr-15.flac": {
+      "hash": "7fc59babe4b344363b226cba47f8a80266cff7abff8f61097372a88137c64516",
+      "music_gain_linear": 0.1783839762210846,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -33.022377014160156,
+      "voice_lufs": -18.022375106811523
+    },
+    "mix_3_snr-25.flac": {
+      "hash": "19c3f1b1dda12ec5bc9f1f1fbab66566820425168e1abb9397cd7a8281b76553",
+      "music_gain_linear": 0.05640997365117073,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -43.022377014160156,
+      "voice_lufs": -18.022375106811523
+    },
+    "mix_3_snr-6.flac": {
+      "hash": "6fbd226769ea8310024164329922d8d27235920019aaced6436d236263a01e06",
+      "music_gain_linear": 0.5027544498443604,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -24.022375106811523,
+      "voice_lufs": -18.022375106811523
+    },
+    "music_1_snr-15.flac": "cc963de600d18906d9c58e1b4fd81acef8c953ea62c278cca789e93ad0dad0d7",
+    "music_1_snr-25.flac": "8e7557c68f301d3785a2d2139c87d546cd1c61595b4e3b5dc3046b6b578a4468",
+    "music_1_snr-6.flac": "8ce02dd7e86a95ebd900ddfc3900a95cab72ab8ac562907abcc654ddce56498a",
+    "music_2_snr-15.flac": "ee050fe792aa532455931049a2162768d753ef504f3f173f6083822832d6e8cf",
+    "music_2_snr-25.flac": "0f1685855dc808c3f3cbc56499f828e6f0998238a1c9704a288a0c0a86af7adf",
+    "music_2_snr-6.flac": "282c64adab37637a7c56d1726c4dd6ae1574d017f8f0b99bb78422d2072ed91c",
+    "music_3_snr-15.flac": "32ff8f6f782605072b36ebb3f081a7b5327fd13d8be47a3faca3b898e6a3d763",
+    "music_3_snr-25.flac": "9ad73512810a4dbca0dd41ab69e93fb91dc4c2e4ba46dcd177cebb6c1eaee771",
+    "music_3_snr-6.flac": "af6e7336bb3d81514cae4ac8349b7ce7aa7d0e703d62f126f6b35dc1ed8be326",
+    "voice_1.flac": "9560115a66830dc5824333c30c6ece03281f321e0313a3f240030ce0b6655b62",
+    "voice_2.flac": "1c0adc288e71a4daf15da59593fc913b571f34011702715e15b7c54cfdcd7908",
+    "voice_3.flac": "32a730d25df5122f90da2745739de5b9a3908844d6d7c644608b84c76d12a928"
+  },
+  "seed": 314159
+}
