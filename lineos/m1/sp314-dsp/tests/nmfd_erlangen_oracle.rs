@@ -372,3 +372,168 @@ fn test_nmfd_f32_h_only_characterization() {
         cost_iter1
     );
 }
+
+#[test]
+fn test_partial_frozen_determinism() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let init_w_f64 = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
+    let init_h_f64 = load_bin("init_H.bin", K * NUM_FRAMES);
+    let init_w: Vec<f32> = init_w_f64.iter().map(|&x| x as f32).collect();
+    let init_h: Vec<f32> = init_h_f64.iter().map(|&x| x as f32).collect();
+
+    let (w_f1, h_f1, _) = nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w, &init_h, NUM_BINS, 2, K, NUM_FRAMES, T_FRAMES, 5,
+    );
+    let (w_f2, h_f2, _) = nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w, &init_h, NUM_BINS, 2, K, NUM_FRAMES, T_FRAMES, 5,
+    );
+    for (a, b) in w_f1.iter().zip(w_f2.iter()) {
+        assert_eq!(a.to_bits(), b.to_bits(), "W determinism broken");
+    }
+    for (a, b) in h_f1.iter().zip(h_f2.iter()) {
+        assert_eq!(a.to_bits(), b.to_bits(), "H determinism broken");
+    }
+}
+
+#[test]
+fn test_partial_frozen_invariance() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let k8 = 8;
+    let frozen_k = 4;
+    let mut init_w8 = vec![0.0_f32; NUM_BINS * k8 * T_FRAMES];
+    let mut init_h8 = vec![0.0_f32; k8 * NUM_FRAMES];
+    // Random seeded init
+    for i in 0..init_w8.len() {
+        init_w8[i] = ((i * 17) % 100) as f32 / 100.0 + 0.01;
+    }
+    for i in 0..init_h8.len() {
+        init_h8[i] = ((i * 31) % 100) as f32 / 100.0 + 0.01;
+    }
+
+    let (w_out, _, _) = nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w8, &init_h8, NUM_BINS, frozen_k, k8, NUM_FRAMES, T_FRAMES, 5,
+    );
+    for bin in 0..NUM_BINS {
+        for r in 0..frozen_k {
+            for tau in 0..T_FRAMES {
+                let idx = (bin * k8 * T_FRAMES) + (r * T_FRAMES) + tau;
+                assert_eq!(
+                    w_out[idx].to_bits(),
+                    init_w8[idx].to_bits(),
+                    "frozen slot invariance broken at bin={} r={} tau={}",
+                    bin,
+                    r,
+                    tau
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_partial_frozen_degenerate() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let init_w_f64 = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
+    let init_h_f64 = load_bin("init_H.bin", K * NUM_FRAMES);
+    let init_w: Vec<f32> = init_w_f64.iter().map(|&x| x as f32).collect();
+    let init_h: Vec<f32> = init_h_f64.iter().map(|&x| x as f32).collect();
+
+    let (w_ref, h_ref, cost_ref) =
+        nmfd::nmfd_f32(&v, &init_w, &init_h, NUM_BINS, K, NUM_FRAMES, T_FRAMES, 5);
+    let (w_0, h_0, cost_0) = nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w, &init_h, NUM_BINS, 0, K, NUM_FRAMES, T_FRAMES, 5,
+    );
+
+    for (i, (a, b)) in w_ref.iter().zip(w_0.iter()).enumerate() {
+        if a.to_bits() != b.to_bits() {
+            println!(
+                "W diff at {}: ref={} ({}), out={} ({})",
+                i,
+                a,
+                a.to_bits(),
+                b,
+                b.to_bits()
+            );
+            panic!("degenerate W broken");
+        }
+    }
+    for (i, (a, b)) in h_ref.iter().zip(h_0.iter()).enumerate() {
+        if a.to_bits() != b.to_bits() {
+            println!(
+                "H diff at {}: ref={} ({}), out={} ({})",
+                i,
+                a,
+                a.to_bits(),
+                b,
+                b.to_bits()
+            );
+            panic!("degenerate H broken");
+        }
+    }
+    if cost_ref.to_bits() != cost_0.to_bits() {
+        println!(
+            "Cost diff: ref={} ({}), out={} ({})",
+            cost_ref,
+            cost_ref.to_bits(),
+            cost_0,
+            cost_0.to_bits()
+        );
+        panic!("degenerate cost broken");
+    }
+}
+
+#[test]
+fn test_partial_frozen_wfit() {
+    let v_f64 = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
+    let v: Vec<f32> = v_f64.iter().map(|&x| x as f32).collect();
+    let init_w_f64 = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);
+    let init_h_f64 = load_bin("init_H.bin", K * NUM_FRAMES);
+    let init_w: Vec<f32> = init_w_f64.iter().map(|&x| x as f32).collect();
+    let init_h: Vec<f32> = init_h_f64.iter().map(|&x| x as f32).collect();
+
+    let k8 = 8;
+    let mut init_w8 = vec![0.0_f32; NUM_BINS * k8 * T_FRAMES];
+    let mut init_h8 = vec![0.0_f32; k8 * NUM_FRAMES];
+    for bin in 0..NUM_BINS {
+        for r in 0..K {
+            for tau in 0..T_FRAMES {
+                init_w8[(bin * k8 * T_FRAMES) + (r * T_FRAMES) + tau] =
+                    init_w[(bin * K * T_FRAMES) + (r * T_FRAMES) + tau];
+                init_w8[(bin * k8 * T_FRAMES) + ((r + 4) * T_FRAMES) + tau] =
+                    init_w[(bin * K * T_FRAMES) + (r * T_FRAMES) + tau] * 0.9 + 0.01;
+            }
+        }
+    }
+    for r in 0..K {
+        for m in 0..NUM_FRAMES {
+            init_h8[r * NUM_FRAMES + m] = init_h[r * NUM_FRAMES + m];
+            init_h8[(r + 4) * NUM_FRAMES + m] = init_h[r * NUM_FRAMES + m] * 0.9 + 0.01;
+        }
+    }
+
+    println!("WFIT|frozen_k=4|K=8");
+    for iter in 1..=5 {
+        let (_, _, cost) = nmfd::nmfd_f32_partial_frozen(
+            &v, &init_w8, &init_h8, NUM_BINS, 4, k8, NUM_FRAMES, T_FRAMES, iter,
+        );
+        println!("WFIT|iter={}|cost={:.8e}", iter, cost);
+    }
+
+    let start_full = std::time::Instant::now();
+    nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w8, &init_h8, NUM_BINS, 0, k8, NUM_FRAMES, T_FRAMES, 5,
+    );
+    let dur_full = start_full.elapsed();
+
+    let start_frozen = std::time::Instant::now();
+    nmfd::nmfd_f32_partial_frozen(
+        &v, &init_w8, &init_h8, NUM_BINS, 4, k8, NUM_FRAMES, T_FRAMES, 5,
+    );
+    let dur_frozen = start_frozen.elapsed();
+
+    println!("TIMING|K=8|frozen_k=0|time={:?}", dur_full);
+    println!("TIMING|K=8|frozen_k=4|time={:?}", dur_frozen);
+}

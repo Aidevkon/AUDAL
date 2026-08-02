@@ -638,3 +638,128 @@ pub fn nmfd_f32(
 
     (tensor_w, h, final_cost)
 }
+
+#[allow(clippy::too_many_arguments)] // explicit dims are the contract
+pub fn nmfd_f32_partial_frozen(
+    v: &[f32],
+    init_w: &[f32],
+    init_h: &[f32],
+    num_bins: usize,
+    frozen_k: usize,
+    k: usize,
+    num_frames: usize,
+    t_frames: usize,
+    num_iter: usize,
+) -> (Vec<f32>, Vec<f32>, f32) {
+    let mut tensor_w = init_w.to_vec();
+    let mut h = init_h.to_vec();
+
+    let v_sum: f32 = pairwise_sum_f32(v);
+    let v_tmp_denom = EPS_F32 + v_sum;
+    let mut v_tmp = vec![0.0; num_bins * num_frames];
+    for i in 0..(num_bins * num_frames) {
+        v_tmp[i] = v[i] / v_tmp_denom;
+    }
+
+    let mut final_cost = 0.0;
+
+    for _iter in 0..num_iter {
+        let lambda = conv_model_f32(&tensor_w, &h, num_bins, k, t_frames, num_frames);
+
+        let mut cost_mat = vec![0.0; num_bins * num_frames];
+        for i in 0..(num_bins * num_frames) {
+            let lam = lambda[i];
+            cost_mat[i] = v_tmp[i] * (1.0 + v_tmp[i] / (lam + EPS_F32)).ln() - v_tmp[i] + lam;
+        }
+        final_cost = pairwise_sum_f32(&cost_mat) / (num_bins * num_frames) as f32;
+
+        let mut q = vec![0.0; num_bins * num_frames];
+        for i in 0..(num_bins * num_frames) {
+            q[i] = v_tmp[i] / (lambda[i] + EPS_F32);
+        }
+
+        let mut mult_h = vec![0.0; k * num_frames];
+
+        for tau in 0..t_frames {
+            let shifted_h = shift_operator_f32(&h, k, num_frames, tau as isize);
+
+            let mut num_update_w = vec![0.0; num_bins * k];
+            let mut den_update_w = vec![0.0; num_bins * k];
+
+            let mut h_row_sums = vec![0.0; k];
+            for r in 0..k {
+                for m in 0..num_frames {
+                    h_row_sums[r] += shifted_h[r * num_frames + m];
+                }
+            }
+
+            for bin in 0..num_bins {
+                for r in frozen_k..k {
+                    let mut sum_q_h = 0.0_f32;
+                    for m in 0..num_frames {
+                        sum_q_h =
+                            q[bin * num_frames + m].mul_add(shifted_h[r * num_frames + m], sum_q_h);
+                    }
+                    num_update_w[bin * k + r] = sum_q_h;
+                    den_update_w[bin * k + r] = h_row_sums[r] + EPS_F32;
+                }
+            }
+
+            for bin in 0..num_bins {
+                for r in frozen_k..k {
+                    let w_idx = (bin * k * t_frames) + (r * t_frames) + tau;
+                    tensor_w[w_idx] *= num_update_w[bin * k + r] / den_update_w[bin * k + r];
+                }
+            }
+
+            let shifted_q = shift_operator_f32(&q, num_bins, num_frames, -(tau as isize));
+
+            for r in 0..k {
+                let mut w_col_sum = 0.0;
+                for bin in 0..num_bins {
+                    w_col_sum += tensor_w[(bin * k * t_frames) + (r * t_frames) + tau];
+                }
+                let den_h = w_col_sum + EPS_F32;
+
+                for m in 0..num_frames {
+                    let mut sum_w_q = 0.0_f32;
+                    for bin in 0..num_bins {
+                        sum_w_q = tensor_w[(bin * k * t_frames) + (r * t_frames) + tau]
+                            .mul_add(shifted_q[bin * num_frames + m], sum_w_q);
+                    }
+                    mult_h[r * num_frames + m] += sum_w_q / den_h;
+                }
+            }
+        }
+
+        for r in 0..k {
+            for m in 0..num_frames {
+                h[r * num_frames + m] *= mult_h[r * num_frames + m] / (t_frames as f32);
+            }
+        }
+
+        let mut norm_vec = vec![0.0; k];
+        for r in frozen_k..k {
+            let mut bin_sums = vec![0.0; num_bins];
+            for bin in 0..num_bins {
+                let mut tau_sums = vec![0.0; t_frames];
+                for tau in 0..t_frames {
+                    tau_sums[tau] = tensor_w[(bin * k * t_frames) + (r * t_frames) + tau];
+                }
+                bin_sums[bin] = pairwise_sum_f32(&tau_sums);
+            }
+            norm_vec[r] = pairwise_sum_f32(&bin_sums);
+        }
+
+        for bin in 0..num_bins {
+            for r in frozen_k..k {
+                let factor = 1.0 / (EPS_F32 + norm_vec[r]);
+                for tau in 0..t_frames {
+                    tensor_w[(bin * k * t_frames) + (r * t_frames) + tau] *= factor;
+                }
+            }
+        }
+    }
+
+    (tensor_w, h, final_cost)
+}
