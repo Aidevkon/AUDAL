@@ -381,7 +381,12 @@ impl NmfEngine {
                         }
                     }
                 }
-                mel_mask[m] = target / (total + 1e-10_f32);
+                // safediv measurement (sha 474b5866...), zero non-finite to 1e-18, exact partition is structural since total==sum(targets)
+                if total > 0.0 {
+                    mel_mask[m] = target / total;
+                } else {
+                    mel_mask[m] = 1.0 / k as f32;
+                }
             }
             let linear_mask = crate::analysis::mel_128::expand_mask_to_linear(&mel_mask);
             expanded_mask[f].copy_from_slice(&linear_mask);
