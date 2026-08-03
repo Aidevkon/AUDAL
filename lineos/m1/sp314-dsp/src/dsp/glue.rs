@@ -1,4 +1,4 @@
-use crate::analysis::pre_analysis::{butter_lp2, butter_hp2, Biquad};
+use crate::dsp::biquad::{Biquad, butter_lp2_prewarped, butter_hp2_prewarped};
 
 pub struct Allpass {
     x1: f32,
@@ -42,16 +42,16 @@ impl GlueChain {
     pub fn new(sample_rate: f32, mode: WidthMode) -> Self {
         Self {
             // 4th order LPF at 8kHz
-            lpf_l1: butter_lp2(8000.0, sample_rate),
-            lpf_l2: butter_lp2(8000.0, sample_rate),
-            lpf_r1: butter_lp2(8000.0, sample_rate),
-            lpf_r2: butter_lp2(8000.0, sample_rate),
+            lpf_l1: butter_lp2_prewarped(8000.0, sample_rate),
+            lpf_l2: butter_lp2_prewarped(8000.0, sample_rate),
+            lpf_r1: butter_lp2_prewarped(8000.0, sample_rate),
+            lpf_r2: butter_lp2_prewarped(8000.0, sample_rate),
             
             // 4th order HPF at 150Hz
-            hpf_l1: butter_hp2(150.0, sample_rate),
-            hpf_l2: butter_hp2(150.0, sample_rate),
-            hpf_r1: butter_hp2(150.0, sample_rate),
-            hpf_r2: butter_hp2(150.0, sample_rate),
+            hpf_l1: butter_hp2_prewarped(150.0, sample_rate),
+            hpf_l2: butter_hp2_prewarped(150.0, sample_rate),
+            hpf_r1: butter_hp2_prewarped(150.0, sample_rate),
+            hpf_r2: butter_hp2_prewarped(150.0, sample_rate),
             
             apf: Allpass::new(0.5),
             w: 1.0,
