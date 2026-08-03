@@ -33,3 +33,4 @@ pub mod stem_escalation;
 pub mod vad_features;
 pub mod vad_model;
 pub mod vad_sensors;
+pub mod role;
