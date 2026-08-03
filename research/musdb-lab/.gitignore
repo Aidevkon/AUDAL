@@ -2,12 +2,12 @@
 *.wav
 *.mp3
 *.flac
-excerpts/
+excerpts
 venv/
 *.log
 
 # Standalone lab-tool build artifacts (never committed)
 dbus_eval/target/
 oracle_extract/target/
-speech/
-musdb18hq/
+speech
+musdb18hq
