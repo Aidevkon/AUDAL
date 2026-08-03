@@ -1,0 +1,12 @@
+[package]
+name = "oracle_extract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hound = "3.5"
+rustfft = "6"
+libm = "0.2"
+sp314-dsp = { path = "../../../lineos/m1/sp314-dsp" }
+
+[workspace]
