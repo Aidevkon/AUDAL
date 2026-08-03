@@ -5,3 +5,7 @@
 excerpts/
 venv/
 *.log
+
+# Standalone lab-tool build artifacts (never committed)
+dbus_eval/target/
+oracle_extract/target/
