@@ -41,6 +41,7 @@ pub mod stft;
 pub mod verification;
 
 pub mod analysis;
+pub mod dsp;
 pub mod glider;
 pub use analysis::{MixMetrics, PreAnalyzer, StemFeatureAnalyzer, StemFeatures, StemMetrics};
 
