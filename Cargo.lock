@@ -7995,6 +7995,7 @@ name = "sp314-dsp"
 version = "3.0.0"
 dependencies = [
  "approx",
+ "arc-swap",
  "claxon",
  "cpal",
  "ctrlc",

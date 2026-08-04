@@ -1,5 +1,5 @@
-use rustfft::num_complex::Complex;
 use crate::stft::{StftEngine, N_BINS};
+use rustfft::num_complex::Complex;
 
 pub struct DrumSplit {
     pub percussive: Vec<f32>,
@@ -53,17 +53,19 @@ mod tests {
     use crate::stft::StftEngine;
 
     fn generate_test_signal(len: usize) -> Vec<f32> {
-        (0..len).map(|i| libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0)).collect()
+        (0..len)
+            .map(|i| libm::sinf(2.0 * core::f32::consts::PI * 440.0 * i as f32 / 48000.0))
+            .collect()
     }
 
     #[test]
     fn test_reconstruction() {
         let input_len = 48000;
         let input = generate_test_signal(input_len);
-        
+
         let mut stft = StftEngine::new();
         let (spectrum, _n_frames) = stft.forward(&input);
-        
+
         // Generate a dummy mask (checkerboard pattern)
         let mut mask_p = vec![vec![0.0_f32; N_BINS]; spectrum.len()];
         for t in 0..spectrum.len() {
@@ -71,19 +73,24 @@ mod tests {
                 mask_p[t][b] = if (t + b) % 2 == 0 { 0.8 } else { 0.2 };
             }
         }
-        
+
         let split = split_percussive(&spectrum, &mask_p, input_len);
         let mut stft2 = StftEngine::new();
         let output = stft2.inverse(&spectrum, input_len); // Direct inverse of spectrum
-        
+
         assert_eq!(split.percussive.len(), input_len);
         assert_eq!(split.harmonic.len(), input_len);
         assert_eq!(output.len(), input_len);
-        
+
         for i in 0..input_len {
             let sum = split.percussive[i] + split.harmonic[i];
             let diff = (sum - output[i]).abs();
-            assert!(diff < 1e-4, "Reconstruction failed at sample {}, diff: {}", i, diff);
+            assert!(
+                diff < 1e-4,
+                "Reconstruction failed at sample {}, diff: {}",
+                i,
+                diff
+            );
         }
     }
 
@@ -91,16 +98,16 @@ mod tests {
     fn test_mask_all_zeros() {
         let input_len = 48000;
         let input = generate_test_signal(input_len);
-        
+
         let mut stft = StftEngine::new();
         let (spectrum, _n_frames) = stft.forward(&input);
-        
+
         let mask_p = vec![vec![0.0_f32; N_BINS]; spectrum.len()];
         let split = split_percussive(&spectrum, &mask_p, input_len);
-        
+
         let mut stft2 = StftEngine::new();
         let output = stft2.inverse(&spectrum, input_len);
-        
+
         for i in 0..input_len {
             assert!(split.percussive[i].abs() < 1e-6);
             assert!((split.harmonic[i] - output[i]).abs() < 1e-4);
@@ -111,16 +118,16 @@ mod tests {
     fn test_mask_all_ones() {
         let input_len = 48000;
         let input = generate_test_signal(input_len);
-        
+
         let mut stft = StftEngine::new();
         let (spectrum, _n_frames) = stft.forward(&input);
-        
+
         let mask_p = vec![vec![1.0_f32; N_BINS]; spectrum.len()];
         let split = split_percussive(&spectrum, &mask_p, input_len);
-        
+
         let mut stft2 = StftEngine::new();
         let output = stft2.inverse(&spectrum, input_len);
-        
+
         for i in 0..input_len {
             assert!(split.harmonic[i].abs() < 1e-6);
             assert!((split.percussive[i] - output[i]).abs() < 1e-4);
@@ -133,10 +140,10 @@ mod tests {
         let input = generate_test_signal(input_len);
         let mut stft = StftEngine::new();
         let (spectrum, _n_frames) = stft.forward(&input);
-        
+
         let mask_p = vec![vec![0.5_f32; N_BINS]; spectrum.len()];
         let split = split_percussive(&spectrum, &mask_p, input_len);
-        
+
         assert_eq!(split.percussive.len(), input_len);
         assert_eq!(split.harmonic.len(), input_len);
     }
@@ -145,19 +152,21 @@ mod tests {
     fn test_no_nan_inf() {
         let input_len = 48000;
         // Full scale input
-        let input: Vec<f32> = (0..input_len).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+        let input: Vec<f32> = (0..input_len)
+            .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+            .collect();
         let mut stft = StftEngine::new();
         let (spectrum, _n_frames) = stft.forward(&input);
-        
+
         let mut mask_p = vec![vec![0.0_f32; N_BINS]; spectrum.len()];
         for t in 0..spectrum.len() {
             for b in 0..N_BINS {
                 mask_p[t][b] = (t as f32 / spectrum.len() as f32).clamp(0.0, 1.0);
             }
         }
-        
+
         let split = split_percussive(&spectrum, &mask_p, input_len);
-        
+
         for i in 0..input_len {
             assert!(split.percussive[i].is_finite());
             assert!(split.harmonic[i].is_finite());

@@ -1,87 +1,38 @@
-use std::sync::atomic::{AtomicUsize, AtomicU32, AtomicBool, Ordering, fence};
+use arc_swap::ArcSwap;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ControlFrame {
-    pub p_speech: f32,     // 0..=1, from the micro-VAD
-    pub duck_gain: f32,    // linear gain for the Music bus, 0..=1
-    pub voice_gate: bool,  // Voice bus open/closed
+    pub p_speech: f32,    // 0..=1, from the micro-VAD
+    pub duck_gain: f32,   // linear gain for the Music bus, 0..=1
+    pub voice_gate: bool, // Voice bus open/closed
     pub snr_db: f32,
 }
 
-/// A lock-free Single-Writer Multiple-Reader (SWMR) bus using a Seqlock.
-/// We use per-field atomics so that racy reads are well-defined by the Rust
-/// memory model (avoiding UB from reading an UnsafeCell while a write is in flight).
-/// The sequence counter remains strictly necessary for consistency: if a reader
-/// reads `p_speech` then the writer updates all fields, the reader's subsequent 
-/// read of `duck_gain` would belong to a new frame. The sequence counter ensures
-/// the entire read snapshot belongs to a single COMPLETE frame.
+/// A lock-free Single-Writer Multiple-Reader (SWMR) bus using ArcSwap.
+/// Read path performs no allocations. Publish allocates a single Arc per frame.
 pub struct ControlBus {
-    seq: AtomicUsize,
-    p_speech: AtomicU32,
-    duck_gain: AtomicU32,
-    voice_gate: AtomicBool,
-    snr_db: AtomicU32,
+    data: ArcSwap<ControlFrame>,
 }
-
-// Safe because reads/writes are synchronized via the sequence lock and atomics
-unsafe impl Sync for ControlBus {}
-unsafe impl Send for ControlBus {}
 
 impl ControlBus {
     pub fn new(_sample_rate: f32) -> Self {
         Self {
-            seq: AtomicUsize::new(0),
-            p_speech: AtomicU32::new(0.0f32.to_bits()),
-            duck_gain: AtomicU32::new(1.0f32.to_bits()),
-            voice_gate: AtomicBool::new(false),
-            snr_db: AtomicU32::new(0.0f32.to_bits()),
+            data: ArcSwap::from_pointee(ControlFrame {
+                p_speech: 0.0,
+                duck_gain: 1.0,
+                voice_gate: false,
+                snr_db: 0.0,
+            }),
         }
     }
 
     pub fn publish(&self, frame: ControlFrame) {
-        let seq = self.seq.load(Ordering::Relaxed);
-        // Odd sequence number indicates a write is in progress
-        self.seq.store(seq + 1, Ordering::Relaxed);
-        fence(Ordering::Release);
-
-        self.p_speech.store(frame.p_speech.to_bits(), Ordering::Relaxed);
-        self.duck_gain.store(frame.duck_gain.to_bits(), Ordering::Relaxed);
-        self.voice_gate.store(frame.voice_gate, Ordering::Relaxed);
-        self.snr_db.store(frame.snr_db.to_bits(), Ordering::Relaxed);
-
-        fence(Ordering::Release);
-        // Even sequence number indicates write is complete
-        self.seq.store(seq + 2, Ordering::Relaxed);
+        self.data.store(Arc::new(frame));
     }
 
     pub fn read(&self) -> ControlFrame {
-        loop {
-            let seq1 = self.seq.load(Ordering::Acquire);
-            if seq1 & 1 == 1 {
-                // Write in progress, spin wait
-                std::hint::spin_loop();
-                continue;
-            }
-            
-            // Read the individual atomics
-            let p_speech = f32::from_bits(self.p_speech.load(Ordering::Relaxed));
-            let duck_gain = f32::from_bits(self.duck_gain.load(Ordering::Relaxed));
-            let voice_gate = self.voice_gate.load(Ordering::Relaxed);
-            let snr_db = f32::from_bits(self.snr_db.load(Ordering::Relaxed));
-            
-            fence(Ordering::Acquire);
-            
-            // Check if a write started or completed while we were reading
-            let seq2 = self.seq.load(Ordering::Acquire);
-            if seq1 == seq2 {
-                return ControlFrame {
-                    p_speech,
-                    duck_gain,
-                    voice_gate,
-                    snr_db,
-                };
-            }
-        }
+        **self.data.load()
     }
 }
 
@@ -95,11 +46,11 @@ pub struct Ducker {
 
 impl Ducker {
     pub fn new(sample_rate: f32) -> Self {
-        let frame_rate = sample_rate / 512.0; 
-        
+        let frame_rate = sample_rate / 512.0;
+
         let attack_alpha = f32::exp(-2.2 / (0.030 * frame_rate));
         let release_alpha = f32::exp(-2.2 / (0.500 * frame_rate));
-        
+
         Self {
             duck_gain: 1.0,
             attack_alpha,
@@ -122,19 +73,19 @@ impl Ducker {
             self.nonfinite_count = self.nonfinite_count.saturating_add(1);
             return self.duck_gain;
         }
-        
+
         self.last_valid_p = p_speech;
-        
+
         let floor = 10.0f32.powf(-12.0 / 20.0);
         let p_speech_clamped = p_speech.clamp(0.0, 1.0);
         let target = 1.0 - p_speech_clamped * (1.0 - floor);
-        
+
         if target < self.duck_gain {
             self.duck_gain = target + self.attack_alpha * (self.duck_gain - target);
         } else {
             self.duck_gain = target + self.release_alpha * (self.duck_gain - target);
         }
-        
+
         self.duck_gain = self.duck_gain.clamp(0.0, 1.0);
         self.duck_gain
     }
@@ -191,7 +142,9 @@ mod tests {
         let attack_ms = attack_frames as f32 * frame_ms;
 
         // Ensure steady state
-        for _ in 0..100 { ducker.update(1.0); }
+        for _ in 0..100 {
+            ducker.update(1.0);
+        }
 
         // RELEASE: from fully ducked, feed p_speech = 0.0
         let release_threshold_linear = 10.0f32.powf(-1.0 / 20.0);
@@ -212,7 +165,10 @@ mod tests {
     fn test_ducker_attack_ms() {
         let (attack_ms, _) = run_ballistics_test();
         println!("Measured Attack: {:.2} ms", attack_ms);
-        assert!(attack_ms >= 20.0 && attack_ms <= 60.0, "Attack ms outside gate");
+        assert!(
+            attack_ms >= 20.0 && attack_ms <= 60.0,
+            "Attack ms outside gate"
+        );
     }
 
     // Gate 4: release ms
@@ -220,7 +176,10 @@ mod tests {
     fn test_ducker_release_ms() {
         let (_, release_ms) = run_ballistics_test();
         println!("Measured Release: {:.2} ms", release_ms);
-        assert!(release_ms >= 300.0 && release_ms <= 800.0, "Release ms outside gate");
+        assert!(
+            release_ms >= 300.0 && release_ms <= 800.0,
+            "Release ms outside gate"
+        );
     }
 
     // Gate 5: asymmetry ratio
@@ -236,9 +195,22 @@ mod tests {
     #[test]
     fn test_ducker_bounds() {
         let mut ducker = Ducker::new(48000.0);
-        for p in [0.0, 1.0, 0.5, 1.5, -0.5, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        for p in [
+            0.0,
+            1.0,
+            0.5,
+            1.5,
+            -0.5,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ] {
             let gain = ducker.update(p);
-            assert!(gain >= 0.0 && gain <= 1.0, "Bounds check failed: gain = {}", gain);
+            assert!(
+                gain >= 0.0 && gain <= 1.0,
+                "Bounds check failed: gain = {}",
+                gain
+            );
             assert!(gain.is_finite(), "Gain is not finite for p_speech = {}", p);
         }
     }
@@ -259,38 +231,60 @@ mod tests {
     fn test_ducker_nan_freeze() {
         let mut ducker = Ducker::new(48000.0);
         // feed 1.0 until fully ducked
-        for _ in 0..100 { ducker.update(1.0); }
+        for _ in 0..100 {
+            ducker.update(1.0);
+        }
         let pre_nan = ducker.update(1.0);
-        
+
         // feed NaN for 100 frames
         for _ in 0..100 {
             let gain = ducker.update(f32::NAN);
-            assert_eq!(gain.to_bits(), pre_nan.to_bits(), "duck_gain did not perfectly freeze on NaN");
+            assert_eq!(
+                gain.to_bits(),
+                pre_nan.to_bits(),
+                "duck_gain did not perfectly freeze on NaN"
+            );
         }
-        
+
         // feed 0.0 and confirm release
         let release_gain = ducker.update(0.0);
-        assert!(release_gain > pre_nan, "did not begin releasing after NaN freeze");
+        assert!(
+            release_gain > pre_nan,
+            "did not begin releasing after NaN freeze"
+        );
     }
 
     // Gate 9: Feed Inf and -Inf
     #[test]
     fn test_ducker_inf_freeze() {
         let mut ducker = Ducker::new(48000.0);
-        for _ in 0..100 { ducker.update(1.0); }
+        for _ in 0..100 {
+            ducker.update(1.0);
+        }
         let pre_inf = ducker.update(1.0);
-        
+
         for _ in 0..100 {
             let gain = ducker.update(f32::INFINITY);
-            assert_eq!(gain.to_bits(), pre_inf.to_bits(), "duck_gain did not perfectly freeze on INFINITY");
+            assert_eq!(
+                gain.to_bits(),
+                pre_inf.to_bits(),
+                "duck_gain did not perfectly freeze on INFINITY"
+            );
         }
         for _ in 0..100 {
             let gain = ducker.update(f32::NEG_INFINITY);
-            assert_eq!(gain.to_bits(), pre_inf.to_bits(), "duck_gain did not perfectly freeze on NEG_INFINITY");
+            assert_eq!(
+                gain.to_bits(),
+                pre_inf.to_bits(),
+                "duck_gain did not perfectly freeze on NEG_INFINITY"
+            );
         }
-        
+
         let release_gain = ducker.update(0.0);
-        assert!(release_gain > pre_inf, "did not begin releasing after Inf freeze");
+        assert!(
+            release_gain > pre_inf,
+            "did not begin releasing after Inf freeze"
+        );
     }
 
     // Gate 10: nonfinite_count and last_valid_p
@@ -300,17 +294,82 @@ mod tests {
         ducker.update(0.7);
         assert_eq!(ducker.last_valid_p(), 0.7);
         assert_eq!(ducker.nonfinite_count(), 0);
-        
+
         ducker.update(f32::NAN);
         assert_eq!(ducker.last_valid_p(), 0.7);
         assert_eq!(ducker.nonfinite_count(), 1);
-        
+
         ducker.update(f32::INFINITY);
         assert_eq!(ducker.last_valid_p(), 0.7);
         assert_eq!(ducker.nonfinite_count(), 2);
-        
+
         ducker.update(0.2);
         assert_eq!(ducker.last_valid_p(), 0.2);
         assert_eq!(ducker.nonfinite_count(), 2);
+    }
+
+    // Gate 11: Concurrent stress test
+    #[test]
+    fn test_concurrent_read_write() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let bus = Arc::new(ControlBus::new(48000.0));
+        let mut readers = vec![];
+
+        let read_flags = Arc::new(std::sync::atomic::AtomicBool::new(true));
+
+        for i in 0..4 {
+            let bus_clone = bus.clone();
+            let flags = read_flags.clone();
+            readers.push(thread::spawn(move || {
+                let mut reads = 0;
+                while flags.load(std::sync::atomic::Ordering::Relaxed) {
+                    let frame = bus_clone.read();
+                    reads += 1;
+
+                    // Verify internal consistency: duck_gain = p_speech + 1.0, snr_db = p_speech + 2.0
+                    // except default frame where p_speech = 0.0, duck_gain = 1.0, snr_db = 0.0
+                    if frame.snr_db != 0.0 {
+                        assert_eq!(
+                            frame.duck_gain,
+                            frame.p_speech + 1.0,
+                            "Torn frame detected!"
+                        );
+                        assert_eq!(frame.snr_db, frame.p_speech + 2.0, "Torn frame detected!");
+                    }
+                }
+                println!("Thread {} performed {} reads", i, reads);
+            }));
+        }
+
+        for i in 1..=10_000 {
+            bus.publish(ControlFrame {
+                p_speech: i as f32,
+                duck_gain: (i + 1) as f32,
+                voice_gate: i % 2 == 0,
+                snr_db: (i + 2) as f32,
+            });
+        }
+
+        read_flags.store(false, std::sync::atomic::Ordering::Relaxed);
+        for t in readers {
+            t.join().unwrap();
+        }
+    }
+
+    // Gate 12: No staleness beyond one publish
+    #[test]
+    fn test_no_staleness() {
+        let bus = ControlBus::new(48000.0);
+        bus.publish(ControlFrame {
+            p_speech: 999.0,
+            duck_gain: 999.0,
+            voice_gate: true,
+            snr_db: 999.0,
+        });
+        let frame = bus.read();
+        assert_eq!(frame.p_speech, 999.0);
+        assert_eq!(frame.duck_gain, 999.0);
     }
 }

@@ -29,8 +29,13 @@ pub fn butter_lp2_prewarped(freq: f32, sr: f32) -> Biquad {
     let b1 = 2.0 * b0;
     let b2 = b0;
     Biquad {
-        b0, b1, b2, a1, a2,
-        w1: 0.0, w2: 0.0,
+        b0,
+        b1,
+        b2,
+        a1,
+        a2,
+        w1: 0.0,
+        w2: 0.0,
     }
 }
 
@@ -44,7 +49,12 @@ pub fn butter_hp2_prewarped(freq: f32, sr: f32) -> Biquad {
     let b1 = -2.0 * b0;
     let b2 = b0;
     Biquad {
-        b0, b1, b2, a1, a2,
-        w1: 0.0, w2: 0.0,
+        b0,
+        b1,
+        b2,
+        a1,
+        a2,
+        w1: 0.0,
+        w2: 0.0,
     }
 }

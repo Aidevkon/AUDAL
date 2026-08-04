@@ -1,4 +1,4 @@
-use crate::dsp::biquad::{Biquad, butter_lp2_prewarped, butter_hp2_prewarped};
+use crate::dsp::biquad::{butter_hp2_prewarped, butter_lp2_prewarped, Biquad};
 
 pub struct Allpass {
     x1: f32,
@@ -8,7 +8,11 @@ pub struct Allpass {
 
 impl Allpass {
     pub fn new(c: f32) -> Self {
-        Self { x1: 0.0, y1: 0.0, c }
+        Self {
+            x1: 0.0,
+            y1: 0.0,
+            c,
+        }
     }
     pub fn process(&mut self, x: f32) -> f32 {
         let y = self.c * x + self.x1 - self.c * self.y1;
@@ -46,13 +50,13 @@ impl GlueChain {
             lpf_l2: butter_lp2_prewarped(8000.0, sample_rate),
             lpf_r1: butter_lp2_prewarped(8000.0, sample_rate),
             lpf_r2: butter_lp2_prewarped(8000.0, sample_rate),
-            
+
             // 4th order HPF at 150Hz
             hpf_l1: butter_hp2_prewarped(150.0, sample_rate),
             hpf_l2: butter_hp2_prewarped(150.0, sample_rate),
             hpf_r1: butter_hp2_prewarped(150.0, sample_rate),
             hpf_r2: butter_hp2_prewarped(150.0, sample_rate),
-            
+
             apf: Allpass::new(0.5),
             w: 1.0,
             d: 0.0,
@@ -93,8 +97,16 @@ impl GlueChain {
             let r_new = m - s * self.w;
 
             let d = self.d;
-            *l = if d < 1e-5 { l_new } else { libm::tanhf(l_new * d) / d };
-            *r = if d < 1e-5 { r_new } else { libm::tanhf(r_new * d) / d };
+            *l = if d < 1e-5 {
+                l_new
+            } else {
+                libm::tanhf(l_new * d) / d
+            };
+            *r = if d < 1e-5 {
+                r_new
+            } else {
+                libm::tanhf(r_new * d) / d
+            };
         }
     }
 }
@@ -109,24 +121,28 @@ mod tests {
         chain.set_amount(1.0);
         let mut l = vec![0.5, -0.5, 0.25, -0.1];
         let mut r = vec![0.5, -0.5, 0.25, -0.1]; // Mono input
-        
+
         let l_orig = l.clone();
         let r_orig = r.clone();
-        
+
         chain.process(&mut l, &mut r);
         let mut sum_widened = vec![0.0; l.len()];
-        for i in 0..l.len() { sum_widened[i] = l[i] + r[i]; }
+        for i in 0..l.len() {
+            sum_widened[i] = l[i] + r[i];
+        }
 
         let mut chain_bypassed = GlueChain::new(48000.0, WidthMode::Reveal);
         chain_bypassed.set_amount(1.0);
-        chain_bypassed.w = 1.0; 
-        
+        chain_bypassed.w = 1.0;
+
         let mut l_b = l_orig.clone();
         let mut r_b = r_orig.clone();
         chain_bypassed.process(&mut l_b, &mut r_b);
-        
+
         let mut sum_bypassed = vec![0.0; l_b.len()];
-        for i in 0..l_b.len() { sum_bypassed[i] = l_b[i] + r_b[i]; }
+        for i in 0..l_b.len() {
+            sum_bypassed[i] = l_b[i] + r_b[i];
+        }
 
         let mut e_w = 0.0;
         let mut e_b = 0.0;
@@ -134,7 +150,7 @@ mod tests {
             e_w += sum_widened[i] * sum_widened[i];
             e_b += sum_bypassed[i] * sum_bypassed[i];
         }
-        
+
         let diff = (10.0 * libm::log10f(e_w / e_b)).abs();
         assert!(diff < 0.01, "Energy diff was {}", diff);
     }
@@ -147,10 +163,10 @@ mod tests {
         let mut r = vec![0.5, -0.2, 0.1];
         let l_orig = l.clone();
         let r_orig = r.clone();
-        
+
         chain.process(&mut l, &mut r);
-        
-        // It is unchanged APART from the two filters. 
+
+        // It is unchanged APART from the two filters.
         // We can simulate just the two filters on the original signal to compare.
         let mut chain_filters_only = GlueChain::new(48000.0, WidthMode::Reveal);
         chain_filters_only.set_amount(0.0);
@@ -162,7 +178,7 @@ mod tests {
             l_filt = chain_filters_only.lpf_l2.process(l_filt);
             l_filt = chain_filters_only.hpf_l1.process(l_filt);
             l_filt = chain_filters_only.hpf_l2.process(l_filt);
-            
+
             let mut r_filt = chain_filters_only.lpf_r1.process(*rr);
             r_filt = chain_filters_only.lpf_r2.process(r_filt);
             r_filt = chain_filters_only.hpf_r1.process(r_filt);
@@ -190,12 +206,16 @@ mod tests {
             r[i] = s; // Mono 60Hz sine
         }
         let mut e_in = 0.0;
-        for &x in &l { e_in += x * x; }
-        
+        for &x in &l {
+            e_in += x * x;
+        }
+
         chain.process(&mut l, &mut r);
         let mut e_out = 0.0;
-        for &x in &l { e_out += x * x; }
-        
+        for &x in &l {
+            e_out += x * x;
+        }
+
         let atten = 10.0 * libm::log10f(e_out / e_in);
         assert!(atten < -20.0, "Attenuation was {}", atten);
     }
@@ -213,12 +233,16 @@ mod tests {
             r[i] = s; // Mono 15kHz sine
         }
         let mut e_in = 0.0;
-        for &x in &l { e_in += x * x; }
-        
+        for &x in &l {
+            e_in += x * x;
+        }
+
         chain.process(&mut l, &mut r);
         let mut e_out = 0.0;
-        for &x in &l { e_out += x * x; }
-        
+        for &x in &l {
+            e_out += x * x;
+        }
+
         let atten = 10.0 * libm::log10f(e_out / e_in);
         // Using 4th order filter, attenuation is ~31.14 dB. Using a 30 dB gate.
         assert!(atten < -30.0, "Attenuation was {}", atten);
@@ -243,8 +267,12 @@ mod tests {
         let mut l = vec![1.0, -1.0, 1.0, 0.0];
         let mut r = vec![1.0, -1.0, 1.0, 0.0];
         chain.process(&mut l, &mut r);
-        for &x in &l { assert!(x.is_finite()); }
-        for &x in &r { assert!(x.is_finite()); }
+        for &x in &l {
+            assert!(x.is_finite());
+        }
+        for &x in &r {
+            assert!(x.is_finite());
+        }
     }
 
     #[test]
@@ -263,15 +291,15 @@ mod tests {
     fn test_create_mono_in_out() {
         let mut chain = GlueChain::new(48000.0, WidthMode::Create);
         chain.set_amount(1.0);
-        
+
         // Feed a low amplitude impulse to avoid saturation warping the mono fold-down check
         let mut l = vec![0.01, 0.0, 0.0, 0.0];
         let mut r = vec![0.01, 0.0, 0.0, 0.0];
         let l_orig = l.clone();
         let r_orig = r.clone();
-        
+
         chain.process(&mut l, &mut r);
-        
+
         let mut diff_sum = 0.0;
         for i in 0..l.len() {
             diff_sum += (l[i] - r[i]).abs();
@@ -279,18 +307,22 @@ mod tests {
         assert!(diff_sum > 0.0001, "Create mode failed to invent width!");
 
         let mut sum_created = vec![0.0; l.len()];
-        for i in 0..l.len() { sum_created[i] = l[i] + r[i]; }
+        for i in 0..l.len() {
+            sum_created[i] = l[i] + r[i];
+        }
 
         let mut chain_bypassed = GlueChain::new(48000.0, WidthMode::Create);
         chain_bypassed.set_amount(1.0);
-        chain_bypassed.w = 1.0; 
-        
+        chain_bypassed.w = 1.0;
+
         let mut l_b = l_orig.clone();
         let mut r_b = r_orig.clone();
         chain_bypassed.process(&mut l_b, &mut r_b);
-        
+
         let mut sum_bypassed = vec![0.0; l_b.len()];
-        for i in 0..l_b.len() { sum_bypassed[i] = l_b[i] + r_b[i]; }
+        for i in 0..l_b.len() {
+            sum_bypassed[i] = l_b[i] + r_b[i];
+        }
 
         let mut e_c = 0.0;
         let mut e_b = 0.0;
@@ -298,7 +330,7 @@ mod tests {
             e_c += sum_created[i] * sum_created[i];
             e_b += sum_bypassed[i] * sum_bypassed[i];
         }
-        
+
         let diff = (10.0 * libm::log10f(e_c / e_b)).abs();
         assert!(diff < 0.01, "Energy diff was {} in Create mode", diff);
     }
