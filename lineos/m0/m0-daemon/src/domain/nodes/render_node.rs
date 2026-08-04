@@ -286,6 +286,20 @@ pub fn run(
     };
 
     let trace_path = crate::spool::spool_dir().join(format!("vad-trace-{}.csv", settings.blob_id));
+    // W1 glue-feed: ControlBus observer για το κύκλωμα read-back echo
+    let control_bus = std::sync::Arc::new(
+        sp314_dsp::dsp::control_bus::ControlBus::new(settings.sample_rate as f32),
+    );
+    let mut ducker = sp314_dsp::dsp::control_bus::Ducker::new(settings.sample_rate as f32);
+    let echo_path = std::path::PathBuf::from("/tmp/w1_csv_B_bus.csv");
+    let _ = std::fs::remove_file(&echo_path);
+    let echo_file = std::fs::File::create(&echo_path).ok();
+    let mut echo_w = echo_file.map(|f| {
+        use std::io::Write;
+        let mut bw = std::io::BufWriter::new(f);
+        let _ = writeln!(bw, "frame_index,time_sec,p_speech,voice_gate,old_duck_gain,new_duck_gain");
+        bw
+    });
     let mut observer_holder = if settings.vad_observe_enabled {
         match std::fs::File::create(&trace_path) {
             Ok(file) => {
@@ -310,6 +324,28 @@ pub fn run(
                         obs.rms_delta_30ms,
                         obs.noise_floor_dbfs
                     );
+                    // W1 wiring: update → publish → read-back echo
+                    let new_duck = ducker.update(obs.posterior);
+                    control_bus.publish(sp314_dsp::dsp::control_bus::ControlFrame {
+                        p_speech: obs.posterior,
+                        duck_gain: new_duck,
+                        voice_gate: obs.is_speech,
+                        snr_db: obs.rms_db - obs.noise_floor_dbfs,
+                    });
+                    let echo = control_bus.read();
+                    if let Some(ref mut ew) = echo_w {
+                        use std::io::Write;
+                        let _ = writeln!(
+                            ew,
+                            "{},{:.2},{:.4},{},{:.4},{:.4}",
+                            obs.frame_index,
+                            time_sec,
+                            echo.p_speech,
+                            echo.voice_gate,
+                            obs.duck_gain,
+                            echo.duck_gain,
+                        );
+                    }
                 })
             }
             Err(e) => {
