@@ -251,4 +251,373 @@ mod tests {
             println!("{}: {}", k, outputs[*k]);
         }
     }
+
+    // ── W2.0 Splice Fixture Generator (rev2) ───────────────────────────────
+    // Builds two 30s FLACs with speech strictly in [10s, 20s].
+    // Seed: 271828 (distinct from build_fixtures seed 314159).
+    //
+    // Outputs (tests/fixtures/duck_splice/):
+    //   duck_splice_synth_snr-15.flac — synth noise bed + speech  [primary gate]
+    //   duck_splice_real_snr-15.flac  — Skelpolu stem + speech    [sensor witness]
+    //   speech_segment.flac           — speech-only, full 30s context
+    //   synth_bed.flac                — scaled synth bed alone
+    //   skelpolu_bed.flac             — scaled Skelpolu bed alone
+    //   manifest.json                 — ground truth + 28-candidate bed scan
+    #[test]
+    #[ignore]
+    fn build_duck_splice_fixture() {
+        let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/duck_splice");
+        std::fs::create_dir_all(base_out).unwrap();
+
+        let target_sr: u32 = 48000;
+        let total_samples: usize = 1_440_000; // 30s @ 48kHz
+        let speech_onset_sample: usize = 480_000; // 10s
+        let speech_end_sample: usize = 960_000; // 20s
+        let speech_n_samples: usize = speech_end_sample - speech_onset_sample; // 480000
+
+        // ── 1. MUSDB stem scan (no gate — record all 28 candidates) ───────
+        // First measured corpus of micro-VAD music false-positive rates.
+        // PARK[RED]: micro-VAD has no speech-vs-music discrimination
+        // (28/28 stems > 43% VAD, median ~97%). Sensor upgrade required.
+        // W2 proceeds as hydraulic gate with synth fixture.
+        let initial_tracks: &[&str] = &[
+            "Buitraker_-_Revo_X",
+            "Hollow_Ground_-_Ill_Fate",
+            "MERC_Music_-_Knockout",
+            "Moosmusic_-_Big_Dummy_Shake",
+            "Timboz_-_Pony",
+        ];
+        let fallback_tracks: &[&str] = &[
+            "Al_James_-_Schoolboy_Facination",
+            "AM_Contra_-_Heart_Peripheral",
+            "Arise_-_Run_Run_Run",
+            "Ben_Carrigan_-_Well_Talk_About_It_All_Tonight",
+            "Forkupines_-_Semantics",
+            "Little_Chicagos_Finest_-_My_Own",
+            "Louis_Cressy_Band_-_Good_Time",
+            "Motor_Tapes_-_Shore",
+            "PR_-_Oh_No",
+            "Punkdisco_-_Oral_Hygiene",
+            "Secretariat_-_Borderline",
+            "Signe_Jakobsen_-_What_Have_You_Done_To_Me",
+            "Skelpolu_-_Resurrection",
+            "Speak_Softly_-_Like_Horses",
+            "The_Mountaineering_Club_-_Mallory",
+            "The_Sunshine_Garcia_Band_-_For_I_Am_The_Moon",
+            "Tom_McKenzie_-_Directions",
+            "Zeno_-_Signs",
+        ];
+        let base_dir = "/home/aidevcon/Downloads/DATASET/excerpts";
+        let mut bed_scan_log: Vec<serde_json::Value> = Vec::new();
+
+        for phase in 0..3_u8 {
+            let tracks: &[&str] = if phase < 2 { initial_tracks } else { fallback_tracks };
+            let stem_label = match phase {
+                0 => "drums+bass",
+                1 => "drums",
+                _ => "other",
+            };
+            for &track in tracks {
+                let primary_stem = if phase < 2 { "drums" } else { "other" };
+                let path1 = format!("{}/{}/{}.wav", base_dir, track, primary_stem);
+                let mut rng1 = Lcg::new(271828);
+                let audio1 = get_audio_excerpt(&path1, target_sr, 30.0, &mut rng1);
+                let audio = if phase == 0 {
+                    let path2 = format!("{}/{}/bass.wav", base_dir, track);
+                    let mut rng2 = Lcg::new(271828);
+                    let audio2 = get_audio_excerpt(&path2, target_sr, 30.0, &mut rng2);
+                    let len = audio1.len().min(audio2.len());
+                    audio1[..len]
+                        .iter()
+                        .zip(audio2[..len].iter())
+                        .map(|(a, b)| a + b)
+                        .collect::<Vec<f32>>()
+                } else {
+                    audio1
+                };
+                let vad_pct = evaluate_vad(&audio);
+                let passed = vad_pct < 5.0;
+                println!(
+                    "DUCK_SPLICE|BED|phase={}|stem={}|track={}|vad={:.2}|pass={}",
+                    phase, stem_label, track, vad_pct, passed
+                );
+                bed_scan_log.push(serde_json::json!({
+                    "phase": phase,
+                    "stem": stem_label,
+                    "track": track,
+                    "vad_pct": vad_pct,
+                    "pass": passed,
+                }));
+            }
+        }
+
+        // ── 2. Synth bed: bandlimited noise (1-pole IIR lowpass @ 400Hz) ──
+        // y[n] = α·y[n-1] + (1-α)·x[n], α = exp(-2π·400/48000) ≈ 0.9481.
+        // Seed: 271828 + 999999 (isolated from all other Lcg uses).
+        // Hard assert VAD < 5%: cannot proceed without clean bed.
+        let synth_fc_hz: f32 = 400.0;
+        let synth_alpha =
+            (-2.0_f32 * std::f32::consts::PI * synth_fc_hz / target_sr as f32).exp();
+        let synth_k = 1.0_f32 - synth_alpha;
+        let mut synth_rng = Lcg::new(271_828 + 999_999);
+        let mut synth_lpf = 0.0_f32;
+        let mut synth_bed: Vec<f32> = Vec::with_capacity(total_samples);
+        for _ in 0..total_samples {
+            let white = synth_rng.next_float() * 2.0_f32 - 1.0_f32;
+            synth_lpf = synth_alpha * synth_lpf + synth_k * white;
+            synth_bed.push(synth_lpf);
+        }
+        let synth_vad_pct = evaluate_vad(&synth_bed);
+        println!(
+            "DUCK_SPLICE|SYNTH_BED|fc={:.0}Hz|alpha={:.6}|vad={:.2}|pass={}",
+            synth_fc_hz, synth_alpha, synth_vad_pct, synth_vad_pct < 5.0
+        );
+        assert!(
+            synth_vad_pct < 5.0,
+            "Synth bed failed VAD gate ({:.2}% >= 5%); lower fc_hz or adjust IIR",
+            synth_vad_pct
+        );
+
+        // ── 3. Skelpolu witness bed (no gate — known-contaminated) ─────────
+        // Best real MUSDB candidate from scan: ~7.67% (music false-positive).
+        // W2.2 reports duck envelope for this fixture as informational only.
+        let skelpolu_path = format!("{}/Skelpolu_-_Resurrection/other.wav", base_dir);
+        let mut ske_rng = Lcg::new(271828);
+        let mut skelpolu_bed =
+            get_audio_excerpt(&skelpolu_path, target_sr, 30.0, &mut ske_rng);
+        skelpolu_bed.truncate(total_samples);
+        while skelpolu_bed.len() < total_samples {
+            skelpolu_bed.push(0.0_f32);
+        }
+        let skelpolu_vad_pct = evaluate_vad(&skelpolu_bed);
+        println!(
+            "DUCK_SPLICE|WITNESS_BED|track=Skelpolu_-_Resurrection|vad={:.2}",
+            skelpolu_vad_pct
+        );
+
+        // ── 4. Speech: 2-3 utterances, strictly [10s, 20s] ────────────────
+        // Sources verified: all 3 files exist, each ≥32s @16kHz.
+        // 422-122949-0013: 32.645s, 2902-9006-0015: 32.485s, 5338-24615-0002: 32.145s.
+        let utterance_sources: &[(&str, &str)] = &[
+            (
+                "/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/dev-clean/422/122949/422-122949-0013.flac",
+                "422-122949-0013",
+            ),
+            (
+                "/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/dev-clean/2902/9006/2902-9006-0015.flac",
+                "2902-9006-0015",
+            ),
+            (
+                "/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/dev-clean/5338/24615/5338-24615-0002.flac",
+                "5338-24615-0002",
+            ),
+        ];
+        let mut speech_concat: Vec<f32> = Vec::with_capacity(speech_n_samples);
+        let mut utterance_manifest: Vec<serde_json::Value> = Vec::new();
+        for (utt_idx, &(path, id)) in utterance_sources.iter().enumerate() {
+            if speech_concat.len() >= speech_n_samples {
+                break;
+            }
+            let remaining = speech_n_samples - speech_concat.len();
+            let request_sec = (remaining as f32 / target_sr as f32 + 1.0).min(11.0_f32);
+            let mut utt_rng = Lcg::new(271828 + utt_idx as u64 * 1_000_003);
+            let utt = get_audio_excerpt(path, target_sr, request_sec, &mut utt_rng);
+            let rel_start = speech_concat.len();
+            let rel_end = (rel_start + utt.len()).min(speech_n_samples);
+            utterance_manifest.push(serde_json::json!({
+                "id": id,
+                "path": path,
+                "speech_relative_start_sample": rel_start,
+                "speech_relative_end_sample": rel_end,
+                "mix_start_sample": speech_onset_sample + rel_start,
+                "mix_end_sample":   speech_onset_sample + rel_end,
+                "samples_used": rel_end - rel_start,
+            }));
+            speech_concat.extend_from_slice(&utt[..utt.len().min(remaining)]);
+        }
+        speech_concat.truncate(speech_n_samples);
+        while speech_concat.len() < speech_n_samples {
+            speech_concat.push(0.0_f32);
+        }
+        // Assert: actual speech material ≥ 9.5s (= 456000 samples @ 48kHz).
+        // Prevents fixture with a half-empty speech window from resampler underflow.
+        let speech_actual_samples: usize = utterance_manifest
+            .iter()
+            .map(|u| u["samples_used"].as_u64().unwrap_or(0) as usize)
+            .sum();
+        assert!(
+            speech_actual_samples >= (9.5 * target_sr as f32) as usize,
+            "Speech window underfilled: {} samples < 9.5s ({} samples)",
+            speech_actual_samples,
+            (9.5 * target_sr as f32) as usize,
+        );
+        println!(
+            "DUCK_SPLICE|SPEECH_SANITY|actual_samples={}|min_required={}|ok=true",
+            speech_actual_samples,
+            (9.5 * target_sr as f32) as usize,
+        );
+
+        // ── 5. Level scaling ──────────────────────────────────────────────
+        // All paths are dual-mono (L==R). BS.1770 stereo factor cancels:
+        // 10·log10(L²+R²) = 10·log10(2·L²) — same offset on all channels.
+
+        // Speech → -20 LUFS
+        let speech_lufs_raw = measure_integrated_lufs(&speech_concat, &speech_concat);
+        let speech_target_lufs = -20.0_f32;
+        let speech_gain = 10.0_f32.powf((speech_target_lufs - speech_lufs_raw) / 20.0);
+        let speech_scaled: Vec<f32> =
+            speech_concat.iter().map(|s| s * speech_gain).collect();
+
+        let bed_target_lufs = speech_target_lufs - 15.0_f32; // -35 LUFS
+
+        let synth_lufs_raw = measure_integrated_lufs(&synth_bed, &synth_bed);
+        let synth_gain = 10.0_f32.powf((bed_target_lufs - synth_lufs_raw) / 20.0);
+        let synth_scaled: Vec<f32> =
+            synth_bed.iter().map(|s| s * synth_gain).collect();
+
+        let ske_lufs_raw = measure_integrated_lufs(&skelpolu_bed, &skelpolu_bed);
+        let ske_gain = 10.0_f32.powf((bed_target_lufs - ske_lufs_raw) / 20.0);
+        let ske_scaled: Vec<f32> =
+            skelpolu_bed.iter().map(|s| s * ske_gain).collect();
+
+        // Speech-in-context (zero outside [10s,20s], shared by both fixtures)
+        let mut speech_ctx = vec![0.0_f32; total_samples];
+        for (i, &s) in speech_scaled.iter().enumerate() {
+            speech_ctx[speech_onset_sample + i] = s;
+        }
+
+        // ── 6. Two mixes ──────────────────────────────────────────────────
+        // Mix A: synth bed + speech  (primary gate fixture)
+        let mut mix_synth = synth_scaled.clone();
+        for (i, &s) in speech_scaled.iter().enumerate() {
+            mix_synth[speech_onset_sample + i] += s;
+        }
+        for s in mix_synth.iter_mut() {
+            *s = s.clamp(-1.0_f32, 1.0_f32);
+        }
+
+        // Mix B: Skelpolu + speech   (sensor witness fixture)
+        let mut mix_real = ske_scaled.clone();
+        for (i, &s) in speech_scaled.iter().enumerate() {
+            mix_real[speech_onset_sample + i] += s;
+        }
+        for s in mix_real.iter_mut() {
+            *s = s.clamp(-1.0_f32, 1.0_f32);
+        }
+
+        // ── 7. Write FLAC files ───────────────────────────────────────────
+        let mix_synth_path  = format!("{}/duck_splice_synth_snr-15.flac", base_out);
+        let mix_real_path   = format!("{}/duck_splice_real_snr-15.flac",  base_out);
+        let speech_ctx_path = format!("{}/speech_segment.flac",           base_out);
+        let synth_bed_path  = format!("{}/synth_bed.flac",                base_out);
+        let ske_bed_path    = format!("{}/skelpolu_bed.flac",              base_out);
+
+        FlacWriter::write(&mix_synth_path,  &mix_synth,    &mix_synth,    target_sr).unwrap();
+        FlacWriter::write(&mix_real_path,   &mix_real,     &mix_real,     target_sr).unwrap();
+        FlacWriter::write(&speech_ctx_path, &speech_ctx,   &speech_ctx,   target_sr).unwrap();
+        FlacWriter::write(&synth_bed_path,  &synth_scaled, &synth_scaled, target_sr).unwrap();
+        FlacWriter::write(&ske_bed_path,    &ske_scaled,   &ske_scaled,   target_sr).unwrap();
+
+        // ── 8. Manifest ───────────────────────────────────────────────────
+        let mix_synth_sha = hash_file(&mix_synth_path);
+        let mix_real_sha  = hash_file(&mix_real_path);
+        let speech_sha    = hash_file(&speech_ctx_path);
+        let synth_bed_sha = hash_file(&synth_bed_path);
+        let ske_bed_sha   = hash_file(&ske_bed_path);
+
+        let manifest = serde_json::json!({
+            "version": "W2.0-rev2",
+            "seed": 271828_u64,
+            "resampler": "rubato SincFixedIn",
+            "target_sr": target_sr,
+            "total_samples": total_samples,
+            "total_duration_sec": 30.0_f32,
+            "speech_onset_sample": speech_onset_sample,
+            "speech_end_sample":   speech_end_sample,
+            "speech_n_samples":    speech_n_samples,
+            "speech_onset_sec": 10.0_f32,
+            "speech_end_sec":   20.0_f32,
+            "snr_db": -15.0_f32,
+            "speech_minus_bed_lu": 15.0_f32,
+
+            "synth_fixture": {
+                "role": "primary_gate",
+                "note": "W2.2 pass/fail fixture: duck iff [10s,20s]",
+                "file": "duck_splice_synth_snr-15.flac",
+                "bed_file": "synth_bed.flac",
+                "bed": {
+                    "type": "synthetic_lowpass_noise",
+                    "seed": 271_828_u64 + 999_999_u64,
+                    "lpf_fc_hz": synth_fc_hz,
+                    "lpf_alpha": synth_alpha,
+                    "vad_pct": synth_vad_pct,
+                    "gate_passed": synth_vad_pct < 5.0,
+                    "original_lufs": synth_lufs_raw,
+                    "target_lufs": bed_target_lufs,
+                    "gain_linear": synth_gain,
+                },
+            },
+
+            "real_fixture": {
+                "role": "sensor_witness",
+                "note": "Pre/post VAD-upgrade benchmark. W2.2 reports duck as informational only.",
+                "file": "duck_splice_real_snr-15.flac",
+                "bed_file": "skelpolu_bed.flac",
+                "bed": {
+                    "type": "musdb_stem",
+                    "track": "Skelpolu_-_Resurrection",
+                    "stem": "other",
+                    "vad_pct": skelpolu_vad_pct,
+                    "gate_passed": false,
+                    "known_contamination": "music false-positive, not speech",
+                    "original_lufs": ske_lufs_raw,
+                    "target_lufs": bed_target_lufs,
+                    "gain_linear": ske_gain,
+                },
+            },
+
+            "speech": {
+                "file": "speech_segment.flac",
+                "original_lufs": speech_lufs_raw,
+                "target_lufs": speech_target_lufs,
+                "gain_linear": speech_gain,
+                "utterances": utterance_manifest,
+            },
+
+            "bed_scan": {
+                "note": "First measured corpus of micro-VAD music FP rates. PARK[RED]: upgrade required.",
+                "gate_threshold_pct": 5.0,
+                "total_candidates": bed_scan_log.len(),
+                "candidates_tried": bed_scan_log,
+            },
+
+            "hashes": {
+                "duck_splice_synth_snr-15.flac": &mix_synth_sha,
+                "duck_splice_real_snr-15.flac":  &mix_real_sha,
+                "speech_segment.flac":           &speech_sha,
+                "synth_bed.flac":                &synth_bed_sha,
+                "skelpolu_bed.flac":             &ske_bed_sha,
+            }
+        });
+
+        let manifest_path = format!("{}/manifest.json", base_out);
+        let mut mf = File::create(&manifest_path).unwrap();
+        mf.write_all(serde_json::to_string_pretty(&manifest).unwrap().as_bytes())
+            .unwrap();
+
+        // ── 9. Console summary ────────────────────────────────────────────
+        println!(
+            "DUCK_SPLICE|speech_lufs_raw={:.2}|target={:.2}|gain={:.6}",
+            speech_lufs_raw, speech_target_lufs, speech_gain
+        );
+        println!(
+            "DUCK_SPLICE|speech_onset_sample={}|speech_end_sample={}",
+            speech_onset_sample, speech_end_sample
+        );
+        println!("DUCK_SPLICE|synth_mix_sha={}", mix_synth_sha);
+        println!("DUCK_SPLICE|real_mix_sha={}",  mix_real_sha);
+        println!("DUCK_SPLICE|speech_sha={}",    speech_sha);
+        println!("DUCK_SPLICE|manifest written to {}/manifest.json", base_out);
+    }
 }
+

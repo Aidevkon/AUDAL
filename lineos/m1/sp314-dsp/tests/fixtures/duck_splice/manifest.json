@@ -1,0 +1,276 @@
+{
+  "bed_scan": {
+    "candidates_tried": [
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Buitraker_-_Revo_X",
+        "vad_pct": 99.96666717529297
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Hollow_Ground_-_Ill_Fate",
+        "vad_pct": 94.36666870117188
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "MERC_Music_-_Knockout",
+        "vad_pct": 56.766666412353516
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Moosmusic_-_Big_Dummy_Shake",
+        "vad_pct": 98.80000305175781
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Timboz_-_Pony",
+        "vad_pct": 85.13333129882812
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Buitraker_-_Revo_X",
+        "vad_pct": 98.80000305175781
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Hollow_Ground_-_Ill_Fate",
+        "vad_pct": 70.73332977294922
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "MERC_Music_-_Knockout",
+        "vad_pct": 43.0
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Moosmusic_-_Big_Dummy_Shake",
+        "vad_pct": 89.46666717529297
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Timboz_-_Pony",
+        "vad_pct": 76.13333129882812
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Al_James_-_Schoolboy_Facination",
+        "vad_pct": 85.03333282470703
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "AM_Contra_-_Heart_Peripheral",
+        "vad_pct": 99.96666717529297
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Arise_-_Run_Run_Run",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Ben_Carrigan_-_Well_Talk_About_It_All_Tonight",
+        "vad_pct": 99.66666412353516
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Forkupines_-_Semantics",
+        "vad_pct": 81.69999694824219
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Little_Chicagos_Finest_-_My_Own",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Louis_Cressy_Band_-_Good_Time",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Motor_Tapes_-_Shore",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "PR_-_Oh_No",
+        "vad_pct": 83.36666870117188
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Punkdisco_-_Oral_Hygiene",
+        "vad_pct": 43.06666564941406
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Secretariat_-_Borderline",
+        "vad_pct": 86.69999694824219
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Signe_Jakobsen_-_What_Have_You_Done_To_Me",
+        "vad_pct": 90.5
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Skelpolu_-_Resurrection",
+        "vad_pct": 7.666666507720947
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Speak_Softly_-_Like_Horses",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "The_Mountaineering_Club_-_Mallory",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "The_Sunshine_Garcia_Band_-_For_I_Am_The_Moon",
+        "vad_pct": 96.43333435058594
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Tom_McKenzie_-_Directions",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Zeno_-_Signs",
+        "vad_pct": 99.96666717529297
+      }
+    ],
+    "gate_threshold_pct": 5.0,
+    "note": "First measured corpus of micro-VAD music FP rates. PARK[RED]: upgrade required.",
+    "total_candidates": 28
+  },
+  "hashes": {
+    "duck_splice_real_snr-15.flac": "45677cd8f52477bae723ee0709842f570a0aa9a738e3c54c1bda26d767bebe3d",
+    "duck_splice_synth_snr-15.flac": "b3761ccbdddcbe9ab70ad24836c5bacf07be01d6f9c760f79c1b70c32278981e",
+    "skelpolu_bed.flac": "9be0bb3fbade4d27a357a354ff65641fc31c218728b0751b69083d4e3bb65670",
+    "speech_segment.flac": "44c97972c2c78a2e8a545a8fcc519efe2c8e54de729a9d71f7f3df02880c8b81",
+    "synth_bed.flac": "5428da4c0947545197d2824ad3251422ef3992498c6210b54d6c2a91cd82c79b"
+  },
+  "real_fixture": {
+    "bed": {
+      "gain_linear": 0.4339156448841095,
+      "gate_passed": false,
+      "known_contamination": "music false-positive, not speech",
+      "original_lufs": -27.748106002807617,
+      "stem": "other",
+      "target_lufs": -35.0,
+      "track": "Skelpolu_-_Resurrection",
+      "type": "musdb_stem",
+      "vad_pct": 7.666666507720947
+    },
+    "bed_file": "skelpolu_bed.flac",
+    "file": "duck_splice_real_snr-15.flac",
+    "note": "Pre/post VAD-upgrade benchmark. W2.2 reports duck as informational only.",
+    "role": "sensor_witness"
+  },
+  "resampler": "rubato SincFixedIn",
+  "seed": 271828,
+  "snr_db": -15.0,
+  "speech": {
+    "file": "speech_segment.flac",
+    "gain_linear": 1.1107920408248901,
+    "original_lufs": -20.912654876708984,
+    "target_lufs": -20.0,
+    "utterances": [
+      {
+        "id": "422-122949-0013",
+        "mix_end_sample": 960000,
+        "mix_start_sample": 480000,
+        "path": "/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/dev-clean/422/122949/422-122949-0013.flac",
+        "samples_used": 480000,
+        "speech_relative_end_sample": 480000,
+        "speech_relative_start_sample": 0
+      }
+    ]
+  },
+  "speech_end_sample": 960000,
+  "speech_end_sec": 20.0,
+  "speech_minus_bed_lu": 15.0,
+  "speech_n_samples": 480000,
+  "speech_onset_sample": 480000,
+  "speech_onset_sec": 10.0,
+  "synth_fixture": {
+    "bed": {
+      "gain_linear": 0.13726477324962616,
+      "gate_passed": true,
+      "lpf_alpha": 0.9489873051643372,
+      "lpf_fc_hz": 400.0,
+      "original_lufs": -17.751182556152344,
+      "seed": 1271827,
+      "target_lufs": -35.0,
+      "type": "synthetic_lowpass_noise",
+      "vad_pct": 0.0
+    },
+    "bed_file": "synth_bed.flac",
+    "file": "duck_splice_synth_snr-15.flac",
+    "note": "W2.2 pass/fail fixture: duck iff [10s,20s]",
+    "role": "primary_gate"
+  },
+  "target_sr": 48000,
+  "total_duration_sec": 30.0,
+  "total_samples": 1440000,
+  "version": "W2.0-rev2"
+}
