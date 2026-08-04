@@ -312,8 +312,11 @@ impl Biquad {
     }
 }
 
-/// Design 2nd-order Butterworth lowpass biquad.
-/// Public for streaming consumers (trunk_pass).
+/// Resonant 2nd-order lowpass (Q = 1.414). NOT Butterworth despite the name.
+/// Measured consequence: +3.01 dB at the corner, +3.59 dB peak, at every cutoff.
+/// Name kept for compatibility (see F-049 in FINDINGS.md).
+/// For ANALYSIS paths only. For signal path, use `dsp::biquad::butter_lp2_prewarped`
+/// which is true Butterworth (Q = 1/sqrt2) and pre-warped.
 pub fn butter_lp2(freq: f32, sr: f32) -> Biquad {
     let w0 = 2.0 * core::f32::consts::PI * freq / sr;
     let cs = libm::cosf(w0);
@@ -331,8 +334,11 @@ pub fn butter_lp2(freq: f32, sr: f32) -> Biquad {
     }
 }
 
-/// Design 2nd-order Butterworth highpass biquad.
-/// Public for streaming consumers (trunk_pass).
+/// Resonant 2nd-order highpass (Q = 1.414). NOT Butterworth despite the name.
+/// Measured consequence: +3.01 dB at the corner, +3.59 dB peak, at every cutoff.
+/// Name kept for compatibility (see F-049 in FINDINGS.md).
+/// For ANALYSIS paths only. For signal path, use `dsp::biquad::butter_hp2_prewarped`
+/// which is true Butterworth (Q = 1/sqrt2) and pre-warped.
 pub fn butter_hp2(freq: f32, sr: f32) -> Biquad {
     let w0 = 2.0 * core::f32::consts::PI * freq / sr;
     let cs = libm::cosf(w0);
