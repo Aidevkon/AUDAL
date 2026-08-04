@@ -155,6 +155,38 @@ pub fn run(
         .unwrap_or_default();
     let mut write_offset = 0;
 
+    // W3: Routing Attribution (known by construction)
+    const STEM_ID_VOICE: usize = 0;
+    const STEM_ID_DRUMS: usize = 1;
+    const STEM_ID_BASS: usize = 2;
+    const STEM_ID_HARMONICS: usize = 3;
+
+    let mut routing_table = sp314_dsp::analysis::routing::RoutingTable::default();
+    routing_table.assign(STEM_ID_VOICE, sp314_dsp::analysis::routing::Bus::Voice);
+    routing_table.assign(STEM_ID_DRUMS, sp314_dsp::analysis::routing::Bus::Drums);
+    routing_table.assign(STEM_ID_BASS, sp314_dsp::analysis::routing::Bus::Music);
+    routing_table.assign(STEM_ID_HARMONICS, sp314_dsp::analysis::routing::Bus::Music);
+    // ambience = glue-feed: εκτός RoutingTable κατά v2
+    // (Glue = processor, not stem). Routing του glue path: W4.
+
+    struct BusGains { voice: f32, drums: f32, music: f32 }
+    let bus_gains = BusGains { voice: 1.0, drums: 1.0, music: 1.0 };
+
+    let get_bus_gain = |bus: Option<sp314_dsp::analysis::routing::Bus>| -> f32 {
+        match bus {
+            Some(sp314_dsp::analysis::routing::Bus::Voice) => bus_gains.voice,
+            Some(sp314_dsp::analysis::routing::Bus::Drums) => bus_gains.drums,
+            Some(sp314_dsp::analysis::routing::Bus::Music) => bus_gains.music,
+            None => 1.0,
+        }
+    };
+
+    let effective_voice_gain = mix.voice * get_bus_gain(routing_table.bus_of(STEM_ID_VOICE));
+    let effective_drums_gain = mix.drums * get_bus_gain(routing_table.bus_of(STEM_ID_DRUMS));
+    let effective_bass_gain = mix.bass * get_bus_gain(routing_table.bus_of(STEM_ID_BASS));
+    let effective_harmonics_gain = mix.harmonics * get_bus_gain(routing_table.bus_of(STEM_ID_HARMONICS));
+    // Το mix.ambience μένει ως έχει, αφού δεν μπαίνει στον πίνακα.
+
     let original_sum_sq = inputs.original_sum_sq;
     // Captured error from spatial I/O inside the infallible callback.
     let mut spatial_err: Option<String> = None;
@@ -181,15 +213,15 @@ pub fn run(
                 if settings.restoration_enabled {
                     sample = vocal_gate.process_mono(sample);
                 }
-                sample * mix.voice
+                sample * effective_voice_gain
             })
             .collect();
-        let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * mix.drums).collect();
-        let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * mix.bass).collect();
+        let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * effective_drums_gain).collect();
+        let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * effective_bass_gain).collect();
         let mh: Vec<f32> = stems_chunk
             .harmonics
             .iter()
-            .map(|s| s * mix.harmonics)
+            .map(|s| s * effective_harmonics_gain)
             .collect();
         let ma: Vec<f32> = stems_chunk
             .ambience
