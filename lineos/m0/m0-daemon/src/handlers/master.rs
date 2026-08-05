@@ -110,6 +110,7 @@ pub async fn trigger_mastering(
         intent_tone: req.intent_tone,
         intent_dynamics: req.intent_dynamics,
         chaos_seed: req.chaos_seed,
+        mix_levels: req.mix_levels.map(|m| m.clamped()),
     };
 
     // Register progress immediately

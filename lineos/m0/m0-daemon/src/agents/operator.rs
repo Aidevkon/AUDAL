@@ -101,6 +101,7 @@ pub struct MasteringParams {
     pub intent_tone: Option<f32>,
     pub intent_dynamics: Option<f32>,
     pub chaos_seed: Option<u64>,
+    pub mix_levels: Option<crate::handlers::master::MixLevels>,
 }
 
 /// Plan from Conductor (R2) → Executor (R3)
@@ -113,6 +114,7 @@ pub struct ExecutionPlan {
     pub target_lufs: f32,
     pub max_tp_db: f32,
     pub session_id: String,
+    pub mix_levels: Option<crate::handlers::master::MixLevels>,
 }
 
 /// Output from Executor (R3) → Conductor (R2)

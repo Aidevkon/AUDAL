@@ -50,7 +50,7 @@ pub async fn run(
                     chaos_seed: None,
                     project_id: None,
                     track_id: None,
-                    mix_levels: None,
+                    mix_levels: plan.mix_levels,
                     preview_id: None,
                     restoration_enabled: None,
                     macro_router_enabled: None,

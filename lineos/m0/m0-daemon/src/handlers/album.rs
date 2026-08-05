@@ -67,6 +67,7 @@ pub async fn trigger_album_mastering(
             intent_tone: req.intent_tone,
             intent_dynamics: req.intent_dynamics,
             chaos_seed: None,
+            mix_levels: None,
         })
         .collect();
 

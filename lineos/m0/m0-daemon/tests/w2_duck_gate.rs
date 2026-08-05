@@ -257,3 +257,61 @@ fn w2_duck_gate_synth_variance() {
     let (_, _, _, _, _, artifacts_c) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w2-synth-C".to_string(), state_tmp_c.path().to_str().unwrap(), out_dir_c.path().to_str().unwrap()).unwrap();
     fs::copy(artifacts_c.pre_master_guards.unwrap().0.path(), "/tmp/w2_synth_noduck_C_pre_l.f32").unwrap();
 }
+
+#[test]
+#[ignore]
+fn w3b_mix_levels_gate() {
+    use m0d::handlers::master::MixLevels;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav");
+    assert!(path.exists(), "Missing fixture: {}", path.display());
+
+    // RUN A: mix_levels: None
+    let mut req_a = MasterRequest {
+        audio_path: path.to_str().unwrap().to_string(),
+        preset_id: "Transparent".to_string(),
+        flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
+        project_id: Some("w3b".to_string()),
+        track_id: Some("w3b_none".to_string()),
+        mix_levels: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        vad_observe_enabled: Some(false),
+    };
+
+    let state_tmp_a = tempfile::TempDir::new().unwrap();
+    let out_dir_a = tempfile::TempDir::new().unwrap();
+    let (_, _, pcm_a, _, _, _) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w3b-A".to_string(), state_tmp_a.path().to_str().unwrap(), out_dir_a.path().to_str().unwrap()).unwrap();
+    
+    let bytes_a = fs::read(pcm_a.path()).unwrap();
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes_a);
+    let hash_a = format!("{:x}", hasher.finalize());
+    println!("SHA (None): {}", hash_a);
+    assert_eq!(hash_a, "7df8c9ec66bdf767926054cf5d4805dc7d55ec4a030ff671cc01823f620f94e2");
+
+    fs::copy(pcm_a.path(), "/tmp/w3b_mix_none.wav").unwrap();
+
+    // RUN B: mix_levels: Some
+    req_a.track_id = Some("w3b_some".to_string());
+    req_a.mix_levels = Some(MixLevels {
+        voice: 0.5,
+        drums: 1.0,
+        bass: 1.0,
+        harmonics: 1.0,
+        ambience: 1.0,
+    });
+
+    let state_tmp_b = tempfile::TempDir::new().unwrap();
+    let out_dir_b = tempfile::TempDir::new().unwrap();
+    let (_, _, pcm_b, _, _, _) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w3b-B".to_string(), state_tmp_b.path().to_str().unwrap(), out_dir_b.path().to_str().unwrap()).unwrap();
+    
+    let bytes_b = fs::read(pcm_b.path()).unwrap();
+    let mut hasher2 = Sha256::new();
+    hasher2.update(&bytes_b);
+    let hash_b = format!("{:x}", hasher2.finalize());
+    println!("SHA (Some): {}", hash_b);
+    assert_ne!(hash_b, hash_a, "Mix levels did not change output!");
+
+    fs::copy(pcm_b.path(), "/tmp/w3b_mix_some.wav").unwrap();
+}

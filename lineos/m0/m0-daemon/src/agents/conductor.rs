@@ -68,6 +68,7 @@ pub async fn run(
                         target_lufs: params.target_lufs,
                         max_tp_db: params.max_tp_db,
                         session_id: params.session_id.clone(),
+                        mix_levels: params.mix_levels,
                     };
 
                     // Dispatch to Executor (R3)
