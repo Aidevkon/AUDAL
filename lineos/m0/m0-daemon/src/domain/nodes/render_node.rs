@@ -202,6 +202,10 @@ pub fn run(
         sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, settings.sample_rate as f64);
     let mut glue_lpf_state = sp314_dsp::masking_eq::biquad::BiquadState::default();
 
+    let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let duck_track_cb = duck_track.clone();
+    let duck_track_clone = duck_track.clone();
+
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
 
@@ -217,12 +221,31 @@ pub fn run(
             })
             .collect();
         let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * effective_drums_gain).collect();
-        let mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * effective_bass_gain).collect();
-        let mh: Vec<f32> = stems_chunk
+        let mut mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * effective_bass_gain).collect();
+        let mut mh: Vec<f32> = stems_chunk
             .harmonics
             .iter()
             .map(|s| s * effective_harmonics_gain)
             .collect();
+
+        // W2.2: ControlTrack consumer — duck στο M (bass+harmonics). Sensor-agnostic: πιστότητα στο posterior stream, όποιο κι αν είναι. Gate: w2_duck_gate + splice fixtures.
+        // cross-chunk interpolation στο chunk boundary είναι σκόπιμο — τα frames του επόμενου chunk υπάρχουν ήδη στο track (batch push, recon W2 §2)· στο EOF ο guard clamp-άρει.
+        {
+            let track = duck_track_cb.borrow();
+            if !track.is_empty() {
+                debug_assert_eq!(mb.len(), chunk_len);
+                for i in 0..chunk_len {
+                    let s = write_offset + i;
+                    let f = s / 480;
+                    let t = (s % 480) as f32 / 480.0;
+                    let f_c = f.min(track.len().saturating_sub(1));
+                    let f1_c = (f + 1).min(track.len().saturating_sub(1));
+                    let g = track[f_c] * (1.0 - t) + track[f1_c] * t;
+                    mb[i] *= g;
+                    mh[i] *= g;
+                }
+            }
+        }
         let ma: Vec<f32> = stems_chunk
             .ambience
             .iter()
@@ -300,9 +323,6 @@ pub fn run(
         let _ = writeln!(bw, "frame_index,time_sec,p_speech,voice_gate,old_duck_gain,new_duck_gain");
         bw
     });
-
-    let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let duck_track_clone = duck_track.clone();
 
     let mut observer_holder = if settings.vad_observe_enabled {
         match std::fs::File::create(&trace_path) {

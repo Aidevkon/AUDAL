@@ -15,7 +15,11 @@ use std::path::PathBuf;
 
 #[derive(Debug, Default)]
 pub struct RenderArtifacts {
-    pub persisted_master: Option<PathBuf>,
+    pub persisted_master: Option<std::path::PathBuf>,
+    pub pre_master_guards: Option<(
+        std::sync::Arc<lineos_types::audio::ManagedPcm>,
+        std::sync::Arc<lineos_types::audio::ManagedPcm>,
+    )>,
 }
 
 #[allow(deprecated)]
@@ -608,7 +612,10 @@ fn run_dsp_internal(
             cert_out.file_path,
             None,
             Some(raw_guard),
-            RenderArtifacts { persisted_master },
+            RenderArtifacts {
+                persisted_master,
+                pre_master_guards: None,
+            },
         ));
     }
 
@@ -661,6 +668,7 @@ fn run_dsp_internal(
                     None,
                     RenderArtifacts {
                         persisted_master: None,
+                        pre_master_guards: None,
                     },
                 ));
             }
@@ -693,7 +701,7 @@ fn run_dsp_internal(
                 model,
                 None,
                 RenderArtifacts {
-                    persisted_master: None,
+                    persisted_master: None, pre_master_guards: None,
                 },
             ));
         }
@@ -835,7 +843,7 @@ fn run_dsp_internal(
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
     // Allocate file-backed mmaps for working storage
     let scratch_l_path = crate::spool::spool_dir().join(format!("m0d-scratch-l-{}.pcm", blob_id));
-    let _scratch_l_guard = lineos_types::audio::ManagedPcm::new(scratch_l_path.clone());
+    let _scratch_l_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_l_path.clone()));
     let scratch_l_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -853,7 +861,7 @@ fn run_dsp_internal(
         unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total) };
 
     let scratch_r_path = crate::spool::spool_dir().join(format!("m0d-scratch-r-{}.pcm", blob_id));
-    let _scratch_r_guard = lineos_types::audio::ManagedPcm::new(scratch_r_path.clone());
+    let _scratch_r_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_r_path.clone()));
     let scratch_r_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -970,6 +978,23 @@ fn run_dsp_internal(
         rms(&scratch_r_view[..]),
         rms(&scratch_r_view[..]) / rms(&scratch_l_view[..]).max(1e-9)
     );
+
+    let pre_master_guards = if req.vad_observe_enabled.is_some() {
+        scratch_l_mmap.flush().map_err(|e| e.to_string())?;
+        scratch_r_mmap.flush().map_err(|e| e.to_string())?;
+        let pre_l = crate::spool::spool_dir().join(format!("m0d-premaster-l-{}.pcm", blob_id));
+        let pre_r = crate::spool::spool_dir().join(format!("m0d-premaster-r-{}.pcm", blob_id));
+        std::fs::copy(&scratch_l_path, &pre_l).map_err(|e| e.to_string())?;
+        std::fs::copy(&scratch_r_path, &pre_r).map_err(|e| e.to_string())?;
+        // DIAGNOSTIC MODE (snapshot, όχι alias): Τα scratch γίνονται in-place post-master από τον dsp_node.
+        // To is_some() καλύπτει και Some(false) σκόπιμα (το A/B test θέλει και τις δύο πλευρές). Production (None) = μηδέν κόστος.
+        Some((
+            std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(pre_l)),
+            std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(pre_r)),
+        ))
+    } else {
+        None
+    };
 
     // F-052: no head trim — left_post/right_post are the full views.
     let left_post = &mut scratch_l_view[..];
@@ -1096,7 +1121,10 @@ fn run_dsp_internal(
         cert_out.file_path,
         dsp_out.user_model,
         None,
-        RenderArtifacts { persisted_master },
+        RenderArtifacts {
+            persisted_master,
+            pre_master_guards,
+        },
     ))
 }
 
