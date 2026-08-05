@@ -37,24 +37,17 @@ async fn test_album_sse_pipeline_emits_bpm() {
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // 2. Dispatch a Batch Mastering intent
-    let params = m0d::agents::operator::MasteringParams {
-        audio_path: concat!(
+    let params = m0d::agents::operator::MasteringParams::minimal(
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/test_stereo_input.wav"
         )
         .into(), // Uses committed fixture, always available on CI
-        preset_id: "spotify".into(),
-        target_lufs: -14.0,
-        max_tp_db: -1.0,
-        session_id: "sse_test_001".into(),
-        project_id: None,
-        track_id: None,
-        flavour_id: None,
-        intent_tone: None,
-        intent_dynamics: None,
-        chaos_seed: None,
-        mix_levels: None, normalizer_ceiling_db: None,
-    };
+        "spotify".into(),
+        -14.0,
+        -1.0,
+        "sse_test_001".into(),
+    );
 
     let (tx, _res_rx) = oneshot::channel();
     let intent = m0d::agents::operator::Intent::ExecuteBatchMastering {

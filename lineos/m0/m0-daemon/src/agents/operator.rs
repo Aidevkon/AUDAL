@@ -105,6 +105,32 @@ pub struct MasteringParams {
     pub normalizer_ceiling_db: Option<f32>,
 }
 
+impl MasteringParams {
+    pub fn minimal(
+        audio_path: String,
+        preset_id: String,
+        target_lufs: f32,
+        max_tp_db: f32,
+        session_id: String,
+    ) -> Self {
+        Self {
+            audio_path,
+            preset_id,
+            target_lufs,
+            max_tp_db,
+            session_id,
+            project_id: None,
+            track_id: None,
+            flavour_id: None,
+            intent_tone: None,
+            intent_dynamics: None,
+            chaos_seed: None,
+            mix_levels: None,
+            normalizer_ceiling_db: None,
+        }
+    }
+}
+
 /// Plan from Conductor (R2) → Executor (R3)
 /// Pure data. No logic inside.
 /// Executor runs DspAdapter::master() from this — no decisions.
@@ -117,6 +143,26 @@ pub struct ExecutionPlan {
     pub session_id: String,
     pub mix_levels: Option<crate::handlers::master::MixLevels>,
     pub normalizer_ceiling_db: Option<f32>,
+}
+
+impl ExecutionPlan {
+    pub fn minimal(
+        audio_path: String,
+        preset_id: String,
+        target_lufs: f32,
+        max_tp_db: f32,
+        session_id: String,
+    ) -> Self {
+        Self {
+            audio_path,
+            preset_id,
+            target_lufs,
+            max_tp_db,
+            session_id,
+            mix_levels: None,
+            normalizer_ceiling_db: None,
+        }
+    }
 }
 
 /// Output from Executor (R3) → Conductor (R2)

@@ -40,24 +40,17 @@ async fn test_agent_pipeline_executes_mastering() {
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Build MasteringParams
-    let params = m0d::agents::operator::MasteringParams {
-        audio_path: concat!(
+    let params = m0d::agents::operator::MasteringParams::minimal(
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/test_stereo_input.wav"
         )
         .into(),
-        preset_id: "spotify".into(),
-        target_lufs: -14.0,
-        max_tp_db: -1.0,
-        session_id: "e2e_test_001".into(),
-        project_id: None,
-        track_id: None,
-        flavour_id: None,
-        intent_tone: None,
-        intent_dynamics: None,
-        chaos_seed: None,
-        mix_levels: None, normalizer_ceiling_db: None,
-    };
+        "spotify".into(),
+        -14.0,
+        -1.0,
+        "e2e_test_001".into(),
+    );
 
     // Dispatch Intent::ExecuteMastering
     let (tx, rx) = oneshot::channel();
@@ -120,43 +113,29 @@ async fn test_conductor_rejects_concurrent_mastering() {
     let (tx1, rx1) = oneshot::channel();
     let (tx2, rx2) = oneshot::channel();
 
-    let params1 = m0d::agents::operator::MasteringParams {
-        audio_path: concat!(
+    let params1 = m0d::agents::operator::MasteringParams::minimal(
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/test_stereo_input.wav"
         )
         .into(),
-        preset_id: "spotify".into(),
-        target_lufs: -14.0,
-        max_tp_db: -1.0,
-        session_id: "concurrent_001".into(),
-        project_id: None,
-        track_id: None,
-        flavour_id: None,
-        intent_tone: None,
-        intent_dynamics: None,
-        chaos_seed: None,
-        mix_levels: None, normalizer_ceiling_db: None,
-    };
+        "spotify".into(),
+        -14.0,
+        -1.0,
+        "concurrent_001".into(),
+    );
 
-    let params2 = m0d::agents::operator::MasteringParams {
-        audio_path: concat!(
+    let params2 = m0d::agents::operator::MasteringParams::minimal(
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/test_stereo_input.wav"
         )
         .into(),
-        preset_id: "spotify".into(),
-        target_lufs: -14.0,
-        max_tp_db: -1.0,
-        session_id: "concurrent_002".into(),
-        project_id: None,
-        track_id: None,
-        flavour_id: None,
-        intent_tone: None,
-        intent_dynamics: None,
-        chaos_seed: None,
-        mix_levels: None, normalizer_ceiling_db: None,
-    };
+        "spotify".into(),
+        -14.0,
+        -1.0,
+        "concurrent_002".into(),
+    );
 
     operator
         .dispatch(m0d::agents::operator::Intent::ExecuteMastering {
