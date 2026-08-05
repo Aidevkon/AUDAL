@@ -458,8 +458,8 @@ impl TwoPassEngine {
         &mut self,
         signal: &[f32],
         sample_rate: u32,
-        quiet_window_start_frame: Option<usize>,
-        dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
+        _quiet_window_start_frame: Option<usize>,
+        _dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
     ) -> ScoutResult {
         let t_scout = std::time::Instant::now();
 
