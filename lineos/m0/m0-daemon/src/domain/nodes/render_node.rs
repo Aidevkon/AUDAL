@@ -300,6 +300,10 @@ pub fn run(
         let _ = writeln!(bw, "frame_index,time_sec,p_speech,voice_gate,old_duck_gain,new_duck_gain");
         bw
     });
+
+    let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let duck_track_clone = duck_track.clone();
+
     let mut observer_holder = if settings.vad_observe_enabled {
         match std::fs::File::create(&trace_path) {
             Ok(file) => {
@@ -346,6 +350,10 @@ pub fn run(
                             echo.duck_gain,
                         );
                     }
+
+                    // W2.1: ControlTrack — time-indexed duck automation. frame i ↔ samples [i*480,(i+1)*480).
+                    // Καταναλωτής: W2.2 (M bus, vector lookup + per-sample interpolation).
+                    duck_track_clone.borrow_mut().push(new_duck);
                 })
             }
             Err(e) => {

@@ -1,6 +1,9 @@
 use arc_swap::ArcSwap;
 use std::sync::Arc;
 
+// Duck depth: hardcoded until the persona/settings layer lands (W3.b+).
+const DUCK_FLOOR_DB: f32 = -12.0;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ControlFrame {
     pub p_speech: f32,    // 0..=1, from the micro-VAD
@@ -46,7 +49,7 @@ pub struct Ducker {
 
 impl Ducker {
     pub fn new(sample_rate: f32) -> Self {
-        let frame_rate = sample_rate / 512.0;
+        let frame_rate = sample_rate / crate::analysis::vad_sensors::FRAME_SAMPLES as f32;
 
         let attack_alpha = f32::exp(-2.2 / (0.030 * frame_rate));
         let release_alpha = f32::exp(-2.2 / (0.500 * frame_rate));
@@ -76,7 +79,7 @@ impl Ducker {
 
         self.last_valid_p = p_speech;
 
-        let floor = 10.0f32.powf(-12.0 / 20.0);
+        let floor = 10.0f32.powf(DUCK_FLOOR_DB / 20.0);
         let p_speech_clamped = p_speech.clamp(0.0, 1.0);
         let target = 1.0 - p_speech_clamped * (1.0 - floor);
 
@@ -126,7 +129,8 @@ mod tests {
     fn run_ballistics_test() -> (f32, f32) {
         let sample_rate = 48000.0;
         let mut ducker = Ducker::new(sample_rate);
-        let frame_rate = sample_rate / 512.0;
+        // test clock must match Ducker's frame rate
+        let frame_rate = sample_rate / crate::analysis::vad_sensors::FRAME_SAMPLES as f32;
         let frame_ms = 1000.0 / frame_rate;
 
         // ATTACK: from silence, feed p_speech = 1.0
