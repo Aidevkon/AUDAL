@@ -69,6 +69,7 @@ pub async fn run(
                         max_tp_db: params.max_tp_db,
                         session_id: params.session_id.clone(),
                         mix_levels: params.mix_levels,
+                        normalizer_ceiling_db: params.normalizer_ceiling_db,
                     };
 
                     // Dispatch to Executor (R3)

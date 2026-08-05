@@ -24,7 +24,7 @@ async fn test_e2e_latency_compensation() {
         chaos_seed: Some(42),
         project_id: Some("proj_latency".to_string()),
         track_id: Some("track_latency".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,

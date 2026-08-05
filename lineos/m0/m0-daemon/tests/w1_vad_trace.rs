@@ -33,7 +33,7 @@ fn render_vad_trace_vehicle() {
         chaos_seed: None,
         project_id: Some("w1_trace".to_string()),
         track_id: Some("bodleasons".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,

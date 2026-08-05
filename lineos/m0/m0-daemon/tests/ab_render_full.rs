@@ -34,7 +34,7 @@ fn render_ab_full_pipeline() {
         chaos_seed: None,
         project_id: Some("ab_render".to_string()),
         track_id: Some("bodleasons".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,

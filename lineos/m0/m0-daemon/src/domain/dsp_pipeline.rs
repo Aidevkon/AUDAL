@@ -936,6 +936,7 @@ fn run_dsp_internal(
             &crate::domain::nodes::render_node::RenderSettings {
                 ducking_gain: final_ducking,
                 mix_levels: req.mix_levels.as_ref(),
+                normalizer_ceiling_db: req.normalizer_ceiling_db,
                 flavour_id: req.flavour_id.as_deref(),
                 sample_rate: decoded.pcm_sample_rate,
                 noise_floor_dbfs: trunk_metrics.noise_floor_dbfs,

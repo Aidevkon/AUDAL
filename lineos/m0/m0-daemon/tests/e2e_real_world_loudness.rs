@@ -37,7 +37,7 @@ async fn test_e2e_real_world_loudness() {
         chaos_seed: Some(42),
         project_id: Some("proj_loudness".to_string()),
         track_id: Some("track_loudness".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,

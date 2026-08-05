@@ -267,7 +267,7 @@ fn full_pipeline_heap_is_scale_invariant() {
             // measured/owned by tests/persist_master.rs, not here.
             project_id: None,
             track_id: None,
-            mix_levels: None,
+            mix_levels: None, normalizer_ceiling_db: None,
             preview_id: None,
             restoration_enabled: None,
             macro_router_enabled: None,
@@ -349,7 +349,7 @@ fn music_pipeline_heap_is_scale_invariant() {
             // F-060: None on purpose — see comment at the other builder.
             project_id: None,
             track_id: None,
-            mix_levels: None,
+            mix_levels: None, normalizer_ceiling_db: None,
             preview_id: None,
             restoration_enabled: None,
             macro_router_enabled: None,

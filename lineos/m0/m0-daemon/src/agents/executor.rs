@@ -51,6 +51,7 @@ pub async fn run(
                     project_id: None,
                     track_id: None,
                     mix_levels: plan.mix_levels,
+                    normalizer_ceiling_db: plan.normalizer_ceiling_db,
                     preview_id: None,
                     restoration_enabled: None,
                     macro_router_enabled: None,

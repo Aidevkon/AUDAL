@@ -46,7 +46,7 @@ fn w2_duck_gate_synth() {
         chaos_seed: None,
         project_id: Some("w2_synth".to_string()),
         track_id: Some("w2synthA".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
@@ -88,7 +88,7 @@ fn w2_duck_gate_synth() {
         chaos_seed: None,
         project_id: Some("w2_synth".to_string()),
         track_id: Some("w2synthB".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
@@ -155,7 +155,7 @@ fn w2_duck_gate_real() {
         chaos_seed: None,
         project_id: Some("w2_real".to_string()),
         track_id: Some("w2realA".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
@@ -198,7 +198,7 @@ fn w2_duck_gate_real() {
         chaos_seed: None,
         project_id: Some("w2_real".to_string()),
         track_id: Some("w2realB".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
@@ -243,7 +243,7 @@ fn w2_duck_gate_synth_variance() {
         flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
         project_id: Some("w2_synth".to_string()),
         track_id: Some("w2synthA".to_string()),
-        mix_levels: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        mix_levels: None, normalizer_ceiling_db: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
         vad_observe_enabled: Some(false),
     };
     let state_tmp_a = tempfile::TempDir::new().unwrap();
@@ -274,7 +274,7 @@ fn w3b_mix_levels_gate() {
         flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
         project_id: Some("w3b".to_string()),
         track_id: Some("w3b_none".to_string()),
-        mix_levels: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        mix_levels: None, normalizer_ceiling_db: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
         vad_observe_enabled: Some(false),
     };
 
@@ -314,4 +314,141 @@ fn w3b_mix_levels_gate() {
     assert_ne!(hash_b, hash_a, "Mix levels did not change output!");
 
     fs::copy(pcm_b.path(), "/tmp/w3b_mix_some.wav").unwrap();
+}
+
+#[test]
+#[ignore]
+fn w4_ceiling_gate() {
+    use sha2::{Digest, Sha256};
+    use std::fs;
+    use m0d::handlers::master::MixLevels;
+
+    let path = fixture_path("duck_splice_synth_snr-15.flac");
+    assert!(path.exists(), "Missing fixture: {}", path.display());
+
+    // RUN A: Baseline (no custom mix, no custom ceiling)
+    let req_a = MasterRequest {
+        audio_path: path.to_str().unwrap().to_string(),
+        preset_id: "Transparent".to_string(),
+        flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
+        project_id: Some("w4".to_string()),
+        track_id: Some("w4_baseline".to_string()),
+        mix_levels: None, normalizer_ceiling_db: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        vad_observe_enabled: Some(false),
+    };
+
+    let state_tmp_a = tempfile::TempDir::new().unwrap();
+    let out_dir_a = tempfile::TempDir::new().unwrap();
+    let (_, _, pcm_a, _, _, _) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w4-A".to_string(), state_tmp_a.path().to_str().unwrap(), out_dir_a.path().to_str().unwrap()).unwrap();
+
+    let bytes_a = fs::read(pcm_a.path()).unwrap();
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes_a);
+    let hash_a = format!("{:x}", hasher.finalize());
+    println!("SHA (None/None): {}", hash_a);
+    
+    // Helper to compute RMS
+    let compute_rms = |bytes: &[u8]| -> f32 {
+        let floats: Vec<f32> = bytes
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect();
+        let sum_sq: f32 = floats.iter().map(|&x| x * x).sum();
+        if floats.is_empty() { 0.0 } else { (sum_sq / floats.len() as f32).sqrt() }
+    };
+    let rms_a = compute_rms(&bytes_a);
+    println!("RMS (A): {}", rms_a);
+
+    // RUN B: extreme_multi, ceiling=None (default 6dB)
+    let req_b = MasterRequest {
+        audio_path: path.to_str().unwrap().to_string(),
+        preset_id: "Transparent".to_string(),
+        flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
+        project_id: Some("w4".to_string()),
+        track_id: Some("w4_undercompensated".to_string()),
+        mix_levels: Some(MixLevels {
+            voice: 0.1,
+            drums: 0.1,
+            bass: 0.1,
+            harmonics: 0.1,
+            ambience: 1.0,
+        }),
+        normalizer_ceiling_db: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        vad_observe_enabled: Some(false),
+    };
+    
+    let state_tmp_b = tempfile::TempDir::new().unwrap();
+    let out_dir_b = tempfile::TempDir::new().unwrap();
+    let (_, _, _, _, _, artifacts_b) = run_dsp(&req_b, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w4-B".to_string(), state_tmp_b.path().to_str().unwrap(), out_dir_b.path().to_str().unwrap()).unwrap();
+    let pre_b = fs::read(artifacts_b.pre_master_guards.as_ref().unwrap().0.path()).unwrap();
+    let rms_b = compute_rms(&pre_b);
+    println!("RMS (B - extreme_multi, ceil=None, PRE-MASTER): {}", rms_b);
+
+    // RUN C: extreme_multi, ceiling=Some(20.0) [~10x generous]
+    let req_c = MasterRequest {
+        audio_path: path.to_str().unwrap().to_string(),
+        preset_id: "Transparent".to_string(),
+        flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
+        project_id: Some("w4".to_string()),
+        track_id: Some("w4_generous_ceiling".to_string()),
+        mix_levels: Some(MixLevels {
+            voice: 0.1,
+            drums: 0.1,
+            bass: 0.1,
+            harmonics: 0.1,
+            ambience: 1.0,
+        }),
+        normalizer_ceiling_db: Some(20.0), preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+        vad_observe_enabled: Some(false),
+    };
+    
+    let state_tmp_c = tempfile::TempDir::new().unwrap();
+    let out_dir_c = tempfile::TempDir::new().unwrap();
+    let (_, _, _, _, _, artifacts_c) = run_dsp(&req_c, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w4-C".to_string(), state_tmp_c.path().to_str().unwrap(), out_dir_c.path().to_str().unwrap()).unwrap();
+    let pre_c = fs::read(artifacts_c.pre_master_guards.as_ref().unwrap().0.path()).unwrap();
+    let rms_c = compute_rms(&pre_c);
+    println!("RMS (C - extreme_multi, ceil=20.0, PRE-MASTER): {}", rms_c);
+
+    println!("Sanity: rms_a={:.6} (should ≈ true original_rms of unmixed input, verify independently if this gate fails)", rms_a);
+    assert!(rms_c > rms_b, "With higher ceiling, PRE-MASTER output RMS should be higher because the gain is not capped at 2.0x");
+}
+
+#[test]
+#[ignore]
+fn w4_ceiling_sweep() {
+    use std::path::Path;
+    use m0d::handlers::master::MixLevels;
+    
+    let fixtures = vec![
+        ("duck_splice", fixture_path("duck_splice_synth_snr-15.flac")),
+        ("bodleasons", Path::new(env!("CARGO_MANIFEST_DIR")).join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav")),
+    ];
+
+    let profiles = vec![
+        ("extreme_multi", Some(MixLevels { voice: 0.1, drums: 0.1, bass: 0.1, harmonics: 0.1, ambience: 1.0 })),
+    ];
+
+    for (fix_name, fix_path) in &fixtures {
+        assert!(fix_path.exists(), "Missing fixture: {}", fix_path.display());
+
+        for (prof_name, mix_levels) in &profiles {
+            let req = MasterRequest {
+                audio_path: fix_path.to_str().unwrap().to_string(),
+                preset_id: "Transparent".to_string(),
+                flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
+                project_id: Some(format!("w4_swp_{}", fix_name)),
+                track_id: Some(format!("{}_{}", fix_name, prof_name)),
+                mix_levels: mix_levels.clone(),
+                normalizer_ceiling_db: None,
+                preview_id: None, restoration_enabled: None, macro_router_enabled: None,
+                vad_observe_enabled: Some(false),
+            };
+
+            let state_tmp = tempfile::TempDir::new().unwrap();
+            let out_dir = tempfile::TempDir::new().unwrap();
+            
+            println!("--- [SWEEP] fixture={} profile={} ---", fix_name, prof_name);
+            let _ = run_dsp(&req, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, format!("{}-{}", fix_name, prof_name), state_tmp.path().to_str().unwrap(), out_dir.path().to_str().unwrap()).unwrap();
+        }
+    }
 }

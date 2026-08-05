@@ -53,7 +53,7 @@ async fn test_album_sse_pipeline_emits_bpm() {
         intent_tone: None,
         intent_dynamics: None,
         chaos_seed: None,
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
     };
 
     let (tx, _res_rx) = oneshot::channel();

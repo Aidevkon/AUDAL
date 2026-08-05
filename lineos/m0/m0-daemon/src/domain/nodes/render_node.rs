@@ -101,6 +101,7 @@ impl SpatialDumpWriter {
 pub struct RenderSettings<'a> {
     pub ducking_gain: f32,
     pub mix_levels: Option<&'a MixLevels>,
+    pub normalizer_ceiling_db: Option<f32>,
     pub flavour_id: Option<&'a str>,
     pub sample_rate: u32,
     pub noise_floor_dbfs: Option<f32>,
@@ -427,8 +428,9 @@ pub fn run(
             .sum::<f32>()
             / (left_slice.len() * 2) as f32,
     );
+    let ceiling_linear = settings.normalizer_ceiling_db.map(|db| 10_f32.powf(db / 20.0)).unwrap_or(2.0);
     let gain = if mix_rms > 1e-10 {
-        (original_rms / mix_rms).clamp(0.5, 2.0)
+        (original_rms / mix_rms).clamp(0.5, ceiling_linear)
     } else {
         1.0
     };

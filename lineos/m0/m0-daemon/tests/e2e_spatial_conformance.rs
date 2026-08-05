@@ -40,7 +40,7 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
         chaos_seed: None,
         project_id: None,
         track_id: Some("test-session-spatial-001".to_string()),
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,

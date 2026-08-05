@@ -102,6 +102,7 @@ pub struct MasteringParams {
     pub intent_dynamics: Option<f32>,
     pub chaos_seed: Option<u64>,
     pub mix_levels: Option<crate::handlers::master::MixLevels>,
+    pub normalizer_ceiling_db: Option<f32>,
 }
 
 /// Plan from Conductor (R2) → Executor (R3)
@@ -115,6 +116,7 @@ pub struct ExecutionPlan {
     pub max_tp_db: f32,
     pub session_id: String,
     pub mix_levels: Option<crate::handlers::master::MixLevels>,
+    pub normalizer_ceiling_db: Option<f32>,
 }
 
 /// Output from Executor (R3) → Conductor (R2)

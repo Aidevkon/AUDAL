@@ -32,6 +32,7 @@ pub struct MasterRequest {
     /// Phase 8b: per-stem mix levels from 5.1 Spatial Mixer widget.
     /// None = default (all 1.0 — backward compatible).
     pub mix_levels: Option<MixLevels>,
+    pub normalizer_ceiling_db: Option<f32>,
     /// Phase 8a: preview session reference (future ScoutResult cache).
     pub preview_id: Option<String>,
     /// Phase 14: Enable restoration blocks (NoiseGate, etc.)
@@ -111,6 +112,7 @@ pub async fn trigger_mastering(
         intent_dynamics: req.intent_dynamics,
         chaos_seed: req.chaos_seed,
         mix_levels: req.mix_levels.map(|m| m.clamped()),
+        normalizer_ceiling_db: req.normalizer_ceiling_db,
     };
 
     // Register progress immediately

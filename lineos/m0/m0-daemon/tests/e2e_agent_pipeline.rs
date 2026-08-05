@@ -56,7 +56,7 @@ async fn test_agent_pipeline_executes_mastering() {
         intent_tone: None,
         intent_dynamics: None,
         chaos_seed: None,
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
     };
 
     // Dispatch Intent::ExecuteMastering
@@ -136,7 +136,7 @@ async fn test_conductor_rejects_concurrent_mastering() {
         intent_tone: None,
         intent_dynamics: None,
         chaos_seed: None,
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
     };
 
     let params2 = m0d::agents::operator::MasteringParams {
@@ -155,7 +155,7 @@ async fn test_conductor_rejects_concurrent_mastering() {
         intent_tone: None,
         intent_dynamics: None,
         chaos_seed: None,
-        mix_levels: None,
+        mix_levels: None, normalizer_ceiling_db: None,
     };
 
     operator

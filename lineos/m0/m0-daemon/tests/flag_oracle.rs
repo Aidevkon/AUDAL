@@ -122,6 +122,7 @@ fn render_once(
         &RenderSettings {
             ducking_gain: 1.0,
             mix_levels,
+            normalizer_ceiling_db: None,
             flavour_id: None,
             sample_rate: SR,
             noise_floor_dbfs: Some(-45.0),
