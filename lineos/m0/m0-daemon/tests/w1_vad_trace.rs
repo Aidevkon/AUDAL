@@ -33,11 +33,13 @@ fn render_vad_trace_vehicle() {
         chaos_seed: None,
         project_id: Some("w1_trace".to_string()),
         track_id: Some("bodleasons".to_string()),
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: Some(true), // ΕΝΕΡΓΟΠΟΙΗΜΕΝΟ VAD TRACE
+        use_nmfd: None,
     };
 
     let state = Arc::new(ArcSwap::from_pointee(DspState::default()));
@@ -74,13 +76,17 @@ fn render_vad_trace_vehicle() {
     println!("Written WAV: {}", final_dest);
 
     // Εντοπισμός και αντιγραφή του παραχθέντος vad-trace CSV
-    assert!(generated_csv.exists(), "Generated CSV not found at: {}", generated_csv.display());
-    
+    assert!(
+        generated_csv.exists(),
+        "Generated CSV not found at: {}",
+        generated_csv.display()
+    );
+
     fs::copy(&generated_csv, dest_csv).unwrap();
-    
+
     let csv_content = fs::read_to_string(dest_csv).unwrap();
     let lines_count = csv_content.lines().count();
-    
+
     println!("CSV Lines: {}", lines_count);
     println!("Written CSV: {}", dest_csv);
 }

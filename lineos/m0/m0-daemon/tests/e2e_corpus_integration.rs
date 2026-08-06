@@ -39,11 +39,13 @@ async fn e2e_corpus_integration_writes_model_to_disk() {
         chaos_seed: Some(42),
         project_id: Some("e2e_test_proj".to_string()),
         track_id: Some("track_1".to_string()),
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let start = Instant::now();
@@ -149,11 +151,13 @@ async fn e2e_corpus_music_path_uses_30s_proxy() {
         chaos_seed: Some(42),
         project_id: Some("e2e_test_proj".to_string()),
         track_id: Some("track_proxy".to_string()),
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let start = std::time::Instant::now();

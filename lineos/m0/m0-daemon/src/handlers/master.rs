@@ -39,6 +39,7 @@ pub struct MasterRequest {
     pub restoration_enabled: Option<bool>,
     pub macro_router_enabled: Option<bool>,
     pub vad_observe_enabled: Option<bool>,
+    pub use_nmfd: Option<bool>,
 }
 
 /// Per-stem mix levels from 5.1 Spatial Mixer widget.
@@ -113,6 +114,7 @@ pub async fn trigger_mastering(
         chaos_seed: req.chaos_seed,
         mix_levels: req.mix_levels.map(|m| m.clamped()),
         normalizer_ceiling_db: req.normalizer_ceiling_db,
+        use_nmfd: req.use_nmfd,
     };
 
     // Register progress immediately

@@ -59,11 +59,13 @@ fn run_pipeline(wav_path: &str, preset: &str, track_id: &str) -> m0d::blob_store
         chaos_seed: None,
         project_id: Some("acx_e2e".to_string()),
         track_id: Some(track_id.to_string()),
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
     let state = std::sync::Arc::new(arc_swap::ArcSwap::from_pointee(
         xaak::repo::DspState::default(),

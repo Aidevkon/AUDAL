@@ -69,6 +69,7 @@ pub async fn trigger_album_mastering(
             chaos_seed: None,
             mix_levels: None,
             normalizer_ceiling_db: None,
+            use_nmfd: None,
         })
         .collect();
 

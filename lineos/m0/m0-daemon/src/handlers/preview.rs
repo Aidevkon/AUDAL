@@ -227,7 +227,7 @@ fn generate_preview_stems(
     let mut stem_ambience: Vec<f32> = Vec::new();
 
     engine
-        .process_chunks(snippet, &scout, |chunk| {
+        .process_chunks(snippet, &scout, false, |chunk| {
             stem_voices.extend_from_slice(&chunk.voice);
             stem_drums.extend_from_slice(&chunk.drums);
             stem_bass.extend_from_slice(&chunk.bass);

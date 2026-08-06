@@ -12,7 +12,6 @@ use xaak::repo::DspState;
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 
-
 #[derive(Debug, Default)]
 pub struct RenderArtifacts {
     pub persisted_master: Option<std::path::PathBuf>,
@@ -701,7 +700,8 @@ fn run_dsp_internal(
                 model,
                 None,
                 RenderArtifacts {
-                    persisted_master: None, pre_master_guards: None,
+                    persisted_master: None,
+                    pre_master_guards: None,
                 },
             ));
         }
@@ -843,7 +843,8 @@ fn run_dsp_internal(
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
     // Allocate file-backed mmaps for working storage
     let scratch_l_path = crate::spool::spool_dir().join(format!("m0d-scratch-l-{}.pcm", blob_id));
-    let _scratch_l_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_l_path.clone()));
+    let _scratch_l_guard =
+        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_l_path.clone()));
     let scratch_l_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -861,7 +862,8 @@ fn run_dsp_internal(
         unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total) };
 
     let scratch_r_path = crate::spool::spool_dir().join(format!("m0d-scratch-r-{}.pcm", blob_id));
-    let _scratch_r_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_r_path.clone()));
+    let _scratch_r_guard =
+        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_r_path.clone()));
     let scratch_r_file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -944,6 +946,7 @@ fn run_dsp_internal(
                 macro_router_enabled: req.macro_router_enabled.unwrap_or(false),
                 boundaries: &trunk_report.boundaries,
                 vad_observe_enabled: req.vad_observe_enabled.unwrap_or(false),
+                use_nmfd: req.use_nmfd.unwrap_or(false),
                 blob_id: &blob_id,
             },
             crate::domain::nodes::render_node::RenderInputs {

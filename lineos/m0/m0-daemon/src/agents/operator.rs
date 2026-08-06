@@ -103,6 +103,7 @@ pub struct MasteringParams {
     pub chaos_seed: Option<u64>,
     pub mix_levels: Option<crate::handlers::master::MixLevels>,
     pub normalizer_ceiling_db: Option<f32>,
+    pub use_nmfd: Option<bool>,
 }
 
 impl MasteringParams {
@@ -127,6 +128,7 @@ impl MasteringParams {
             chaos_seed: None,
             mix_levels: None,
             normalizer_ceiling_db: None,
+            use_nmfd: None,
         }
     }
 }
@@ -143,6 +145,7 @@ pub struct ExecutionPlan {
     pub session_id: String,
     pub mix_levels: Option<crate::handlers::master::MixLevels>,
     pub normalizer_ceiling_db: Option<f32>,
+    pub use_nmfd: Option<bool>,
 }
 
 impl ExecutionPlan {
@@ -161,6 +164,7 @@ impl ExecutionPlan {
             session_id,
             mix_levels: None,
             normalizer_ceiling_db: None,
+            use_nmfd: None,
         }
     }
 }

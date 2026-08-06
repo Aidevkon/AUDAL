@@ -73,7 +73,7 @@ fn render_ab_variant() {
     };
 
     engine
-        .process_slices_with_params(&mono, &left, &right, &scout, 1.0, callback)
+        .process_slices_with_params(&mono, &left, &right, &scout, 1.0, false, callback)
         .unwrap();
 
     // Write WAV

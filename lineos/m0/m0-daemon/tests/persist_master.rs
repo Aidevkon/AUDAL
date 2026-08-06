@@ -23,11 +23,13 @@ fn test_persist_master() {
         chaos_seed: None,
         intent_tone: None,
         intent_dynamics: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let state = Arc::new(ArcSwap::from_pointee(DspState::default()));
@@ -101,11 +103,13 @@ fn test_persist_master() {
         chaos_seed: None,
         intent_tone: None,
         intent_dynamics: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let (_, _, _, _, _, artifacts2) = run_dsp(
@@ -139,11 +143,13 @@ fn test_persist_master() {
         chaos_seed: None,
         intent_tone: None,
         intent_dynamics: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let (_, _, _, _, _, artifacts3) = run_dsp(

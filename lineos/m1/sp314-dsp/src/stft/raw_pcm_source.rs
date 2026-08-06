@@ -275,7 +275,7 @@ mod tests {
         let mut old_ambience = Vec::new();
 
         engine
-            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, |chunk| {
+            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, false, |chunk| {
                 old_voice.extend_from_slice(&chunk.voice);
                 old_drums.extend_from_slice(&chunk.drums);
                 old_bass.extend_from_slice(&chunk.bass);
@@ -304,6 +304,7 @@ mod tests {
                 reader,
                 &scout_new,
                 1.0,
+                false,
                 false,
                 &[],
                 1.0,

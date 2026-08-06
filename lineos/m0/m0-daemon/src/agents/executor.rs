@@ -56,6 +56,7 @@ pub async fn run(
                     restoration_enabled: None,
                     macro_router_enabled: None,
                     vad_observe_enabled: None,
+                    use_nmfd: plan.use_nmfd,
                 };
 
                 let start = std::time::Instant::now();

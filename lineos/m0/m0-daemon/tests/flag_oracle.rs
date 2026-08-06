@@ -130,6 +130,7 @@ fn render_once(
             macro_router_enabled,
             boundaries,
             vad_observe_enabled: false,
+            use_nmfd: false,
             blob_id: "flag_oracle",
         },
         RenderInputs {

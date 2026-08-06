@@ -49,11 +49,13 @@ fn make_req(path: &str, preset: &str) -> MasterRequest {
         chaos_seed: None,
         project_id: None,
         track_id: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     }
 }
 

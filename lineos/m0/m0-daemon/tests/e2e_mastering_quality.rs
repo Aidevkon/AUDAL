@@ -91,11 +91,13 @@ fn make_req(path: &str) -> MasterRequest {
         chaos_seed: None,
         project_id: None,
         track_id: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     }
 }
 
@@ -139,6 +141,45 @@ fn inv_qa_1_output_integrity() {
     println!(
         "INV-QA-1 OK: rms={rms:.4} \
          peak={peak:.4}"
+    );
+}
+
+#[ignore = "W5.d true-path gate: slow NMFD render"]
+#[test]
+fn inv_qa_5_nmfd_true_path_active() {
+    let sr = 48000u32;
+    let input = generate_chaos_mix(sr, 3.0);
+    let state_tmp = tempfile::TempDir::new().unwrap();
+    let path = state_tmp.path().join("input.wav");
+    let path = path.to_str().unwrap();
+    write_wav(&input, sr, path);
+
+    let mut req = make_req(path);
+    req.use_nmfd = Some(true); // W5.e Consumer Integration
+
+    let result = run_dsp(
+        &req,
+        Instant::now(),
+        make_head(),
+        None,
+        None,
+        "qa-nmfd".to_string(),
+        state_tmp.path().to_str().unwrap(),
+        "/tmp",
+    );
+    assert!(
+        result.is_ok(),
+        "run_dsp failed with use_nmfd=true: {:?}",
+        result.err()
+    );
+    let (blob, _, _, _, _, _artifacts) = result.unwrap();
+    assert_eq!(blob.channels, 2);
+
+    let out_l = read_raw_pcm_left(blob.audio_path.path());
+    assert!(!out_l.is_empty());
+    assert!(
+        out_l.iter().all(|s| s.is_finite()),
+        "Output contains NaN/Inf"
     );
 }
 
@@ -401,11 +442,13 @@ fn inv_qa_4_compressor_is_active() {
         chaos_seed: None,
         project_id: None,
         track_id: None,
-        mix_levels: None, normalizer_ceiling_db: None,
+        mix_levels: None,
+        normalizer_ceiling_db: None,
         preview_id: None,
         restoration_enabled: None,
         macro_router_enabled: None,
         vad_observe_enabled: None,
+        use_nmfd: None,
     };
 
     let result = run_dsp(

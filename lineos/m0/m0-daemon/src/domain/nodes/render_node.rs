@@ -109,6 +109,7 @@ pub struct RenderSettings<'a> {
     pub macro_router_enabled: bool,
     pub boundaries: &'a [lineos_corpus::scout::SegmentBoundary],
     pub vad_observe_enabled: bool,
+    pub use_nmfd: bool,
     pub blob_id: &'a str,
 }
 
@@ -170,8 +171,16 @@ pub fn run(
     // ambience = glue-feed: εκτός RoutingTable κατά v2
     // (Glue = processor, not stem). Routing του glue path: W4.
 
-    struct BusGains { voice: f32, drums: f32, music: f32 }
-    let bus_gains = BusGains { voice: 1.0, drums: 1.0, music: 1.0 };
+    struct BusGains {
+        voice: f32,
+        drums: f32,
+        music: f32,
+    }
+    let bus_gains = BusGains {
+        voice: 1.0,
+        drums: 1.0,
+        music: 1.0,
+    };
 
     let get_bus_gain = |bus: Option<sp314_dsp::analysis::routing::Bus>| -> f32 {
         match bus {
@@ -185,7 +194,8 @@ pub fn run(
     let effective_voice_gain = mix.voice * get_bus_gain(routing_table.bus_of(STEM_ID_VOICE));
     let effective_drums_gain = mix.drums * get_bus_gain(routing_table.bus_of(STEM_ID_DRUMS));
     let effective_bass_gain = mix.bass * get_bus_gain(routing_table.bus_of(STEM_ID_BASS));
-    let effective_harmonics_gain = mix.harmonics * get_bus_gain(routing_table.bus_of(STEM_ID_HARMONICS));
+    let effective_harmonics_gain =
+        mix.harmonics * get_bus_gain(routing_table.bus_of(STEM_ID_HARMONICS));
     // Το mix.ambience μένει ως έχει, αφού δεν μπαίνει στον πίνακα.
 
     let original_sum_sq = inputs.original_sum_sq;
@@ -203,7 +213,8 @@ pub fn run(
         sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, settings.sample_rate as f64);
     let mut glue_lpf_state = sp314_dsp::masking_eq::biquad::BiquadState::default();
 
-    let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> =
+        std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let duck_track_cb = duck_track.clone();
     let duck_track_clone = duck_track.clone();
 
@@ -221,8 +232,16 @@ pub fn run(
                 sample * effective_voice_gain
             })
             .collect();
-        let md: Vec<f32> = stems_chunk.drums.iter().map(|s| s * effective_drums_gain).collect();
-        let mut mb: Vec<f32> = stems_chunk.bass.iter().map(|s| s * effective_bass_gain).collect();
+        let md: Vec<f32> = stems_chunk
+            .drums
+            .iter()
+            .map(|s| s * effective_drums_gain)
+            .collect();
+        let mut mb: Vec<f32> = stems_chunk
+            .bass
+            .iter()
+            .map(|s| s * effective_bass_gain)
+            .collect();
         let mut mh: Vec<f32> = stems_chunk
             .harmonics
             .iter()
@@ -311,9 +330,9 @@ pub fn run(
 
     let trace_path = crate::spool::spool_dir().join(format!("vad-trace-{}.csv", settings.blob_id));
     // W1 glue-feed: ControlBus observer για το κύκλωμα read-back echo
-    let control_bus = std::sync::Arc::new(
-        sp314_dsp::dsp::control_bus::ControlBus::new(settings.sample_rate as f32),
-    );
+    let control_bus = std::sync::Arc::new(sp314_dsp::dsp::control_bus::ControlBus::new(
+        settings.sample_rate as f32,
+    ));
     let mut ducker = sp314_dsp::dsp::control_bus::Ducker::new(settings.sample_rate as f32);
     let echo_path = std::path::PathBuf::from("/tmp/w1_csv_B_bus.csv");
     let _ = std::fs::remove_file(&echo_path);
@@ -321,7 +340,10 @@ pub fn run(
     let mut echo_w = echo_file.map(|f| {
         use std::io::Write;
         let mut bw = std::io::BufWriter::new(f);
-        let _ = writeln!(bw, "frame_index,time_sec,p_speech,voice_gate,old_duck_gain,new_duck_gain");
+        let _ = writeln!(
+            bw,
+            "frame_index,time_sec,p_speech,voice_gate,old_duck_gain,new_duck_gain"
+        );
         bw
     });
 
@@ -395,6 +417,7 @@ pub fn run(
             scout,
             ducking_gain,
             settings.macro_router_enabled,
+            settings.use_nmfd,
             settings.boundaries,
             settings.sample_rate as f32,
             settings.noise_floor_dbfs,
@@ -428,7 +451,10 @@ pub fn run(
             .sum::<f32>()
             / (left_slice.len() * 2) as f32,
     );
-    let ceiling_linear = settings.normalizer_ceiling_db.map(|db| 10_f32.powf(db / 20.0)).unwrap_or(2.0);
+    let ceiling_linear = settings
+        .normalizer_ceiling_db
+        .map(|db| 10_f32.powf(db / 20.0))
+        .unwrap_or(2.0);
     let gain = if mix_rms > 1e-10 {
         (original_rms / mix_rms).clamp(0.5, ceiling_linear)
     } else {

@@ -70,6 +70,7 @@ pub async fn run(
                         session_id: params.session_id.clone(),
                         mix_levels: params.mix_levels,
                         normalizer_ceiling_db: params.normalizer_ceiling_db,
+                        use_nmfd: params.use_nmfd,
                     };
 
                     // Dispatch to Executor (R3)

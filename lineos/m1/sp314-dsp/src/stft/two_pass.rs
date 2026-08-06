@@ -173,6 +173,7 @@ pub(crate) struct SingleChunkData<'a> {
     pub padded_right: &'a [f32],
     pub core_chunk: &'a [f32],
     pub pad_frames: usize,
+    pub use_nmfd: bool,
 }
 
 pub(crate) fn process_single_chunk(
@@ -236,38 +237,65 @@ pub(crate) fn process_single_chunk(
     }
 
     let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);
+    // h_chunk is used later in the chunk (around line 382) for transient density
     let h_chunk = nmf.transform(&scout.w, &chunk_frames);
 
-    const USE_NMFD: bool = false;
-    let (voice_mask, bass_mask, harm_mask, amb_mask) = if USE_NMFD {
+    let (voice_mask, bass_mask, harm_mask, amb_mask) = if data.use_nmfd {
+        // These hardcoded values mirror scout fit + W5.b harness
+        let nmfd_k = 8;
+        let nmfd_iter = 12;
+        let init_val = 0.1_f32;
+
+        let mut c_v = vec![0.0_f32; 128 * n_frames];
+        for f in 0..n_frames {
+            let mel_frame = crate::analysis::mel_128::fold_to_mel(
+                chunk_frames[f].as_slice().try_into().unwrap(),
+            );
+            for b in 0..128 {
+                c_v[b * n_frames + f] = mel_frame[b];
+            }
+        }
+
+        let init_h = vec![init_val; nmfd_k * n_frames];
+        let (nmfd_h, _) = crate::stft::nmfd::nmfd_f32_h_only(
+            &c_v,
+            &scout.tensor_w,
+            &init_h,
+            128,
+            nmfd_k,
+            n_frames,
+            scout.tau,
+            nmfd_iter,
+        );
+
         (
-            nmf.nmfd_component_mask_chunk(
-                scout.voice_idx,
-                &h_chunk,
+            nmf.nmfd_group_mask_chunk(
+                &[0, 1, 2, 3],
+                &nmfd_h,
                 &scout.tensor_w,
                 n_frames,
                 N_BINS,
                 scout.tau,
             ),
             nmf.nmfd_component_mask_chunk(
-                scout.bass_idx,
-                &h_chunk,
+                scout.nmfd_bass_idx,
+                &nmfd_h,
                 &scout.tensor_w,
                 n_frames,
                 N_BINS,
                 scout.tau,
             ),
             nmf.nmfd_component_mask_chunk(
-                scout.harmonics_idx,
-                &h_chunk,
+                scout.nmfd_harmonics_idx,
+                &nmfd_h,
                 &scout.tensor_w,
                 n_frames,
                 N_BINS,
                 scout.tau,
             ),
             nmf.nmfd_component_mask_chunk(
-                scout.ambience_idx,
-                &h_chunk,
+                scout.nmfd_ambience_idx,
+                &nmfd_h,
                 &scout.tensor_w,
                 n_frames,
                 N_BINS,
@@ -558,20 +586,24 @@ impl TwoPassEngine {
         let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
 
         // 1. Load w_speech_v1.bin (the K=4 LibriSpeech tensor; 8kHz limit noted)
-        let w_speech_path = format!("{}/../../../research/w-speech/w_speech_v1.bin", env!("CARGO_MANIFEST_DIR"));
+        let w_speech_path = format!(
+            "{}/../../../research/w-speech/w_speech_v1.bin",
+            env!("CARGO_MANIFEST_DIR")
+        );
         let mut f = std::fs::File::open(&w_speech_path).unwrap();
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
         let mut w_speech = vec![0.0_f32; 128 * 4 * 8];
         for i in 0..128 * 4 * 8 {
-            w_speech[i] = f32::from_le_bytes(buf[i*4..(i+1)*4].try_into().unwrap());
+            w_speech[i] = f32::from_le_bytes(buf[i * 4..(i + 1) * 4].try_into().unwrap());
         }
 
         // 2. Fill slots 0-3 frozen
         for m in 0..128 {
             for r in 0..4 {
                 for tau in 0..nmfd_tau {
-                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
+                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] =
+                        w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
                 }
             }
         }
@@ -634,39 +666,66 @@ impl TwoPassEngine {
             let mut arith = 0.0f32;
             let mut sum_mw = 0.0f32;
             let eps = 1e-10f32;
-            
+
             for m in 0..128 {
                 let mut avg_t = 0.0_f32;
                 for t in 0..nmfd_tau {
                     avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
                 }
                 avg_t /= nmfd_tau as f32;
-                
+
                 log_sum += libm::logf(avg_t + eps);
                 arith += avg_t;
                 sum_mw += m as f32 * avg_t;
             }
             let geom = libm::expf(log_sum / 128.0);
             let mean = arith / 128.0;
-            free_flatness[i] = if mean > eps { (geom / mean).clamp(0.0, 1.0) } else { 0.0 };
+            free_flatness[i] = if mean > eps {
+                (geom / mean).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             free_centroids[i] = if mean > eps { sum_mw / arith } else { 0.0 };
         }
 
         let ambience_idx_free = (0..free_count)
             .max_by(|&a, &b| free_flatness[a].partial_cmp(&free_flatness[b]).unwrap())
             .unwrap_or(0);
-        let remaining_free: Vec<usize> = (0..free_count).filter(|&i| i != ambience_idx_free).collect();
+        let remaining_free: Vec<usize> = (0..free_count)
+            .filter(|&i| i != ambience_idx_free)
+            .collect();
         let mut sorted_by_centroid = remaining_free.clone();
-        sorted_by_centroid.sort_by(|&a, &b| free_centroids[a].partial_cmp(&free_centroids[b]).unwrap());
+        sorted_by_centroid
+            .sort_by(|&a, &b| free_centroids[a].partial_cmp(&free_centroids[b]).unwrap());
 
         let bass_idx_free = sorted_by_centroid[0];
         let drums_idx_free = sorted_by_centroid[1];
         let harmonics_idx_free = sorted_by_centroid[2];
 
-        println!("FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}", bass_idx_free + 4, free_centroids[bass_idx_free], free_flatness[bass_idx_free]);
-        println!("FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}", drums_idx_free + 4, free_centroids[drums_idx_free], free_flatness[drums_idx_free]);
-        println!("FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}", harmonics_idx_free + 4, free_centroids[harmonics_idx_free], free_flatness[harmonics_idx_free]);
-        println!("FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}", ambience_idx_free + 4, free_centroids[ambience_idx_free], free_flatness[ambience_idx_free]);
+        println!(
+            "FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}",
+            bass_idx_free + 4,
+            free_centroids[bass_idx_free],
+            free_flatness[bass_idx_free]
+        );
+        println!(
+            "FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}",
+            drums_idx_free + 4,
+            free_centroids[drums_idx_free],
+            free_flatness[drums_idx_free]
+        );
+        println!(
+            "FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}",
+            harmonics_idx_free + 4,
+            free_centroids[harmonics_idx_free],
+            free_flatness[harmonics_idx_free]
+        );
+        println!(
+            "FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}",
+            ambience_idx_free + 4,
+            free_centroids[ambience_idx_free],
+            free_flatness[ambience_idx_free]
+        );
 
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
@@ -927,6 +986,7 @@ impl TwoPassEngine {
         scout: &ScoutResult,
         ducking_gain: f32,
         macro_router_enabled: bool,
+        use_nmfd: bool,
         boundaries: &[SegmentBoundary],
         sample_rate: f32,
         noise_floor_dbfs: Option<f32>,
@@ -1069,6 +1129,7 @@ impl TwoPassEngine {
                                 padded_right: &owned.padded_right,
                                 core_chunk: &owned.core_chunk,
                                 pad_frames: owned.pad_frames,
+                                use_nmfd,
                             },
                         )
                     }
@@ -1145,6 +1206,7 @@ impl TwoPassEngine {
         right: &[f32],
         scout: &ScoutResult,
         ducking_gain: f32,
+        use_nmfd: bool,
         mut callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -1205,6 +1267,7 @@ impl TwoPassEngine {
                         padded_right,
                         core_chunk,
                         pad_frames,
+                        use_nmfd,
                     },
                 )
             })
@@ -1286,6 +1349,7 @@ impl TwoPassEngine {
         &mut self,
         signal: &[f32],
         scout: &ScoutResult,
+        use_nmfd: bool,
         callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -1297,6 +1361,7 @@ impl TwoPassEngine {
             signal,
             scout,
             COLLISION_DUCKING_GAIN,
+            use_nmfd,
             callback,
         )
     }
@@ -1650,7 +1715,7 @@ mod tests {
         let scout = engine.scout(&signal, 48000, None, None);
 
         let mut call_count = 0usize;
-        let result = engine.process_chunks(&signal, &scout, |chunk| {
+        let result = engine.process_chunks(&signal, &scout, false, |chunk| {
             call_count += 1;
             assert!(!chunk.voice.is_empty());
             assert_eq!(chunk.voice.len(), chunk.bass.len());
@@ -1666,7 +1731,7 @@ mod tests {
         let mut engine = TwoPassEngine::new();
         let scout = engine.scout(&signal, 48000, None, None);
         let w_before = scout.w.clone();
-        let _ = engine.process_chunks(&signal, &scout, |_| {});
+        let _ = engine.process_chunks(&signal, &scout, false, |_| {});
         assert_eq!(w_before, scout.w, "INV-ST-2: W must not change");
     }
 
@@ -1675,7 +1740,7 @@ mod tests {
         let signal = sine(440.0, 96000);
         let mut engine = TwoPassEngine::new();
         let scout = engine.scout(&signal, 48000, None, None);
-        let _ = engine.process_chunks(&signal, &scout, |chunk| {
+        let _ = engine.process_chunks(&signal, &scout, false, |chunk| {
             assert_eq!(chunk.voice.len(), chunk.drums.len());
             assert_eq!(chunk.voice.len(), chunk.bass.len());
             assert_eq!(chunk.voice.len(), chunk.harmonics.len());
@@ -1692,7 +1757,7 @@ mod tests {
 
         let mut total_output_samples = 0;
         let meta = engine
-            .process_slices_with_params(&signal, &signal, &signal, &scout, 1.0, |chunk| {
+            .process_slices_with_params(&signal, &signal, &signal, &scout, 1.0, false, |chunk| {
                 total_output_samples += chunk.voice.len();
             })
             .unwrap();
@@ -1911,6 +1976,7 @@ mod tests {
                 &scout,
                 1.0,
                 true,
+                false,
                 &boundaries,
                 48000.0,
                 None,
@@ -2005,9 +2071,9 @@ mod tests {
         let scout = engine.scout(&signal, 48000, None, None);
 
         // Run the OLD path to establish the exact reference
-        let mut old_voice = Vec::with_capacity(n_total);
+        let mut old_voice: Vec<f32> = Vec::with_capacity(n_total);
         let _ = engine
-            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, |chunk| {
+            .process_slices_with_params(&signal, &left, &right, &scout, 1.0, false, |chunk| {
                 old_voice.extend_from_slice(&chunk.voice);
             })
             .unwrap();
@@ -2016,7 +2082,7 @@ mod tests {
         engine.bass_ducking_gain = 1.0;
 
         // Run the NEW path
-        let mut new_voice = Vec::with_capacity(n_total);
+        let mut new_voice: Vec<f32> = Vec::with_capacity(n_total);
         use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
         let source = TestMemorySource {
             data: interleaved,
@@ -2029,6 +2095,7 @@ mod tests {
                 reader,
                 &scout,
                 1.0,
+                false,
                 false,
                 &[],
                 48000.0,
@@ -2083,7 +2150,7 @@ mod tests {
         let scout = engine.scout(&signal, 48000, None, None);
 
         // Run with observer OFF
-        let mut off_voice = Vec::new();
+        let mut off_voice: Vec<f32> = Vec::new();
         use crate::stft::sliding_overlap_reader::SlidingOverlapReader;
         let reader_off = SlidingOverlapReader::new(
             TestMemorySource {
@@ -2098,6 +2165,7 @@ mod tests {
                 &scout,
                 1.0,
                 false,
+                false,
                 &[],
                 48000.0,
                 None,
@@ -2109,7 +2177,7 @@ mod tests {
             .unwrap();
 
         // Run with observer ON
-        let mut on_voice = Vec::new();
+        let mut on_voice: Vec<f32> = Vec::new();
         let reader_on = SlidingOverlapReader::new(
             TestMemorySource {
                 data: interleaved,
@@ -2131,6 +2199,7 @@ mod tests {
                 reader_on,
                 &scout,
                 1.0,
+                false,
                 false,
                 &[],
                 48000.0,
