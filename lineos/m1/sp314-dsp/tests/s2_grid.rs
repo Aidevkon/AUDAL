@@ -103,7 +103,7 @@ fn test_s2_grid() {
 
         let signal = decode_audio(&audio_path);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         let tensor_w = scout.tensor_w.clone();
         let tau = scout.tau;

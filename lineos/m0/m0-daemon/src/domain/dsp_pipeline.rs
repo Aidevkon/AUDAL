@@ -456,6 +456,7 @@ fn run_dsp_internal(
             req.project_id.as_deref().unwrap_or("default"),
             req.flavour_id.as_deref().unwrap_or("default"),
             &pre_analysis,
+            req.use_nmfd.unwrap_or(false),
         )?;
         let streaming_features = scout_out.scout.features.clone();
 
@@ -798,6 +799,7 @@ fn run_dsp_internal(
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
         &pre_analysis,
+        req.use_nmfd.unwrap_or(false),
     )?;
     let mut two_pass = scout_out.engine;
     let scout = scout_out.scout;

@@ -89,7 +89,7 @@ fn measure_region(
 fn test_jury_corrected() {
     let signal = read_audio("tests/fixtures/bodleasons_mid.wav");
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, 48000, None, None);
+    let scout = engine.scout(&signal, 48000, None, None, true);
 
     let tensor_w = scout.tensor_w.clone();
     let proxy_w = scout.w.clone();

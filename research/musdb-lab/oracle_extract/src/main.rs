@@ -71,7 +71,7 @@ fn main() {
     let sample_rate = 48000;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, sample_rate, None, None);
+    let scout = engine.scout(&signal, sample_rate, None, None, true);
 
     let k_b = std::env::var("NMFD_K").unwrap_or("8".to_string()).parse::<usize>().unwrap();
     let n_frames = (signal.len() + 512) / 512 + 10; 

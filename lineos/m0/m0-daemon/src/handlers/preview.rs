@@ -217,7 +217,7 @@ fn generate_preview_stems(
 
     // Scout on snippet
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(snippet, sample_rate, None, None);
+    let scout = engine.scout(snippet, sample_rate, None, None, false /* run_nmfd */);
 
     // Render stems for the snippet
     let mut stem_voices: Vec<f32> = Vec::new();

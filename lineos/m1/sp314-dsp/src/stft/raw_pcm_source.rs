@@ -266,7 +266,7 @@ mod tests {
 
         // 2. OLD PATH (Slice-based)
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         let mut old_voice = Vec::new();
         let mut old_drums = Vec::new();
@@ -288,7 +288,7 @@ mod tests {
         let mut e_new = TwoPassEngine::new();
         // Re-run scout to populate e_new.nmf exactly identical to e_old.
         // This takes ~150ms and avoids accessing private fields or risking shared state.
-        let scout_new = e_new.scout(&signal, 48000, None, None);
+        let scout_new = e_new.scout(&signal, 48000, None, None, false);
 
         let mut new_voice: Vec<f32> = Vec::new();
         let mut new_drums: Vec<f32> = Vec::new();

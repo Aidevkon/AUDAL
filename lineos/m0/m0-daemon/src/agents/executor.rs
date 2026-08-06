@@ -270,6 +270,7 @@ pub async fn run(
                         "default",
                         plan.flavour_id.as_deref().unwrap_or("default"),
                         &pre_analysis,
+                        false,
                     )
                     .map_err(|e| ExecutorError::DspFailed(format!("scout failed: {e}")))?;
                     let streaming_features = scout_out.scout.features.clone();

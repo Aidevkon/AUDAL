@@ -18,6 +18,7 @@ pub fn run(
     _project_id: &str,
     _flavour_id: &str,
     pre_analysis: &lineos_types::pre_analysis::PreAnalysisData,
+    use_nmfd: bool,
 ) -> Result<ScoutOutput, String> {
     // Build mono mix
     let mono: Vec<f32> = left
@@ -29,7 +30,7 @@ pub fn run(
     let scout_slice = &mono;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(scout_slice, sample_rate, None, None);
+    let scout = engine.scout(scout_slice, sample_rate, None, None, use_nmfd);
 
     // Maestro — compute adaptive ducking_gain based on rhythm
     let render_params = AutoTuningController::compute_render_params(pre_analysis);

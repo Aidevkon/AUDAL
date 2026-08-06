@@ -87,6 +87,8 @@ pub struct FiveStemsChunk {
 /// Result of Pass 1 — all static parameters locked.
 /// Pass 2 uses these blindly — no recomputation.
 /// INV-ST-1: W is read-only after scout() returns.
+/// Note: If `tensor_w` is empty, `tau` is 0, and indices are `usize::MAX`,
+/// scout ran without NMFD fit. Using the true branch with these is a caller bug and will panic loudly.
 #[derive(Clone)]
 pub struct ScoutResult {
     /// NMF basis matrix — READ ONLY (flat w for Pass 2 legacy path)
@@ -492,6 +494,7 @@ impl TwoPassEngine {
         sample_rate: u32,
         _quiet_window_start_frame: Option<usize>,
         _dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
+        run_nmfd: bool,
     ) -> ScoutResult {
         let t_scout = std::time::Instant::now();
 
@@ -534,198 +537,210 @@ impl TwoPassEngine {
         let w_proxy = self.nmf.fit(&proxy_frames);
         eprintln!("[PERF] nmf_fit={}ms", t_fit.elapsed().as_millis());
 
-        // ── NMFD fit (Rung-C) on FULL-RATE proxy ───────────────────────
-        let t_nmfd = std::time::Instant::now();
-        let nmfd_n_mels = crate::analysis::mel_128::MEL_BANDS;
+        let (nmfd_tensor_w, nmfd_tau, nmfd_bass_idx, nmfd_harmonics_idx, nmfd_ambience_idx) = if run_nmfd {
+            // ── NMFD fit (Rung-C) on FULL-RATE proxy ───────────────────────
+            let t_nmfd = std::time::Instant::now();
+            let nmfd_n_mels = crate::analysis::mel_128::MEL_BANDS;
 
-        let chunk_size = 48000;
-        let mut nmfd_ctx = StreamingStftEncoder::new();
-        let mut mel_v_fm = Vec::with_capacity(nmfd_n_mels * (signal.len() / 512 + 2));
-        let mut nmfd_n_frames = 0;
+            let chunk_size = 48000;
+            let mut nmfd_ctx = StreamingStftEncoder::new();
+            let mut mel_v_fm = Vec::with_capacity(nmfd_n_mels * (signal.len() / 512 + 2));
+            let mut nmfd_n_frames = 0;
 
-        for chunk in signal.chunks(chunk_size) {
-            let frames_cplx = nmfd_ctx.feed_chunk(chunk);
-            for f in 0..frames_cplx.len() {
+            for chunk in signal.chunks(chunk_size) {
+                let frames_cplx = nmfd_ctx.feed_chunk(chunk);
+                for f in 0..frames_cplx.len() {
+                    let mut frame = [0.0_f32; N_BINS];
+                    for b in 0..N_BINS {
+                        let c = frames_cplx[f][b];
+                        frame[b] = libm::sqrtf(c.re * c.re + c.im * c.im);
+                    }
+                    mel_v_fm.extend_from_slice(&crate::analysis::mel_128::fold_to_mel(&frame));
+                    nmfd_n_frames += 1;
+                }
+            }
+            let finish_cplx = nmfd_ctx.finish();
+            for f in 0..finish_cplx.len() {
                 let mut frame = [0.0_f32; N_BINS];
                 for b in 0..N_BINS {
-                    let c = frames_cplx[f][b];
+                    let c = finish_cplx[f][b];
                     frame[b] = libm::sqrtf(c.re * c.re + c.im * c.im);
                 }
                 mel_v_fm.extend_from_slice(&crate::analysis::mel_128::fold_to_mel(&frame));
                 nmfd_n_frames += 1;
             }
-        }
-        let finish_cplx = nmfd_ctx.finish();
-        for f in 0..finish_cplx.len() {
-            let mut frame = [0.0_f32; N_BINS];
-            for b in 0..N_BINS {
-                let c = finish_cplx[f][b];
-                frame[b] = libm::sqrtf(c.re * c.re + c.im * c.im);
-            }
-            mel_v_fm.extend_from_slice(&crate::analysis::mel_128::fold_to_mel(&frame));
-            nmfd_n_frames += 1;
-        }
 
-        let mut mel_v = vec![0.0_f32; nmfd_n_mels * nmfd_n_frames];
-        for f in 0..nmfd_n_frames {
-            for m in 0..nmfd_n_mels {
-                mel_v[m * nmfd_n_frames + f] = mel_v_fm[f * nmfd_n_mels + m];
-            }
-        }
-
-        let nmfd_tau = 8;
-
-        // fit_protocol_v3: K=8 (4 frozen slots seeded from LibriSpeech w_speech_v1.bin,
-        // 4 free slots seeded randomly), 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
-        let nmfd_k = 8;
-        let nmfd_frozen_k = 4;
-        let nmfd_num_iter = 12;
-        let nmfd_seed = 314159;
-
-        let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
-        let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
-
-        // 1. Load w_speech_v1.bin (the K=4 LibriSpeech tensor; 8kHz limit noted)
-        let w_speech_path = format!(
-            "{}/../../../research/w-speech/w_speech_v1.bin",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        let mut f = std::fs::File::open(&w_speech_path).unwrap();
-        let mut buf = Vec::new();
-        std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
-        let mut w_speech = vec![0.0_f32; 128 * 4 * 8];
-        for i in 0..128 * 4 * 8 {
-            w_speech[i] = f32::from_le_bytes(buf[i * 4..(i + 1) * 4].try_into().unwrap());
-        }
-
-        // 2. Fill slots 0-3 frozen
-        for m in 0..128 {
-            for r in 0..4 {
-                for tau in 0..nmfd_tau {
-                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] =
-                        w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
+            let mut mel_v = vec![0.0_f32; nmfd_n_mels * nmfd_n_frames];
+            for f in 0..nmfd_n_frames {
+                for m in 0..nmfd_n_mels {
+                    mel_v[m * nmfd_n_frames + f] = mel_v_fm[f * nmfd_n_mels + m];
                 }
             }
-        }
 
-        // 3. Seed 4 free slots randomly
-        let mut lcg_state: u32 = nmfd_seed;
-        let mut next_rand = || -> f32 {
-            lcg_state = lcg_state.wrapping_mul(1664525).wrapping_add(1013904223);
-            (lcg_state as f32) / (u32::MAX as f32)
-        };
+            let nmfd_tau = 8;
 
-        for m in 0..128 {
-            for r in 4..8 {
-                for tau in 0..nmfd_tau {
-                    init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = next_rand();
-                }
-            }
-        }
-        for x in init_h.iter_mut() {
-            *x = next_rand();
-        }
+            // fit_protocol_v3: K=8 (4 frozen slots seeded from LibriSpeech w_speech_v1.bin,
+            // 4 free slots seeded randomly), 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
+            let nmfd_k = 8;
+            let nmfd_frozen_k = 4;
+            let nmfd_num_iter = 12;
+            let nmfd_seed = 314159;
 
-        let mut current_w = init_w.clone();
-        let mut current_h = init_h.clone();
-        let mut final_cost = 0.0;
-        for iter in 1..=nmfd_num_iter {
-            let (next_w, next_h, cost) = crate::stft::nmfd::nmfd_f32_partial_frozen(
-                &mel_v,
-                &current_w,
-                &current_h,
-                nmfd_n_mels,
-                nmfd_frozen_k,
-                nmfd_k,
-                nmfd_n_frames,
-                nmfd_tau,
-                1,
+            let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
+            let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
+
+            // 1. Load w_speech_v1.bin (the K=4 LibriSpeech tensor; 8kHz limit noted)
+            let w_speech_path = format!(
+                "{}/../../../research/w-speech/w_speech_v1.bin",
+                env!("CARGO_MANIFEST_DIR")
             );
-            current_w = next_w;
-            current_h = next_h;
-            final_cost = cost;
-            println!("SCOUTFIT_ITER|iter={}|cost={:.8e}", iter, cost);
-        }
-        let nmfd_tensor_w = current_w;
+            let mut f = std::fs::File::open(&w_speech_path).unwrap();
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
+            let mut w_speech = vec![0.0_f32; 128 * 4 * 8];
+            for i in 0..128 * 4 * 8 {
+                w_speech[i] = f32::from_le_bytes(buf[i * 4..(i + 1) * 4].try_into().unwrap());
+            }
 
-        eprintln!(
-            "[PERF] SCOUTFIT|ms={}|cost={}",
-            t_nmfd.elapsed().as_millis(),
-            final_cost
-        );
+            // 2. Fill slots 0-3 frozen
+            for m in 0..128 {
+                for r in 0..4 {
+                    for tau in 0..nmfd_tau {
+                        init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] =
+                            w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
+                    }
+                }
+            }
 
-        // ── Free Slots Semantic Assignment (Report Only) ───────────────────────────────
-        let free_start = 4;
-        let free_count = 4;
-        let mut free_flatness = [0.0f32; 4];
-        let mut free_centroids = [0.0f32; 4];
-
-        for i in 0..free_count {
-            let c = free_start + i;
-            let mut log_sum = 0.0f32;
-            let mut arith = 0.0f32;
-            let mut sum_mw = 0.0f32;
-            let eps = 1e-10f32;
+            // 3. Seed 4 free slots randomly
+            let mut lcg_state: u32 = nmfd_seed;
+            let mut next_rand = || -> f32 {
+                lcg_state = lcg_state.wrapping_mul(1664525).wrapping_add(1013904223);
+                (lcg_state as f32) / (u32::MAX as f32)
+            };
 
             for m in 0..128 {
-                let mut avg_t = 0.0_f32;
-                for t in 0..nmfd_tau {
-                    avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                for r in 4..8 {
+                    for tau in 0..nmfd_tau {
+                        init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = next_rand();
+                    }
                 }
-                avg_t /= nmfd_tau as f32;
-
-                log_sum += libm::logf(avg_t + eps);
-                arith += avg_t;
-                sum_mw += m as f32 * avg_t;
             }
-            let geom = libm::expf(log_sum / 128.0);
-            let mean = arith / 128.0;
-            free_flatness[i] = if mean > eps {
-                (geom / mean).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            free_centroids[i] = if mean > eps { sum_mw / arith } else { 0.0 };
-        }
+            for x in init_h.iter_mut() {
+                *x = next_rand();
+            }
 
-        let ambience_idx_free = (0..free_count)
-            .max_by(|&a, &b| free_flatness[a].partial_cmp(&free_flatness[b]).unwrap())
-            .unwrap_or(0);
-        let remaining_free: Vec<usize> = (0..free_count)
-            .filter(|&i| i != ambience_idx_free)
-            .collect();
-        let mut sorted_by_centroid = remaining_free.clone();
-        sorted_by_centroid
-            .sort_by(|&a, &b| free_centroids[a].partial_cmp(&free_centroids[b]).unwrap());
+            let mut current_w = init_w.clone();
+            let mut current_h = init_h.clone();
+            let mut final_cost = 0.0;
+            for iter in 1..=nmfd_num_iter {
+                let (next_w, next_h, cost) = crate::stft::nmfd::nmfd_f32_partial_frozen(
+                    &mel_v,
+                    &current_w,
+                    &current_h,
+                    nmfd_n_mels,
+                    nmfd_frozen_k,
+                    nmfd_k,
+                    nmfd_n_frames,
+                    nmfd_tau,
+                    1,
+                );
+                current_w = next_w;
+                current_h = next_h;
+                final_cost = cost;
+                println!("SCOUTFIT_ITER|iter={}|cost={:.8e}", iter, cost);
+            }
+            let nmfd_tensor_w = current_w;
 
-        let bass_idx_free = sorted_by_centroid[0];
-        let drums_idx_free = sorted_by_centroid[1];
-        let harmonics_idx_free = sorted_by_centroid[2];
+            eprintln!(
+                "[PERF] SCOUTFIT|ms={}|cost={}",
+                t_nmfd.elapsed().as_millis(),
+                final_cost
+            );
 
-        println!(
-            "FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}",
-            bass_idx_free + 4,
-            free_centroids[bass_idx_free],
-            free_flatness[bass_idx_free]
-        );
-        println!(
-            "FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}",
-            drums_idx_free + 4,
-            free_centroids[drums_idx_free],
-            free_flatness[drums_idx_free]
-        );
-        println!(
-            "FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}",
-            harmonics_idx_free + 4,
-            free_centroids[harmonics_idx_free],
-            free_flatness[harmonics_idx_free]
-        );
-        println!(
-            "FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}",
-            ambience_idx_free + 4,
-            free_centroids[ambience_idx_free],
-            free_flatness[ambience_idx_free]
-        );
+            // ── Free Slots Semantic Assignment (Report Only) ───────────────────────────────
+            let free_start = 4;
+            let free_count = 4;
+            let mut free_flatness = [0.0f32; 4];
+            let mut free_centroids = [0.0f32; 4];
+
+            for i in 0..free_count {
+                let c = free_start + i;
+                let mut log_sum = 0.0f32;
+                let mut arith = 0.0f32;
+                let mut sum_mw = 0.0f32;
+                let eps = 1e-10f32;
+
+                for m in 0..128 {
+                    let mut avg_t = 0.0_f32;
+                    for t in 0..nmfd_tau {
+                        avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                    }
+                    avg_t /= nmfd_tau as f32;
+
+                    log_sum += libm::logf(avg_t + eps);
+                    arith += avg_t;
+                    sum_mw += m as f32 * avg_t;
+                }
+                let geom = libm::expf(log_sum / 128.0);
+                let mean = arith / 128.0;
+                free_flatness[i] = if mean > eps {
+                    (geom / mean).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                free_centroids[i] = if mean > eps { sum_mw / arith } else { 0.0 };
+            }
+
+            let ambience_idx_free = (0..free_count)
+                .max_by(|&a, &b| free_flatness[a].partial_cmp(&free_flatness[b]).unwrap())
+                .unwrap_or(0);
+            let remaining_free: Vec<usize> = (0..free_count)
+                .filter(|&i| i != ambience_idx_free)
+                .collect();
+            let mut sorted_by_centroid = remaining_free.clone();
+            sorted_by_centroid
+                .sort_by(|&a, &b| free_centroids[a].partial_cmp(&free_centroids[b]).unwrap());
+
+            let bass_idx_free = sorted_by_centroid[0];
+            let drums_idx_free = sorted_by_centroid[1];
+            let harmonics_idx_free = sorted_by_centroid[2];
+
+            println!(
+                "FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}",
+                bass_idx_free + 4,
+                free_centroids[bass_idx_free],
+                free_flatness[bass_idx_free]
+            );
+            println!(
+                "FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}",
+                drums_idx_free + 4,
+                free_centroids[drums_idx_free],
+                free_flatness[drums_idx_free]
+            );
+            println!(
+                "FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}",
+                harmonics_idx_free + 4,
+                free_centroids[harmonics_idx_free],
+                free_flatness[harmonics_idx_free]
+            );
+            println!(
+                "FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}",
+                ambience_idx_free + 4,
+                free_centroids[ambience_idx_free],
+                free_flatness[ambience_idx_free]
+            );
+
+            (nmfd_tensor_w, nmfd_tau, bass_idx_free + 4, harmonics_idx_free + 4, ambience_idx_free + 4)
+        } else {
+            (
+                Vec::new(),
+                0, // 0 is recognizably invalid (not 8)
+                usize::MAX,
+                usize::MAX,
+                usize::MAX,
+            )
+        };
 
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
@@ -909,9 +924,9 @@ impl TwoPassEngine {
             bass_idx,
             harmonics_idx,
             ambience_idx,
-            nmfd_bass_idx: bass_idx_free + 4,
-            nmfd_harmonics_idx: harmonics_idx_free + 4,
-            nmfd_ambience_idx: ambience_idx_free + 4,
+            nmfd_bass_idx,
+            nmfd_harmonics_idx,
+            nmfd_ambience_idx,
             assignments,
             rear_scale,
             lfe_scale,
@@ -1636,7 +1651,7 @@ mod tests {
     fn w_bin_mapping_produces_full_size_w() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         assert_eq!(
             scout.w.len(),
             N_BINS * N_COMPONENTS,
@@ -1654,8 +1669,8 @@ mod tests {
         let signal = sine(440.0, 48000);
         let mut e1 = TwoPassEngine::new();
         let mut e2 = TwoPassEngine::new();
-        let s1 = e1.scout(&signal, 48000, None, None);
-        let s2 = e2.scout(&signal, 48000, None, None);
+        let s1 = e1.scout(&signal, 48000, None, None, false);
+        let s2 = e2.scout(&signal, 48000, None, None, false);
         for (a, b) in s1.w.iter().zip(s2.w.iter()) {
             assert!(
                 (a - b).abs() < 1e-10,
@@ -1669,7 +1684,7 @@ mod tests {
         // Bins above proxy Nyquist must be EPS (no template)
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         // Proxy Nyquist = 48000 / (2 * SCOUT_DOWNSAMPLE) = 6000 Hz
         // Bin at 6kHz = 6000 * N_BINS * 2 / 48000 = ~256
         for b in N_BINS.div_ceil(SCOUT_DOWNSAMPLE)..N_BINS {
@@ -1687,7 +1702,7 @@ mod tests {
     fn scout_produces_locked_assignments() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         assert_eq!(scout.w.len(), N_BINS * N_COMPONENTS);
         assert!(scout.voice_idx < N_COMPONENTS);
         assert!(scout.rear_scale >= 0.0 && scout.rear_scale <= 1.0);
@@ -1699,8 +1714,8 @@ mod tests {
         let signal = sine(1000.0, 48000);
         let mut e1 = TwoPassEngine::new();
         let mut e2 = TwoPassEngine::new();
-        let s1 = e1.scout(&signal, 48000, None, None);
-        let s2 = e2.scout(&signal, 48000, None, None);
+        let s1 = e1.scout(&signal, 48000, None, None, false);
+        let s2 = e2.scout(&signal, 48000, None, None, false);
         for (a, b) in s1.w.iter().zip(s2.w.iter()) {
             assert!((a - b).abs() < 1e-6, "INV-AB-1: W must be identical");
         }
@@ -1712,7 +1727,7 @@ mod tests {
     fn process_chunks_produces_callback_calls() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         let mut call_count = 0usize;
         let result = engine.process_chunks(&signal, &scout, false, |chunk| {
@@ -1729,7 +1744,7 @@ mod tests {
     fn w_read_only_during_process() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         let w_before = scout.w.clone();
         let _ = engine.process_chunks(&signal, &scout, false, |_| {});
         assert_eq!(w_before, scout.w, "INV-ST-2: W must not change");
@@ -1739,7 +1754,7 @@ mod tests {
     fn five_stems_chunk_all_same_length() {
         let signal = sine(440.0, 96000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         let _ = engine.process_chunks(&signal, &scout, false, |chunk| {
             assert_eq!(chunk.voice.len(), chunk.drums.len());
             assert_eq!(chunk.voice.len(), chunk.bass.len());
@@ -1753,7 +1768,7 @@ mod tests {
         let n_total = 48000;
         let signal = sine(440.0, n_total);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         let mut total_output_samples = 0;
         let meta = engine
@@ -1944,7 +1959,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
         let source = TestMemorySource {
             data: interleaved,
             offset: 0,
@@ -2068,7 +2083,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         // Run the OLD path to establish the exact reference
         let mut old_voice: Vec<f32> = Vec::with_capacity(n_total);
@@ -2147,7 +2162,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None);
+        let scout = engine.scout(&signal, 48000, None, None, false);
 
         // Run with observer OFF
         let mut off_voice: Vec<f32> = Vec::new();

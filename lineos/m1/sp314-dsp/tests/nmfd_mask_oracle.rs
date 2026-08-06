@@ -106,7 +106,7 @@ fn test_nmfd_mask_oracle_a_and_b() {
     let history_len = 10240;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, 48000, None, None);
+    let scout = engine.scout(&signal, 48000, None, None, true);
     let tensor_w = scout.tensor_w.clone();
     let tau = scout.tau;
     let k_b = 8;
@@ -256,7 +256,7 @@ fn test_nmfd_mask_oracle_c() {
     let history_len = 10240;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, 48000, None, None);
+    let scout = engine.scout(&signal, 48000, None, None, true);
     let tensor_w = scout.tensor_w.clone();
     let tau = scout.tau;
     let k_b = 8;

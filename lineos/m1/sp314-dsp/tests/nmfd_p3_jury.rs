@@ -71,7 +71,7 @@ fn compute_vad_speech_pct(audio: &[f32]) -> f32 {
 fn test_p3_jury() {
     let signal = read_audio("tests/fixtures/bodleasons_mid.wav");
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, 48000, None, None);
+    let scout = engine.scout(&signal, 48000, None, None, true);
 
     let tensor_w = scout.tensor_w.clone();
     let proxy_w = scout.w.clone();

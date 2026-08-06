@@ -37,7 +37,7 @@ fn test_dragon_test() {
     let signal = read_audio("tests/fixtures/bodleasons_mid.wav");
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, 48000, None, None);
+    let scout = engine.scout(&signal, 48000, None, None, true);
 
     let tensor_w = scout.tensor_w.clone();
     let tau = scout.tau;
