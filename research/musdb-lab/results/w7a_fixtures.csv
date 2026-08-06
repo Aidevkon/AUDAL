@@ -1,0 +1,5 @@
+fixture,variant,ratio_in,ratio_out
+duck_splice_synth_snr-15,raw,0.394,0.000
+duck_splice_synth_snr-15,sep,1.000,1.000
+duck_splice_real_snr-15,raw,0.810,0.044
+duck_splice_real_snr-15,sep,1.000,1.000
