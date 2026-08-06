@@ -102,6 +102,10 @@ pub struct ScoutResult {
     pub bass_idx: usize,
     pub harmonics_idx: usize,
     pub ambience_idx: usize,
+    /// NMFD K=8 semantic map. Voice = sum of frozen slots 0..NMFD_FROZEN_K (speech prior, δεν χρειάζεται index — fixed group). Drums: HPSS-owned, no NMFD index by design (v2 doctrine).
+    pub nmfd_bass_idx: usize,
+    pub nmfd_harmonics_idx: usize,
+    pub nmfd_ambience_idx: usize,
     /// Locked spatial assignments from proxy stems
     pub assignments: StemChannelAssignments,
     /// Pre-computed firewall scales from proxy energy
@@ -846,6 +850,9 @@ impl TwoPassEngine {
             bass_idx,
             harmonics_idx,
             ambience_idx,
+            nmfd_bass_idx: bass_idx_free + 4,
+            nmfd_harmonics_idx: harmonics_idx_free + 4,
+            nmfd_ambience_idx: ambience_idx_free + 4,
             assignments,
             rear_scale,
             lfe_scale,

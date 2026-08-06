@@ -241,21 +241,21 @@ fn w2_duck_gate_synth_variance() {
         audio_path: path.to_str().unwrap().to_string(),
         preset_id: "Transparent".to_string(),
         flavour_id: None, intent_tone: None, intent_dynamics: None, persona_id: None, tone: None, dynamics: None, chaos_seed: None,
-        project_id: Some("w2_synth".to_string()),
-        track_id: Some("w2synthA".to_string()),
+        project_id: Some("w2_synth_var".to_string()),
+        track_id: Some("w2synthVAR".to_string()),
         mix_levels: None, normalizer_ceiling_db: None, preview_id: None, restoration_enabled: None, macro_router_enabled: None,
         vad_observe_enabled: Some(false),
     };
     let state_tmp_a = tempfile::TempDir::new().unwrap();
     let out_dir_a = tempfile::TempDir::new().unwrap();
-    let (_, _, _, _, _, artifacts_a) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w2-synth-A".to_string(), state_tmp_a.path().to_str().unwrap(), out_dir_a.path().to_str().unwrap()).unwrap();
-    fs::copy(artifacts_a.pre_master_guards.unwrap().0.path(), "/tmp/w2_synth_noduck_A_pre_l.f32").unwrap();
+    let (_, _, _, _, _, artifacts_a) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w2-synth-VAR".to_string(), state_tmp_a.path().to_str().unwrap(), out_dir_a.path().to_str().unwrap()).unwrap();
+    fs::copy(artifacts_a.pre_master_guards.unwrap().0.path(), "/tmp/w2_synth_noduck_VAR_pre_l.f32").unwrap();
 
-    req_a.track_id = Some("w2synthC".to_string());
+    req_a.track_id = Some("w2synthVAR2".to_string());
     let state_tmp_c = tempfile::TempDir::new().unwrap();
     let out_dir_c = tempfile::TempDir::new().unwrap();
-    let (_, _, _, _, _, artifacts_c) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w2-synth-C".to_string(), state_tmp_c.path().to_str().unwrap(), out_dir_c.path().to_str().unwrap()).unwrap();
-    fs::copy(artifacts_c.pre_master_guards.unwrap().0.path(), "/tmp/w2_synth_noduck_C_pre_l.f32").unwrap();
+    let (_, _, _, _, _, artifacts_c) = run_dsp(&req_a, std::time::Instant::now(), Arc::new(ArcSwap::from_pointee(DspState::default())), None, None, "w2-synth-VAR2".to_string(), state_tmp_c.path().to_str().unwrap(), out_dir_c.path().to_str().unwrap()).unwrap();
+    fs::copy(artifacts_c.pre_master_guards.unwrap().0.path(), "/tmp/w2_synth_noduck_VAR2_pre_l.f32").unwrap();
 }
 
 #[test]

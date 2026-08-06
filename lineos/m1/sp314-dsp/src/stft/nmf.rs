@@ -394,6 +394,62 @@ impl NmfEngine {
         expanded_mask
     }
 
+    pub fn nmfd_group_mask_chunk(
+        &self,
+        components: &[usize],
+        h_chunk: &[f32],
+        tensor_w: &[f32],
+        n_chunk_frames: usize,
+        n_bins: usize,
+        tau_frames: usize,
+    ) -> Vec<Vec<f32>> {
+        let k = self.n_components;
+        let n_mels = crate::analysis::mel_128::MEL_BANDS;
+
+        let mut expanded_mask = vec![vec![0.0_f32; n_bins]; n_chunk_frames];
+        for f in 0..n_chunk_frames {
+            let mut mel_mask = [0.0_f32; crate::analysis::mel_128::MEL_BANDS];
+            for m in 0..n_mels {
+                let mut target = 0.0_f32;
+                let mut total = 0.0_f32;
+                for tau in 0..tau_frames {
+                    if f >= tau {
+                        let h_f = f - tau;
+                        for &c in components {
+                            let idx = c * n_chunk_frames + h_f;
+                            let h_cf = if idx < h_chunk.len() {
+                                h_chunk[idx]
+                            } else {
+                                0.0
+                            };
+                            let w_mc = tensor_w[m * (k * tau_frames) + c * tau_frames + tau];
+                            target += w_mc * h_cf;
+                        }
+
+                        for c in 0..k {
+                            let h_idx = c * n_chunk_frames + h_f;
+                            let h_val = if h_idx < h_chunk.len() {
+                                h_chunk[h_idx]
+                            } else {
+                                0.0
+                            };
+                            let w_c = tensor_w[m * (k * tau_frames) + c * tau_frames + tau];
+                            total += w_c * h_val;
+                        }
+                    }
+                }
+                if total > 0.0 {
+                    mel_mask[m] = target / total;
+                } else {
+                    mel_mask[m] = components.len() as f32 / k as f32;
+                }
+            }
+            let linear_mask = crate::analysis::mel_128::expand_mask_to_linear(&mel_mask);
+            expanded_mask[f].copy_from_slice(&linear_mask);
+        }
+        expanded_mask
+    }
+
     /// S.2 Fix: Resolves Low-End Clashes via Envelope Correlation (Slew-Rate Limiting).
     /// Identifies the transient (Kick) and sustained (Bass) components, and physically
     /// restricts the Bass from having sharp transients, transferring that excess energy to the Kick.
@@ -849,5 +905,61 @@ mod transform_tests {
         let h2 = nmf.transform(&w, &frames);
 
         assert_eq!(h1, h2, "INV-AB-1: transform must be deterministic");
+    }
+}
+
+#[cfg(test)]
+mod nmfd_mask_tests {
+    use super::*;
+
+    #[test]
+    fn group_mask_single_element_matches_component_mask() {
+        let mut nmf = NmfEngine::default();
+        nmf.n_components = 8;
+        let k = 8;
+        let n_mels = 128;
+        let n_bins = 1025;
+        let n_frames = 10;
+        let tau = 3;
+
+        let tensor_w: Vec<f32> = (0..(n_mels * k * tau)).map(|i| (i as f32 * 0.1).sin().abs()).collect();
+        let h_chunk: Vec<f32> = (0..(k * n_frames)).map(|i| (i as f32 * 0.2).cos().abs()).collect();
+
+        let single = nmf.nmfd_component_mask_chunk(2, &h_chunk, &tensor_w, n_frames, n_bins, tau);
+        let group = nmf.nmfd_group_mask_chunk(&[2], &h_chunk, &tensor_w, n_frames, n_bins, tau);
+
+        for f in 0..n_frames {
+            for b in 0..n_bins {
+                assert!((single[f][b] - group[f][b]).abs() < 1e-7);
+            }
+        }
+    }
+
+    #[test]
+    fn group_mask_sum_matches_sum_of_components() {
+        let mut nmf = NmfEngine::default();
+        nmf.n_components = 8;
+        let k = 8;
+        let n_mels = 128;
+        let n_bins = 1025;
+        let n_frames = 10;
+        let tau = 3;
+
+        let tensor_w: Vec<f32> = (0..(n_mels * k * tau)).map(|i| (i as f32 * 0.1).sin().abs()).collect();
+        let h_chunk: Vec<f32> = (0..(k * n_frames)).map(|i| (i as f32 * 0.2).cos().abs()).collect();
+
+        let group = nmf.nmfd_group_mask_chunk(&[0, 1, 2, 3], &h_chunk, &tensor_w, n_frames, n_bins, tau);
+
+        let c0 = nmf.nmfd_component_mask_chunk(0, &h_chunk, &tensor_w, n_frames, n_bins, tau);
+        let c1 = nmf.nmfd_component_mask_chunk(1, &h_chunk, &tensor_w, n_frames, n_bins, tau);
+        let c2 = nmf.nmfd_component_mask_chunk(2, &h_chunk, &tensor_w, n_frames, n_bins, tau);
+        let c3 = nmf.nmfd_component_mask_chunk(3, &h_chunk, &tensor_w, n_frames, n_bins, tau);
+
+        for f in 0..n_frames {
+            for b in 0..n_bins {
+                let sum_single = c0[f][b] + c1[f][b] + c2[f][b] + c3[f][b];
+                assert!((group[f][b] - sum_single).abs() < 1e-6);
+            }
+        }
     }
 }
