@@ -190,7 +190,22 @@ fn main() {
         }
     }
 
-    let chunk_size = 16000 * 5; // 5 seconds
+
+    let mut norm_mode = "chunk".to_string();
+    for arg in args.iter().skip(2) {
+        if arg.starts_with("--dump=") {
+            dump_csv = Some(arg[7..].to_string());
+        } else if arg.starts_with("--norm=") {
+            norm_mode = arg[7..].to_string();
+        } else if window_start_s < 0.0 {
+            window_start_s = arg.parse().unwrap();
+        } else if window_end_s < 0.0 {
+            window_end_s = arg.parse().unwrap();
+        }
+    }
+
+    let chunk_size = if norm_mode == "rolling" { x.len().max(1) } else { 16000 * 5 };
+
     let n_fft = 400;
     let hop = 160;
     let pad = 200;
@@ -302,25 +317,48 @@ fn main() {
     
     let mut global_mean = 0.0;
     let mut global_std = 1.0;
-    if norm_mode == "global" {
+    if norm_mode == "global" || norm_mode == "scout30mid" || norm_mode == "scout30head" {
+        let n_frames: usize = all_chunks_mels.iter().map(|c| c.len()).sum();
+        
+        let (start_frame, end_frame) = if norm_mode == "global" || n_frames <= 3000 {
+            (0, n_frames)
+        } else if norm_mode == "scout30mid" {
+            let s = (n_frames - 3000) / 2;
+            (s, s + 3000)
+        } else {
+            (0, 3000)
+        };
+
         let mut sum = 0.0;
         let mut count = 0;
+        let mut current_frame = 0;
+        
         for chunk_mels in &all_chunks_mels {
             for frame in chunk_mels {
-                for &val in frame { sum += val; count += 1; }
+                if current_frame >= start_frame && current_frame < end_frame {
+                    for &val in frame { sum += val; count += 1; }
+                }
+                current_frame += 1;
             }
         }
-        global_mean = sum / count as f32;
+        global_mean = if count > 0 { sum / count as f32 } else { 0.0 };
+        
         let mut sum_sq = 0.0;
+        current_frame = 0;
         for chunk_mels in &all_chunks_mels {
             for frame in chunk_mels {
-                for &val in frame { let d = val - global_mean; sum_sq += d * d; }
+                if current_frame >= start_frame && current_frame < end_frame {
+                    for &val in frame { let d = val - global_mean; sum_sq += d * d; }
+                }
+                current_frame += 1;
             }
         }
-        global_std = (sum_sq / (count as f32 - 1.0)).sqrt();
+        global_std = if count > 1 { (sum_sq / (count as f32 - 1.0)).sqrt() } else { 1.0 };
     }
 
+
     start_idx = 0;
+    let mut prev_mels: Vec<Vec<f32>> = Vec::new();
     for mut mel_matrix in all_chunks_mels {
         let num_frames = mel_matrix.len();
         if num_frames == 0 {
@@ -332,7 +370,8 @@ fn main() {
         let mut mean = 0.0;
         let mut std = 1.0;
 
-        if norm_mode == "chunk" || (norm_mode == "warmup" && chunk_idx == 0) {
+
+        if norm_mode == "chunk" || norm_mode == "chunkcont" || (norm_mode == "warmup" && chunk_idx == 0) {
             let mut sum = 0.0;
             let mut count = 0;
             for frame in &mel_matrix {
@@ -365,13 +404,24 @@ fn main() {
 
         // Inference (from frame 50 onwards)
         let chunk_start_s = start_idx as f32 / 16000.0;
-        for i in 50..num_frames {
+        let inference_start = if norm_mode == "chunkcont" && chunk_idx > 0 { 0 } else { 50 };
+        for i in inference_start..num_frames {
             // window = 64 x 51
             // mel_matrix shape: [num_frames][64]
             let mut window = vec![vec![0.0f32; 51]; 64];
             for t in 0..51 {
+                let frame_idx = i as isize - 50 + t as isize;
                 for c in 0..64 {
-                    window[c][t] = mel_matrix[i - 50 + t][c];
+                    if frame_idx < 0 {
+                        let prev_i = prev_mels.len() as isize + frame_idx;
+                        if prev_i >= 0 {
+                            window[c][t] = prev_mels[prev_i as usize][c];
+                        } else {
+                            window[c][t] = 0.0;
+                        }
+                    } else {
+                        window[c][t] = mel_matrix[frame_idx as usize][c];
+                    }
                 }
             }
 
@@ -428,6 +478,11 @@ fn main() {
                 writeln!(w, "{:.6},{:.6}", frame_time, p).unwrap();
             }
         }
+        if norm_mode == "chunkcont" {
+            let take = 50.min(mel_matrix.len());
+            prev_mels = mel_matrix[mel_matrix.len() - take..].to_vec();
+        }
+
         start_idx += chunk_size;
         chunk_idx += 1;
     }
