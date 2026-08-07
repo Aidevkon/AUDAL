@@ -589,17 +589,15 @@ impl TwoPassEngine {
             let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
             let mut init_h = vec![0.0_f32; nmfd_k * nmfd_n_frames];
 
-            // 1. Load w_speech_v1.bin (the K=4 LibriSpeech tensor; 8kHz limit noted)
-            let w_speech_path = format!(
-                "{}/../../../research/w-speech/w_speech_v1.bin",
-                env!("CARGO_MANIFEST_DIR")
-            );
-            let mut f = std::fs::File::open(&w_speech_path).unwrap();
-            let mut buf = Vec::new();
-            std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
+            // 1. w_speech_v1.bin (K=4 LibriSpeech tensor; 8kHz limit
+            // noted). Embedded at compile time — production builds
+            // must not depend on a dev checkout layout. Source of
+            // truth: research/w-speech/ (retrains re-copy + SHA-pair).
+            static W_SPEECH_V1: &[u8] = include_bytes!("../../assets/w_speech_v1.bin");
+            const _: () = assert!(W_SPEECH_V1.len() == 128 * 4 * 8 * 4);
             let mut w_speech = vec![0.0_f32; 128 * 4 * 8];
             for i in 0..128 * 4 * 8 {
-                w_speech[i] = f32::from_le_bytes(buf[i * 4..(i + 1) * 4].try_into().unwrap());
+                w_speech[i] = f32::from_le_bytes(W_SPEECH_V1[i * 4..(i + 1) * 4].try_into().unwrap());
             }
 
             // 2. Fill slots 0-3 frozen
