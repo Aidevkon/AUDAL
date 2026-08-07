@@ -276,6 +276,7 @@ version = "0.1.0"
 dependencies = [
  "hound",
  "libm",
+ "lineos-corpus",
  "rustfft",
  "sp314-dsp",
 ]
