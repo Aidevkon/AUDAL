@@ -26,17 +26,20 @@ fn read_f32_le(data: &[u8], offset: &mut usize) -> f32 {
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: mvad_phi1 <input.wav> [window_start_s window_end_s] [--dump=<csv>]");
+        eprintln!("Usage: mvad_phi1 <input.wav> [window_start_s window_end_s] [--dump=<csv>] [--norm=<chunk|global|warmup>]");
         std::process::exit(1);
     }
     let input_path = &args[1];
     let mut window_start_s = -1.0f32;
     let mut window_end_s = -1.0f32;
     let mut dump_csv: Option<String> = None;
+    let mut norm_mode = "chunk".to_string();
 
     for arg in args.iter().skip(2) {
         if arg.starts_with("--dump=") {
             dump_csv = Some(arg[7..].to_string());
+        } else if arg.starts_with("--norm=") {
+            norm_mode = arg[7..].to_string();
         } else if window_start_s < 0.0 {
             window_start_s = arg.parse().unwrap();
         } else if window_end_s < 0.0 {
@@ -235,6 +238,7 @@ fn main() {
     let mut all_p = Vec::new();
     let mut all_t = Vec::new();
 
+    let mut all_chunks_mels = Vec::new();
     let mut start_idx = 0;
     while start_idx < x.len() {
         let end_idx = (start_idx + chunk_size).min(x.len());
@@ -288,31 +292,70 @@ fn main() {
             k += 1;
         }
 
-        // Chunk Normalization
+        all_chunks_mels.push(mel_matrix);
+        start_idx += chunk_size;
+    }
+
+    let mut chunk_idx = 0;
+    let mut saved_mean = 0.0;
+    let mut saved_std = 1.0;
+    
+    let mut global_mean = 0.0;
+    let mut global_std = 1.0;
+    if norm_mode == "global" {
+        let mut sum = 0.0;
+        let mut count = 0;
+        for chunk_mels in &all_chunks_mels {
+            for frame in chunk_mels {
+                for &val in frame { sum += val; count += 1; }
+            }
+        }
+        global_mean = sum / count as f32;
+        let mut sum_sq = 0.0;
+        for chunk_mels in &all_chunks_mels {
+            for frame in chunk_mels {
+                for &val in frame { let d = val - global_mean; sum_sq += d * d; }
+            }
+        }
+        global_std = (sum_sq / (count as f32 - 1.0)).sqrt();
+    }
+
+    start_idx = 0;
+    for mut mel_matrix in all_chunks_mels {
         let num_frames = mel_matrix.len();
         if num_frames == 0 {
             start_idx += chunk_size;
+            chunk_idx += 1;
             continue;
         }
 
-        let mut sum = 0.0;
-        let mut count = 0;
-        for frame in &mel_matrix {
-            for &val in frame {
-                sum += val;
-                count += 1;
-            }
-        }
-        let mean = sum / count as f32;
+        let mut mean = 0.0;
+        let mut std = 1.0;
 
-        let mut sum_sq = 0.0;
-        for frame in &mel_matrix {
-            for &val in frame {
-                let diff = val - mean;
-                sum_sq += diff * diff;
+        if norm_mode == "chunk" || (norm_mode == "warmup" && chunk_idx == 0) {
+            let mut sum = 0.0;
+            let mut count = 0;
+            for frame in &mel_matrix {
+                for &val in frame { sum += val; count += 1; }
             }
+            mean = sum / count as f32;
+            let mut sum_sq = 0.0;
+            for frame in &mel_matrix {
+                for &val in frame { let d = val - mean; sum_sq += d * d; }
+            }
+            std = (sum_sq / (count as f32 - 1.0)).sqrt();
+
+            if norm_mode == "warmup" && chunk_idx == 0 {
+                saved_mean = mean;
+                saved_std = std;
+            }
+        } else if norm_mode == "warmup" {
+            mean = saved_mean;
+            std = saved_std;
+        } else if norm_mode == "global" {
+            mean = global_mean;
+            std = global_std;
         }
-        let std = (sum_sq / (count as f32 - 1.0)).sqrt(); // Bessel's correction
 
         for frame in &mut mel_matrix {
             for val in frame.iter_mut() {
@@ -386,6 +429,7 @@ fn main() {
             }
         }
         start_idx += chunk_size;
+        chunk_idx += 1;
     }
 
     if window_start_s < 0.0 { window_start_s = 0.0; }

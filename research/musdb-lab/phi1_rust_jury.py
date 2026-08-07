@@ -42,7 +42,8 @@ total_frames = 0
 
 def run_bin(*args):
     global total_frames
-    cmd = [BIN_PATH] + list(args)
+    norm_mode = os.environ.get("PHI1_NORM_MODE", "chunk")
+    cmd = [BIN_PATH] + list(args) + [f"--norm={norm_mode}"]
     res = subprocess.run(cmd, capture_output=True, text=True)
     out = res.stdout.strip()
     if not out.startswith("PHI1|"):
