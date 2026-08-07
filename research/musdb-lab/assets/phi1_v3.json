@@ -1,0 +1,49 @@
+{
+  "arch": "conv48k11d1-conv48k11d4-fc32-fc1",
+  "input": "logmel64x51",
+  "norm": "clip_meanstd",
+  "layout": [
+    "conv1.weight",
+    "conv1.bias",
+    "conv2.weight",
+    "conv2.bias",
+    "fc1.weight",
+    "fc1.bias",
+    "fc2.weight",
+    "fc2.bias"
+  ],
+  "shapes": {
+    "conv1.weight": [
+      48,
+      64,
+      11
+    ],
+    "conv1.bias": [
+      48
+    ],
+    "conv2.weight": [
+      48,
+      48,
+      11
+    ],
+    "conv2.bias": [
+      48
+    ],
+    "fc1.weight": [
+      32,
+      48
+    ],
+    "fc1.bias": [
+      32
+    ],
+    "fc2.weight": [
+      1,
+      32
+    ],
+    "fc2.bias": [
+      1
+    ]
+  },
+  "sha256": "0409a66f3c0a6ab2c72c80571a9b41b12e540b8a90a501acb25e2f534a78cd77",
+  "dataset": "phi1_manifest.csv@b18304bc9da100c7ef26e8e559f40f3dd4a98d80"
+}

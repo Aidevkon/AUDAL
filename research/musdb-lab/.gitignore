@@ -11,3 +11,4 @@ dbus_eval/target/
 oracle_extract/target/
 speech
 musdb18hq
+__pycache__/
