@@ -1,0 +1,3 @@
+fixture,segments,armed_seg,armed_frame_ratio,ratio_in,ratio_out,armed_g,in_g,out_g
+duck_splice_synth_snr-15,1,0,0.000,0.000,0.000,0.000,0.000,0.000
+duck_splice_real_snr-15,1,0,0.000,0.000,0.000,0.000,0.000,0.000

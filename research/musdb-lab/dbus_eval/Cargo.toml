@@ -8,5 +8,6 @@ hound = "3.5"
 rustfft = "6.1"
 libm = "0.2.8"
 sp314-dsp = { path = "../../../lineos/m1/sp314-dsp" }
+lineos-corpus = { path = "../../../lineos/m1/lineos-corpus" }
 
 [workspace]
