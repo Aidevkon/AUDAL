@@ -1004,6 +1004,7 @@ impl TwoPassEngine {
         sample_rate: f32,
         noise_floor_dbfs: Option<f32>,
         mut vad_observer: Option<&mut dyn FnMut(crate::analysis::vad_model::VadObservation)>,
+        phi1_enabled: bool,
         mut callback: F,
     ) -> Result<RenderMetadata, StreamError>
     where
@@ -1037,6 +1038,14 @@ impl TwoPassEngine {
         } else {
             None
         };
+        let mut phi1 = if phi1_enabled && vad_observer.is_some() {
+            Some((
+                crate::analysis::phi1_sensor::Phi2StreamingFrontend::new(),
+                crate::analysis::phi1_sensor::Phi2Pcen::new(),
+                crate::analysis::phi1_sensor::Phi2Sensor::new(),
+                std::collections::VecDeque::<f32>::new(),  // ουρά p
+            ))
+        } else { None };
         let mut vad_frame_index: u64 = 0;
         let noise_floor = noise_floor_dbfs.unwrap_or(-144.0);
 
@@ -1068,6 +1077,17 @@ impl TwoPassEngine {
                                 r.len(),
                                 "Stage (b) Contract: left and right must be aligned"
                             );
+                            // τρέφουμε τον Φ1 με ΤΟ ΙΔΙΟ m slice
+                            if let Some((fe, pcen, sensor, queue)) = phi1.as_mut() {
+                                for mel_pow in fe.push(m) {
+                                    let pcen_frame = pcen.process(&mel_pow);
+                                    if let Some(p) = sensor.push_frame(&pcen_frame) {
+                                        queue.push_back(p);
+                                    } else {
+                                        queue.push_back(f32::NAN);  // context γεμίζει
+                                    }
+                                }
+                            }
                             for f in ext.process_chunk(m, l, r) {
                                 let d = clf.process(&f, noise_floor);
                                 if let Some(obs) = vad_observer.as_deref_mut() {
@@ -1081,7 +1101,9 @@ impl TwoPassEngine {
                                         mid_side_ratio: f.mid_side_ratio,
                                         rms_delta_30ms: d.rms_delta_30ms,
                                         noise_floor_dbfs: noise_floor,
-                                        phi1_p: None,
+                                        phi1_p: phi1.as_mut()
+                                            .and_then(|(_, _, _, q)| q.pop_front())
+                                            .filter(|p| p.is_finite()),
                                     });
                                 }
                                 vad_frame_index += 1;
@@ -1995,6 +2017,7 @@ mod tests {
                 48000.0,
                 None,
                 None::<&mut dyn FnMut(_)>,
+                false,
                 |stems| {
                     captured_chunks.push((
                         stems.voice.clone(),
@@ -2115,6 +2138,7 @@ mod tests {
                 48000.0,
                 None,
                 None::<&mut dyn FnMut(_)>,
+                false,
                 |chunk| {
                     new_voice.extend_from_slice(&chunk.voice);
                 },
@@ -2184,6 +2208,7 @@ mod tests {
                 48000.0,
                 None,
                 None::<&mut dyn FnMut(_)>,
+                false,
                 |chunk| {
                     off_voice.extend_from_slice(&chunk.voice);
                 },
@@ -2219,6 +2244,7 @@ mod tests {
                 48000.0,
                 None,
                 Some(&mut observer),
+                false,
                 |chunk| {
                     on_voice.extend_from_slice(&chunk.voice);
                 },

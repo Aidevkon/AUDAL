@@ -422,6 +422,7 @@ pub fn run(
             settings.sample_rate as f32,
             settings.noise_floor_dbfs,
             vad_observer,
+            false,
             callback,
         )
         .map_err(|e| format!("TwoPassEngine error: {e}"))?;

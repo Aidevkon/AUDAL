@@ -310,6 +310,7 @@ mod tests {
                 1.0,
                 None,
                 None,
+                false,
                 |chunk| {
                     new_voice.extend_from_slice(&chunk.voice);
                     new_drums.extend_from_slice(&chunk.drums);
