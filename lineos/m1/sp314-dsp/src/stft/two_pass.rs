@@ -1081,6 +1081,7 @@ impl TwoPassEngine {
                                         mid_side_ratio: f.mid_side_ratio,
                                         rms_delta_30ms: d.rms_delta_30ms,
                                         noise_floor_dbfs: noise_floor,
+                                        phi1_p: None,
                                     });
                                 }
                                 vad_frame_index += 1;

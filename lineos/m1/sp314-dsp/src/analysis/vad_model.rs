@@ -167,6 +167,7 @@ pub struct VadObservation {
     pub mid_side_ratio: f32,
     pub rms_delta_30ms: f32,
     pub noise_floor_dbfs: f32,
+    pub phi1_p: Option<f32>,
 }
 
 pub struct VadDecision {

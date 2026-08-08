@@ -17,6 +17,7 @@ fn test_phi2_sensor_equivalence() {
     std::fs::create_dir_all("/tmp/phi2").unwrap();
 
     let output = Command::new("cargo")
+        .env("CARGO_TARGET_DIR", "/tmp/mvad_target")
         .args(&[
             "run", "--release", "--bin", "mvad_phi1", "--manifest-path",
             "../../../research/musdb-lab/dbus_eval/Cargo.toml", "--",

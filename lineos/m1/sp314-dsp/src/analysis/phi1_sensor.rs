@@ -165,6 +165,49 @@ impl Phi1MelFrontend {
         mel_matrix
     }
 
+
+
+
+    pub fn decimate_only(&self, mono_48k: &[f32]) -> Vec<f32> {
+        let orig_sr = 48000.0;
+        let fc = 7600.0 / orig_sr;
+        let m = 120;
+        let mut h = vec![0.0f32; m + 1];
+        let mut sum_h = 0.0;
+        for n in 0..=m {
+            let n_f32 = n as f32;
+            let m_f32 = m as f32;
+            let hamming = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * n_f32 / m_f32).cos();
+            let x_val = n_f32 - m_f32 / 2.0;
+            let sinc = if x_val.abs() < 1e-6 {
+                2.0 * fc
+            } else {
+                (2.0 * std::f32::consts::PI * fc * x_val).sin() / (std::f32::consts::PI * x_val)
+            };
+            h[n] = sinc * hamming;
+            sum_h += h[n];
+        }
+        for n in 0..=m {
+            h[n] /= sum_h;
+        }
+
+        let len = mono_48k.len();
+        let mut filtered = vec![0.0f32; len];
+        let half_m = m / 2;
+        for i in 0..len {
+            let mut acc = 0.0;
+            for j in 0..=m {
+                let mut src_idx = i as isize + j as isize - half_m as isize;
+                if src_idx < 0 { src_idx = 0; }
+                if src_idx >= len as isize { src_idx = len as isize - 1; }
+                acc += h[j] * mono_48k[src_idx as usize];
+            }
+            filtered[i] = acc;
+        }
+
+        filtered.into_iter().step_by(3).collect()
+    }
+
     pub fn compute_all_power(&mut self, mono_48k: &[f32]) -> Vec<[f32; 64]> {
         let orig_sr = 48000.0;
         let fc = 7600.0 / orig_sr;
@@ -256,6 +299,252 @@ impl Phi1MelFrontend {
         }
 
         mel_matrix
+    }
+}
+
+pub struct Phi2StreamingFrontend {
+    mel: Phi1MelFrontend,
+    pending_48k: Vec<f32>,
+    dec_buf: Vec<f32>,
+    dec_consumed: usize,
+    first: bool,
+    total_48k: usize,
+    carry_48k: usize,
+}
+
+impl Phi2StreamingFrontend {
+    pub fn new() -> Self {
+        Self {
+            mel: Phi1MelFrontend::new(),
+            pending_48k: Vec::new(),
+            dec_buf: Vec::new(),
+            dec_consumed: 0,
+            first: true,
+            total_48k: 0,
+            carry_48k: 0,
+        }
+    }
+
+    pub fn push(&mut self, new_48k: &[f32]) -> Vec<[f32; 64]> {
+        self.pending_48k.extend_from_slice(new_48k);
+        let mut frames = Vec::new();
+        
+        let m = 120;
+        if self.pending_48k.len() <= m {
+            return frames;
+        }
+
+        let len = self.pending_48k.len();
+        let valid_end = len.saturating_sub(60);
+        if valid_end <= self.carry_48k {
+            return frames;
+        }
+
+        let orig_sr = 48000.0;
+        let fc = 7600.0 / orig_sr;
+        let mut h = vec![0.0f32; m + 1];
+        let mut sum_h = 0.0;
+        for n in 0..=m {
+            let n_f32 = n as f32;
+            let m_f32 = m as f32;
+            let hamming = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * n_f32 / m_f32).cos();
+            let x_val = n_f32 - m_f32 / 2.0;
+            let sinc = if x_val.abs() < 1e-6 {
+                2.0 * fc
+            } else {
+                (2.0 * std::f32::consts::PI * fc * x_val).sin() / (std::f32::consts::PI * x_val)
+            };
+            h[n] = sinc * hamming;
+            sum_h += h[n];
+        }
+        for n in 0..=m {
+            h[n] /= sum_h;
+        }
+
+        let half_m = m / 2;
+        let out_n = valid_end - self.carry_48k;
+        let mut filtered = vec![0.0f32; out_n];
+        for (idx, i) in (self.carry_48k..valid_end).enumerate() {
+            let mut acc = 0.0;
+            for j in 0..=m {
+                let mut src_idx = i as isize + j as isize - half_m as isize;
+                if src_idx < 0 { src_idx = 0; }
+                if src_idx >= len as isize { src_idx = len as isize - 1; }
+                acc += h[j] * self.pending_48k[src_idx as usize];
+            }
+            filtered[idx] = acc;
+        }
+
+        let phase = (3 - (self.total_48k % 3)) % 3;
+        let x: Vec<f32> = filtered.iter().skip(phase).step_by(3).copied().collect();
+        
+        if self.first {
+            let mut padded = vec![0.0f32; 200 + x.len()];
+            padded[200..].copy_from_slice(&x);
+            for i in 0..200 {
+                if i + 1 < x.len() {
+                    padded[200 - 1 - i] = x[i + 1];
+                }
+            }
+            self.dec_buf.extend_from_slice(&padded);
+            self.first = false;
+        } else {
+            self.dec_buf.extend_from_slice(&x);
+        }
+
+        let keep = 120;
+        let consume;
+        if valid_end > keep {
+            let drop = valid_end - keep;
+            consume = drop;
+            self.pending_48k.drain(0..drop);
+            self.carry_48k = keep;
+        } else {
+            consume = 0;
+            self.carry_48k = valid_end;
+        }
+
+        self.total_48k += out_n;
+        
+        let n_fft = 400;
+        let hop = 160;
+        let n_freqs = n_fft / 2 + 1;
+        let fft = self.mel.planner.plan_fft_forward(n_fft);
+
+        loop {
+            let start = self.dec_consumed * hop;
+            if start + n_fft > self.dec_buf.len() {
+                break;
+            }
+
+            let frame = &self.dec_buf[start..start + n_fft];
+            let mut buffer: Vec<rustfft::num_complex::Complex<f32>> = frame.iter().zip(self.mel.w.iter())
+                .map(|(&xv, &win)| rustfft::num_complex::Complex { re: xv * win, im: 0.0 })
+                .collect();
+            
+            fft.process(&mut buffer);
+
+            let mut power = vec![0.0f32; n_freqs];
+            for i in 0..n_freqs {
+                power[i] = buffer[i].re * buffer[i].re + buffer[i].im * buffer[i].im;
+            }
+
+            let mut mel_frame = [0.0f32; 64];
+            for m_idx in 0..64 {
+                let mut energy = 0.0f32;
+                for f in 0..n_freqs {
+                    energy += self.mel.fb[f][m_idx] * power[f];
+                }
+                mel_frame[m_idx] = energy;
+            }
+            frames.push(mel_frame);
+            self.dec_consumed += 1;
+        }
+
+        let consume_dec = self.dec_consumed * hop;
+        if consume_dec > 0 {
+            self.dec_buf.drain(0..consume_dec);
+            self.dec_consumed = 0;
+        }
+
+        frames
+    }
+
+    pub fn finish(&mut self) -> Vec<[f32; 64]> {
+        let mut frames = Vec::new();
+        let m = 120;
+        
+        let len = self.pending_48k.len();
+        if len == 0 {
+            return frames;
+        }
+
+        let orig_sr = 48000.0;
+        let fc = 7600.0 / orig_sr;
+        let mut h = vec![0.0f32; m + 1];
+        let mut sum_h = 0.0;
+        for n in 0..=m {
+            let n_f32 = n as f32;
+            let m_f32 = m as f32;
+            let hamming = 0.54 - 0.46 * (2.0 * std::f32::consts::PI * n_f32 / m_f32).cos();
+            let x_val = n_f32 - m_f32 / 2.0;
+            let sinc = if x_val.abs() < 1e-6 {
+                2.0 * fc
+            } else {
+                (2.0 * std::f32::consts::PI * fc * x_val).sin() / (std::f32::consts::PI * x_val)
+            };
+            h[n] = sinc * hamming;
+            sum_h += h[n];
+        }
+        for n in 0..=m {
+            h[n] /= sum_h;
+        }
+
+        let half_m = m / 2;
+        let out_n = len.saturating_sub(self.carry_48k);
+        let mut filtered = vec![0.0f32; out_n];
+        for (idx, i) in (self.carry_48k..len).enumerate() {
+            let mut acc = 0.0;
+            for j in 0..=m {
+                let mut src_idx = i as isize + j as isize - half_m as isize;
+                if src_idx < 0 { src_idx = 0; }
+                if src_idx >= len as isize { src_idx = len as isize - 1; }
+                acc += h[j] * self.pending_48k[src_idx as usize];
+            }
+            filtered[idx] = acc;
+        }
+
+        let phase = (3 - (self.total_48k % 3)) % 3;
+        let x: Vec<f32> = filtered.iter().skip(phase).step_by(3).copied().collect();
+        
+        self.dec_buf.extend_from_slice(&x);
+        
+        let n = self.dec_buf.len();
+        for i in 0..200 {
+            if n >= 2 + i {
+                let v = self.dec_buf[n - 2 - i];
+                self.dec_buf.push(v);
+            }
+        }
+        
+        self.pending_48k.clear();
+        
+        let n_fft = 400;
+        let hop = 160;
+        let n_freqs = n_fft / 2 + 1;
+        let fft = self.mel.planner.plan_fft_forward(n_fft);
+
+        loop {
+            let start = self.dec_consumed * hop;
+            if start + n_fft > self.dec_buf.len() {
+                break;
+            }
+
+            let frame = &self.dec_buf[start..start + n_fft];
+            let mut buffer: Vec<rustfft::num_complex::Complex<f32>> = frame.iter().zip(self.mel.w.iter())
+                .map(|(&xv, &win)| rustfft::num_complex::Complex { re: xv * win, im: 0.0 })
+                .collect();
+            
+            fft.process(&mut buffer);
+
+            let mut power = vec![0.0f32; n_freqs];
+            for i in 0..n_freqs {
+                power[i] = buffer[i].re * buffer[i].re + buffer[i].im * buffer[i].im;
+            }
+
+            let mut mel_frame = [0.0f32; 64];
+            for m_idx in 0..64 {
+                let mut energy = 0.0f32;
+                for f in 0..n_freqs {
+                    energy += self.mel.fb[f][m_idx] * power[f];
+                }
+                mel_frame[m_idx] = energy;
+            }
+            frames.push(mel_frame);
+            self.dec_consumed += 1;
+        }
+
+        frames
     }
 }
 
