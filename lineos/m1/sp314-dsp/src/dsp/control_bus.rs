@@ -4,6 +4,14 @@ use std::sync::Arc;
 // Duck depth: hardcoded until the persona/settings layer lands (W3.b+).
 const DUCK_FLOOR_DB: f32 = -12.0;
 
+/// Κάτω από αυτό, p θεωρείται "καθόλου ομιλία" και το
+/// ducking είναι ΑΚΡΙΒΩΣ μηδέν. Μετρημένο (Phi-1.f,
+/// 5523775): σε καθαρή μουσική, 272 frames <0.99 αντί
+/// για 2868. Κόστος στη φωνή: 0.6dB από 10.1.
+/// Δοκιμάστηκε soft knee (logistic + shifted logistic)
+/// και έχασε — η καμπύλη ανεβαίνει ΠΡΙΝ το κατώφλι.
+pub const DUCK_DEADZONE: f32 = 0.30;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ControlFrame {
     pub p_speech: f32,    // 0..=1, from the micro-VAD
@@ -81,7 +89,12 @@ impl Ducker {
 
         let floor = 10.0f32.powf(DUCK_FLOOR_DB / 20.0);
         let p_speech_clamped = p_speech.clamp(0.0, 1.0);
-        let target = 1.0 - p_speech_clamped * (1.0 - floor);
+        let p_gated = if p_speech_clamped < DUCK_DEADZONE {
+            0.0
+        } else {
+            (p_speech_clamped - DUCK_DEADZONE) / (1.0 - DUCK_DEADZONE)
+        };
+        let target = 1.0 - p_gated * (1.0 - floor);
 
         if target < self.duck_gain {
             self.duck_gain = target + self.attack_alpha * (self.duck_gain - target);

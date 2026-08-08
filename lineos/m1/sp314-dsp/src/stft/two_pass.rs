@@ -34,7 +34,7 @@ const COLLISION_SMOOTHING_ALPHA: f32 = 0.005;
 /// DSP classifier. Μετρημένο: median FP στα beds 0.019 vs
 /// 0.727 (Phi-1.e, 8caa514). false μέχρι να περάσει τα
 /// gates με ήχο.
-const USE_NEURAL_VAD: bool = false;
+const USE_NEURAL_VAD: bool = true;
 
 /// Per-stem MFCC fingerprints computed during scout().
 /// Captures the timbral identity of each stem BEFORE render.
