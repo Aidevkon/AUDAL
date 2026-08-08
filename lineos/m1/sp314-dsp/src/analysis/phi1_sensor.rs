@@ -4,6 +4,12 @@ use std::f32::consts::PI;
 pub const PHI1_FRAME_SAMPLES_16K: usize = 160;
 pub const PHI1_CONTEXT_FRAMES: usize = 51;
 
+pub const PHI2_PCEN_S: f32 = 0.025;
+pub const PHI2_PCEN_ALPHA: f32 = 0.98;
+pub const PHI2_PCEN_DELTA: f32 = 2.0;
+pub const PHI2_PCEN_R: f32 = 0.5;
+pub const PHI2_PCEN_EPS: f32 = 1e-6;
+
 pub struct Phi1Norm {
     pub mean: f32,
     pub std: f32,
@@ -151,6 +157,99 @@ impl Phi1MelFrontend {
                     energy += self.fb[f][m_idx] * power[f];
                 }
                 mel_frame[m_idx] = (energy + 1e-9).ln();
+            }
+            mel_matrix.push(mel_frame);
+            k += 1;
+        }
+
+        mel_matrix
+    }
+
+    pub fn compute_all_power(&mut self, mono_48k: &[f32]) -> Vec<[f32; 64]> {
+        let orig_sr = 48000.0;
+        let fc = 7600.0 / orig_sr;
+        let m = 120;
+        let mut h = vec![0.0f32; m + 1];
+        let mut sum_h = 0.0;
+        for n in 0..=m {
+            let n_f32 = n as f32;
+            let m_f32 = m as f32;
+            let hamming = 0.54 - 0.46 * (2.0 * PI * n_f32 / m_f32).cos();
+            let x_val = n_f32 - m_f32 / 2.0;
+            let sinc = if x_val.abs() < 1e-6 {
+                2.0 * fc
+            } else {
+                (2.0 * PI * fc * x_val).sin() / (PI * x_val)
+            };
+            h[n] = sinc * hamming;
+            sum_h += h[n];
+        }
+        for n in 0..=m {
+            h[n] /= sum_h;
+        }
+
+        let len = mono_48k.len();
+        let mut filtered = vec![0.0f32; len];
+        let half_m = m / 2;
+        for i in 0..len {
+            let mut acc = 0.0;
+            for j in 0..=m {
+                let mut src_idx = i as isize + j as isize - half_m as isize;
+                if src_idx < 0 { src_idx = 0; }
+                if src_idx >= len as isize { src_idx = len as isize - 1; }
+                acc += h[j] * mono_48k[src_idx as usize];
+            }
+            filtered[i] = acc;
+        }
+
+        let x: Vec<f32> = filtered.into_iter().step_by(3).collect();
+
+        let n = x.len();
+        let pad = 200;
+        let padded_len = pad + n + pad;
+        let mut padded = vec![0.0f32; padded_len];
+        padded[pad..pad + n].copy_from_slice(&x);
+        for i in 0..pad {
+            if i + 1 < n {
+                padded[pad - 1 - i] = x[i + 1];
+            }
+            if n >= 2 + i {
+                padded[pad + n + i] = x[n - 2 - i];
+            }
+        }
+
+        let n_fft = 400;
+        let hop = 160;
+        let n_freqs = n_fft / 2 + 1;
+        let fft = self.planner.plan_fft_forward(n_fft);
+
+        let mut mel_matrix = Vec::new();
+        let mut k = 0;
+        loop {
+            let start = k * hop;
+            if start + n_fft > padded_len {
+                break;
+            }
+
+            let frame = &padded[start..start + n_fft];
+            let mut buffer: Vec<Complex<f32>> = frame.iter().zip(self.w.iter())
+                .map(|(&xv, &win)| Complex { re: xv * win, im: 0.0 })
+                .collect();
+            
+            fft.process(&mut buffer);
+
+            let mut power = vec![0.0f32; n_freqs];
+            for i in 0..n_freqs {
+                power[i] = buffer[i].re * buffer[i].re + buffer[i].im * buffer[i].im;
+            }
+
+            let mut mel_frame = [0.0f32; 64];
+            for m_idx in 0..64 {
+                let mut energy = 0.0f32;
+                for f in 0..n_freqs {
+                    energy += self.fb[f][m_idx] * power[f];
+                }
+                mel_frame[m_idx] = energy;
             }
             mel_matrix.push(mel_frame);
             k += 1;
@@ -343,5 +442,181 @@ impl Phi1Sensor {
         
         let p = 1.0 / (1.0 + (-sum_val).exp());
         Some(p)
+    }
+}
+
+pub struct Phi2Pcen {
+    m: [f32; 64],
+    initialized: bool,
+}
+
+impl Phi2Pcen {
+    pub fn new() -> Self {
+        Self {
+            m: [0.0; 64],
+            initialized: false,
+        }
+    }
+
+    pub fn process(&mut self, mel_pow: &[f32; 64]) -> [f32; 64] {
+        let mut out = [0.0f32; 64];
+        if !self.initialized {
+            for m in 0..64 {
+                self.m[m] = mel_pow[m];
+            }
+            self.initialized = true;
+        }
+        for m in 0..64 {
+            self.m[m] = (1.0 - PHI2_PCEN_S) * self.m[m] + PHI2_PCEN_S * mel_pow[m];
+            out[m] = (mel_pow[m] / (PHI2_PCEN_EPS + self.m[m]).powf(PHI2_PCEN_ALPHA) + PHI2_PCEN_DELTA).powf(PHI2_PCEN_R) - PHI2_PCEN_DELTA.powf(PHI2_PCEN_R);
+        }
+        out
+    }
+}
+
+pub struct Phi2Sensor {
+    ring_buf: Vec<[f32; 64]>,
+    count: usize,
+    
+    conv1_w: Vec<Vec<Vec<f32>>>,
+    conv1_b: Vec<f32>,
+    conv2_w: Vec<Vec<Vec<f32>>>,
+    conv2_b: Vec<f32>,
+    fc1_w: Vec<Vec<f32>>,
+    fc1_b: Vec<f32>,
+    fc2_w: Vec<Vec<f32>>,
+    fc2_b: f32,
+}
+
+impl Phi2Sensor {
+    pub fn new() -> Self {
+        let model_bytes = include_bytes!("../../assets/phi2_pcen.bin");
+        if model_bytes.len() != 243332 {
+            panic!("Invalid model size: {} bytes", model_bytes.len());
+        }
+
+        let mut offset = 0;
+        
+        let mut conv1_w = vec![vec![vec![0.0f32; 11]; 64]; 48];
+        for o in 0..48 {
+            for c in 0..64 {
+                for k in 0..11 {
+                    conv1_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
+                }
+            }
+        }
+        let mut conv1_b = vec![0.0f32; 48];
+        for o in 0..48 {
+            conv1_b[o] = read_f32_le(model_bytes, &mut offset);
+        }
+
+        let mut conv2_w = vec![vec![vec![0.0f32; 11]; 48]; 48];
+        for o in 0..48 {
+            for c in 0..48 {
+                for k in 0..11 {
+                    conv2_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
+                }
+            }
+        }
+        let mut conv2_b = vec![0.0f32; 48];
+        for o in 0..48 {
+            conv2_b[o] = read_f32_le(model_bytes, &mut offset);
+        }
+
+        let mut fc1_w = vec![vec![0.0f32; 48]; 32];
+        for o in 0..32 {
+            for c in 0..48 {
+                fc1_w[o][c] = read_f32_le(model_bytes, &mut offset);
+            }
+        }
+        let mut fc1_b = vec![0.0f32; 32];
+        for o in 0..32 {
+            fc1_b[o] = read_f32_le(model_bytes, &mut offset);
+        }
+
+        let mut fc2_w = vec![vec![0.0f32; 32]; 1];
+        for c in 0..32 {
+            fc2_w[0][c] = read_f32_le(model_bytes, &mut offset);
+        }
+        let fc2_b = read_f32_le(model_bytes, &mut offset);
+
+        Self {
+            ring_buf: Vec::with_capacity(PHI1_CONTEXT_FRAMES),
+            count: 0,
+            conv1_w,
+            conv1_b,
+            conv2_w,
+            conv2_b,
+            fc1_w,
+            fc1_b,
+            fc2_w,
+            fc2_b,
+        }
+    }
+
+    pub fn push_frame(&mut self, pcen: &[f32; 64]) -> Option<f32> {
+        if self.ring_buf.len() < PHI1_CONTEXT_FRAMES {
+            self.ring_buf.push(*pcen);
+        } else {
+            let idx = self.count % PHI1_CONTEXT_FRAMES;
+            self.ring_buf[idx] = *pcen;
+        }
+        self.count += 1;
+
+        if self.count >= PHI1_CONTEXT_FRAMES {
+            let mut window = vec![vec![0.0f32; PHI1_CONTEXT_FRAMES]; 64];
+            for t in 0..PHI1_CONTEXT_FRAMES {
+                let physical_idx = (self.count - PHI1_CONTEXT_FRAMES + t) % PHI1_CONTEXT_FRAMES;
+                for c in 0..64 {
+                    window[c][t] = self.ring_buf[physical_idx][c];
+                }
+            }
+
+            // Conv1
+            let mut y1 = vec![vec![0.0f32; 48]; 41];
+            for t in 0..41 {
+                for o in 0..48 {
+                    let mut acc = self.conv1_b[o];
+                    for c in 0..64 {
+                        for k in 0..11 {
+                            acc += window[c][t + k] * self.conv1_w[o][c][k];
+                        }
+                    }
+                    y1[t][o] = acc.tanh();
+                }
+            }
+
+            // Conv2
+            let mut y2 = vec![0.0f32; 48];
+            for o in 0..48 {
+                let mut acc = self.conv2_b[o];
+                for c in 0..48 {
+                    for k in 0..11 {
+                        acc += y1[k * 4][c] * self.conv2_w[o][c][k];
+                    }
+                }
+                y2[o] = acc.tanh();
+            }
+
+            // FC1
+            let mut fc1 = vec![0.0f32; 32];
+            for o in 0..32 {
+                let mut acc = self.fc1_b[o];
+                for c in 0..48 {
+                    acc += y2[c] * self.fc1_w[o][c];
+                }
+                fc1[o] = acc.tanh();
+            }
+
+            // FC2
+            let mut acc = self.fc2_b;
+            for c in 0..32 {
+                acc += fc1[c] * self.fc2_w[0][c];
+            }
+            let p = 1.0 / (1.0 + (-acc).exp());
+            Some(p)
+        } else {
+            None
+        }
     }
 }
