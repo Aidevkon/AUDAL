@@ -1,0 +1,49 @@
+{
+  "arch": "conv48k11d1-conv48k11d4-fc32-fc1",
+  "input": "pcen64x51",
+  "norm": "pcen_s0.025_a0.98_d2.0_r0.5",
+  "layout": [
+    "conv1.weight",
+    "conv1.bias",
+    "conv2.weight",
+    "conv2.bias",
+    "fc1.weight",
+    "fc1.bias",
+    "fc2.weight",
+    "fc2.bias"
+  ],
+  "shapes": {
+    "conv1.weight": [
+      48,
+      64,
+      11
+    ],
+    "conv1.bias": [
+      48
+    ],
+    "conv2.weight": [
+      48,
+      48,
+      11
+    ],
+    "conv2.bias": [
+      48
+    ],
+    "fc1.weight": [
+      32,
+      48
+    ],
+    "fc1.bias": [
+      32
+    ],
+    "fc2.weight": [
+      1,
+      32
+    ],
+    "fc2.bias": [
+      1
+    ]
+  },
+  "sha256": "81841e5ee3186ff17021e6977835b2164dbcd48f997933a74f158a7d34e81885",
+  "dataset": "phi1_manifest.csv@4a553b2a7be80dbb28ff9baa9c3c20a58afe4de7"
+}

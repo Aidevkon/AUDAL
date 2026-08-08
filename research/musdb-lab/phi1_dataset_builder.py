@@ -23,8 +23,8 @@ class TeeLogger:
         self.log.flush()
 
 def setup_logger():
-    os.makedirs("/tmp/phi1", exist_ok=True)
-    sys.stdout = TeeLogger("/tmp/phi1/builder.log")
+    os.makedirs("/tmp/phi2", exist_ok=True)
+    sys.stdout = TeeLogger("/tmp/phi2/builder.log")
     sys.stderr = sys.stdout
 
 SPEECH_BLOCKLIST = {"422", "2902", "5338", "2277"}
@@ -146,7 +146,8 @@ def get_mel(audio):
     )
     mel_spec = mel_transform(wav)
     log_mel = torch.log(mel_spec + 1e-9).squeeze(0)
-    return log_mel.numpy()
+    mel_spec = mel_spec.squeeze(0)
+    return log_mel.numpy(), mel_spec.numpy()
 
 def get_labels(audio, model):
     import silero_vad
@@ -176,9 +177,9 @@ def main():
     print("Loading Silero VAD...")
     model = silero_vad.load_silero_vad()
     
-    out_dir = "/tmp/phi1/dataset"
+    out_dir = "/tmp/phi2/dataset"
     os.makedirs(out_dir, exist_ok=True)
-    manifest_path = "/tmp/phi1/manifest.csv"
+    manifest_path = "/tmp/phi2/manifest.csv"
     
     with open(manifest_path, "w", newline='') as f:
         writer = csv.writer(f)
@@ -263,12 +264,13 @@ def main():
                         
                         audio_for_mel = np.clip(sp_audio + mu_audio, -1.0, 1.0)
                         
-                    mel = get_mel(audio_for_mel)
-                    min_len = min(mel.shape[1], labels.shape[0])
-                    mel = mel[:, :min_len]
+                    mel_log, mel_pow = get_mel(audio_for_mel)
+                    min_len = min(mel_log.shape[1], labels.shape[0])
+                    mel_log = mel_log[:, :min_len]
+                    mel_pow = mel_pow[:, :min_len]
                     labels = labels[:min_len]
                     
-                    np.save(npy_path, {"mel": mel, "labels": labels})
+                    np.save(npy_path, {"mel_log": mel_log, "mel_pow": mel_pow, "labels": labels})
                     
                     writer.writerow([sample_id, split_name, kind, spk, sp_f, tr_id, lic, snr, npy_path])
                 except Exception as e:

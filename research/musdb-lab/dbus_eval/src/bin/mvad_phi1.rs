@@ -34,12 +34,18 @@ fn main() {
     let mut window_end_s = -1.0f32;
     let mut dump_csv: Option<String> = None;
     let mut norm_mode = "chunk".to_string();
+    let mut weights_path: Option<String> = None;
+    let mut frontend = "logmel".to_string();
 
     for arg in args.iter().skip(2) {
         if arg.starts_with("--dump=") {
             dump_csv = Some(arg[7..].to_string());
         } else if arg.starts_with("--norm=") {
             norm_mode = arg[7..].to_string();
+        } else if arg.starts_with("--weights=") {
+            weights_path = Some(arg[10..].to_string());
+        } else if arg.starts_with("--frontend=") {
+            frontend = arg[11..].to_string();
         } else if window_start_s < 0.0 {
             window_start_s = arg.parse().unwrap();
         } else if window_end_s < 0.0 {
@@ -47,7 +53,12 @@ fn main() {
         }
     }
 
-    let model_bytes = include_bytes!("../../../assets/phi1_v3.bin");
+    let embedded_bytes = include_bytes!("../../../assets/phi1_v3.bin").to_vec();
+    let model_bytes = if let Some(path) = &weights_path {
+        std::fs::read(path).expect("Failed to read weights file")
+    } else {
+        embedded_bytes
+    };
     if model_bytes.len() != 243332 {
         panic!("Invalid model size: {} bytes", model_bytes.len());
     }
@@ -59,13 +70,13 @@ fn main() {
     for o in 0..48 {
         for c in 0..64 {
             for k in 0..11 {
-                conv1_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
+                conv1_w[o][c][k] = read_f32_le(&model_bytes, &mut offset);
             }
         }
     }
     let mut conv1_b = vec![0.0f32; 48];
     for o in 0..48 {
-        conv1_b[o] = read_f32_le(model_bytes, &mut offset);
+        conv1_b[o] = read_f32_le(&model_bytes, &mut offset);
     }
 
     // conv2: 48, 48, 11
@@ -73,33 +84,33 @@ fn main() {
     for o in 0..48 {
         for c in 0..48 {
             for k in 0..11 {
-                conv2_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
+                conv2_w[o][c][k] = read_f32_le(&model_bytes, &mut offset);
             }
         }
     }
     let mut conv2_b = vec![0.0f32; 48];
     for o in 0..48 {
-        conv2_b[o] = read_f32_le(model_bytes, &mut offset);
+        conv2_b[o] = read_f32_le(&model_bytes, &mut offset);
     }
 
     // fc1: 32, 48
     let mut fc1_w = vec![vec![0.0f32; 48]; 32];
     for o in 0..32 {
         for c in 0..48 {
-            fc1_w[o][c] = read_f32_le(model_bytes, &mut offset);
+            fc1_w[o][c] = read_f32_le(&model_bytes, &mut offset);
         }
     }
     let mut fc1_b = vec![0.0f32; 32];
     for o in 0..32 {
-        fc1_b[o] = read_f32_le(model_bytes, &mut offset);
+        fc1_b[o] = read_f32_le(&model_bytes, &mut offset);
     }
 
     // fc2: 1, 32
     let mut fc2_w = vec![vec![0.0f32; 32]; 1];
     for c in 0..32 {
-        fc2_w[0][c] = read_f32_le(model_bytes, &mut offset);
+        fc2_w[0][c] = read_f32_le(&model_bytes, &mut offset);
     }
-    let fc2_b = read_f32_le(model_bytes, &mut offset);
+    let fc2_b = read_f32_le(&model_bytes, &mut offset);
 
     // Read audio
     let mut reader = WavReader::open(input_path).unwrap();
@@ -197,6 +208,10 @@ fn main() {
             dump_csv = Some(arg[7..].to_string());
         } else if arg.starts_with("--norm=") {
             norm_mode = arg[7..].to_string();
+        } else if arg.starts_with("--weights=") {
+            weights_path = Some(arg[10..].to_string());
+        } else if arg.starts_with("--frontend=") {
+            frontend = arg[11..].to_string();
         } else if window_start_s < 0.0 {
             window_start_s = arg.parse().unwrap();
         } else if window_end_s < 0.0 {
@@ -301,7 +316,11 @@ fn main() {
                 for f in 0..n_freqs {
                     energy += fb[f][m] * power[f];
                 }
-                mel_frame[m] = (energy + 1e-9).ln();
+                if frontend == "logmel" {
+                    mel_frame[m] = (energy + 1e-9).ln();
+                } else {
+                    mel_frame[m] = energy;
+                }
             }
             mel_matrix.push(mel_frame);
             k += 1;
@@ -359,6 +378,8 @@ fn main() {
 
     start_idx = 0;
     let mut prev_mels: Vec<Vec<f32>> = Vec::new();
+    let mut pcen_m = vec![0.0f32; 64];
+    let mut pcen_initialized = false;
     for mut mel_matrix in all_chunks_mels {
         let num_frames = mel_matrix.len();
         if num_frames == 0 {
@@ -371,40 +392,56 @@ fn main() {
         let mut std = 1.0;
 
 
-        if norm_mode == "chunk" || norm_mode == "chunkcont" || (norm_mode == "warmup" && chunk_idx == 0) {
-            let mut sum = 0.0;
-            let mut count = 0;
-            for frame in &mel_matrix {
-                for &val in frame { sum += val; count += 1; }
+        if frontend == "pcen" {
+            for frame in &mut mel_matrix {
+                if !pcen_initialized {
+                    for m in 0..64 {
+                        pcen_m[m] = frame[m];
+                    }
+                    pcen_initialized = true;
+                }
+                for m in 0..64 {
+                    pcen_m[m] = (1.0 - 0.025) * pcen_m[m] + 0.025 * frame[m];
+                    let out = (frame[m] / (1e-6 + pcen_m[m]).powf(0.98) + 2.0).powf(0.5) - 2.0f32.powf(0.5);
+                    frame[m] = out;
+                }
             }
-            mean = sum / count as f32;
-            let mut sum_sq = 0.0;
-            for frame in &mel_matrix {
-                for &val in frame { let d = val - mean; sum_sq += d * d; }
-            }
-            std = (sum_sq / (count as f32 - 1.0)).sqrt();
+        } else {
+            if norm_mode == "chunk" || norm_mode == "chunkcont" || (norm_mode == "warmup" && chunk_idx == 0) {
+                let mut sum = 0.0;
+                let mut count = 0;
+                for frame in &mel_matrix {
+                    for &val in frame { sum += val; count += 1; }
+                }
+                mean = sum / count as f32;
+                let mut sum_sq = 0.0;
+                for frame in &mel_matrix {
+                    for &val in frame { let d = val - mean; sum_sq += d * d; }
+                }
+                std = (sum_sq / (count as f32 - 1.0)).sqrt();
 
-            if norm_mode == "warmup" && chunk_idx == 0 {
-                saved_mean = mean;
-                saved_std = std;
+                if norm_mode == "warmup" && chunk_idx == 0 {
+                    saved_mean = mean;
+                    saved_std = std;
+                }
+            } else if norm_mode == "warmup" {
+                mean = saved_mean;
+                std = saved_std;
+            } else if norm_mode == "global" {
+                mean = global_mean;
+                std = global_std;
             }
-        } else if norm_mode == "warmup" {
-            mean = saved_mean;
-            std = saved_std;
-        } else if norm_mode == "global" {
-            mean = global_mean;
-            std = global_std;
-        }
 
-        for frame in &mut mel_matrix {
-            for val in frame.iter_mut() {
-                *val = (*val - mean) / (std + 1e-5);
+            for frame in &mut mel_matrix {
+                for val in frame.iter_mut() {
+                    *val = (*val - mean) / (std + 1e-5);
+                }
             }
         }
 
         // Inference (from frame 50 onwards)
         let chunk_start_s = start_idx as f32 / 16000.0;
-        let inference_start = if norm_mode == "chunkcont" && chunk_idx > 0 { 0 } else { 50 };
+        let inference_start = if (norm_mode == "chunkcont" || frontend == "pcen") && chunk_idx > 0 { 0 } else { 50 };
         for i in inference_start..num_frames {
             // window = 64 x 51
             // mel_matrix shape: [num_frames][64]
@@ -478,7 +515,7 @@ fn main() {
                 writeln!(w, "{:.6},{:.6}", frame_time, p).unwrap();
             }
         }
-        if norm_mode == "chunkcont" {
+        if norm_mode == "chunkcont" || frontend == "pcen" {
             let take = 50.min(mel_matrix.len());
             prev_mels = mel_matrix[mel_matrix.len() - take..].to_vec();
         }
