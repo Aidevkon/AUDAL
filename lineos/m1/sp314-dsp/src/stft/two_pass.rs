@@ -30,6 +30,12 @@ const COLLISION_BASS_RMS_THRESHOLD_DB: f32 = -40.0;
 const COLLISION_DUCKING_GAIN: f32 = 0.707;
 const COLLISION_SMOOTHING_ALPHA: f32 = 0.005;
 
+/// Ο Φ2 (PCEN neural VAD) οδηγεί το ducking αντί για τον
+/// DSP classifier. Μετρημένο: median FP στα beds 0.019 vs
+/// 0.727 (Phi-1.e, 8caa514). false μέχρι να περάσει τα
+/// gates με ήχο.
+const USE_NEURAL_VAD: bool = false;
+
 /// Per-stem MFCC fingerprints computed during scout().
 /// Captures the timbral identity of each stem BEFORE render.
 /// Used by AutoTuningController to set adaptive ducking_gain.
@@ -1038,7 +1044,8 @@ impl TwoPassEngine {
         } else {
             None
         };
-        let mut phi1 = if phi1_enabled && vad_observer.is_some() {
+        let phi1_active = phi1_enabled || USE_NEURAL_VAD;
+        let mut phi1 = if phi1_active && vad_observer.is_some() {
             Some((
                 crate::analysis::phi1_sensor::Phi2StreamingFrontend::new(),
                 crate::analysis::phi1_sensor::Phi2Pcen::new(),
@@ -1090,10 +1097,17 @@ impl TwoPassEngine {
                             }
                             for f in ext.process_chunk(m, l, r) {
                                 let d = clf.process(&f, noise_floor);
+                                let phi1_p_value = phi1.as_mut()
+                                    .and_then(|(_, _, _, q)| q.pop_front())
+                                    .filter(|p| p.is_finite());
                                 if let Some(obs) = vad_observer.as_deref_mut() {
                                     obs(crate::analysis::vad_model::VadObservation {
                                         frame_index: vad_frame_index,
-                                        posterior: d.posterior,
+                                        posterior: if USE_NEURAL_VAD {
+                                            phi1_p_value.unwrap_or(d.posterior)
+                                        } else {
+                                            d.posterior
+                                        },
                                         is_speech: d.is_speech,
                                         duck_gain: d.duck_gain,
                                         rms_db: f.rms_db,
@@ -1101,9 +1115,7 @@ impl TwoPassEngine {
                                         mid_side_ratio: f.mid_side_ratio,
                                         rms_delta_30ms: d.rms_delta_30ms,
                                         noise_floor_dbfs: noise_floor,
-                                        phi1_p: phi1.as_mut()
-                                            .and_then(|(_, _, _, q)| q.pop_front())
-                                            .filter(|p| p.is_finite()),
+                                        phi1_p: phi1_p_value,
                                     });
                                 }
                                 vad_frame_index += 1;
