@@ -269,6 +269,8 @@ fn main() {
         let mut nmfd8_vocals_cplx = full_cplx.clone();
         let mut nmfd8_bass_cplx = full_cplx.clone();
         let mut nmfd8_other_cplx = full_cplx.clone();
+        let mut nmfd8_harm_cplx = full_cplx.clone();
+        let mut nmfd8_amb_cplx = full_cplx.clone();
         
         for f in 0..std::cmp::min(full_cplx.len(), total_frames_processed) {
             for b in 0..N_BINS {
@@ -285,6 +287,14 @@ fn main() {
                 // other (harmonics + ambience)
                 let o_m = (b_masks[scout.nmfd_harmonics_idx][f][b] + b_masks[scout.nmfd_ambience_idx][f][b]).min(1.0);
                 nmfd8_other_cplx[f][b].re *= o_m; nmfd8_other_cplx[f][b].im *= o_m;
+                
+                let h_m = b_masks[scout.nmfd_harmonics_idx][f][b].min(1.0);
+                nmfd8_harm_cplx[f][b].re *= h_m;
+                nmfd8_harm_cplx[f][b].im *= h_m;
+                
+                let a_m = b_masks[scout.nmfd_ambience_idx][f][b].min(1.0);
+                nmfd8_amb_cplx[f][b].re *= a_m;
+                nmfd8_amb_cplx[f][b].im *= a_m;
             }
         }
         
@@ -299,6 +309,14 @@ fn main() {
         let mut stft = StftEngine::new();
         let out_o = stft.inverse(&nmfd8_other_cplx, signal.len());
         write_audio(&format!("{}/other.wav", nmfd8_dir), &out_o, actual_sample_rate);
+        
+        let mut stft = StftEngine::new();
+        let out_h = stft.inverse(&nmfd8_harm_cplx, signal.len());
+        write_audio(&format!("{}/harmonics.wav", nmfd8_dir), &out_h, actual_sample_rate);
+        
+        let mut stft = StftEngine::new();
+        let out_a = stft.inverse(&nmfd8_amb_cplx, signal.len());
+        write_audio(&format!("{}/ambience.wav", nmfd8_dir), &out_a, actual_sample_rate);
 
     } else {
         // Original behavior

@@ -70,6 +70,14 @@ impl GlueChain {
         self.d = 0.7 * amt;
     }
 
+    pub fn set_drive(&mut self, d: f32) {
+        self.d = d;
+    }
+
+    pub fn set_width(&mut self, w: f32) {
+        self.w = w;
+    }
+
     pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {
         for (l, r) in left.iter_mut().zip(right.iter_mut()) {
             // Apply cleanup filters to the FULL signal (L and R)
