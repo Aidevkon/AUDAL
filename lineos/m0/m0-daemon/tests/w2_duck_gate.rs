@@ -123,8 +123,37 @@ fn w2_duck_gate_synth() {
     assert!(generated_csv.exists(), "CSV not found!");
     fs::copy(&generated_csv, csv_dest).unwrap();
     let csv_content = fs::read_to_string(csv_dest).unwrap();
-    println!("CSV Lines: {}", csv_content.lines().count());
-    println!("Written CSV: {}", csv_dest);
+    // Ο φρουρός του αισθητήρα. Το CSV γράφει το posterior
+    // που τρέφει τον Ducker (USE_NEURAL_VAD=true → είναι ο Φ2).
+    // Το fixture είναι splice -15dB SNR: ΕΧΕΙ φωνή σε τμήματα
+    // και μουσική στα υπόλοιπα, άρα το posterior ΠΡΕΠΕΙ να
+    // κινείται. Τα όρια είναι χαλαρά σκόπιμα — πιάνουν
+    // "ο αισθητήρας σταμάτησε", όχι tuning.
+    let posteriors: Vec<f32> = csv_content
+        .lines()
+        .skip(1)
+        .filter_map(|l| l.split(',').nth(2))
+        .filter_map(|s| s.parse::<f32>().ok())
+        .collect();
+    assert!(posteriors.len() > 1000,
+        "expected a posterior per frame, got {}", posteriors.len());
+
+    let above_05 = posteriors.iter().filter(|&&p| p > 0.5).count();
+    let below_01 = posteriors.iter().filter(|&&p| p < 0.1).count();
+    let pmax = posteriors.iter().cloned().fold(0.0f32, f32::max);
+    let pmin = posteriors.iter().cloned().fold(1.0f32, f32::min);
+    println!("posterior: n={} min={:.4} max={:.4} \
+              above0.5={} below0.1={}",
+        posteriors.len(), pmin, pmax, above_05, below_01);
+
+    assert!(pmax > 0.7,
+        "sensor never fires: max posterior {:.4}", pmax);
+    assert!(pmin < 0.2,
+        "sensor never rests: min posterior {:.4}", pmin);
+    assert!(above_05 > 50,
+        "too few speech frames: {}", above_05);
+    assert!(below_01 > 50,
+        "too few silent frames: {}", below_01);
 }
 
 #[test]
