@@ -10,7 +10,11 @@ use std::env;
 fn read_audio(path: &str) -> (Vec<f32>, u32) {
     let mut reader = hound::WavReader::open(path).unwrap();
     let spec = reader.spec();
-    let samples: Vec<f32> = reader.samples().map(|s| s.unwrap()).collect();
+    let samples: Vec<f32> = if spec.sample_format == hound::SampleFormat::Float {
+        reader.samples::<f32>().map(|s| s.unwrap()).collect()
+    } else {
+        reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect()
+    };
     let mut mono = Vec::new();
     if spec.channels == 2 {
         for i in 0..(samples.len() / 2) {
@@ -257,6 +261,8 @@ fn main() {
         let mut stft = StftEngine::new();
         let out_a = stft.inverse(&nmf5_amb_cplx, signal.len());
         let out_other: Vec<f32> = out_h.iter().zip(out_a.iter()).map(|(h, a)| h + a).collect();
+        write_audio(&format!("{}/harmonics.wav", nmf5_dir), &out_h, actual_sample_rate);
+        write_audio(&format!("{}/ambience.wav", nmf5_dir), &out_a, actual_sample_rate);
         write_audio(&format!("{}/other.wav", nmf5_dir), &out_other, actual_sample_rate);
         
         // ----- NMFD8 Render -----
