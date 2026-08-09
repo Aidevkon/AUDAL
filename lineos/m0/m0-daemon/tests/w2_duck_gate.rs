@@ -356,9 +356,13 @@ fn w3b_mix_levels_gate() {
     hasher.update(&bytes_a);
     let hash_a = format!("{:x}", hasher.finalize());
     println!("SHA (None): {}", hash_a);
+    // Ανανεώθηκε W6.c: το NMFD8 έγινε default separator
+    // (unwrap_or(false)→(true) στο dsp_pipeline.rs). Το
+    // προηγούμενο 7df8c9ec ήταν NMF5 render. Ο ήχος άλλαξε
+    // ΣΚΟΠΙΜΑ — W6.b: NMFD 20/20 σε κάθε SNR, W12: κόστος 9%.
     assert_eq!(
         hash_a,
-        "7df8c9ec66bdf767926054cf5d4805dc7d55ec4a030ff671cc01823f620f94e2"
+        "761d412808e73d64e52db52e3ceeb69dae4d9700430e7ce8678dc8f26cd06715"
     );
 
     fs::copy(pcm_a.path(), "/tmp/w3b_mix_none.wav").unwrap();
@@ -479,11 +483,11 @@ fn w4_ceiling_gate() {
         project_id: Some("w4".to_string()),
         track_id: Some("w4_undercompensated".to_string()),
         mix_levels: Some(MixLevels {
-            voice: 0.1,
-            drums: 0.1,
-            bass: 0.1,
-            harmonics: 0.1,
-            ambience: 1.0,
+            voice: 0.01,
+            drums: 0.01,
+            bass: 0.01,
+            harmonics: 0.01,
+            ambience: 0.05,
         }),
         normalizer_ceiling_db: None,
         preview_id: None,
@@ -524,11 +528,11 @@ fn w4_ceiling_gate() {
         project_id: Some("w4".to_string()),
         track_id: Some("w4_generous_ceiling".to_string()),
         mix_levels: Some(MixLevels {
-            voice: 0.1,
-            drums: 0.1,
-            bass: 0.1,
-            harmonics: 0.1,
-            ambience: 1.0,
+            voice: 0.01,
+            drums: 0.01,
+            bass: 0.01,
+            harmonics: 0.01,
+            ambience: 0.05,
         }),
         normalizer_ceiling_db: Some(20.0),
         preview_id: None,

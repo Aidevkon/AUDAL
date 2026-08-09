@@ -457,7 +457,7 @@ fn run_dsp_internal(
             req.project_id.as_deref().unwrap_or("default"),
             req.flavour_id.as_deref().unwrap_or("default"),
             &pre_analysis,
-            req.use_nmfd.unwrap_or(false),
+            req.use_nmfd.unwrap_or(true),
         )?;
         eprintln!("[PERF-NODE] scout_node={}ms", t_scout_node.elapsed().as_millis());
         let streaming_features = scout_out.scout.features.clone();
@@ -811,7 +811,7 @@ fn run_dsp_internal(
         req.project_id.as_deref().unwrap_or("default"),
         req.flavour_id.as_deref().unwrap_or("default"),
         &pre_analysis,
-        req.use_nmfd.unwrap_or(false),
+        req.use_nmfd.unwrap_or(true),
     )?;
     eprintln!("[PERF-NODE] scout_node={}ms", t_scout_node.elapsed().as_millis());
     let mut two_pass = scout_out.engine;
@@ -962,7 +962,7 @@ fn run_dsp_internal(
                 macro_router_enabled: req.macro_router_enabled.unwrap_or(false),
                 boundaries: &trunk_report.boundaries,
                 vad_observe_enabled: req.vad_observe_enabled.unwrap_or(false),
-                use_nmfd: req.use_nmfd.unwrap_or(false),
+                use_nmfd: req.use_nmfd.unwrap_or(true),
                 blob_id: &blob_id,
             },
             crate::domain::nodes::render_node::RenderInputs {
