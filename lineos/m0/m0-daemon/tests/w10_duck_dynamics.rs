@@ -124,7 +124,7 @@ fn w10_duck_dynamics() {
         use_nmfd: None,
     };
 
-    let (_blob, _, _pcm_a, _, _, artifacts_a) = run_dsp(
+    let (blob_a, _, _pcm_a, _, _, artifacts_a) = run_dsp(
         &req_a,
         std::time::Instant::now(),
         Arc::new(ArcSwap::from_pointee(DspState::default())),
@@ -135,6 +135,14 @@ fn w10_duck_dynamics() {
         out_dir_a.path().to_str().unwrap(),
     )
     .expect("run_dsp failed for noduck");
+
+    println!("[FINAL] integrated_lufs={:.2} true_peak={:.2} \
+              too_quiet={} spotify_ok={} apple_pod_ok={}",
+        blob_a.loudness.integrated_lufs,
+        blob_a.loudness.true_peak_dbtp,
+        blob_a.loudness.too_quiet_for_mobile,
+        blob_a.loudness.spotify_compliant,
+        blob_a.loudness.apple_podcasts_compliant);
 
     let mut noduck_pre_l = Vec::new();
     let mut noduck_pre_r = Vec::new();
@@ -169,7 +177,7 @@ fn w10_duck_dynamics() {
         use_nmfd: None,
     };
 
-    let (_blob, _, _pcm_b, _, _, artifacts_b) = run_dsp(
+    let (blob_b, _, _pcm_b, _, _, artifacts_b) = run_dsp(
         &req_b,
         std::time::Instant::now(),
         Arc::new(ArcSwap::from_pointee(DspState::default())),
@@ -180,6 +188,14 @@ fn w10_duck_dynamics() {
         out_dir_b.path().to_str().unwrap(),
     )
     .expect("run_dsp failed for ducked");
+
+    println!("[FINAL] integrated_lufs={:.2} true_peak={:.2} \
+              too_quiet={} spotify_ok={} apple_pod_ok={}",
+        blob_b.loudness.integrated_lufs,
+        blob_b.loudness.true_peak_dbtp,
+        blob_b.loudness.too_quiet_for_mobile,
+        blob_b.loudness.spotify_compliant,
+        blob_b.loudness.apple_podcasts_compliant);
 
     let mut ducked_pre_l = Vec::new();
     let mut ducked_pre_r = Vec::new();
