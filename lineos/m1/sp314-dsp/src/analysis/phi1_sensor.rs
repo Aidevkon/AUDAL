@@ -782,14 +782,18 @@ pub struct Phi2Sensor {
     ring_buf: Vec<[f32; 64]>,
     count: usize,
     
-    conv1_w: Vec<Vec<Vec<f32>>>,
+    conv1_w: Vec<f32>,
     conv1_b: Vec<f32>,
-    conv2_w: Vec<Vec<Vec<f32>>>,
+    conv2_w: Vec<f32>,
     conv2_b: Vec<f32>,
-    fc1_w: Vec<Vec<f32>>,
+    fc1_w: Vec<f32>,
     fc1_b: Vec<f32>,
-    fc2_w: Vec<Vec<f32>>,
+    fc2_w: Vec<f32>,
     fc2_b: f32,
+    window: Vec<f32>,
+    y1: Vec<f32>,
+    y2: Vec<f32>,
+    fc1_out: Vec<f32>,
 }
 
 impl Phi2Sensor {
@@ -801,46 +805,36 @@ impl Phi2Sensor {
 
         let mut offset = 0;
         
-        let mut conv1_w = vec![vec![vec![0.0f32; 11]; 64]; 48];
-        for o in 0..48 {
-            for c in 0..64 {
-                for k in 0..11 {
-                    conv1_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
-                }
-            }
+        let mut conv1_w = vec![0.0f32; 48 * 64 * 11];
+        for i in 0..conv1_w.len() {
+            conv1_w[i] = read_f32_le(model_bytes, &mut offset);
         }
         let mut conv1_b = vec![0.0f32; 48];
         for o in 0..48 {
             conv1_b[o] = read_f32_le(model_bytes, &mut offset);
         }
 
-        let mut conv2_w = vec![vec![vec![0.0f32; 11]; 48]; 48];
-        for o in 0..48 {
-            for c in 0..48 {
-                for k in 0..11 {
-                    conv2_w[o][c][k] = read_f32_le(model_bytes, &mut offset);
-                }
-            }
+        let mut conv2_w = vec![0.0f32; 48 * 48 * 11];
+        for i in 0..conv2_w.len() {
+            conv2_w[i] = read_f32_le(model_bytes, &mut offset);
         }
         let mut conv2_b = vec![0.0f32; 48];
         for o in 0..48 {
             conv2_b[o] = read_f32_le(model_bytes, &mut offset);
         }
 
-        let mut fc1_w = vec![vec![0.0f32; 48]; 32];
-        for o in 0..32 {
-            for c in 0..48 {
-                fc1_w[o][c] = read_f32_le(model_bytes, &mut offset);
-            }
+        let mut fc1_w = vec![0.0f32; 32 * 48];
+        for i in 0..fc1_w.len() {
+            fc1_w[i] = read_f32_le(model_bytes, &mut offset);
         }
         let mut fc1_b = vec![0.0f32; 32];
         for o in 0..32 {
             fc1_b[o] = read_f32_le(model_bytes, &mut offset);
         }
 
-        let mut fc2_w = vec![vec![0.0f32; 32]; 1];
-        for c in 0..32 {
-            fc2_w[0][c] = read_f32_le(model_bytes, &mut offset);
+        let mut fc2_w = vec![0.0f32; 32];
+        for i in 0..fc2_w.len() {
+            fc2_w[i] = read_f32_le(model_bytes, &mut offset);
         }
         let fc2_b = read_f32_le(model_bytes, &mut offset);
 
@@ -855,6 +849,10 @@ impl Phi2Sensor {
             fc1_b,
             fc2_w,
             fc2_b,
+            window: vec![0.0f32; 64 * 51],
+            y1: vec![0.0f32; 11 * 48],
+            y2: vec![0.0f32; 48],
+            fc1_out: vec![0.0f32; 32],
         }
     }
 
@@ -868,55 +866,51 @@ impl Phi2Sensor {
         self.count += 1;
 
         if self.count >= PHI1_CONTEXT_FRAMES {
-            let mut window = vec![vec![0.0f32; PHI1_CONTEXT_FRAMES]; 64];
             for t in 0..PHI1_CONTEXT_FRAMES {
                 let physical_idx = (self.count - PHI1_CONTEXT_FRAMES + t) % PHI1_CONTEXT_FRAMES;
                 for c in 0..64 {
-                    window[c][t] = self.ring_buf[physical_idx][c];
+                    self.window[c * 51 + t] = self.ring_buf[physical_idx][c];
                 }
             }
 
             // Conv1
-            let mut y1 = vec![vec![0.0f32; 48]; 11];
             for ki in 0..11 {
                 let t = ki * 4;
                 for o in 0..48 {
                     let mut acc = self.conv1_b[o];
                     for c in 0..64 {
                         for k in 0..11 {
-                            acc += window[c][t + k] * self.conv1_w[o][c][k];
+                            acc += self.window[c * 51 + t + k] * self.conv1_w[(o * 64 + c) * 11 + k];
                         }
                     }
-                    y1[ki][o] = acc.tanh();
+                    self.y1[ki * 48 + o] = acc.tanh();
                 }
             }
 
             // Conv2
-            let mut y2 = vec![0.0f32; 48];
             for o in 0..48 {
                 let mut acc = self.conv2_b[o];
                 for c in 0..48 {
                     for k in 0..11 {
-                        acc += y1[k][c] * self.conv2_w[o][c][k];
+                        acc += self.y1[k * 48 + c] * self.conv2_w[(o * 48 + c) * 11 + k];
                     }
                 }
-                y2[o] = acc.tanh();
+                self.y2[o] = acc.tanh();
             }
 
             // FC1
-            let mut fc1 = vec![0.0f32; 32];
             for o in 0..32 {
                 let mut acc = self.fc1_b[o];
                 for c in 0..48 {
-                    acc += y2[c] * self.fc1_w[o][c];
+                    acc += self.y2[c] * self.fc1_w[o * 48 + c];
                 }
-                fc1[o] = acc.tanh();
+                self.fc1_out[o] = acc.tanh();
             }
 
             // FC2
             let mut acc = self.fc2_b;
             for c in 0..32 {
-                acc += fc1[c] * self.fc2_w[0][c];
+                acc += self.fc1_out[c] * self.fc2_w[c];
             }
             let p = 1.0 / (1.0 + (-acc).exp());
             Some(p)
