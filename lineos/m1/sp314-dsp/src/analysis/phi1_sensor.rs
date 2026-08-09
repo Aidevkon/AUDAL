@@ -918,4 +918,76 @@ impl Phi2Sensor {
             None
         }
     }
+
+    /// Batch inference: παίρνει ΟΛΑ τα pcen frames και
+    /// επιστρέφει ένα p ανά frame (None για τα πρώτα 50).
+    /// Δεν χρησιμοποιεί ring_buf — διαβάζει απευθείας από
+    /// τον πίνακα. ΙΔΙΑ αριθμητική με την push_frame.
+    pub fn infer_batch(&self, frames: &[[f32; 64]]) -> Vec<Option<f32>> {
+        use rayon::prelude::*;
+
+        frames
+            .par_iter()
+            .enumerate()
+            .map(|(i, _)| {
+                if i + 1 < PHI1_CONTEXT_FRAMES {
+                    None
+                } else {
+                    let mut window = vec![0.0f32; 64 * 51];
+                    let window_start = i + 1 - PHI1_CONTEXT_FRAMES;
+                    for t in 0..PHI1_CONTEXT_FRAMES {
+                        let frame = &frames[window_start + t];
+                        for c in 0..64 {
+                            window[c * 51 + t] = frame[c];
+                        }
+                    }
+
+                    // Conv1
+                    let mut y1 = vec![0.0f32; 11 * 48];
+                    for ki in 0..11 {
+                        let t = ki * 4;
+                        for o in 0..48 {
+                            let mut acc = self.conv1_b[o];
+                            for c in 0..64 {
+                                for k in 0..11 {
+                                    acc += window[c * 51 + t + k] * self.conv1_w[(o * 64 + c) * 11 + k];
+                                }
+                            }
+                            y1[ki * 48 + o] = acc.tanh();
+                        }
+                    }
+
+                    // Conv2
+                    let mut y2 = vec![0.0f32; 48];
+                    for o in 0..48 {
+                        let mut acc = self.conv2_b[o];
+                        for c in 0..48 {
+                            for k in 0..11 {
+                                acc += y1[k * 48 + c] * self.conv2_w[(o * 48 + c) * 11 + k];
+                            }
+                        }
+                        y2[o] = acc.tanh();
+                    }
+
+                    // FC1
+                    let mut fc1_out = vec![0.0f32; 32];
+                    for o in 0..32 {
+                        let mut acc = self.fc1_b[o];
+                        for c in 0..48 {
+                            acc += y2[c] * self.fc1_w[o * 48 + c];
+                        }
+                        fc1_out[o] = acc.tanh();
+                    }
+
+                    // FC2
+                    let mut acc = self.fc2_b;
+                    for c in 0..32 {
+                        acc += fc1_out[c] * self.fc2_w[c];
+                    }
+                    let p = 1.0 / (1.0 + (-acc).exp());
+                    Some(p)
+                }
+            })
+            .collect()
+    }
 }
