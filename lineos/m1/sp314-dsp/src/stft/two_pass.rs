@@ -1050,9 +1050,15 @@ impl TwoPassEngine {
                 crate::analysis::phi1_sensor::Phi2StreamingFrontend::new(),
                 crate::analysis::phi1_sensor::Phi2Pcen::new(),
                 crate::analysis::phi1_sensor::Phi2Sensor::new(),
-                std::collections::VecDeque::<f32>::new(),  // ουρά p
+                Vec::<[f32; 64]>::new(),  // pending pcen frames
             ))
         } else { None };
+        let mut phi1_queue: std::collections::VecDeque<f32> = Default::default();
+        let mut phi1_carry: usize = 0;
+        let mut pending_obs: Vec<(
+            crate::analysis::vad_features::VadFeatures,
+            crate::analysis::vad_model::VadDecision,
+        )> = Vec::new();
         let mut vad_frame_index: u64 = 0;
         let noise_floor = noise_floor_dbfs.unwrap_or(-144.0);
         let mut t_read = 0u128;
@@ -1092,16 +1098,11 @@ impl TwoPassEngine {
                                 r.len(),
                                 "Stage (b) Contract: left and right must be aligned"
                             );
-                            // τρέφουμε τον Φ1 με ΤΟ ΙΔΙΟ m slice
+                            // τρέφουμε τον Φ1 — ΜΟΝΟ συσσώρευση pcen frames
                             let t1_phi1 = std::time::Instant::now();
-                            if let Some((fe, pcen, sensor, queue)) = phi1.as_mut() {
+                            if let Some((fe, pcen, _, pending)) = phi1.as_mut() {
                                 for mel_pow in fe.push(m) {
-                                    let pcen_frame = pcen.process(&mel_pow);
-                                    if let Some(p) = sensor.push_frame(&pcen_frame) {
-                                        queue.push_back(p);
-                                    } else {
-                                        queue.push_back(f32::NAN);
-                                    }
+                                    pending.push(pcen.process(&mel_pow));
                                 }
                             }
                             t_phi1 += t1_phi1.elapsed().as_millis();
@@ -1109,28 +1110,7 @@ impl TwoPassEngine {
                             let t1_dsp = std::time::Instant::now();
                             for f in ext.process_chunk(m, l, r) {
                                 let d = clf.process(&f, noise_floor);
-                                let phi1_p_value = phi1.as_mut()
-                                    .and_then(|(_, _, _, q)| q.pop_front())
-                                    .filter(|p| p.is_finite());
-                                if let Some(obs) = vad_observer.as_deref_mut() {
-                                    obs(crate::analysis::vad_model::VadObservation {
-                                        frame_index: vad_frame_index,
-                                        posterior: if USE_NEURAL_VAD {
-                                            phi1_p_value.unwrap_or(d.posterior)
-                                        } else {
-                                            d.posterior
-                                        },
-                                        is_speech: d.is_speech,
-                                        duck_gain: d.duck_gain,
-                                        rms_db: f.rms_db,
-                                        spectral_flatness: f.spectral_flatness,
-                                        mid_side_ratio: f.mid_side_ratio,
-                                        rms_delta_30ms: d.rms_delta_30ms,
-                                        noise_floor_dbfs: noise_floor,
-                                        phi1_p: phi1_p_value,
-                                    });
-                                }
-                                vad_frame_index += 1;
+                                pending_obs.push((f, d));
                             }
                             t_vad_dsp += t1_dsp.elapsed().as_millis();
                         }
@@ -1152,6 +1132,53 @@ impl TwoPassEngine {
 
             if batch.is_empty() {
                 break; // EOF reached
+            }
+
+            // Batch inference for phi1 sensor
+            let t1_phi1_batch = std::time::Instant::now();
+            if let Some((_, _, sensor, pending)) = phi1.as_mut() {
+                if pending.len() > phi1_carry {
+                    let out = sensor.infer_batch(pending);
+                    for p in out.into_iter().skip(phi1_carry) {
+                        phi1_queue.push_back(p.unwrap_or(f32::NAN));
+                    }
+                    let keep = (crate::analysis::phi1_sensor::PHI1_CONTEXT_FRAMES - 1)
+                        .min(pending.len());
+                    let drop_n = pending.len() - keep;
+                    pending.drain(0..drop_n);
+                    phi1_carry = keep;
+                }
+            }
+            t_phi1 += t1_phi1_batch.elapsed().as_millis();
+
+            // Emit observations now that phi1_queue is populated
+            let n_emit = if phi1.is_some() {
+                pending_obs.len().min(phi1_queue.len())
+            } else {
+                pending_obs.len()
+            };
+            for (f, d) in pending_obs.drain(0..n_emit) {
+                let phi1_p_value = phi1_queue.pop_front()
+                    .filter(|p| p.is_finite());
+                if let Some(obs) = vad_observer.as_deref_mut() {
+                    obs(crate::analysis::vad_model::VadObservation {
+                        frame_index: vad_frame_index,
+                        posterior: if USE_NEURAL_VAD {
+                            phi1_p_value.unwrap_or(d.posterior)
+                        } else {
+                            d.posterior
+                        },
+                        is_speech: d.is_speech,
+                        duck_gain: d.duck_gain,
+                        rms_db: f.rms_db,
+                        spectral_flatness: f.spectral_flatness,
+                        mid_side_ratio: f.mid_side_ratio,
+                        rms_delta_30ms: d.rms_delta_30ms,
+                        noise_floor_dbfs: noise_floor,
+                        phi1_p: phi1_p_value,
+                    });
+                }
+                vad_frame_index += 1;
             }
 
             // 2. Parallel Transform Phase (Heavy Math)
@@ -1229,6 +1256,31 @@ impl TwoPassEngine {
                 callback(&out.stems);
                 t_callback += t3.elapsed().as_millis();
             }
+        }
+
+        // EOF: emit any remaining observations
+        for (f, d) in pending_obs.drain(..) {
+            let phi1_p_value = phi1_queue.pop_front()
+                .filter(|p| p.is_finite());
+            if let Some(obs) = vad_observer.as_deref_mut() {
+                obs(crate::analysis::vad_model::VadObservation {
+                    frame_index: vad_frame_index,
+                    posterior: if USE_NEURAL_VAD {
+                        phi1_p_value.unwrap_or(d.posterior)
+                    } else {
+                        d.posterior
+                    },
+                    is_speech: d.is_speech,
+                    duck_gain: d.duck_gain,
+                    rms_db: f.rms_db,
+                    spectral_flatness: f.spectral_flatness,
+                    mid_side_ratio: f.mid_side_ratio,
+                    rms_delta_30ms: d.rms_delta_30ms,
+                    noise_floor_dbfs: noise_floor,
+                    phi1_p: phi1_p_value,
+                });
+            }
+            vad_frame_index += 1;
         }
 
         let avg = chunk_count.max(1) as f32;
