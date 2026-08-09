@@ -1055,12 +1055,20 @@ impl TwoPassEngine {
         } else { None };
         let mut vad_frame_index: u64 = 0;
         let noise_floor = noise_floor_dbfs.unwrap_or(-144.0);
+        let mut t_read = 0u128;
+        let mut t_vad_dsp = 0u128;
+        let mut t_phi1 = 0u128;
+        let mut t_stems = 0u128;
+        let mut t_callback = 0u128;
 
         loop {
             // 1. Pull a macro-batch of owned chunks
             let mut batch = Vec::with_capacity(macro_batch_size);
             for _ in 0..macro_batch_size {
-                match reader.next_chunk(CHUNK_FRAMES) {
+                let t0 = std::time::Instant::now();
+                let chunk_res = reader.next_chunk(CHUNK_FRAMES);
+                t_read += t0.elapsed().as_millis();
+                match chunk_res {
                     Ok(Some(overlap_chunk)) => {
                         let pad_frames = if overlap_chunk.start < overlap_chunk.offset {
                             (overlap_chunk.offset - overlap_chunk.start + (FFT_SIZE / 2)) / HOP_SIZE
@@ -1085,16 +1093,20 @@ impl TwoPassEngine {
                                 "Stage (b) Contract: left and right must be aligned"
                             );
                             // τρέφουμε τον Φ1 με ΤΟ ΙΔΙΟ m slice
+                            let t1_phi1 = std::time::Instant::now();
                             if let Some((fe, pcen, sensor, queue)) = phi1.as_mut() {
                                 for mel_pow in fe.push(m) {
                                     let pcen_frame = pcen.process(&mel_pow);
                                     if let Some(p) = sensor.push_frame(&pcen_frame) {
                                         queue.push_back(p);
                                     } else {
-                                        queue.push_back(f32::NAN);  // context γεμίζει
+                                        queue.push_back(f32::NAN);
                                     }
                                 }
                             }
+                            t_phi1 += t1_phi1.elapsed().as_millis();
+
+                            let t1_dsp = std::time::Instant::now();
                             for f in ext.process_chunk(m, l, r) {
                                 let d = clf.process(&f, noise_floor);
                                 let phi1_p_value = phi1.as_mut()
@@ -1120,6 +1132,7 @@ impl TwoPassEngine {
                                 }
                                 vad_frame_index += 1;
                             }
+                            t_vad_dsp += t1_dsp.elapsed().as_millis();
                         }
 
                         batch.push(OwnedChunkData {
@@ -1142,6 +1155,7 @@ impl TwoPassEngine {
             }
 
             // 2. Parallel Transform Phase (Heavy Math)
+            let t2 = std::time::Instant::now();
             let parallel_results: Vec<ParallelChunkOut> = batch
                 .into_par_iter()
                 .map(|mut owned| {
@@ -1183,6 +1197,7 @@ impl TwoPassEngine {
                     }
                 })
                 .collect();
+            t_stems += t2.elapsed().as_millis();
 
             // 3. Serial Stitch Phase (Stateful processing + callback)
             for mut out in parallel_results {
@@ -1210,7 +1225,9 @@ impl TwoPassEngine {
                 }
 
                 frames_written += out.stems.voice.len();
+                let t3 = std::time::Instant::now();
                 callback(&out.stems);
+                t_callback += t3.elapsed().as_millis();
             }
         }
 
@@ -1221,6 +1238,11 @@ impl TwoPassEngine {
             final_spatial[i].pan_mean = global_spatial_sums[i].0 / den;
             final_spatial[i].pan_width = global_spatial_sums[i].1 / den;
         }
+
+        eprintln!(
+            "[PERF-RENDER] read={}ms vad_dsp={}ms vad_phi1={}ms stems={}ms callback={}ms",
+            t_read, t_vad_dsp, t_phi1, t_stems, t_callback
+        );
 
         eprintln!(
             "[BAND-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",

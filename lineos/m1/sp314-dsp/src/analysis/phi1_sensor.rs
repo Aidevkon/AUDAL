@@ -364,14 +364,28 @@ impl Phi2StreamingFrontend {
         let half_m = m / 2;
         let out_n = valid_end - self.carry_48k;
         let mut filtered = vec![0.0f32; out_n];
+        let src = &self.pending_48k[..];
+
         for (idx, i) in (self.carry_48k..valid_end).enumerate() {
-            let mut acc = 0.0;
-            for j in 0..=m {
-                let mut src_idx = i as isize + j as isize - half_m as isize;
-                if src_idx < 0 { src_idx = 0; }
-                if src_idx >= len as isize { src_idx = len as isize - 1; }
-                acc += h[j] * self.pending_48k[src_idx as usize];
-            }
+            let lo = i as isize - half_m as isize;
+            let hi = lo + m as isize;
+            let acc = if lo >= 0 && hi < len as isize {
+                let base = lo as usize;
+                let mut a = 0.0f32;
+                for j in 0..=m {
+                    a += h[j] * src[base + j];
+                }
+                a
+            } else {
+                let mut a = 0.0f32;
+                for j in 0..=m {
+                    let mut s = i as isize + j as isize - half_m as isize;
+                    if s < 0 { s = 0; }
+                    if s >= len as isize { s = len as isize - 1; }
+                    a += h[j] * src[s as usize];
+                }
+                a
+            };
             filtered[idx] = acc;
         }
 
@@ -393,19 +407,19 @@ impl Phi2StreamingFrontend {
         }
 
         let keep = 120;
-        let consume;
+        let _consume;
         if valid_end > keep {
             let drop = valid_end - keep;
-            consume = drop;
+            _consume = drop;
             self.pending_48k.drain(0..drop);
             self.carry_48k = keep;
         } else {
-            consume = 0;
+            _consume = 0;
             self.carry_48k = valid_end;
         }
 
         self.total_48k += out_n;
-        
+
         let n_fft = 400;
         let hop = 160;
         let n_freqs = n_fft / 2 + 1;
@@ -437,6 +451,7 @@ impl Phi2StreamingFrontend {
                 }
                 mel_frame[m_idx] = energy;
             }
+
             frames.push(mel_frame);
             self.dec_consumed += 1;
         }
@@ -862,8 +877,9 @@ impl Phi2Sensor {
             }
 
             // Conv1
-            let mut y1 = vec![vec![0.0f32; 48]; 41];
-            for t in 0..41 {
+            let mut y1 = vec![vec![0.0f32; 48]; 11];
+            for ki in 0..11 {
+                let t = ki * 4;
                 for o in 0..48 {
                     let mut acc = self.conv1_b[o];
                     for c in 0..64 {
@@ -871,7 +887,7 @@ impl Phi2Sensor {
                             acc += window[c][t + k] * self.conv1_w[o][c][k];
                         }
                     }
-                    y1[t][o] = acc.tanh();
+                    y1[ki][o] = acc.tanh();
                 }
             }
 
@@ -881,7 +897,7 @@ impl Phi2Sensor {
                 let mut acc = self.conv2_b[o];
                 for c in 0..48 {
                     for k in 0..11 {
-                        acc += y1[k * 4][c] * self.conv2_w[o][c][k];
+                        acc += y1[k][c] * self.conv2_w[o][c][k];
                     }
                 }
                 y2[o] = acc.tanh();

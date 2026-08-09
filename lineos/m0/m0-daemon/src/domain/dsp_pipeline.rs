@@ -449,6 +449,7 @@ fn run_dsp_internal(
         // — deliberate. scout_node takes sample_rate as a param;
         // feeding 48k data with 48k is self-consistent.
         emit_progress("Scout Pass");
+        let t_scout_node = std::time::Instant::now();
         let scout_out = crate::domain::nodes::scout_node::run(
             &scout_left,
             &scout_right,
@@ -458,6 +459,7 @@ fn run_dsp_internal(
             &pre_analysis,
             req.use_nmfd.unwrap_or(false),
         )?;
+        eprintln!("[PERF-NODE] scout_node={}ms", t_scout_node.elapsed().as_millis());
         let streaming_features = scout_out.scout.features.clone();
 
         // Corpus (user model) on the scout slice.
@@ -526,6 +528,7 @@ fn run_dsp_internal(
         // Verdicts already ran in pass-0; DumpAudioSource has
         // no health monitor. Pass a no-op closure.
         emit_progress("Mastering");
+        let t_episode_render = std::time::Instant::now();
         let mut dump_source = crate::dsp::dump_audio_source::DumpAudioSource::open(&raw_path_buf)?;
         let render_res = crate::domain::episode_render::run(
             &mut dump_source,
@@ -535,6 +538,7 @@ fn run_dsp_internal(
             &pre_analysis,
             |_: &crate::dsp::dump_audio_source::DumpAudioSource| Ok(()),
         )?;
+        eprintln!("[PERF-NODE] episode_render={}ms", t_episode_render.elapsed().as_millis());
 
         let (fingerprints, spatial_metadata) = ContentType::bypassed_render();
         profiler.mark_stage_with_hash("Mastering", render_res.output_sha256.clone());
@@ -548,6 +552,7 @@ fn run_dsp_internal(
             acx: trunk_metrics.acx,
         };
 
+        let t_cert_node = std::time::Instant::now();
         let cert_out = crate::domain::nodes::certificate_node::run_streaming(
             &blob_id,
             render_res.output_lufs,
@@ -572,13 +577,13 @@ fn run_dsp_internal(
             processing_timeline,
             cert_data,
         )?;
+        eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
         let mut persisted_master = None;
         if let (Some(project_id), Some(track_id)) =
             (req.project_id.as_deref(), req.track_id.as_deref())
         {
-            let project_dir = std::path::Path::new(masters_dir)
-                .join(project_id.replace('/', "").replace('\\', ""));
+            let project_dir = std::path::Path::new(masters_dir).join(project_id.replace('/', "").replace('\\', ""));
             let _ = std::fs::create_dir_all(&project_dir);
             let track_safe = track_id.replace('/', "").replace('\\', "");
             let flac_path = project_dir.join(format!("{track_safe}.flac"));
@@ -588,6 +593,7 @@ fn run_dsp_internal(
                     let mmap_f32: &[f32] = unsafe {
                         std::slice::from_raw_parts(mmap.as_ptr() as *const f32, mmap.len() / 4)
                     };
+                    let t_flac = std::time::Instant::now();
                     if let Err(e) = crate::io_flac::encode_f32_flac_24(
                         mmap_f32,
                         render_res.sample_rate,
@@ -600,6 +606,7 @@ fn run_dsp_internal(
                             e
                         );
                     } else {
+                        eprintln!("[PERF-NODE] flac_encode={}ms", t_flac.elapsed().as_millis());
                         persisted_master = Some(flac_path);
                     }
                 }
@@ -622,7 +629,9 @@ fn run_dsp_internal(
     // NODE 1: DECODE (Music only — Episode returned
     // above without a full-file decode)
     emit_progress("Ingest");
+    let t_decode_node = std::time::Instant::now();
     let decoded = crate::domain::nodes::decode_node::run(audio_path, preset_id, &blob_id)?;
+    eprintln!("[PERF-NODE] decode_node={}ms", t_decode_node.elapsed().as_millis());
     // If the preset didn't specify a
     // target, use the ContentType default.
     // Episode → -16.0 (Apple Podcasts spec)
@@ -764,9 +773,11 @@ fn run_dsp_internal(
     let scout_left = &scout_left_owned[..];
     let scout_right = &scout_right_owned[..];
 
+    let t_trunk_pass = std::time::Instant::now();
     let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(&raw_path)
         .map_err(|e| format!("Trunk Pass failed: {e}"))?;
     let trunk_metrics = &trunk_report.metrics;
+    eprintln!("[PERF-NODE] trunk_pass={}ms", t_trunk_pass.elapsed().as_millis());
 
     // Episode/spoken-word: skip beat
     // detection entirely. BPM and beat
@@ -792,6 +803,7 @@ fn run_dsp_internal(
     // NODE 3: SCOUT (NMF + Maestro)
     // --- NODE 3: SCOUT PASS ---
     emit_progress("Scout Pass");
+    let t_scout_node = std::time::Instant::now();
     let scout_out = crate::domain::nodes::scout_node::run(
         scout_left,
         scout_right,
@@ -801,6 +813,7 @@ fn run_dsp_internal(
         &pre_analysis,
         req.use_nmfd.unwrap_or(false),
     )?;
+    eprintln!("[PERF-NODE] scout_node={}ms", t_scout_node.elapsed().as_millis());
     let mut two_pass = scout_out.engine;
     let scout = scout_out.scout;
     let render_params = scout_out.render_params;
@@ -905,6 +918,7 @@ fn run_dsp_internal(
 
     emit_progress("Stem Engine");
 
+    let t_render_node = std::time::Instant::now();
     let (fingerprints, spatial_metadata) = if content_type.skip_stems() {
         // Episode path: bypass stem
         // separation entirely.
@@ -961,6 +975,7 @@ fn run_dsp_internal(
             spatial_writer.as_mut(),
         )?
     };
+    eprintln!("[PERF-NODE] render_node={}ms", t_render_node.elapsed().as_millis());
 
     if let Some(writer) = spatial_writer {
         writer.finish(n_total)?;
@@ -1020,6 +1035,7 @@ fn run_dsp_internal(
 
     // NODE 5: DSP (pre-analysis + autotune + AetherBridge + corpus + master)
     emit_progress("Mastering");
+    let t_dsp_node = std::time::Instant::now();
     let dsp_out = crate::domain::nodes::dsp_node::run(
         left_post,
         right_post,
@@ -1042,6 +1058,7 @@ fn run_dsp_internal(
         pre_analysis.clone(),
         state_dir,
     )?;
+    eprintln!("[PERF-NODE] dsp_node={}ms", t_dsp_node.elapsed().as_millis());
     let pre_analysis = dsp_out.pre_analysis;
     let dsp_config = dsp_out.dsp_config;
     let proof_log = dsp_out.proof_log;
@@ -1072,6 +1089,7 @@ fn run_dsp_internal(
         let track_safe = track_id.replace('/', "").replace('\\', "");
         let flac_path = project_dir.join(format!("{track_safe}.flac"));
 
+        let t_flac = std::time::Instant::now();
         if let Err(e) = crate::io_flac::encode_f32_flac_24(
             &mmap_f32[..n_total * 2],
             decoded.pcm_sample_rate,
@@ -1084,6 +1102,7 @@ fn run_dsp_internal(
                 e
             );
         } else {
+            eprintln!("[PERF-NODE] flac_encode={}ms", t_flac.elapsed().as_millis());
             persisted_master = Some(flac_path);
         }
     }
@@ -1093,6 +1112,7 @@ fn run_dsp_internal(
 
     let processing_timeline = profiler.finalize();
 
+    let t_cert_node = std::time::Instant::now();
     let cert_out = crate::domain::nodes::certificate_node::run(
         &blob_id,
         lufs,
@@ -1120,6 +1140,7 @@ fn run_dsp_internal(
         n_total,
         processing_timeline,
     )?;
+    eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
     Ok((
         cert_out.blob,
