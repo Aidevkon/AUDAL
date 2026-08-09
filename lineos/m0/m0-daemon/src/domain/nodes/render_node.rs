@@ -220,6 +220,8 @@ pub fn run(
 
     let neutral_sum_sq = std::cell::Cell::new(0.0f64);
     let neutral_count = std::cell::Cell::new(0usize);
+    let anchor_sum_sq = std::cell::Cell::new(0.0f64);
+    let anchor_count = std::cell::Cell::new(0usize);
 
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
@@ -249,6 +251,16 @@ pub fn run(
                 sample * effective_voice_gain
             })
             .collect();
+
+        {
+            let mut s = anchor_sum_sq.get();
+            for i in 0..chunk_len {
+                let v = mv[i] as f64;
+                s += v * v;
+            }
+            anchor_sum_sq.set(s);
+            anchor_count.set(anchor_count.get() + chunk_len);
+        }
         let md: Vec<f32> = stems_chunk
             .drums
             .iter()
@@ -485,6 +497,13 @@ pub fn run(
                mix_rms={:.6} gain_now={:.4} gain_would_be={:.4}",
         original_rms, neutral_rms, mix_rms, gain,
         (neutral_rms / mix_rms.max(1e-10)).clamp(0.5, ceiling_linear));
+
+    let anchor_rms = (anchor_sum_sq.get()
+        / anchor_count.get().max(1) as f64).sqrt() as f32;
+    eprintln!("[W10] anchor_rms={:.6} mix_rms={:.6} \
+               ratio_dB={:.2}",
+        anchor_rms, mix_rms,
+        20.0 * (anchor_rms / mix_rms.max(1e-10)).log10());
 
     for i in 0..left_slice.len() {
         left_slice[i] *= gain;
