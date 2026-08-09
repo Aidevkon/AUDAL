@@ -320,6 +320,7 @@ fn assemble_blob(
             apple_podcasts_compliant: platform_ok(lufs, -16.0, true_peak),
             broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
             tidal_compliant: platform_ok(lufs, -14.0, true_peak),
+            too_quiet_for_mobile: lufs < MIN_MOBILE_PLAYBACK_LUFS,
             acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
             acx_rms_db: acx.map(|a| a.rms_db),
             acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
@@ -386,6 +387,17 @@ fn assemble_blob(
 
     Ok(CertificateOutput { blob, file_path })
 }
+
+/// AES TD1008 §5: "it is recommended to keep the
+/// Integrated Loudness of content above -20 LUFS" —
+/// κάτω από αυτό, players με ανεπαρκές gain δεν το
+/// παίζουν αρκετά δυνατά, ιδίως με περιβαλλοντικό
+/// θόρυβο. Ιδιότητα των ΣΥΣΚΕΥΩΝ, όχι των πλατφορμών:
+/// broadcast (-23) και Netflix (-27) είναι νόμιμα
+/// κάτω από αυτό ΚΑΙ όντως πολύ ήσυχα για κινητό.
+/// Επισήμανση, ΟΧΙ σφάλμα — wide dynamic range content
+/// είναι σκόπιμα χαμηλό.
+pub const MIN_MOBILE_PLAYBACK_LUFS: f32 = -20.0;
 
 /// LUFS within 1 LU of target AND TP ≤ ceiling → platform compliant.
 fn platform_ok(lufs: f32, target: f32, tp: f32) -> bool {

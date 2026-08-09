@@ -113,6 +113,8 @@ pub struct StoredLoudness {
     pub apple_podcasts_compliant: bool,
     pub broadcast_compliant: bool,
     pub tidal_compliant: bool,
+    #[serde(default)]
+    pub too_quiet_for_mobile: bool,
     /// ACX audiobook delivery check (sample peak <= -3 dB, RMS -23..-18,
     /// quietest-500ms noise floor <= -60 dB — the Audacity ACX Check
     /// method, validated against an independent oracle 2026-07-30).
