@@ -206,6 +206,13 @@ impl DspAdapter {
 
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
 
+            // W17 DIAGNOSTIC — TEMPORARY
+            eprintln!(
+                "[W17-LUFS-CORR] output_lufs={:.4} target_lufs={:.4} correction_db={:.4} correction_linear={:.6} peak_raw_db={:.4} projected_peak={:.4} ceiling_db={:.4} max_limiter_gr_db={:.4}",
+                output_lufs, target_lufs, correction_db, correction_linear,
+                peak_raw_db, projected_peak, ceiling_db, intent.max_limiter_gr_db
+            );
+
             let ceiling_linear = libm::powf(10.0_f32, intent.target.max_true_peak_db / 20.0_f32);
 
             let isp_limiter_config = LimiterConfig {

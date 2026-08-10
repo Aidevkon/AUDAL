@@ -155,6 +155,11 @@ pub fn run(
     let mix = mix_levels
         .map(|m: &crate::handlers::master::MixLevels| m.clamped())
         .unwrap_or_default();
+
+    eprintln!("[W17-MIX] v={:.3} d={:.3} b={:.3} h={:.3} a={:.3} was_some={}",
+        mix.voice, mix.drums, mix.bass,
+        mix.harmonics, mix.ambience,
+        mix_levels.is_some());
     let mut write_offset = 0;
 
     // W3: Routing Attribution (known by construction)
@@ -219,6 +224,9 @@ pub fn run(
 
     let w16_sums = std::rc::Rc::new(std::cell::RefCell::new([0.0f32; 6]));
     let w16_sums_clone = w16_sums.clone();
+
+    let w17_post_sums = std::rc::Rc::new(std::cell::RefCell::new([0.0f32; 6]));
+    let w17_post_sums_clone = w17_post_sums.clone();
 
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
@@ -294,6 +302,18 @@ pub fn run(
                 sample * mix.ambience
             })
             .collect();
+
+        {
+            let mut sums = w17_post_sums_clone.borrow_mut();
+            for i in 0..chunk_len {
+                sums[0] += mv[i] * mv[i];
+                sums[1] += md[i] * md[i];
+                sums[2] += mb[i] * mb[i];
+                sums[3] += mh[i] * mh[i];
+                sums[4] += ma[i] * ma[i];
+                sums[5] += 1.0;
+            }
+        }
 
         h_voice
             .update(unsafe { std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4) });
@@ -487,6 +507,18 @@ pub fn run(
             let h = libm::sqrtf(sums[3] / sums[5]);
             let a = libm::sqrtf(sums[4] / sums[5]);
             eprintln!("[W16-STEMS] v={:.6} d={:.6} b={:.6} h={:.6} a={:.6}", v, d, b, h, a);
+        }
+    }
+
+    {
+        let sums = w17_post_sums.borrow();
+        if sums[5] > 0.0 {
+            let v = libm::sqrtf(sums[0] / sums[5]);
+            let d = libm::sqrtf(sums[1] / sums[5]);
+            let b = libm::sqrtf(sums[2] / sums[5]);
+            let h = libm::sqrtf(sums[3] / sums[5]);
+            let a = libm::sqrtf(sums[4] / sums[5]);
+            eprintln!("[W17-POST] mv={:.6} md={:.6} mb={:.6} mh={:.6} ma={:.6}", v, d, b, h, a);
         }
     }
 

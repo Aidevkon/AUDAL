@@ -1101,6 +1101,18 @@ fn run_dsp_internal(
     let _sc = 1.0; // stereo correlation proxy for v3
     let elapsed = start.elapsed().as_millis() as u64;
 
+    // W17 DIAGNOSTIC — TEMPORARY
+    {
+        let post_rms_l = rms(&left_post[..]);
+        let post_rms_r = rms(&right_post[..]);
+        let peak_l = left_post.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+        let peak_r = right_post.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+        eprintln!(
+            "[W17-POST-MASTER] rms_l={:.6} rms_r={:.6} peak_l={:.6} peak_r={:.6} lufs={:.4} tp={:.4} n_total={}",
+            post_rms_l, post_rms_r, peak_l, peak_r, lufs, tp, n_total
+        );
+    }
+
     // Interleave planar slices into mmap for playback (xaak/cpal expect interleaved)
     let mmap_f32: &mut [f32] =
         unsafe { std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2) };

@@ -42,6 +42,33 @@ pub fn encode_f32_flac_24(
         .map_err(|e| format!("FLAC write error: {:?}", e))?;
     let bytes = sink.into_inner();
 
+    // W17: το flacenc 0.3.1 παράγει 123× bloat σε
+    // συγκεκριμένα σήματα (trigger στα ~80s, εξαρτάται
+    // από συσσωρευμένο state, ΟΧΙ από το σήμα — το ίδιο
+    // υλικό κωδικοποιείται σωστά αν κοπεί). Το libsndfile
+    // δίνει 10.4MB για το ίδιο σήμα που εδώ βγάζει 1.29GB.
+    // Μέχρι να αντικατασταθεί ο encoder, ΜΗΝ γράφεις
+    // τερατώδη αρχεία στον δίσκο.
+    let raw_size = interleaved.len() * 3; // 24-bit
+    if bytes.len() > raw_size {
+        return Err(format!(
+            "FLAC encoder produced {} bytes for {} samples \
+             ({}x raw PCM) — refusing to write. flacenc bloat bug.",
+            bytes.len(), interleaved.len(),
+            bytes.len() / raw_size.max(1)
+        ));
+    }
+
+    // W17 DIAGNOSTIC — TEMPORARY
+    eprintln!(
+        "[W17-FLAC] input_samples={} quantized_samples={} output_bytes={} ratio={:.4} path={}",
+        interleaved.len(),
+        quantized.len(),
+        bytes.len(),
+        bytes.len() as f64 / (interleaved.len() as f64 * 3.0),  // vs 24-bit PCM
+        path.display()
+    );
+
     std::fs::write(path, bytes).map_err(|e| format!("Failed to write FLAC file: {}", e))
 }
 

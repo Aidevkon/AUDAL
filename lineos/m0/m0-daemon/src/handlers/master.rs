@@ -68,7 +68,7 @@ impl Default for MixLevels {
 }
 
 impl MixLevels {
-    /// Clamp all levels to [0.0, 1.0] — constitutional safety.
+    /// Clamp all levels — constitutional safety.
     pub fn clamped(&self) -> Self {
         Self {
             voice: self.voice.clamp(0.0, 1.0),
