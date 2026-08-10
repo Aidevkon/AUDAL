@@ -326,3 +326,127 @@ mod tests {
         assert!(json.contains("\"integrated_lufs\""));
     }
 }
+
+/// ΒΗΜΑ 1 του certificate-as-type.
+/// Παράλληλα με το StoredBlob. Κανείς δεν τα χρησιμοποιεί
+/// ακόμα. northstar §Σ.
+///
+/// ΤΟ ΠΡΟΒΛΗΜΑ ΠΟΥ ΛΥΝΟΥΝ: το StoredBlob λειτουργεί ως
+/// C-union — τρία σημεία το κατασκευάζουν με
+/// ..Default::default() γεμίζοντας 13 πεδία με μηδενικά,
+/// και ένα από τα πέντε παραδοτέα (spatial) φεύγει χωρίς
+/// καμία απόδειξη.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredBlobCore {
+    pub id: String,
+    pub version: String,
+    pub blob_type: String,
+    pub created_at: String,
+    pub input_hash: String,
+    pub seed: u64,
+    pub pipeline_version: String,
+    /// = 0. ΣΠΑΕΙ ΧΩΡΙΣ MIGRATION μέχρι το πρώτο
+    /// public release. northstar, schema_version.
+    pub schema_version: u32,
+    /// ΠΡΟΣΩΡΙΝΟ: σήμερα το preset_id κουβαλάει ΤΕΣΣΕΡΑ
+    /// είδη πραγμάτων (delivery target, flavour, routing
+    /// mode, typos/casing). Μένει String μέχρι το ΜΗΤΡΩΟ
+    /// να το σπάσει σε delivery_target / flavour /
+    /// routing_mode.
+    /// ΜΗΝ προσθέσεις λογική που το θεωρεί ενιαίο.
+    pub preset_id: String,
+    pub pcm_blake3: Option<String>,
+    pub cert_signature: Option<String>,
+    #[serde(skip)]
+    pub audio_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
+    #[serde(skip)]
+    pub sample_rate: u32,
+    #[serde(skip)]
+    pub channels: u16,
+    #[serde(skip)]
+    pub num_frames: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BlobVariant {
+    /// Μετρήθηκε. Έχει απόδειξη.
+    Certified {
+        loudness: crate::blob_store::StoredLoudness,
+        quality: crate::blob_store::StoredQuality,
+        provenance: crate::blob_store::StoredProvenance,
+        spatial: crate::blob_store::StoredSpatial,
+        stem_fingerprints: Option<crate::blob_store::StemFingerprints>,
+        processing_timeline: Vec<crate::blob_store::StageRecord>,
+        dead_air: crate::dsp::signal_health::DeadAirSummary,
+        aether_cert: Option<String>,
+        aether_persona: Option<String>,
+        aether_config: Option<String>,
+        qr_base64: Option<String>,
+    },
+    /// ΔΕΝ μετρήθηκε. ΧΡΕΟΣ με όνομα.
+    /// ΔΕΝ παραδίδεται σε χρήστη χωρίς ρητή μετατροπή.
+    Uncertified { reason: UncertifiedReason },
+}
+
+/// Κάθε λόγος είναι ΧΡΕΟΣ με συνθήκη λήξης.
+/// grep UncertifiedReason = η λίστα του χρέους.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum UncertifiedReason {
+    /// ΧΡΕΟΣ: το spatial_conformance_path δεν μετράει
+    /// lufs/true_peak/lra — δουλεύει in-place σε mmap
+    /// χωρίς telemetry pass.
+    /// ΣΒΗΝΕΙ όταν αποκτήσει O(1) analyzer. northstar §Σ.
+    SpatialPathHasNoTelemetry,
+
+    /// ΧΡΕΟΣ: το deliver.rs::build_minimal_blob ΦΤΙΑΧΝΕΙ
+    /// blob αντί να ΔΙΑΒΑΖΕΙ το υπάρχον.
+    /// ΣΒΗΝΕΙ όταν το delivery διαβάζει από το store.
+    DeliveryManifestStub,
+
+    /// ΧΡΕΟΣ: το conductor λαμβάνει BatchTrackOutput
+    /// (7 πεδία) μέσω async καναλιού, όχι πλήρη StoredBlob.
+    /// ΣΒΗΝΕΙ όταν το run_batch() γίνει συνάρτηση.
+    /// northstar §Β.
+    ProxyForAlbumContext,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredBlobV2 {
+    pub core: StoredBlobCore,
+    pub variant: BlobVariant,
+}
+
+/// Το παραδοτέο. Ο τύπος που εγγυάται ότι κάθε αρχείο
+/// φεύγει με ό,τι το συνοδεύει.
+#[derive(Debug)]
+pub enum Deliverable {
+    Single(StoredBlobV2),
+    Album {
+        cert: crate::domain::nodes::album_certificate_node::AlbumCertificate,
+        tracks: Vec<StoredBlobV2>,
+        /// ΠΛΑΙΣΙΟ: χωρίς αυτό το track #2 δεν
+        /// αναπαράγεται μόνο του. Δόγμα Α.
+        contexts: Vec<TrackContext>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackContext {
+    pub position_in_batch: usize,
+
+    /// ΧΡΕΟΣ (recon 2026-08-11): ο conductor κρατάει ΜΟΝΟ
+    /// το fatigue_detected: bool σε Vec<bool> fatigue_map.
+    /// Οι πραγματικοί multipliers του EarFatigueDelta
+    /// ΠΕΤΙΟΝΤΑΙ μετά την εφαρμογή
+    /// (conductor.rs:476-484).
+    /// Μένουν None μέχρι το run_batch() να μεταφέρει
+    /// αυτούσιο το EarFatigueDelta. northstar §Β.
+    pub ear_fatigue_ducking_mult: Option<f32>,
+    pub ear_fatigue_width_mult: Option<f32>,
+
+    /// Χωρίς αυτά το track #2 δεν αναπαράγεται μόνο του.
+    /// Το EarFatigue διαβάζει integrated_lufs ΚΑΙ
+    /// transient_density του index-1. Δόγμα Α.
+    pub prev_track_lufs: Option<f32>,
+    pub prev_track_transient_density: Option<f32>,
+}
