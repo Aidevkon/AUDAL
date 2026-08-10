@@ -17,6 +17,7 @@ pub enum DecodeError {
     DecodeFailure(String),
     ResampleFailure(String),
     ConsumerError(String),
+    MissingSampleRate,
 }
 
 impl fmt::Display for DecodeError {
@@ -31,6 +32,7 @@ impl fmt::Display for DecodeError {
             DecodeError::DecodeFailure(e) => write!(f, "Decode failure: {e}"),
             DecodeError::ResampleFailure(e) => write!(f, "Resample failure: {e}"),
             DecodeError::ConsumerError(e) => write!(f, "Consumer error: {e}"),
+            DecodeError::MissingSampleRate => write!(f, "Missing sample rate"),
         }
     }
 }
@@ -39,6 +41,7 @@ impl fmt::Display for DecodeError {
 pub enum LazyReaderError {
     NoSupportedTrack,
     Symphonia(String),
+    MissingSampleRate,
     InvalidBufferLength { len: usize, channels: usize },
 }
 
@@ -47,6 +50,7 @@ impl fmt::Display for LazyReaderError {
         match self {
             Self::NoSupportedTrack => write!(f, "no supported audio track found"),
             Self::Symphonia(e) => write!(f, "symphonia error: {e}"),
+            Self::MissingSampleRate => write!(f, "missing sample rate"),
             Self::InvalidBufferLength { len, channels } => write!(
                 f,
                 "buffer length {len} is not a \

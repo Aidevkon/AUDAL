@@ -68,7 +68,14 @@ impl LazyAudioReader {
             .ok_or(LazyReaderError::NoSupportedTrack)?;
 
         let track_id = track.id;
-        let sample_rate = track.codec_params.sample_rate.unwrap_or(48000);
+        // X1: το sample rate είναι η ΚΛΙΜΑΚΑ ΤΟΥ ΧΡΟΝΟΥ, όχι
+        // μεταδεδομένο. Λάθος τιμή = pitch shift + κάθε
+        // μέτρηση μετατοπισμένη (44.1k ως 48k = +1.47
+        // ημιτόνια, 8.8% σε LUFS φίλτρα, mel filterbank,
+        // frame 480). Τέσσερα σημεία μάντευαν με τρεις
+        // διαφορετικές τιμές. ΑΡΝΗΣΗ αντί για μαντεψιά.
+        let sample_rate = track.codec_params.sample_rate
+            .ok_or(LazyReaderError::MissingSampleRate)?;
         let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
 
         let decoder = symphonia::default::get_codecs()

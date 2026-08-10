@@ -705,7 +705,13 @@ pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome
             .ok_or_else(|| "No audio track found".to_string())?;
 
         let track_id = track.id;
-        let dec_sr = track.codec_params.sample_rate.unwrap_or(0);
+        // X1: το sample rate είναι η ΚΛΙΜΑΚΑ ΤΟΥ ΧΡΟΝΟΥ, όχι
+        // μεταδεδομένο. Λάθος τιμή = pitch shift + κάθε
+        // μέτρηση μετατοπισμένη (44.1k ως 48k = +1.47
+        // ημιτόνια, 8.8% σε LUFS φίλτρα, mel filterbank,
+        // frame 480). Τέσσερα σημεία μάντευαν με τρεις
+        // διαφορετικές τιμές. ΑΡΝΗΣΗ αντί για μαντεψιά.
+        let dec_sr = track.codec_params.sample_rate.ok_or_else(|| "Missing sample rate".to_string())?;
         let dec_ch = track
             .codec_params
             .channels
