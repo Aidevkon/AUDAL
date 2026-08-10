@@ -325,6 +325,99 @@ mod tests {
         assert!(json.contains("\"type\":\"audio\""));
         assert!(json.contains("\"integrated_lufs\""));
     }
+
+    #[test]
+    fn bridge_certified_loses_nothing() {
+        let v2 = crate::blob_store::StoredBlobV2 {
+            core: crate::blob_store::StoredBlobCore {
+                id: "core-id".into(),
+                version: "2.0".into(),
+                blob_type: "video".into(),
+                created_at: "now".into(),
+                input_hash: "hash".into(),
+                seed: 42,
+                pipeline_version: "v1".into(),
+                schema_version: 3,
+                preset_id: "preset".into(),
+                pcm_blake3: Some("blake".into()),
+                cert_signature: Some("sig".into()),
+                audio_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::default()),
+                sample_rate: 44100,
+                channels: 1,
+                num_frames: 100,
+            },
+            variant: crate::blob_store::BlobVariant::Certified {
+                loudness: crate::blob_store::StoredLoudness { integrated_lufs: -10.0, ..Default::default() },
+                quality: crate::blob_store::StoredQuality { stereo_correlation: 0.5, ..Default::default() },
+                provenance: crate::blob_store::StoredProvenance { engine_id: "E2".into(), ..Default::default() },
+                spatial: crate::blob_store::StoredSpatial { low: crate::blob_store::BandSpatial { pan_mean: 0.1, pan_width: 0.2 }, ..Default::default() },
+                stem_fingerprints: Some(crate::blob_store::StemFingerprints::default()),
+                processing_timeline: vec![crate::blob_store::StageRecord::default()],
+                dead_air: crate::dsp::signal_health::DeadAirSummary { noise_floor_dbfs: Some(-80.0), ..Default::default() },
+                aether_cert: Some("cert".into()),
+                aether_persona: Some("persona".into()),
+                aether_config: Some("config".into()),
+                qr_base64: Some("qr".into()),
+            },
+        };
+        let blob: crate::blob_store::StoredBlob = v2.into();
+        assert_eq!(blob.id, "core-id");
+        assert_eq!(blob.version, "2.0");
+        assert_eq!(blob.blob_type, "video");
+        assert_eq!(blob.created_at, "now");
+        assert_eq!(blob.input_hash, "hash");
+        assert_eq!(blob.seed, 42);
+        assert_eq!(blob.pipeline_version, "v1");
+        assert_eq!(blob.schema_version, 3);
+        assert_eq!(blob.preset_id, "preset");
+        assert_eq!(blob.pcm_blake3, Some("blake".into()));
+        assert_eq!(blob.cert_signature, Some("sig".into()));
+        assert_eq!(blob.sample_rate, 44100);
+        assert_eq!(blob.channels, 1);
+        assert_eq!(blob.num_frames, 100);
+
+        assert_eq!(blob.loudness.integrated_lufs, -10.0);
+        assert_eq!(blob.quality.stereo_correlation, 0.5);
+        assert_eq!(blob.provenance.engine_id, "E2");
+        assert_eq!(blob.spatial.low.pan_mean, 0.1);
+        assert!(blob.stem_fingerprints.is_some());
+        assert_eq!(blob.processing_timeline.len(), 1);
+        assert_eq!(blob.dead_air.noise_floor_dbfs, Some(-80.0));
+        assert_eq!(blob.aether_cert, Some("cert".into()));
+        assert_eq!(blob.aether_persona, Some("persona".into()));
+        assert_eq!(blob.aether_config, Some("config".into()));
+        assert_eq!(blob.qr_base64, Some("qr".into()));
+    }
+
+    #[test]
+    fn bridge_uncertified_is_default() {
+        let v2 = crate::blob_store::StoredBlobV2 {
+            core: crate::blob_store::StoredBlobCore {
+                id: "core-id".into(),
+                version: "2.0".into(),
+                blob_type: "video".into(),
+                created_at: "now".into(),
+                input_hash: "hash".into(),
+                seed: 42,
+                pipeline_version: "v1".into(),
+                schema_version: 3,
+                preset_id: "preset".into(),
+                pcm_blake3: Some("blake".into()),
+                cert_signature: Some("sig".into()),
+                audio_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::default()),
+                sample_rate: 44100,
+                channels: 1,
+                num_frames: 100,
+            },
+            variant: crate::blob_store::BlobVariant::Uncertified { reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry },
+        };
+        let blob: crate::blob_store::StoredBlob = v2.into();
+        assert_eq!(blob.id, "core-id");
+        assert_eq!(blob.seed, 42);
+        
+        assert_eq!(blob.loudness.integrated_lufs, 0.0);
+        assert_eq!(blob.aether_cert, None);
+    }
 }
 
 /// ΒΗΜΑ 1 του certificate-as-type.
@@ -552,6 +645,83 @@ impl StoredBlobV2 {
         match &self.variant {
             BlobVariant::Certified { .. } => None,
             BlobVariant::Uncertified { reason } => Some(*reason),
+        }
+    }
+}
+
+/// ΠΡΟΣΩΡΙΝΟ — βήμα 3/7. ΣΒΗΝΕΙ στο βήμα 7 όταν φύγει
+/// το παλιό StoredBlob.
+///
+/// Το Certified γεμίζει τα πεδία ένα προς ένα.
+/// Το Uncertified τα αφήνει Default — δηλαδή ΞΑΝΑΓΕΜΙΖΕΙ
+/// με μηδενικά, που είναι ΑΚΡΙΒΩΣ αυτό που προσπαθούμε
+/// να σταματήσουμε. Γι' αυτό η γέφυρα είναι προσωρινή
+/// και γι' αυτό ΔΕΝ επιτρέπεται νέος caller της.
+///
+/// ΜΗΝ γράψεις From<StoredBlob> for StoredBlobV2 —
+/// η αντίστροφη κατεύθυνση θα νομιμοποιούσε το παλιό.
+impl From<StoredBlobV2> for StoredBlob {
+    fn from(v2: StoredBlobV2) -> Self {
+        match v2.variant {
+            BlobVariant::Certified {
+                loudness,
+                quality,
+                provenance,
+                spatial,
+                stem_fingerprints,
+                processing_timeline,
+                dead_air,
+                aether_cert,
+                aether_persona,
+                aether_config,
+                qr_base64,
+            } => StoredBlob {
+                id: v2.core.id,
+                version: v2.core.version,
+                blob_type: v2.core.blob_type,
+                created_at: v2.core.created_at,
+                input_hash: v2.core.input_hash,
+                seed: v2.core.seed,
+                pipeline_version: v2.core.pipeline_version,
+                preset_id: v2.core.preset_id,
+                schema_version: v2.core.schema_version,
+                pcm_blake3: v2.core.pcm_blake3,
+                cert_signature: v2.core.cert_signature,
+                audio_path: v2.core.audio_path,
+                sample_rate: v2.core.sample_rate,
+                channels: v2.core.channels,
+                num_frames: v2.core.num_frames,
+                
+                loudness,
+                quality,
+                provenance,
+                spatial,
+                stem_fingerprints,
+                processing_timeline,
+                dead_air,
+                aether_cert,
+                aether_persona,
+                aether_config,
+                qr_base64,
+            },
+            BlobVariant::Uncertified { .. } => StoredBlob {
+                id: v2.core.id,
+                version: v2.core.version,
+                blob_type: v2.core.blob_type,
+                created_at: v2.core.created_at,
+                input_hash: v2.core.input_hash,
+                seed: v2.core.seed,
+                pipeline_version: v2.core.pipeline_version,
+                preset_id: v2.core.preset_id,
+                schema_version: v2.core.schema_version,
+                pcm_blake3: v2.core.pcm_blake3,
+                cert_signature: v2.core.cert_signature,
+                audio_path: v2.core.audio_path,
+                sample_rate: v2.core.sample_rate,
+                channels: v2.core.channels,
+                num_frames: v2.core.num_frames,
+                ..Default::default()
+            },
         }
     }
 }

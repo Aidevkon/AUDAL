@@ -2,8 +2,7 @@
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P5
 
 use crate::blob_store::{
-    BandSpatial, StageRecord, StemFingerprints, StoredBlob, StoredLoudness, StoredProvenance,
-    StoredQuality, StoredSpatial,
+    StageRecord, StemFingerprints, StoredBlob,
 };
 use chrono::Utc;
 use lineos_telemetry::lra::LraCalculator;
@@ -289,95 +288,100 @@ fn assemble_blob(
     // Extract early to avoid borrow-after-move when dead_air is consumed below.
     let noise_floor = dead_air.noise_floor_dbfs;
 
-    let blob = StoredBlob {
-        id: blob_id.to_string(),
-        version: "1.0".into(),
-        blob_type: "audio".into(),
-        created_at: Utc::now().to_rfc3339(),
-        input_hash: input_hash_hex.to_string(),
-        seed,
-        pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
-        preset_id: preset_id.to_string(),
-        stem_fingerprints: Some(fingerprints.clone()),
-        qr_base64,
-        pcm_blake3: Some(pcm_blake3),
-        cert_signature: Some(cert_sig),
-        processing_timeline,
-        dead_air,
-        loudness: StoredLoudness {
-            integrated_lufs: lufs,
-            short_term_lufs: telemetry_short_term,
-            momentary_lufs: telemetry_momentary,
-            true_peak_dbtp: true_peak,
-            lra: telemetry_lra,
-            noise_floor_dbfs: noise_floor,
-            k_weighted: true,
-            ebu_r128_target_lufs: -23.0,
-            ebu_r128_compliant: lufs <= -23.0 && true_peak <= -1.0,
-            spotify_compliant: platform_ok(lufs, -14.0, true_peak),
-            youtube_compliant: platform_ok(lufs, -14.0, true_peak),
-            apple_music_compliant: platform_ok(lufs, -16.0, true_peak),
-            apple_podcasts_compliant: platform_ok(lufs, -16.0, true_peak),
-            broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
-            tidal_compliant: platform_ok(lufs, -14.0, true_peak),
-            too_quiet_for_mobile: lufs < MIN_MOBILE_PLAYBACK_LUFS,
-            acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
-            acx_rms_db: acx.map(|a| a.rms_db),
-            acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
-            acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
-            acx_compliant: acx.map(|a| a.passes_acx()),
+    let blob_v2 = crate::blob_store::StoredBlobV2 {
+        core: crate::blob_store::StoredBlobCore {
+            id: blob_id.to_string(),
+            version: "1.0".into(),
+            blob_type: "audio".into(),
+            created_at: Utc::now().to_rfc3339(),
+            input_hash: input_hash_hex.to_string(),
+            seed,
+            pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
+            preset_id: preset_id.to_string(),
+            schema_version: 2,
+            pcm_blake3: Some(pcm_blake3),
+            cert_signature: Some(cert_sig),
+            audio_path: file_path.clone(),
+            sample_rate,
+            channels,
+            num_frames: n_total,
         },
-        quality: StoredQuality {
-            stereo_correlation: sc,
-            phase_coherence: 0.97,
-            stereo_width: 0.5,
-            dynamic_range_db: dr,
-            rms_db: lufs + 3.0,
-            spectral_centroid: 3_200.0,
-            spectral_flatness: 0.12,
-            clips_detected: 0,
-            clip_free: true_peak <= -1.0,
-        },
-        spatial: StoredSpatial {
-            low: BandSpatial {
-                pan_mean: spatial_metadata.spatial[0].pan_mean,
-                pan_width: spatial_metadata.spatial[0].pan_width,
+        variant: crate::blob_store::BlobVariant::Certified {
+            stem_fingerprints: Some(fingerprints.clone()),
+            qr_base64,
+            processing_timeline,
+            dead_air,
+            aether_cert: Some(cert_json),
+            aether_persona: Some(persona_config.id.clone()),
+            aether_config: Some(config_json),
+            loudness: crate::blob_store::StoredLoudness {
+                integrated_lufs: lufs,
+                short_term_lufs: telemetry_short_term,
+                momentary_lufs: telemetry_momentary,
+                true_peak_dbtp: true_peak,
+                lra: telemetry_lra,
+                noise_floor_dbfs: noise_floor,
+                k_weighted: true,
+                ebu_r128_target_lufs: -23.0,
+                ebu_r128_compliant: lufs <= -23.0 && true_peak <= -1.0,
+                spotify_compliant: platform_ok(lufs, -14.0, true_peak),
+                youtube_compliant: platform_ok(lufs, -14.0, true_peak),
+                apple_music_compliant: platform_ok(lufs, -16.0, true_peak),
+                apple_podcasts_compliant: platform_ok(lufs, -16.0, true_peak),
+                broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
+                tidal_compliant: platform_ok(lufs, -14.0, true_peak),
+                too_quiet_for_mobile: lufs < MIN_MOBILE_PLAYBACK_LUFS,
+                acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
+                acx_rms_db: acx.map(|a| a.rms_db),
+                acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
+                acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
+                acx_compliant: acx.map(|a| a.passes_acx()),
             },
-            low_mid: BandSpatial {
-                pan_mean: spatial_metadata.spatial[1].pan_mean,
-                pan_width: spatial_metadata.spatial[1].pan_width,
+            quality: crate::blob_store::StoredQuality {
+                stereo_correlation: sc,
+                phase_coherence: 0.97,
+                stereo_width: 0.5,
+                dynamic_range_db: dr,
+                rms_db: lufs + 3.0,
+                spectral_centroid: 3_200.0,
+                spectral_flatness: 0.12,
+                clips_detected: 0,
+                clip_free: true_peak <= -1.0,
             },
-            mid: BandSpatial {
-                pan_mean: spatial_metadata.spatial[2].pan_mean,
-                pan_width: spatial_metadata.spatial[2].pan_width,
+            spatial: crate::blob_store::StoredSpatial {
+                low: crate::blob_store::BandSpatial {
+                    pan_mean: spatial_metadata.spatial[0].pan_mean,
+                    pan_width: spatial_metadata.spatial[0].pan_width,
+                },
+                low_mid: crate::blob_store::BandSpatial {
+                    pan_mean: spatial_metadata.spatial[1].pan_mean,
+                    pan_width: spatial_metadata.spatial[1].pan_width,
+                },
+                mid: crate::blob_store::BandSpatial {
+                    pan_mean: spatial_metadata.spatial[2].pan_mean,
+                    pan_width: spatial_metadata.spatial[2].pan_width,
+                },
+                high_mid: crate::blob_store::BandSpatial {
+                    pan_mean: spatial_metadata.spatial[3].pan_mean,
+                    pan_width: spatial_metadata.spatial[3].pan_width,
+                },
+                high: crate::blob_store::BandSpatial {
+                    pan_mean: spatial_metadata.spatial[4].pan_mean,
+                    pan_width: spatial_metadata.spatial[4].pan_width,
+                },
             },
-            high_mid: BandSpatial {
-                pan_mean: spatial_metadata.spatial[3].pan_mean,
-                pan_width: spatial_metadata.spatial[3].pan_width,
+            provenance: crate::blob_store::StoredProvenance {
+                engine_id: "E11".into(),
+                engine_version: env!("CARGO_PKG_VERSION").to_string(),
+                processing_time_ms: elapsed_ms,
+                host_os: std::env::consts::OS.to_string(),
+                created_by: "stillair-cockpit".into(),
+                aether_enriched: true,
+                aether_devices: vec![],
             },
-            high: BandSpatial {
-                pan_mean: spatial_metadata.spatial[4].pan_mean,
-                pan_width: spatial_metadata.spatial[4].pan_width,
-            },
-        },
-        provenance: StoredProvenance {
-            engine_id: "E11".into(),
-            engine_version: env!("CARGO_PKG_VERSION").to_string(),
-            processing_time_ms: elapsed_ms,
-            host_os: std::env::consts::OS.to_string(),
-            created_by: "stillair-cockpit".into(),
-            aether_enriched: true,
-            aether_devices: vec![],
-        },
-        schema_version: 2,
-        aether_cert: Some(cert_json),
-        aether_persona: Some(persona_config.id.clone()),
-        aether_config: Some(config_json),
-        sample_rate,
-        channels,
-        num_frames: n_total,
-        audio_path: file_path.clone(),
+        }
     };
+    let blob: StoredBlob = blob_v2.into();
 
     // Generate PDF certificate — silent, never blocks pipeline
     let pdf_path =
