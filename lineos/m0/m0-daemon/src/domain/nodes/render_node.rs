@@ -217,8 +217,22 @@ pub fn run(
     let duck_track_cb = duck_track.clone();
     let duck_track_clone = duck_track.clone();
 
+    let w16_sums = std::rc::Rc::new(std::cell::RefCell::new([0.0f32; 6]));
+    let w16_sums_clone = w16_sums.clone();
+
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
         let chunk_len = stems_chunk.voice.len();
+        {
+            let mut sums = w16_sums_clone.borrow_mut();
+            for i in 0..chunk_len {
+                sums[0] += stems_chunk.voice[i] * stems_chunk.voice[i];
+                sums[1] += stems_chunk.drums[i] * stems_chunk.drums[i];
+                sums[2] += stems_chunk.bass[i] * stems_chunk.bass[i];
+                sums[3] += stems_chunk.harmonics[i] * stems_chunk.harmonics[i];
+                sums[4] += stems_chunk.ambience[i] * stems_chunk.ambience[i];
+                sums[5] += 1.0;
+            }
+        }
 
         let mv: Vec<f32> = stems_chunk
             .voice
@@ -460,6 +474,21 @@ pub fn run(
     } else {
         1.0
     };
+
+    eprintln!("[W16] original_rms={:.6} mix_rms={:.6} gain={:.4} ceiling={:.4}",
+        original_rms, mix_rms, gain, ceiling_linear);
+
+    {
+        let sums = w16_sums.borrow();
+        if sums[5] > 0.0 {
+            let v = libm::sqrtf(sums[0] / sums[5]);
+            let d = libm::sqrtf(sums[1] / sums[5]);
+            let b = libm::sqrtf(sums[2] / sums[5]);
+            let h = libm::sqrtf(sums[3] / sums[5]);
+            let a = libm::sqrtf(sums[4] / sums[5]);
+            eprintln!("[W16-STEMS] v={:.6} d={:.6} b={:.6} h={:.6} a={:.6}", v, d, b, h, a);
+        }
+    }
 
     // Διαγνωστικό: αποδεικνύει ότι ο Ducker φτάνει το floor.
     // Μετρημένο (W10.c): min 0.2517 = -12dB, 79% των frames

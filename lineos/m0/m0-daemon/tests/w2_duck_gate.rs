@@ -385,13 +385,18 @@ fn w3b_mix_levels_gate() {
     hasher.update(&bytes_a);
     let hash_a = format!("{:x}", hasher.finalize());
     println!("SHA (None): {}", hash_a);
-    // Ανανεώθηκε W6.c: το NMFD8 έγινε default separator
-    // (unwrap_or(false)→(true) στο dsp_pipeline.rs). Το
-    // προηγούμενο 7df8c9ec ήταν NMF5 render. Ο ήχος άλλαξε
-    // ΣΚΟΠΙΜΑ — W6.b: NMFD 20/20 σε κάθε SNR, W12: κόστος 9%.
+    // Ανανεώθηκε W16: το 761d4128 του W6.c πιστοποιούσε
+    // render με ΣΠΑΣΜΕΝΑ NMFD masks — το two_pass περνούσε
+    // NmfEngine::default() (n_components=5) σε συναρτήσεις
+    // που χρησιμοποιούν το k ως stride σε tensor_w δομημένο
+    // για k=8. Μετρημένο: mask sum max 16.59 αντί ≈1.0,
+    // bass stem 5.3× και ambience 6.1× πάνω από ΟΛΟ το
+    // input, τελικό LUFS −25.13 αντί −14.70.
+    // Το W6.b ΔΕΝ μολύνθηκε: το oracle_extract περνάει
+    // NmfEngine::new(8) σωστά. Το bug ήταν μόνο στο wire.
     assert_eq!(
         hash_a,
-        "761d412808e73d64e52db52e3ceeb69dae4d9700430e7ce8678dc8f26cd06715"
+        "fa97ff060fd4b53b9798d1a1e8e64d7ebea4b94d4ea83952715c805fdd050149"
     );
 
     fs::copy(pcm_a.path(), "/tmp/w3b_mix_none.wav").unwrap();

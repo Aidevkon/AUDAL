@@ -276,8 +276,17 @@ pub(crate) fn process_single_chunk(
             nmfd_iter,
         );
 
+        // W16: nmf comes from NmfEngine::default() (n_components=5)
+        // but tensor_w/h_chunk are structured for k=8. The NMFD mask
+        // functions use self.n_components as STRIDE for tensor_w
+        // indexing — with k=5 they read wrong addresses.
+        // Measured: mask sum max 16.59 instead of ≈1.0,
+        // bass stem 5.3× and ambience 6.1× above input,
+        // −8.7dB in final LUFS (−25.13 vs −16.42).
+        let nmfd_engine = crate::stft::nmf::NmfEngine::new(nmfd_k);
+
         (
-            nmf.nmfd_group_mask_chunk(
+            nmfd_engine.nmfd_group_mask_chunk(
                 &[0, 1, 2, 3],
                 &nmfd_h,
                 &scout.tensor_w,
@@ -285,7 +294,7 @@ pub(crate) fn process_single_chunk(
                 N_BINS,
                 scout.tau,
             ),
-            nmf.nmfd_component_mask_chunk(
+            nmfd_engine.nmfd_component_mask_chunk(
                 scout.nmfd_bass_idx,
                 &nmfd_h,
                 &scout.tensor_w,
@@ -293,7 +302,7 @@ pub(crate) fn process_single_chunk(
                 N_BINS,
                 scout.tau,
             ),
-            nmf.nmfd_component_mask_chunk(
+            nmfd_engine.nmfd_component_mask_chunk(
                 scout.nmfd_harmonics_idx,
                 &nmfd_h,
                 &scout.tensor_w,
@@ -301,7 +310,7 @@ pub(crate) fn process_single_chunk(
                 N_BINS,
                 scout.tau,
             ),
-            nmf.nmfd_component_mask_chunk(
+            nmfd_engine.nmfd_component_mask_chunk(
                 scout.nmfd_ambience_idx,
                 &nmfd_h,
                 &scout.tensor_w,

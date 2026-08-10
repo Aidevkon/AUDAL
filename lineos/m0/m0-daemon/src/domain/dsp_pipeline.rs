@@ -12,6 +12,17 @@ use xaak::repo::DspState;
 /// Phase 7: uses decode::decode_audio() — real symphonia decode.
 /// Runs blocking decode + DSP in Tokio blocking tasks.
 
+/// Parallel send: out = dry + GlueChain(dry)·amount.
+/// ΜΟΝΟ width (drive=0 — μετρημένο ταυτόσημο με/χωρίς
+/// όταν υπάρχει brickwall limiter, 5cc9021).
+/// Default 0.5: δεν βλάπτει σε ηλεκτρονικό/ακουστικό/
+/// ροκ. Το 1.0 είναι ευδιάκριτα καλύτερο αλλά είναι
+/// προτίμηση, όχι default.
+/// Μετρημένο (ακουστικό, μέσω limiter):
+///   dry rms 0.0848 side 0.0262
+///   100% rms 0.1161 side 0.0551
+const GLUE_SEND_AMOUNT: f32 = 0.0;   // ΠΡΟΣ ΤΟ ΠΑΡΟΝ 0
+
 #[derive(Debug, Default)]
 pub struct RenderArtifacts {
     pub persisted_master: Option<std::path::PathBuf>,
@@ -1022,6 +1033,25 @@ fn run_dsp_internal(
     let right_post = &mut scratch_r_view[..];
 
     profiler.mark_stage("Stem Engine", &left_post[..]);
+
+    if GLUE_SEND_AMOUNT > 1e-6 {
+        let t_glue = std::time::Instant::now();
+        let mut wet_l = left_post.to_vec();
+        let mut wet_r = right_post.to_vec();
+        let mut chain = sp314_dsp::dsp::glue::GlueChain::new(
+            decoded.pcm_sample_rate as f32,
+            sp314_dsp::dsp::glue::WidthMode::Reveal,
+        );
+        chain.set_amount(1.0);
+        chain.set_drive(0.0);
+        chain.process(&mut wet_l, &mut wet_r);
+        for i in 0..left_post.len() {
+            left_post[i]  += wet_l[i]  * GLUE_SEND_AMOUNT;
+            right_post[i] += wet_r[i] * GLUE_SEND_AMOUNT;
+        }
+        eprintln!("[PERF-NODE] glue_send={}ms",
+                  t_glue.elapsed().as_millis());
+    }
 
     // Markov spatial modulation (simplified — full in Phase 8)
     emit_progress("Spatial");
