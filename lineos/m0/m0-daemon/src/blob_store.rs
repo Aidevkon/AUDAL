@@ -450,3 +450,108 @@ pub struct TrackContext {
     pub prev_track_lufs: Option<f32>,
     pub prev_track_transient_density: Option<f32>,
 }
+
+impl StoredBlobV2 {
+    /// Some μόνο αν Certified. None αν Uncertified.
+    /// ΣΚΟΠΙΜΑ Option: ο caller ΠΡΕΠΕΙ να αντιμετωπίσει
+    /// την περίπτωση που δεν υπάρχει μέτρηση.
+    pub fn loudness(&self) -> Option<&StoredLoudness> {
+        match &self.variant {
+            BlobVariant::Certified { loudness, .. } => Some(loudness),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn quality(&self) -> Option<&StoredQuality> {
+        match &self.variant {
+            BlobVariant::Certified { quality, .. } => Some(quality),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn provenance(&self) -> Option<&StoredProvenance> {
+        match &self.variant {
+            BlobVariant::Certified { provenance, .. } => Some(provenance),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn spatial(&self) -> Option<&StoredSpatial> {
+        match &self.variant {
+            BlobVariant::Certified { spatial, .. } => Some(spatial),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn stem_fingerprints(&self) -> Option<&StemFingerprints> {
+        match &self.variant {
+            BlobVariant::Certified { stem_fingerprints, .. } => stem_fingerprints.as_ref(),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn qr_base64(&self) -> Option<&str> {
+        match &self.variant {
+            BlobVariant::Certified { qr_base64, .. } => qr_base64.as_deref(),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn aether_cert(&self) -> Option<&str> {
+        match &self.variant {
+            BlobVariant::Certified { aether_cert, .. } => aether_cert.as_deref(),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn aether_persona(&self) -> Option<&str> {
+        match &self.variant {
+            BlobVariant::Certified { aether_persona, .. } => aether_persona.as_deref(),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    pub fn aether_config(&self) -> Option<&str> {
+        match &self.variant {
+            BlobVariant::Certified { aether_config, .. } => aether_config.as_deref(),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    /// ΠΛΗΡΕΣ PATH — το DeadAirSummary ΔΕΝ είναι σε scope
+    /// στο blob_store.rs. Γράψ' το αυτούσιο, ΜΗΝ προσθέσεις
+    /// use statement (θα ήταν αλλαγή σε υπάρχοντα κώδικα).
+    pub fn dead_air(&self) -> Option<&crate::dsp::signal_health::DeadAirSummary> {
+        match &self.variant {
+            BlobVariant::Certified { dead_air, .. } => Some(dead_air),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    /// ΠΡΟΣΟΧΗ ΣΗΜΑΣΙΟΛΟΓΙΑΣ:
+    ///   None       = ΔΕΝ μετρήθηκε (Uncertified)
+    ///   Some(&[])  = μετρήθηκε, κανένα στάδιο
+    /// Είναι ΔΙΑΦΟΡΕΤΙΚΑ. Μην τα συγχέεις.
+    pub fn processing_timeline(&self) -> Option<&[StageRecord]> {
+        match &self.variant {
+            BlobVariant::Certified { processing_timeline, .. } => Some(processing_timeline.as_slice()),
+            BlobVariant::Uncertified { .. } => None,
+        }
+    }
+
+    /// Ρητός έλεγχος πριν από export. Το Uncertified
+    /// ΔΕΝ παραδίδεται σε χρήστη χωρίς συνειδητή απόφαση.
+    pub fn is_certified(&self) -> bool {
+        matches!(self.variant, BlobVariant::Certified { .. })
+    }
+
+    /// None αν Certified. Some(reason) αν όχι — ώστε ο
+    /// caller να μπορεί να πει ΓΙΑΤΙ λείπει η απόδειξη.
+    /// By value: το UncertifiedReason είναι Copy (βήμα 1).
+    pub fn uncertified_reason(&self) -> Option<UncertifiedReason> {
+        match &self.variant {
+            BlobVariant::Certified { .. } => None,
+            BlobVariant::Uncertified { reason } => Some(*reason),
+        }
+    }
+}
