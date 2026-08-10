@@ -47,6 +47,14 @@ fn compute_rms(signal: &[f32]) -> f32 {
     (sum_sq / signal.len() as f32).sqrt()
 }
 
+/// ΔΙΟΡΘΩΘΗΚΕ: το test έδινε ΟΛΟΚΛΗΡΟ το αρχείο στο
+/// scout, ενώ το προϊόν δίνει τα πρώτα 30s
+/// (dsp_pipeline.rs:449). Η διαφορά είναι δραματική:
+/// scout(ΟΛΟ) → harmonics 500Hz-2k = 18.0%,
+/// scout(30s) → 86.2%. Με σταθερό K=8, περισσότερο
+/// υλικό δίνει πιο ΓΕΝΙΚΑ components. Οι μετρήσεις
+/// του W17 που βασίστηκαν σε αυτό το test ΔΕΝ
+/// αντιστοιχούσαν στο προϊόν.
 #[test]
 #[ignore]
 fn w17_stem_spectrum() {
@@ -61,7 +69,8 @@ fn w17_stem_spectrum() {
 
     let (signal, sample_rate) = read_wav_mono(input_path);
     let mut two_pass = TwoPassEngine::new();
-    let scout = two_pass.scout(&signal, sample_rate, None, None, true);
+    let scout_window = (30 * sample_rate as usize).min(signal.len());
+    let scout = two_pass.scout(&signal[..scout_window], sample_rate, None, None, true);
 
     let mut stft = StftEngine::new();
     let (cplx_frames, n_frames) = stft.forward(&signal);
