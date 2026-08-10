@@ -931,6 +931,9 @@ fn inv_qa_9_multi_genre() {
 /// the MaskingEQ in isolation.
 ///
 /// Measured: in=5.15 out=3.84 delta=+25.3%
+/// ΑΚΥΡΟ από fb53431: το 3.84 ήταν παρενέργεια bug
+/// (topology parameters αγνοούνταν). Τώρα 5.31.
+#[ignore = "X0: μετρούσε παρενέργεια bug. Πριν το fb53431 οι topology parameters αγνοούνταν και ο ReverbNode έτρεχε με constructor defaults — το decorrelation έδινε mud 5.15→3.84 (−25.3%). Το fb53431 διόρθωσε την εφαρμογή των parameters· τώρα ambience_reverb mix=0.0 και ambience_width decorrelation=0.0, γιατί config.ambience είναι None σε αυτό το preset (dsp/mod.rs else branch). Μετρημένο τώρα: 5.15→5.31. Ο MaskingEQ ήταν ΠΑΝΤΑ dormant (gains_db=[0.0;8]) — το ίδιο το docstring το λέει. Το gate χρειάζεται preset με config.ambience=Some, ή αναδιατύπωση σε ό,τι το pipeline ΟΝΤΩΣ υπόσχεται."]
 #[test]
 fn inv_qa_6_mud_correction() {
     let sr = 48000u32;

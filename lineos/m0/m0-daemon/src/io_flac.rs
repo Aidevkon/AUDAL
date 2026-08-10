@@ -43,18 +43,24 @@ pub fn encode_f32_flac_24(
     let bytes = sink.into_inner();
 
     // W17: το flacenc 0.3.1 παράγει 123× bloat σε
-    // συγκεκριμένα σήματα (trigger στα ~80s, εξαρτάται
-    // από συσσωρευμένο state, ΟΧΙ από το σήμα — το ίδιο
-    // υλικό κωδικοποιείται σωστά αν κοπεί). Το libsndfile
-    // δίνει 10.4MB για το ίδιο σήμα που εδώ βγάζει 1.29GB.
-    // Μέχρι να αντικατασταθεί ο encoder, ΜΗΝ γράφεις
-    // τερατώδη αρχεία στον δίσκο.
+    // συγκεκριμένα σήματα. Trigger στα ~80s και εξαρτάται
+    // από ΣΥΣΣΩΡΕΥΜΕΝΟ STATE, όχι από το σήμα.
+    // Το libsndfile δίνει 10.4MB για το ίδιο σήμα που
+    // εδώ βγάζει 1.29GB.
+    // ΠΡΟΣΟΧΗ: το FLAC έχει σταθερό overhead (STREAMINFO
+    // + frame headers) που κυριαρχεί σε μικρά αρχεία —
+    // 5 δείγματα δίνουν νόμιμα 1160 bytes. Ο έλεγχος
+    // ισχύει μόνο πάνω από ένα κατώφλι μεγέθους.
+    const FLAC_GUARD_MIN_SAMPLES: usize = 48_000; // ~0.5s stereo
     let raw_size = interleaved.len() * 3; // 24-bit
-    if bytes.len() > raw_size {
+    if interleaved.len() >= FLAC_GUARD_MIN_SAMPLES
+        && bytes.len() > raw_size
+    {
         return Err(format!(
             "FLAC encoder produced {} bytes for {} samples \
              ({}x raw PCM) — refusing to write. flacenc bloat bug.",
-            bytes.len(), interleaved.len(),
+            bytes.len(),
+            interleaved.len(),
             bytes.len() / raw_size.max(1)
         ));
     }
