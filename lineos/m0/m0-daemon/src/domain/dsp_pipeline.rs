@@ -45,8 +45,8 @@ pub fn run_dsp(
     masters_dir: &str,
 ) -> Result<
     (
-        StoredBlob,
-        Option<StoredBlob>,
+        crate::blob_store::StoredBlobV2,
+        Option<crate::blob_store::StoredBlobV2>,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
         Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
@@ -102,7 +102,7 @@ fn spatial_conformance_path(
     _input_sha256_hex: &str,
 ) -> Result<
     (
-        crate::blob_store::StoredBlob,
+        crate::blob_store::StoredBlobV2,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
     ),
@@ -251,9 +251,8 @@ fn spatial_conformance_path(
             reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,
         },
     };
-    let blob: crate::blob_store::StoredBlob = blob_v2.into();
 
-    Ok((blob, spatial_guard, None))
+    Ok((blob_v2, spatial_guard, None))
 }
 
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
@@ -318,8 +317,8 @@ fn run_dsp_internal(
     masters_dir: &str,
 ) -> Result<
     (
-        StoredBlob,
-        Option<StoredBlob>,
+        crate::blob_store::StoredBlobV2,
+        Option<crate::blob_store::StoredBlobV2>,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
         Option<std::sync::Arc<lineos_types::audio::ManagedPcm>>,
@@ -966,7 +965,7 @@ fn run_dsp_internal(
         None
     };
 
-    let mut spatial_blob_out: Option<StoredBlob> = None;
+    let mut spatial_blob_out: Option<crate::blob_store::StoredBlobV2> = None;
 
     emit_progress("Stem Engine");
 

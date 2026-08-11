@@ -10,7 +10,7 @@ use lineos_telemetry::windows::{momentary_lufs, short_term_lufs};
 use lineos_types::pre_analysis::PreAnalysisData;
 
 pub struct CertificateOutput {
-    pub blob: StoredBlob,
+    pub blob: crate::blob_store::StoredBlobV2,
     pub file_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
 }
 
@@ -381,7 +381,7 @@ fn assemble_blob(
             },
         }
     };
-    let blob: StoredBlob = blob_v2.into();
+    let blob: StoredBlob = blob_v2.clone().into();
 
     // Generate PDF certificate — silent, never blocks pipeline
     let pdf_path =
@@ -389,7 +389,7 @@ fn assemble_blob(
     let pdf_path_str = pdf_path.to_string_lossy();
     crate::handlers::pdf_gen::generate_silent_certificate(&blob, &pdf_path_str);
 
-    Ok(CertificateOutput { blob, file_path })
+    Ok(CertificateOutput { blob: blob_v2, file_path })
 }
 
 /// AES TD1008 §5: "it is recommended to keep the

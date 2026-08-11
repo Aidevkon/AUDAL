@@ -46,7 +46,7 @@ fn write_wav(samples: &[f32], sr: u32, path: &str) {
 }
 
 /// Run the full pipeline (run_dsp) and return the StoredBlob.
-fn run_pipeline(wav_path: &str, preset: &str, track_id: &str) -> m0d::blob_store::StoredBlob {
+fn run_pipeline(wav_path: &str, preset: &str, track_id: &str) -> m0d::blob_store::StoredBlobV2 {
     let req = m0d::handlers::master::MasterRequest {
         audio_path: wav_path.to_string(),
         preset_id: preset.to_string(),

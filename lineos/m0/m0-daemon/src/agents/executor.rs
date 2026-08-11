@@ -113,18 +113,23 @@ pub async fn run(
                         // Track write removed here — ExecutionPlan lacks project_id/track_id.
                         // Moved to the HTTP handler that calls run_dsp/handles the request.
 
-                        blob_store.insert(blob.clone());
+                        // ΠΡΟΣΩΡΙΝΟ, βήμα 7α.1/3: ο BlobStore κρατάει ακόμα
+                        // τον παλιό τύπο. Η γέφυρα μετακόμισε εδώ αντί να
+                        // ζει μέσα στην assemble_blob — ένα βήμα πιο κοντά
+                        // στην έξοδο. Φεύγει στο 7α.2 όταν ο BlobStore
+                        // κρατήσει StoredBlobV2. northstar §Σ.
+                        blob_store.insert(blob.clone().into());
 
                         if let Some(spatial_blob) = spatial_blob_opt {
-                            blob_store.insert(spatial_blob.clone());
-                            eprintln!("[SPATIAL] persisted spatial blob: {}", spatial_blob.id);
+                            blob_store.insert(spatial_blob.clone().into());
+                            eprintln!("[SPATIAL] persisted spatial blob: {}", spatial_blob.core.id);
                         }
 
                         let p = crate::app_state::MasteringProgress {
                             job_id: plan.session_id.clone(),
                             stage: "CERTIFIED".into(),
                             elapsed_ms: start.elapsed().as_millis() as u64,
-                            blob_id: Some(blob.id.clone()),
+                            blob_id: Some(blob.core.id.clone()),
                             error: None,
                             bpm: None,
                         };
@@ -134,12 +139,12 @@ pub async fn run(
                         let l = blob.loudness()
                             .expect("executor requires certified blob");
                         let output = DspOutput {
-                            blob_id: blob.id.clone(),
+                            blob_id: blob.core.id.clone(),
                             lufs: l.integrated_lufs,
                             true_peak: l.true_peak_dbtp,
                             pcm_data: Some(mastered_path),
-                            num_frames: blob.num_frames,
-                            sample_rate: blob.sample_rate,
+                            num_frames: blob.core.num_frames,
+                            sample_rate: blob.core.sample_rate,
                             raw_pcm_data: raw_guard_opt,
                             persisted_master: artifacts.persisted_master,
                         };
@@ -472,7 +477,7 @@ pub async fn run(
                         let _ = response.send(Err(e));
                     }
                     Ok(Ok((output, blob))) => {
-                        blob_store.insert(blob);
+                        blob_store.insert(blob.clone().into());
                         let _ = response.send(Ok(output));
                     }
                 }

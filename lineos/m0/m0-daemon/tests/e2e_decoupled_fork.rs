@@ -59,7 +59,7 @@ fn e2e_stereo_input_spatial_upmix_produces_both_blobs() {
 
     // Fork A — stereo πάντα
     assert_eq!(
-        stereo_blob.channels, 2,
+        stereo_blob.core.channels, 2,
         "Stereo blob should have 2 channels"
     );
 
@@ -70,28 +70,28 @@ fn e2e_stereo_input_spatial_upmix_produces_both_blobs() {
     );
     let spatial_blob = spatial_blob_opt.unwrap();
     assert_eq!(
-        spatial_blob.channels, 6,
+        spatial_blob.core.channels, 6,
         "Spatial blob should have 6 channels"
     );
     assert_eq!(
-        spatial_blob.blob_type, "spatial_bed",
+        spatial_blob.core.blob_type, "spatial_bed",
         "Spatial blob_type mismatch"
     );
 
     // Verify spatial blob id convention
     assert!(
-        spatial_blob.id.ends_with("-spatial"),
+        spatial_blob.core.id.ends_with("-spatial"),
         "Spatial blob id should end -spatial, got: {}",
-        spatial_blob.id
+        spatial_blob.core.id
     );
 
     println!(
         "Decoupled Fork OK:\n  stereo: {} ({}ch)\n  spatial: {} ({}ch, {})",
-        stereo_blob.id,
-        stereo_blob.channels,
-        spatial_blob.id,
-        spatial_blob.channels,
-        spatial_blob.blob_type
+        stereo_blob.core.id,
+        stereo_blob.core.channels,
+        spatial_blob.core.id,
+        spatial_blob.core.channels,
+        spatial_blob.core.blob_type
     );
 }
 
@@ -199,7 +199,7 @@ fn e2e_pro_bundle_both_produces_both_blobs() {
     let (stereo_blob, spatial_blob_opt, _path, _model, _, _artifacts) = result.unwrap();
 
     // Fork A: stereo master
-    assert_eq!(stereo_blob.channels, 2);
+    assert_eq!(stereo_blob.core.channels, 2);
 
     // Fork B: spatial — pro_bundle_both ενεργοποιεί ΚΑΙ τα δύο
     assert!(
@@ -207,18 +207,18 @@ fn e2e_pro_bundle_both_produces_both_blobs() {
         "pro_bundle_both must produce both stereo AND spatial blobs"
     );
     let spatial = spatial_blob_opt.unwrap();
-    assert_eq!(spatial.channels, 6);
-    assert_eq!(spatial.blob_type, "spatial_bed");
+    assert_eq!(spatial.core.channels, 6);
+    assert_eq!(spatial.core.blob_type, "spatial_bed");
 
     // Επιβεβαίωσε ότι είναι ΔΙΑΦΟΡΕΤΙΚΑ blobs με ξεχωριστά IDs
     assert_ne!(
-        stereo_blob.id, spatial.id,
+        stereo_blob.core.id, spatial.core.id,
         "Stereo and spatial must have distinct ids"
     );
-    assert!(spatial.id.ends_with("-spatial"));
+    assert!(spatial.core.id.ends_with("-spatial"));
 
     println!(
         "pro_bundle_both: stereo={} spatial={}",
-        stereo_blob.id, spatial.id
+        stereo_blob.core.id, spatial.core.id
     );
 }

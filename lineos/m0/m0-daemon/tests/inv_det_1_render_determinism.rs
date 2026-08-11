@@ -103,6 +103,6 @@ fn inv_det_1_render_determinism() {
     println!("SHA B: {}", sha_2);
 
     assert_eq!(sha_1, sha_2, "Files are not byte-for-byte identical");
-    assert_eq!(blob1.loudness.integrated_lufs, blob2.loudness.integrated_lufs, "LUFS not identical");
-    assert_eq!(blob1.loudness.true_peak_dbtp, blob2.loudness.true_peak_dbtp, "True Peak not identical");
+    assert_eq!(blob1.loudness().expect("test expects Certified").integrated_lufs, blob2.loudness().expect("test expects Certified").integrated_lufs, "LUFS not identical");
+    assert_eq!(blob1.loudness().expect("test expects Certified").true_peak_dbtp, blob2.loudness().expect("test expects Certified").true_peak_dbtp, "True Peak not identical");
 }

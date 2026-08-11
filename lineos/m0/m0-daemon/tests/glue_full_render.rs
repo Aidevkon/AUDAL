@@ -101,9 +101,9 @@ fn glue_full_render() {
 
     println!("[FINAL NMF5] integrated_lufs={:.2} true_peak={:.2} \
               too_quiet={} spotify_ok={} apple_pod_ok={}",
-        blob2.loudness.integrated_lufs,
-        blob2.loudness.true_peak_dbtp,
-        blob2.loudness.too_quiet_for_mobile,
-        blob2.loudness.spotify_compliant,
-        blob2.loudness.apple_podcasts_compliant);
+        blob2.loudness().expect("test expects Certified").integrated_lufs,
+        blob2.loudness().expect("test expects Certified").true_peak_dbtp,
+        blob2.loudness().expect("test expects Certified").too_quiet_for_mobile,
+        blob2.loudness().expect("test expects Certified").spotify_compliant,
+        blob2.loudness().expect("test expects Certified").apple_podcasts_compliant);
 }

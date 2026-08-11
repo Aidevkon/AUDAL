@@ -62,7 +62,7 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
 
     // Verify properties
     assert_eq!(
-        blob.schema_version, 2,
+        blob.core.schema_version, 2,
         "GoldenBlob must be schema_version 2"
     );
 

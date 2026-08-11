@@ -68,20 +68,20 @@ fn e2e_5dot1_wav_produces_spatial_blob() {
 
     let (blob, _spatial, _path, _model, _, _artifacts) = result.unwrap();
 
-    assert_eq!(blob.channels, 6, "Expected 6 channels in spatial blob");
+    assert_eq!(blob.core.channels, 6, "Expected 6 channels in spatial blob");
     assert_eq!(
-        blob.blob_type, "spatial_bed",
+        blob.core.blob_type, "spatial_bed",
         "Expected blob_type = spatial_bed"
     );
-    assert!(blob.sample_rate == 48000, "Expected 48000 Hz sample rate");
+    assert!(blob.core.sample_rate == 48000, "Expected 48000 Hz sample rate");
 
-    let pcm_path = format!("/tmp/m0d-raw-{}.pcm", blob.id);
+    let pcm_path = format!("/tmp/m0d-raw-{}.pcm", blob.core.id);
     let pcm_bytes = std::fs::read(&pcm_path).expect("PCM dump should exist");
     assert_eq!(pcm_bytes.len(), 48000 * 6 * 4, "PCM dump size mismatch");
 
     println!(
         "Spatial blob: id={} channels={} sample_rate={} blob_type={}",
-        blob.id, blob.channels, blob.sample_rate, blob.blob_type
+        blob.core.id, blob.core.channels, blob.core.sample_rate, blob.core.blob_type
     );
 
     // (1) Run In-process MultichannelLufsMeter (Secondary Check)

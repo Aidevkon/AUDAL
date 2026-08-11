@@ -84,10 +84,10 @@ fn test_persist_master() {
     };
 
     assert!(
-        decoded_frames1 >= blob1.num_frames && decoded_frames1 < blob1.num_frames + 4096,
+        decoded_frames1 >= blob1.core.num_frames && decoded_frames1 < blob1.core.num_frames + 4096,
         "Decoded frames ({}) mismatch vs rendered ({})",
         decoded_frames1,
-        blob1.num_frames
+        blob1.core.num_frames
     );
 
     // 2. Second track in same project
