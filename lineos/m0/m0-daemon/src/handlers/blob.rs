@@ -13,7 +13,7 @@ use axum::{
 
 use crate::app_state::AppState;
 use crate::blob_store::{StoredBlobV2, BlobVariant};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 /// GET /blob/:id — return Golden Blob metrics as JSON.
 /// Audio bytes are NOT returned — Cockpit receives metrics only.
@@ -28,6 +28,17 @@ pub async fn get_blob(
             Json(blob.into())
         })
         .ok_or(StatusCode::NOT_FOUND)
+}
+
+/// Το seed σειριοποιείται ως string, όχι αριθμός.
+/// ΜΕΤΑΚΙΝΗΘΗΚΕ από το blob_store στο 7β: έγινε pub
+/// στο 7α.3 για να τη δανειστεί το DTO, και μόλις
+/// έφυγε ο StoredBlob έμεινε δημόσια συνάρτηση σε
+/// module που δεν τη χρησιμοποιεί — διαρροή προς την
+/// ΑΝΤΙΘΕΤΗ κατεύθυνση από αυτήν που χτίσαμε.
+/// Ζει δίπλα στον μοναδικό της χρήστη.
+fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&v.to_string())
 }
 
 /// Το σχήμα που βλέπει ο κόσμος. ΣΤΑΘΕΡΟ.
@@ -51,7 +62,7 @@ pub struct BlobResponse {
     pub blob_type: String,
     pub created_at: String,
     pub input_hash: String,
-    #[serde(serialize_with = "crate::blob_store::serialize_u64_as_string")]
+    #[serde(serialize_with = "serialize_u64_as_string")]
     pub seed: u64,
     pub pipeline_version: String,
     pub preset_id: String,

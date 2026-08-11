@@ -3,15 +3,11 @@
 //! Phase 6: in-memory only. Blobs are dropped when m0d restarts.
 //! Authority: golden-blob-spec.md §Lifecycle
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Serialize a u64 as a JSON string to preserve precision in JavaScript.
-/// JS numbers are IEEE 754 doubles — u64 > 2^53 loses precision as a bare number.
-pub fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(&v.to_string())
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StageRecord {

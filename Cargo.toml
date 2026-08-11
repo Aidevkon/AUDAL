@@ -29,7 +29,18 @@ members = [
 # Phase 11: cockpit-dioxus        per P11-001
 
 [profile.release]
-opt-level = 'z'
+# ΗΤΑΝ 'z' (βελτιστοποίηση για ΜΕΓΕΘΟΣ). Για ένα DSP
+# engine που τρέχει τοπικά, το μέγεθος του binary δεν
+# μετράει και το inlining μετράει πολύ.
+# git log -S "opt-level" -- Cargo.toml = ΚΕΝΟ: η
+# πρόθεση πίσω από το 'z' δεν καταγράφηκε ποτέ.
+# Το μόνο τεκμήριο είναι ότι το cockpit είχε ΔΙΚΟ ΤΟΥ
+# profile (3 + lto) που το cargo αγνοούσε υπέρ του
+# workspace 'z' — άρα το 'z' προϋπήρχε.
+# ⚠ ΑΛΛΑΖΕΙ ΠΙΘΑΝΩΣ ΤΑ BYTES ΕΞΟΔΟΥ. Γίνεται ΤΩΡΑ
+# επειδή δεν υπάρχουν χρήστες ούτε δημοσιευμένα
+# certificates. northstar §Ρ.
+opt-level = 3
 
 # cockpit-dioxus originally declared its own release profile
 # (opt-level=3, lto, codegen-units=1 — max-speed WASM) which cargo
