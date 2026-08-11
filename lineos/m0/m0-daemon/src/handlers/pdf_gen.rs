@@ -47,9 +47,11 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     layer.use_text(&blob.id, 9.0, Mm(20.0), Mm(252.0), &font);
 
     // EBU Metrics
-    let lufs = blob.loudness.integrated_lufs;
-    let tp = blob.loudness.true_peak_dbtp;
-    let lra = blob.loudness.lra;
+    let l = blob.loudness()
+        .expect("PDF certificate requires certified blob");
+    let lufs = l.integrated_lufs;
+    let tp = l.true_peak_dbtp;
+    let lra = l.lra;
 
     layer.use_text("COMPLIANCE", 11.0, Mm(20.0), Mm(243.0), &font_bold);
     layer.use_text(
@@ -82,7 +84,7 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     );
 
     // Stem fingerprints
-    if let Some(fp) = &blob.stem_fingerprints {
+    if let Some(fp) = blob.stem_fingerprints() {
         layer.use_text("STEM DNA", 11.0, Mm(20.0), Mm(208.0), &font_bold);
         layer.use_text(
             format!("Voice:     {}", fp.voice),
@@ -135,21 +137,26 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     }
 
     // Timeline
-    if !blob.processing_timeline.is_empty() {
-        layer.use_text("PROCESSING TIMELINE", 11.0, Mm(20.0), Mm(144.0), &font_bold);
-        let mut y = 137.0f32;
-        for record in &blob.processing_timeline {
-            layer.use_text(
-                format!(
-                    "  {}  {}ms  {}",
-                    record.stage, record.duration_ms, record.stage_hash
-                ),
-                8.0,
-                Mm(20.0),
-                Mm(y),
-                &font,
-            );
-            y -= 6.0;
+    // Ρητό if let, ΟΧΙ timeline_or_empty(): το PDF είναι
+    // artifact χρήστη και μια σιωπηλά παραλειπόμενη
+    // ενότητα είναι χειρότερη από μια ορατή απουσία.
+    if let Some(timeline) = blob.processing_timeline() {
+        if !timeline.is_empty() {
+            layer.use_text("PROCESSING TIMELINE", 11.0, Mm(20.0), Mm(144.0), &font_bold);
+            let mut y = 137.0f32;
+            for record in timeline {
+                layer.use_text(
+                    format!(
+                        "  {}  {}ms  {}",
+                        record.stage, record.duration_ms, record.stage_hash
+                    ),
+                    8.0,
+                    Mm(20.0),
+                    Mm(y),
+                    &font,
+                );
+                y -= 6.0;
+            }
         }
     }
 

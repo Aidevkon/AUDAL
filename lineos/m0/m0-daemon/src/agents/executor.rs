@@ -131,10 +131,12 @@ pub async fn run(
                         progress_map.insert(plan.session_id.clone(), p.clone());
                         let _ = progress_tx.send(p);
 
+                        let l = blob.loudness()
+                            .expect("executor requires certified blob");
                         let output = DspOutput {
                             blob_id: blob.id.clone(),
-                            lufs: blob.loudness.integrated_lufs,
-                            true_peak: blob.loudness.true_peak_dbtp,
+                            lufs: l.integrated_lufs,
+                            true_peak: l.true_peak_dbtp,
                             pcm_data: Some(mastered_path),
                             num_frames: blob.num_frames,
                             sample_rate: blob.sample_rate,

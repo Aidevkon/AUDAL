@@ -35,9 +35,11 @@ pub fn generate_certificate_png(blob: &StoredBlob, output_path: &str) {
     draw_text_mut(&mut img, blue, 60, 256, scale_sm, &font, &blob.id);
 
     // EBU Metrics
-    let lufs = blob.loudness.integrated_lufs;
-    let tp = blob.loudness.true_peak_dbtp;
-    let lra = blob.loudness.lra;
+    let l = blob.loudness()
+        .expect("PNG certificate requires certified blob");
+    let lufs = l.integrated_lufs;
+    let tp = l.true_peak_dbtp;
+    let lra = l.lra;
     draw_text_mut(
         &mut img,
         green,
