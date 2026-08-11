@@ -1,4 +1,3 @@
-use crate::blob_store::StoredBlob;
 use crate::domain::{ContentType, ContentTypeExt};
 use crate::handlers::master::MasterRequest;
 use arc_swap::ArcSwap;

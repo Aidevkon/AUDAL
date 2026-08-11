@@ -20,79 +20,6 @@ pub struct StageRecord {
     pub stage_hash: String, // FNV of stage output
 }
 
-fn default_schema_v1() -> u32 {
-    1
-}
-
-/// Golden Blob as stored by M0.
-/// Audio bytes stored separately — only metrics/metadata serialized to JSON.
-/// Field contract: golden-blob-spec.md v1.0 §Structure
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct StoredBlob {
-    // Top-level fields — golden-blob-spec.md §Top-level
-    pub id: String,
-    pub version: String,
-    #[serde(rename = "type")]
-    pub blob_type: String,
-    pub created_at: String,
-    pub input_hash: String,
-    #[serde(serialize_with = "serialize_u64_as_string")]
-    pub seed: u64,
-    pub pipeline_version: String,
-    pub preset_id: String,
-
-    // Metrics — golden-blob-spec.md §LoudnessMetrics
-    pub loudness: StoredLoudness,
-
-    // Quality — golden-blob-spec.md §QualityMetrics
-    pub quality: StoredQuality,
-
-    // Provenance — golden-blob-spec.md §Provenance
-    pub provenance: StoredProvenance,
-
-    // Spatial telemetry
-    #[serde(default)]
-    pub spatial: StoredSpatial,
-
-    // Mirror GoldenBlob v2 fields
-    #[serde(default = "default_schema_v1")]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub aether_cert: Option<String>,
-    #[serde(default)]
-    pub aether_persona: Option<String>,
-    #[serde(default)]
-    pub aether_config: Option<String>,
-
-    #[serde(default)]
-    pub stem_fingerprints: Option<StemFingerprints>,
-    #[serde(default)]
-    pub qr_base64: Option<String>,
-
-    #[serde(default)]
-    pub pcm_blake3: Option<String>,
-    #[serde(default)]
-    pub cert_signature: Option<String>,
-    #[serde(default)]
-    pub processing_timeline: Vec<StageRecord>,
-
-    /// Dead-air diagnostics (bounded, O(1)).
-    /// Default = clean (batch path / no monitor).
-    #[serde(default)]
-    pub dead_air: crate::dsp::signal_health::DeadAirSummary,
-
-    // Audio payload — not serialized to JSON (never sent to frontend).
-    // Authority: Amendment A-002 §3 — FORBIDDEN to return raw audio bytes to surface.
-    // Phase 10: interleaved f32 LE PCM at 48kHz from MasteringPipeline output.
-    #[serde(skip)]
-    pub audio_path: std::sync::Arc<lineos_types::audio::ManagedPcm>,
-    #[serde(skip)]
-    pub sample_rate: u32, // always 48000 after Phase 7 decode
-    #[serde(skip)]
-    pub channels: u16, // stereo = 2
-    #[serde(skip)]
-    pub num_frames: usize, // actual audio length without tail
-}
 
 /// ΠΡΟΣΩΡΙΝΟ — βήμα 6α/7. Ίδιες υπογραφές με το
 /// StoredBlobV2 ώστε τα ~90 call sites να
@@ -107,64 +34,6 @@ pub struct StoredBlob {
 /// συνυπάρχουν ΣΚΟΠΙΜΑ όσο διαρκεί η μετανάστευση.
 ///
 /// ΣΒΗΝΕΙ στο βήμα 7β μαζί με τον παλιό τύπο.
-impl StoredBlob {
-    pub fn loudness(&self) -> Option<&StoredLoudness> {
-        Some(&self.loudness)
-    }
-    pub fn quality(&self) -> Option<&StoredQuality> {
-        Some(&self.quality)
-    }
-    pub fn provenance(&self) -> Option<&StoredProvenance> {
-        Some(&self.provenance)
-    }
-    pub fn spatial(&self) -> Option<&StoredSpatial> {
-        Some(&self.spatial)
-    }
-    pub fn stem_fingerprints(&self) -> Option<&StemFingerprints> {
-        self.stem_fingerprints.as_ref()
-    }
-    pub fn processing_timeline(&self) -> Option<&[StageRecord]> {
-        Some(self.processing_timeline.as_slice())
-    }
-    pub fn qr_base64(&self) -> Option<&str> {
-        self.qr_base64.as_deref()
-    }
-    pub fn aether_cert(&self) -> Option<&str> {
-        self.aether_cert.as_deref()
-    }
-    pub fn aether_persona(&self) -> Option<&str> {
-        self.aether_persona.as_deref()
-    }
-    pub fn aether_config(&self) -> Option<&str> {
-        self.aether_config.as_deref()
-    }
-    pub fn is_certified(&self) -> bool {
-        true
-    }
-    pub fn uncertified_reason(&self) -> Option<UncertifiedReason> {
-        None
-    }
-    /// ΠΛΗΡΕΣ PATH — το DeadAirSummary ΔΕΝ είναι σε scope
-    /// στο blob_store.rs. Γράψ' το αυτούσιο, ΜΗΝ προσθέσεις
-    /// use statement.
-    pub fn dead_air(&self) -> Option<&crate::dsp::signal_health::DeadAirSummary> {
-        Some(&self.dead_air)
-    }
-    /// Το κενό slice είναι ΣΩΣΤΗ συμπεριφορά όπου ένα for
-    /// που δεν τρέχει ή ένα .len()==0 δεν κρύβει τίποτα.
-    /// Το _or_empty στο όνομα κάνει την απώλεια ΡΗΤΗ στο
-    /// call site — ο αναγνώστης βλέπει ότι κάποιος
-    /// ΑΠΟΦΑΣΙΣΕ να μη διακρίνει, δεν το ανακαλύπτει
-    /// διαβάζοντας την υλοποίηση.
-    ///
-    /// ΜΗΝ το χρησιμοποιείς σε artifact χρήστη (PDF, PNG,
-    /// sidecar) — εκεί το κενό timeline είναι ΣΙΩΠΗΛΗ
-    /// ΠΑΡΑΛΕΙΨΗ ΕΝΟΤΗΤΑΣ. Χρησιμοποίησε τον κύριο
-    /// accessor με ρητό if let Some(..).
-    pub fn timeline_or_empty(&self) -> &[StageRecord] {
-        self.processing_timeline.as_slice()
-    }
-}
 
 /// BS.1770-4 canonical values + platform compliance flags.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -309,70 +178,6 @@ impl Default for BlobStore {
 mod tests {
     use super::*;
 
-    fn stub_blob(id: &str) -> StoredBlob {
-        StoredBlob {
-            id: id.to_string(),
-            version: "1.0".into(),
-            blob_type: "audio".into(),
-            created_at: "2026-04-15T00:00:00Z".into(),
-            input_hash: "aabbccdd".into(),
-            seed: 1,
-            pipeline_version: "0.4.0".into(),
-            preset_id: "spotify".into(),
-            loudness: StoredLoudness {
-                integrated_lufs: -14.0,
-                short_term_lufs: -13.5,
-                momentary_lufs: -12.0,
-                true_peak_dbtp: -1.0,
-                lra: 8.0,
-                k_weighted: true,
-                ebu_r128_target_lufs: -23.0,
-                ebu_r128_compliant: false,
-                spotify_compliant: true,
-                youtube_compliant: true,
-                apple_music_compliant: false,
-                apple_podcasts_compliant: false,
-                broadcast_compliant: false,
-                tidal_compliant: true,
-                ..Default::default()
-            },
-            quality: StoredQuality {
-                stereo_correlation: 0.94,
-                phase_coherence: 0.97,
-                stereo_width: 0.74,
-                dynamic_range_db: 9.5,
-                rms_db: -16.0,
-                spectral_centroid: 3_200.0,
-                spectral_flatness: 0.12,
-                clips_detected: 0,
-                clip_free: true,
-            },
-            provenance: StoredProvenance {
-                engine_id: "E11".into(),
-                engine_version: "0.4.0".into(),
-                processing_time_ms: 1_234,
-                host_os: "linux-x86_64".into(),
-                created_by: "test".into(),
-                aether_enriched: false,
-                aether_devices: vec![],
-            },
-            spatial: StoredSpatial::default(),
-            schema_version: 1,
-            aether_cert: None,
-            aether_persona: None,
-            aether_config: None,
-            stem_fingerprints: None,
-            qr_base64: None,
-            pcm_blake3: None,
-            cert_signature: None,
-            processing_timeline: vec![],
-            dead_air: Default::default(),
-            audio_path: Default::default(), // ManagedPcm::default() — no file to delete
-            sample_rate: 48000,
-            channels: 2,
-            num_frames: 48000,
-        }
-    }
 
     fn stub_blob_v2(id: &str) -> StoredBlobV2 {
         StoredBlobV2 {
@@ -424,107 +229,6 @@ mod tests {
         assert!(store.get("nonexistent").is_none());
     }
 
-    #[test]
-    fn test_stored_blob_serializes_to_json() {
-        let blob = stub_blob("test-uuid");
-        let json = serde_json::to_string(&blob).unwrap();
-        assert!(json.contains("\"id\":\"test-uuid\""));
-        assert!(json.contains("\"type\":\"audio\""));
-        assert!(json.contains("\"integrated_lufs\""));
-    }
-
-    #[test]
-    fn bridge_certified_loses_nothing() {
-        let v2 = crate::blob_store::StoredBlobV2 {
-            core: crate::blob_store::StoredBlobCore {
-                id: "core-id".into(),
-                version: "2.0".into(),
-                blob_type: "video".into(),
-                created_at: "now".into(),
-                input_hash: "hash".into(),
-                seed: 42,
-                pipeline_version: "v1".into(),
-                schema_version: 3,
-                preset_id: "preset".into(),
-                pcm_blake3: Some("blake".into()),
-                cert_signature: Some("sig".into()),
-                audio_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::default()),
-                sample_rate: 44100,
-                channels: 1,
-                num_frames: 100,
-            },
-            variant: crate::blob_store::BlobVariant::Certified {
-                loudness: crate::blob_store::StoredLoudness { integrated_lufs: -10.0, ..Default::default() },
-                quality: crate::blob_store::StoredQuality { stereo_correlation: 0.5, ..Default::default() },
-                provenance: crate::blob_store::StoredProvenance { engine_id: "E2".into(), ..Default::default() },
-                spatial: crate::blob_store::StoredSpatial { low: crate::blob_store::BandSpatial { pan_mean: 0.1, pan_width: 0.2 }, ..Default::default() },
-                stem_fingerprints: Some(crate::blob_store::StemFingerprints::default()),
-                processing_timeline: vec![crate::blob_store::StageRecord::default()],
-                dead_air: crate::dsp::signal_health::DeadAirSummary { noise_floor_dbfs: Some(-80.0), ..Default::default() },
-                aether_cert: Some("cert".into()),
-                aether_persona: Some("persona".into()),
-                aether_config: Some("config".into()),
-                qr_base64: Some("qr".into()),
-            },
-        };
-        let blob: crate::blob_store::StoredBlob = v2.into();
-        assert_eq!(blob.id, "core-id");
-        assert_eq!(blob.version, "2.0");
-        assert_eq!(blob.blob_type, "video");
-        assert_eq!(blob.created_at, "now");
-        assert_eq!(blob.input_hash, "hash");
-        assert_eq!(blob.seed, 42);
-        assert_eq!(blob.pipeline_version, "v1");
-        assert_eq!(blob.schema_version, 3);
-        assert_eq!(blob.preset_id, "preset");
-        assert_eq!(blob.pcm_blake3, Some("blake".into()));
-        assert_eq!(blob.cert_signature, Some("sig".into()));
-        assert_eq!(blob.sample_rate, 44100);
-        assert_eq!(blob.channels, 1);
-        assert_eq!(blob.num_frames, 100);
-
-        assert_eq!(blob.loudness.integrated_lufs, -10.0);
-        assert_eq!(blob.quality.stereo_correlation, 0.5);
-        assert_eq!(blob.provenance.engine_id, "E2");
-        assert_eq!(blob.spatial.low.pan_mean, 0.1);
-        assert!(blob.stem_fingerprints.is_some());
-        assert_eq!(blob.processing_timeline.len(), 1);
-        assert_eq!(blob.dead_air.noise_floor_dbfs, Some(-80.0));
-        assert_eq!(blob.aether_cert, Some("cert".into()));
-        assert_eq!(blob.aether_persona, Some("persona".into()));
-        assert_eq!(blob.aether_config, Some("config".into()));
-        assert_eq!(blob.qr_base64, Some("qr".into()));
-    }
-
-    #[test]
-    fn bridge_uncertified_is_default() {
-        let v2 = crate::blob_store::StoredBlobV2 {
-            core: crate::blob_store::StoredBlobCore {
-                id: "core-id".into(),
-                version: "2.0".into(),
-                blob_type: "video".into(),
-                created_at: "now".into(),
-                input_hash: "hash".into(),
-                seed: 42,
-                pipeline_version: "v1".into(),
-                schema_version: 3,
-                preset_id: "preset".into(),
-                pcm_blake3: Some("blake".into()),
-                cert_signature: Some("sig".into()),
-                audio_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::default()),
-                sample_rate: 44100,
-                channels: 1,
-                num_frames: 100,
-            },
-            variant: crate::blob_store::BlobVariant::Uncertified { reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry },
-        };
-        let blob: crate::blob_store::StoredBlob = v2.into();
-        assert_eq!(blob.id, "core-id");
-        assert_eq!(blob.seed, 42);
-        
-        assert_eq!(blob.loudness.integrated_lufs, 0.0);
-        assert_eq!(blob.aether_cert, None);
-    }
 }
 
 /// ΒΗΜΑ 1 του certificate-as-type.
@@ -622,11 +326,6 @@ pub enum UncertifiedReason {
     /// spawn_blocking. northstar §Π.
     TransportOnlyNotASource,
 
-    /// ΧΡΕΟΣ: το conductor λαμβάνει BatchTrackOutput
-    /// (7 πεδία) μέσω async καναλιού, όχι πλήρη StoredBlob.
-    /// ΣΒΗΝΕΙ όταν το run_batch() γίνει συνάρτηση.
-    /// northstar §Β.
-    ProxyForAlbumContext,
 }
 
 impl UncertifiedReason {
@@ -652,7 +351,6 @@ impl UncertifiedReason {
         match self {
             Self::SpatialPathHasNoTelemetry => "no_measurements",
             Self::TransportOnlyNotASource   => "not_a_certificate",
-            Self::ProxyForAlbumContext      => "no_measurements",
         }
     }
 }
@@ -821,79 +519,3 @@ impl StoredBlobV2 {
     }
 }
 
-/// ΠΡΟΣΩΡΙΝΟ — βήμα 3/7. ΣΒΗΝΕΙ στο βήμα 7 όταν φύγει
-/// το παλιό StoredBlob.
-///
-/// Το Certified γεμίζει τα πεδία ένα προς ένα.
-/// Το Uncertified τα αφήνει Default — δηλαδή ΞΑΝΑΓΕΜΙΖΕΙ
-/// με μηδενικά, που είναι ΑΚΡΙΒΩΣ αυτό που προσπαθούμε
-/// να σταματήσουμε. Γι' αυτό η γέφυρα είναι προσωρινή
-/// και γι' αυτό ΔΕΝ επιτρέπεται νέος caller της.
-///
-/// ΜΗΝ γράψεις From<StoredBlob> for StoredBlobV2 —
-/// η αντίστροφη κατεύθυνση θα νομιμοποιούσε το παλιό.
-impl From<StoredBlobV2> for StoredBlob {
-    fn from(v2: StoredBlobV2) -> Self {
-        match v2.variant {
-            BlobVariant::Certified {
-                loudness,
-                quality,
-                provenance,
-                spatial,
-                stem_fingerprints,
-                processing_timeline,
-                dead_air,
-                aether_cert,
-                aether_persona,
-                aether_config,
-                qr_base64,
-            } => StoredBlob {
-                id: v2.core.id,
-                version: v2.core.version,
-                blob_type: v2.core.blob_type,
-                created_at: v2.core.created_at,
-                input_hash: v2.core.input_hash,
-                seed: v2.core.seed,
-                pipeline_version: v2.core.pipeline_version,
-                preset_id: v2.core.preset_id,
-                schema_version: v2.core.schema_version,
-                pcm_blake3: v2.core.pcm_blake3,
-                cert_signature: v2.core.cert_signature,
-                audio_path: v2.core.audio_path,
-                sample_rate: v2.core.sample_rate,
-                channels: v2.core.channels,
-                num_frames: v2.core.num_frames,
-                
-                loudness,
-                quality,
-                provenance,
-                spatial,
-                stem_fingerprints,
-                processing_timeline,
-                dead_air,
-                aether_cert,
-                aether_persona,
-                aether_config,
-                qr_base64,
-            },
-            BlobVariant::Uncertified { .. } => StoredBlob {
-                id: v2.core.id,
-                version: v2.core.version,
-                blob_type: v2.core.blob_type,
-                created_at: v2.core.created_at,
-                input_hash: v2.core.input_hash,
-                seed: v2.core.seed,
-                pipeline_version: v2.core.pipeline_version,
-                preset_id: v2.core.preset_id,
-                schema_version: v2.core.schema_version,
-                pcm_blake3: v2.core.pcm_blake3,
-                cert_signature: v2.core.cert_signature,
-                audio_path: v2.core.audio_path,
-                sample_rate: v2.core.sample_rate,
-                channels: v2.core.channels,
-                num_frames: v2.core.num_frames,
-                ..Default::default()
-            },
-        }
-    }
-}

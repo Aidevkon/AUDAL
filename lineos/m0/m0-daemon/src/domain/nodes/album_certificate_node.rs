@@ -2,7 +2,6 @@
 //! Aggregates N track StoredBlobs into one AlbumCertificate.
 //! Authority: aether-black-spec-v1_0.md AB-P7
 
-use crate::blob_store::StoredBlob;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

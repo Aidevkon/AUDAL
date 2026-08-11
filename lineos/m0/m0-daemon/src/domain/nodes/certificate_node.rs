@@ -2,7 +2,7 @@
 //! Authority: dsp-pipeline-refactor-spec-v1_0.md R-P5
 
 use crate::blob_store::{
-    StageRecord, StemFingerprints, StoredBlob,
+    StageRecord, StemFingerprints, 
 };
 use chrono::Utc;
 use lineos_telemetry::lra::LraCalculator;
@@ -243,7 +243,7 @@ pub fn run_streaming(
     )
 }
 
-/// Assemble the StoredBlob, generate the PDF,
+/// Assemble the  generate the PDF,
 /// and return the CertificateOutput. Shared by
 /// run() (Music, hashes computed from arrays)
 /// and run_streaming() (Episode, hashes computed
