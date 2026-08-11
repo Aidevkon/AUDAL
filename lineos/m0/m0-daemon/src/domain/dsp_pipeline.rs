@@ -216,22 +216,34 @@ fn spatial_conformance_path(
     // 5. Φτιάξε StoredBlob
     let spatial_guard =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path.to_path_buf()));
-    let blob = crate::blob_store::StoredBlob {
-        id: blob_id.to_string(),
-        version: "1.0".to_string(),
-        blob_type: "spatial_bed".to_string(),
-        created_at: chrono::Utc::now().to_rfc3339(),
-        input_hash: input_hash_hex.to_string(),
-        seed,
-        pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
-        preset_id: preset_id.to_string(),
-        channels: 6,
-        sample_rate,
-        audio_path: spatial_guard.clone(),
-        num_frames,
-        pcm_blake3: Some(input_blake3_hex.to_string()),
-        ..Default::default()
+    // ΒΗΜΑ 4/7: το spatial ΔΗΛΩΝΕΙ ότι δεν έχει μετρήσεις,
+    // αντί να τις προσποιείται με ..Default.
+    // Η γέφυρα .into() ξαναγεμίζει με μηδενικά — ΠΡΟΣΩΡΙΝΟ,
+    // μέχρι το βήμα 7. Η διαφορά είναι ότι τώρα ο ΤΥΠΟΣ
+    // λέει ΓΙΑΤΙ λείπουν.
+    let blob_v2 = crate::blob_store::StoredBlobV2 {
+        core: crate::blob_store::StoredBlobCore {
+            id: blob_id.to_string(),
+            version: "1.0".to_string(),
+            blob_type: "spatial_bed".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            input_hash: input_hash_hex.to_string(),
+            seed,
+            pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
+            schema_version: 0,
+            preset_id: preset_id.to_string(),
+            pcm_blake3: None,
+            cert_signature: None,
+            audio_path: spatial_guard.clone(),
+            sample_rate,
+            channels: 6,
+            num_frames,
+        },
+        variant: crate::blob_store::BlobVariant::Uncertified {
+            reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,
+        },
     };
+    let blob: crate::blob_store::StoredBlob = blob_v2.into();
 
     Ok((blob, spatial_guard, None))
 }
