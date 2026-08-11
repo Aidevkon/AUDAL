@@ -580,7 +580,94 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
 
-    // 4. True peak check on 44.1k mono signal
+    // 4a. RMS window correction.
+    //
+    // Το ACX ορίζει ΠΑΡΑΘΥΡΟ, όχι στόχο: [-23, -18] dBFS
+    // RMS. Αν το υλικό είναι ΗΔΗ μέσα, ΔΕΝ αγγίζεται.
+    // Το προϊόν επιβάλλει ΣΥΜΜΟΡΦΩΣΗ, όχι στάθμη.
+    //
+    // ΕΛΑΧΙΣΤΗ ΕΠΕΜΒΑΣΗ: στόχος το ΚΟΝΤΙΝΟΤΕΡΟ σημείο
+    // μέσα στο παράθυρο, ΟΧΙ το κέντρο. Ένα αρχείο στα
+    // -22.8 είναι συμμορφούμενο· το να το μετακινήσεις
+    // στο -20.5 είναι αυθαιρεσία — και το -20.5 είναι
+    // ακριβώς το proxy που αυτό το βήμα καταργεί.
+    //
+    // Μετράμε με τον ΙΔΙΟ analyzer που κρίνει παρακάτω.
+    // Μία μέτρηση, ένας ορισμός. northstar, δόγμα Δ.
+    //
+    // ΑΝΟΙΧΤΟ — BATCH COHESION: αυτή η διόρθωση κοιτάει
+    // ΕΝΑ αρχείο. Σε audiobook με 20 κεφάλαια, όλα
+    // μπορεί να είναι μέσα στο [-23,-18] και να
+    // ακούγονται ανομοιόμορφα — ο ακροατής κρίνει τη
+    // ΣΕΙΡΑ, το ACX ελέγχει το ΑΡΧΕΙΟ.
+    // Το album path λύνει ΗΔΗ το ίδιο πρόβλημα σε LUFS
+    // με cohesion pre-pass και target_lufs_override.
+    // Απαιτεί ΔΥΟ περάσματα (μέτρα όλα → κοινός στόχος →
+    // διόρθωσε όλα)· το run_deliver_core σήμερα είναι
+    // σειριακό, ένα πέρασμα.
+    // ΣΒΗΝΕΙ μαζί με το run_batch(). northstar §Β.
+    let mut acx_pre = AcxCheckAnalyzer::new(target_sr as u32);
+    for chunk in mono.chunks(4096) {
+        acx_pre.feed_chunk(chunk);
+    }
+    let report_first_pass = acx_pre.finish();
+    let rms_before = report_first_pass.rms_db;
+
+    const ACX_RMS_MIN: f32 = -23.0;
+    const ACX_RMS_MAX: f32 = -18.0;
+
+    // Στοχεύουμε λίγο ΜΕΣΑ από το όριο, όχι πάνω του.
+    // ΟΧΙ για δική μας μέτρηση — ο analyzer τρέχει ΠΡΙΝ
+    // το LAME και δεν βλέπει ποτέ την επίδρασή του.
+    // Το περιθώριο προστατεύει την ΕΠΟΜΕΝΗ μέτρηση: ο
+    // narrator θα ξαναελέγξει το τελικό mp3 με το
+    // Audacity ACX Check, και εκεί το lossy encoding θα
+    // έχει μετακινήσει τα δείγματα. Ένα αρχείο ακριβώς
+    // στα -23.00 μπορεί να διαβαστεί -23.02 και να κοπεί.
+    const RMS_MARGIN_DB: f32 = 0.5;
+
+    let rms_correction_db = if rms_before < ACX_RMS_MIN {
+        ACX_RMS_MIN + RMS_MARGIN_DB - rms_before
+    } else if rms_before > ACX_RMS_MAX {
+        ACX_RMS_MAX - RMS_MARGIN_DB - rms_before
+    } else {
+        0.0
+    };
+
+    if rms_correction_db != 0.0 {
+        tracing::info!(
+            rms_before,
+            rms_correction_db,
+            "ACX RMS window correction"
+        );
+        let gain = libm::powf(10.0, rms_correction_db / 20.0);
+        for s in mono.iter_mut() {
+            *s *= gain;
+        }
+    }
+
+    // 4b. True peak ceiling. ΜΕΤΑ το RMS, ΟΧΙ πριν.
+    //
+    // ΠΡΟΣΟΧΗ ΣΤΑ ΔΥΟ ΔΙΑΦΟΡΕΤΙΚΑ PEAK: εδώ μετράει ο
+    // TruePeakMeter (oversampled, inter-sample peaks).
+    // Ο AcxCheckAnalyzer αναφέρει SAMPLE peak, τυπικά
+    // 0.5-1.5 dB χαμηλότερο. Το report και αυτός ο
+    // έλεγχος ΔΕΝ συγκρίνουν το ίδιο νούμερο.
+    // Ο έλεγχος εδώ είναι ο ΑΥΣΤΗΡΟΤΕΡΟΣ, σκόπιμα.
+    //
+    // ΑΝ ΤΟ ACX ΕΙΝΑΙ ΑΝΕΦΙΚΤΟ: υλικό με crest factor
+    // τέτοιο ώστε RMS -23 να σημαίνει true peak > -3 ΔΕΝ
+    // μπορεί να συμμορφωθεί. Το RMS correction ανεβάζει,
+    // το peak trim κατεβάζει, και καταλήγεις εκεί που
+    // ξεκίνησες.
+    // ΔΕΝ κάνουμε δεύτερο γύρο. Ο analyzer του βήματος 5
+    // θα το πει με τα πραγματικά νούμερα και το
+    // passes_acx() θα είναι false — ΠΡΑΓΜΑΤΙΚΗ
+    // πληροφορία για τον narrator (το υλικό δεν έχει
+    // αρκετό headroom και θέλει compression ή
+    // επανηχογράφηση), όχι σιωπηλός συμβιβασμός.
+    let mut tp_trim_db = 0.0_f32;
+
     let mut tp_meter = TruePeakMeter::new();
     for chunk in mono.chunks(4096) {
         tp_meter.process_chunk(chunk, chunk);
@@ -590,6 +677,7 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     if tp_db > -3.0 {
         // static gain trim to bring it to -3.05
         let diff_db = -3.05 - tp_db;
+        tp_trim_db = diff_db;
         tracing::info!("Applying ACX True Peak trim of {} dB", diff_db);
         let gain = libm::powf(10.0, diff_db / 20.0);
         for s in mono.iter_mut() {
@@ -598,11 +686,24 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     }
 
     // 5. AcxCheckAnalyzer
-    let mut acx = AcxCheckAnalyzer::new(target_sr as u32);
-    for chunk in mono.chunks(4096) {
-        acx.feed_chunk(chunk);
-    }
-    let report = acx.finish();
+    // Αν ΤΙΠΟΤΑ δεν άγγιξε το σήμα, το πρώτο πέρασμα
+    // ισχύει ακόμα — ένα ΗΔΗ συμμορφούμενο αρχείο δεν
+    // πληρώνει δεύτερη ανάλυση, και το ότι δεν αγγίχτηκε
+    // είναι ΟΡΑΤΟ στον κώδικα.
+    //
+    // Η σύγκριση με 0.0 είναι ασφαλής εδώ: και οι δύο
+    // τιμές προκύπτουν από ΡΗΤΗ ανάθεση (= 0.0 ή έναν
+    // υπολογισμό), όχι από συσσώρευση — δεν υπάρχει
+    // float drift να συγκρίνουμε.
+    let report = if rms_correction_db == 0.0 && tp_trim_db == 0.0 {
+        report_first_pass
+    } else {
+        let mut acx = AcxCheckAnalyzer::new(target_sr as u32);
+        for chunk in mono.chunks(4096) {
+            acx.feed_chunk(chunk);
+        }
+        acx.finish()
+    };
 
     // 6. LAME encode
     let gfp = unsafe { lame_init() };

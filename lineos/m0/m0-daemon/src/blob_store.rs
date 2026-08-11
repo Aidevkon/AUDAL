@@ -56,6 +56,45 @@ pub struct StoredLoudness {
     /// quietest-500ms noise floor <= -60 dB — the Audacity ACX Check
     /// method, validated against an independent oracle 2026-07-30).
     /// None = not measured (non-ACX preset), which is NOT a pass.
+    //
+    // ── ΤΑ ΤΕΣΣΕΡΑ acx_* ΜΕΤΡΟΥΝ ΤΟ INPUT ──────────
+    //
+    // ΟΧΙ το παραδοτέο. Προέρχονται από
+    // run_trunk_metrics_with_acx στο trunk pass
+    // (dsp_pipeline.rs:457-466), που τρέχει ΠΡΙΝ το
+    // render — πριν το gain staging, πριν το limiter,
+    // πριν το resample σε 44.1k και τον downmix σε mono.
+    //
+    // ΜΕΤΡΗΜΕΝΟ (e2e_acx_certificate): τα νούμερα του
+    // certificate είναι ΤΑΥΤΟΣΗΜΑ με το
+    // [TRUNK-episode] log. Δεν είναι σύμπτωση — είναι
+    // αντιγραφή.
+    //
+    // Το παραδοτέο μετριέται ΞΑΝΑ στο export_mp3_acx,
+    // μετά από RMS window correction και peak trim.
+    // Εκείνη η μέτρηση πάει ΜΟΝΟ στο manifest.json του
+    // delivery· εδώ δεν φτάνει ποτέ.
+    //
+    // ΓΙΑΤΙ ΔΕΝ ΔΙΟΡΘΩΝΕΤΑΙ ΕΔΩ: το certificate γράφεται
+    // στο certificate_node, ΠΡΙΝ το export. Το παραδοτέο
+    // δεν υπάρχει ακόμα. Χρειάζεται certificate που
+    // ΕΝΗΜΕΡΩΝΕΤΑΙ, όχι snapshot.
+    //
+    // ΤΟ INPUT ΕΧΕΙ ΑΞΙΑ: το noise floor ΠΡΕΠΕΙ να
+    // μετρηθεί εδώ — αν ο θόρυβος του πηγαίου είναι πολύ
+    // ψηλά, δεν σώζεται με mastering (βλ. σχόλιο στο
+    // DeliverySpec::max_noise_floor_db). Το πρόβλημα δεν
+    // είναι ΟΤΙ μετράμε το input· είναι ότι τα πεδία
+    // ΔΕΝ ΛΕΝΕ ποιο αρχείο μέτρησαν.
+    //
+    // Ένας narrator που διαβάζει "acx_rms_db: -25.65"
+    // συμπεραίνει ότι το ΠΑΡΑΔΟΤΕΟ του είναι εκεί.
+    // Δεν είναι.
+    //
+    // ΣΒΗΝΕΙ όταν το certificate γίνει project file που
+    // ενημερώνεται και κρατάει ΚΑΙ ΤΙΣ ΔΥΟ μετρήσεις,
+    // ονομασμένες. northstar §Σ. Δόγμα Ι.
+    // ────────────────────────────────────────────────
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acx_sample_peak_db: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
