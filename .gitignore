@@ -34,3 +34,8 @@ lineos/m1/sp314-dsp/tests/outputs/
 lineos/m0/m0-daemon/tests/fixtures/lufs_*.wav
 
 scripts/dom_inspector/
+
+# agent scratch
+*.log
+grep*.txt
+test_*.txt
