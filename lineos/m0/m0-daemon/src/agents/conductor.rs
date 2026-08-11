@@ -6,7 +6,7 @@
 //! Motto: "I build the plan. I do not execute it."
 
 use super::operator::{ConductorError, ExecutionPlan, ExecutorError, Intent, MasteringOutput};
-use crate::domain::nodes::album_certificate_node::AlbumCertificate;
+use crate::domain::nodes::album_certificate_node::{AlbumCertificate, TrackSummary};
 use arc_swap::ArcSwap;
 use sp314_dsp::analysis::ear_fatigue::EarFatigueModel;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -484,17 +484,12 @@ pub async fn run(
                         .collect();
 
                     let album_cert_path = {
-                        // Build proxy blobs from real output metrics
-                        let proxy_blobs: Vec<crate::blob_store::StoredBlob> = outputs
+                        let summaries: Vec<TrackSummary> = outputs
                             .iter()
-                            .map(|o| crate::blob_store::StoredBlob {
-                                id: o.blob_id.clone(),
-                                input_hash: o.pcm_blake3.clone(),
-                                loudness: crate::blob_store::StoredLoudness {
-                                    integrated_lufs: o.output_lufs,
-                                    ..Default::default()
-                                },
-                                ..Default::default()
+                            .map(|o| TrackSummary {
+                                blob_id: o.blob_id.clone(),
+                                content_hash: o.pcm_blake3.clone(),
+                                integrated_lufs: o.output_lufs,
                             })
                             .collect();
 
@@ -509,7 +504,7 @@ pub async fn run(
 
                         let cert = AlbumCertificate::from_tracks(
                             &batch_id,
-                            &proxy_blobs,
+                            &summaries,
                             anchor_idx,
                             &fatigue_map,
                         );
