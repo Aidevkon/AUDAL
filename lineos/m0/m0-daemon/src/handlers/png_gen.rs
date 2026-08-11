@@ -1,8 +1,8 @@
-use crate::blob_store::StoredBlob;
+use crate::blob_store::StoredBlobV2;
 use image::{Rgb, RgbImage};
 use imageproc::drawing::draw_text_mut;
 
-pub fn generate_certificate_png(blob: &StoredBlob, output_path: &str) {
+pub fn generate_certificate_png(blob: &StoredBlobV2, output_path: &str) {
     // A4 at 150dpi: 1240 x 1754 px
     let mut img = RgbImage::from_pixel(1240, 1754, Rgb([255u8, 255, 255]));
 
@@ -32,7 +32,7 @@ pub fn generate_certificate_png(blob: &StoredBlob, output_path: &str) {
 
     // Certificate ID
     draw_text_mut(&mut img, gray, 60, 220, scale_sm, &font, "Certificate ID:");
-    draw_text_mut(&mut img, blue, 60, 256, scale_sm, &font, &blob.id);
+    draw_text_mut(&mut img, blue, 60, 256, scale_sm, &font, &blob.core.id);
 
     // EBU Metrics
     let l = blob.loudness()

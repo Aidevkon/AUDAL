@@ -23,7 +23,16 @@ pub async fn get_blob(
     state
         .blob_store
         .get(&id)
-        .map(Json)
+        .map(|blob| {
+            // ΠΡΟΣΩΡΙΝΟ, βήμα 7α.2/3: το API επιστρέφει ακόμα
+            // το παλιό flat σχήμα. Το StoredBlobV2 θα
+            // σειριοποιούνταν ως {"core":{...},"variant":{...}}
+            // και το enum θα πρόσθετε άλλο επίπεδο.
+            // Το JSON συγχωρεί προσθήκη πεδίων και τίποτα άλλο.
+            // ΣΒΗΝΕΙ στο 7α.3 με το BlobResponse DTO.
+            // northstar §Σ, ΟΡΙΟ ΔΗΜΟΣΙΟΥ ΣΧΗΜΑΤΟΣ.
+            Json(blob.into())
+        })
         .ok_or(StatusCode::NOT_FOUND)
 }
 

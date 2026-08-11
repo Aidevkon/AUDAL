@@ -301,7 +301,7 @@ pub struct Manifest {
 /// of truth. Η export_mp3_acx διαβάζει ΜΟΝΟ audio_path
 /// και channels· το manifest.json γεμίζει από
 /// πραγματικές μετρήσεις (outcome.report).
-fn build_minimal_blob(audio_path: &str) -> StoredBlob {
+fn build_minimal_blob(audio_path: &str) -> StoredBlobV2 {
     let blob_v2 = StoredBlobV2 {
         core: StoredBlobCore {
             // ΠΡΑΓΜΑΤΙΚΑ (διαβάζονται από export_mp3_acx):
@@ -333,8 +333,7 @@ fn build_minimal_blob(audio_path: &str) -> StoredBlob {
             reason: UncertifiedReason::TransportOnlyNotASource,
         },
     };
-    let blob: StoredBlob = blob_v2.into();
-    blob
+    blob_v2
 }
 
 pub fn run_deliver_core(

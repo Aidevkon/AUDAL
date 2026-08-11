@@ -1,5 +1,5 @@
 use lineos_types::audio::ManagedPcm;
-use m0d::blob_store::{StoredBlob, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial};
+use m0d::blob_store::{StoredBlobV2, StoredBlobCore, BlobVariant, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial};
 use m0d::dsp::signal_health::DeadAirSummary;
 use m0d::handlers::export::export_mp3_acx;
 use std::io::Write;
@@ -31,34 +31,38 @@ fn generate_test_pcm(path: &std::path::Path) {
     }
 }
 
-fn make_blob(pcm_path: PathBuf) -> StoredBlob {
-    StoredBlob {
-        id: "test_acx".into(),
-        version: "1.0".into(),
-        blob_type: "audio".into(),
-        created_at: "".into(),
-        input_hash: "".into(),
-        seed: 1,
-        pipeline_version: "".into(),
-        preset_id: "acx".into(),
-        loudness: StoredLoudness::default(),
-        quality: StoredQuality::default(),
-        provenance: StoredProvenance::default(),
-        spatial: StoredSpatial::default(),
-        schema_version: 1,
-        aether_cert: None,
-        aether_persona: None,
-        aether_config: None,
-        stem_fingerprints: None,
-        qr_base64: None,
-        pcm_blake3: None,
-        cert_signature: None,
-        processing_timeline: vec![],
-        dead_air: DeadAirSummary::default(),
-        audio_path: Arc::new(ManagedPcm::new(pcm_path)),
-        sample_rate: 48000,
-        channels: 2,
-        num_frames: 48000 * 12,
+fn make_blob(pcm_path: PathBuf) -> StoredBlobV2 {
+    StoredBlobV2 {
+        core: StoredBlobCore {
+            id: "test_acx".into(),
+            version: "1.0".into(),
+            blob_type: "audio".into(),
+            created_at: "".into(),
+            input_hash: "".into(),
+            seed: 1,
+            pipeline_version: "".into(),
+            schema_version: 1,
+            preset_id: "acx".into(),
+            pcm_blake3: None,
+            cert_signature: None,
+            audio_path: Arc::new(ManagedPcm::new(pcm_path)),
+            sample_rate: 48000,
+            channels: 2,
+            num_frames: 48000 * 12,
+        },
+        variant: BlobVariant::Certified {
+            loudness: StoredLoudness::default(),
+            quality: StoredQuality::default(),
+            provenance: StoredProvenance::default(),
+            spatial: StoredSpatial::default(),
+            stem_fingerprints: None,
+            processing_timeline: vec![],
+            dead_air: DeadAirSummary::default(),
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
+            qr_base64: None,
+        },
     }
 }
 

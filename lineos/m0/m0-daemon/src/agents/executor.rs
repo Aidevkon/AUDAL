@@ -113,15 +113,10 @@ pub async fn run(
                         // Track write removed here — ExecutionPlan lacks project_id/track_id.
                         // Moved to the HTTP handler that calls run_dsp/handles the request.
 
-                        // ΠΡΟΣΩΡΙΝΟ, βήμα 7α.1/3: ο BlobStore κρατάει ακόμα
-                        // τον παλιό τύπο. Η γέφυρα μετακόμισε εδώ αντί να
-                        // ζει μέσα στην assemble_blob — ένα βήμα πιο κοντά
-                        // στην έξοδο. Φεύγει στο 7α.2 όταν ο BlobStore
-                        // κρατήσει StoredBlobV2. northstar §Σ.
-                        blob_store.insert(blob.clone().into());
+                        blob_store.insert(blob.clone());
 
                         if let Some(spatial_blob) = spatial_blob_opt {
-                            blob_store.insert(spatial_blob.clone().into());
+                            blob_store.insert(spatial_blob.clone());
                             eprintln!("[SPATIAL] persisted spatial blob: {}", spatial_blob.core.id);
                         }
 
@@ -477,7 +472,7 @@ pub async fn run(
                         let _ = response.send(Err(e));
                     }
                     Ok(Ok((output, blob))) => {
-                        blob_store.insert(blob.clone().into());
+                        blob_store.insert(blob.clone());
                         let _ = response.send(Ok(output));
                     }
                 }

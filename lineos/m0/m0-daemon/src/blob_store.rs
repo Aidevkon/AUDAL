@@ -257,7 +257,7 @@ pub struct StoredSpatial {
 /// Phase 7: replace with content-addressed file store.
 #[derive(Clone)]
 pub struct BlobStore {
-    inner: Arc<Mutex<HashMap<String, StoredBlob>>>,
+    inner: Arc<Mutex<HashMap<String, StoredBlobV2>>>,
 }
 
 impl BlobStore {
@@ -276,16 +276,16 @@ impl BlobStore {
         }
     }
 
-    pub fn insert(&self, blob: StoredBlob) {
+    pub fn insert(&self, blob: StoredBlobV2) {
         if let Ok(mut map) = self.inner.lock() {
-            map.insert(blob.id.clone(), blob);
+            map.insert(blob.core.id.clone(), blob);
 
             // Evict oldest when over cap (created_at is chrono RFC 3339 —
             // ISO 8601 with UTC, lexicographically sortable).
             if map.len() > Self::MAX_BLOBS {
                 let oldest_id = map
                     .iter()
-                    .min_by_key(|(_, b)| &b.created_at)
+                    .min_by_key(|(_, b)| &b.core.created_at)
                     .map(|(id, _)| id.clone());
                 if let Some(id) = oldest_id {
                     map.remove(&id);
@@ -294,7 +294,7 @@ impl BlobStore {
         }
     }
 
-    pub fn get(&self, id: &str) -> Option<StoredBlob> {
+    pub fn get(&self, id: &str) -> Option<StoredBlobV2> {
         self.inner.lock().ok()?.get(id).cloned()
     }
 }
@@ -374,13 +374,48 @@ mod tests {
         }
     }
 
+    fn stub_blob_v2(id: &str) -> StoredBlobV2 {
+        StoredBlobV2 {
+            core: crate::blob_store::StoredBlobCore {
+                id: id.into(),
+                version: "1.0".into(),
+                blob_type: "audio".into(),
+                created_at: "2026-04-15T00:00:00Z".into(),
+                input_hash: "aabbccdd".into(),
+                seed: 1,
+                pipeline_version: "0.4.0".into(),
+                schema_version: 1,
+                preset_id: "spotify".into(),
+                pcm_blake3: None,
+                cert_signature: None,
+                audio_path: std::sync::Arc::new(lineos_types::audio::ManagedPcm::default()),
+                sample_rate: 48000,
+                channels: 2,
+                num_frames: 48000,
+            },
+            variant: crate::blob_store::BlobVariant::Certified {
+                loudness: StoredLoudness { integrated_lufs: -14.0, ..Default::default() },
+                quality: StoredQuality { ..Default::default() },
+                provenance: StoredProvenance { ..Default::default() },
+                spatial: StoredSpatial { ..Default::default() },
+                stem_fingerprints: None,
+                processing_timeline: vec![],
+                dead_air: Default::default(),
+                aether_cert: None,
+                aether_persona: None,
+                aether_config: None,
+                qr_base64: None,
+            },
+        }
+    }
+
     #[test]
     fn test_blob_store_insert_get() {
         let store = BlobStore::new();
-        store.insert(stub_blob("blob-001"));
+        store.insert(stub_blob_v2("blob-001"));
         let retrieved = store.get("blob-001").unwrap();
-        assert_eq!(retrieved.id, "blob-001");
-        assert!((retrieved.loudness.integrated_lufs - (-14.0)).abs() < 1e-6);
+        assert_eq!(retrieved.core.id, "blob-001");
+        assert!((retrieved.loudness().unwrap().integrated_lufs - (-14.0)).abs() < 1e-6);
     }
 
     #[test]

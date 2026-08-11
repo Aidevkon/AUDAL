@@ -9,7 +9,7 @@
 //! Files use unique /tmp names (m0d-test-lifecycle-{uuid}) so the startup
 //! sweep's "m0d-" prefix match is irrelevant and parallel runs never collide.
 
-use m0d::blob_store::{BlobStore, StoredBlob};
+use m0d::blob_store::{BlobStore, StoredBlobV2, StoredBlobCore, BlobVariant};
 use std::sync::Arc;
 
 /// BlobStore::MAX_BLOBS is private; mirror it here.
@@ -21,17 +21,38 @@ fn stub_blob_with_path(
     id: &str,
     created_at: &str,
     audio_path: Arc<lineos_types::audio::ManagedPcm>,
-) -> StoredBlob {
-    StoredBlob {
-        id: id.to_string(),
-        version: "1.0".into(),
-        blob_type: "audio".into(),
-        created_at: created_at.to_string(),
-        audio_path,
-        sample_rate: 48000,
-        channels: 2,
-        num_frames: 48000,
-        ..Default::default()
+) -> StoredBlobV2 {
+    StoredBlobV2 {
+        core: StoredBlobCore {
+            id: id.to_string(),
+            version: "1.0".into(),
+            blob_type: "audio".into(),
+            created_at: created_at.to_string(),
+            input_hash: "aabbccdd".into(),
+            seed: 1,
+            pipeline_version: "0.4.0".into(),
+            schema_version: 1,
+            preset_id: "spotify".into(),
+            pcm_blake3: None,
+            cert_signature: None,
+            audio_path,
+            sample_rate: 48000,
+            channels: 2,
+            num_frames: 48000,
+        },
+        variant: BlobVariant::Certified {
+            loudness: Default::default(),
+            quality: Default::default(),
+            provenance: Default::default(),
+            spatial: Default::default(),
+            stem_fingerprints: None,
+            processing_timeline: vec![],
+            dead_air: Default::default(),
+            aether_cert: None,
+            aether_persona: None,
+            aether_config: None,
+            qr_base64: None,
+        }
     }
 }
 

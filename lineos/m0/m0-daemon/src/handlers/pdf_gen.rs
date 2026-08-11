@@ -2,22 +2,22 @@
 //! Runs automatically after mastering — no user action needed
 //! Output: {blob_id_short}_certificate.pdf alongside corpus files
 
-use crate::blob_store::StoredBlob;
+use crate::blob_store::StoredBlobV2;
 use printpdf::*;
 use std::fs::File;
 use std::io::BufWriter;
 
-pub fn generate_silent_certificate(blob: &StoredBlob, output_path: &str) {
+pub fn generate_silent_certificate(blob: &StoredBlobV2, output_path: &str) {
     let result = std::panic::catch_unwind(|| _generate(blob, output_path));
     if result.is_err() {
         eprintln!(
             "[cert] PDF generation failed silently for {}",
-            &blob.id[..8]
+            &blob.core.id[..8]
         );
     }
 }
 
-fn _generate(blob: &StoredBlob, output_path: &str) {
+fn _generate(blob: &StoredBlobV2, output_path: &str) {
     let (doc, page1, layer1) = PdfDocument::new(
         "CreatorOS Mastering Certificate",
         Mm(210.0),
@@ -44,7 +44,7 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
 
     // Certificate ID
     layer.use_text("Certificate ID:", 9.0, Mm(20.0), Mm(257.0), &font_bold);
-    layer.use_text(&blob.id, 9.0, Mm(20.0), Mm(252.0), &font);
+    layer.use_text(&blob.core.id, 9.0, Mm(20.0), Mm(252.0), &font);
 
     // EBU Metrics
     let l = blob.loudness()
@@ -131,7 +131,7 @@ fn _generate(blob: &StoredBlob, output_path: &str) {
     }
 
     // BLAKE3 + Signature
-    if let Some(hash) = &blob.pcm_blake3 {
+    if let Some(hash) = &blob.core.pcm_blake3 {
         layer.use_text("CRYPTOGRAPHIC PROOF", 11.0, Mm(20.0), Mm(161.0), &font_bold);
         layer.use_text(format!("BLAKE3: {}", hash), 8.0, Mm(20.0), Mm(154.0), &font);
     }

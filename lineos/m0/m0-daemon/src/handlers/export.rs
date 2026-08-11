@@ -27,7 +27,7 @@ use std::path::Path;
 
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
-use crate::blob_store::{StoredBlob, StoredLoudness, StoredQuality};
+use crate::blob_store::{StoredBlobV2, StoredLoudness, StoredQuality};
 
 // ── Request/Response types ────────────────────────────────────────────────────
 
@@ -185,7 +185,7 @@ pub async fn export_audio(
 // ── P10-002: Export format writers ────────────────────────────────────────────
 
 /// Route to format-specific writer.
-fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(), String> {
+fn export_blob(blob: &StoredBlobV2, format: ExportFormat, path: &Path) -> Result<(), String> {
     match format {
         ExportFormat::Flac => export_flac(blob, path),
         ExportFormat::Wav => export_wav(blob, path),
@@ -204,19 +204,19 @@ fn export_blob(blob: &StoredBlob, format: ExportFormat, path: &Path) -> Result<(
 /// 24-bit, deterministic round-half-even quantization, no dither — see
 /// io_flac.rs for the rationale. (The old body dumped raw f32 bytes
 /// under a .flac name; no FLAC reader could open it.)
-pub fn export_flac(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(blob.audio_path.path())
+pub fn export_flac(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
+    let audio_bytes = std::fs::read(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — mastering may have failed".into());
     }
     let pcm = pcm_bytes_to_f32(&audio_bytes);
-    crate::io_flac::encode_f32_flac_24(&pcm, blob.sample_rate, blob.channels, path)
+    crate::io_flac::encode_f32_flac_24(&pcm, blob.core.sample_rate, blob.core.channels, path)
 }
 
 /// WAV: decode f32 LE PCM bytes → write 32-bit float WAV via hound.
-fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(blob.audio_path.path())
+fn export_wav(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
+    let audio_bytes = std::fs::read(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write WAV".into());
@@ -225,8 +225,8 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     let samples = pcm_bytes_to_f32(&audio_bytes);
 
     let spec = hound::WavSpec {
-        channels: blob.channels,
-        sample_rate: blob.sample_rate,
+        channels: blob.core.channels,
+        sample_rate: blob.core.sample_rate,
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,
     };
@@ -250,17 +250,17 @@ fn export_wav(blob: &StoredBlob, path: &Path) -> Result<(), String> {
 /// Reads 6-channel interleaved f32 LE PCM from Golden Blob, de-interleaves
 /// to planar [L, R, C, LFE, Ls, Rs], writes RIFF + WAVE_FORMAT_EXTENSIBLE
 /// fmt + bext + data chunks via sp314_dsp::io::wav_writer::write_adm_bwf.
-fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
+fn export_adm_bwf(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
     // ADM BWF requires exactly 6 channels
-    if blob.channels != 6 {
+    if blob.core.channels != 6 {
         return Err(format!(
             "ADM BWF export requires 6-channel audio, got {} channels. \
              Use ExportFormat::Wav for stereo.",
-            blob.channels
+            blob.core.channels
         ));
     }
 
-    let meta = std::fs::metadata(blob.audio_path.path())
+    let meta = std::fs::metadata(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to stat blob PCM: {e}"))?;
     let len_bytes = meta.len();
     if len_bytes % (6 * 4) != 0 {
@@ -274,12 +274,12 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     // Riff32 for now (Bw64 pending consumer validation — P39)
     let mut writer = AdmBwfStreamWriter::create(
         &path.to_string_lossy(),
-        blob.sample_rate,
+        blob.core.sample_rate,
         num_frames,
         AdmContainerFormat::Riff32,
     )?;
 
-    let file = std::fs::File::open(blob.audio_path.path())
+    let file = std::fs::File::open(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to open blob PCM: {e}"))?;
     let mut reader = std::io::BufReader::new(file);
 
@@ -312,7 +312,7 @@ fn export_adm_bwf(blob: &StoredBlob, path: &Path) -> Result<(), String> {
 
 /// Opus: stub — requires libopus-dev system library (Phase 11).
 /// Phase 10 delivers WAV + FLAC. Opus wired in Phase 11 after libopus install.
-fn export_opus(_blob: &StoredBlob, _path: &Path) -> Result<(), String> {
+fn export_opus(_blob: &StoredBlobV2, _path: &Path) -> Result<(), String> {
     Err("Opus export requires libopus-dev (Phase 11). \
          Use WAV, FLAC, MP3, or AIFF."
         .into())
@@ -330,16 +330,16 @@ fn export_opus(_blob: &StoredBlob, _path: &Path) -> Result<(), String> {
 ///     SSND chunk: offset(4) + blockSize(4) + big-endian PCM
 ///
 /// No DSP re-run — reads f32 LE PCM from Golden Blob, converts to BE in-place.
-fn export_aiff(blob: &StoredBlob, path: &Path) -> Result<(), String> {
-    let audio_bytes = std::fs::read(blob.audio_path.path())
+fn export_aiff(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
+    let audio_bytes = std::fs::read(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write AIFF".into());
     }
 
     let pcm = pcm_bytes_to_f32(&audio_bytes);
-    let channels = blob.channels.max(1);
-    let sample_rate = blob.sample_rate;
+    let channels = blob.core.channels.max(1);
+    let sample_rate = blob.core.sample_rate;
     let num_frames = (pcm.len() / channels as usize) as u32;
     let bit_depth: u16 = 32;
 
@@ -486,7 +486,7 @@ pub fn edge_quiet_secs(mono: &[f32], sample_rate: u32) -> (f32, f32) {
     ((head_windows as f32) * 0.1, (tail_windows as f32) * 0.1)
 }
 
-pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome, String> {
+pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutcome, String> {
     use lame_sys::{
         lame_encode_buffer_ieee_float, lame_encode_flush_nogap, lame_init, lame_init_params,
         lame_set_VBR, lame_set_brate, lame_set_in_samplerate, lame_set_mode, lame_set_num_channels,
@@ -503,7 +503,7 @@ pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome
     use symphonia::core::meta::MetadataOptions;
     use symphonia::core::probe::Hint;
 
-    let audio_bytes = std::fs::read(blob.audio_path.path())
+    let audio_bytes = std::fs::read(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write MP3".into());
@@ -511,7 +511,7 @@ pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome
 
     // 1. Read blob PCM, de-interleave to planar 2ch.
     let pcm = pcm_bytes_to_f32(&audio_bytes);
-    let channels = blob.channels.max(1) as usize;
+    let channels = blob.core.channels.max(1) as usize;
     if channels != 2 {
         return Err(format!("Expected 2 channels, found {channels}"));
     }
@@ -772,13 +772,13 @@ pub fn export_mp3_acx(blob: &StoredBlob, path: &Path) -> Result<AcxExportOutcome
     })
 }
 
-fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
+fn export_mp3(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
     use lame_sys::{
         lame_close, lame_encode_buffer_interleaved_ieee_float, lame_encode_flush_nogap, lame_init,
         lame_init_params, lame_set_in_samplerate, lame_set_num_channels, lame_set_quality,
     };
 
-    let audio_bytes = std::fs::read(blob.audio_path.path())
+    let audio_bytes = std::fs::read(blob.core.audio_path.path())
         .map_err(|e| format!("Failed to read audio from disk: {e}"))?;
     if audio_bytes.is_empty() {
         return Err("No audio bytes in file — cannot write MP3".into());
@@ -786,7 +786,7 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
 
     let pcm = pcm_bytes_to_f32(&audio_bytes);
     // Samples per channel (LAME interleaved API takes frames, not total samples)
-    let num_samples_per_channel = (pcm.len() / blob.channels.max(1) as usize) as i32;
+    let num_samples_per_channel = (pcm.len() / blob.core.channels.max(1) as usize) as i32;
 
     // ── Initialise LAME context ──────────────────────────────────────────
     // SAFETY: lame_sys wraps a C library. All pointers are valid for the scope.
@@ -808,12 +808,12 @@ fn export_mp3(blob: &StoredBlob, path: &Path) -> Result<(), String> {
     let _guard = LameGuard(gfp);
 
     unsafe {
-        let r = lame_set_num_channels(gfp, blob.channels as i32);
+        let r = lame_set_num_channels(gfp, blob.core.channels as i32);
         if r < 0 {
             return Err(format!("MP3: lame_set_num_channels failed: {r}"));
         }
 
-        let r = lame_set_in_samplerate(gfp, blob.sample_rate as i32);
+        let r = lame_set_in_samplerate(gfp, blob.core.sample_rate as i32);
         if r < 0 {
             return Err(format!("MP3: lame_set_in_samplerate failed: {r}"));
         }
@@ -906,7 +906,7 @@ pub struct ComplianceSummary {
 
 /// Write sidecar JSON alongside audio file.
 /// Path: audio_path with extension replaced by "stillair.json".
-pub fn write_sidecar(blob: &StoredBlob, format: &str, audio_path: &Path) -> Result<(), String> {
+pub fn write_sidecar(blob: &StoredBlobV2, format: &str, audio_path: &Path) -> Result<(), String> {
     // ΑΡΝΗΣΗ, ΟΧΙ null: το ComplianceSummary έχει πέντε
     // bool και δεν υπάρχει null για bool. Το false θα
     // δήλωνε "ελέγχθηκε και απέτυχε" αντί για "δεν
@@ -931,8 +931,8 @@ pub fn write_sidecar(blob: &StoredBlob, format: &str, audio_path: &Path) -> Resu
         .expect("sidecar: guard above guarantees certified");
 
     let sidecar = ExportSidecar {
-        blob_id: &blob.id,
-        preset_id: &blob.preset_id,
+        blob_id: &blob.core.id,
+        preset_id: &blob.core.preset_id,
         export_format: format,
         exported_at: Utc::now().to_rfc3339(),
         loudness: l,
