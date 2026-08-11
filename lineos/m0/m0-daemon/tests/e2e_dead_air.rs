@@ -95,33 +95,33 @@ async fn dead_air_reaches_the_real_certificate() {
         .expect("blob must exist in store");
 
     assert!(
-        blob.dead_air.total_count > 0,
+        blob.dead_air().expect("test expects Certified").total_count > 0,
         "expected at least one dead-air event for 4s of silence, got 0"
     );
     assert!(
-        blob.dead_air.total_sec >= 3.5,
+        blob.dead_air().expect("test expects Certified").total_sec >= 3.5,
         "expected the detected dead air to cover most of the 4s silent \
          region, got {}s",
-        blob.dead_air.total_sec
+        blob.dead_air().expect("test expects Certified").total_sec
     );
 
     assert!(
-        !blob.processing_timeline.is_empty(),
+        !blob.timeline_or_empty().is_empty(),
         "expected real timeline stages, got an empty vec"
     );
     assert_eq!(
-        blob.processing_timeline.len(),
+        blob.timeline_or_empty().len(),
         6,
         "expected exactly 6 stages (Scout/PreAnalysis, Trunk Pass, Decode Setup, \
          Streaming Render, Verification Pass, Certificate Assembly), \
          got {}",
-        blob.processing_timeline.len()
+        blob.timeline_or_empty().len()
     );
     // The Verification Pass stage should carry a real hash (the
     // only stage wired with one today) — proves stage-specific data
     // isn't just placeholder-uniform.
     let verification_stage = blob
-        .processing_timeline
+        .timeline_or_empty()
         .iter()
         .find(|s| s.stage == "Verification Pass")
         .expect("Verification Pass stage must exist");
@@ -129,7 +129,7 @@ async fn dead_air_reaches_the_real_certificate() {
         !verification_stage.stage_hash.is_empty(),
         "Verification Pass should carry a real pcm_blake3 hash, got empty"
     );
-    for stage in &blob.processing_timeline {
+    for stage in blob.timeline_or_empty() {
         println!(
             "  stage={} duration_ms={} hash_len={}",
             stage.stage,

@@ -67,18 +67,18 @@ async fn test_e2e_golden_pathway_aether_pipeline() {
     );
 
     // Check Aether fields are populated
-    assert!(blob.aether_persona.is_some(), "aether_persona must be set");
+    assert!(blob.aether_persona().is_some(), "aether_persona must be set");
     assert_eq!(
-        blob.aether_persona.unwrap(),
+        blob.aether_persona().expect("test expects Certified"),
         "warm_analog",
         "Persona must match request"
     );
 
-    assert!(blob.aether_config.is_some(), "aether_config must be set");
-    assert!(blob.aether_cert.is_some(), "aether_cert must be generated");
+    assert!(blob.aether_config().is_some(), "aether_config must be set");
+    assert!(blob.aether_cert().is_some(), "aether_cert must be generated");
 
     // Deserialize cert and verify hashes
-    let cert_str = blob.aether_cert.unwrap();
+    let cert_str = blob.aether_cert().expect("test expects Certified");
     let cert: serde_json::Value =
         serde_json::from_str(&cert_str).expect("Failed to deserialize ExecutionCertificate");
 
