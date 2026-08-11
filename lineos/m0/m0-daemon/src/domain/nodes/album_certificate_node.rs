@@ -37,10 +37,22 @@ impl AlbumCertificate {
 
         let anchor_lufs = blobs
             .get(anchor_idx)
-            .map(|b| b.loudness.integrated_lufs)
+            .and_then(|b| b.loudness())
+            .map(|l| l.integrated_lufs)
             .unwrap_or(-14.0);
 
-        let track_lufs: Vec<f32> = blobs.iter().map(|b| b.loudness.integrated_lufs).collect();
+        let track_lufs: Vec<f32> = blobs
+            .iter()
+            .enumerate()
+            .map(|(i, b)| {
+                b.loudness()
+                    .unwrap_or_else(|| panic!(
+                        "album certificate: track {i} ({}) is uncertified",
+                        b.id
+                    ))
+                    .integrated_lufs
+            })
+            .collect();
 
         let track_blob_ids: Vec<String> = blobs.iter().map(|b| b.id.clone()).collect();
 

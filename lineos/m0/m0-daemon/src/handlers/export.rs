@@ -907,21 +907,42 @@ pub struct ComplianceSummary {
 /// Write sidecar JSON alongside audio file.
 /// Path: audio_path with extension replaced by "stillair.json".
 pub fn write_sidecar(blob: &StoredBlob, format: &str, audio_path: &Path) -> Result<(), String> {
+    // ΑΡΝΗΣΗ, ΟΧΙ null: το ComplianceSummary έχει πέντε
+    // bool και δεν υπάρχει null για bool. Το false θα
+    // δήλωνε "ελέγχθηκε και απέτυχε" αντί για "δεν
+    // ελέγχθηκε" — ψευδής δήλωση μη συμμόρφωσης σε
+    // αρχείο που διαβάζεται αυτόματα.
+    // Το sidecar είναι απόδειξη. Χωρίς μετρήσεις δεν
+    // υπάρχει τι να αποδειχθεί.
+    // ΣΗΜΕΡΑ ΔΕΝ ΠΥΡΟΔΟΤΕΙΤΑΙ: το /export παίρνει blob
+    // από το store, πάντα Certified. Είναι φράγμα για
+    // το μέλλον.
+    if let Some(reason) = blob.uncertified_reason() {
+        return Err(format!(
+            "cannot write sidecar for uncertified blob: {reason:?}"
+        ));
+    }
+
     let sidecar_path = audio_path.with_extension("stillair.json");
+
+    let l = blob.loudness()
+        .expect("sidecar: guard above guarantees certified");
+    let q = blob.quality()
+        .expect("sidecar: guard above guarantees certified");
 
     let sidecar = ExportSidecar {
         blob_id: &blob.id,
         preset_id: &blob.preset_id,
         export_format: format,
         exported_at: Utc::now().to_rfc3339(),
-        loudness: &blob.loudness,
-        quality: &blob.quality,
+        loudness: l,
+        quality: q,
         compliance: ComplianceSummary {
-            spotify: blob.loudness.spotify_compliant,
-            youtube: blob.loudness.youtube_compliant,
-            apple: blob.loudness.apple_music_compliant,
-            tidal: blob.loudness.tidal_compliant,
-            broadcast: blob.loudness.broadcast_compliant,
+            spotify: l.spotify_compliant,
+            youtube: l.youtube_compliant,
+            apple: l.apple_music_compliant,
+            tidal: l.tidal_compliant,
+            broadcast: l.broadcast_compliant,
         },
     };
 
