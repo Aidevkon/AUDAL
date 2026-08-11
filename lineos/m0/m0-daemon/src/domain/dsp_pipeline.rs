@@ -428,6 +428,27 @@ fn run_dsp_internal(
         // order exactly (lines 499-510 before this rewire).
         stream.tier1_verdict(crate::dsp::signal_health::VerdictTiming::Final)?;
         stream.tier2_verdict()?;
+        // ΧΡΕΟΣ: το spatial_conformance_path ΔΕΝ υπολογίζει
+        // hash του OUTPUT — το pcm_blake3 του είναι None
+        // (βήμα 4/7). Το hash του input μένει αχρησιμοποίητο
+        // εδώ.
+        //
+        // ΤΟ BLAKE3 ΔΕΝ ΕΙΝΑΙ ΣΠΑΤΑΛΗ: υπολογίζεται streaming
+        // στον ΙΔΙΟ βρόχο με το tap write, πάνω στα ΙΔΙΑ
+        // le_bytes (stream_core.rs:143-151). Ρητή σύμβαση:
+        // "The dump is BYTE-IDENTICAL to the blake3 input
+        // stream by construction."
+        // Η αξία του είναι στο ότι ΥΠΟΛΟΓΙΖΕΤΑΙ, όχι στο ότι
+        // αποθηκεύεται. Σαν assertion που τρέχει πάντα.
+        //
+        // ΠΡΟΣΟΧΗ: η σύμβαση ισχύει ΓΙ' ΑΥΤΗ τη διαδρομή.
+        // Στο wav_to_raw ΔΕΝ ισχύει — εκεί το blake3 χασάρει
+        // μόνο το αριστερό κανάλι ενώ το αρχείο γράφεται
+        // interleaved. northstar §Ρ.
+        //
+        // ΣΒΗΝΕΙ όταν προστεθεί πέρασμα blake3 μετά το
+        // mmap.flush() στο spatial_conformance_path, όπου το
+        // αρχείο στον δίσκο είναι πλήρες. northstar §Σ.
         let (_input_blake3_hex, input_sha256_hex) = stream.input_hashes();
         let dead_air = stream.into_dead_air();
 
