@@ -149,6 +149,32 @@ impl<const N: usize> StandardizedStreamCore<N> {
                         .map_err(|e| format!("tap write error: {e}"))?;
                 }
                 self.blake3.update(&bytes);
+                // BE ΣΚΟΠΙΜΑ, ΟΧΙ τυπογραφικό.
+                //
+                // ΜΕΤΡΗΜΕΝΟ: το μοτίβο blake3→LE / sha256→BE
+                // είναι συνεπές σε πέντε αρχεία —
+                // stream_core · wav_to_raw ·
+                // six_channel_stream · standardized_stream —
+                // και κλειδωμένο από tests
+                // (wav_to_raw:180-182, stream_core:301).
+                //
+                // ΤΟ ΞΕΡΟΥΜΕ: το blake3 (LE) ταυτίζεται με το
+                // dump — ρητή σύμβαση στη γρ.144.
+                //
+                // ΔΕΝ ΞΕΡΟΥΜΕ γιατί επιλέχθηκε BE για το
+                // sha256. Το `git log -S "to_be_bytes"` σε
+                // αυτό το αρχείο είναι ΚΕΝΟ: η πρόθεση δεν
+                // καταγράφηκε ποτέ. Όποιος ψάξει, δεν θα
+                // βρει.
+                //
+                // ΜΗΝ ΤΟ "ΔΙΟΡΘΩΣΕΙΣ" — θα σπάσουν tests.
+                //
+                // ΣΧΕΤΙΚΟ: η μορφή του sha256 (f32 BE,
+                // interleaved) ΔΕΝ δηλώνεται πουθενά στο
+                // certificate, ενώ του pcm_blake3 ναι
+                // (certificate_node.rs:134). Χωρίς δήλωση
+                // μορφής, ένα hash δεν επαληθεύεται από
+                // τρίτον. northstar §Ρ.
                 self.sha256.update(s.to_be_bytes());
                 interleaved.push(s);
             }
