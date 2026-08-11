@@ -47,12 +47,27 @@ pub fn build_intent_and_config(
     streaming_features: &StemFeatures,
     pre_analysis: &lineos_types::pre_analysis::PreAnalysisData,
 ) -> Result<IntentConfig, String> {
+    // Το target ΠΡΟΚΥΠΤΕΙ από το preset, δεν χτίζεται
+    // από hardcoded τιμές.
+    //
+    // ΗΤΑΝ: max_true_peak_db: -1.0 σταθερό, platform
+    // "default". Ο ACX ορίζει -3.0· η τιμή ταξίδευε
+    // σωστά από το DeliverySpec μέχρι εδώ και πετιόταν
+    // σε αυτή τη γραμμή.
+    //
+    // Το target_lufs ΔΕΧΕΤΑΙ override (το cohesion
+    // pre-pass του album path το χρειάζεται)· το ceiling
+    // ΟΧΙ — είναι απαίτηση της πλατφόρμας, όχι προτίμηση.
+    let preset_target =
+        lineos_types::config::LoudnessTarget::from_preset(preset_id);
+
     let intent = MasteringIntent {
         target: LoudnessTarget {
-            target_lufs: target_lufs.unwrap_or(-14.0),
-            max_true_peak_db: -1.0,
-            max_lra_lu: None,
-            platform: "default".into(),
+            target_lufs: target_lufs
+                .unwrap_or(preset_target.target_lufs),
+            max_true_peak_db: preset_target.max_true_peak_db,
+            max_lra_lu: preset_target.max_lra_lu,
+            platform: preset_target.platform.clone(),
         },
         preset_name: preset_id.to_string(),
         stem_mode: false,
@@ -126,9 +141,18 @@ pub fn run(
     state_dir: &str,
 ) -> Result<DspOutput, String> {
     // Autotune
+    // ΙΔΙΟ fallback με το intent (γρ.52): το autotune
+    // υπολογίζει pre-gain ΠΡΟΣ τον στόχο. Αν στοχεύει
+    // αλλού από το intent, το gain staging ανεβάζει και
+    // η LUFS correction κατεβάζει — δύο στάδια που
+    // διαφωνούν μέσα στο ίδιο render, με το υλικό να
+    // περνάει από saturation και limiter σε λάθος στάθμη.
     let autotune_result = sp314_dsp::pipeline::autotune::autotune(
         pre_analysis.integrated_lufs,
-        target_lufs.unwrap_or(-14.0),
+        target_lufs.unwrap_or(
+            lineos_types::config::LoudnessTarget::from_preset(preset_id)
+                .target_lufs,
+        ),
     );
     let gain_linear = libm::powf(10.0_f32, autotune_result.pre_gain_db / 20.0_f32);
     // F-042 fixed: applied as drive staging inside
