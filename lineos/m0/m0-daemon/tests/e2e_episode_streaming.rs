@@ -75,7 +75,7 @@ fn render_episode(
         &mut source,
         blob_id,
         graph,
-        -16.0,
+        Some(-16.0),
         &pre,
         // No-op health hook: this test exercises the
         // O(1) streaming heap, not the early-abort

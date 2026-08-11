@@ -64,7 +64,15 @@ pub fn run<S: crate::dsp::audio_source::AudioSource, F>(
     source: &mut S,
     blob_id: &str,
     mut graph: sp314_nodes::graph::DspGraph,
-    target_lufs: f32,
+    // None σημαίνει ΜΗΝ ΑΓΓΙΞΕΙΣ ΤΗ ΣΤΑΘΜΗ, όχι
+    // "χρησιμοποίησε default". Το "raw" preset έχει
+    // target_lufs: null στο schema ΡΗΤΑ — υπάρχει για
+    // να μην κανονικοποιεί τίποτα.
+    //
+    // ΗΤΑΝ f32 με τον caller να κάνει unwrap_or(-16.0),
+    // που ένωνε το ρητό null με το άγνωστο preset. Το
+    // raw έβγαινε στα -16.
+    target_lufs: Option<f32>,
     _pre_analysis: &PreAnalysisData,
     mut progress_hook: F,
 ) -> Result<EpisodeRenderResult, String>
@@ -170,13 +178,16 @@ where
         }
     }
 
-    // LUFS from streaming meter
-    let output_lufs = lufs_meter.finish().unwrap_or(target_lufs);
+    // LUFS from streaming meter (fallback to -144.0 if silence and no target)
+    let output_lufs = lufs_meter.finish().unwrap_or(target_lufs.unwrap_or(-144.0));
     let output_lra = lra_calc.compute();
 
     // Static gain correction (dB → linear)
-    let correction_db = target_lufs - output_lufs;
-    let correction_linear = libm::powf(10.0_f32, correction_db / 20.0);
+    // ΥΠΟ ΣΥΝΘΗΚΗ: αν None, καμία διόρθωση στάθμης (1.0).
+    let correction_linear = match target_lufs {
+        Some(t) => libm::powf(10.0_f32, (t - output_lufs) / 20.0),
+        None => 1.0,
+    };
 
     // ── PASS 3: gain + limit + hash ───
     let mut final_lufs_meter = LufsMeter::new();

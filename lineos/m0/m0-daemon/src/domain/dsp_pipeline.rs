@@ -89,14 +89,13 @@ fn spatial_conformance_path(
     preset_id: &str,
     input_hash_hex: &str,
     seed: u64,
-    // ΑΧΡΗΣΙΜΟΠΟΙΗΤΟ ΣΚΟΠΙΜΑ — βήμα 4/7.
-    // Τροφοδοτούσε το pcm_blake3 με το hash του INPUT,
-    // βαφτισμένο ως hash του output. Τώρα είναι None.
-    // Το warning είναι ο ΜΟΝΑΔΙΚΟΣ δείκτης στον κώδικα
-    // ότι εδώ λείπει το πραγματικό hash εξόδου — θα
-    // υπολογιζόταν μετά το mmap.flush() (γρ.~212), όπου
-    // το αρχείο στον δίσκο είναι πλήρες.
-    // ΜΗΝ το σβήσεις με _ ούτε #[allow]. northstar §Σ.
+    // ΑΧΡΗΣΙΜΟΠΟΙΗΤΟ ΣΚΟΠΙΜΑ.
+    // Παλιότερα τροφοδοτούσε το pcm_blake3 με το hash του INPUT,
+    // βαφτισμένο ως hash του output (βήμα 4/7). 
+    // Το output hash υπολογίζεται πλέον κανονικά στο PASS 3 (streaming), 
+    // άρα το input_blake3_hex παραμένει αχρησιμοποίητο ΕΔΩ.
+    // Το warning μένει ως δείκτης ότι το input hash δεν καταναλώνεται
+    // σε αυτή τη διαδρομή. ΜΗΝ το σβήσεις με _ ούτε #[allow].
     input_blake3_hex: &str,
     _input_sha256_hex: &str,
 ) -> Result<
@@ -110,6 +109,15 @@ fn spatial_conformance_path(
     use sp314_dsp::limiter::true_peak::TruePeakDetector;
     use sp314_dsp::metering::MultichannelLufsMeter;
     use std::fs::OpenOptions;
+    // Το .pcm είναι ΕΝΔΙΑΜΕΣΟ. Δένεται σε ΤΟΠΙΚΟ guard
+    // (ΟΧΙ Arc, δεν επιστρέφεται πουθενά) ώστε να
+    // καθαρίζει όταν βγει το scope — ΚΑΙ σε Ok ΚΑΙ σε
+    // early return από σφάλμα.
+    // Χειροκίνητο remove_file δεν θα έτρεχε αν το pass 3
+    // σκάσει· το Drop τρέχει πάντα.
+    let _pcm_intermediate = lineos_types::audio::ManagedPcm::new(
+        raw_path.to_path_buf(),
+    );
 
     // ── PASS 1 (measure, read-only): LUFS + per-channel TruePeak ──
     const CHUNK_FRAMES: usize = 65536;
@@ -220,9 +228,106 @@ fn spatial_conformance_path(
             .map_err(|e| format!("spatial_conformance pass-2 flush: {e}"))?;
     }
 
+    // ── PASS 3 (export + hash, streaming) ──
+    //
+    // Ένα πέρασμα, δύο χρέη: το ADM BWF που το schema
+    // ζητάει και αγνοούνταν, και το pcm_blake3 του
+    // OUTPUT που έλειπε από το βήμα 4/7.
+    //
+    // Streaming, ΟΧΙ batch: η write_adm_bwf απαιτεί 6
+    // planar Vec<f32> — 4.1 GB για μία ώρα, συν 3.1 GB
+    // για το 24-bit buffer. Ο AdmBwfStreamWriter δέχεται
+    // interleaved chunks και κρατάει μόνο το buffer.
+    // INV-ST-3 (50MB peak) παραμένει.
+
+    let adm_path = raw_path.with_extension("wav");
+
+    // Riff32 σφάλλει πάνω από u32::MAX — δεν σιωπά.
+    // Το όριο χτυπάει στα ~1h17m (6ch × 3 bytes × 48k).
+    // ⚠ Το Bw64 branch είναι ΑΝΕΠΑΛΗΘΕΥΤΟ με πραγματικό
+    //   καταναλωτή — ο ίδιος ο writer το λέει:
+    //   "pending consumer validation before becoming the
+    //    export default (P39)". Επιλέγεται μόνο όταν το
+    //   Riff32 ΔΕΝ χωράει.
+    let data_bytes = (num_frames as u64) * 6 * 3;
+    let format = if data_bytes + 2048 > u32::MAX as u64 {
+        sp314_dsp::io::wav_writer::AdmContainerFormat::Bw64
+    } else {
+        sp314_dsp::io::wav_writer::AdmContainerFormat::Riff32
+    };
+
+    let mut writer = sp314_dsp::io::wav_writer::AdmBwfStreamWriter::create(
+        adm_path.to_str().ok_or("spatial: non-UTF8 adm path")?,
+        sample_rate,
+        num_frames,
+        format,
+    )
+    .map_err(|e| format!("spatial_conformance pass-3 create: {e}"))?;
+
+    // ΤΟ HASH ΕΙΝΑΙ ΤΟΥ ΠΕΡΙΕΧΟΜΕΝΟΥ, ΟΧΙ ΤΟΥ ΑΡΧΕΙΟΥ.
+    //
+    // Χασάρουμε τα interleaved f32 LE bytes ΠΡΙΝ τη
+    // μετατροπή σε 24-bit και ΧΩΡΙΣ τα RIFF headers.
+    // Αν χασάραμε το container, μια αλλαγή σε string του
+    // bext (π.χ. "Creator OS v2") θα άλλαζε την ταυτότητα
+    // ΤΟΥ ΗΧΟΥ — και θα έσπαγε caching και dedup.
+    //
+    // ΣΚΟΠΙΜΗ ΑΠΟΚΛΙΣΗ ΑΠΟ ΤΟ episode_render: εκείνο
+    // χασάρει ΜΟΝΟ το αριστερό κανάλι
+    // (episode_render.rs:250, "matches blake3_pcm()").
+    // Για 5.1 αυτό ΔΕΝ ταυτοποιεί το υλικό — δύο
+    // διαφορετικά mixes με ίδιο L θα έδιναν ίδιο hash.
+    // Εδώ χασάρουμε ΚΑΙ ΤΑ ΕΞΙ, interleaved, ίδια σειρά
+    // με το αρχείο. Ένα hash που δεν ταυτοποιεί δεν
+    // είναι ταυτότητα.
+    let mut hasher = blake3::Hasher::new();
+
+    {
+        use sp314_dsp::stft::sliding_overlap_reader::ChunkSource;
+        let mut source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(
+            std::path::Path::new(raw_path),
+            6,
+        )
+        .map_err(|e| format!("spatial_conformance pass-3 open: {e}"))?;
+        let mut flat_buf = vec![0.0f32; CHUNK_FRAMES * 6];
+
+        loop {
+            let frames = source
+                .fill_buffer(&mut flat_buf)
+                .map_err(|e| format!("spatial_conformance pass-3 read: {e}"))?;
+            if frames == 0 {
+                break;
+            }
+            let slice = &flat_buf[..frames * 6];
+            for &s in slice {
+                hasher.update(&s.to_le_bytes());
+            }
+            writer
+                .write_interleaved_f32(slice)
+                .map_err(|e| format!("spatial_conformance pass-3 write: {e}"))?;
+        }
+    }
+
+    // finish() επαληθεύει ότι γράφτηκαν ΑΚΡΙΒΩΣ τα
+    // αναμενόμενα bytes — frame count mismatch είναι
+    // σφάλμα, όχι σιωπηλή απώλεια.
+    writer
+        .finish()
+        .map_err(|e| format!("spatial_conformance pass-3 finish: {e}"))?;
+
+    let output_blake3 = hasher.finalize().to_hex().to_string();
+
     // 5. Φτιάξε StoredBlob
-    let spatial_guard =
-        std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path.to_path_buf()));
+    // ΤΟ GUARD ΔΕΙΧΝΕΙ ΣΤΟ ΠΑΡΑΔΟΤΕΟ, ΟΧΙ ΣΤΟ ΕΝΔΙΑΜΕΣΟ.
+    // Το .pcm είναι raw f32 εργασίας — καταναλώθηκε στο
+    // pass 3. Το .wav είναι το ADM BWF που ζητάει το
+    // schema (export_format: "AdmBwf") και είναι ό,τι
+    // παραδίδεται.
+    // ΗΤΑΝ ανάποδα: το εργασιακό προστατευόταν, το
+    // παραδοτέο διέρρεε.
+    let spatial_guard = std::sync::Arc::new(
+        lineos_types::audio::ManagedPcm::new(adm_path.clone()),
+    );
     // ΒΗΜΑ 4/7: το spatial ΔΗΛΩΝΕΙ ότι δεν έχει μετρήσεις,
     // αντί να τις προσποιείται με ..Default.
     // Η γέφυρα .into() ξαναγεμίζει με μηδενικά — ΠΡΟΣΩΡΙΝΟ,
@@ -239,7 +344,7 @@ fn spatial_conformance_path(
             pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
             schema_version: 0,
             preset_id: preset_id.to_string(),
-            pcm_blake3: None,
+            pcm_blake3: Some(output_blake3),
             cert_signature: None,
             audio_path: spatial_guard.clone(),
             sample_rate,
@@ -366,18 +471,41 @@ fn run_dsp_internal(
     // target_lufs from the preset schema (cheap,
     // compile-time embedded JSON — no audio read).
     // Falls back to the Apple Podcasts spec.
-    let episode_target_lufs = serde_json::from_str::<serde_json::Value>(include_str!(
+    // ΤΡΕΙΣ ΠΕΡΙΠΤΩΣΕΙΣ, ΟΧΙ ΜΙΑ:
+    //
+    //   preset με αριθμό  → Some(αριθμός)
+    //   preset με null    → None ΣΚΟΠΙΜΑ ("raw": μην
+    //                       αγγίξεις τη στάθμη)
+    //   άγνωστο preset    → fallback, ΧΡΕΟΣ §3
+    //
+    // ΤΟ .or(Some(-16.0)) ΤΑ ΕΝΩΝΕ ΟΛΑ. Το raw, που
+    // υπάρχει για να ΜΗΝ κάνει τίποτα, κανονικοποιείται
+    // στα -16 LUFS.
+    //
+    // ΤΟ ΑΓΝΩΣΤΟ PRESET κρατάει το -16.0 προσωρινά:
+    // είναι ΕΝΑ από ΤΡΙΑ διαφορετικά fallback στο ίδιο
+    // render (config.rs:49 δίνει spotify -14,
+    // content_type.rs:42 δίνει Music). Λύνεται μαζί
+    // τους στο §3, όχι εδώ.
+    let schema_value = serde_json::from_str::<serde_json::Value>(include_str!(
         "../../../../shared/schema/bmr-128.schema.json"
     ))
     .ok()
     .and_then(|s| {
         s.get("presets")
             .and_then(|p| p.get(preset_id))
-            .and_then(|p| p.get("target_lufs"))
+            .cloned()
+    });
+
+    let episode_target_lufs = match schema_value {
+        // preset βρέθηκε — τιμή ή ρητό null
+        Some(entry) => entry
+            .get("target_lufs")
             .and_then(|l| l.as_f64())
-            .map(|l| (l as f32).clamp(-40.0, 0.0))
-    })
-    .or(Some(-16.0));
+            .map(|l| (l as f32).clamp(-40.0, 0.0)),
+        // preset ΔΕΝ βρέθηκε — χρέος §3
+        None => Some(-16.0),
+    };
 
     // ═══ EPISODE STREAMING PATH (O(1) RAM) ═══
     // Bounded-memory podcast mastering. The full
@@ -584,7 +712,7 @@ fn run_dsp_internal(
             &mut dump_source,
             &blob_id,
             graph,
-            episode_target_lufs.unwrap_or(-16.0),
+            episode_target_lufs,
             &pre_analysis,
             |_: &crate::dsp::dump_audio_source::DumpAudioSource| Ok(()),
         )?;
