@@ -223,9 +223,9 @@ fn run_dsp_counts_dead_air_gaps() {
     );
     let (blob, _, _, _, _, _artifacts) = result.unwrap();
 
-    let count = blob.dead_air.total_count;
-    let sec = blob.dead_air.total_sec;
-    let longest = blob.dead_air.longest_sec;
+    let count = blob.dead_air().expect("test expects Certified").total_count;
+    let sec = blob.dead_air().expect("test expects Certified").total_sec;
+    let longest = blob.dead_air().expect("test expects Certified").longest_sec;
 
     println!("DEAD_AIR_COUNT: {}", count);
     println!("DEAD_AIR_SEC: {:.2}", sec);

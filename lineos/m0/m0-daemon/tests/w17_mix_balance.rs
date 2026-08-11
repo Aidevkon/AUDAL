@@ -54,11 +54,11 @@ fn render_with_mix(
 
     Some((
         name.to_string(),
-        blob.loudness.integrated_lufs,
-        blob.loudness.true_peak_dbtp,
-        blob.loudness.too_quiet_for_mobile,
-        blob.loudness.spotify_compliant,
-        blob.loudness.apple_podcasts_compliant,
+        blob.loudness().expect("test expects Certified").integrated_lufs,
+        blob.loudness().expect("test expects Certified").true_peak_dbtp,
+        blob.loudness().expect("test expects Certified").too_quiet_for_mobile,
+        blob.loudness().expect("test expects Certified").spotify_compliant,
+        blob.loudness().expect("test expects Certified").apple_podcasts_compliant,
     ))
 }
 
