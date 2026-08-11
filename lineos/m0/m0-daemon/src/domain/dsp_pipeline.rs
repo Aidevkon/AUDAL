@@ -90,6 +90,14 @@ fn spatial_conformance_path(
     preset_id: &str,
     input_hash_hex: &str,
     seed: u64,
+    // ΑΧΡΗΣΙΜΟΠΟΙΗΤΟ ΣΚΟΠΙΜΑ — βήμα 4/7.
+    // Τροφοδοτούσε το pcm_blake3 με το hash του INPUT,
+    // βαφτισμένο ως hash του output. Τώρα είναι None.
+    // Το warning είναι ο ΜΟΝΑΔΙΚΟΣ δείκτης στον κώδικα
+    // ότι εδώ λείπει το πραγματικό hash εξόδου — θα
+    // υπολογιζόταν μετά το mmap.flush() (γρ.~212), όπου
+    // το αρχείο στον δίσκο είναι πλήρες.
+    // ΜΗΝ το σβήσεις με _ ούτε #[allow]. northstar §Σ.
     input_blake3_hex: &str,
     _input_sha256_hex: &str,
 ) -> Result<

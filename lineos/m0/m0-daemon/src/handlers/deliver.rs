@@ -1,9 +1,8 @@
 use crate::app_state::AppState;
 use crate::blob_store::{
-    StoredBlob, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial,
+    BlobVariant, StoredBlob, StoredBlobCore, StoredBlobV2, UncertifiedReason,
 };
 use crate::db::schema::Track;
-use crate::dsp::signal_health::DeadAirSummary;
 use crate::handlers::export::export_mp3_acx;
 use axum::{
     extract::{Path, State},
@@ -298,35 +297,44 @@ pub struct Manifest {
     pub warnings: Vec<String>,
 }
 
+/// ΒΗΜΑ 5/7: αυτό το blob είναι ΜΕΤΑΦΟΡΕΑΣ, όχι source
+/// of truth. Η export_mp3_acx διαβάζει ΜΟΝΟ audio_path
+/// και channels· το manifest.json γεμίζει από
+/// πραγματικές μετρήσεις (outcome.report).
 fn build_minimal_blob(audio_path: &str) -> StoredBlob {
-    StoredBlob {
-        id: "delivery".into(),
-        version: "1.0".into(),
-        blob_type: "audio".into(),
-        created_at: "".into(),
-        input_hash: "".into(),
-        seed: 1,
-        pipeline_version: "".into(),
-        preset_id: "acx".into(),
-        loudness: StoredLoudness::default(),
-        quality: StoredQuality::default(),
-        provenance: StoredProvenance::default(),
-        spatial: StoredSpatial::default(),
-        schema_version: 1,
-        aether_cert: None,
-        aether_persona: None,
-        aether_config: None,
-        stem_fingerprints: None,
-        qr_base64: None,
-        pcm_blake3: None,
-        cert_signature: None,
-        processing_timeline: vec![],
-        dead_air: DeadAirSummary::default(),
-        audio_path: Arc::new(ManagedPcm::new(std::path::PathBuf::from(audio_path))),
-        sample_rate: 48000,
-        channels: 2,
-        num_frames: 0,
-    }
+    let blob_v2 = StoredBlobV2 {
+        core: StoredBlobCore {
+            // ΠΡΑΓΜΑΤΙΚΑ (διαβάζονται από export_mp3_acx):
+            audio_path: Arc::new(ManagedPcm::new(std::path::PathBuf::from(audio_path))),
+            channels: 2,
+            // ευθυγράμμιση με βήματα 1-4. ΗΤΑΝ 1.
+            // northstar: ΣΠΑΕΙ ΧΩΡΙΣ MIGRATION μέχρι το πρώτο public release.
+            schema_version: 0,
+            pcm_blake3: None,
+            cert_signature: None,
+            // ΨΕΥΔΗ, αλλά ΔΕΝ διαβάζονται από κανέναν σήμερα.
+            // preset_id="acx" ό,τι κι αν ζήτησε ο χρήστης,
+            // id="delivery" για κάθε track. Διορθώνονται στο
+            // ΜΗΤΡΩΟ, όπου το preset_id σπάει σε
+            // delivery_target / flavour / routing_mode ούτως ή
+            // άλλως. northstar §3.
+            id: "delivery".into(),
+            version: "1.0".into(),
+            blob_type: "audio".into(),
+            created_at: "".into(),
+            input_hash: "".into(),
+            seed: 1,
+            pipeline_version: "".into(),
+            preset_id: "acx".into(),
+            sample_rate: 48000,
+            num_frames: 0,
+        },
+        variant: BlobVariant::Uncertified {
+            reason: UncertifiedReason::TransportOnlyNotASource,
+        },
+    };
+    let blob: StoredBlob = blob_v2.into();
+    blob
 }
 
 pub fn run_deliver_core(

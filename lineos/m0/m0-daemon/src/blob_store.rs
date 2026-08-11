@@ -94,6 +94,78 @@ pub struct StoredBlob {
     pub num_frames: usize, // actual audio length without tail
 }
 
+/// ΠΡΟΣΩΡΙΝΟ — βήμα 6α/7. Ίδιες υπογραφές με το
+/// StoredBlobV2 ώστε τα ~90 call sites να
+/// μεταναστεύσουν ΠΡΙΝ αλλάξει ο τύπος επιστροφής του
+/// run_dsp (βήμα 7α).
+///
+/// ΠΑΝΤΑ Some: ο παλιός τύπος δεν ξέρει από variants.
+///
+/// ΠΡΟΣΟΧΗ — ΔΕΝ ΕΙΝΑΙ ΛΑΘΟΣ: methods και fields ζουν
+/// σε διαφορετικά namespaces στη Rust, οπότε
+/// blob.loudness (πεδίο) και blob.loudness() (μέθοδος)
+/// συνυπάρχουν ΣΚΟΠΙΜΑ όσο διαρκεί η μετανάστευση.
+///
+/// ΣΒΗΝΕΙ στο βήμα 7β μαζί με τον παλιό τύπο.
+impl StoredBlob {
+    pub fn loudness(&self) -> Option<&StoredLoudness> {
+        Some(&self.loudness)
+    }
+    pub fn quality(&self) -> Option<&StoredQuality> {
+        Some(&self.quality)
+    }
+    pub fn provenance(&self) -> Option<&StoredProvenance> {
+        Some(&self.provenance)
+    }
+    pub fn spatial(&self) -> Option<&StoredSpatial> {
+        Some(&self.spatial)
+    }
+    pub fn stem_fingerprints(&self) -> Option<&StemFingerprints> {
+        self.stem_fingerprints.as_ref()
+    }
+    pub fn processing_timeline(&self) -> Option<&[StageRecord]> {
+        Some(self.processing_timeline.as_slice())
+    }
+    pub fn qr_base64(&self) -> Option<&str> {
+        self.qr_base64.as_deref()
+    }
+    pub fn aether_cert(&self) -> Option<&str> {
+        self.aether_cert.as_deref()
+    }
+    pub fn aether_persona(&self) -> Option<&str> {
+        self.aether_persona.as_deref()
+    }
+    pub fn aether_config(&self) -> Option<&str> {
+        self.aether_config.as_deref()
+    }
+    pub fn is_certified(&self) -> bool {
+        true
+    }
+    pub fn uncertified_reason(&self) -> Option<UncertifiedReason> {
+        None
+    }
+    /// ΠΛΗΡΕΣ PATH — το DeadAirSummary ΔΕΝ είναι σε scope
+    /// στο blob_store.rs. Γράψ' το αυτούσιο, ΜΗΝ προσθέσεις
+    /// use statement.
+    pub fn dead_air(&self) -> Option<&crate::dsp::signal_health::DeadAirSummary> {
+        Some(&self.dead_air)
+    }
+    /// Το κενό slice είναι ΣΩΣΤΗ συμπεριφορά όπου ένα for
+    /// που δεν τρέχει ή ένα .len()==0 δεν κρύβει τίποτα.
+    /// Το _or_empty στο όνομα κάνει την απώλεια ΡΗΤΗ στο
+    /// call site — ο αναγνώστης βλέπει ότι κάποιος
+    /// ΑΠΟΦΑΣΙΣΕ να μη διακρίνει, δεν το ανακαλύπτει
+    /// διαβάζοντας την υλοποίηση.
+    ///
+    /// ΜΗΝ το χρησιμοποιείς σε artifact χρήστη (PDF, PNG,
+    /// sidecar) — εκεί το κενό timeline είναι ΣΙΩΠΗΛΗ
+    /// ΠΑΡΑΛΕΙΨΗ ΕΝΟΤΗΤΑΣ. Χρησιμοποίησε τον κύριο
+    /// accessor με ρητό if let Some(..).
+    pub fn timeline_or_empty(&self) -> &[StageRecord] {
+        self.processing_timeline.as_slice()
+    }
+}
+
 /// BS.1770-4 canonical values + platform compliance flags.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredLoudness {
@@ -491,10 +563,29 @@ pub enum UncertifiedReason {
     /// ΣΒΗΝΕΙ όταν αποκτήσει O(1) analyzer. northstar §Σ.
     SpatialPathHasNoTelemetry,
 
-    /// ΧΡΕΟΣ: το deliver.rs::build_minimal_blob ΦΤΙΑΧΝΕΙ
-    /// blob αντί να ΔΙΑΒΑΖΕΙ το υπάρχον.
-    /// ΣΒΗΝΕΙ όταν το delivery διαβάζει από το store.
-    DeliveryManifestStub,
+    /// Το blob ΔΕΝ είναι πηγή αλήθειας — υπάρχει ΜΟΝΟ για
+    /// να μεταφέρει audio_path και channels στην
+    /// export_mp3_acx. Οι πραγματικές μετρήσεις του
+    /// delivery έρχονται από ΕΠΑΝΑΜΕΤΡΗΣΗ του τελικού
+    /// αρχείου (AcxCheckReport) και μπαίνουν στο
+    /// manifest.json.
+    ///
+    /// ΓΙΑΤΙ ΜΕΤΡΑΕΙ: τρεις συναρτήσεις δέχονται
+    /// &StoredBlob και παράγουν artifact για χρήστη —
+    /// write_sidecar · generate_silent_certificate ·
+    /// generate_certificate_png. ΚΑΜΙΑ δεν καλείται από το
+    /// delivery σήμερα. Αν προστεθεί, ο τύπος εμποδίζει
+    /// διαρροή LUFS=0.0 / TP=0.0 / compliance=false /
+    /// id="delivery" σε certificate χρήστη.
+    ///
+    /// ΣΒΗΝΕΙ όταν το delivery διαβάζει πραγματικό blob.
+    /// ΑΠΑΙΤΕΙ: PlanEntry.blob_id + το StoredBlob να
+    /// γράφεται στη SurrealDB (η βάση ΥΠΑΡΧΕΙ και είναι
+    /// persistent — γράφει ήδη Project/Session/Track,
+    /// απλώς ΟΧΙ blobs) + λύση για το ότι η βάση είναι
+    /// async ενώ το run_deliver_core τρέχει σε
+    /// spawn_blocking. northstar §Π.
+    TransportOnlyNotASource,
 
     /// ΧΡΕΟΣ: το conductor λαμβάνει BatchTrackOutput
     /// (7 πεδία) μέσω async καναλιού, όχι πλήρη StoredBlob.
@@ -645,6 +736,24 @@ impl StoredBlobV2 {
         match &self.variant {
             BlobVariant::Certified { .. } => None,
             BlobVariant::Uncertified { reason } => Some(*reason),
+        }
+    }
+
+    /// Το κενό slice είναι ΣΩΣΤΗ συμπεριφορά όπου ένα for
+    /// που δεν τρέχει ή ένα .len()==0 δεν κρύβει τίποτα.
+    /// Το _or_empty στο όνομα κάνει την απώλεια ΡΗΤΗ στο
+    /// call site — ο αναγνώστης βλέπει ότι κάποιος
+    /// ΑΠΟΦΑΣΙΣΕ να μη διακρίνει, δεν το ανακαλύπτει
+    /// διαβάζοντας την υλοποίηση.
+    ///
+    /// ΜΗΝ το χρησιμοποιείς σε artifact χρήστη (PDF, PNG,
+    /// sidecar) — εκεί το κενό timeline είναι ΣΙΩΠΗΛΗ
+    /// ΠΑΡΑΛΕΙΨΗ ΕΝΟΤΗΤΑΣ. Χρησιμοποίησε τον κύριο
+    /// accessor με ρητό if let Some(..).
+    pub fn timeline_or_empty(&self) -> &[StageRecord] {
+        match &self.variant {
+            BlobVariant::Certified { processing_timeline, .. } => processing_timeline.as_slice(),
+            BlobVariant::Uncertified { .. } => &[],
         }
     }
 }
