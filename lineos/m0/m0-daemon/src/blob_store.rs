@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 /// Serialize a u64 as a JSON string to preserve precision in JavaScript.
 /// JS numbers are IEEE 754 doubles — u64 > 2^53 loses precision as a bare number.
-fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
+pub fn serialize_u64_as_string<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&v.to_string())
 }
 
@@ -627,6 +627,34 @@ pub enum UncertifiedReason {
     /// ΣΒΗΝΕΙ όταν το run_batch() γίνει συνάρτηση.
     /// northstar §Β.
     ProxyForAlbumContext,
+}
+
+impl UncertifiedReason {
+    /// Ο ΔΗΜΟΣΙΟΣ λόγος. ΣΚΟΠΙΜΑ γενικός.
+    ///
+    /// Τα εσωτερικά ονόματα λένε ΠΟΙΟ μονοπάτι μας δεν
+    /// μετράει — δική μας δουλειά, όχι του καταναλωτή.
+    /// Το "SpatialPathHasNoTelemetry" σε δημόσιο JSON
+    /// είναι ομολογία ελαττώματος με όνομα αρχείου μέσα.
+    ///
+    /// ΔΥΟ ΤΙΜΕΣ, ΟΧΙ ΤΡΕΙΣ — γιατί ο καταναλωτής
+    /// αντιδρά διαφορετικά:
+    ///   no_measurements    το αντικείμενο είναι σωστό
+    ///                      αλλά ελλιπές
+    ///   not_a_certificate  ΔΕΝ πρέπει να θεωρηθεί
+    ///                      απόδειξη καθόλου
+    ///
+    /// ⚠ ΚΛΕΙΣΤΟ ΣΥΝΟΛΟ. Αυτές οι τιμές είναι ΣΥΜΒΑΣΗ από
+    /// τη στιγμή που φεύγουν. Νέα τιμή = ΑΛΛΑΓΗ API, όχι
+    /// λεπτομέρεια υλοποίησης. Ίδιο μοτίβο με το Δόγμα Β
+    /// για προβολές και ελέγχους.
+    pub fn as_public_str(&self) -> &'static str {
+        match self {
+            Self::SpatialPathHasNoTelemetry => "no_measurements",
+            Self::TransportOnlyNotASource   => "not_a_certificate",
+            Self::ProxyForAlbumContext      => "no_measurements",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
