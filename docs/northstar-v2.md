@@ -336,6 +336,176 @@ offline, το ΠΛΑΙΣΙΟ προϋπολογίζεται. Το ArcSwap έλυ
     → SHA ταυτόσημα, LUFS και true peak bit-identical.
     ΔΕΝ καλύπτει: batch (§Β), read-back, ισοδυναμία.
 
+§Ρ  REPRODUCIBLE BUILDS, CROSS-PLATFORM, ΚΑΙ Η ΜΟΡΦΗ
+    ΤΩΝ HASH
+
+    Το certificate κρατάει έκδοση κώδικα. Αρκεί για
+    «αναπαραγώγιμο ΑΠΟ ΕΣΕΝΑ». ΔΕΝ αρκεί για επαλήθευση
+    από τρίτον: ο τρίτος πρέπει να τρέξει ΤΟ ΙΔΙΟ binary,
+    και «v1.2» είναι ισχυρισμός, όχι απόδειξη.
+
+    ΜΕΤΡΗΜΕΝΟ (2026-08-11):
+
+      target triple = x86_64-unknown-linux-gnu
+      'gnu' = δυναμικό linking με τη glibc ΤΟΥ ΜΗΧΑΝΗΜΑΤΟΣ
+
+      ~285 κλήσεις libm στο signal path:
+        sinf 111 · sqrtf 104 · log10f 50 · powf 49 ·
+        expf 28 · cosf 20 · tanhf 4
+      ΜΗΔΕΝ δικές μας υλοποιήσεις, κανένα LUT.
+      Το IEEE 754 τυποποιεί ΜΟΝΟ το sqrt. Τα υπόλοιπα
+      επιτρέπεται να διαφέρουν 1-2 ulp ανά υλοποίηση.
+      Το NMF τα πολλαπλασιάζει σε 12 επαναλήψεις.
+
+      ΤΟ CI ΔΕΝ ΜΕΤΡΑΕΙ ΤΟ ΠΡΟΪΟΝ:
+        ci.yml:56 και constitutional-gates.yml:54 τρέχουν
+        `cargo test --workspace` — ΧΩΡΙΣ --release.
+        ΜΟΝΟ το red-freeze.yml:34 έχει --release.
+        Και το dev profile δίνει στο sp314-dsp opt-level=3
+        ενώ το release δίνει 'z'.
+      ⇒ το INV-DET-1 και το ci-arm αποδεικνύουν
+        ντετερμινισμό για binary ΠΟΥ ΔΕΝ ΠΑΡΑΔΙΔΕΤΑΙ ΠΟΤΕ.
+        Δόγμα Ε, μετρημένο.
+
+      ci-arm (ci.yml:58-61): ονομάζεται "Cross-Platform
+        Determinism Check (ARM64)", τρέχει σε macos-latest,
+        continue-on-error: true, ΧΩΡΙΣ ΚΑΝΕΝΑ ΣΧΟΛΙΟ.
+        Ο λόγος δεν καταγράφηκε. Ένα test σιγασμένο ΔΕΝ
+        είναι test — και ονομάζεται Check, όχι warn.
+        (Αντίθετα το G-011 λέγεται ρητά "(warn)".)
+
+      Cargo.toml [profile.release]: opt-level='z' ΜΟΝΟ.
+      Το 'z' βελτιστοποιεί για ΜΕΓΕΘΟΣ — σχεδόν μηδέν
+      inlining, καμία vectorization. Το DSP της παραγωγής
+      τρέχει σε build για embedded firmware.
+
+      ΚΑΙ ΤΟ ΑΝΤΙΘΕΤΟ ΣΤΟ DEV:
+        [profile.dev.package."*"]       opt-level = 3
+        [profile.dev.package.sp314-dsp] opt-level = 3
+      ⇒ το dev build βελτιστοποιεί το DSP ΠΕΡΙΣΣΟΤΕΡΟ από
+        το release. Δύο builds του ίδιου κώδικα,
+        διαφορετικό inlining, πιθανώς διαφορετικά bytes.
+
+      codegen-units: ΔΕΝ ορίζεται στο release ⇒ default 16.
+      ΔΕΝ σημαίνει μη-ντετερμινισμό build-to-build — ο
+      διαμερισμός είναι ντετερμινιστικός. Σημαίνει ότι το
+      binary με 16 μπορεί να παράγει ΑΛΛΑ BYTES από το
+      binary με 1. Είναι μεταβλητή που πρέπει να
+      ΔΗΛΩΝΕΤΑΙ, όχι σφάλμα.
+
+      INV-PA-1 (pre-analysis-constitution.md:362) ΑΠΑΙΤΕΙ
+        "CI must enforce -C target-cpu=baseline".
+        ΔΕΝ υπάρχει .cargo/config.toml, ΔΕΝ υπάρχει
+        RUSTFLAGS σε κανένα workflow. Η απαίτηση δεν
+        επιβάλλεται πουθενά.
+        ΚΑΙ είναι πιο φιλόδοξη απ' ό,τι μπορεί να τηρηθεί:
+        υπόσχεται "bit-exact across platforms", που με
+        ~285 κλήσεις libm δεν είναι εφικτό. Το target-cpu
+        λύνει FMA και vectorization, ΟΧΙ τη libm.
+
+      git log -S "opt-level" -- Cargo.toml = ΚΕΝΟ.
+        Δεύτερη περίπτωση χαμένου λόγου σε αυτή την
+        ενότητα, μετά το to_be_bytes. Το μόνο τεκμήριο
+        είναι το σχόλιο στο Cargo.toml: το cockpit είχε
+        ΔΙΚΟ ΤΟΥ profile (opt-level=3, lto) που το cargo
+        αγνοούσε υπέρ του workspace 'z'. Άρα το 'z'
+        ΠΡΟΫΠΗΡΧΕ· το WASM ήταν θύμα, όχι αιτία.
+
+    ⇒ ΤΟ INV-DET-1 ΑΠΟΔΕΙΚΝΥΕΙ ΝΤΕΤΕΡΜΙΝΙΣΜΟ ΣΕ ΜΙΑ
+      ΜΗΧΑΝΗ, ΜΙΑ ΑΡΧΙΤΕΚΤΟΝΙΚΗ, ΜΙΑ LIBC, ΕΝΑ BINARY —
+      ΚΑΙ ΜΑΛΙΣΤΑ ΣΕ ΛΑΘΟΣ PROFILE.
+
+    Η ΜΟΡΦΗ ΤΩΝ HASH — τέσσερα ευρήματα:
+
+      1. wav_to_raw γράφει to_ne_bytes (γρ.86) ενώ το
+         blake3 χασάρει to_le_bytes (γρ.81).
+         ΕΝΕΡΓΗ διαδρομή — executor.rs:371.
+         Σε LE μηχάνημα ταυτίζονται. Σε BE ΟΧΙ: η σχέση
+         hash↔αρχείο σπάει ΣΙΩΠΗΛΑ, κανένα test δεν το
+         πιάνει γιατί κανένα CI δεν τρέχει εκεί.
+         Αντιβαίνει στο δικό μας «Write LE bytes» (Ψ-Shape).
+
+      2. Η ΜΟΡΦΗ του input_hash δεν δηλώνεται πουθενά.
+         Το pcm_blake3 την έχει (certificate_node:134:
+         "left channel, f32 LE"). Το sha256 ΟΧΙ — και
+         είναι f32 BE, interleaved stereo.
+         Χωρίς δήλωση ΔΕΝ επαληθεύεται από τρίτον, όσο
+         σωστός κι αν είναι ο αλγόριθμος.
+
+      3. git log -S "to_be_bytes" = ΚΕΝΟ.
+         Η πρόθεση πίσω από blake3→LE / sha256→BE δεν
+         καταγράφηκε ΠΟΤΕ. Το μοτίβο είναι συνεπές σε
+         πέντε αρχεία και κλειδωμένο από tests.
+         Ο ΛΟΓΟΣ έχει χαθεί.
+
+      4. Η σύμβαση «dump is BYTE-IDENTICAL to the blake3
+         input stream» (stream_core:144) ΔΕΝ ΙΣΧΥΕΙ
+         ΚΑΘΟΛΙΚΑ. Στο wav_to_raw το blake3 χασάρει ΜΟΝΟ
+         το αριστερό κανάλι ενώ το αρχείο γράφεται
+         interleaved. Δύο διαδρομές, δύο σημασίες, ένα
+         όνομα πεδίου — ίδια οικογένεια με το pcm_blake3
+         που έδειχνε στο input αντί στο output (βήμα 4/7).
+
+    Η ΑΠΟΦΑΣΗ — ΥΠΟΣΧΕΣΗ Β:
+      ΟΧΙ «τρέχει παντού, ίδιο αποτέλεσμα» — απαιτεί δικές
+      μας transcendental bit-exact, δουλειά ετών, και ο
+      χρήστης δεν την αγοράζει.
+      ΝΑΙ «τρέχει παντού, το certificate ΔΗΛΩΝΕΙ πλατφόρμα»:
+        target_triple · libc_version · cpu_features ·
+        opt_level · codegen_units · rustc_version ·
+        ΜΟΡΦΗ κάθε hash
+      ⇒ πεδία στο §Σ
+
+    ΤΑ ΒΗΜΑΤΑ, ΟΤΑΝ ΤΟ ΠΙΑΣΟΥΜΕ:
+
+      0. ΚΑΝΟΝΑΣ ΠΡΟΦΙΛ, ΠΡΙΝ ΑΠΟ ΟΛΑ:
+         ο ντετερμινισμός δηλώνεται για ΕΝΑ profile — το
+         release. Το dev είναι εργαλείο ανάπτυξης και ΔΕΝ
+         παράγει certificates.
+         Κάθε test που ελέγχει ντετερμινισμό ή παράγει
+         certificate τρέχει με --release. ΠΟΤΕ αλλιώς.
+         ΕΝΕΡΓΟ ΠΡΟΒΛΗΜΑ, ΟΧΙ ΠΡΟΛΗΨΗ: το ci.yml και το
+         constitutional-gates.yml το παραβιάζουν σήμερα.
+
+      1. codegen-units = 1 στο release.
+         ΟΧΙ επειδή λείπει ντετερμινισμός σήμερα, αλλά για
+         να γίνει η ρύθμιση ΡΗΤΗ και ΣΤΑΘΕΡΗ — και για να
+         μπορεί να δηλωθεί στο certificate.
+         Μετά: ξαναμέτρηση INV-DET-1 ΚΑΙ realtime factor.
+
+      2. .cargo/config.toml με target-cpu=baseline
+         (το INV-PA-1 το απαιτεί ήδη και δεν επιβάλλεται)
+
+      3. §Ρ πεδία στο certificate schema
+
+      4. ci-arm: από determinism check → BUILD check,
+         το continue-on-error ΦΕΥΓΕΙ.
+         ΚΑΙ το INV-PA-1 ξαναγράφεται: η υπόσχεση
+         "bit-exact across platforms" ΔΕΝ είναι εφικτή με
+         ~285 κλήσεις libm. Ή αλλάζει η υπόσχεση, ή
+         γράφουμε δικές μας transcendental.
+
+      5. opt-level='z' → ΞΕΧΩΡΙΣΤΗ ΕΞΕΤΑΣΗ.
+         Η πρόθεση ΔΕΝ καταγράφηκε (git log -S = κενό).
+
+    ΠΡΟΣΟΧΗ — ΔΕΝ ΕΙΝΑΙ ΔΩΡΕΑΝ: αλλαγή σε musl, σε
+    opt-level, ή σε δική μας libm ΜΠΟΡΕΙ ΝΑ ΑΛΛΑΞΕΙ ΤΟ
+    OUTPUT. Πρέπει να γίνει ΠΡΙΝ κυκλοφορήσουν
+    certificates, αλλιώς κάθε παλιό γίνεται μη
+    επαληθεύσιμο. ΣΗΜΕΡΑ ΔΕΝ ΥΠΑΡΧΟΥΝ ΧΡΗΣΤΕΣ — το
+    παράθυρο είναι ΤΩΡΑ.
+
+    ΦΘΗΝΟΙ ΤΡΟΠΟΙ ΜΕΤΡΗΣΗΣ ΧΩΡΙΣ MAC:
+      · build με opt-level=3 vs 'z', σύγκριση hash εξόδου
+        → ΤΟ ΦΘΗΝΟΤΕΡΟ. Λέει αμέσως αν το profile είναι
+          μέρος του certificate.
+      · cross-compile σε x86_64-unknown-linux-musl
+        → άλλη libm, ίδια αρχιτεκτονική. ΔΩΡΕΑΝ, τοπικά.
+      · build με -C target-feature=-fma vs default
+        → αποδεικνύει ευπάθεια σε float reordering
+      · ΕΝΑ χειροκίνητο CI run, ΟΤΑΝ το αποφασίσεις
+        → ΚΟΣΤΙΖΕΙ. Μία φορά, ΟΧΙ σε κάθε push.
+
 §Σ  ΣΧΗΜΑ certificate: πεδία, ιεραρχία, τι υπογράφεται,
     content-addressing παραγώγων.
     ΓΡΑΦΕΤΑΙ ΤΕΛΕΥΤΑΙΟ, ΑΠΟ ΜΕΤΡΗΣΕΙΣ — όχι από θεωρία.
