@@ -433,6 +433,7 @@ fn run_dsp_internal(
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let audio_path = &req.audio_path;
     let preset_id = &req.preset_id;
+    let routing_mode = lineos_types::presets::RoutingMode::from_preset_id(preset_id);
     let content_type = ContentType::from_preset(preset_id);
 
     fn rms(buf: &[f32]) -> f32 {
@@ -1079,7 +1080,7 @@ fn run_dsp_internal(
 
     // Spatial output —
     // A4-iii: streaming dump writer replaces the six Vec<f32> allocations
-    let needs_spatial = matches!(preset_id.as_str(), "spatial_upmix" | "pro_bundle_both");
+    let needs_spatial = routing_mode.needs_spatial();
     let spatial_raw_path =
         crate::spool::spool_dir().join(format!("m0d-raw-{}-spatial.pcm", blob_id));
     let mut spatial_writer = if needs_spatial {

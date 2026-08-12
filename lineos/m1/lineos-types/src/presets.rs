@@ -22,6 +22,49 @@ pub enum ContentKind {
     Music,
 }
 
+/// Πώς δρομολογείται το render. ΔΕΝ είναι preset και
+/// ΔΕΝ είναι flavour — είναι τρίτο είδος τιμής που
+/// ταξίδευε στο ίδιο String.
+///
+/// ΗΤΑΝ: τρία string matches στο dsp_pipeline
+/// (γρ.571, 865, 1082), η ίδια συνθήκη γραμμένη με
+/// τρεις διαφορετικούς τρόπους. Ένα τυπογραφικό σε
+/// οποιαδήποτε περνούσε σιωπηλά.
+///
+/// Το preset_id ΜΕΝΕΙ String στα structs, στο DB και
+/// στο API. Αυτό που αλλάζει είναι ότι δεν αποφασίζει
+/// πια routing — η απόφαση παίρνεται ΜΙΑ φορά και
+/// ταξιδεύει ως τύπος.
+///
+/// ΤΟ "stereo_master" ΔΕΝ ΕΙΝΑΙ ΕΔΩ: δεν ελέγχεται
+/// πουθενά στο src/. Εμφανίζεται μόνο σε δύο tests
+/// που περνάνε string που κανείς δεν διαβάζει.
+/// StereoOnly είναι η ΑΠΟΥΣΙΑ spatial, όχι ένα όνομα.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoutingMode {
+    StereoOnly,
+    SpatialUpmix,
+    Both,
+}
+
+impl RoutingMode {
+    /// ΜΙΑ πηγή αλήθειας για τη μετάφραση.
+    /// Άγνωστο string → StereoOnly, γιατί η spatial
+    /// έξοδος πρέπει να ζητηθεί ΡΗΤΑ.
+    pub fn from_preset_id(preset_id: &str) -> Self {
+        match preset_id {
+            "spatial_upmix"   => Self::SpatialUpmix,
+            "pro_bundle_both" => Self::Both,
+            _                 => Self::StereoOnly,
+        }
+    }
+
+    /// Χρειάζεται spatial έξοδος;
+    pub fn needs_spatial(&self) -> bool {
+        matches!(self, Self::SpatialUpmix | Self::Both)
+    }
+}
+
 /// What the destination requires of the finished file.
 /// Borrowed platform name rather than String, so the catalogue can be static.
 #[derive(Debug, Clone, Copy, PartialEq)]
