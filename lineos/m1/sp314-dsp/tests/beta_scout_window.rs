@@ -93,7 +93,7 @@ fn test_beta_scout_window() {
 
     for (name, scout_slice) in &test_cases {
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(scout_slice, sample_rate, None, None, true);
+        let scout = engine.scout(scout_slice, scout_slice, sample_rate, None, None, true);
         
         let mut voice_stem = Vec::new();
         let mut harm_stem = Vec::new();

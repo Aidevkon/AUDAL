@@ -67,7 +67,7 @@ fn w14_boundary_check() {
     }
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono, 48000, None, None, false);
+    let scout = engine.scout(&mono, &mono, 48000, None, None, false);
 
     let reader_on = SlidingOverlapReader::new(
         TestMemorySource {

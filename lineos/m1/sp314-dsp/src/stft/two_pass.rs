@@ -503,15 +503,35 @@ impl TwoPassEngine {
 
     /// Pass 1: proxy analysis → all static parameters locked.
     /// INV-ST-1: only fit() call in the entire run.
+    /// Το `left`/`right` χρησιμοποιούνται ΜΟΝΟ για τη
+    /// χωρική ανάλυση. Το NMF, το NMFD και τα proxy stems
+    /// δουλεύουν στο mono άθροισμα — ο διαχωρισμός δεν
+    /// χρειάζεται στερεοφωνία, η ΜΕΤΡΗΣΗ την χρειάζεται.
+    ///
+    /// ΗΤΑΝ ένα mono `signal`. Το SpatialPreAnalysis
+    /// έπαιρνε δύο κλώνους του, μετρούσε (l−r)*0.5 = 0,
+    /// και το ms_ratio ήταν σταθερά μηδέν — άρα το
+    /// voice_center πάντα 0.95 και το ambience_rear πάντα
+    /// 0.30, ενώ ο κώδικας διάβαζε σαν να προσαρμοζόταν
+    /// στο υλικό.
     pub fn scout(
         &mut self,
-        signal: &[f32],
+        left: &[f32],
+        right: &[f32],
         sample_rate: u32,
         _quiet_window_start_frame: Option<usize>,
         _dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
         run_nmfd: bool,
     ) -> ScoutResult {
         let t_scout = std::time::Instant::now();
+
+        // Το mono άθροισμα, για ό,τι δεν χρειάζεται κανάλια.
+        let signal: Vec<f32> = left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect();
+        let signal = &signal[..];
 
         // Downsample → ~11kHz mono proxy
         let proxy: Vec<f32> = signal.iter().step_by(SCOUT_DOWNSAMPLE).copied().collect();
@@ -874,16 +894,29 @@ impl TwoPassEngine {
             }
         };
 
-        // Duplicate proxy signal as stereo for spatial analysis
-        let proxy_stereo_l = proxy_voice.clone();
-        let proxy_stereo_r = proxy_voice.clone();
+        // ΤΟ ΠΡΑΓΜΑΤΙΚΟ STEREO, downsampled όπως το proxy.
+        //
+        // ΗΤΑΝ: proxy_voice.clone() δύο φορές. Το analyze
+        // μετράει side = (l−r)*0.5, οπότε με ταυτόσημα
+        // κανάλια το side ήταν μηδέν και το ms_ratio σταθερά
+        // 0.0 — μετρημένο 2026-08-12.
+        //
+        // Το SCOUT_DOWNSAMPLE εφαρμόζεται ΚΑΙ ΕΔΩ ώστε το
+        // sample_rate που περνάει παρακάτω να αντιστοιχεί:
+        // τα IIR φίλτρα των 80 Hz μέσα στο analyze
+        // υπολογίζουν alpha από αυτό.
+        let spatial_l: Vec<f32> =
+            left.iter().step_by(SCOUT_DOWNSAMPLE).copied().collect();
+        let spatial_r: Vec<f32> =
+            right.iter().step_by(SCOUT_DOWNSAMPLE).copied().collect();
 
         // scout-resident by design: outputs steer Pass-2 (rear/lfe scales); a full-file version is a Cycle-5 question
         let spatial_pre = SpatialPreAnalysis::analyze(
-            &proxy_stereo_l,
-            &proxy_stereo_r,
+            &spatial_l,
+            &spatial_r,
             sample_rate / SCOUT_DOWNSAMPLE as u32,
         );
+
 
         // StemFeatures from proxy
         let proxy_fivs = FiveStems {
@@ -1767,7 +1800,7 @@ mod tests {
     fn w_bin_mapping_produces_full_size_w() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         assert_eq!(
             scout.w.len(),
             N_BINS * N_COMPONENTS,
@@ -1785,8 +1818,8 @@ mod tests {
         let signal = sine(440.0, 48000);
         let mut e1 = TwoPassEngine::new();
         let mut e2 = TwoPassEngine::new();
-        let s1 = e1.scout(&signal, 48000, None, None, false);
-        let s2 = e2.scout(&signal, 48000, None, None, false);
+        let s1 = e1.scout(&signal, &signal, 48000, None, None, false);
+        let s2 = e2.scout(&signal, &signal, 48000, None, None, false);
         for (a, b) in s1.w.iter().zip(s2.w.iter()) {
             assert!(
                 (a - b).abs() < 1e-10,
@@ -1800,7 +1833,7 @@ mod tests {
         // Bins above proxy Nyquist must be EPS (no template)
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         // Proxy Nyquist = 48000 / (2 * SCOUT_DOWNSAMPLE) = 6000 Hz
         // Bin at 6kHz = 6000 * N_BINS * 2 / 48000 = ~256
         for b in N_BINS.div_ceil(SCOUT_DOWNSAMPLE)..N_BINS {
@@ -1818,7 +1851,7 @@ mod tests {
     fn scout_produces_locked_assignments() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         assert_eq!(scout.w.len(), N_BINS * N_COMPONENTS);
         assert!(scout.voice_idx < N_COMPONENTS);
         assert!(scout.rear_scale >= 0.0 && scout.rear_scale <= 1.0);
@@ -1830,8 +1863,8 @@ mod tests {
         let signal = sine(1000.0, 48000);
         let mut e1 = TwoPassEngine::new();
         let mut e2 = TwoPassEngine::new();
-        let s1 = e1.scout(&signal, 48000, None, None, false);
-        let s2 = e2.scout(&signal, 48000, None, None, false);
+        let s1 = e1.scout(&signal, &signal, 48000, None, None, false);
+        let s2 = e2.scout(&signal, &signal, 48000, None, None, false);
         for (a, b) in s1.w.iter().zip(s2.w.iter()) {
             assert!((a - b).abs() < 1e-6, "INV-AB-1: W must be identical");
         }
@@ -1843,7 +1876,7 @@ mod tests {
     fn process_chunks_produces_callback_calls() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
 
         let mut call_count = 0usize;
         let result = engine.process_chunks(&signal, &scout, false, |chunk| {
@@ -1860,7 +1893,7 @@ mod tests {
     fn w_read_only_during_process() {
         let signal = sine(440.0, 48000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         let w_before = scout.w.clone();
         let _ = engine.process_chunks(&signal, &scout, false, |_| {});
         assert_eq!(w_before, scout.w, "INV-ST-2: W must not change");
@@ -1870,7 +1903,7 @@ mod tests {
     fn five_stems_chunk_all_same_length() {
         let signal = sine(440.0, 96000);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         let _ = engine.process_chunks(&signal, &scout, false, |chunk| {
             assert_eq!(chunk.voice.len(), chunk.drums.len());
             assert_eq!(chunk.voice.len(), chunk.bass.len());
@@ -1884,7 +1917,7 @@ mod tests {
         let n_total = 48000;
         let signal = sine(440.0, n_total);
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
 
         let mut total_output_samples = 0;
         let meta = engine
@@ -2075,7 +2108,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         let source = TestMemorySource {
             data: interleaved,
             offset: 0,
@@ -2200,7 +2233,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
 
         // Run the OLD path to establish the exact reference
         let mut old_voice: Vec<f32> = Vec::with_capacity(n_total);
@@ -2280,7 +2313,7 @@ mod tests {
         }
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&signal, 48000, None, None, false);
+        let scout = engine.scout(&signal, &signal, 48000, None, None, false);
 
         // Run with observer OFF
         let mut off_voice: Vec<f32> = Vec::new();

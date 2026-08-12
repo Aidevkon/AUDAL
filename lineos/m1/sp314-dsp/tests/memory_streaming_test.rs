@@ -44,7 +44,7 @@ fn two_pass_engine_peak_heap_under_50mb() {
     // Pass 1 — Scout on 30s snippet only
     // In production: reader.seek(mid_offset) → read 30s → scout
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&snippet, sample_rate, None, None, false);
+    let scout = engine.scout(&snippet, &snippet, sample_rate, None, None, false);
 
     let stats_scout = dhat::HeapStats::get();
     println!(

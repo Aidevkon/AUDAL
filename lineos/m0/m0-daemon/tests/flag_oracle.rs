@@ -108,7 +108,7 @@ fn render_once(
         .map(|(l, r)| (l + r) * 0.5)
         .collect();
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono, SR, None, None, false);
+    let scout = engine.scout(&mono, &mono, SR, None, None, false);
 
     let source = RawPcmFileSource::new(pcm_path, 2).unwrap();
     let stream_source = SlidingOverlapReader::new(source, 10240);

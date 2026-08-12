@@ -25,7 +25,7 @@ fn read_audio_mono(path: &Path) -> (Vec<f32>, u32) {
 
 fn run_pipeline_for_activations(signal: &[f32], sample_rate: u32) -> (Vec<f64>, usize) {
     let mut two_pass = TwoPassEngine::new();
-    let scout = two_pass.scout(signal, sample_rate, None, None, true);
+    let scout = two_pass.scout(signal, signal, sample_rate, None, None, true);
 
     let mut stft = StftEngine::new();
     let (cplx_frames, n_frames) = stft.forward(signal);

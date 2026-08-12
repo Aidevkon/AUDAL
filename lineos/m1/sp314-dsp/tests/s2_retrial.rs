@@ -91,7 +91,7 @@ fn test_s2_retrial() {
 
             let signal = decode_audio(&audio_path);
             let mut engine = TwoPassEngine::new();
-            let scout = engine.scout(&signal, 48000, None, None, false);
+            let scout = engine.scout(&signal, &signal, 48000, None, None, false);
 
             let tensor_w = scout.tensor_w.clone();
             let tau = scout.tau;

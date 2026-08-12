@@ -105,7 +105,7 @@ fn test_phi1_duck_compare() {
     };
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono_signal, spec.sample_rate, None, None, false);
+    let scout = engine.scout(&mono_signal, &mono_signal, spec.sample_rate, None, None, false);
 
     let reader_on = SlidingOverlapReader::new(
         TestMemorySource {
@@ -167,7 +167,7 @@ fn test_phi1_duck_compare() {
         };
 
         let mut engine = TwoPassEngine::new();
-        let scout = engine.scout(&mono_signal, spec.sample_rate, None, None, false);
+        let scout = engine.scout(&mono_signal, &mono_signal, spec.sample_rate, None, None, false);
 
         let reader_on = SlidingOverlapReader::new(
             TestMemorySource {

@@ -56,7 +56,7 @@ fn test_gamma_voice_leak() {
     let mut engine = TwoPassEngine::new();
     
     for &use_nmfd in &[true, false] {
-        let scout = engine.scout(&mono, sample_rate, None, None, use_nmfd);
+        let scout = engine.scout(&mono, &mono, sample_rate, None, None, use_nmfd);
         
         let mut voice_stem = Vec::new();
         engine.process_chunks(&mono, &scout, use_nmfd, |chunk| {

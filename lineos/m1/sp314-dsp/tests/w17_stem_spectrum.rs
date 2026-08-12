@@ -70,7 +70,7 @@ fn w17_stem_spectrum() {
     let (signal, sample_rate) = read_wav_mono(input_path);
     let mut two_pass = TwoPassEngine::new();
     let scout_window = (30 * sample_rate as usize).min(signal.len());
-    let scout = two_pass.scout(&signal[..scout_window], sample_rate, None, None, true);
+    let scout = two_pass.scout(&signal[..scout_window], &signal[..scout_window], sample_rate, None, None, true);
 
     let mut stft = StftEngine::new();
     let (cplx_frames, n_frames) = stft.forward(&signal);

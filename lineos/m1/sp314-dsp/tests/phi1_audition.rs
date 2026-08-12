@@ -71,7 +71,7 @@ fn test_phi1_audition() {
     }
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&mono_mix, 48000, None, None, false);
+    let scout = engine.scout(&mono_mix, &mono_mix, 48000, None, None, false);
 
     let reader_on = SlidingOverlapReader::new(
         TestMemorySource {
