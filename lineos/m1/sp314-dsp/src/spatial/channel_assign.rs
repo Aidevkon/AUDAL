@@ -19,10 +19,62 @@ pub struct StemChannelAssignments {
     pub ambience: ChannelAssignment,
 }
 
+/// Το side_weight ΠΡΕΠΕΙ να μείνει κάτω από 1.0.
+///
+/// Το render_chunk γράφει (1.0 + s) αριστερά και
+/// (1.0 - s) δεξιά. Με s > 1.0 ο δεύτερος όρος
+/// γίνεται ΑΡΝΗΤΙΚΟΣ — δηλαδή το stem εμφανίζεται
+/// ΑΝΤΕΣΤΡΑΜΜΕΝΟ στη μία πλευρά.
+///
+/// Αυτό δεν είναι θέμα ακραίας τιμής. Είναι
+/// προϋπόθεση για ΚΑΘΕ φασικό στάδιο που μπαίνει
+/// μετά: το matrixing εδώ είναι γραμμικό και
+/// mono-safe (L+R = 2·stem·w, το s εξαφανίζεται στο
+/// άθροισμα). Ένα allpass shuffler πάνω σε ήδη
+/// αντεστραμμένο side δίνει απρόβλεπτο mono
+/// fold-down.
+///
+/// 0.95 και όχι 1.0: στο 1.0 η μία πλευρά μηδενίζεται
+/// εντελώς, που είναι hard pan και ακούγεται ως
+/// σφάλμα.
+#[inline]
+fn clamp_side(s: f32) -> f32 {
+    s.clamp(0.0, 0.95)
+}
+
 impl StemChannelAssignments {
     /// Deterministic assignment from StemFeatures + SpatialPreAnalysis
     /// INV-SP-8: Voice always has center_weight > 0
     pub fn compute(features: &StemFeatures, spatial: &SpatialPreAnalysis) -> Self {
+        // ── Το πλάτος του ΥΛΙΚΟΥ κλιμακώνει το πλάτος του ΡΟΛΟΥ ──
+        //
+        // Το side_weight κάθε stem λέει ΠΟΙΟ απλώνεται
+        // περισσότερο: ambience πάνω απ' όλα, μετά harmonics,
+        // λίγο τα drums, καθόλου φωνή και μπάσο. Αυτό είναι
+        // σωστό και μένει.
+        //
+        // Αυτό που έλειπε: ΠΟΣΟ πλατύ είναι το ίδιο το υλικό.
+        // Μέχρι το 9334b54 το ms_ratio ήταν σταθερά μηδέν
+        // (το SpatialPreAnalysis έπαιρνε δύο κλώνους του
+        // ίδιου mono), οπότε δεν υπήρχε τίποτα να διαβαστεί.
+        //
+        // ΠΟΛΛΑΠΛΑΣΙΑΣΤΙΚΟ, ΟΧΙ ΠΡΟΣΘΕΤΙΚΟ: σε mono υλικό το
+        // spread ΣΒΗΝΕΙ. Δεν κατασκευάζουμε στερεοφωνία που
+        // δεν υπήρχε — αυτό είναι ρητή επιλογή του χρήστη
+        // μέσω του intent knob, όχι σιωπηλή απόφαση του
+        // engine.
+        //
+        // ΜΕΤΡΗΜΕΝΟ 2026-08-12, 24 κομμάτια σε 4 γένη:
+        //   διάμεσος ms_ratio 0.2283
+        //   pop 0.2056 · techno 0.2099 · acoustic 0.2254 ·
+        //   metal 0.3012
+        //   ακρότατα: Spastik 0.0442, Robot Rock 0.5018
+        // Στον διάμεσο ο πολλαπλασιαστής είναι 1.0 και τα
+        // βάρη ταυτίζονται με το 41710dd, που ακούστηκε και
+        // ήταν σωστό.
+        const MS_RATIO_MEDIAN: f32 = 0.23;
+        let width_scale = spatial.ms_ratio / MS_RATIO_MEDIAN;
+
         // Voice center weight: stronger when signal is correlated
         // (correlated = mono-like = voice dominant = more center)
         let voice_center = if spatial.ms_ratio < 0.3 {
@@ -47,7 +99,7 @@ impl StemChannelAssignments {
             front_lr_weight: 0.9,
             rear_lr_weight: 0.1,
             lfe_weight: 0.0,
-            side_weight: 0.2,
+            side_weight: clamp_side(0.2 * width_scale),
         };
 
         // Bass rule: front + LFE
@@ -70,7 +122,7 @@ impl StemChannelAssignments {
             front_lr_weight: 0.8,
             rear_lr_weight: 0.2,
             lfe_weight: 0.0,
-            side_weight: 0.4,
+            side_weight: clamp_side(0.4 * width_scale),
         };
 
         // Ambience rule: rear
@@ -84,7 +136,7 @@ impl StemChannelAssignments {
             front_lr_weight: 0.2,
             rear_lr_weight: (ambience_rear + rear_factor * 0.2).min(1.0_f32),
             lfe_weight: 0.0,
-            side_weight: 0.6,
+            side_weight: clamp_side(0.6 * width_scale),
         };
 
         Self {
