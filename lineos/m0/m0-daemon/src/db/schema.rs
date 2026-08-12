@@ -13,11 +13,23 @@ pub struct Project {
     pub track_count: usize,
 }
 
+/// ⚠ ΤΡΙΑ ΠΡΑΓΜΑΤΑ ΠΡΕΠΕΙ ΝΑ ΣΥΜΦΩΝΟΥΝ: αυτό το
+/// struct, το DEFINE TABLE παρακάτω, και κάθε
+/// CREATE query. Ο πίνακας είναι SCHEMAFULL —
+/// άγνωστο πεδίο ΑΠΟΡΡΙΠΤΕΙ ολόκληρη την εγγραφή.
+///
+/// ΜΕΤΡΗΜΕΝΟ (db_track_write.rs): το track_id
+/// έλειπε από τα δύο πρώτα και υπήρχε στο CREATE
+/// του master.rs. Κάθε εγγραφή απέτυχε, ο πίνακας
+/// έμεινε άδειος, και κανείς δεν το είδε επειδή
+/// το σφάλμα καταπινόταν σε tokio::spawn.
+///
 /// A single mastered track within a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
     pub id: Option<String>,
     pub project_id: String,
+    pub track_id: String,
     pub audio_path: String,
     pub blob_id: String,
     pub lufs: f32,
@@ -128,6 +140,7 @@ pub async fn migrate(db: &super::DbConn) -> Result<(), surrealdb::Error> {
 
         DEFINE TABLE tracks SCHEMAFULL;
         DEFINE FIELD project_id  ON tracks TYPE string;
+        DEFINE FIELD track_id    ON tracks TYPE string;
         DEFINE FIELD audio_path  ON tracks TYPE string;
         DEFINE FIELD blob_id     ON tracks TYPE string;
         DEFINE FIELD lufs        ON tracks TYPE float;

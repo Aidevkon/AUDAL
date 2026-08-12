@@ -8,6 +8,7 @@ fn make_fake_track(id: &str, dur: u64, path: &str) -> Track {
     Track {
         id: Some(id.to_string()),
         project_id: "proj_1".into(),
+        track_id: id.to_string(),
         audio_path: path.into(),
         blob_id: "blob_1".into(),
         lufs: -14.0,

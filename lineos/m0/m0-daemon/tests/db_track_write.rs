@@ -1,11 +1,15 @@
 use m0d::db;
 use m0d::db::Track;
 
-/// ΟΚΤΩ πεδία, όσα δηλώνει το schema. ΠΡΕΠΕΙ να
-/// περάσει — αν αποτύχει, το πρόβλημα είναι αλλού
-/// και τα άλλα δύο tests δεν λένε τίποτα.
+/// ΟΛΑ τα δηλωμένα πεδία, όσα λέει το DEFINE TABLE.
+/// ΠΡΕΠΕΙ να περάσει — αν αποτύχει, το struct, ο
+/// ορισμός και το query ξαναδιαφώνησαν.
+///
+/// ΗΤΑΝ "eight_fields": το schema δήλωνε οκτώ και
+/// το CREATE του master.rs έστελνε εννέα. Τώρα
+/// δηλώνει εννέα.
 #[tokio::test]
-async fn eight_fields_write_and_read_back() {
+async fn all_declared_fields_round_trip() {
     let db = db::init_test().await.expect("test db");
     db::schema::migrate(&db).await.expect("migrate failed");
 
@@ -16,6 +20,7 @@ async fn eight_fields_write_and_read_back() {
         true_peak: $true_peak,
         created_at: $created_at,
         project_id: $project_id,
+        track_id: $track_id,
         flavour_id: $flavour_id,
         duration_ms: $duration_ms
     }";
@@ -28,10 +33,13 @@ async fn eight_fields_write_and_read_back() {
         .bind(("true_peak", -1.0f32))
         .bind(("created_at", "2024-01-01T00:00:00Z"))
         .bind(("project_id", "proj_123"))
+        .bind(("track_id", "track_123"))
         .bind(("flavour_id", "flav_123"))
         .bind(("duration_ms", 1000u64))
         .await
-        .expect("query success");
+        .expect("outer query error")
+        .check()
+        .expect("inner query error");
 
     let mut response = db.query("SELECT * FROM tracks").await.expect("select success");
     let raw: Vec<serde_json::Value> = response.take(0).expect("take success");
@@ -42,32 +50,37 @@ async fn eight_fields_write_and_read_back() {
     
     assert_eq!(tracks.len(), 1);
     assert_eq!(tracks[0].project_id, "proj_123");
+    assert_eq!(tracks[0].track_id, "track_123");
     assert_eq!(tracks[0].lufs, -14.0f32);
 }
 
-/// ΕΝΝΕΑ πεδία — ΑΚΡΙΒΩΣ το SQL του master.rs:204,
-/// αντιγραμμένο ΑΥΤΟΥΣΙΟ.
+/// Το SCHEMAFULL απορρίπτει άγνωστο πεδίο και
+/// ΟΛΟΚΛΗΡΗ την εγγραφή μαζί.
 ///
-/// ΑΥΤΟ ΤΟ TEST ΔΕΝ ΕΧΕΙ ΠΡΟΚΑΘΟΡΙΣΜΕΝΗ ΑΠΑΝΤΗΣΗ.
-/// ΜΗΝ γράψεις assert που υποθέτει αποτυχία ΟΥΤΕ
-/// επιτυχία. ΤΥΠΩΣΕ το αποτέλεσμα και βάλε assert
-/// ΜΟΝΟ σε ό,τι μετρήθηκε.
+/// ΜΕΤΡΗΜΕΝΟ, ΟΧΙ ΥΠΟΤΕΘΕΝ: αυτό ακριβώς συνέβαινε
+/// με το track_id — "Found field 'track_id', but no
+/// such field exists for table 'tracks'", row count 0,
+/// σε κάθε master, χωρίς log.
+///
+/// Ο μάρτυρας μένει ώστε η επόμενη διαφωνία σχήματος
+/// να πιαστεί εδώ αντί για την παραγωγή.
 #[tokio::test]
-async fn nine_fields_what_actually_happens() {
+async fn unknown_field_is_rejected_by_schemafull() {
     let db = db::init_test().await.expect("test db");
     db::schema::migrate(&db).await.expect("migrate failed");
 
     let sql = "CREATE tracks CONTENT {
-                            blob_id: $blob_id,
-                            audio_path: $audio_path,
-                            lufs: $lufs,
-                            true_peak: $true_peak,
-                            created_at: $created_at,
-                            project_id: $project_id,
-                            track_id: $track_id,
-                            flavour_id: $flavour_id,
-                            duration_ms: $duration_ms
-                        }";
+        blob_id: $blob_id,
+        audio_path: $audio_path,
+        lufs: $lufs,
+        true_peak: $true_peak,
+        created_at: $created_at,
+        project_id: $project_id,
+        track_id: $track_id,
+        flavour_id: $flavour_id,
+        duration_ms: $duration_ms,
+        definitely_not_a_field: $fake
+    }";
 
     let result = db
         .query(sql)
@@ -80,29 +93,28 @@ async fn nine_fields_what_actually_happens() {
         .bind(("track_id", "track_123"))
         .bind(("flavour_id", "flav_123"))
         .bind(("duration_ms", 1000u64))
+        .bind(("fake", "some_value"))
         .await;
 
-    println!("Result of 9 fields CREATE: {:?}", result);
+    assert!(result.is_ok(), "Outer result is Ok, query parses");
+    let checked_result = result.unwrap().check();
+    assert!(checked_result.is_err(), "Inner result is Err via .check()");
 
-    if let Ok(mut response) = db.query("SELECT * FROM tracks").await {
-        if let Ok(tracks) = response.take::<Vec<serde_json::Value>>(0) {
-            println!("tracks table row count: {}", tracks.len());
-            for (i, t) in tracks.iter().enumerate() {
-                println!("row {}: {:?}", i, t);
-            }
-        } else {
-            println!("failed to parse SELECT output");
-        }
-    } else {
-        println!("SELECT query failed");
-    }
+    println!("Result of invalid CREATE with check(): {:?}", checked_result);
+
+    let mut response = db.query("SELECT * FROM tracks").await.expect("select ok");
+    let tracks: Vec<serde_json::Value> = response.take(0).expect("take ok");
+    
+    println!("tracks table row count: {}", tracks.len());
+    assert_eq!(tracks.len(), 0, "No tracks should be written when unknown field fails validation");
 }
 
-/// Τα 7 tests που καλούν init_test ΔΕΝ καλούν
-/// migrate. Δηλαδή δουλεύουν σε βάση χωρίς πίνακες.
-/// Αυτό επιβεβαιώνει ότι το migrate είναι απαραίτητο.
+/// ΧΩΡΙΣ migrate η SurrealDB φτιάχνει τον πίνακα
+/// σιωπηλά ως SCHEMALESS και δέχεται τα πάντα.
+/// Επτά tests καλούν init_test χωρίς migrate —
+/// δουλεύουν σε βάση που δεν μοιάζει με την παραγωγή.
 #[tokio::test]
-async fn without_migrate_the_table_does_not_exist() {
+async fn without_migrate_the_table_is_schemaless() {
     let db = db::init_test().await.expect("test db");
 
     let sql = "CREATE tracks CONTENT {
@@ -112,8 +124,10 @@ async fn without_migrate_the_table_does_not_exist() {
         true_peak: $true_peak,
         created_at: $created_at,
         project_id: $project_id,
+        track_id: $track_id,
         flavour_id: $flavour_id,
-        duration_ms: $duration_ms
+        duration_ms: $duration_ms,
+        definitely_not_a_field: $fake
     }";
 
     let result = db
@@ -124,9 +138,15 @@ async fn without_migrate_the_table_does_not_exist() {
         .bind(("true_peak", -1.0f32))
         .bind(("created_at", "2024-01-01T00:00:00Z"))
         .bind(("project_id", "proj_123"))
+        .bind(("track_id", "track_123"))
         .bind(("flavour_id", "flav_123"))
         .bind(("duration_ms", 1000u64))
-        .await;
+        .bind(("fake", "some_value"))
+        .await
+        .expect("outer query error");
 
-    println!("Result without migrate: {:?}", result);
+    let checked_result = result.check();
+    assert!(checked_result.is_ok(), "Without migrate, schemaless table accepts any field");
+
+    println!("Result without migrate: {:?}", checked_result);
 }

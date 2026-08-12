@@ -214,7 +214,16 @@ pub async fn trigger_mastering(
                             duration_ms: $duration_ms
                         }";
 
-                        let _ = db_clone
+                        // ΤΟ .check() ΔΕΝ ΕΙΝΑΙ ΔΙΑΚΟΣΜΗΤΙΚΟ: το SurrealDB
+                        // επιστρέφει Ok στο εξωτερικό Result ακόμα κι όταν
+                        // η εγγραφή απορρίπτεται — το σφάλμα ζει ΜΕΣΑ στο
+                        // Response, ανά statement.
+                        // ΜΕΤΡΗΜΕΝΟ (db_track_write.rs):
+                        //   Ok(IndexedResults { results: {0: (…, Err(…))} })
+                        // Χωρίς check, ένα match στο outer πιάνει μόνο
+                        // σφάλματα σύνδεσης και αφήνει τα σφάλματα σχήματος
+                        // να περάσουν ως επιτυχία.
+                        match db_clone
                             .query(sql)
                             .bind(("blob_id", track_blob))
                             .bind(("audio_path", track_path))
@@ -225,7 +234,16 @@ pub async fn trigger_mastering(
                             .bind(("track_id", track_id))
                             .bind(("flavour_id", bg_flavour_id))
                             .bind(("duration_ms", duration_ms))
-                            .await;
+                            .await
+                            .and_then(|r| r.check())
+                        {
+                            Ok(_) => {}
+                            Err(e) => tracing::error!(
+                                error = %e,
+                                "failed to record track — the master exists \
+                                 on disk but is not in the database"
+                            ),
+                        }
                     });
                 }
 
