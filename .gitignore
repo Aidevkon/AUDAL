@@ -39,3 +39,5 @@ scripts/dom_inspector/
 *.log
 grep*.txt
 test_*.txt
+index.scip
+.code-graph/
