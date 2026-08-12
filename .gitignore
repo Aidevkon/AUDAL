@@ -41,3 +41,4 @@ grep*.txt
 test_*.txt
 index.scip
 .code-graph/
+graphify-out/
