@@ -226,21 +226,51 @@ impl FiveDotOneStage {
                 + h * assignments.harmonics.center_weight
                 + a * assignments.ambience.center_weight;
 
-            l[i] = v * assignments.voice.front_lr_weight
-                + d * assignments.drums.front_lr_weight
-                + b * assignments.bass.front_lr_weight
-                + h * assignments.harmonics.front_lr_weight
-                + a * assignments.ambience.front_lr_weight;
+            // Το side_weight απλώνει το stem ΑΣΥΜΜΕΤΡΑ. Κάθε
+            // stem παίρνει διαφορετικό gain ανά πλευρά — το
+            // πλάτος προκύπτει από ΔΙΑΦΟΡΕΤΙΚΟ ΠΕΡΙΕΧΟΜΕΝΟ
+            // αριστερά και δεξιά, όχι από φασική επεξεργασία
+            // του ίδιου σήματος.
+            //
+            // ΜΕΤΡΗΜΕΝΟ (stem_independence.rs): harmonics και
+            // ambience έχουν συσχέτιση 0.2790 — χωρίζουν καθαρά.
+            // bass↔harmonics 0.6192, γι' αυτό το bass έχει
+            // side 0.0 και μένει κέντρο.
+            //
+            // ΗΤΑΝ r[i] = l[i] από το f98166e, με σχόλιο
+            // "symmetric front". Συνέπεια: κάθε music master
+            // mono — το fold-down άθροιζε δύο ταυτόσημα κανάλια,
+            // και ο Glue widener (Reveal) δεν είχε side να δει.
 
-            r[i] = l[i]; // symmetric front
+            let sv = assignments.voice.side_weight;
+            let sd = assignments.drums.side_weight;
+            let sb = assignments.bass.side_weight;
+            let sh = assignments.harmonics.side_weight;
+            let sa = assignments.ambience.side_weight;
 
-            ls[i] = v * assignments.voice.rear_lr_weight
-                + d * assignments.drums.rear_lr_weight
-                + b * assignments.bass.rear_lr_weight
-                + h * assignments.harmonics.rear_lr_weight
-                + a * assignments.ambience.rear_lr_weight;
+            l[i] = v * assignments.voice.front_lr_weight * (1.0 + sv)
+                + d * assignments.drums.front_lr_weight * (1.0 + sd)
+                + b * assignments.bass.front_lr_weight * (1.0 + sb)
+                + h * assignments.harmonics.front_lr_weight * (1.0 + sh)
+                + a * assignments.ambience.front_lr_weight * (1.0 - sa);
 
-            rs[i] = ls[i]; // symmetric rear
+            r[i] = v * assignments.voice.front_lr_weight * (1.0 - sv)
+                + d * assignments.drums.front_lr_weight * (1.0 - sd)
+                + b * assignments.bass.front_lr_weight * (1.0 - sb)
+                + h * assignments.harmonics.front_lr_weight * (1.0 - sh)
+                + a * assignments.ambience.front_lr_weight * (1.0 + sa);
+
+            ls[i] = v * assignments.voice.rear_lr_weight * (1.0 + sv)
+                + d * assignments.drums.rear_lr_weight * (1.0 + sd)
+                + b * assignments.bass.rear_lr_weight * (1.0 + sb)
+                + h * assignments.harmonics.rear_lr_weight * (1.0 + sh)
+                + a * assignments.ambience.rear_lr_weight * (1.0 - sa);
+
+            rs[i] = v * assignments.voice.rear_lr_weight * (1.0 - sv)
+                + d * assignments.drums.rear_lr_weight * (1.0 - sd)
+                + b * assignments.bass.rear_lr_weight * (1.0 - sb)
+                + h * assignments.harmonics.rear_lr_weight * (1.0 - sh)
+                + a * assignments.ambience.rear_lr_weight * (1.0 + sa);
 
             lfe[i] = v * assignments.voice.lfe_weight
                 + d * assignments.drums.lfe_weight
