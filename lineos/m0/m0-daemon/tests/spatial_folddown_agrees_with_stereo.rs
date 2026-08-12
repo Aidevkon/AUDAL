@@ -77,12 +77,69 @@ fn max_correlation(a: &[f32], b: &[f32], max_lag: i32) -> (f32, i32) {
     (max_corr, best_lag)
 }
 
+    /// Το stereo master ΕΙΝΑΙ το fold-down του 5.1.
+    ///
+    /// ΜΕΤΡΗΜΕΝΟ, render_node.rs:344-356: το
+    /// FiveDotOneStage χτίζεται από τα stems, γράφεται
+    /// στο spatial dump, και ΤΟ ΙΔΙΟ stage περνάει από
+    /// StereoRenderer::render για να δώσει το stereo
+    /// master. Μία πηγή, δύο έξοδοι — αλλά η δεύτερη
+    /// είναι ΠΑΡΑΓΩΓΗ της πρώτης, όχι αδελφή της.
+    ///
+    /// ΑΡΑ ΑΥΤΟ ΤΟ TEST ΔΕΝ ΑΠΟΔΕΙΚΝΥΕΙ ότι δύο
+    /// ανεξάρτητες προβολές συμφωνούν. Δεν είναι
+    /// ανεξάρτητες.
+    ///
+    /// ΤΙ ΑΠΟΔΕΙΚΝΥΕΙ: ότι το 5.1 επιβιώνει της
+    /// διαδρομής του. Ανάμεσα στα δύο σημεία μεσολαβούν
+    ///   · κβαντισμός σε 24-bit
+    ///   · εγγραφή και ανάγνωση ADM BWF
+    ///   · το conformance gain του spatial (-18 LUFS
+    ///     και per-channel true peak scale)
+    ///   · το limiting του stereo
+    /// Αν κάποιο από αυτά αλλοίωνε το σήμα δομικά — λάθος
+    /// κανάλι, αντεστραμμένη φάση, χαμένο stem, σφάλμα
+    /// στο i24 round-trip — η συσχέτιση θα κατέρρεε.
+    ///
+    /// ΚΑΙ ΕΝΑ ΑΝΟΙΧΤΟ: επειδή το fold-down αθροίζει
+    /// L+0.707·C+0.707·Ls+LFE και R+0.707·C+0.707·Rs+LFE,
+    /// αν το FiveDotOneStage παράγει συμμετρικά ls/rs
+    /// τότε L_out == R_out ΕΞ ΟΡΙΣΜΟΥ — και το
+    /// [BISECT-3-RENDER] το επιβεβαιώνει με
+    /// ratio=1.0000 ακόμα και σε fixture που μπαίνει με
+    /// 4.2 dB διαφορά L/R.
+    /// Δηλαδή το stereo output είναι στην πράξη mono.
+    /// ΔΕΝ διορθώνεται εδώ· καταγράφεται.
 #[test]
 #[ignore]
 fn spatial_folddown_agrees_with_stereo() {
+    // ΠΡΑΓΜΑΤΙΚΟ ΥΛΙΚΟ, ΟΧΙ ΗΜΙΤΟΝΟ.
+    //
+    // Το test_stereo_input.wav είναι καθαρό ημίτονο:
+    // crest 1.414 (√2, δηλαδή 3 dB), LRA 0.0,
+    // L_rms == R_rms με ακρίβεια έξι δεκαδικών. Με αυτό
+    // το fold-down έδινε corr=1.0000 — αλλά επειδή ο
+    // limiter δεν ενεργοποιούνταν ΚΑΘΟΛΟΥ
+    // (correction -0.038 dB, peak 12 dB κάτω από το
+    // ceiling). Δύο ΓΡΑΜΜΙΚΕΣ διαδρομές συμφωνούσαν, που
+    // δεν αποδεικνύει τίποτα για το πραγματικό σύστημα.
+    //
+    // Αυτό εδώ είναι 10s πραγματικής μουσικής:
+    //   LUFS -26.7, peak R -9.86 → shift +12.7 dB προς
+    //   τα -14 → peak +2.84 dBTP έναντι ceiling -1.0.
+    //   Ο limiter ΘΑ κόψει ~4 dB.
+    // Το fixture είναι ΠΡΑΓΜΑΤΙΚΑ stereo — L peak -14.07,
+    // R peak -9.86 — αλλά ΤΟ STEREO WIDTH ΔΕΝ ΔΟΚΙΜΑΖΕΤΑΙ:
+    // μπαίνει με 4.2 dB διαφορά L/R (peak L -14.07,
+    // R -9.86): το fold-down το ισοπεδώνει. Βλ. doc
+    // comment στην κορυφή.
+    //
+    // ΤΟ ΣΚΟΡ ΔΕΝ ΕΠΕΣΕ: 0.9992. Η μη γραμμικότητα του
+    // limiter επηρεάζει ΚΑΙ ΤΙΣ ΔΥΟ πλευρές, γιατί το
+    // stereo ΕΙΝΑΙ το fold-down. Βλ. doc comment.
     let input_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/test_stereo_input.wav"
+        "/tests/fixtures/test_stereo_dynamic.wav"
     );
 
     let req = MasterRequest {
@@ -177,32 +234,24 @@ fn spatial_folddown_agrees_with_stereo() {
     println!("[FOLDDOWN] R: corr={:.4} lag={}", cr, lr);
     println!("[FOLDDOWN] frames: spatial={} stereo={}", n_spatial, n_stereo);
 
-    // ── ΚΑΤΩΦΛΙ, ΚΛΕΙΔΩΜΕΝΟ ΑΠΟ ΜΕΤΡΗΣΗ ──
+    // ΚΛΕΙΔΩΜΕΝΟ ΑΠΟ ΜΕΤΡΗΣΗ 2026-08-12.
     //
-    // ΜΕΤΡΗΜΕΝΟ 2026-08-12, fixture test_stereo_input.wav:
-    //   fold-down vs stereo    corr = 1.0000, lag = 0
-    //   άσχετο υλικό           corr = 0.0091
-    //   (unit test correlation_unrelated_is_low)
+    // fixture test_stereo_dynamic.wav, 10s πραγματικής
+    // μουσικής, LUFS -26.7 → shift +12.7 dB → peak
+    // +1.50 dBTP έναντι ceiling -1.0.
+    // Ο limiter ΔΟΥΛΕΨΕ: [W17-POST-MASTER] tp=-1.1269.
     //
-    // Το 1.0000 δεν είναι τύχη: το fixture είναι
-    // synthetic και το limiter δεν ενεργοποιήθηκε —
-    // correction_db=-0.0380, peak -12.87 dB πολύ κάτω
-    // από ceiling -1.0. Καμία μη γραμμικότητα δεν
-    // χώρισε τις δύο διαδρομές.
+    //   corr = 0.9992, lag = 0, και στα δύο κανάλια
     //
-    // ΤΟ 0.90 ΑΦΗΝΕΙ ΠΕΡΙΘΩΡΙΟ για πραγματικό υλικό,
-    // όπου το limiter και το glue θα δουλέψουν στ'
-    // αλήθεια και το fold-down δεν θα έχει υποστεί το
-    // ίδιο limiting. Απέχει δύο τάξεις μεγέθους από τον
-    // θόρυβο (0.009), άρα δεν κινδυνεύει να περάσει
-    // λάθος υλικό.
+    // Το 0.99 είναι λίγο κάτω από το μετρημένο. Δεν
+    // υπάρχει λόγος για χαλαρότερο: το μόνο που
+    // μεσολαβεί είναι κβαντισμός και limiting, και
+    // μετρήθηκε ότι κοστίζουν 0.0008.
     //
-    // ΑΝ ΤΟ FIXTURE ΑΝΤΙΚΑΤΑΣΤΑΘΕΙ ΜΕ ΠΡΑΓΜΑΤΙΚΟ ΥΛΙΚΟ
-    // ΚΑΙ ΤΟ ΣΚΟΡ ΠΕΣΕΙ ΣΤΟ 0.88: αυτό ΔΕΝ είναι
-    // regression. Είναι η πρώτη φορά που το limiter
-    // μετράει. Ξαναμέτρησε και ξανακλείδωσε ΜΕ ΣΧΟΛΙΟ,
-    // μην χαλαρώσεις σιωπηλά.
-    const FOLDDOWN_MIN_CORR: f32 = 0.90;
+    // ΑΝ ΠΕΣΕΙ ΚΑΤΩ ΑΠΟ 0.99: κάτι άλλαξε στο i24
+    // round-trip, στο ADM BWF, ή στο conformance gain.
+    // ΜΗΝ χαλαρώσεις το κατώφλι — βρες τι άλλαξε.
+    const FOLDDOWN_MIN_CORR: f32 = 0.99;
 
     assert!(
         cl > FOLDDOWN_MIN_CORR,
