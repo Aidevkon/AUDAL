@@ -248,29 +248,40 @@ impl FiveDotOneStage {
             let sh = assignments.harmonics.side_weight;
             let sa = assignments.ambience.side_weight;
 
-            l[i] = v * assignments.voice.front_lr_weight * (1.0 + sv)
-                + d * assignments.drums.front_lr_weight * (1.0 + sd)
-                + b * assignments.bass.front_lr_weight * (1.0 + sb)
-                + h * assignments.harmonics.front_lr_weight * (1.0 + sh)
-                + a * assignments.ambience.front_lr_weight * (1.0 - sa);
+            // Το side_weight λέει ΠΟΣΟ απλώνεται το stem, το pan
+            // ΠΡΟΣ ΤΑ ΠΟΥ. Μέχρι τώρα η κατεύθυνση ήταν
+            // κωδικοποιημένη στη ΣΕΙΡΑ των όρων — το ambience
+            // είχε αντεστραμμένα πρόσημα και τα υπόλοιπα όχι.
+            // Ίδια αριθμητική, ρητή πλέον.
+            let pv = assignments.voice.side_weight * assignments.voice.pan;
+            let pd = assignments.drums.side_weight * assignments.drums.pan;
+            let pb = assignments.bass.side_weight * assignments.bass.pan;
+            let ph = assignments.harmonics.side_weight * assignments.harmonics.pan;
+            let pa = assignments.ambience.side_weight * assignments.ambience.pan;
 
-            r[i] = v * assignments.voice.front_lr_weight * (1.0 - sv)
-                + d * assignments.drums.front_lr_weight * (1.0 - sd)
-                + b * assignments.bass.front_lr_weight * (1.0 - sb)
-                + h * assignments.harmonics.front_lr_weight * (1.0 - sh)
-                + a * assignments.ambience.front_lr_weight * (1.0 + sa);
+            l[i] = v * assignments.voice.front_lr_weight * (1.0 + pv)
+                + d * assignments.drums.front_lr_weight * (1.0 + pd)
+                + b * assignments.bass.front_lr_weight * (1.0 + pb)
+                + h * assignments.harmonics.front_lr_weight * (1.0 + ph)
+                + a * assignments.ambience.front_lr_weight * (1.0 + pa);
 
-            ls[i] = v * assignments.voice.rear_lr_weight * (1.0 + sv)
-                + d * assignments.drums.rear_lr_weight * (1.0 + sd)
-                + b * assignments.bass.rear_lr_weight * (1.0 + sb)
-                + h * assignments.harmonics.rear_lr_weight * (1.0 + sh)
-                + a * assignments.ambience.rear_lr_weight * (1.0 - sa);
+            r[i] = v * assignments.voice.front_lr_weight * (1.0 - pv)
+                + d * assignments.drums.front_lr_weight * (1.0 - pd)
+                + b * assignments.bass.front_lr_weight * (1.0 - pb)
+                + h * assignments.harmonics.front_lr_weight * (1.0 - ph)
+                + a * assignments.ambience.front_lr_weight * (1.0 - pa);
 
-            rs[i] = v * assignments.voice.rear_lr_weight * (1.0 - sv)
-                + d * assignments.drums.rear_lr_weight * (1.0 - sd)
-                + b * assignments.bass.rear_lr_weight * (1.0 - sb)
-                + h * assignments.harmonics.rear_lr_weight * (1.0 - sh)
-                + a * assignments.ambience.rear_lr_weight * (1.0 + sa);
+            ls[i] = v * assignments.voice.rear_lr_weight * (1.0 + pv)
+                + d * assignments.drums.rear_lr_weight * (1.0 + pd)
+                + b * assignments.bass.rear_lr_weight * (1.0 + pb)
+                + h * assignments.harmonics.rear_lr_weight * (1.0 + ph)
+                + a * assignments.ambience.rear_lr_weight * (1.0 + pa);
+
+            rs[i] = v * assignments.voice.rear_lr_weight * (1.0 - pv)
+                + d * assignments.drums.rear_lr_weight * (1.0 - pd)
+                + b * assignments.bass.rear_lr_weight * (1.0 - pb)
+                + h * assignments.harmonics.rear_lr_weight * (1.0 - ph)
+                + a * assignments.ambience.rear_lr_weight * (1.0 - pa);
 
             lfe[i] = v * assignments.voice.lfe_weight
                 + d * assignments.drums.lfe_weight
@@ -322,6 +333,7 @@ mod tests {
             rear_lr_weight: 0.0,
             lfe_weight: 0.0,
             side_weight: 0.0,
+            pan: 0.0,
         };
         StemChannelAssignments {
             voice: zero(),
