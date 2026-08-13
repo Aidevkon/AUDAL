@@ -618,7 +618,7 @@ impl TwoPassEngine {
             // 4 free slots seeded randomly), 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
             let nmfd_k = 8;
             let nmfd_frozen_k = 4;
-            let nmfd_num_iter = 12;
+            let nmfd_num_iter = 30;
             let nmfd_seed = 314159;
 
             let mut init_w = vec![0.0_f32; nmfd_n_mels * nmfd_k * nmfd_tau];
