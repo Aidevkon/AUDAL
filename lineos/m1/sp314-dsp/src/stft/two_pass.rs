@@ -777,8 +777,9 @@ impl TwoPassEngine {
             //
             // ΜΗ ΣΥΝΔΕΔΕΜΕΝΟ. Τυπώνεται, δεν διαβάζεται.
 
-            let mel_band: [usize; 128] = {
-                let mut out = [0usize; 128];
+            let (mel_band, mel_width): ([usize; 128], [f32; 128]) = {
+                let mut band = [0usize; 128];
+                let mut width = [0.0_f32; 128];
                 for m in 0..crate::analysis::mel_128::MEL_BANDS {
                     let mut num = 0.0_f32;
                     let mut den = 0.0_f32;
@@ -788,8 +789,8 @@ impl TwoPassEngine {
                         den += w;
                     }
                     let c = if den > 1e-10 { num / den } else { 0.0 };
-                    // ΙΔΙΑ ΟΡΙΑ με το pan, σε bin index.
-                    out[m] = if c <= 10.0 {
+                    width[m] = den.max(1e-10);
+                    band[m] = if c <= 10.0 {
                         0
                     } else if c <= 42.0 {
                         1
@@ -801,8 +802,25 @@ impl TwoPassEngine {
                         4
                     };
                 }
-                out
+                (band, width)
             };
+
+            // ΠΟΣΑ mel bins και ΠΟΣΟ ΕΥΡΟΣ ανά ζώνη. Αν μια ζώνη
+            // έχει λίγα bins αλλά μεγάλο εύρος, η μέτρησή της
+            // είναι χονδροειδής.
+            {
+                let mut cnt = [0usize; 5];
+                let mut wid = [0.0_f32; 5];
+                for m in 0..crate::analysis::mel_128::MEL_BANDS {
+                    cnt[mel_band[m]] += 1;
+                    wid[mel_band[m]] += mel_width[m];
+                }
+                eprintln!(
+                    "[MEL-MAP] bins: {} {} {} {} {} · width: {:.1} {:.1} {:.1} {:.1} {:.1}",
+                    cnt[0], cnt[1], cnt[2], cnt[3], cnt[4],
+                    wid[0], wid[1], wid[2], wid[3], wid[4]
+                );
+            }
 
             let roles: [(&str, usize); 4] = [
                 ("bass", bass_idx_free + 4),
@@ -818,7 +836,7 @@ impl TwoPassEngine {
                     for t in 0..nmfd_tau {
                         avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + *c * nmfd_tau + t];
                     }
-                    e[mel_band[m]] += avg_t / nmfd_tau as f32;
+                    e[mel_band[m]] += (avg_t / nmfd_tau as f32) / mel_width[m];
                 }
                 let tot: f32 = e.iter().sum::<f32>().max(1e-10);
                 eprintln!(
@@ -837,7 +855,7 @@ impl TwoPassEngine {
                         acc += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
                     }
                 }
-                ev[mel_band[m]] += acc / (nmfd_tau * nmfd_frozen_k) as f32;
+                ev[mel_band[m]] += (acc / (nmfd_tau * nmfd_frozen_k) as f32) / mel_width[m];
             }
             let tot: f32 = ev.iter().sum::<f32>().max(1e-10);
             eprintln!(
@@ -845,6 +863,199 @@ impl TwoPassEngine {
                  high_mid={:.4} high={:.4}",
                 ev[0] / tot, ev[1] / tot, ev[2] / tot, ev[3] / tot, ev[4] / tot
             );
+
+            // ── ΠΟΣΟ ΑΠΟΦΑΣΙΣΤΙΚΑ ΜΟΙΡΑΖΕΤΑΙ ΚΑΘΕ BIN ──
+            //
+            // Το W matrix δίνει, για κάθε mel bin, μια κατανομή
+            // ενέργειας πάνω στα k components. Αν ένα component
+            // κυριαρχεί, ο διαχωρισμός είναι καθαρός εκεί. Αν
+            // μοιράζονται, κάθε stem παίρνει κομμάτι του ίδιου
+            // bin — και τότε τα stems ΔΕΝ μπορούν να ξεχωρίσουν
+            // φασματικά, όσο καλά κι αν ξεχωρίζουν χρονικά.
+            //
+            // ΓΙΑΤΙ ΜΕΤΡΑΤΑΙ: τρία προβλήματα κόλλησαν εδώ —
+            // spatial panning, EQ masking, micro-VAD. Κοινή
+            // υποψία ότι το soft Wiener masking είναι θολό εξ
+            // ορισμού.
+            //
+            // ΜΗ ΣΥΝΔΕΔΕΜΕΝΟ. Τυπώνεται, δεν διαβάζεται.
+            {
+                let mut ent_sum = 0.0_f32;
+                let mut top_sum = 0.0_f32;
+                let mut top2_sum = 0.0_f32;
+                let mut counted = 0usize;
+
+                // ΚΑΤΑΝΟΜΗ ΤΟΥ ΚΥΡΙΑΡΧΟΥ ΣΕ ΚΑΔΟΥΣ, ώστε να
+                // φανεί αν υπάρχουν ΚΑΙ καθαρά ΚΑΙ θολά bins,
+                // ή αν είναι όλα μέτρια.
+                let mut hist = [0usize; 5]; // <0.3 · <0.5 · <0.7 · <0.9 · ≥0.9
+
+                for m in 0..nmfd_n_mels {
+                    // Ενέργεια κάθε component σε αυτό το mel bin,
+                    // αθροισμένη πάνω στο tau.
+                    let mut e = vec![0.0_f32; nmfd_k];
+                    for c in 0..nmfd_k {
+                        let mut acc = 0.0_f32;
+                        for t in 0..nmfd_tau {
+                            acc += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                        }
+                        e[c] = acc;
+                    }
+                    let tot: f32 = e.iter().sum();
+                    if tot < 1e-9 {
+                        continue;
+                    }
+
+                    // Εντροπία, κανονικοποιημένη στο [0,1].
+                    let mut h = 0.0_f32;
+                    for c in 0..nmfd_k {
+                        let p = e[c] / tot;
+                        if p > 1e-9 {
+                            h -= p * libm::logf(p);
+                        }
+                    }
+                    let h_norm = h / libm::logf(nmfd_k as f32);
+
+                    // Μερίδιο κυρίαρχου και δεύτερου.
+                    let mut sorted = e.clone();
+                    sorted.sort_by(|a, b| b.partial_cmp(a).unwrap());
+                    let top = sorted[0] / tot;
+                    let top2 = if nmfd_k > 1 { sorted[1] / tot } else { 0.0 };
+
+                    ent_sum += h_norm;
+                    top_sum += top;
+                    top2_sum += top2;
+                    counted += 1;
+
+                    let idx = if top < 0.3 {
+                        0
+                    } else if top < 0.5 {
+                        1
+                    } else if top < 0.7 {
+                        2
+                    } else if top < 0.9 {
+                        3
+                    } else {
+                        4
+                    };
+                    hist[idx] += 1;
+                }
+
+                let n = counted.max(1) as f32;
+                eprintln!(
+                    "[MASK-SHARP] entropy={:.4} top={:.4} top2={:.4} bins={}",
+                    ent_sum / n,
+                    top_sum / n,
+                    top2_sum / n,
+                    counted
+                );
+                eprintln!(
+                    "[MASK-HIST] <0.3={} <0.5={} <0.7={} <0.9={} >=0.9={}",
+                    hist[0], hist[1], hist[2], hist[3], hist[4]
+                );
+            }
+
+            // ── ΤΟ ΠΡΑΓΜΑΤΙΚΟ MASK, ΟΧΙ ΜΟΝΟ ΤΟ W ──
+            //
+            // Το [MASK-SHARP] μέτρησε το W: πόσο μοιράζεται
+            // κάθε mel bin μεταξύ components, αθροισμένο σε όλο
+            // τον χρόνο. Αλλά το mask που εφαρμόζεται είναι
+            // W·H — και ένα component διάχυτο φασματικά μπορεί
+            // να ενεργοποιείται μόνο σε λίγα frames, οπότε το
+            // τελικό mask να είναι αιχμηρό εκεί που μετράει.
+            //
+            // ΑΥΤΟ ΜΕΤΡΑΕΙ ΤΟ ΓΙΝΟΜΕΝΟ, ανά (bin, frame), και
+            // ΣΤΑΘΜΙΖΕΙ ΜΕ ΤΗΝ ΕΝΕΡΓΕΙΑ — ένα frame σιωπής δεν
+            // πρέπει να μετράει όσο ένα δυνατό.
+            //
+            // ΜΗ ΣΥΝΔΕΔΕΜΕΝΟ. Τυπώνεται, δεν διαβάζεται.
+            {
+                let n_frames = nmfd_n_frames;
+
+                let mut ent_w = 0.0_f32;   // εντροπία, σταθμισμένη
+                let mut top_w = 0.0_f32;
+                let mut wsum  = 0.0_f32;   // συνολικό βάρος
+                let mut hist = [0usize; 5];
+                let mut counted = 0usize;
+
+                // ΔΕΙΓΜΑΤΟΛΗΨΙΑ: κάθε 16ο frame, αλλιώς είναι
+                // 128 bins × μερικές χιλιάδες frames × 8 comps.
+                const FRAME_STEP: usize = 16;
+
+                for f in (0..n_frames).step_by(FRAME_STEP) {
+                    for m in 0..nmfd_n_mels {
+                        // Συνεισφορά κάθε component σε αυτό το
+                        // (bin, frame): Σ_tau W[m,c,tau]·H[c,f−tau]
+                        let mut e = vec![0.0_f32; nmfd_k];
+                        for c in 0..nmfd_k {
+                            let mut acc = 0.0_f32;
+                            for t in 0..nmfd_tau {
+                                if f < t {
+                                    continue;
+                                }
+                                let w = nmfd_tensor_w
+                                    [m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                                let h = current_h[c * nmfd_n_frames + (f - t)];
+                                acc += w * h;
+                            }
+                            e[c] = acc;
+                        }
+                        let tot: f32 = e.iter().sum();
+                        if tot < 1e-9 {
+                            continue;
+                        }
+
+                        let mut hh = 0.0_f32;
+                        for c in 0..nmfd_k {
+                            let p = e[c] / tot;
+                            if p > 1e-9 {
+                                hh -= p * libm::logf(p);
+                            }
+                        }
+                        let h_norm = hh / libm::logf(nmfd_k as f32);
+
+                        let mut top = 0.0_f32;
+                        for c in 0..nmfd_k {
+                            let p = e[c] / tot;
+                            if p > top {
+                                top = p;
+                            }
+                        }
+
+                        // ΣΤΑΘΜΙΣΗ ΜΕ ΤΗΝ ΕΝΕΡΓΕΙΑ ΤΟΥ BIN.
+                        ent_w += h_norm * tot;
+                        top_w += top * tot;
+                        wsum  += tot;
+                        counted += 1;
+
+                        let idx = if top < 0.3 {
+                            0
+                        } else if top < 0.5 {
+                            1
+                        } else if top < 0.7 {
+                            2
+                        } else if top < 0.9 {
+                            3
+                        } else {
+                            4
+                        };
+                        hist[idx] += 1;
+                    }
+                }
+
+                let w = wsum.max(1e-10);
+                eprintln!(
+                    "[MASK-REAL] entropy={:.4} top={:.4} cells={} frames_step={}",
+                    ent_w / w,
+                    top_w / w,
+                    counted,
+                    FRAME_STEP
+                );
+                eprintln!(
+                    "[MASK-REAL-HIST] <0.3={} <0.5={} <0.7={} <0.9={} >=0.9={}",
+                    hist[0], hist[1], hist[2], hist[3], hist[4]
+                );
+            }
 
             (nmfd_tensor_w, nmfd_tau, bass_idx_free + 4, harmonics_idx_free + 4, ambience_idx_free + 4)
         } else {
