@@ -249,7 +249,18 @@ pub(crate) fn process_single_chunk(
     let h_chunk = nmf.transform(&scout.w, &chunk_frames);
 
     let (voice_mask, bass_mask, harm_mask, amb_mask) = if data.use_nmfd {
-        // These hardcoded values mirror scout fit + W5.b harness
+        // ΤΟ nmfd_iter ΕΔΩ ΕΙΝΑΙ ΣΚΟΠΙΜΑ ΔΙΑΦΟΡΕΤΙΚΟ ΑΠΟ ΤΟ SCOUT.
+        // Το scout τρέχει nmfd_num_iter = 30 και λύνει ΚΑΙ ΤΑ ΔΥΟ,
+        // W και H. Εδώ το W είναι κλειδωμένο (scout.tensor_w) και
+        // λύνουμε ΜΟΝΟ για το H — πολύ ευκολότερο πρόβλημα.
+        //
+        // ΜΕΤΡΗΜΕΝΟ 2026-08-13: με 30 αντί για 12 το fold-down ratio
+        // πάει από 0.7961 σε 0.7955, δηλαδή τέταρτο δεκαδικό, ενώ
+        // το render_node διπλασιάζεται από 621 ms σε 1229 ms.
+        // Τα 12 αρκούν.
+        //
+        // ΗΤΑΝ: «These hardcoded values mirror scout fit + W5.b
+        // harness» — έπαψε να ισχύει όταν το scout πήγε στις 30.
         let nmfd_k = 8;
         let nmfd_iter = 12;
         let init_val = 0.1_f32;
