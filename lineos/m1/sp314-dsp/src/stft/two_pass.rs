@@ -80,6 +80,33 @@ impl StemMfccs {
     }
 }
 
+/// Ένα stem με τα δύο του κανάλια.
+///
+/// Τα δύο πάνε ΜΑΖΙ εξ ορισμού — δεν μπορεί κάποιος
+/// να γεμίσει το ένα και να ξεχάσει το άλλο.
+///
+/// ΠΡΟΣΤΕΘΗΚΕ ΣΤΟ S1, ΧΡΗΣΙΜΟΠΟΙΕΙΤΑΙ ΣΤΟ S2.
+#[derive(Debug, Clone, Default)]
+pub struct StereoStem {
+    pub l: Vec<f32>,
+    pub r: Vec<f32>,
+}
+
+impl StereoStem {
+    /// ΠΡΟΣΩΡΙΝΟ ΓΕΦΥΡΩΜΑ — το mixing δεν ξέρει
+    /// ακόμα stereo.
+    ///
+    /// ΦΕΥΓΕΙ ΣΤΟ S3, όταν το render_chunk διαβάζει
+    /// l και r ξεχωριστά.
+    pub fn mono(&self) -> Vec<f32> {
+        self.l
+            .iter()
+            .zip(self.r.iter())
+            .map(|(l, r)| (l + r) * 0.5)
+            .collect()
+    }
+}
+
 /// A single chunk of 5 stems — chunk-sized slices only.
 /// Never holds full-file data. Passed to process_chunks callback.
 pub struct FiveStemsChunk {
@@ -180,6 +207,9 @@ pub(crate) struct SingleChunkData<'a> {
     pub padded_left: &'a [f32],
     pub padded_right: &'a [f32],
     pub core_chunk: &'a [f32],
+    /// ΠΡΟΣΤΕΘΗΚΕ ΣΤΟ S1. Δεν διαβάζεται ακόμα.
+    pub core_left: &'a [f32],
+    pub core_right: &'a [f32],
     pub pad_frames: usize,
     pub use_nmfd: bool,
 }
@@ -207,10 +237,16 @@ pub(crate) fn process_single_chunk(
 
     let mut core_frames_l_cplx = stft_l.feed_chunk(data.padded_left);
     core_frames_l_cplx.extend(stft_l.finish());
+    // ΤΑ COMPLEX ΤΩΝ L/R ΜΕΝΟΥΝ ΔΙΑΘΕΣΙΜΑ.
+    //
+    // Τα magnitudes χρησιμεύουν για το pan_mean. Η ΦΑΣΗ
+    // χρειάζεται για να εφαρμοστούν τα masks ξεχωριστά
+    // σε κάθε κανάλι (S2). Το STFT γίνεται ήδη — μόνο το
+    // αποτέλεσμα πετιόταν.
     let core_frames_l: Vec<Vec<f32>> = core_frames_l_cplx
-        .into_iter()
+        .iter()
         .map(|f| {
-            f.into_iter()
+            f.iter()
                 .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
                 .collect()
         })
@@ -219,9 +255,9 @@ pub(crate) fn process_single_chunk(
     let mut core_frames_r_cplx = stft_r.feed_chunk(data.padded_right);
     core_frames_r_cplx.extend(stft_r.finish());
     let core_frames_r: Vec<Vec<f32>> = core_frames_r_cplx
-        .into_iter()
+        .iter()
         .map(|f| {
-            f.into_iter()
+            f.iter()
                 .map(|c| libm::sqrtf(c.re * c.re + c.im * c.im))
                 .collect()
         })
@@ -1442,6 +1478,9 @@ impl TwoPassEngine {
             padded_left: Vec<f32>,
             padded_right: Vec<f32>,
             core_chunk: Vec<f32>,
+            /// ΠΡΟΣΤΕΘΗΚΕ ΣΤΟ S1. Δεν διαβάζεται ακόμα.
+            core_left: Vec<f32>,
+            core_right: Vec<f32>,
             pad_frames: usize,
             offset: usize,
         }
@@ -1540,6 +1579,8 @@ impl TwoPassEngine {
                             padded_right: overlap_chunk.right.to_vec(),
                             core_chunk: overlap_chunk.signal[offset_idx..offset_idx + new_len]
                                 .to_vec(),
+                            core_left: overlap_chunk.left[offset_idx..offset_idx + new_len].to_vec(),
+                            core_right: overlap_chunk.right[offset_idx..offset_idx + new_len].to_vec(),
                             pad_frames,
                             offset: overlap_chunk.offset,
                         });
@@ -1636,6 +1677,8 @@ impl TwoPassEngine {
                                 padded_left: &owned.padded_left,
                                 padded_right: &owned.padded_right,
                                 core_chunk: &owned.core_chunk,
+                                core_left: &owned.core_left,
+                                core_right: &owned.core_right,
                                 pad_frames: owned.pad_frames,
                                 use_nmfd,
                             },
@@ -1793,6 +1836,8 @@ impl TwoPassEngine {
                     &[]
                 };
                 let core_chunk = &signal[chunk_in.offset..chunk_in.end];
+                let core_left = &left[chunk_in.offset..chunk_in.end];
+                let core_right = &right[chunk_in.offset..chunk_in.end];
                 let pad_frames = if chunk_in.start < chunk_in.offset {
                     (chunk_in.offset - chunk_in.start + (FFT_SIZE / 2)) / HOP_SIZE
                 } else {
@@ -1807,6 +1852,8 @@ impl TwoPassEngine {
                         padded_left,
                         padded_right,
                         core_chunk,
+                        core_left,
+                        core_right,
                         pad_frames,
                         use_nmfd,
                     },
