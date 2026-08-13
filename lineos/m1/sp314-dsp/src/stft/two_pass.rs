@@ -764,6 +764,88 @@ impl TwoPassEngine {
                 free_flatness[ambience_idx_free]
             );
 
+            // ── ΠΟΥ ΖΕΙ ΚΑΘΕ STEM ΦΑΣΜΑΤΙΚΑ ──
+            //
+            // Το W matrix ΕΙΝΑΙ το φασματικό πρότυπο κάθε
+            // component. Δεν χρειάζεται φίλτρο ούτε δεύτερη
+            // ανάλυση — υπάρχει ήδη, σε πλήρες εύρος.
+            //
+            // ΤΟ drums_idx_free ΣΥΜΠΕΡΙΛΑΜΒΑΝΕΤΑΙ παρότι η
+            // παραγωγή παίρνει drums από HPSS. Είναι το μόνο
+            // φασματικό πρότυπο για κρουστά που υπάρχει στο
+            // scout, και το σχίσμα είναι καταγεγραμμένο (0ef3eb2).
+            //
+            // ΜΗ ΣΥΝΔΕΔΕΜΕΝΟ. Τυπώνεται, δεν διαβάζεται.
+
+            let mel_band: [usize; 128] = {
+                let mut out = [0usize; 128];
+                for m in 0..crate::analysis::mel_128::MEL_BANDS {
+                    let mut num = 0.0_f32;
+                    let mut den = 0.0_f32;
+                    for b in 0..crate::analysis::mel_128::N_BINS {
+                        let w = crate::analysis::mel_128::MEL_128_MATRIX[m][b];
+                        num += w * b as f32;
+                        den += w;
+                    }
+                    let c = if den > 1e-10 { num / den } else { 0.0 };
+                    // ΙΔΙΑ ΟΡΙΑ με το pan, σε bin index.
+                    out[m] = if c <= 10.0 {
+                        0
+                    } else if c <= 42.0 {
+                        1
+                    } else if c <= 170.0 {
+                        2
+                    } else if c <= 341.0 {
+                        3
+                    } else {
+                        4
+                    };
+                }
+                out
+            };
+
+            let roles: [(&str, usize); 4] = [
+                ("bass", bass_idx_free + 4),
+                ("harmonics", harmonics_idx_free + 4),
+                ("ambience", ambience_idx_free + 4),
+                ("drums", drums_idx_free + 4),
+            ];
+
+            for (name, c) in roles.iter() {
+                let mut e = [0.0_f32; 5];
+                for m in 0..nmfd_n_mels {
+                    let mut avg_t = 0.0_f32;
+                    for t in 0..nmfd_tau {
+                        avg_t += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + *c * nmfd_tau + t];
+                    }
+                    e[mel_band[m]] += avg_t / nmfd_tau as f32;
+                }
+                let tot: f32 = e.iter().sum::<f32>().max(1e-10);
+                eprintln!(
+                    "[STEM-BAND] {}: lows={:.4} low_mid={:.4} mid={:.4} \
+                     high_mid={:.4} high={:.4}",
+                    name, e[0] / tot, e[1] / tot, e[2] / tot, e[3] / tot, e[4] / tot
+                );
+            }
+
+            // ΤΟ VOICE είναι το ΑΘΡΟΙΣΜΑ των frozen slots 0..4.
+            let mut ev = [0.0_f32; 5];
+            for m in 0..nmfd_n_mels {
+                let mut acc = 0.0_f32;
+                for c in 0..nmfd_frozen_k {
+                    for t in 0..nmfd_tau {
+                        acc += nmfd_tensor_w[m * (nmfd_k * nmfd_tau) + c * nmfd_tau + t];
+                    }
+                }
+                ev[mel_band[m]] += acc / (nmfd_tau * nmfd_frozen_k) as f32;
+            }
+            let tot: f32 = ev.iter().sum::<f32>().max(1e-10);
+            eprintln!(
+                "[STEM-BAND] voice: lows={:.4} low_mid={:.4} mid={:.4} \
+                 high_mid={:.4} high={:.4}",
+                ev[0] / tot, ev[1] / tot, ev[2] / tot, ev[3] / tot, ev[4] / tot
+            );
+
             (nmfd_tensor_w, nmfd_tau, bass_idx_free + 4, harmonics_idx_free + 4, ambience_idx_free + 4)
         } else {
             (
@@ -774,6 +856,79 @@ impl TwoPassEngine {
                 usize::MAX,
             )
         };
+
+        // ── ΠΟΥ ΓΕΡΝΕΙ ΚΑΘΕ ΖΩΝΗ ΣΤΟ ΠΡΩΤΟΤΥΠΟ ──
+        //
+        // ΙΔΙΟΣ ΥΠΟΛΟΓΙΣΜΟΣ με two_pass.rs:429 — p =
+        // (|X_r| − |X_l|) / (|X_l| + |X_r|), σταθμισμένο με
+        // amp ανά bin, ίδια όρια ζωνών κατά bin index.
+        //
+        // ΓΙΑΤΙ ΕΔΩ: στην Pass 2 υπολογίζεται ήδη, αλλά η
+        // StemChannelAssignments::compute() αποφασίζει στο
+        // scout. Η πληροφορία έφτανε πάντα αργά.
+        //
+        // ΓΙΑΤΙ STFT ΚΑΙ ΟΧΙ ΦΙΛΤΡΑ: μετρήθηκε ότι το LR4
+        // δίνει RMS ανά ζώνη ενώ αυτό σταθμίζει ανά bin —
+        // διαφορετικά μεγέθη. Τα 24 κομμάτια της 2026-08-12
+        // δεν θα ίσχυαν ως αναφορά.
+        //
+        // ΜΗ ΣΥΝΔΕΔΕΜΕΝΟ. Τυπώνεται, δεν διαβάζεται.
+        let chunk_size = 48000;
+        let mut stft_l = StreamingStftEncoder::new();
+        let mut stft_r = StreamingStftEncoder::new();
+        let mut band_sums = [(0.0_f32, 0.0_f32, 0.0_f32); 5];
+
+        for (cl, cr) in left.chunks(chunk_size).zip(right.chunks(chunk_size)) {
+            let fl = stft_l.feed_chunk(cl);
+            let fr = stft_r.feed_chunk(cr);
+            for (frame_l, frame_r) in fl.iter().zip(fr.iter()) {
+                for b in 0..N_BINS {
+                    let x_l = libm::sqrtf(
+                        frame_l[b].re * frame_l[b].re + frame_l[b].im * frame_l[b].im,
+                    );
+                    let x_r = libm::sqrtf(
+                        frame_r[b].re * frame_r[b].re + frame_r[b].im * frame_r[b].im,
+                    );
+                    let amp = x_l + x_r;
+                    if amp < 1e-6 {
+                        continue;
+                    }
+                    let p = (x_r - x_l) / (amp + 1e-10_f32);
+                    // ΙΔΙΑ ΟΡΙΑ με two_pass.rs:432-442.
+                    let band = if b <= 10 {
+                        0
+                    } else if b <= 42 {
+                        1
+                    } else if b <= 170 {
+                        2
+                    } else if b <= 341 {
+                        3
+                    } else {
+                        4
+                    };
+                    band_sums[band].0 += p * amp;
+                    band_sums[band].1 += libm::fabsf(p) * amp;
+                    band_sums[band].2 += amp;
+                }
+            }
+        }
+
+        let mut scout_pan = [0.0_f32; 5];
+        let mut scout_width = [0.0_f32; 5];
+        for i in 0..5 {
+            let den = band_sums[i].2.max(1e-10);
+            scout_pan[i] = band_sums[i].0 / den;
+            scout_width[i] = band_sums[i].1 / den;
+        }
+
+        eprintln!(
+            "[SCOUT-PAN] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            scout_pan[0], scout_pan[1], scout_pan[2], scout_pan[3], scout_pan[4]
+        );
+        eprintln!(
+            "[SCOUT-WIDTH] lows={:.4} low_mid={:.4} mid={:.4} high_mid={:.4} high={:.4}",
+            scout_width[0], scout_width[1], scout_width[2], scout_width[3], scout_width[4]
+        );
 
         // ── W-matrix bin mapping: proxy (12kHz) → full (48kHz) ──────
         // SCOUT_DOWNSAMPLE=4 is an integer → b_proxy = b_full * 4 exactly.
