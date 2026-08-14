@@ -276,11 +276,13 @@ mod tests {
 
         engine
             .process_slices_with_params(&signal, &left, &right, &scout, 1.0, false, |chunk| {
-                old_voice.extend_from_slice(&chunk.voice);
-                old_drums.extend_from_slice(&chunk.drums);
-                old_bass.extend_from_slice(&chunk.bass);
-                old_harmonics.extend_from_slice(&chunk.harmonics);
-                old_ambience.extend_from_slice(&chunk.ambience);
+                // ΠΡΟΣΩΡΙΝΟ — S2. Τα stems είναι πλέον stereo· εδώ
+                // χρειάζεται mono για ανάλυση. ΞΑΝΑΔΕΣ ΣΤΟ S3.
+                old_voice.extend_from_slice(&chunk.voice.mono());
+                old_drums.extend_from_slice(&chunk.drums.mono());
+                old_bass.extend_from_slice(&chunk.bass.mono());
+                old_harmonics.extend_from_slice(&chunk.harmonics.mono());
+                old_ambience.extend_from_slice(&chunk.ambience.mono());
             })
             .unwrap();
 
@@ -312,11 +314,11 @@ mod tests {
                 None,
                 false,
                 |chunk| {
-                    new_voice.extend_from_slice(&chunk.voice);
-                    new_drums.extend_from_slice(&chunk.drums);
-                    new_bass.extend_from_slice(&chunk.bass);
-                    new_harmonics.extend_from_slice(&chunk.harmonics);
-                    new_ambience.extend_from_slice(&chunk.ambience);
+                    new_voice.extend_from_slice(&chunk.voice.mono());
+                    new_drums.extend_from_slice(&chunk.drums.mono());
+                    new_bass.extend_from_slice(&chunk.bass.mono());
+                    new_harmonics.extend_from_slice(&chunk.harmonics.mono());
+                    new_ambience.extend_from_slice(&chunk.ambience.mono());
                 },
             )
             .unwrap();

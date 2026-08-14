@@ -60,7 +60,7 @@ fn test_gamma_voice_leak() {
         
         let mut voice_stem = Vec::new();
         engine.process_chunks(&mono, &scout, use_nmfd, |chunk| {
-            voice_stem.extend_from_slice(&chunk.voice);
+            voice_stem.extend_from_slice(&chunk.voice.mono());
         }).unwrap();
 
         // 3. ΕΥΘΥΓΡΑΜΜΙΣΕ

@@ -98,7 +98,7 @@ fn w14_boundary_check() {
             Some(&mut observer),
             true, // phi1_enabled
             |chunk| {
-                on_voice.extend_from_slice(&chunk.voice);
+                on_voice.extend_from_slice(&chunk.voice.l);
             },
         )
         .unwrap();

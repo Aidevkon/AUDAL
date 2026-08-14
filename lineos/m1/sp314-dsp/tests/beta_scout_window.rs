@@ -98,8 +98,8 @@ fn test_beta_scout_window() {
         let mut voice_stem = Vec::new();
         let mut harm_stem = Vec::new();
         engine.process_chunks(&mono, &scout, true, |chunk| {
-            voice_stem.extend_from_slice(&chunk.voice);
-            harm_stem.extend_from_slice(&chunk.harmonics);
+            voice_stem.extend_from_slice(&chunk.voice.mono());
+            harm_stem.extend_from_slice(&chunk.harmonics.mono());
         }).unwrap();
 
         for (stem_name, stem) in [("voice", voice_stem), ("harmonics", harm_stem)] {

@@ -89,7 +89,7 @@ fn two_pass_engine_peak_heap_under_50mb() {
         engine
             .process_chunks(&chunk_mono, &scout, false, |stems| {
                 chunk_count += 1;
-                let _ = stems.voice.len();
+                let _ = stems.voice.l.len();
             })
             .expect("process_chunks failed");
 

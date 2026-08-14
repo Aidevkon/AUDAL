@@ -60,12 +60,15 @@ fn render_ab_variant() {
     let mut output_right = Vec::with_capacity(mono.len());
 
     let callback = |stems: &FiveStemsChunk| {
-        for i in 0..stems.voice.len() {
-            let l = stems.voice[i]
-                + stems.drums[i]
-                + stems.bass[i]
-                + stems.harmonics[i]
-                + stems.ambience[i];
+        // ΠΡΟΣΩΡΙΝΟ — S2. Τα stems είναι stereo· η
+        // αναφορά είναι mono, άρα το άθροισμα στο mono τους.
+        let sv = stems.voice.mono();
+        let sd = stems.drums.mono();
+        let sb = stems.bass.mono();
+        let sh = stems.harmonics.mono();
+        let sa = stems.ambience.mono();
+        for i in 0..sv.len() {
+            let l = sv[i] + sd[i] + sb[i] + sh[i] + sa[i];
             output_left.push(l);
             // Simple stereo: duplicate mono sum (stems are mono)
             output_right.push(l);

@@ -230,11 +230,13 @@ fn generate_preview_stems(
 
     engine
         .process_chunks(snippet, &scout, false, |chunk| {
-            stem_voices.extend_from_slice(&chunk.voice);
-            stem_drums.extend_from_slice(&chunk.drums);
-            stem_bass.extend_from_slice(&chunk.bass);
-            stem_harmonics.extend_from_slice(&chunk.harmonics);
-            stem_ambience.extend_from_slice(&chunk.ambience);
+            // ΠΡΟΣΩΡΙΝΟ — S2. Τα stems είναι πλέον stereo· εδώ
+            // χρειάζεται mono για ανάλυση. ΞΑΝΑΔΕΣ ΣΤΟ S3.
+            stem_voices.extend_from_slice(&chunk.voice.mono());
+            stem_drums.extend_from_slice(&chunk.drums.mono());
+            stem_bass.extend_from_slice(&chunk.bass.mono());
+            stem_harmonics.extend_from_slice(&chunk.harmonics.mono());
+            stem_ambience.extend_from_slice(&chunk.ambience.mono());
         })
         .map_err(|e| format!("process_chunks error: {e}"))?;
 

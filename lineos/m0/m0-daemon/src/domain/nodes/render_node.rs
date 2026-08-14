@@ -229,21 +229,28 @@ pub fn run(
     let w17_post_sums_clone = w17_post_sums.clone();
 
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
-        let chunk_len = stems_chunk.voice.len();
+        // ΠΡΟΣΩΡΙΝΟ — S2. Το mixing δεν ξέρει ακόμα stereo.
+        // ΦΕΥΓΕΙ ΣΤΟ S3.
+        let sm_voice = stems_chunk.voice.mono();
+        let sm_drums = stems_chunk.drums.mono();
+        let sm_bass = stems_chunk.bass.mono();
+        let sm_harmonics = stems_chunk.harmonics.mono();
+        let sm_ambience = stems_chunk.ambience.mono();
+
+        let chunk_len = sm_voice.len();
         {
             let mut sums = w16_sums_clone.borrow_mut();
             for i in 0..chunk_len {
-                sums[0] += stems_chunk.voice[i] * stems_chunk.voice[i];
-                sums[1] += stems_chunk.drums[i] * stems_chunk.drums[i];
-                sums[2] += stems_chunk.bass[i] * stems_chunk.bass[i];
-                sums[3] += stems_chunk.harmonics[i] * stems_chunk.harmonics[i];
-                sums[4] += stems_chunk.ambience[i] * stems_chunk.ambience[i];
+                sums[0] += sm_voice[i] * sm_voice[i];
+                sums[1] += sm_drums[i] * sm_drums[i];
+                sums[2] += sm_bass[i] * sm_bass[i];
+                sums[3] += sm_harmonics[i] * sm_harmonics[i];
+                sums[4] += sm_ambience[i] * sm_ambience[i];
                 sums[5] += 1.0;
             }
         }
 
-        let mv: Vec<f32> = stems_chunk
-            .voice
+        let mv: Vec<f32> = sm_voice
             .iter()
             .map(|s| {
                 let mut sample = *s;
@@ -253,18 +260,15 @@ pub fn run(
                 sample * effective_voice_gain
             })
             .collect();
-        let md: Vec<f32> = stems_chunk
-            .drums
+        let md: Vec<f32> = sm_drums
             .iter()
             .map(|s| s * effective_drums_gain)
             .collect();
-        let mut mb: Vec<f32> = stems_chunk
-            .bass
+        let mut mb: Vec<f32> = sm_bass
             .iter()
             .map(|s| s * effective_bass_gain)
             .collect();
-        let mut mh: Vec<f32> = stems_chunk
-            .harmonics
+        let mut mh: Vec<f32> = sm_harmonics
             .iter()
             .map(|s| s * effective_harmonics_gain)
             .collect();
@@ -287,8 +291,7 @@ pub fn run(
                 }
             }
         }
-        let ma: Vec<f32> = stems_chunk
-            .ambience
+        let ma: Vec<f32> = sm_ambience
             .iter()
             .map(|s| {
                 let mut sample = *s;

@@ -110,11 +110,11 @@ impl StereoStem {
 /// A single chunk of 5 stems — chunk-sized slices only.
 /// Never holds full-file data. Passed to process_chunks callback.
 pub struct FiveStemsChunk {
-    pub voice: Vec<f32>,
-    pub drums: Vec<f32>,
-    pub bass: Vec<f32>,
-    pub harmonics: Vec<f32>,
-    pub ambience: Vec<f32>,
+    pub voice: StereoStem,
+    pub drums: StereoStem,
+    pub bass: StereoStem,
+    pub harmonics: StereoStem,
+    pub ambience: StereoStem,
 }
 
 /// Result of Pass 1 — all static parameters locked.
@@ -267,11 +267,11 @@ pub(crate) fn process_single_chunk(
     if n_frames == 0 {
         return ParallelChunkOut {
             stems: FiveStemsChunk {
-                voice: vec![],
-                drums: vec![],
-                bass: vec![],
-                harmonics: vec![],
-                ambience: vec![],
+                voice: StereoStem::default(),
+                drums: StereoStem::default(),
+                bass: StereoStem::default(),
+                harmonics: StereoStem::default(),
+                ambience: StereoStem::default(),
             },
             voice_transient: 0.0,
             drums_transient: 0.0,
@@ -413,17 +413,62 @@ pub(crate) fn process_single_chunk(
         &[]
     };
 
-    let mut engine = crate::stft::StftEngine::new();
-    let core_frames_cplx = engine.forward(data.core_chunk).0;
+    // ΤΟ ΙΔΙΟ STFT ΠΟΥ ΠΑΡΗΓΑΓΕ ΤΑ MASKS.
+    //
+    // Τα masks βγαίνουν από forward(padded_chunk), που
+    // βάζει FFT_SIZE/2 μηδενικά μπροστά και πίσω. Ο
+    // carrier ΠΡΕΠΕΙ να έχει την ΙΔΙΑ ευθυγράμμιση —
+    // αλλιώς το mask πολλαπλασιάζεται σε λάθος frames
+    // και το ISTFT ακυρώνει ενέργεια.
+    //
+    // ΜΕΤΡΗΜΕΝΟ: με τα streaming frames του
+    // StreamingStftEncoder (carry με πραγματικά
+    // γειτονικά δείγματα) το LUFS έπεσε από −14.15 σε
+    // −39.41. Η διαφορά είναι ΜΕΣΑ στο παράθυρο, οπότε
+    // κανένα frame slicing δεν τη διορθώνει.
+    //
+    // ΞΕΧΩΡΙΣΤΟΣ engine ανά κανάλι — κρατάει state.
+    let mut eng_l = crate::stft::StftEngine::new();
+    let mut eng_r = crate::stft::StftEngine::new();
+    let core_l_cplx_vec = eng_l.forward(data.core_left).0;
+    let core_r_cplx_vec = eng_r.forward(data.core_right).0;
+    let core_l_cplx = core_l_cplx_vec.as_slice();
+    let core_r_cplx = core_r_cplx_vec.as_slice();
 
-    let voice_chunk =
-        apply_spectral_mask_to_chunk(&core_frames_cplx, core_voice_mask, data.core_chunk.len());
-    let bass_chunk =
-        apply_spectral_mask_to_chunk(&core_frames_cplx, core_bass_mask, data.core_chunk.len());
-    let harm_chunk =
-        apply_spectral_mask_to_chunk(&core_frames_cplx, core_harm_mask, data.core_chunk.len());
-    let amb_chunk =
-        apply_spectral_mask_to_chunk(&core_frames_cplx, core_amb_mask, data.core_chunk.len());
+    // ── ΙΔΙΟ MASK, ΔΥΟ ΚΑΝΑΛΙΑ ──
+    //
+    // Το mask υπολογίστηκε από το mono άθροισμα και λέει
+    // ποιο bin ανήκει σε ποιο stem. Εφαρμοσμένο ξεχωριστά
+    // σε L και R, κάθε stem κρατάει τη ΔΙΚΗ ΤΟΥ
+    // στερεοφωνική εικόνα.
+    //
+    // ΗΤΑΝ: μία εφαρμογή στο mono core_chunk. Η θέση κάθε
+    // οργάνου χανόταν, και δύο μετρήσεις έδειξαν ότι δεν
+    // ανακατασκευάζεται (95614c5).
+    let voice = StereoStem {
+        l: apply_spectral_mask_to_chunk(
+            core_l_cplx, core_voice_mask, data.core_left.len()),
+        r: apply_spectral_mask_to_chunk(
+            core_r_cplx, core_voice_mask, data.core_right.len()),
+    };
+    let bass = StereoStem {
+        l: apply_spectral_mask_to_chunk(
+            core_l_cplx, core_bass_mask, data.core_left.len()),
+        r: apply_spectral_mask_to_chunk(
+            core_r_cplx, core_bass_mask, data.core_right.len()),
+    };
+    let harmonics = StereoStem {
+        l: apply_spectral_mask_to_chunk(
+            core_l_cplx, core_harm_mask, data.core_left.len()),
+        r: apply_spectral_mask_to_chunk(
+            core_r_cplx, core_harm_mask, data.core_right.len()),
+    };
+    let ambience = StereoStem {
+        l: apply_spectral_mask_to_chunk(
+            core_l_cplx, core_amb_mask, data.core_left.len()),
+        r: apply_spectral_mask_to_chunk(
+            core_r_cplx, core_amb_mask, data.core_right.len()),
+    };
 
     let drums_weights: Vec<f32> = (0..data.core_chunk.len())
         .map(|i| {
@@ -435,12 +480,15 @@ pub(crate) fn process_single_chunk(
             }
         })
         .collect();
-    let drums_chunk: Vec<f32> = data
-        .core_chunk
-        .iter()
-        .zip(drums_weights.iter())
-        .map(|(s, w)| s * w)
-        .collect();
+    
+    // Δύο πολλαπλασιασμοί, μηδέν φασματική δουλειά.
+    // Το μόνο stem που κρατάει την αρχική φάση ανέπαφη.
+    let drums = StereoStem {
+        l: data.core_left.iter().zip(drums_weights.iter())
+            .map(|(s, w)| s * w).collect(),
+        r: data.core_right.iter().zip(drums_weights.iter())
+            .map(|(s, w)| s * w).collect(),
+    };
 
     let h_voice: Vec<f32> = (0..core_n_frames)
         .map(|f| {
@@ -496,11 +544,11 @@ pub(crate) fn process_single_chunk(
 
     ParallelChunkOut {
         stems: FiveStemsChunk {
-            voice: voice_chunk,
-            drums: drums_chunk,
-            bass: bass_chunk,
-            harmonics: harm_chunk,
-            ambience: amb_chunk,
+            voice,
+            drums,
+            bass,
+            harmonics,
+            ambience,
         },
         voice_transient: v_transient,
         drums_transient: d_transient,
@@ -1657,11 +1705,14 @@ impl TwoPassEngine {
                         let len = owned.core_chunk.len();
                         ParallelChunkOut {
                             stems: FiveStemsChunk {
-                                voice: std::mem::take(&mut owned.core_chunk),
-                                drums: vec![0.0; len],
-                                bass: vec![0.0; len],
-                                harmonics: vec![0.0; len],
-                                ambience: vec![0.0; len],
+                                voice: StereoStem {
+                                    l: std::mem::take(&mut owned.core_left),
+                                    r: std::mem::take(&mut owned.core_right),
+                                },
+                                drums: StereoStem { l: vec![0.0; len], r: vec![0.0; len] },
+                                bass: StereoStem { l: vec![0.0; len], r: vec![0.0; len] },
+                                harmonics: StereoStem { l: vec![0.0; len], r: vec![0.0; len] },
+                                ambience: StereoStem { l: vec![0.0; len], r: vec![0.0; len] },
                             },
                             voice_transient: 0.0,
                             drums_transient: 0.0,
@@ -1704,16 +1755,19 @@ impl TwoPassEngine {
                     g.2 += s.2;
                 }
 
-                let collision = detect_collision(&out.stems.drums, &out.stems.bass);
+                let tmp_drums = out.stems.drums.mono();
+                let tmp_bass = out.stems.bass.mono();
+                let collision = detect_collision(&tmp_drums, &tmp_bass);
                 let target_gain = if collision { ducking_gain } else { 1.0_f32 };
                 let alpha = COLLISION_SMOOTHING_ALPHA;
 
-                for s in out.stems.bass.iter_mut() {
+                for (sl, sr) in out.stems.bass.l.iter_mut().zip(out.stems.bass.r.iter_mut()) {
                     self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
-                    *s *= self.bass_ducking_gain;
+                    *sl *= self.bass_ducking_gain;
+                    *sr *= self.bass_ducking_gain;
                 }
 
-                frames_written += out.stems.voice.len();
+                frames_written += out.stems.voice.l.len();
                 let t3 = std::time::Instant::now();
                 callback(&out.stems);
                 t_callback += t3.elapsed().as_millis();
@@ -1885,16 +1939,19 @@ impl TwoPassEngine {
             }
 
             // Psychoacoustic Collision Matrix — smoothed micro-ducking sequentially across chunks.
-            let collision = detect_collision(&out.stems.drums, &out.stems.bass);
+            let tmp_drums = out.stems.drums.mono();
+            let tmp_bass = out.stems.bass.mono();
+            let collision = detect_collision(&tmp_drums, &tmp_bass);
             let target_gain = if collision { ducking_gain } else { 1.0_f32 };
             let alpha = COLLISION_SMOOTHING_ALPHA;
 
-            for s in out.stems.bass.iter_mut() {
+            for (sl, sr) in out.stems.bass.l.iter_mut().zip(out.stems.bass.r.iter_mut()) {
                 self.bass_ducking_gain += alpha * (target_gain - self.bass_ducking_gain);
-                *s *= self.bass_ducking_gain;
+                *sl *= self.bass_ducking_gain;
+                *sr *= self.bass_ducking_gain;
             }
 
-            frames_written += out.stems.voice.len();
+            frames_written += out.stems.voice.l.len();
             callback(&out.stems);
         }
 
@@ -2305,8 +2362,8 @@ mod tests {
         let mut call_count = 0usize;
         let result = engine.process_chunks(&signal, &scout, false, |chunk| {
             call_count += 1;
-            assert!(!chunk.voice.is_empty());
-            assert_eq!(chunk.voice.len(), chunk.bass.len());
+            assert!(!chunk.voice.l.is_empty());
+            assert_eq!(chunk.voice.l.len(), chunk.bass.l.len());
         });
 
         assert!(result.is_ok());
@@ -2329,10 +2386,10 @@ mod tests {
         let mut engine = TwoPassEngine::new();
         let scout = engine.scout(&signal, &signal, 48000, None, None, false);
         let _ = engine.process_chunks(&signal, &scout, false, |chunk| {
-            assert_eq!(chunk.voice.len(), chunk.drums.len());
-            assert_eq!(chunk.voice.len(), chunk.bass.len());
-            assert_eq!(chunk.voice.len(), chunk.harmonics.len());
-            assert_eq!(chunk.voice.len(), chunk.ambience.len());
+            assert_eq!(chunk.voice.l.len(), chunk.drums.l.len());
+            assert_eq!(chunk.voice.l.len(), chunk.bass.l.len());
+            assert_eq!(chunk.voice.l.len(), chunk.harmonics.l.len());
+            assert_eq!(chunk.voice.l.len(), chunk.ambience.l.len());
         });
     }
 
@@ -2346,7 +2403,7 @@ mod tests {
         let mut total_output_samples = 0;
         let meta = engine
             .process_slices_with_params(&signal, &signal, &signal, &scout, 1.0, false, |chunk| {
-                total_output_samples += chunk.voice.len();
+                total_output_samples += chunk.voice.l.len();
             })
             .unwrap();
 
@@ -2582,16 +2639,25 @@ mod tests {
 
         assert_eq!(captured_chunks.len(), 2);
 
-        let chunk1_voice = &captured_chunks[0].0;
+        // Το signal είναι το mono των left/right, άρα η
+        // σύγκριση θέλει mono(). ΚΑΙ ΤΟ TEST ΕΓΙΝΕ
+        // ΙΣΧΥΡΟΤΕΡΟ: πριν επιβεβαίωνε ότι το bypass
+        // περνάει το σήμα αυτούσιο· τώρα επιβεβαιώνει
+        // ΕΠΙΠΛΕΟΝ ότι τα δύο κανάλια ανακατασκευάζουν
+        // το mono.
+        let chunk1_voice = captured_chunks[0].0.mono();
+        let chunk1_drums = captured_chunks[0].1.mono();
+        let chunk1_bass  = captured_chunks[0].2.mono();
         assert_eq!(chunk1_voice.len(), CHUNK_FRAMES);
         assert_eq!(chunk1_voice[100], signal[100]); // raw value (with pad offset skipped by reader output)
-        assert_eq!(captured_chunks[0].1[100], 0.0); // drums zeroed
-        assert_eq!(captured_chunks[0].2[100], 0.0); // bass zeroed
+        assert_eq!(chunk1_drums[100], 0.0); // drums zeroed
+        assert_eq!(chunk1_bass[100], 0.0); // bass zeroed
 
-        let chunk2_voice = &captured_chunks[1].0;
+        let chunk2_voice = captured_chunks[1].0.mono();
+        let chunk2_drums = captured_chunks[1].1.mono();
         assert_eq!(chunk2_voice.len(), CHUNK_FRAMES);
         assert_ne!(chunk2_voice[100], signal[CHUNK_FRAMES + 100]); // nmf ran
-        assert_ne!(captured_chunks[1].1[100], 0.0); // drums has signal
+        assert_ne!(chunk2_drums[100], 0.0); // drums has signal
     }
 
     struct TestMemorySource {
@@ -2663,7 +2729,7 @@ mod tests {
         let mut old_voice: Vec<f32> = Vec::with_capacity(n_total);
         let _ = engine
             .process_slices_with_params(&signal, &left, &right, &scout, 1.0, false, |chunk| {
-                old_voice.extend_from_slice(&chunk.voice);
+                old_voice.extend_from_slice(&chunk.voice.mono());
             })
             .unwrap();
 
@@ -2692,7 +2758,7 @@ mod tests {
                 None::<&mut dyn FnMut(_)>,
                 false,
                 |chunk| {
-                    new_voice.extend_from_slice(&chunk.voice);
+                    new_voice.extend_from_slice(&chunk.voice.mono());
                 },
             )
             .unwrap();
@@ -2762,7 +2828,7 @@ mod tests {
                 None::<&mut dyn FnMut(_)>,
                 false,
                 |chunk| {
-                    off_voice.extend_from_slice(&chunk.voice);
+                    off_voice.extend_from_slice(&chunk.voice.l);
                 },
             )
             .unwrap();
@@ -2798,7 +2864,7 @@ mod tests {
                 Some(&mut observer),
                 false,
                 |chunk| {
-                    on_voice.extend_from_slice(&chunk.voice);
+                    on_voice.extend_from_slice(&chunk.voice.l);
                 },
             )
             .unwrap();

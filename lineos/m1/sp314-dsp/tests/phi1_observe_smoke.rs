@@ -89,7 +89,7 @@ fn test_phi1_observe_smoke() {
             Some(&mut observer),
             true, // phi1_enabled: true
             |chunk| {
-                on_voice.extend_from_slice(&chunk.voice);
+                on_voice.extend_from_slice(&chunk.voice.l);
             },
         )
         .unwrap();
