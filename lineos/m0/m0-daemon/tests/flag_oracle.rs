@@ -101,7 +101,7 @@ fn render_once(
     macro_router_enabled: bool,
     mix_levels: Option<&MixLevels>,
     boundaries: &[SegmentBoundary],
-) -> Vec<f32> {
+) -> (Vec<f32>, Vec<f32>) {
     let mono: Vec<f32> = scout_left
         .iter()
         .zip(scout_right.iter())
@@ -144,7 +144,7 @@ fn render_once(
     )
     .unwrap();
 
-    left_out
+    (left_out, right_out)
 }
 
 // ─── Statistics ───────────────────────────────────────────────────────────────
@@ -156,6 +156,15 @@ fn mse(a: &[f32], b: &[f32]) -> f64 {
         .map(|(x, y)| (*x as f64 - *y as f64).powi(2))
         .sum::<f64>()
         / a.len() as f64
+}
+
+fn rms_diff(a: &[f32], b: &[f32]) -> f32 {
+    let n = a.len().min(b.len());
+    if n == 0 { return 0.0; }
+    let sum_sq: f32 = a[..n].iter().zip(b[..n].iter())
+        .map(|(l, r)| (l - r) * (l - r))
+        .sum();
+    (sum_sq / n as f32).sqrt()
 }
 
 fn mean_sq(a: &[f32]) -> f64 {
@@ -245,7 +254,7 @@ fn restoration_vocal_gate_closes_in_quiet_region() {
         false,
         Some(&mix_voice_only),
         &[],
-    );
+    ).0;
     let out_on = render_once(
         pcm_file.path(),
         &scout_left,
@@ -255,7 +264,7 @@ fn restoration_vocal_gate_closes_in_quiet_region() {
         false,
         Some(&mix_voice_only),
         &[],
-    );
+    ).0;
 
     // Region boundaries:
     //   loud1:  [ 6_000 ..  42_000]  0.125 s – 0.875 s of second 0
@@ -376,7 +385,7 @@ fn restoration_glue_bus_pads_ambience() {
         false,
         Some(&mix_ambience_only),
         &[],
-    );
+    ).0;
     let out_on = render_once(
         pcm_file.path(),
         &scout_left,
@@ -386,7 +395,7 @@ fn restoration_glue_bus_pads_ambience() {
         false,
         Some(&mix_ambience_only),
         &[],
-    );
+    ).0;
 
     let off_msq = mean_sq(&out_off);
     let on_msq = mean_sq(&out_on);
@@ -488,7 +497,7 @@ fn macro_router_bypasses_nmf_exact() {
         true, // macro_router ON — bypass fires, drums stem zeroed
         Some(&mix_drums_only),
         &boundaries,
-    );
+    ).0;
     let out_nmf_drums = render_once(
         pcm_file.path(),
         &scout_left,
@@ -498,7 +507,7 @@ fn macro_router_bypasses_nmf_exact() {
         false, // macro_router OFF — NMF produces nonzero drums stem
         Some(&mix_drums_only),
         &boundaries,
-    );
+    ).0;
 
     let bypass_drums_msq = mean_sq(&out_bypass_drums);
     let nmf_drums_msq = mean_sq(&out_nmf_drums);
@@ -541,7 +550,7 @@ fn macro_router_bypasses_nmf_exact() {
         ambience: 0.0,
     };
 
-    let out_bypass_voice = render_once(
+    let (out_bypass_voice_l, out_bypass_voice_r) = render_once(
         pcm_file.path(),
         &scout_left,
         &scout_right,
@@ -551,7 +560,7 @@ fn macro_router_bypasses_nmf_exact() {
         Some(&mix_voice_only),
         &boundaries,
     );
-    let out_nmf_voice = render_once(
+    let (out_nmf_voice_l, out_nmf_voice_r) = render_once(
         pcm_file.path(),
         &scout_left,
         &scout_right,
@@ -562,25 +571,57 @@ fn macro_router_bypasses_nmf_exact() {
         &boundaries,
     );
 
-    let n = out_bypass_voice.len().min(raw_mono.len());
-    let corr_bypass = pearson(&out_bypass_voice[..n], &raw_mono[..n]);
-    let corr_nmf = pearson(&out_nmf_voice[..n], &raw_mono[..n]);
+    let n = out_bypass_voice_l.len().min(raw_mono.len());
+    let corr_bypass_l = pearson(&out_bypass_voice_l[..n], &raw_mono[..n]);
+    let corr_nmf_l = pearson(&out_nmf_voice_l[..n], &raw_mono[..n]);
 
     println!(
         "\n[test3 / macro_router voice-correlation]\n\
-         bypass  Pearson(out, raw_mono) = {:.6}\n\
-         nmf     Pearson(out, raw_mono) = {:.6}",
-        corr_bypass, corr_nmf
+         bypass  Pearson(out_l, raw_mono) = {:.6}\n\
+         nmf     Pearson(out_l, raw_mono) = {:.6}",
+        corr_bypass_l, corr_nmf_l
     );
 
-    // bypass: voice = raw_mono × constant_spatial_gain → Pearson = 1.0 exactly.
-    // Allow for floating-point accumulation in the spatial stage.
-    assert!(
-        corr_bypass.abs() > 0.9999,
-        "macro_router bypass: output must correlate with raw mono input at > 0.9999 \
-         (bypass sets voice = raw_chunk = (L+R)/2). Got {:.6}",
-        corr_bypass
-    );
+    // ── ΤΙ ΦΥΛΑΕΙ ΑΥΤΟ ΤΟ ΣΚΕΛΟΣ ──
+    //
+    // ΗΤΑΝ: Pearson(out, raw_mono) > 0.9999 — το bypass
+    // έβαζε voice = (L+R)/2 και η έξοδος ήταν mono.
+    //
+    // ΜΕΤΑ ΤΟ S3 το bypass βάζει core_left/core_right
+    // ξεχωριστά. Η έξοδος ΔΕΝ είναι mono, και το παλιό
+    // κατώφλι μετρούσε ακριβώς αυτό που διορθώθηκε.
+    //
+    // ΜΕΤΡΗΜΕΝΟ σε αυτό το fixture:
+    //   Pearson(L, R) εισόδου  0.9305
+    //   out_l vs scout_left    0.9904
+    //   out_r vs scout_right   0.9889
+    //   survival του side      0.0999998
+    //
+    // Το 10% είναι το voice routing, όχι απώλεια του
+    // S3: center_weight 0.95, front_lr_weight 0.20 —
+    // η φωνή πάει κέντρο by design, και το side περνάει
+    // μόνο από το front_lr.
+
+    let pearson_l = pearson(&out_bypass_voice_l[..n], &scout_left[..n]);
+    let pearson_r = pearson(&out_bypass_voice_r[..n], &scout_right[..n]);
+    
+    let side_in  = rms_diff(&scout_left[..n], &scout_right[..n]);
+    let side_out = rms_diff(&out_bypass_voice_l[..n], &out_bypass_voice_r[..n]);
+    let survival = side_out / side_in;
+    
+    println!("out_l vs scout_left: {:.6}", pearson_l);
+    println!("out_r vs scout_right: {:.6}", pearson_r);
+    println!("survival του side: {:.6}", survival);
+
+    // 1. ΤΟ ΣΗΜΑ ΠΕΡΝΑΕΙ ΑΝΑ ΚΑΝΑΛΙ
+    assert!(pearson_l > 0.98, "macro_router bypass: out_l does not strongly correlate with scout_left: {}", pearson_l);
+    assert!(pearson_r > 0.98, "macro_router bypass: out_r does not strongly correlate with scout_right: {}", pearson_r);
+
+    // 2. ΤΟ SIDE ΕΠΙΒΙΩΝΕΙ, ΔΕΜΕΝΟ ΣΤΗΝ ΕΙΣΟΔΟ
+    //    ΜΕ ΤΟ ΠΑΛΙΟ PIPELINE ΗΤΑΝ ΑΚΡΙΒΩΣ ΜΗΔΕΝ.
+    //    Κατώφλι 0.05 και όχι >0: το ">0" περνάει με
+    //    1e-9 και δεν φυλάει τίποτα.
+    assert!(survival > 0.05, "macro_router bypass: side signal did not survive appropriately... survival={survival:.6}");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

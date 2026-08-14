@@ -7,30 +7,28 @@ pub struct ChannelAssignment {
     pub front_lr_weight: f32, // Drums/Harmonics → L+R
     pub rear_lr_weight: f32,  // Ambience → Ls+Rs
     pub lfe_weight: f32,      // Bass sub → LFE
-    pub side_weight: f32,     // stereo width contribution
-    /// Κατεύθυνση, [−1.0, +1.0]: −1 αριστερά, +1 δεξιά,
-    /// 0 κέντρο. Το side_weight λέει ΠΟΣΟ, αυτό ΠΡΟΣ
-    /// ΤΑ ΠΟΥ.
+    /// ΟΡΦΑΝΟ ΑΠΟ ΤΟ S3 — υπολογίζεται, δεν διαβάζεται.
     ///
-    /// ΣΗΜΕΡΑ ΕΙΝΑΙ ΣΤΑΘΕΡΟ και αναπαράγει ΑΚΡΙΒΩΣ
-    /// τη συμπεριφορά που είχε το πρόσημο όταν ήταν
-    /// hardcoded στο render_chunk: +1 για voice,
-    /// drums, bass, harmonics · −1 για ambience.
+    /// Ήταν η τοποθέτηση: (1.0 ± side_weight·pan) στο
+    /// render_chunk. Από το S3 τα stems περνάνε με τη
+    /// δική τους εικόνα (passthrough, απόφαση Β) και
+    /// κανένα στάδιο δεν πλαταίνει ανά stem — το
+    /// GlueChain κάνει M/S widening στο master.
     ///
-    /// ΤΟ ΟΤΙ ΕΙΝΑΙ ΣΤΑΘΕΡΟ ΕΙΝΑΙ ΤΟ ΠΡΟΒΛΗΜΑ, ΟΧΙ Η
-    /// ΛΥΣΗ. Το σύστημα μετράει ήδη πού γέρνει κάθε
-    /// ζώνη συχνοτήτων στο πρωτότυπο — το pan_mean
-    /// του two_pass.rs:429 — αλλά υπολογίζεται στην
-    /// Pass 2, αφού η compute() έχει ήδη αποφασίσει
-    /// στο scout, και κανένας κώδικας δεν αντιστοιχεί
-    /// stem σε ζώνη.
-    ///
-    /// ΜΕΤΡΗΜΕΝΟ 2026-08-12, 24 κομμάτια: οι ζώνες
-    /// ΔΙΑΦΕΡΟΥΝ. Διάμεσος |pan_high − pan_lows|
-    /// 0.0368, και το Sad But True έχει −0.0955 στα
-    /// μπάσα με +0.0756 στα πρίμα — βάση αριστερά,
-    /// cymbals δεξιά, στο ίδιο κομμάτι.
-    pub pan: f32,
+    /// ΕΠΑΝΕΡΧΕΤΑΙ ΩΣ WIDENER ΑΝΑ STEM ΜΟΝΟ ΑΝ Η
+    /// ΑΚΡΟΑΣΗ ΤΟ ΖΗΤΗΣΕΙ: m + s·(1+side_weight), σε
+    /// δικό του βήμα με δική του μέτρηση.
+    pub side_weight: f32,
+    // ΤΟ pan ΥΠΗΡΞΕ ΕΔΩ (9734168 → S3) ΚΑΙ ΑΦΑΙΡΕΘΗΚΕ.
+    //
+    // Μπήκε όταν τα stems ήταν mono και η θέση έπρεπε
+    // να ανακατασκευαστεί από σταθερές ανά ρόλο.
+    // Μετρήθηκε ΔΥΟ φορές ότι μέτρηση δεν τη δίνει:
+    // ranking 5/24 έναντι τύχης 4.8 (95614c5).
+    // Από το S2 κάθε stem φέρνει τη θέση του από το
+    // πρωτότυπο — pan από πάνω θα ήταν ΔΙΠΛΗ ΕΦΑΡΜΟΓΗ:
+    // hi-hat 80% δεξιά θα πήγαινε ΠΙΟ δεξιά.
+    // ΜΗΝ ΤΟ ΞΑΝΑΣΥΝΔΕΣΕΙΣ.
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +112,6 @@ impl StemChannelAssignments {
             rear_lr_weight: 0.0,
             lfe_weight: 0.0,
             side_weight: 0.0,
-            pan: 1.0,
         };
 
         // Drums rule: front
@@ -124,7 +121,6 @@ impl StemChannelAssignments {
             rear_lr_weight: 0.1,
             lfe_weight: 0.0,
             side_weight: clamp_side(0.2 * width_scale),
-            pan: 1.0,
         };
 
         // Bass rule: front + LFE
@@ -139,7 +135,6 @@ impl StemChannelAssignments {
             rear_lr_weight: 0.0,
             lfe_weight: bass_lfe.clamp(0.0, 1.0),
             side_weight: 0.0,
-            pan: 1.0,
         };
 
         // Harmonics rule: front
@@ -149,7 +144,6 @@ impl StemChannelAssignments {
             rear_lr_weight: 0.2,
             lfe_weight: 0.0,
             side_weight: clamp_side(0.4 * width_scale),
-            pan: 1.0,
         };
 
         // Ambience rule: rear
@@ -164,7 +158,6 @@ impl StemChannelAssignments {
             rear_lr_weight: (ambience_rear + rear_factor * 0.2).min(1.0_f32),
             lfe_weight: 0.0,
             side_weight: clamp_side(0.6 * width_scale),
-            pan: -1.0,
         };
 
         Self {

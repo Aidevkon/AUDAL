@@ -192,19 +192,18 @@ impl FiveDotOneStage {
     /// Uses pre-locked StemChannelAssignments from ScoutResult.
     /// INV-SP-1: deterministic — same chunk → same output.
     pub fn render_chunk(
-        voice: &[f32],
-        drums: &[f32],
-        bass: &[f32],
-        harmonics: &[f32],
-        ambience: &[f32],
+        voice: &crate::stft::two_pass::StereoStem,
+        drums: &crate::stft::two_pass::StereoStem,
+        bass: &crate::stft::two_pass::StereoStem,
+        harmonics: &crate::stft::two_pass::StereoStem,
+        ambience: &crate::stft::two_pass::StereoStem,
         assignments: &StemChannelAssignments,
     ) -> Self {
-        let len = voice
-            .len()
-            .min(drums.len())
-            .min(bass.len())
-            .min(harmonics.len())
-            .min(ambience.len());
+        let len = voice.l.len()
+            .min(drums.l.len())
+            .min(bass.l.len())
+            .min(harmonics.l.len())
+            .min(ambience.l.len());
 
         let mut l = vec![0.0_f32; len];
         let mut r = vec![0.0_f32; len];
@@ -213,81 +212,58 @@ impl FiveDotOneStage {
         let mut rs = vec![0.0_f32; len];
         let mut lfe = vec![0.0_f32; len];
 
+        // ── PASSTHROUGH: Η ΕΙΚΟΝΑ ΤΟΥ ΠΡΩΤΟΤΥΠΟΥ ΠΕΡΝΑΕΙ ──
+        //
+        // l και r ανά stem έρχονται από το ΙΔΙΟ mask
+        // εφαρμοσμένο στα πραγματικά κανάλια (S2). Θέση και
+        // πλάτος είναι του κομματιού. ΚΑΝΕΝΑ pan, ΚΑΝΕΝΑ
+        // widening εδώ — ό,τι ακούγεται, ήταν εκεί.
+        //
+        // Το m = (l+r)/2 ΜΟΝΟ για C και LFE, που είναι
+        // mono κανάλια — το μόνο σημείο όπου το downmix
+        // είναι σωστό, γιατί το ηχείο είναι ένα.
         for i in 0..len {
-            let v = voice[i];
-            let d = drums[i];
-            let b = bass[i];
-            let h = harmonics[i];
-            let a = ambience[i];
+            let mv = (voice.l[i] + voice.r[i]) * 0.5;
+            let md = (drums.l[i] + drums.r[i]) * 0.5;
+            let mb = (bass.l[i] + bass.r[i]) * 0.5;
+            let mh = (harmonics.l[i] + harmonics.r[i]) * 0.5;
+            let ma = (ambience.l[i] + ambience.r[i]) * 0.5;
 
-            c[i] = v * assignments.voice.center_weight
-                + d * assignments.drums.center_weight
-                + b * assignments.bass.center_weight
-                + h * assignments.harmonics.center_weight
-                + a * assignments.ambience.center_weight;
+            l[i] = voice.l[i] * assignments.voice.front_lr_weight
+                + drums.l[i] * assignments.drums.front_lr_weight
+                + bass.l[i] * assignments.bass.front_lr_weight
+                + harmonics.l[i] * assignments.harmonics.front_lr_weight
+                + ambience.l[i] * assignments.ambience.front_lr_weight;
 
-            // Το side_weight απλώνει το stem ΑΣΥΜΜΕΤΡΑ. Κάθε
-            // stem παίρνει διαφορετικό gain ανά πλευρά — το
-            // πλάτος προκύπτει από ΔΙΑΦΟΡΕΤΙΚΟ ΠΕΡΙΕΧΟΜΕΝΟ
-            // αριστερά και δεξιά, όχι από φασική επεξεργασία
-            // του ίδιου σήματος.
-            //
-            // ΜΕΤΡΗΜΕΝΟ (stem_independence.rs): harmonics και
-            // ambience έχουν συσχέτιση 0.2790 — χωρίζουν καθαρά.
-            // bass↔harmonics 0.6192, γι' αυτό το bass έχει
-            // side 0.0 και μένει κέντρο.
-            //
-            // ΗΤΑΝ r[i] = l[i] από το f98166e, με σχόλιο
-            // "symmetric front". Συνέπεια: κάθε music master
-            // mono — το fold-down άθροιζε δύο ταυτόσημα κανάλια,
-            // και ο Glue widener (Reveal) δεν είχε side να δει.
+            r[i] = voice.r[i] * assignments.voice.front_lr_weight
+                + drums.r[i] * assignments.drums.front_lr_weight
+                + bass.r[i] * assignments.bass.front_lr_weight
+                + harmonics.r[i] * assignments.harmonics.front_lr_weight
+                + ambience.r[i] * assignments.ambience.front_lr_weight;
 
-            let sv = assignments.voice.side_weight;
-            let sd = assignments.drums.side_weight;
-            let sb = assignments.bass.side_weight;
-            let sh = assignments.harmonics.side_weight;
-            let sa = assignments.ambience.side_weight;
+            c[i] = mv * assignments.voice.center_weight
+                + md * assignments.drums.center_weight
+                + mb * assignments.bass.center_weight
+                + mh * assignments.harmonics.center_weight
+                + ma * assignments.ambience.center_weight;
 
-            // Το side_weight λέει ΠΟΣΟ απλώνεται το stem, το pan
-            // ΠΡΟΣ ΤΑ ΠΟΥ. Μέχρι τώρα η κατεύθυνση ήταν
-            // κωδικοποιημένη στη ΣΕΙΡΑ των όρων — το ambience
-            // είχε αντεστραμμένα πρόσημα και τα υπόλοιπα όχι.
-            // Ίδια αριθμητική, ρητή πλέον.
-            let pv = assignments.voice.side_weight * assignments.voice.pan;
-            let pd = assignments.drums.side_weight * assignments.drums.pan;
-            let pb = assignments.bass.side_weight * assignments.bass.pan;
-            let ph = assignments.harmonics.side_weight * assignments.harmonics.pan;
-            let pa = assignments.ambience.side_weight * assignments.ambience.pan;
+            ls[i] = voice.l[i] * assignments.voice.rear_lr_weight
+                + drums.l[i] * assignments.drums.rear_lr_weight
+                + bass.l[i] * assignments.bass.rear_lr_weight
+                + harmonics.l[i] * assignments.harmonics.rear_lr_weight
+                + ambience.l[i] * assignments.ambience.rear_lr_weight;
 
-            l[i] = v * assignments.voice.front_lr_weight * (1.0 + pv)
-                + d * assignments.drums.front_lr_weight * (1.0 + pd)
-                + b * assignments.bass.front_lr_weight * (1.0 + pb)
-                + h * assignments.harmonics.front_lr_weight * (1.0 + ph)
-                + a * assignments.ambience.front_lr_weight * (1.0 + pa);
+            rs[i] = voice.r[i] * assignments.voice.rear_lr_weight
+                + drums.r[i] * assignments.drums.rear_lr_weight
+                + bass.r[i] * assignments.bass.rear_lr_weight
+                + harmonics.r[i] * assignments.harmonics.rear_lr_weight
+                + ambience.r[i] * assignments.ambience.rear_lr_weight;
 
-            r[i] = v * assignments.voice.front_lr_weight * (1.0 - pv)
-                + d * assignments.drums.front_lr_weight * (1.0 - pd)
-                + b * assignments.bass.front_lr_weight * (1.0 - pb)
-                + h * assignments.harmonics.front_lr_weight * (1.0 - ph)
-                + a * assignments.ambience.front_lr_weight * (1.0 - pa);
-
-            ls[i] = v * assignments.voice.rear_lr_weight * (1.0 + pv)
-                + d * assignments.drums.rear_lr_weight * (1.0 + pd)
-                + b * assignments.bass.rear_lr_weight * (1.0 + pb)
-                + h * assignments.harmonics.rear_lr_weight * (1.0 + ph)
-                + a * assignments.ambience.rear_lr_weight * (1.0 + pa);
-
-            rs[i] = v * assignments.voice.rear_lr_weight * (1.0 - pv)
-                + d * assignments.drums.rear_lr_weight * (1.0 - pd)
-                + b * assignments.bass.rear_lr_weight * (1.0 - pb)
-                + h * assignments.harmonics.rear_lr_weight * (1.0 - ph)
-                + a * assignments.ambience.rear_lr_weight * (1.0 - pa);
-
-            lfe[i] = v * assignments.voice.lfe_weight
-                + d * assignments.drums.lfe_weight
-                + b * assignments.bass.lfe_weight
-                + h * assignments.harmonics.lfe_weight
-                + a * assignments.ambience.lfe_weight;
+            lfe[i] = mv * assignments.voice.lfe_weight
+                + md * assignments.drums.lfe_weight
+                + mb * assignments.bass.lfe_weight
+                + mh * assignments.harmonics.lfe_weight
+                + ma * assignments.ambience.lfe_weight;
         }
 
         Self {
@@ -333,7 +309,6 @@ mod tests {
             rear_lr_weight: 0.0,
             lfe_weight: 0.0,
             side_weight: 0.0,
-            pan: 0.0,
         };
         StemChannelAssignments {
             voice: zero(),

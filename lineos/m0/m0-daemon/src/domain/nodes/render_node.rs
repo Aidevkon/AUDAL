@@ -216,7 +216,8 @@ pub fn run(
     const GLUE_PAD_LINEAR: f32 = 0.125_892_54; // 10^(-18/20)
     let glue_lpf_coeffs =
         sp314_dsp::masking_eq::biquad::rbj_lowpass(6000.0, 0.707, settings.sample_rate as f64);
-    let mut glue_lpf_state = sp314_dsp::masking_eq::biquad::BiquadState::default();
+    let mut glue_lpf_state_l = sp314_dsp::masking_eq::biquad::BiquadState::default();
+    let mut glue_lpf_state_r = sp314_dsp::masking_eq::biquad::BiquadState::default();
     let duck_track: std::rc::Rc<std::cell::RefCell<Vec<f32>>> =
         std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let duck_track_cb = duck_track.clone();
@@ -229,56 +230,52 @@ pub fn run(
     let w17_post_sums_clone = w17_post_sums.clone();
 
     let callback = |stems_chunk: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
-        // ΠΡΟΣΩΡΙΝΟ — S2. Το mixing δεν ξέρει ακόμα stereo.
-        // ΦΕΥΓΕΙ ΣΤΟ S3.
-        let sm_voice = stems_chunk.voice.mono();
-        let sm_drums = stems_chunk.drums.mono();
-        let sm_bass = stems_chunk.bass.mono();
-        let sm_harmonics = stems_chunk.harmonics.mono();
-        let sm_ambience = stems_chunk.ambience.mono();
-
-        let chunk_len = sm_voice.len();
+        let chunk_len = stems_chunk.voice.l.len();
         {
             let mut sums = w16_sums_clone.borrow_mut();
             for i in 0..chunk_len {
-                sums[0] += sm_voice[i] * sm_voice[i];
-                sums[1] += sm_drums[i] * sm_drums[i];
-                sums[2] += sm_bass[i] * sm_bass[i];
-                sums[3] += sm_harmonics[i] * sm_harmonics[i];
-                sums[4] += sm_ambience[i] * sm_ambience[i];
+                sums[0] += (stems_chunk.voice.l[i] * stems_chunk.voice.l[i] + stems_chunk.voice.r[i] * stems_chunk.voice.r[i]) * 0.5;
+                sums[1] += (stems_chunk.drums.l[i] * stems_chunk.drums.l[i] + stems_chunk.drums.r[i] * stems_chunk.drums.r[i]) * 0.5;
+                sums[2] += (stems_chunk.bass.l[i] * stems_chunk.bass.l[i] + stems_chunk.bass.r[i] * stems_chunk.bass.r[i]) * 0.5;
+                sums[3] += (stems_chunk.harmonics.l[i] * stems_chunk.harmonics.l[i] + stems_chunk.harmonics.r[i] * stems_chunk.harmonics.r[i]) * 0.5;
+                sums[4] += (stems_chunk.ambience.l[i] * stems_chunk.ambience.l[i] + stems_chunk.ambience.r[i] * stems_chunk.ambience.r[i]) * 0.5;
                 sums[5] += 1.0;
             }
         }
 
-        let mv: Vec<f32> = sm_voice
-            .iter()
-            .map(|s| {
-                let mut sample = *s;
-                if settings.restoration_enabled {
-                    sample = vocal_gate.process_mono(sample);
-                }
-                sample * effective_voice_gain
-            })
-            .collect();
-        let md: Vec<f32> = sm_drums
-            .iter()
-            .map(|s| s * effective_drums_gain)
-            .collect();
-        let mut mb: Vec<f32> = sm_bass
-            .iter()
-            .map(|s| s * effective_bass_gain)
-            .collect();
-        let mut mh: Vec<f32> = sm_harmonics
-            .iter()
-            .map(|s| s * effective_harmonics_gain)
-            .collect();
+        let mut mv = stems_chunk.voice.clone();
+        for i in 0..chunk_len {
+            if settings.restoration_enabled {
+                let (lg, rg) = vocal_gate.process_stereo(mv.l[i], mv.r[i]);
+                mv.l[i] = lg;
+                mv.r[i] = rg;
+            }
+            mv.l[i] *= effective_voice_gain;
+            mv.r[i] *= effective_voice_gain;
+        }
 
-        // W2.2: ControlTrack consumer — duck στο M (bass+harmonics). Sensor-agnostic: πιστότητα στο posterior stream, όποιο κι αν είναι. Gate: w2_duck_gate + splice fixtures.
-        // cross-chunk interpolation στο chunk boundary είναι σκόπιμο — τα frames του επόμενου chunk υπάρχουν ήδη στο track (batch push, recon W2 §2)· στο EOF ο guard clamp-άρει.
+        let mut md = stems_chunk.drums.clone();
+        for i in 0..chunk_len {
+            md.l[i] *= effective_drums_gain;
+            md.r[i] *= effective_drums_gain;
+        }
+
+        let mut mb = stems_chunk.bass.clone();
+        for i in 0..chunk_len {
+            mb.l[i] *= effective_bass_gain;
+            mb.r[i] *= effective_bass_gain;
+        }
+
+        let mut mh = stems_chunk.harmonics.clone();
+        for i in 0..chunk_len {
+            mh.l[i] *= effective_harmonics_gain;
+            mh.r[i] *= effective_harmonics_gain;
+        }
+
         {
             let track = duck_track_cb.borrow();
             if !track.is_empty() {
-                debug_assert_eq!(mb.len(), chunk_len);
+                debug_assert_eq!(mb.l.len(), chunk_len);
                 for i in 0..chunk_len {
                     let s = write_offset + i;
                     let f = s / 480;
@@ -286,65 +283,66 @@ pub fn run(
                     let f_c = f.min(track.len().saturating_sub(1));
                     let f1_c = (f + 1).min(track.len().saturating_sub(1));
                     let g = track[f_c] * (1.0 - t) + track[f1_c] * t;
-                    mb[i] *= g;
-                    mh[i] *= g;
+                    mb.l[i] *= g;
+                    mb.r[i] *= g;
+                    mh.l[i] *= g;
+                    mh.r[i] *= g;
                 }
             }
         }
-        let ma: Vec<f32> = sm_ambience
-            .iter()
-            .map(|s| {
-                let mut sample = *s;
-                if settings.restoration_enabled {
-                    sample = sp314_dsp::masking_eq::biquad::process_tdf2(
-                        sample,
-                        &glue_lpf_coeffs,
-                        &mut glue_lpf_state,
-                    ) * GLUE_PAD_LINEAR;
-                }
-                sample * mix.ambience
-            })
-            .collect();
+
+        let mut ma = stems_chunk.ambience.clone();
+        for i in 0..chunk_len {
+            if settings.restoration_enabled {
+                ma.l[i] = sp314_dsp::masking_eq::biquad::process_tdf2(
+                    ma.l[i],
+                    &glue_lpf_coeffs,
+                    &mut glue_lpf_state_l,
+                ) * GLUE_PAD_LINEAR;
+                ma.r[i] = sp314_dsp::masking_eq::biquad::process_tdf2(
+                    ma.r[i],
+                    &glue_lpf_coeffs,
+                    &mut glue_lpf_state_r,
+                ) * GLUE_PAD_LINEAR;
+            }
+            ma.l[i] *= mix.ambience;
+            ma.r[i] *= mix.ambience;
+        }
 
         {
             let mut sums = w17_post_sums_clone.borrow_mut();
             for i in 0..chunk_len {
-                sums[0] += mv[i] * mv[i];
-                sums[1] += md[i] * md[i];
-                sums[2] += mb[i] * mb[i];
-                sums[3] += mh[i] * mh[i];
-                sums[4] += ma[i] * ma[i];
+                sums[0] += (mv.l[i] * mv.l[i] + mv.r[i] * mv.r[i]) * 0.5;
+                sums[1] += (md.l[i] * md.l[i] + md.r[i] * md.r[i]) * 0.5;
+                sums[2] += (mb.l[i] * mb.l[i] + mb.r[i] * mb.r[i]) * 0.5;
+                sums[3] += (mh.l[i] * mh.l[i] + mh.r[i] * mh.r[i]) * 0.5;
+                sums[4] += (ma.l[i] * ma.l[i] + ma.r[i] * ma.r[i]) * 0.5;
                 sums[5] += 1.0;
             }
         }
 
-        h_voice
-            .update(unsafe { std::slice::from_raw_parts(mv.as_ptr() as *const u8, mv.len() * 4) });
-        h_drums
-            .update(unsafe { std::slice::from_raw_parts(md.as_ptr() as *const u8, md.len() * 4) });
-        h_bass
-            .update(unsafe { std::slice::from_raw_parts(mb.as_ptr() as *const u8, mb.len() * 4) });
-        h_harmonics
-            .update(unsafe { std::slice::from_raw_parts(mh.as_ptr() as *const u8, mh.len() * 4) });
-        h_ambience
-            .update(unsafe { std::slice::from_raw_parts(ma.as_ptr() as *const u8, ma.len() * 4) });
+        h_voice.update(unsafe { std::slice::from_raw_parts(mv.l.as_ptr() as *const u8, mv.l.len() * 4) });
+        h_voice.update(unsafe { std::slice::from_raw_parts(mv.r.as_ptr() as *const u8, mv.r.len() * 4) });
+        h_drums.update(unsafe { std::slice::from_raw_parts(md.l.as_ptr() as *const u8, md.l.len() * 4) });
+        h_drums.update(unsafe { std::slice::from_raw_parts(md.r.as_ptr() as *const u8, md.r.len() * 4) });
+        h_bass.update(unsafe { std::slice::from_raw_parts(mb.l.as_ptr() as *const u8, mb.l.len() * 4) });
+        h_bass.update(unsafe { std::slice::from_raw_parts(mb.r.as_ptr() as *const u8, mb.r.len() * 4) });
+        h_harmonics.update(unsafe { std::slice::from_raw_parts(mh.l.as_ptr() as *const u8, mh.l.len() * 4) });
+        h_harmonics.update(unsafe { std::slice::from_raw_parts(mh.r.as_ptr() as *const u8, mh.r.len() * 4) });
+        h_ambience.update(unsafe { std::slice::from_raw_parts(ma.l.as_ptr() as *const u8, ma.l.len() * 4) });
+        h_ambience.update(unsafe { std::slice::from_raw_parts(ma.r.as_ptr() as *const u8, ma.r.len() * 4) });
 
-        let mut clean_voice = mv.clone();
         if let Some(ref mut vg) = voice_graph_opt {
-            let mut v_right = clean_voice.clone();
             let mut frame = 0;
             while frame < chunk_len {
                 let end = (frame + 512).min(chunk_len);
-                vg.process_block(&mut clean_voice[frame..end], &mut v_right[frame..end]);
+                vg.process_block(&mut mv.l[frame..end], &mut mv.r[frame..end]);
                 frame = end;
-            }
-            for i in 0..chunk_len {
-                clean_voice[i] = (clean_voice[i] + v_right[i]) * 0.5;
             }
         }
 
         let stage =
-            FiveDotOneStage::render_chunk(&clean_voice, &md, &mb, &mh, &ma, &scout.assignments);
+            FiveDotOneStage::render_chunk(&mv, &md, &mb, &mh, &ma, &scout.assignments);
         let mut stage = stage;
         stage.apply_scales(scout.rear_scale, scout.lfe_scale);
 
