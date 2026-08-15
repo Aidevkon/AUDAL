@@ -22,6 +22,34 @@ use lineos_types::StemFeatures;
 /// Constitutional chunk size — 65536 samples = ~1.37s at 48kHz
 pub const CHUNK_FRAMES: usize = 65536;
 
+/// Πόσο αφαιρείται από τα 4 NMFD masks στα cells
+/// που το HPSS δίνει στα drums (time-domain,
+/// drums_weights). 0.0 = σημερινή συμπεριφορά.
+///
+/// ΜΕΤΡΗΜΕΝΟ (MASKH-PROBE): με α=0, percussive
+/// ενέργεια μπαίνει δύο φορές — drums + 21% voice
+/// + 27% amb στα βέβαια percussive cells.
+/// Drum de-dup: πόσο αφαιρείται από τα 4 NMFD masks στα cells
+/// που το HPSS δίνει στα drums (time-domain, drums_weights).
+///
+/// ΜΕΤΡΗΜΕΝΟ (MASKH-PROBE 2026-08-15): με α=0, percussive
+/// ενέργεια μπαίνει ΔΥΟ φορές στο mix — μία στα drums, μία
+/// σκορπισμένη στα masks (voice 21%, amb 27% στα cells με
+/// mask_p>0.5). Το double-counting φούσκωνε τα transient
+/// peaks → περισσότερη δουλειά στον limiter clamp → χαμένη
+/// στάθμη, και έγερνε το ratio (+0.0036 έναντι πηγαίου).
+/// Με α=0.5: ratio 1.0394 ≈ decoder 1.0391, LUFS +0.7 dB
+/// πιο κοντά στον στόχο. Sweep 0→1.0 ομαλό, monotonic.
+///
+/// ΟΧΙ renormalization, ΟΧΙ αναδιανομή της «χαμένης»
+/// ενέργειας στα drums: ΔΕΝ υπάρχει drums φασματικό mask.
+/// Τα drums είναι ΕΚΤΟΣ του partition ΣΚΟΠΙΜΑ (time-domain
+/// multiply, η μόνη ανέπαφη φάση — δες S1 commit f20cf28).
+/// Η ενέργεια που αφαιρείται εδώ υπάρχει ΗΔΗ εκεί· η
+/// αφαίρεση ΕΙΝΑΙ η διόρθωση, όχι τρύπα.
+pub const DRUM_DEDUP_ALPHA: f32 = 0.5;
+
+
 /// Downsample ratio for Pass 1 Scout proxy (~11kHz mono)
 pub const SCOUT_DOWNSAMPLE: usize = 4;
 
@@ -435,6 +463,50 @@ pub(crate) fn process_single_chunk(
     let core_l_cplx = core_l_cplx_vec.as_slice();
     let core_r_cplx = core_r_cplx_vec.as_slice();
 
+    // ── DRUM DE-DUP ──
+    // Το core_mask_p είναι ΗΔΗ σωστά sliced
+    // ([pad_frames..]) — ίδιο grid με τα core masks.
+    // ΚΑΝΕΝΑ νέο alignment. Ο δράκος του S2 δεν
+    // αγγίζεται.
+    let deduped_voice;
+    let deduped_bass;
+    let deduped_harm;
+    let deduped_amb;
+
+    let mut sum_p = 0.0;
+    let mut count_p = 0;
+    for frame in core_mask_p {
+        for &val in frame {
+            sum_p += val as f32;
+            count_p += 1;
+        }
+    }
+    let mean_p = if count_p > 0 { sum_p / count_p as f32 } else { 0.0 };
+
+    let (v_mask, b_mask, h_mask, a_mask) = if DRUM_DEDUP_ALPHA > 0.0 {
+        let dedup = |mask: &[Vec<f32>]| -> Vec<Vec<f32>> {
+            mask.iter().enumerate().map(|(t, frame)| {
+                frame.iter().enumerate().map(|(b, &m)| {
+                    let p = core_mask_p.get(t)
+                        .and_then(|f| f.get(b)).copied()
+                        .unwrap_or(0.0);
+                    m * (1.0 - DRUM_DEDUP_ALPHA * p)
+                }).collect()
+            }).collect()
+        };
+        deduped_voice = dedup(core_voice_mask);
+        deduped_bass = dedup(core_bass_mask);
+        deduped_harm = dedup(core_harm_mask);
+        deduped_amb = dedup(core_amb_mask);
+        (deduped_voice.as_slice(), deduped_bass.as_slice(), deduped_harm.as_slice(), deduped_amb.as_slice())
+    } else {
+        deduped_voice = Vec::new();
+        deduped_bass = Vec::new();
+        deduped_harm = Vec::new();
+        deduped_amb = Vec::new();
+        (core_voice_mask, core_bass_mask, core_harm_mask, core_amb_mask)
+    };
+
     // ── ΙΔΙΟ MASK, ΔΥΟ ΚΑΝΑΛΙΑ ──
     //
     // Το mask υπολογίστηκε από το mono άθροισμα και λέει
@@ -447,27 +519,27 @@ pub(crate) fn process_single_chunk(
     // ανακατασκευάζεται (95614c5).
     let voice = StereoStem {
         l: apply_spectral_mask_to_chunk(
-            core_l_cplx, core_voice_mask, data.core_left.len()),
+            core_l_cplx, v_mask, data.core_left.len()),
         r: apply_spectral_mask_to_chunk(
-            core_r_cplx, core_voice_mask, data.core_right.len()),
+            core_r_cplx, v_mask, data.core_right.len()),
     };
     let bass = StereoStem {
         l: apply_spectral_mask_to_chunk(
-            core_l_cplx, core_bass_mask, data.core_left.len()),
+            core_l_cplx, b_mask, data.core_left.len()),
         r: apply_spectral_mask_to_chunk(
-            core_r_cplx, core_bass_mask, data.core_right.len()),
+            core_r_cplx, b_mask, data.core_right.len()),
     };
     let harmonics = StereoStem {
         l: apply_spectral_mask_to_chunk(
-            core_l_cplx, core_harm_mask, data.core_left.len()),
+            core_l_cplx, h_mask, data.core_left.len()),
         r: apply_spectral_mask_to_chunk(
-            core_r_cplx, core_harm_mask, data.core_right.len()),
+            core_r_cplx, h_mask, data.core_right.len()),
     };
     let ambience = StereoStem {
         l: apply_spectral_mask_to_chunk(
-            core_l_cplx, core_amb_mask, data.core_left.len()),
+            core_l_cplx, a_mask, data.core_left.len()),
         r: apply_spectral_mask_to_chunk(
-            core_r_cplx, core_amb_mask, data.core_right.len()),
+            core_r_cplx, a_mask, data.core_right.len()),
     };
 
     let drums_weights: Vec<f32> = (0..data.core_chunk.len())
