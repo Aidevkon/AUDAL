@@ -53,6 +53,19 @@ fn audition() {
     let default_input = "/home/aidevcon/Downloads/DATASET/musdb18hq/test/Ben Carrigan - We'll Talk About It All Tonight/mixture.wav";
     let dataset_path = std::env::var("AUDITION_INPUT").unwrap_or_else(|_| default_input.to_string());
     
+    let input_tag = std::path::Path::new(&dataset_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(24)
+        .collect::<String>();
+        
+    let source_tagged = format!("/tmp/audition/A_source_{}.wav", input_tag);
+    let master_tagged = format!("/tmp/audition/B_master_{}.wav", input_tag);
+    let stems_sum_tagged = format!("/tmp/audition/E_stems_sum_{}.wav", input_tag);
+
     // Παλιά αρχεία από προηγούμενες συνεδρίες μπερδεύουν.
     // Σβήνουμε ΜΟΝΟ ό,τι γράφουμε εμείς (το C μένει).
     for f in ["A_source.wav", "B_master.wav", "E_stems_sum.wav", "index.html"] {
@@ -115,6 +128,7 @@ fn audition() {
         w.write_sample(s).unwrap();
     }
     w.finalize().unwrap();
+    std::fs::copy(source_path, &source_tagged).unwrap();
     
     // ── E_stems_sum ──
     let mut left = Vec::with_capacity(segment.len() / 2);
@@ -154,6 +168,7 @@ fn audition() {
         e_w.write_sample(e_right[i]).unwrap();
     }
     e_w.finalize().unwrap();
+    std::fs::copy(stems_sum_path, &stems_sum_tagged).unwrap();
 
     // ── B_master ──
     let req = MasterRequest {
@@ -218,6 +233,7 @@ fn audition() {
         m_w.write_sample(s).unwrap();
     }
     m_w.finalize().unwrap();
+    std::fs::copy(master_path, &master_tagged).unwrap();
 
     if std::env::var("AUDITION_SNAPSHOT").is_ok() {
         std::fs::copy(pcm.path(), ref_path).ok();
@@ -375,6 +391,10 @@ fn audition() {
         println!("  C: {}", ref_path);
     }
     println!("  E: {}", stems_sum_path);
+    println!("[AUDITION] tagged copies:");
+    println!("  A: {}", source_tagged);
+    println!("  B: {}", master_tagged);
+    println!("  E: {}", stems_sum_tagged);
     println!("[AUDITION] listen: cd /tmp/audition && python3 -m http.server 8080");
     println!("[AUDITION] baseline: AUDITION_SNAPSHOT=1 to lock current as C");
 
