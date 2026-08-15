@@ -17,6 +17,8 @@ pub struct BrickwallLimiter {
     midside_eq_enabled: bool,
     true_peak: TruePeakDetector,
     true_peak_enabled: bool,
+    zero_arm: bool,
+    zero_arm_violations: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -81,6 +83,8 @@ impl BrickwallLimiter {
             midside_eq_enabled: config.midside_eq_enabled,
             true_peak: TruePeakDetector::new(),
             true_peak_enabled: config.true_peak_enabled,
+            zero_arm: false,
+            zero_arm_violations: 0,
         }
     }
 
@@ -109,7 +113,14 @@ impl BrickwallLimiter {
         self.peak_ring.push(current_peak);
         let sidechain_peak = libm::fmaxf(current_peak, delayed_peak);
 
-        let gain_reduction = self.follower.process(sidechain_peak);
+        let gain_reduction = if self.zero_arm {
+            if sidechain_peak > self.follower.ceiling() {
+                self.zero_arm_violations += 1;
+            }
+            1.0_f32
+        } else {
+            self.follower.process(sidechain_peak)
+        };
 
         let delayed_l = self.delay_l.push_and_pop(*left);
         let delayed_r = self.delay_r.push_and_pop(*right);
@@ -136,5 +147,13 @@ impl BrickwallLimiter {
 
     pub fn lookahead_samples(&self) -> usize {
         self.lookahead
+    }
+
+    pub fn set_zero_arm(&mut self, zero_arm: bool) {
+        self.zero_arm = zero_arm;
+    }
+
+    pub fn zero_arm_violations(&self) -> u32 {
+        self.zero_arm_violations
     }
 }

@@ -198,13 +198,19 @@ impl DspAdapter {
                     -144.0
                 }
             };
-            let projected_peak = peak_raw_db + correction_db;
+            let true_peak_raw_db = Self::true_peak(left, right);
+            let projected_tp = true_peak_raw_db + correction_db;
             let ceiling_db = intent.target.max_true_peak_db;
-            if projected_peak > ceiling_db + intent.max_limiter_gr_db {
+            let zero_arm = projected_tp <= ceiling_db;
+
+            let projected_peak = peak_raw_db + correction_db;
+            if !zero_arm && projected_peak > ceiling_db + intent.max_limiter_gr_db {
                 correction_db = ceiling_db + intent.max_limiter_gr_db - peak_raw_db;
             }
 
             let correction_linear = libm::powf(10.0_f32, correction_db / 20.0_f32);
+            
+            eprintln!("[ZERO-ARM] projected_tp={:.4} ceiling={:.4} armed={}", projected_tp, ceiling_db, !zero_arm);
 
             // W17 DIAGNOSTIC — TEMPORARY
             eprintln!(
@@ -260,6 +266,7 @@ impl DspAdapter {
                 .map(|&(_start, end, pad_start, pad_end, pad_len)| {
                     let mut isp_limiter_clone =
                         BrickwallLimiter::new(isp_limiter_config, sample_rate);
+                    isp_limiter_clone.set_zero_arm(zero_arm);
 
                     let is_last_chunk = pad_end == num_frames;
                     let flush_len = if is_last_chunk { lookahead } else { 0 };

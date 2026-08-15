@@ -101,4 +101,8 @@ impl PeakFollower {
         self.blend = 0.0_f32;
         self.ramp_step = 0.0_f32;
     }
+
+    pub fn ceiling(&self) -> f32 {
+        self.ceiling
+    }
 }
