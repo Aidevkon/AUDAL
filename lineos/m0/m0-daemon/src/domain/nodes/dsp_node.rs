@@ -81,7 +81,24 @@ pub fn build_intent_and_config(
             let d = req_dynamics.unwrap_or(0.5).clamp(0.0, 1.0);
             200.0 - (d * 190.0)
         },
-        max_limiter_gr_db: 6.0,
+        // ΓΙΑΤΙ 2.0: το branch στο dsp/mod.rs ψαλιδίζει το
+        // correction ώστε ο limiter να μην κόβει πάνω από
+        // αυτό — θυσιάζει στάθμη αντί για δυναμική. Το 6.0
+        // επέτρεπε μετρημένη ζημιά: crest 0-2k −66% στα
+        // 5-6 dB reduction (V1↔V3 probe, 2026-08-15).
+        // Τυφλή ισοσταθμισμένη ακρόαση σε τρία υλικά:
+        //   2.03 dB → οριακά διακριτό (γυμνό acoustic)
+        //   5.23 dB → «σίγουρα, με διαφορά» (kick snap,
+        //             φωνή στον χώρο)
+        //   6.00 dB → συγκαλυμμένο μόνο σε πυκνό synthetic
+        // Η ασυμμετρία κάνει το χαμηλό clamp ασφαλές και
+        // για τους δύο πληθυσμούς: ό,τι άντεχε το κόψιμο
+        // χάνει μόνο LUFS (που το platform normalization
+        // επιστρέφει), ό,τι δεν το άντεχε γλιτώνει.
+        // ΚΟΣΤΟΣ: pre-mastered υλικό με μεγάλο peak_over
+        // βγαίνει ως −19 LUFS σε non-normalized διαδρομές.
+        // Το −1 dBTP ceiling ΔΕΝ αγγίζεται.
+        max_limiter_gr_db: 2.0,
     };
 
     use crate::domain::content_type::{ContentType, ContentTypeExt};

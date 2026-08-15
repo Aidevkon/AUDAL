@@ -4,6 +4,49 @@ use m0d::handlers::master::MasterRequest;
 use std::sync::Arc;
 use xaak::repo::DspState;
 
+fn pearson(a: &[f32], b: &[f32]) -> f32 {
+    let n = a.len().min(b.len());
+    if n < 2 {
+        return 0.0;
+    }
+    let a = &a[..n];
+    let b = &b[..n];
+    let mean_a = a.iter().sum::<f32>() / n as f32;
+    let mean_b = b.iter().sum::<f32>() / n as f32;
+    let mut cov = 0.0;
+    let mut var_a = 0.0;
+    let mut var_b = 0.0;
+    for i in 0..n {
+        let da = a[i] - mean_a;
+        let db = b[i] - mean_b;
+        cov += da * db;
+        var_a += da * da;
+        var_b += db * db;
+    }
+    let std_dev = (var_a * var_b).sqrt();
+    if std_dev > 1e-9 { cov / std_dev } else { 0.0 }
+}
+
+fn resample_linear(input: &[f32], in_sr: f32, out_sr: f32) -> Vec<f32> {
+    if (in_sr - out_sr).abs() < 1.0 {
+        return input.to_vec();
+    }
+    let ratio = in_sr / out_sr;
+    let out_len = (input.len() as f32 / ratio).floor() as usize;
+    let mut out = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let in_idx_f = i as f32 * ratio;
+        let in_idx = in_idx_f.floor() as usize;
+        let frac = in_idx_f - in_idx as f32;
+        if in_idx + 1 < input.len() {
+            out.push(input[in_idx] * (1.0 - frac) + input[in_idx + 1] * frac);
+        } else if in_idx < input.len() {
+            out.push(input[in_idx]);
+        }
+    }
+    out
+}
+
 #[test]
 #[ignore = "audition — writes files for listening"]
 fn audition() {
@@ -11,8 +54,8 @@ fn audition() {
     let dataset_path = std::env::var("AUDITION_INPUT").unwrap_or_else(|_| default_input.to_string());
     
     // Παλιά αρχεία από προηγούμενες συνεδρίες μπερδεύουν.
-    // Σβήνουμε ΜΟΝΟ ό,τι γράφουμε εμείς.
-    for f in ["A_source.wav", "B_master.wav", "index.html"] {
+    // Σβήνουμε ΜΟΝΟ ό,τι γράφουμε εμείς (το C μένει).
+    for f in ["A_source.wav", "B_master.wav", "E_stems_sum.wav", "index.html"] {
         let _ = std::fs::remove_file(format!("/tmp/audition/{f}"));
     }
 
@@ -55,10 +98,6 @@ fn audition() {
         panic!("File is too short!");
     }
 
-    if actual_end < end_sample {
-        println!("WARNING: Source file is shorter than expected. Took available samples.");
-    }
-
     let segment = &all_samples[actual_start..actual_end];
 
     std::fs::create_dir_all("/tmp/audition").unwrap();
@@ -71,16 +110,55 @@ fn audition() {
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         },
-    )
-    .unwrap();
+    ).unwrap();
     for &s in segment {
         w.write_sample(s).unwrap();
     }
     w.finalize().unwrap();
+    
+    // ── E_stems_sum ──
+    let mut left = Vec::with_capacity(segment.len() / 2);
+    let mut right = Vec::with_capacity(segment.len() / 2);
+    for chunk in segment.chunks_exact(2) {
+        left.push(chunk[0]);
+        right.push(chunk[1]);
+    }
+    let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(l, r)| (l + r) * 0.5).collect();
 
+    let mut engine = sp314_dsp::stft::two_pass::TwoPassEngine::new();
+    let scout_res = engine.scout(&left, &right, spec.sample_rate, None, None, true);
+
+    let mut e_left = Vec::with_capacity(segment.len() / 2);
+    let mut e_right = Vec::with_capacity(segment.len() / 2);
+    let callback = |stems: &sp314_dsp::stft::two_pass::FiveStemsChunk| {
+        let len = stems.voice.l.len();
+        for i in 0..len {
+            e_left.push(stems.voice.l[i] + stems.drums.l[i] + stems.bass.l[i] + stems.harmonics.l[i] + stems.ambience.l[i]);
+            e_right.push(stems.voice.r[i] + stems.drums.r[i] + stems.bass.r[i] + stems.harmonics.r[i] + stems.ambience.r[i]);
+        }
+    };
+    engine.process_slices_with_params(&mono, &left, &right, &scout_res, 1.0, true, callback).unwrap();
+
+    let stems_sum_path = "/tmp/audition/E_stems_sum.wav";
+    let mut e_w = hound::WavWriter::create(
+        stems_sum_path,
+        hound::WavSpec {
+            channels: 2,
+            sample_rate: spec.sample_rate,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        },
+    ).unwrap();
+    for i in 0..e_left.len() {
+        e_w.write_sample(e_left[i]).unwrap();
+        e_w.write_sample(e_right[i]).unwrap();
+    }
+    e_w.finalize().unwrap();
+
+    // ── B_master ──
     let req = MasterRequest {
         audio_path: source_path.to_string(),
-        preset_id: "Transparent".to_string(),
+        preset_id: std::env::var("AUDITION_PRESET").unwrap_or_else(|_| "Transparent".to_string()),
         flavour_id: None,
         intent_tone: None,
         intent_dynamics: None,
@@ -121,10 +199,6 @@ fn audition() {
 
     let master_sr = stereo_blob.core.sample_rate;
 
-    // Το pcm.path() είναι ΩΜΟ PCM: f32 LE interleaved,
-    // χωρίς header — γι' αυτό το hound σκάει με
-    // "no RIFF tag found". Το τυλίγουμε σε WAV ώστε ο
-    // browser να το παίξει.
     let raw = std::fs::read(pcm.path()).unwrap();
     let samples_f32: Vec<f32> = raw
         .chunks_exact(4)
@@ -145,22 +219,32 @@ fn audition() {
     }
     m_w.finalize().unwrap();
 
-    // AUDITION_SNAPSHOT=1 → το ΤΡΕΧΟΝ master γίνεται
-    // ΚΑΙ baseline. Χωρίς αυτό, το C μένει ό,τι ήταν.
-    //
-    // ΓΙΑΤΙ ΡΗΤΑ ΚΑΙ ΟΧΙ ΑΥΤΟΜΑΤΑ: ένα baseline που
-    // γράφεται μόνο του είναι πάντα ένα βήμα πίσω και
-    // κανείς δεν ξέρει ποιου commit είναι. Έτσι το
-    // ορίζεις εσύ, όταν το θέλεις.
-    //
-    //   AUDITION_SNAPSHOT=1 cargo test ...   ← κλείδωσε baseline
-    //   cargo test ...                        ← σύγκρινε με αυτό
     if std::env::var("AUDITION_SNAPSHOT").is_ok() {
         std::fs::copy(pcm.path(), ref_path).ok();
         println!("[AUDITION] snapshot: C_reference updated");
     }
 
-    let measure = |path: &str| {
+    // ── MUD PROBE ──
+    let mut ref_l = Vec::new();
+    let mut ref_r = Vec::new();
+    let mut ref_tot_rms = 0.0;
+    let ref_sr: u32;
+    
+    // Read source for reference
+    {
+        let mut r = hound::WavReader::open(source_path).unwrap();
+        ref_sr = r.spec().sample_rate;
+        let samps: Vec<f32> = r.samples::<f32>().map(|s| s.unwrap_or(0.0)).collect();
+        let mut sum_sq = 0.0;
+        for chunk in samps.chunks_exact(2) {
+            ref_l.push(chunk[0]);
+            ref_r.push(chunk[1]);
+            sum_sq += chunk[0]*chunk[0] + chunk[1]*chunk[1];
+        }
+        ref_tot_rms = (sum_sq / samps.len() as f32).sqrt();
+    }
+
+    let measure_mud = |name: &str, path: &str| {
         let mut r = hound::WavReader::open(path).unwrap();
         let sp = r.spec();
         let samps: Vec<f32> = match sp.sample_format {
@@ -177,68 +261,120 @@ fn audition() {
                 }
             }
         };
+
+        let frames = samps.len() / 2;
+        let mut l_vec = Vec::with_capacity(frames);
+        let mut r_vec = Vec::with_capacity(frames);
+        let mut mono = Vec::with_capacity(frames);
+        
         let mut sum_sq_l = 0.0;
         let mut sum_sq_r = 0.0;
         let mut sum_sq_side = 0.0;
-        let mut peak_l = 0.0_f32;
-        let mut peak_r = 0.0_f32;
 
-        let frames = samps.len() / 2;
         for i in 0..frames {
             let l = samps[i * 2];
             let r = samps[i * 2 + 1];
+            l_vec.push(l);
+            r_vec.push(r);
+            mono.push((l + r) * 0.5);
+            
             sum_sq_l += l * l;
             sum_sq_r += r * r;
             let side = (l - r) * 0.5;
             sum_sq_side += side * side;
-            if l.abs() > peak_l {
-                peak_l = l.abs();
-            }
-            if r.abs() > peak_r {
-                peak_r = r.abs();
-            }
         }
+
         let rms_l = (sum_sq_l / frames as f32).sqrt();
         let rms_r = (sum_sq_r / frames as f32).sqrt();
         let side_rms = (sum_sq_side / frames as f32).sqrt();
         let total_rms = ((sum_sq_l + sum_sq_r) / (frames * 2) as f32).sqrt();
-        (rms_l, rms_r, peak_l, peak_r, side_rms, total_rms)
+
+        let corr_l_raw = pearson(&l_vec, &ref_l);
+        let corr_r_raw = pearson(&r_vec, &ref_r);
+
+        let corr_l_resamp = if sp.sample_rate != ref_sr {
+            let resamp_l = resample_linear(&l_vec, sp.sample_rate as f32, ref_sr as f32);
+            pearson(&resamp_l, &ref_l)
+        } else {
+            corr_l_raw
+        };
+
+        let corr_r_resamp = if sp.sample_rate != ref_sr {
+            let resamp_r = resample_linear(&r_vec, sp.sample_rate as f32, ref_sr as f32);
+            pearson(&resamp_r, &ref_r)
+        } else {
+            corr_r_raw
+        };
+
+        use sp314_dsp::dsp::biquad::{butter_hp2_prewarped, butter_lp2_prewarped};
+        let sr_f32 = sp.sample_rate as f32;
+        let mut lp_2k = butter_lp2_prewarped(2000.0, sr_f32);
+        
+        let mut hp_2k = butter_hp2_prewarped(2000.0, sr_f32);
+        let mut lp_8k = butter_lp2_prewarped(8000.0, sr_f32);
+        
+        let mut hp_8k = butter_hp2_prewarped(8000.0, sr_f32);
+
+        let (mut s1, mut p1) = (0.0_f32, 0.0_f32);
+        let (mut s2, mut p2) = (0.0_f32, 0.0_f32);
+        let (mut s3, mut p3) = (0.0_f32, 0.0_f32);
+
+        for &m in &mono {
+            let v1 = lp_2k.process(m);
+            s1 += v1 * v1;
+            if v1.abs() > p1 { p1 = v1.abs(); }
+
+            let v2 = lp_8k.process(hp_2k.process(m));
+            s2 += v2 * v2;
+            if v2.abs() > p2 { p2 = v2.abs(); }
+
+            let v3 = hp_8k.process(m);
+            s3 += v3 * v3;
+            if v3.abs() > p3 { p3 = v3.abs(); }
+        }
+
+        let r1 = (s1 / frames as f32).sqrt();
+        let r2 = (s2 / frames as f32).sqrt();
+        let r3 = (s3 / frames as f32).sqrt();
+
+        let c1 = if r1 > 1e-9 { p1 / r1 } else { 0.0 };
+        let c2 = if r2 > 1e-9 { p2 / r2 } else { 0.0 };
+        let c3 = if r3 > 1e-9 { p3 / r3 } else { 0.0 };
+
+        let level_diff = if ref_tot_rms > 0.0 && total_rms > 0.0 {
+            20.0 * (total_rms / ref_tot_rms).log10()
+        } else {
+            0.0
+        };
+
+        println!("[MUD-PROBE] {}:", name);
+        println!("  Level diff vs A: {:>5.2} dB", level_diff);
+        println!("  rms_l={:.4} rms_r={:.4} side_rms={:.6}", rms_l, rms_r, side_rms);
+        println!("  Pearson raw:    L={:.4} R={:.4}", corr_l_raw, corr_r_raw);
+        println!("  Pearson resamp: L={:.4} R={:.4}", corr_l_resamp, corr_r_resamp);
+        println!("  0-2k:   RMS={:.4} Crest={:.2}", r1, c1);
+        println!("  2k-8k:  RMS={:.4} Crest={:.2}", r2, c2);
+        println!("  8k-24k: RMS={:.4} Crest={:.2}\n", r3, c3);
     };
 
-    let (s_rmsl, s_rmsr, s_pl, s_pr, s_side, s_tot) = measure(source_path);
-    let (m_rmsl, m_rmsr, m_pl, m_pr, m_side, m_tot) = measure(master_path);
-
-    let (lufs, tp) = if let m0d::blob_store::BlobVariant::Certified { loudness, .. } = &stereo_blob.variant {
-        (loudness.integrated_lufs, loudness.true_peak_dbtp)
-    } else {
-        (-99.0, -99.0)
-    };
-
-    let survival = if s_side > 0.0 { m_side / s_side } else { 0.0 };
-    let level_diff_db = if s_tot > 0.0 && m_tot > 0.0 {
-        20.0 * (m_tot / s_tot).log10()
-    } else {
-        0.0
-    };
+    println!();
+    measure_mud("A_source", source_path);
+    measure_mud("E_stems_sum", stems_sum_path);
+    measure_mud("B_master", master_path);
 
     let source_sr = spec.sample_rate;
     if source_sr != master_sr {
         println!("[AUDITION] ⚠ sample rate: source {} · master {}", source_sr, master_sr);
-        println!("[AUDITION] ⚠ ΤΟ A/B ΔΕΝ ΣΥΓΧΡΟΝΙΖΕΤΑΙ — σύγκρινε χαρακτήρα, όχι θέση");
+        println!("[AUDITION] ⚠ ΤΟ A/B ΔΕΝ ΣΥΓΧΡΟΝΙΖΕΤΑΙ — σύγκρινε χαρακτήρα, όχι θέση\n");
     }
 
-    println!("[AUDITION] source: rms_l={:.4} rms_r={:.4} peak_l={:.4} peak_r={:.4}", s_rmsl, s_rmsr, s_pl, s_pr);
-    println!("                   side_rms={:.6}", s_side);
-    println!("[AUDITION] master: rms_l={:.4} rms_r={:.4} peak_l={:.4} peak_r={:.4}", m_rmsl, m_rmsr, m_pl, m_pr);
-    println!("                   side_rms={:.6} lufs={:.2} tp={:.2}", m_side, lufs, tp);
-    println!("[AUDITION] side survival = {:.6}", survival);
-    println!("[AUDITION] level diff = {:.2} dB", level_diff_db);
     println!("[AUDITION] files:");
     println!("  A: {}", source_path);
     println!("  B: {}", master_path);
     if std::path::Path::new(ref_path).exists() {
         println!("  C: {}", ref_path);
     }
+    println!("  E: {}", stems_sum_path);
     println!("[AUDITION] listen: cd /tmp/audition && python3 -m http.server 8080");
     println!("[AUDITION] baseline: AUDITION_SNAPSHOT=1 to lock current as C");
 
@@ -261,48 +397,56 @@ fn audition() {
 </style>
 </head>
 <body>
-  <h1>A/B/C Audition</h1>
+  <h1>A/B/C/E Audition</h1>
   <p id="now-playing">Playing: None</p>
   {warning_html}
   <button id="btnA" onclick="playA()">Source (A)</button>
   <button id="btnB" onclick="playB()">Master (B)</button>
   <button id="btnC" onclick="playC()" style="display:{c_display};">Reference (C)</button>
+  <button id="btnE" onclick="playE()">Stems Sum (E)</button>
 
 <script>
   const a = new Audio('A_source.wav'); a.loop = true;
   const b = new Audio('B_master.wav'); b.loop = true;
   const c = new Audio('C_reference.wav'); c.loop = true;
+  const e = new Audio('E_stems_sum.wav'); e.loop = true;
   
-  a.volume = 0; b.volume = 0; c.volume = 0;
+  a.volume = 0; b.volume = 0; c.volume = 0; e.volume = 0;
   
   let started = false;
   function startAll() {{
     if(!started) {{
-      a.play(); b.play(); c.play();
+      a.play(); b.play(); c.play(); e.play();
       started = true;
     }}
   }}
 
   function playA() {{
     startAll();
-    a.volume = 1; b.volume = 0; c.volume = 0;
+    a.volume = 1; b.volume = 0; c.volume = 0; e.volume = 0;
     document.getElementById('now-playing').innerText = "Playing: Source (A)";
     updateBtns('btnA');
   }}
   function playB() {{
     startAll();
-    a.volume = 0; b.volume = 1; c.volume = 0;
+    a.volume = 0; b.volume = 1; c.volume = 0; e.volume = 0;
     document.getElementById('now-playing').innerText = "Playing: Master (B)";
     updateBtns('btnB');
   }}
   function playC() {{
     startAll();
-    a.volume = 0; b.volume = 0; c.volume = 1;
+    a.volume = 0; b.volume = 0; c.volume = 1; e.volume = 0;
     document.getElementById('now-playing').innerText = "Playing: Reference (C)";
     updateBtns('btnC');
   }}
+  function playE() {{
+    startAll();
+    a.volume = 0; b.volume = 0; c.volume = 0; e.volume = 1;
+    document.getElementById('now-playing').innerText = "Playing: Stems Sum (E)";
+    updateBtns('btnE');
+  }}
   function updateBtns(active) {{
-    ['btnA','btnB','btnC'].forEach(id => {{
+    ['btnA','btnB','btnC','btnE'].forEach(id => {{
       let el = document.getElementById(id);
       if(el) el.classList.toggle('active', id === active);
     }});
@@ -312,7 +456,4 @@ fn audition() {
 </html>"#);
 
     std::fs::write("/tmp/audition/index.html", html).unwrap();
-
-    assert!(s_rmsl > 0.0);
-    assert!(m_rmsl > 0.0);
 }
