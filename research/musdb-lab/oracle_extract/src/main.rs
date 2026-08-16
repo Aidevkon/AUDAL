@@ -75,7 +75,7 @@ fn main() {
     let sample_rate = 48000;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, sample_rate, None, None, true);
+    let scout = engine.scout(&signal, &signal, sample_rate, None, None, true);
 
     let k_b = std::env::var("NMFD_K").unwrap_or("8".to_string()).parse::<usize>().unwrap();
     let n_frames = (signal.len() + 512) / 512 + 10; 
@@ -272,19 +272,26 @@ fn main() {
         let mut nmfd8_harm_cplx = full_cplx.clone();
         let mut nmfd8_amb_cplx = full_cplx.clone();
         
-        for f in 0..std::cmp::min(full_cplx.len(), total_frames_processed) {
-            for b in 0..N_BINS {
-                // vocals: we stored the nmfd_group_mask_chunk result in nmfd8_group_masks
-                let mut v_m = nmfd8_group_masks[f][b];
-                // clamp mask just in case
-                v_m = v_m.min(1.0);
-                nmfd8_vocals_cplx[f][b].re *= v_m; nmfd8_vocals_cplx[f][b].im *= v_m;
-                
-                // bass
-                let b_m = b_masks[scout.nmfd_bass_idx][f][b];
-                nmfd8_bass_cplx[f][b].re *= b_m; nmfd8_bass_cplx[f][b].im *= b_m;
-                
-                // other (harmonics + ambience)
+                let mut cells_total = 0;
+                let mut cells_gt_1 = 0;
+                for f in 0..std::cmp::min(full_cplx.len(), total_frames_processed) {
+                    for b in 0..N_BINS {
+                        cells_total += 1;
+                        if b_masks[scout.nmfd_harmonics_idx][f][b] + b_masks[scout.nmfd_ambience_idx][f][b] > 1.0 {
+                            cells_gt_1 += 1;
+                        }
+                        
+                        // vocals: we stored the nmfd_group_mask_chunk result in nmfd8_group_masks
+                        let mut v_m = nmfd8_group_masks[f][b];
+                        // clamp mask just in case
+                        v_m = v_m.min(1.0);
+                        nmfd8_vocals_cplx[f][b].re *= v_m; nmfd8_vocals_cplx[f][b].im *= v_m;
+                        
+                        // bass
+                        let b_m = b_masks[scout.nmfd_bass_idx][f][b];
+                        nmfd8_bass_cplx[f][b].re *= b_m; nmfd8_bass_cplx[f][b].im *= b_m;
+                        
+                        // other (harmonics + ambience)
                 let o_m = (b_masks[scout.nmfd_harmonics_idx][f][b] + b_masks[scout.nmfd_ambience_idx][f][b]).min(1.0);
                 nmfd8_other_cplx[f][b].re *= o_m; nmfd8_other_cplx[f][b].im *= o_m;
                 
@@ -317,6 +324,16 @@ fn main() {
         let mut stft = StftEngine::new();
         let out_a = stft.inverse(&nmfd8_amb_cplx, signal.len());
         write_audio(&format!("{}/ambience.wav", nmfd8_dir), &out_a, actual_sample_rate);
+        
+        // Measure clamp difference
+        let mut diff_sq = 0.0;
+        for i in 0..out_o.len() {
+            let diff = (out_h[i] + out_a[i]) - out_o[i];
+            diff_sq += diff * diff;
+        }
+        let diff_rms = (diff_sq / out_o.len() as f32).sqrt();
+        eprintln!("[CLAMP-MEASURE] nmfd8: cells_total={} cells_gt_1={} pct={:.4}% diff_rms={:.6}", 
+            cells_total, cells_gt_1, (cells_gt_1 as f32 / cells_total as f32) * 100.0, diff_rms);
 
     } else {
         // Original behavior
