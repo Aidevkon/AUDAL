@@ -15,7 +15,7 @@ fn fixture_path(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w2_duck_gate_synth() {
     let path = fixture_path("duck_splice_synth_snr-15.flac");
     assert!(path.exists(), "Missing fixture: {}", path.display());
@@ -157,7 +157,7 @@ fn w2_duck_gate_synth() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w2_duck_gate_real() {
     let path = fixture_path("duck_splice_real_snr-15.flac");
     assert!(path.exists(), "Missing fixture: {}", path.display());
@@ -271,7 +271,7 @@ fn w2_duck_gate_real() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w2_duck_gate_synth_variance() {
     let path = fixture_path("duck_splice_synth_snr-15.flac");
     let mut req_a = MasterRequest {
@@ -335,7 +335,7 @@ fn w2_duck_gate_synth_variance() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w3b_mix_levels_gate() {
     use m0d::handlers::master::MixLevels;
 
@@ -385,18 +385,16 @@ fn w3b_mix_levels_gate() {
     hasher.update(&bytes_a);
     let hash_a = format!("{:x}", hasher.finalize());
     println!("SHA (None): {}", hash_a);
-    // Ανανεώθηκε W16: το 761d4128 του W6.c πιστοποιούσε
-    // render με ΣΠΑΣΜΕΝΑ NMFD masks — το two_pass περνούσε
-    // NmfEngine::default() (n_components=5) σε συναρτήσεις
-    // που χρησιμοποιούν το k ως stride σε tensor_w δομημένο
-    // για k=8. Μετρημένο: mask sum max 16.59 αντί ≈1.0,
-    // bass stem 5.3× και ambience 6.1× πάνω από ΟΛΟ το
-    // input, τελικό LUFS −25.13 αντί −14.70.
-    // Το W6.b ΔΕΝ μολύνθηκε: το oracle_extract περνάει
-    // NmfEngine::new(8) σωστά. Το bug ήταν μόνο στο wire.
+    // Golden SHA re-locked 2026-08-16 @cafc04f. The old hash (fa97ff06)
+    // was locked at 42f797a and never re-run (#[ignore], see below).
+    // Between the locks, the audio changed LEGITIMATELY and blind-validated:
+    // stereo stems S1-S3 (f20cf28/9d6d296/c450516), limiter clamp 2.0
+    // (93afa9f), drum dedup 0.5 (bca262a), zero-arm (cafc04f — proven
+    // byte-innocent: a6ff083 worktree produced this SAME sha).
+    // A gate that does not run does not guard.
     assert_eq!(
         hash_a,
-        "fa97ff060fd4b53b9798d1a1e8e64d7ebea4b94d4ea83952715c805fdd050149"
+        "958206241cbb71df2f31e485208a7ed96d9f6340b7907b3a3a50b5852ab229e9"
     );
 
     fs::copy(pcm_a.path(), "/tmp/w3b_mix_none.wav").unwrap();
@@ -436,7 +434,7 @@ fn w3b_mix_levels_gate() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w4_ceiling_gate() {
     use m0d::handlers::master::MixLevels;
     use sha2::{Digest, Sha256};
@@ -598,7 +596,7 @@ fn w4_ceiling_gate() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render + /tmp fixtures, ~2min — run explicitly on any audio-touching wire"]
 fn w4_ceiling_sweep() {
     use m0d::handlers::master::MixLevels;
     use std::path::Path;
