@@ -174,8 +174,6 @@ pub struct ScoutResult {
     /// Pre-computed firewall scales from proxy energy
     pub rear_scale: f32,
     pub lfe_scale: f32,
-    /// Global RMS gain for energy compensation
-    pub global_rms_gain: f32,
     /// Spatial pre-analysis from proxy
     pub spatial_pre: SpatialPreAnalysis,
     /// Per-stem MFCC fingerprints from scout proxy analysis.
@@ -1475,19 +1473,6 @@ impl TwoPassEngine {
         // Compute firewall scales from proxy energy (locked for Pass 2)
         let (rear_scale, lfe_scale) = compute_firewall_scales(&proxy_fivs, &assignments);
 
-        // Global RMS gain estimate from proxy
-        let proxy_mix_rms = if !proxy_fivs.voice.is_empty() {
-            let sq: f32 = proxy_fivs.voice.iter().map(|s| s * s).sum();
-            libm::sqrtf(sq / proxy_fivs.voice.len() as f32)
-        } else {
-            1.0
-        };
-        let global_rms_gain = if proxy_mix_rms > 1e-10 {
-            (proxy_rms / proxy_mix_rms).clamp(0.5, 2.0)
-        } else {
-            1.0
-        };
-
         // Transform is NOT explicit in scout, but wait...
         // The scout pass returns a ScoutResult. Where does nmf_transform happen?
         // Wait, fit() does fit_transform, which does both W and H learning.
@@ -1509,7 +1494,6 @@ impl TwoPassEngine {
             assignments,
             rear_scale,
             lfe_scale,
-            global_rms_gain,
             spatial_pre,
             stem_mfccs,
             features,

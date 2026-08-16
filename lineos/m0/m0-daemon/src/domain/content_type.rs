@@ -12,7 +12,6 @@ pub use aether_bridge::ContentType;
 /// Music: all DSP nodes active. Target: -14 LUFS.
 pub trait ContentTypeExt {
     fn from_preset(preset_id: &str) -> Self;
-    fn lufs_target(&self) -> f32;
     fn skip_stems(&self) -> bool;
     fn skip_widening(&self) -> bool;
 
@@ -51,12 +50,6 @@ impl ContentTypeExt for ContentType {
         }
     }
 
-    fn lufs_target(&self) -> f32 {
-        match self {
-            Self::Episode => -16.0,
-            Self::Music => -14.0,
-        }
-    }
 
     fn skip_stems(&self) -> bool {
         matches!(self, Self::Episode)
