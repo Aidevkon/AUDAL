@@ -50,5 +50,7 @@ jobs:
         run: bash infra/ci/checks/spec-coverage-check.sh
         continue-on-error: true
 
+      - name: G-013 Northstar Lint
+        run: bash scripts/northstar-lint.sh --strict
       - name: G-012 Contract Tests
         run: cargo test --workspace
