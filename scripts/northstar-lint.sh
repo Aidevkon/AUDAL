@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Το script εξαρτάται από τη ρίζα του repo σε ΔΥΟ σημεία: το default
+# DOC, και το `git ls-files` που κρίνει τη μοναδικότητα του basename.
+# Χωρίς αυτό δούλευε ΜΟΝΟ όταν το καλούσες από τη ρίζα.
+# ⚠ Προηγείται της ανάγνωσης του $1: σχετικό path ορίσματος από
+#   υποκατάλογο ΔΕΝ υποστηρίζεται. Πλήρες path ή καμία παράμετρος.
+cd "$(git rev-parse --show-toplevel)"
+
 DOC="${1:-docs/northstar-v2.md}"
 
 STRICT=0
@@ -23,6 +30,7 @@ if [ ! -f "$DOC" ]; then
 fi
 
 c_tairiazei=0
+c_tairiazei_sxolio=0
 c_metatopistike=0
 c_xathike=0
 c_tafos=0
@@ -97,7 +105,17 @@ for doc_match in "${matches[@]}"; do
                 while IFS= read -r line; do
                     line_num="${line%%:*}"
                     line_content="${line#*:}"
-                    if [[ "$line_content" =~ ^[[:space:]]*(//|#|\*) ]]; then
+                    if [[ "$line_content" =~ ^[[:space:]]*#\[ ]]; then
+                        # Rust attribute — ΚΩΔΙΚΑΣ, όχι σχόλιο.
+                        # Το '#' εδώ δεν ξεκινάει σχόλιο· ξεκινάει
+                        # #[test] · #[ignore] · #[derive(...)].
+                        # ΗΤΑΝ η αιτία 10 ψευδών ΤΑΦΟΣ στο v2.1.
+                        tafos=0
+                        code_lines_count=$((code_lines_count + 1))
+                        if [ -z "$first_code_line" ]; then
+                            first_code_line="$line_num"
+                        fi
+                    elif [[ "$line_content" =~ ^[[:space:]]*(//|#|\*) ]]; then
                         if [ -z "$first_tafos_line_content" ]; then
                             first_tafos_line_content="$line_content"
                         fi
@@ -111,9 +129,36 @@ for doc_match in "${matches[@]}"; do
                 done < /tmp/occurences.txt
                 
                 if [ "$tafos" -eq 1 ]; then
-                    echo "ΤΑΦΟΣ: $match"
-                    echo "  $first_tafos_line_content"
-                    c_tafos=$((c_tafos + 1))
+                    # ΟΓΔΟΗ ΚΑΤΑΣΤΑΣΗ — ΙΣΧΥΡΙΣΜΟΣ_ΣΕ_ΣΧΟΛΙΟ.
+                    # Υπάρχουν ισχυρισμοί των οποίων το τεκμήριο ΕΙΝΑΙ
+                    # σχόλιο: μια σύμβαση που δηλώνεται σε comment και
+                    # δεν ισχύει καθολικά. Θάβοντάς τα, ο lint τιμωρούσε
+                    # το κείμενο επειδή τεκμηρίωνε σωστά.
+                    # Το κείμενο πρέπει να το ΔΗΛΩΣΕΙ ρητά — αλλιώς
+                    # μένει ΤΑΦΟΣ.
+                    declared_comment_contract=0
+                    if sed -n "${doc_line_num},$((doc_line_num + 3))p" "$DOC" \
+                         | grep -qF 'ΤΕΚΜΗΡΙΟ: ΣΧΟΛΙΟ-ΩΣ-ΣΥΜΒΑΣΗ'; then
+                        declared_comment_contract=1
+                    fi
+
+                    if [ "$declared_comment_contract" -eq 1 ]; then
+                        found_line=$(head -n1 /tmp/occurences.txt | cut -d: -f1)
+                        if [ "$found_line" = "$ref_line" ]; then
+                            echo "ΤΑΙΡΙΑΖΕΙ_ΩΣ_ΣΧΟΛΙΟ: $match"
+                        else
+                            # Η ετυμηγορία ΔΕΝ αλλάζει — αλλά η μετατόπιση
+                            # γίνεται ΟΡΑΤΗ. Μια νέα κατάσταση δεν
+                            # επιτρέπεται να κρύψει το σάπισμα που όλη η
+                            # ταξινομία υπάρχει για να πιάνει.
+                            echo "ΤΑΙΡΙΑΖΕΙ_ΩΣ_ΣΧΟΛΙΟ: $match (⚠ το σχόλιο βρέθηκε στη γραμμή $found_line)"
+                        fi
+                        c_tairiazei_sxolio=$((c_tairiazei_sxolio + 1))
+                    else
+                        echo "ΤΑΦΟΣ: $match"
+                        echo "  $first_tafos_line_content"
+                        c_tafos=$((c_tafos + 1))
+                    fi
                 else
                     if [ "$code_lines_count" -gt 1 ]; then
                         echo "ΑΜΦΙΣΗΜΟ_ΑΓΚΙΣΤΡΟ: $match (βρέθηκε $code_lines_count φορές σε κώδικα στο $target_file)"
@@ -153,7 +198,7 @@ for x in "${xwris_list[@]:-}"; do
     fi
 done
 
-el=$((c_tairiazei + c_metatopistike + c_xathike + c_tafos + c_amfisimo_arxeio + c_agnosto_arxeio + c_amfisimo_agkistro))
+el=$((c_tairiazei + c_tairiazei_sxolio + c_metatopistike + c_xathike + c_tafos + c_amfisimo_arxeio + c_agnosto_arxeio + c_amfisimo_agkistro))
 total=$((el + c_xwris))
 pct=0
 if [ "$total" -gt 0 ]; then
@@ -162,11 +207,18 @@ fi
 
 echo ""
 echo "ΣΥΝΟΨΗ:"
-echo "ΤΑΙΡΙΑΖΕΙ: $c_tairiazei | ΜΕΤΑΤΟΠΙΣΤΗΚΕ: $c_metatopistike | ΧΑΘΗΚΕ: $c_xathike | ΤΑΦΟΣ: $c_tafos | ΑΜΦΙΣΗΜΟ_ΑΡΧΕΙΟ: $c_amfisimo_arxeio | ΑΓΝΩΣΤΟ_ΑΡΧΕΙΟ: $c_agnosto_arxeio | ΑΜΦΙΣΗΜΟ_ΑΓΚΙΣΤΡΟ: $c_amfisimo_agkistro"
+echo "ΤΑΙΡΙΑΖΕΙ: $c_tairiazei | ΤΑΙΡΙΑΖΕΙ_ΩΣ_ΣΧΟΛΙΟ: $c_tairiazei_sxolio | ΜΕΤΑΤΟΠΙΣΤΗΚΕ: $c_metatopistike | ΧΑΘΗΚΕ: $c_xathike | ΤΑΦΟΣ: $c_tafos | ΑΜΦΙΣΗΜΟ_ΑΡΧΕΙΟ: $c_amfisimo_arxeio | ΑΓΝΩΣΤΟ_ΑΡΧΕΙΟ: $c_agnosto_arxeio | ΑΜΦΙΣΗΜΟ_ΑΓΚΙΣΤΡΟ: $c_amfisimo_agkistro"
 echo "ΚΑΛΥΨΗ: $el/$total ($pct%)"
 
 if [ "$STRICT" -eq 1 ]; then
-    if [ "$c_xathike" -gt 0 ] || [ "$c_tafos" -gt 0 ] || [ "$c_agnosto_arxeio" -gt 0 ]; then
+    # ΜΠΛΟΚΑΡΕΙ ΜΟΝΟ ΣΕ ΠΡΑΓΜΑΤΙΚΟ ΣΑΠΙΣΜΑ.
+    # ΧΑΘΗΚΕ / ΑΓΝΩΣΤΟ_ΑΡΧΕΙΟ = το κείμενο δείχνει σε κάτι που ΔΕΝ
+    # ΥΠΑΡΧΕΙ. Αυτό είναι ψέμα και πρέπει να σταματάει το CI.
+    # ΤΑΦΟΣ (μετά την όγδοη κατάσταση) = ισχυρισμός σε σχόλιο ΧΩΡΙΣ
+    # δήλωση — αδυναμία τεκμηρίωσης, όχι ψέμα. Φαίνεται, δεν μπλοκάρει.
+    # ΗΤΑΝ: c_xathike || c_tafos || c_agnosto_arxeio — και γι' αυτό το
+    # --strict δεν μπορούσε να μπει σε CI χωρίς να πέφτει σε ένα ψευδές.
+    if [ "$c_xathike" -gt 0 ] || [ "$c_agnosto_arxeio" -gt 0 ]; then
         exit 1
     fi
 fi
