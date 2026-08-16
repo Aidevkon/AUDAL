@@ -66,6 +66,7 @@ impl DspAdapter {
         }
         let topology_json = Pipelineforge::forge(&conditions)
             .map_err(|e| DspError::ForgeError(format!("{:?}", e)))?;
+        eprintln!("[DIAGNOSTIC] topology={}", topology_json);
         let mut topology = DspTopology::from_json(&topology_json)
             .map_err(|e| DspError::TopologyError(format!("{:?}", e)))?;
         if let Some(config) = aether_config {

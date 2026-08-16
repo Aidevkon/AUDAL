@@ -495,9 +495,11 @@ pub fn run(
     } else {
         1.0
     };
+    let gain = if std::env::var("BYPASS_W16").is_ok() { 1.0 } else { gain };
+    let bypass = std::env::var("BYPASS_W16").is_ok();
 
-    eprintln!("[W16] original_rms={:.6} mix_rms={:.6} gain={:.4} ceiling={:.4}",
-        original_rms, mix_rms, gain, ceiling_linear);
+    eprintln!("[W16] original_rms={:.6} mix_rms={:.6} gain={:.4} ceiling={:.4} bypass={}",
+        original_rms, mix_rms, gain, ceiling_linear, bypass);
 
     {
         let sums = w16_sums.borrow();
