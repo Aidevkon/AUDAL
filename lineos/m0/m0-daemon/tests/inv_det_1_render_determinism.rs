@@ -34,17 +34,43 @@ fn get_sha256(path: &Path) -> String {
     out_str.split_whitespace().next().unwrap().to_string()
 }
 
+/// Το fixture ζει ΜΕΣΑ στο δέντρο, όχι στο /tmp.
+/// ΙΔΙΟ ιδίωμα με ab_render_full · w1_vad_trace ·
+/// w2_duck_gate · vad_validation_real: ΕΝΑ αρχείο,
+/// ΕΝΑΣ τόπος (δόγμα Δ) — κανένα δεύτερο αντίγραφο.
+/// Το CARGO_MANIFEST_DIR ΔΕΝ εξαρτάται από το CWD·
+/// ένα γυμνό σχετικό path εξαρτάται.
+fn fixture_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav")
+}
+
 #[test]
-#[ignore = "full render ~2min — run explicitly on any audio-touching wire"]
+#[ignore = "full render x2 (~15s measured, release) — run explicitly on any audio-touching wire"]
 fn inv_det_1_render_determinism() {
-    let input_path = Path::new("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav");
+    let input_path = fixture_path();
+    // ΗΤΑΝ: println! + return ⇒ ΠΡΑΣΙΝΟ χωρίς μέτρηση.
+    // Ένα gate που περνάει χωρίς το fixture του είναι
+    // πράσινο φανάρι συνδεδεμένο στο πουθενά.
     if !input_path.exists() {
-        panic!("INV-DET-1 fixture missing — the gate must not pass vacuously");
+        panic!(
+            "INV-DET-1 fixture missing — the gate must not pass vacuously: {}",
+            input_path.display()
+        );
     }
 
     let req = MasterRequest {
         audio_path: input_path.to_str().unwrap().to_string(),
-        preset_id: "podcast".to_string(),
+        // ΗΤΑΝ "Transparent" — FLAVOUR, όχι preset: το
+        // lookup() γύριζε None και το ContentType έπεφτε
+        // σε Music μέσω fallback (F-024).
+        // Το "spotify" ΕΙΝΑΙ στο CATALOGUE (presets.rs:177)
+        // και ΕΙΝΑΙ Music (presets.rs:179) ⇒ ΙΔΙΑ
+        // φρουρούμενη διαδρομή — stems · NMFD · spatial —
+        // ΡΗΤΑ αντί κατά τύχη.
+        // Episode (podcast/acx) θα ενεργοποιούσε skip_stems
+        // και θα ΣΤΕΝΕΥΕ το invariant. Βλ. INV-DET-1b.
+        preset_id: "spotify".to_string(),
         flavour_id: None,
         intent_tone: None,
         intent_dynamics: None,
@@ -72,7 +98,7 @@ fn inv_det_1_render_determinism() {
         Arc::new(ArcSwap::from_pointee(DspState::default())),
         None,
         None,
-        "det-podcast-1".to_string(),
+        "det-spotify-1".to_string(),
         state_tmp_1.path().to_str().unwrap(),
         out_dir_1.path().to_str().unwrap(),
     )
@@ -91,7 +117,7 @@ fn inv_det_1_render_determinism() {
         Arc::new(ArcSwap::from_pointee(DspState::default())),
         None,
         None,
-        "det-podcast-2".to_string(),
+        "det-spotify-2".to_string(),
         state_tmp_2.path().to_str().unwrap(),
         out_dir_2.path().to_str().unwrap(),
     )
