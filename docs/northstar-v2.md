@@ -429,12 +429,17 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 
     ΥΠΟΛΟΙΠΑ — ΔΕΝ ΕΚΛΕΙΣΑΝ ΜΕ ΤΟ §3:
 
-      content_type.rs:54 `fn lufs_target(&self) -> f32 {`
-        ΜΗΔΕΝ call sites. Hardcoded −16.0/−14.0, δηλαδή
-        ΔΕΥΤΕΡΗ πηγή αλήθειας που περιμένει καλούντα.
-        Το ΣΕΙΡΑ #1 του v2 υποσχέθηκε «λύνει ΚΑΙ το
-        target_lufs σε τρία σημεία» — έλυσε δύο.
-        ⇒ ΣΕΙΡΑ #2, διαγραφή.
+      content_type::lufs_target()   ΕΚΤΕΛΕΣΤΗΚΕ
+        ΜΕΤΡΗΣΗ 2026-08-12/16: ΜΗΔΕΝ call sites. Hardcoded
+        −16.0/−14.0, δηλαδή ΔΕΥΤΕΡΗ πηγή αλήθειας που
+        περιμένει καλούντα. Το ΣΕΙΡΑ #1 του v2 υποσχέθηκε
+        «λύνει ΚΑΙ το target_lufs σε τρία σημεία» — έλυσε
+        δύο.
+        ΙΣΧΥΕ ΕΩΣ a15d590.
+        ΤΙ ΑΛΛΑΞΕ: διαγράφηκε — η ΠΡΟΤΑΣΗ ΣΕΙΡΑ #2
+        εκτελέστηκε. Το άγκιστρο (ήταν content_type.rs
+        γρ. 54) ΑΠΟΣΥΡΕΤΑΙ: ιστορικό παράθεμα πλέον, όχι
+        ισχυρισμός προς έλεγχο.
 
       apple_music ΛΕΙΠΕΙ από το CATALOGUE. Το v2 το
         κατέγραψε στα ΠΑΡΚΑΡΙΣΜΕΝΑ· ισχύει ακέραιο.
@@ -624,30 +629,54 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
       19 ΓΥΜΝΑ — `#[ignore]` χωρίς αιτιολογία
       54 γυμνά σε όλο το workspace
 
-    ΤΟ ΘΕΜΕΛΙΟ ΤΟΥ CERTIFICATE ΕΙΝΑΙ ΤΡΙΠΛΑ ΨΕΥΔΕΣ:
+    ΤΟ ΘΕΜΕΛΙΟ ΤΟΥ CERTIFICATE ΗΤΑΝ ΤΡΙΠΛΑ ΨΕΥΔΕΣ
+    — ΔΙΟΡΘΩΘΗΚΕ 4e28d43, οι ΜΕΤΡΗΣΕΙΣ μένουν:
 
-      inv_det_1_render_determinism.rs:39 `fn inv_det_1_render_determinism() {`
-        ΤΕΚΜΗΡΙΟ: ΚΩΔΙΚΑΣ
-        Η γρ. 38 φέρει ΓΥΜΝΟ `#[ignore]` — χωρίς λόγο
-        ⇒ δεν τρέχει σε κανένα CI.
-        Αντιφάσκει με τον ισχυρισμό του 83770d5 («All
-        ignore attributes now carry their reason») ΚΑΙ με
-        τον τίτλο του: a gate that does not run does not
-        guard.
+      ΜΕΤΡΗΣΗ 2026-08-16, ΙΣΧΥΕ ΕΩΣ 00eb82f / 4e28d43:
+        (α) γρ. 38 `#[ignore]` ΓΥΜΝΟ, χωρίς λόγο ⇒ δεν
+            έτρεχε σε κανένα CI. Αντιφάσκει με τον
+            ισχυρισμό του 83770d5 («All ignore attributes
+            now carry their reason») ΚΑΙ με τον τίτλο του:
+            a gate that does not run does not guard.
+        (β) γρ. 41-44 `if !input_path.exists()` + println
+            + return ⇒ ΠΡΑΣΙΝΟ αν έλειπε το fixture, που
+            ζούσε στο /tmp/w9/. Εφήμερος κατάλογος ⇒
+            περνούσε by default χωρίς να μετρήσει τίποτα.
+        (γ) γρ. 48 preset_id «Transparent» — FLAVOUR, όχι
+            preset. lookup() → None → warn → Music. Το
+            θεμελιώδες test έτρεχε με id που το ΙΔΙΟ ΜΑΣ
+            ΜΗΤΡΩΟ κατατάσσει ως «not a delivery target».
+            Βλ. §3Β: το φάντασμα ζει σε άλλα 21 σημεία.
 
-      inv_det_1_render_determinism.rs:41 `if !input_path.exists() {`
-        ⇒ επιστρέφει ΠΡΑΣΙΝΟ αν λείπει το fixture. Και το
-        fixture ζει στο /tmp:
-        inv_det_1_render_determinism.rs:42 `println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");`
-        Εφήμερος κατάλογος ⇒ περνάει by default χωρίς να
-        μετρήσει τίποτα.
+      ΜΕΤΡΗΣΗ 2026-08-16, ΤΟ ΕΝΔΙΑΜΕΣΟ ΣΦΑΛΜΑ (00eb82f):
+        Η πρώτη διόρθωση μετονόμασε το φάντασμα σε
+        «podcast» — preset Episode, που ενεργοποιεί
+        skip_stems ΚΑΙ skip_widening. Το gate ΣΤΕΝΕΨΕ:
+        έπαψε να καλύπτει τη διαδρομή που κάλυπτε πάντα
+        μέσω του Music fallback.
+        ΤΕΚΜΗΡΙΟ — το σύνολο των nodes, όχι το ρολόι:
+          podcast  scout · episode_render · flac · cert
+          spotify  decode · trunk_pass · scout · dsp ·
+                   render · flac · cert
+        Τα trunk_pass · dsp_node · render_node ΔΕΝ
+        εκτελούνται καθόλου υπό Episode.
 
-      inv_det_1_render_determinism.rs:48 `preset_id: "Transparent".to_string(),`
-        «Transparent» είναι FLAVOUR, όχι preset. Το
-        lookup() του μητρώου γυρίζει None, βγάζει warn,
-        πέφτει σε Music. Το θεμελιώδες test του
-        certificate τρέχει με id που το ΙΔΙΟ ΜΑΣ ΜΗΤΡΩΟ
-        κατατάσσει ως «not a delivery target».
+      ΤΙ ΙΣΧΥΕΙ ΣΗΜΕΡΑ (4e28d43) — και τα τρία κλειστά:
+        inv_det_1_render_determinism.rs:50 `fn inv_det_1_render_determinism() {`
+        Η γρ. 49 φέρει πλέον `#[ignore = "…"]` ΜΕ τον λόγο
+        και τον ΜΕΤΡΗΜΕΝΟ χρόνο (ΤΕΚΜΗΡΙΟ: ΚΩΔΙΚΑΣ, αλλά
+        attribute ⇒ βλ. ΓΝΩΣΤΑ ΨΕΥΔΗ ΤΟΥ LINT).
+        inv_det_1_render_determinism.rs:56 `panic!(`
+        inv_det_1_render_determinism.rs:73 `preset_id: "spotify".to_string(),`
+        Το fixture ζει ΜΕΣΑ στο δέντρο, μέσω του ιδιώματος
+        των άλλων τεσσάρων m0d tests:
+        inv_det_1_render_determinism.rs:45 `.join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav")`
+        ΕΤΡΕΞΕ: δύο πλήρη renders, ταυτόσημα SHA, LUFS και
+        true peak bit-identical, 15.60s release.
+
+      ⚠ ΤΟ ΥΠΟΛΟΙΠΟ ΤΟΥ ΣΤΟΛΟΥ ΜΕΝΕΙ ΑΝΟΙΧΤΟ. Ένα gate
+        διορθώθηκε· τα 18 γυμνά #[ignore] του m0d και τα
+        54 του workspace δεν άλλαξαν.
 
     ΑΛΛΑ ΓΥΜΝΑ, ΕΝΔΕΙΚΤΙΚΑ — το ΑΓΚΙΣΤΡΟ δείχνει τη
     συνάρτηση (ΤΕΚΜΗΡΙΟ: ΚΩΔΙΚΑΣ)· το γυμνό `#[ignore]`
@@ -947,11 +976,17 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
       «ασφαλής να φύγει». Δόγμα Ι: η μέτρηση ισχύει ΕΚΕΙ
       ΠΟΥ ΕΓΙΝΕ.
 
-    Ο ΚΛΩΝΟΣ ΤΟΥ ΕΙΝΑΙ ΝΕΚΡΟΣ ΧΩΡΙΣ ΟΡΟΥΣ:
-      two_pass.rs:178 `pub global_rms_gain: f32,`
-      two_pass.rs:1485 `let global_rms_gain = if proxy_mix_rms > 1e-10 {`
-      Γράφεται στο :1512, ΔΕΝ διαβάζεται ΠΟΥΘΕΝΑ.
-      Dead on arrival. ⇒ ΣΕΙΡΑ #2, διαγραφή.
+    Ο ΚΛΩΝΟΣ ΤΟΥ — global_rms_gain   ΕΚΤΕΛΕΣΤΗΚΕ
+      ΜΕΤΡΗΣΗ 2026-08-16 (dfa62df): υπολογιζόταν στο
+      two_pass και γραφόταν στο struct, ΧΩΡΙΣ ΚΑΝΕΝΑΝ
+      αναγνώστη. Dead on arrival.
+      ΙΣΧΥΕ ΕΩΣ a15d590.
+      ΤΙ ΑΛΛΑΞΕ: διαγράφηκε — η ΠΡΟΤΑΣΗ ΣΕΙΡΑ #2
+      εκτελέστηκε (16 γραμμές έφυγαν από το two_pass.rs).
+      Τα άγκιστρα (ήταν two_pass.rs γρ. 178 και 1485)
+      ΑΠΟΣΥΡΟΝΤΑΙ: ιστορικό παράθεμα πλέον.
+      ⚠ Ο ΙΔΙΟΣ ο W16 ΜΕΝΕΙ — ο κλώνος έφυγε, το πρωτότυπο
+        είναι ακόμα PARK[ORANGE] παραπάνω.
 
     ΚΑΙ ΕΙΝΑΙ Ο ΑΝΤΙ-ΚΑΝΟΝΑΣ ΤΩΝ ΟΡΙΖΟΝΤΩΝ: ένα dB χωρίς
     ιδιοκτήτη. Δύο στάδια διεκδικούν το ίδιο πλάτος και
@@ -1161,7 +1196,7 @@ GlueChain → mix
 
 
 HPSS mask_h → NMFD
-  ΑΓΚΙΣΤΡΟ  two_pass.rs:311 `let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);`
+  ΑΓΚΙΣΤΡΟ  two_pass.rs:309 `let (_mask_h, mask_p) = hpss_ctx.process_chunk(&chunk_frames);`
 
   ΜΕΤΡΗΣΗ 2026-08-12: το harmonic component υπολογίζεται
     και πετιέται. Το NMFD τρέχει στα ΠΛΗΡΗ magnitudes,
@@ -1185,7 +1220,7 @@ HPSS mask_h → NMFD
     ΑΛΛΗ. Δεν έλειπε το residual — περίσσευε η ενέργεια.
     Η λύση είναι ΑΦΑΙΡΕΣΗ ΧΩΡΙΣ ΑΝΑΚΑΤΑΝΟΜΗ:
       two_pass.rs:50 `pub const DRUM_DEDUP_ALPHA: f32 = 0.5;`
-      two_pass.rs:493 `m * (1.0 - DRUM_DEDUP_ALPHA * p)`
+      two_pass.rs:491 `m * (1.0 - DRUM_DEDUP_ALPHA * p)`
     Σωστό ΕΔΩ γιατί δεν υπάρχει spectral mask των drums
     να επιστραφεί η ενέργεια: τα drums ζουν ΕΞΩ από την
     κατάτμηση σκόπιμα (time-domain multiply, το μόνο stem
@@ -1210,25 +1245,33 @@ HPSS mask_h → NMFD
   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 
-content_type::lufs_target() → οπουδήποτε
-  ΑΓΚΙΣΤΡΟ  content_type.rs:54 `fn lufs_target(&self) -> f32 {`
+content_type::lufs_target() → οπουδήποτε      ΕΚΤΕΛΕΣΤΗΚΕ
+  ΑΓΚΙΣΤΡΟ  ΑΠΟΣΥΡΘΗΚΕ — ήταν content_type.rs γρ. 54,
+    `fn lufs_target(&self) -> f32 {`. Ιστορικό παράθεμα
+    πλέον, όχι ισχυρισμός προς έλεγχο.
   ΜΕΤΡΗΣΗ 2026-08-12, ΕΠΑΛΗΘΕΥΜΕΝΗ 2026-08-16:
     ΜΗΔΕΝ call sites. Μοιάζει με πηγή προδιαγραφών·
     είναι νεκρός κώδικας. Η ΜΟΝΗ ΝΕΚΡΗ του v2 που
-    επιβιώνει ΑΚΕΡΑΙΑ.
-  ΔΙΑΓΝΩΣΗ: μετά το §3, είναι ΔΕΥΤΕΡΗ πηγή αλήθειας που
-    περιμένει καλούντα — χειρότερο από νεκρό, είναι
-    παγίδα δόγματος Δ.
-  ΠΡΟΤΑΣΗ  ΔΙΑΓΡΑΦΗ. ΣΕΙΡΑ #2.
-    ΑΚΥΡΩΝΕΤΑΙ ΑΝ: το μητρώο πάψει να καλύπτει ContentKind.
+    επιβίωσε ΑΚΕΡΑΙΑ μέχρι τη διαγραφή της.
+  ΔΙΑΓΝΩΣΗ  ΙΣΧΥΕ ΕΩΣ a15d590: μετά το §3, ήταν ΔΕΥΤΕΡΗ
+    πηγή αλήθειας που περίμενε καλούντα — χειρότερο από
+    νεκρό, παγίδα δόγματος Δ.
+  ΤΙ ΑΛΛΑΞΕ  a15d590: διαγράφηκε (7 γραμμές). Η ΠΡΟΤΑΣΗ
+    ΣΕΙΡΑ #2 εκτελέστηκε. Ο compiler είναι πλέον ο
+    φύλακας: δεύτερη πηγή δεν μπορεί να ξαναγεννηθεί
+    σιωπηλά.
 
 
-global_rms_gain → οπουδήποτε
-  ΑΓΚΙΣΤΡΟ  two_pass.rs:1485 `let global_rms_gain = if proxy_mix_rms > 1e-10 {`
-  ΜΕΤΡΗΣΗ 2026-08-16 (dfa62df): γράφεται στο :1512,
-    ΔΕΝ διαβάζεται πουθενά. Dead on arrival. Είναι ο
+global_rms_gain → οπουδήποτε                  ΕΚΤΕΛΕΣΤΗΚΕ
+  ΑΓΚΙΣΤΡΟ  ΑΠΟΣΥΡΘΗΚΕ — ήταν two_pass.rs γρ. 178 και
+    1485, `pub global_rms_gain: f32,` και
+    `let global_rms_gain = if proxy_mix_rms > 1e-10 {`.
+  ΜΕΤΡΗΣΗ 2026-08-16 (dfa62df): γραφόταν στο struct,
+    ΔΕΝ διαβαζόταν πουθενά. Dead on arrival. Ήταν ο
     κλώνος του W16 μέσα στο two_pass.
-  ΠΡΟΤΑΣΗ  ΔΙΑΓΡΑΦΗ. ΣΕΙΡΑ #2. Βλ. §W16.
+  ΤΙ ΑΛΛΑΞΕ  a15d590: διαγράφηκε (16 γραμμές). Η ΠΡΟΤΑΣΗ
+    ΣΕΙΡΑ #2 εκτελέστηκε. Βλ. §W16 — το ΠΡΩΤΟΤΥΠΟ μένει
+    PARK[ORANGE]· έφυγε ο κλώνος, όχι ο κανόνας.
 
 
 AdmBwfStreamWriter → spatial path
