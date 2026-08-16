@@ -29,31 +29,36 @@ fn fixture_path() -> std::path::PathBuf {
         .join("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav")
 }
 
-/// ⚠ ΚΑΘΑΡΟ ΕΠΕΙΔΗ **BUG-DECODE-1** — Η ΜΟΝΗ ΓΡΑΜΜΗ ΠΟΥ ΑΛΛΑΖΕΙ
-/// ΟΤΑΝ ΔΙΟΡΘΩΘΕΙ.
+/// ⚠ ΒΡΟΜΙΚΟ ΓΙΑ ΠΑΝΤΑ — **BUG-DECODE-1 ΔΙΟΡΘΩΘΗΚΕ ΠΛΗΡΩΣ**
+/// (uncommitted: ο hash μπαίνει εδώ στο σφράγισμα).
 ///
-/// Ένα `track_id` με slash ΔΕΝ φτάνει καν στο §Π: το render σκάει
-/// στο decode, πριν αρχίσει το mastering.
+/// ΠΡΙΝ: ένα `track_id` με slash ΔΕΝ έφτανε καν στο §Π — το render
+/// έσκαγε στο decode, πριν αρχίσει το mastering (`m0d-raw-track/1.pcm`
+/// — κατάλογος που δεν υπάρχει). Διορθώθηκε πρώτα το decode· τότε
+/// αποκαλύφθηκε ΟΛΟΚΛΗΡΗ αλυσίδα από αδέρφια με την ΙΔΙΑ νόσο:
+/// `m0d-mastering-`, `m0d-scratch-l/r-`, `m0d-premaster-l/r-`,
+/// `m0d-mastered-`, `vad-trace-` — εννέα ακόμα σημεία, ίδιο σχήμα
+/// `spool_dir().join(format!("{prefix}-{blob_id}...", ...))` με
+/// ασανιτάριστο `blob_id`.
 ///
-///   decode_node.rs:67 · :149 · :258
-///     `spool_dir().join(format!("m0d-raw-{}.pcm", blob_id))`
+/// ΤΩΡΑ: `blob_store.rs` έχει το SPOOL NAMING REGISTRY — μία
+/// συνάρτηση ανά οικογένεια (`raw_dump_path`, `raw_dump_spatial_path`,
+/// `mastering_path`, `scratch_l_path`, `scratch_r_path`,
+/// `premaster_l_path`, `premaster_r_path`, `mastered_path`,
+/// `vad_trace_path`), όλες πάνω στην ίδια `sanitize_path_component`
+/// με το FLAC persist / `blob_storage_path`. ΚΑΝΕΝΑ inline
+/// `format!(...)` πάνω σε `spool_dir()` δεν επιζεί σε production
+/// κώδικα — θεσμικός έλεγχος:
+///   `grep -rnE 'm0d-(raw|mastering|scratch|premaster|mastered)|
+///              vad-trace' --include=*.rs lineos`
+///   → ΜΟΝΟ blob_store.rs (το σπίτι) + tests + σχόλια/legacy sweep
+///     filter (lib.rs, prefix-match σε υπάρχοντα ονόματα, όχι
+///     κατασκευή path).
 ///
-/// Το `blob_id` ΕΙΝΑΙ το `track_id` ασανιτάριστο
-/// (`dsp_pipeline.rs:496`), οπότε το path γίνεται
-/// `<spool>/m0d-raw-track/1.pcm` — κατάλογος που δεν υπάρχει:
-///     run_dsp failed: "Failed to write raw dump:
-///                      No such file or directory (os error 2)"
-///
-/// ΠΡΟΫΠΑΡΧΟΝ, εκτός εύρους §Π. Το FLAC persist σανιτάρει, η
-/// `blob_storage_path` σανιτάρει — ο decode, που τρέχει ΠΡΩΤΟΣ,
-/// όχι.
-///
-/// ⇒ ΟΤΑΝ ΔΙΟΡΘΩΘΕΙ ΤΟ BUG-DECODE-1: βάλε εδώ `"track/1"` και το
-///   test καλύπτει τη βρόμικη περίπτωση end-to-end — οι assertions
-///   παρακάτω περιμένουν ήδη το σανιταρισμένο όνομα μέσω της
-///   `sanitize_path_component`, άρα ΔΕΝ χρειάζονται αλλαγή.
-///   Μέχρι τότε η συμμετρία φρουρείται από το unit test στο τέλος.
-const TRACK_ID: &str = "track1";
+/// Το `TRACK_ID` ΜΕΝΕΙ βρόμικο ΓΙΑ ΠΑΝΤΑ — όχι μεταβατικά. Είναι ο
+/// θεσμικός φρουρός: αν αύριο κάποιο νέο scratch-family σημείο
+/// ξαναγράψει inline `format!`, αυτό το gate θα ξανασκάσει.
+const TRACK_ID: &str = "track/persist-1";
 
 fn request(project_id: &str, track_id: &str) -> MasterRequest {
     MasterRequest {
@@ -217,16 +222,17 @@ fn inv_persist_1_certificate_survives_restart() {
     );
 }
 
-/// Η ΣΥΜΜΕΤΡΙΑ ΤΗΣ SANITISATION — ΤΟ ΔΟΝΤΙ ΜΕΧΡΙ ΤΟ BUG-DECODE-1.
+/// Η ΣΥΜΜΕΤΡΙΑ ΤΗΣ SANITISATION — ΤΟ ΦΘΗΝΟ ΔΟΝΤΙ.
 ///
-/// Το end-to-end test δεν μπορεί σήμερα να τρέξει με βρόμικο id
-/// (ο decode σκάει πρώτος). Αυτό όμως ΜΠΟΡΕΙ, και φρουρεί ακριβώς
-/// αυτό που θα έσπαγε σιωπηλά: το `.flac` να πάει σε ένα όνομα και
-/// το `.json` σε άλλο.
+/// Μετά το BUG-DECODE-1 fix (πλήρες, SPOOL NAMING REGISTRY) το
+/// end-to-end test με βρόμικο id ΤΡΕΧΕΙ ΚΑΙ ΠΕΡΝΑΕΙ ολόκληρο. Αυτό
+/// εδώ όμως κοστίζει μηδέν και δεν είναι #[ignore]: πιάνει τη
+/// διάσταση του κανόνα σε ΚΑΘΕ `cargo test`, χωρίς render, και
+/// φρουρεί ακριβώς αυτό που θα έσπαγε σιωπηλά: το `.flac` να πάει σε
+/// ένα όνομα και το `.json` σε άλλο.
 ///
 /// Ο κανόνας του FLAC persist είναι `replace('/',"").replace('\\',"")`
 /// (dsp_pipeline). Η `blob_storage_path` ΠΡΕΠΕΙ να συμφωνεί.
-/// ΔΕΝ είναι #[ignore]: τρέχει σε κάθε `cargo test`, κοστίζει μηδέν.
 #[test]
 fn blob_storage_path_sanitises_like_the_flac_persist() {
     // Ο κανόνας του FLAC persist, αυτούσιος από το dsp_pipeline.

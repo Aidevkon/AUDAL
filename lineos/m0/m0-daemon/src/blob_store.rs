@@ -306,6 +306,90 @@ pub fn sanitize_path_component(s: &str) -> String {
     s.replace('/', "").replace('\\', "")
 }
 
+// ─────────────────────────────────────────────────────────────────
+// ΤΟ SPOOL NAMING REGISTRY.
+//
+// ΚΑΘΕ scratch αρχείο του daemon παίρνει όνομα ΑΠΟ ΕΔΩ. Inline
+// `format!(...)` πάνω σε `spool_dir()` = bug εξ ορισμού: BUG-DECODE-1
+// ήταν ακριβώς αυτό — ο decode έφτιαχνε `m0d-raw-{blob_id}.pcm` με
+// ασανιτάριστο `blob_id`, το path σκούνταζε σε `/` πριν προλάβει να
+// γράψει. Οκτώ ακόμα σημεία (mastering, scratch ×2, premaster ×2,
+// mastered, vad-trace, raw-spatial) είχαν το ΙΔΙΟ σχήμα, ίδια νόσος.
+// Ζει εδώ, στο blob_store.rs, γιατί εδώ ζει ήδη η
+// `sanitize_path_component` και η `blob_storage_path` — ένα αρχείο
+// που απαντάει «ποιο όνομα παίρνει ένα blob στον δίσκο», όχι δύο.
+// ─────────────────────────────────────────────────────────────────
+
+/// BUG-DECODE-1: ο πρώτος writer (decode).
+pub fn raw_dump_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", sanitize_path_component(blob_id)))
+}
+
+/// Ίδιο λεξιλόγιο, spatial variant (`render_node`'s 6ch dump writer).
+pub fn raw_dump_spatial_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-raw-{}-spatial.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Το mmap-backed working file του NODE 4 render· ίδιο όνομα και
+/// στο episode-streaming path (`episode_render.rs`).
+pub fn mastering_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-mastering-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Scratch L — file-backed mmap working storage (NODE 4).
+pub fn scratch_l_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-scratch-l-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Scratch R — file-backed mmap working storage (NODE 4).
+pub fn scratch_r_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-scratch-r-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Pre-master L snapshot — diagnostic mode only (VAD A/B observe).
+pub fn premaster_l_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-premaster-l-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Pre-master R snapshot — diagnostic mode only (VAD A/B observe).
+pub fn premaster_r_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-premaster-r-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// Post-render raw PCM tap — streaming executor path.
+pub fn mastered_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "m0d-mastered-{}.pcm",
+        sanitize_path_component(blob_id)
+    ))
+}
+
+/// VAD trace CSV — diagnostic sidecar of the render node.
+pub fn vad_trace_path(blob_id: &str) -> std::path::PathBuf {
+    crate::spool::spool_dir().join(format!(
+        "vad-trace-{}.csv",
+        sanitize_path_component(blob_id)
+    ))
+}
+
 fn sha256_file(path: &std::path::Path) -> Result<String, SidecarError> {
     use sha2::{Digest, Sha256};
     let bytes = std::fs::read(path).map_err(|e| SidecarError::Io(e.to_string()))?;

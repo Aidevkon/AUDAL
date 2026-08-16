@@ -362,7 +362,7 @@ pub fn run(
         write_offset = end_offset;
     };
 
-    let trace_path = crate::spool::spool_dir().join(format!("vad-trace-{}.csv", settings.blob_id));
+    let trace_path = crate::blob_store::vad_trace_path(settings.blob_id);
     // W1 glue-feed: ControlBus observer για το κύκλωμα read-back echo
     let control_bus = std::sync::Arc::new(sp314_dsp::dsp::control_bus::ControlBus::new(
         settings.sample_rate as f32,

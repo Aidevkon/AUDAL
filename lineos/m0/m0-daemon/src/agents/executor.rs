@@ -162,8 +162,7 @@ pub async fn run(
                     .join(format!("m0d-v3-streaming-{}.wav", blob_id))
                     .to_string_lossy()
                     .into_owned();
-                let raw_tap_path = crate::spool::spool_dir()
-                    .join(format!("m0d-raw-{}.pcm", blob_id))
+                let raw_tap_path = crate::blob_store::raw_dump_path(&blob_id)
                     .to_string_lossy()
                     .into_owned();
                 let raw_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
@@ -362,8 +361,7 @@ pub async fn run(
                     })?;
                     profiler.mark_stage_with_hash("Streaming Render", String::new());
 
-                    let mastered_raw_path =
-                        crate::spool::spool_dir().join(format!("m0d-mastered-{}.pcm", blob_id));
+                    let mastered_raw_path = crate::blob_store::mastered_path(&blob_id);
                     let mastered_guard = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
                         mastered_raw_path.clone(),
                     ));

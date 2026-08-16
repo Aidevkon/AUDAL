@@ -561,7 +561,7 @@ fn run_dsp_internal(
         // StandardizedAudioStream delivers 48k/2ch; set_tap
         // writes the dump byte-identical to the hash input
         // stream (Y3-iii-a core tap contract).
-        let raw_path_buf = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+        let raw_path_buf = crate::blob_store::raw_dump_path(&blob_id);
         let raw_path_str = raw_path_buf.to_string_lossy().into_owned();
         let raw_guard =
             std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(raw_path_buf.clone()));
@@ -884,7 +884,7 @@ fn run_dsp_internal(
             // 2ch None-payload falls through to the streaming Music flow
             // below; 6ch takes the spatial route here (A4-i).
             if decoded.pcm_channels == 6 {
-                let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+                let raw_path = crate::blob_store::raw_dump_path(&blob_id);
                 let (blob, path, model) = spatial_conformance_path(
                     &raw_path,
                     decoded.pcm_sample_rate,
@@ -921,7 +921,7 @@ fn run_dsp_internal(
             num_frames,
         }) => {
             // decode_node already wrote the raw 6ch dump for this blob_id
-            let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+            let raw_path = crate::blob_store::raw_dump_path(&blob_id);
             let (blob, path, model) = spatial_conformance_path(
                 &raw_path,
                 sample_rate,
@@ -993,7 +993,7 @@ fn run_dsp_internal(
     let lazy_scout =
         crate::dsp::lazy_reader::read_scout_sample(std::path::Path::new(audio_path), 30.0);
 
-    let raw_path = crate::spool::spool_dir().join(format!("m0d-raw-{}.pcm", blob_id));
+    let raw_path = crate::blob_store::raw_dump_path(&blob_id);
     let (scout_left_owned, scout_right_owned): (Vec<f32>, Vec<f32>) =
         if let Some((l, r, _sr)) = lazy_scout {
             (l, r)
@@ -1075,7 +1075,7 @@ fn run_dsp_internal(
     // F-052: STFT_FLUSH_TAIL compensation (commit 9039dac) removed — the engine
     // no longer emits head latency since the SlidingOverlapReader era. Proven by
     // alignment oracle: impulse@24000 peaked at frame 23007 (= 24000−1024+smear).
-    let file_path_raw = crate::spool::spool_dir().join(format!("m0d-mastering-{}.pcm", blob_id));
+    let file_path_raw = crate::blob_store::mastering_path(&blob_id);
     let file_path =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(file_path_raw.clone()));
     let file = std::fs::OpenOptions::new()
@@ -1090,7 +1090,7 @@ fn run_dsp_internal(
     let mut mmap =
         unsafe { memmap2::MmapMut::map_mut(&file).map_err(|e| format!("Mmap failed: {e}"))? };
     // Allocate file-backed mmaps for working storage
-    let scratch_l_path = crate::spool::spool_dir().join(format!("m0d-scratch-l-{}.pcm", blob_id));
+    let scratch_l_path = crate::blob_store::scratch_l_path(&blob_id);
     let _scratch_l_guard =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_l_path.clone()));
     let scratch_l_file = std::fs::OpenOptions::new()
@@ -1109,7 +1109,7 @@ fn run_dsp_internal(
     let scratch_l_view: &mut [f32] =
         unsafe { std::slice::from_raw_parts_mut(scratch_l_mmap.as_mut_ptr() as *mut f32, n_total) };
 
-    let scratch_r_path = crate::spool::spool_dir().join(format!("m0d-scratch-r-{}.pcm", blob_id));
+    let scratch_r_path = crate::blob_store::scratch_r_path(&blob_id);
     let _scratch_r_guard =
         std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(scratch_r_path.clone()));
     let scratch_r_file = std::fs::OpenOptions::new()
@@ -1136,7 +1136,7 @@ fn run_dsp_internal(
     // A4-iii: streaming dump writer replaces the six Vec<f32> allocations
     let needs_spatial = routing_mode.needs_spatial();
     let spatial_raw_path =
-        crate::spool::spool_dir().join(format!("m0d-raw-{}-spatial.pcm", blob_id));
+        crate::blob_store::raw_dump_spatial_path(&blob_id);
     let mut spatial_writer = if needs_spatial {
         Some(
             crate::domain::nodes::render_node::SpatialDumpWriter::create(
@@ -1236,8 +1236,8 @@ fn run_dsp_internal(
     let pre_master_guards = if req.vad_observe_enabled.is_some() {
         scratch_l_mmap.flush().map_err(|e| e.to_string())?;
         scratch_r_mmap.flush().map_err(|e| e.to_string())?;
-        let pre_l = crate::spool::spool_dir().join(format!("m0d-premaster-l-{}.pcm", blob_id));
-        let pre_r = crate::spool::spool_dir().join(format!("m0d-premaster-r-{}.pcm", blob_id));
+        let pre_l = crate::blob_store::premaster_l_path(&blob_id);
+        let pre_r = crate::blob_store::premaster_r_path(&blob_id);
         std::fs::copy(&scratch_l_path, &pre_l).map_err(|e| e.to_string())?;
         std::fs::copy(&scratch_r_path, &pre_r).map_err(|e| e.to_string())?;
         // DIAGNOSTIC MODE (snapshot, όχι alias): Τα scratch γίνονται in-place post-master από τον dsp_node.
