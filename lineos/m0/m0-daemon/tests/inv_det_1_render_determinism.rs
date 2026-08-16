@@ -35,17 +35,16 @@ fn get_sha256(path: &Path) -> String {
 }
 
 #[test]
-#[ignore]
+#[ignore = "full render ~2min — run explicitly on any audio-touching wire"]
 fn inv_det_1_render_determinism() {
-    let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
+    let input_path = Path::new("../../m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav");
     if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
+        panic!("INV-DET-1 fixture missing — the gate must not pass vacuously");
     }
 
     let req = MasterRequest {
         audio_path: input_path.to_str().unwrap().to_string(),
-        preset_id: "Transparent".to_string(),
+        preset_id: "podcast".to_string(),
         flavour_id: None,
         intent_tone: None,
         intent_dynamics: None,
