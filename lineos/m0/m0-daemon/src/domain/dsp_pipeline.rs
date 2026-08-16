@@ -25,10 +25,46 @@ const GLUE_SEND_AMOUNT: f32 = 0.0;   // ΠΡΟΣ ΤΟ ΠΑΡΟΝ 0
 #[derive(Debug, Default)]
 pub struct RenderArtifacts {
     pub persisted_master: Option<std::path::PathBuf>,
+    /// §Π — ΤΟ ΣΥΜΜΕΤΡΙΚΟ ΤΟΥ persisted_master.
+    ///
+    /// Some(path) = η απόδειξη κάθεται δίπλα στο προϊόν.
+    /// None       = δεν ζητήθηκε (χωρίς project/track) Ή ΑΠΕΤΥΧΕ.
+    ///
+    /// ΓΙΑΤΙ ΠΕΔΙΟ ΚΑΙ ΟΧΙ ΜΟΝΟ LOG: ένα ERROR στο log είναι ορατό
+    /// σε όποιον κοιτάει τα logs. Το §Π απαιτεί το certificate να
+    /// ΔΗΛΩΝΕΤΑΙ μη-persisted — δηλαδή να το βλέπει ΚΑΤΑΝΑΛΩΤΗΣ,
+    /// και να μπορεί test να το assert-άρει.
+    /// Το db/schema.rs καταγράφει τι κοστίζει η σιωπηλή αποτυχία.
+    pub persisted_certificate: Option<std::path::PathBuf>,
     pub pre_master_guards: Option<(
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
     )>,
+}
+
+/// §Π — γράφει το sidecar και ΕΠΙΣΤΡΕΦΕΙ ΤΗΝ ΑΛΗΘΕΙΑ.
+///
+/// Σύγχρονο, στο ίδιο νήμα. Σε αποτυχία: ERROR log ΚΑΙ None, ώστε
+/// το `persisted_certificate` να λέει «δεν υπάρχει απόδειξη».
+/// ΠΟΤΕ σιωπηλή συνέχεια — αυτό ακριβώς είναι το έγκλημα που
+/// καταγράφει το db/schema.rs.
+fn write_certificate_sidecar(
+    masters_dir: &str,
+    project_id: &str,
+    blob: &crate::blob_store::StoredBlobV2,
+    master_flac: &std::path::Path,
+) -> Option<std::path::PathBuf> {
+    match crate::blob_store::write_sidecar(masters_dir, project_id, blob, master_flac) {
+        Ok(path) => Some(path),
+        Err(e) => {
+            tracing::error!(
+                blob_id = %blob.core.id,
+                master = %master_flac.display(),
+                "§Π: certificate sidecar NOT persisted — the master ships without its proof: {e}"
+            );
+            None
+        }
+    }
 }
 
 #[allow(deprecated)]
@@ -792,6 +828,17 @@ fn run_dsp_internal(
             }
         }
 
+        // §Π — ΤΟ ΖΕΥΓΟΣ: προϊόν + απόδειξη, δίπλα-δίπλα.
+        // ΕΔΩ και όχι στο σημείο του FLAC, γιατί ΕΔΩ υπάρχουν ΚΑΙ ΤΑ
+        // ΔΥΟ στο scope (Episode: certificate_node ΠΡΙΝ το persist).
+        let persisted_certificate = if let (Some(master), Some(pid)) =
+            (persisted_master.as_ref(), req.project_id.as_deref())
+        {
+            write_certificate_sidecar(masters_dir, pid, &cert_out.blob, master)
+        } else {
+            None
+        };
+
         return Ok((
             cert_out.blob,
             None,
@@ -800,6 +847,7 @@ fn run_dsp_internal(
             Some(raw_guard),
             RenderArtifacts {
                 persisted_master,
+                persisted_certificate,
                 pre_master_guards: None,
             },
         ));
@@ -856,6 +904,9 @@ fn run_dsp_internal(
                     None,
                     RenderArtifacts {
                         persisted_master: None,
+                        // ΔΕΝ έγινε persist ⇒ δεν υπάρχει προϊόν
+                        // να πιστοποιηθεί. ΡΗΤΟ, όχι Default.
+                        persisted_certificate: None,
                         pre_master_guards: None,
                     },
                 ));
@@ -890,6 +941,9 @@ fn run_dsp_internal(
                 None,
                 RenderArtifacts {
                     persisted_master: None,
+                    // ΔΕΝ έγινε persist ⇒ δεν υπάρχει προϊόν
+                    // να πιστοποιηθεί. ΡΗΤΟ, όχι Default.
+                    persisted_certificate: None,
                     pre_master_guards: None,
                 },
             ));
@@ -1352,6 +1406,16 @@ fn run_dsp_internal(
     )?;
     eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
+    // §Π — ΤΟ ΖΕΥΓΟΣ. Στο Music το FLAC γράφτηκε ΠΡΙΝ (γρ. ~1293) και
+    // το certificate_node μόλις έτρεξε — ΕΔΩ συναντιούνται.
+    let persisted_certificate = if let (Some(master), Some(pid)) =
+        (persisted_master.as_ref(), req.project_id.as_deref())
+    {
+        write_certificate_sidecar(masters_dir, pid, &cert_out.blob, master)
+    } else {
+        None
+    };
+
     Ok((
         cert_out.blob,
         spatial_blob_out,
@@ -1360,6 +1424,7 @@ fn run_dsp_internal(
         None,
         RenderArtifacts {
             persisted_master,
+            persisted_certificate,
             pre_master_guards,
         },
     ))

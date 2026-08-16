@@ -11,6 +11,7 @@ fn make_fake_track(id: &str, dur: u64, path: &str) -> Track {
         track_id: id.to_string(),
         audio_path: path.into(),
         blob_id: "blob_1".into(),
+        blob_path: "/tmp/blob_1.json".into(),
         lufs: -14.0,
         true_peak: -1.0,
         flavour_id: "test".into(),

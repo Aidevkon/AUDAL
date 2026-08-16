@@ -15,6 +15,7 @@ async fn all_declared_fields_round_trip() {
 
     let sql = "CREATE tracks CONTENT {
         blob_id: $blob_id,
+        blob_path: $blob_path,
         audio_path: $audio_path,
         lufs: $lufs,
         true_peak: $true_peak,
@@ -28,6 +29,7 @@ async fn all_declared_fields_round_trip() {
     let _ = db
         .query(sql)
         .bind(("blob_id", "test_blob"))
+        .bind(("blob_path", "/tmp/test_blob.json"))
         .bind(("audio_path", "/tmp/test.wav"))
         .bind(("lufs", -14.0f32))
         .bind(("true_peak", -1.0f32))

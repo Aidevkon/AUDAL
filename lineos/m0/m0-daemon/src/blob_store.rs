@@ -209,6 +209,240 @@ impl Default for BlobStore {
     }
 }
 
+// ── §Π: ΤΟ CERTIFICATE ΕΠΙΒΙΩΝΕΙ RESTART ─────────────────────────
+
+/// Η DB ξέρει ΓΙΑ τα πράγματα· ο δίσκος ΕΧΕΙ τα πράγματα.
+pub const SIDECAR_FORMAT: &str = "creator-os-certificate-sidecar";
+pub const SIDECAR_FORMAT_VERSION: u32 = 1;
+pub const SIDECAR_SCHEMA: &str = "StoredBlobV2";
+
+/// Τα ΤΡΙΑ πεδία που το `#[serde(skip)]` πετάει από τον Core —
+/// και που το ΔΗΜΟΣΙΟ BlobResponse εκθέτει.
+///
+/// ΧΩΡΙΣ ΑΥΤΑ: ένα certificate που φορτώνεται από δίσκο θα ανέφερε
+/// sample_rate 0 · channels 0 · num_frames 0 ΣΑΝ ΜΕΤΡΗΜΕΝΑ. Σιωπηλό
+/// ψέμα μέσα από τη σύμβαση — δόγμα Ι.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SidecarTechnical {
+    pub sample_rate: u32,
+    pub channels: u16,
+    pub num_frames: usize,
+}
+
+/// Ο φάκελος. ΔΕΝ είναι το blob — το ΠΕΡΙΕΧΕΙ.
+///
+/// Το `format_version` είναι η μεμβράνη: το αρχείο στον δίσκο ζει
+/// χρόνια, το struct αλλάζει.
+/// Το `master_sha256` δένει την απόδειξη στο ΠΡΟΪΟΝ της.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CertificateSidecar {
+    pub format: String,
+    pub format_version: u32,
+    pub schema: String,
+    pub written_at: String,
+    pub engine_version: String,
+    pub engine_commit: String,
+    pub master_sha256: String,
+    pub technical: SidecarTechnical,
+    pub payload: StoredBlobV2,
+}
+
+/// ΚΑΘΕ αποτυχία έχει ΟΝΟΜΑ. Καμία δεν καταπίνεται.
+/// Το schema.rs καταγράφει τι κοστίζει το αντίθετο.
+#[derive(Debug)]
+pub enum SidecarError {
+    Io(String),
+    Serde(String),
+    WrongFormat { found: String },
+    UnknownFormatVersion { found: u32, supported: u32 },
+    MasterMissing(std::path::PathBuf),
+    MasterHashMismatch { expected: String, actual: String },
+}
+
+impl std::fmt::Display for SidecarError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "sidecar io: {e}"),
+            Self::Serde(e) => write!(f, "sidecar json: {e}"),
+            Self::WrongFormat { found } => {
+                write!(f, "not a certificate sidecar: format={found:?}")
+            }
+            Self::UnknownFormatVersion { found, supported } => write!(
+                f,
+                "sidecar format_version {found} is not readable by this build \
+                 (supports {supported}) — the proof is NOT guessed at"
+            ),
+            Self::MasterMissing(p) => write!(
+                f,
+                "certificate exists but its master does not: {} — a proof without its product",
+                p.display()
+            ),
+            Self::MasterHashMismatch { expected, actual } => write!(
+                f,
+                "master_sha256 mismatch — certificate says {expected}, disk says {actual}. \
+                 The certificate certifies BYTES; these are not those bytes"
+            ),
+        }
+    }
+}
+
+/// ΤΟ ΜΟΝΟ σημείο που ξέρει πού ζει ένα certificate.
+/// AUTH-READY HOOK #1: αύριο `{user}/` prefix μπαίνει ΕΔΩ, πουθενά αλλού.
+///
+/// ⚠ Η sanitisation ΠΡΕΠΕΙ να ταυτίζεται με αυτήν του FLAC persist
+/// (dsp_pipeline), αλλιώς ένα track_id με slash σπάει το ζεύγος ΣΙΩΠΗΛΑ.
+pub fn blob_storage_path(
+    masters_dir: &str,
+    project_id: &str,
+    blob_id: &str,
+) -> std::path::PathBuf {
+    std::path::Path::new(masters_dir)
+        .join(sanitize_path_component(project_id))
+        .join(format!("{}.json", sanitize_path_component(blob_id)))
+}
+
+/// Ίδιος κανόνας με το FLAC persist. Ένας κανόνας, ένα σημείο.
+pub fn sanitize_path_component(s: &str) -> String {
+    s.replace('/', "").replace('\\', "")
+}
+
+fn sha256_file(path: &std::path::Path) -> Result<String, SidecarError> {
+    use sha2::{Digest, Sha256};
+    let bytes = std::fs::read(path).map_err(|e| SidecarError::Io(e.to_string()))?;
+    let mut h = Sha256::new();
+    h.update(&bytes);
+    Ok(hex::encode(h.finalize()))
+}
+
+/// Γράφει το ζεύγος απόδειξη-δίπλα-στο-προϊόν. ΣΥΓΧΡΟΝΑ, στο ίδιο νήμα.
+///
+/// Atomic: `.tmp` → rename. Ένα μισογραμμένο certificate είναι χειρότερο
+/// από κανένα, γιατί ΜΟΙΑΖΕΙ με certificate.
+///
+/// ΔΕΝ ΕΝΗΜΕΡΩΝΕΙ ΠΟΤΕ υπάρχον sidecar: το certificate πιστοποιεί BYTES.
+/// Re-encode = ΝΕΟ render = νέο ζεύγος. Τα παλιά μένουν έγκυρο ιστορικό.
+pub fn write_sidecar(
+    masters_dir: &str,
+    project_id: &str,
+    blob: &StoredBlobV2,
+    master_flac: &std::path::Path,
+) -> Result<std::path::PathBuf, SidecarError> {
+    if !master_flac.exists() {
+        return Err(SidecarError::MasterMissing(master_flac.to_path_buf()));
+    }
+    let master_sha256 = sha256_file(master_flac)?;
+
+    let envelope = CertificateSidecar {
+        format: SIDECAR_FORMAT.to_string(),
+        format_version: SIDECAR_FORMAT_VERSION,
+        schema: SIDECAR_SCHEMA.to_string(),
+        written_at: chrono::Utc::now().to_rfc3339(),
+        engine_version: env!("CARGO_PKG_VERSION").to_string(),
+        engine_commit: env!("GIT_HASH").to_string(),
+        master_sha256,
+        technical: SidecarTechnical {
+            sample_rate: blob.core.sample_rate,
+            channels: blob.core.channels,
+            num_frames: blob.core.num_frames,
+        },
+        payload: blob.clone(),
+    };
+
+    let json = serde_json::to_vec_pretty(&envelope)
+        .map_err(|e| SidecarError::Serde(e.to_string()))?;
+
+    let final_path = blob_storage_path(masters_dir, project_id, &blob.core.id);
+    if let Some(dir) = final_path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| SidecarError::Io(e.to_string()))?;
+    }
+    let tmp_path = final_path.with_extension("json.tmp");
+    std::fs::write(&tmp_path, &json).map_err(|e| SidecarError::Io(e.to_string()))?;
+    std::fs::rename(&tmp_path, &final_path).map_err(|e| SidecarError::Io(e.to_string()))?;
+
+    Ok(final_path)
+}
+
+/// Διαβάζει και ΕΠΑΛΗΘΕΥΕΙ. Άγνωστη έκδοση ή λάθος hash ΔΕΝ γίνονται
+/// μαντεψιά και ΔΕΝ γίνονται σιωπηλό 404 — γίνονται ονομασμένο σφάλμα.
+pub fn read_sidecar(path: &std::path::Path) -> Result<StoredBlobV2, SidecarError> {
+    let bytes = std::fs::read(path).map_err(|e| SidecarError::Io(e.to_string()))?;
+    let envelope: CertificateSidecar =
+        serde_json::from_slice(&bytes).map_err(|e| SidecarError::Serde(e.to_string()))?;
+
+    if envelope.format != SIDECAR_FORMAT {
+        return Err(SidecarError::WrongFormat {
+            found: envelope.format,
+        });
+    }
+    if envelope.format_version != SIDECAR_FORMAT_VERSION {
+        return Err(SidecarError::UnknownFormatVersion {
+            found: envelope.format_version,
+            supported: SIDECAR_FORMAT_VERSION,
+        });
+    }
+
+    // Η απόδειξη δένεται στο προϊόν της. Το .flac είναι ΟΜΩΝΥΜΟ,
+    // δίπλα-δίπλα — blob_id ΕΙΝΑΙ το track_id (dsp_pipeline).
+    let master_flac = path.with_extension("flac");
+    if !master_flac.exists() {
+        return Err(SidecarError::MasterMissing(master_flac));
+    }
+    let actual = sha256_file(&master_flac)?;
+    if actual != envelope.master_sha256 {
+        return Err(SidecarError::MasterHashMismatch {
+            expected: envelope.master_sha256,
+            actual,
+        });
+    }
+
+    // Τα τρία τεχνικά ΞΑΝΑΓΕΜΙΖΟΥΝ πριν το blob γίνει ορατό, ώστε το
+    // BlobResponse να βγαίνει ΤΑΥΤΟΣΗΜΟ με το RAM.
+    let mut blob = envelope.payload;
+    blob.core.sample_rate = envelope.technical.sample_rate;
+    blob.core.channels = envelope.technical.channels;
+    blob.core.num_frames = envelope.technical.num_frames;
+    Ok(blob)
+}
+
+/// Ο δίσκος είναι το κοινό μονοπάτι. Το `blob_id` ΔΕΝ κουβαλάει
+/// `project_id` (είναι σκέτο `track_id`), άρα parse-and-construct είναι
+/// αδύνατο — σαρώνουμε τα projects.
+///
+/// ⚠ Ok(None) ΣΗΜΑΙΝΕΙ ΑΠΟΥΣΙΑ. Err ΣΗΜΑΙΝΕΙ ΑΔΥΝΑΜΙΑ ΝΑ ΚΟΙΤΑΞΟΥΜΕ.
+/// Τα δύο ΔΕΝ είναι το ίδιο: ένα read_dir που αποτυγχάνει δεν
+/// επιτρέπεται να γίνει 404 «δεν υπάρχει».
+pub fn find_sidecar(
+    masters_root: &str,
+    blob_id: &str,
+) -> Result<Option<std::path::PathBuf>, SidecarError> {
+    let safe = sanitize_path_component(blob_id);
+    let wanted = format!("{safe}.json");
+
+    let entries = match std::fs::read_dir(masters_root) {
+        Ok(e) => e,
+        // Ο κατάλογος δεν υπάρχει ακόμα = κανένα certificate γράφτηκε ποτέ.
+        // ΑΥΤΟ είναι θεμιτή απουσία.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(SidecarError::Io(e.to_string())),
+    };
+
+    for entry in entries {
+        let entry = entry.map_err(|e| SidecarError::Io(e.to_string()))?;
+        if !entry
+            .file_type()
+            .map_err(|e| SidecarError::Io(e.to_string()))?
+            .is_dir()
+        {
+            continue;
+        }
+        let candidate = entry.path().join(&wanted);
+        if candidate.is_file() {
+            return Ok(Some(candidate));
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

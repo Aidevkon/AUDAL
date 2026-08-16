@@ -17,17 +17,108 @@ use serde::{Serialize, Serializer};
 
 /// GET /blob/:id — return Golden Blob metrics as JSON.
 /// Audio bytes are NOT returned — Cockpit receives metrics only.
+///
+/// §Π — Η ΑΛΥΣΙΔΑ, ΚΑΙ ΓΙΑΤΙ ΜΕ ΑΥΤΗ ΤΗ ΣΕΙΡΑ:
+/// ```text
+///   RAM hit                              το φθηνό μονοπάτι
+///     ↓ miss
+///   δίσκος  <masters>/*/<blob_id>.json   ΤΟ ΚΟΙΝΟ μονοπάτι
+///     ↓ Ok(None)
+///   DB      blob_path                    ΤΕΛΕΥΤΑΙΟ καταφύγιο
+///     ↓ miss
+///   404
+/// ```
+/// Ο δίσκος ΠΡΙΝ τη DB: το DB write ζει σε fire-and-forget
+/// `tokio::spawn` (master.rs) — αν αποτύχει σιωπηλά, ένα certificate
+/// που ΥΠΑΡΧΕΙ στον δίσκο δεν επιτρέπεται να γίνει απρόσιτο.
+///
+/// ⚠ ΚΑΘΕ Err ΣΤΑΜΑΤΑΕΙ ΤΗΝ ΑΛΥΣΙΔΑ ΟΡΑΤΑ — 500 + ERROR log με τον
+/// ονομασμένο λόγο. ΠΟΤΕ fallthrough στο επόμενο σκαλί, ΠΟΤΕ 404:
+/// «δεν μπόρεσα να κοιτάξω» ΔΕΝ είναι «δεν υπάρχει».
 pub async fn get_blob(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<BlobResponse>, StatusCode> {
-    state
-        .blob_store
-        .get(&id)
-        .map(|blob| {
-            Json(blob.into())
-        })
-        .ok_or(StatusCode::NOT_FOUND)
+    // 1. RAM
+    if let Some(blob) = state.blob_store.get(&id) {
+        return Ok(Json(blob.into()));
+    }
+
+    let masters_root = state.config.masters_path.clone();
+
+    // 2. ΔΙΣΚΟΣ
+    match crate::blob_store::find_sidecar(&masters_root, &id) {
+        Err(e) => {
+            tracing::error!(blob_id = %id, "§Π: cannot search for certificate: {e}");
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Ok(Some(path)) => return load_and_cache(&state, &id, &path),
+        Ok(None) => {}
+    }
+
+    // 3. DB — ΤΕΛΕΥΤΑΙΟ καταφύγιο
+    let sql = "SELECT blob_path FROM tracks WHERE blob_id = $blob_id LIMIT 1";
+    let db_path: Option<String> = match state.db.query(sql).bind(("blob_id", id.clone())).await {
+        Ok(mut r) => match r.take::<Option<String>>((0, "blob_path")) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!(blob_id = %id, "§Π: db blob_path unreadable: {e}");
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        },
+        Err(e) => {
+            tracing::error!(blob_id = %id, "§Π: db lookup failed: {e}");
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    match db_path {
+        Some(p) => load_and_cache(&state, &id, std::path::Path::new(&p)),
+        // 4. Πουθενά. ΑΥΤΟ είναι το θεμιτό 404.
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// Διαβάζει, επαληθεύει ΤΑΥΤΟΤΗΤΑ, και ΓΕΜΙΖΕΙ ΤΟ RAM ώστε το επόμενο
+/// hit να είναι φθηνό. Κάθε σφάλμα = 500 με ονομασμένο λόγο.
+fn load_and_cache(
+    state: &AppState,
+    id: &str,
+    path: &std::path::Path,
+) -> Result<Json<BlobResponse>, StatusCode> {
+    match crate::blob_store::read_sidecar(path) {
+        Ok(blob) => {
+            // Στο convention μονοπάτι σχεδόν αδύνατο — το ΟΝΟΜΑ είναι
+            // το id. Στο DB μονοπάτι είναι το ΑΝΑΜΕΝΟΜΕΝΟ failure mode
+            // ενός στάλε row. Και το insert κλειδώνει με blob.core.id:
+            // χωρίς αυτόν τον έλεγχο, η RAM δηλητηριάζεται με blob
+            // κάτω από λάθος κλειδί.
+            if blob.core.id != id {
+                tracing::error!(
+                    requested = %id,
+                    found = %blob.core.id,
+                    path = %path.display(),
+                    "§Π: certificate identity mismatch — the file answers a different question"
+                );
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+            state.blob_store.insert(blob.clone());
+            tracing::info!(
+                blob_id = %id,
+                path = %path.display(),
+                "§Π: certificate restored from disk"
+            );
+            Ok(Json(blob.into()))
+        }
+        Err(e) => {
+            tracing::error!(
+                blob_id = %id,
+                path = %path.display(),
+                "§Π: certificate unreadable: {e}"
+            );
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// Το seed σειριοποιείται ως string, όχι αριθμός.

@@ -32,6 +32,13 @@ pub struct Track {
     pub track_id: String,
     pub audio_path: String,
     pub blob_id: String,
+    /// §Π AUTH-READY HOOK #2 — ο ΔΕΙΚΤΗΣ καταλόγου→δίσκου.
+    /// Η DB ξέρει ΓΙΑ τα πράγματα· ο δίσκος ΕΧΕΙ τα πράγματα.
+    /// ΤΕΛΕΥΤΑΙΟ καταφύγιο του get_blob, ΟΧΙ πρώτο: το write εδώ
+    /// ζει σε fire-and-forget spawn, και ένα certificate που
+    /// υπάρχει στον δίσκο δεν επιτρέπεται να γίνει απρόσιτο
+    /// επειδή απέτυχε μια εγγραφή που κανείς δεν περίμενε.
+    pub blob_path: String,
     pub lufs: f32,
     pub true_peak: f32,
     pub flavour_id: String,
@@ -143,6 +150,7 @@ pub async fn migrate(db: &super::DbConn) -> Result<(), surrealdb::Error> {
         DEFINE FIELD track_id    ON tracks TYPE string;
         DEFINE FIELD audio_path  ON tracks TYPE string;
         DEFINE FIELD blob_id     ON tracks TYPE string;
+        DEFINE FIELD blob_path   ON tracks TYPE string;
         DEFINE FIELD lufs        ON tracks TYPE float;
         DEFINE FIELD true_peak   ON tracks TYPE float;
         DEFINE FIELD flavour_id  ON tracks TYPE string;

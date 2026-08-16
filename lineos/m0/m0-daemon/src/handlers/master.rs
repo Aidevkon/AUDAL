@@ -197,6 +197,22 @@ pub async fn trigger_mastering(
                     let track_tp = output.true_peak;
                     let track_blob = output.blob_id.clone();
                     let track_path = persisted_path.to_string_lossy().to_string();
+                    // §Π — ο δείκτης προς την απόδειξη. Το ζεύγος είναι
+                    // ΟΜΩΝΥΜΟ (blob_id ΕΙΝΑΙ το track_id), άρα το sidecar
+                    // είναι ο αδελφός του .flac με άλλη κατάληξη.
+                    //
+                    // ⚠ ΓΡΑΦΕΤΑΙ ΜΟΝΟ ΑΝ ΥΠΑΡΧΕΙ. Η αλήθεια ζει στο
+                    // RenderArtifacts.persisted_certificate, που ΔΕΝ
+                    // περνάει μέχρι εδώ (operator/executor structs, εκτός
+                    // εύρους §Π v1). Μέχρι να περάσει, ο έλεγχος ύπαρξης
+                    // είναι το τίμιο υποκατάστατο: κενό string σημαίνει
+                    // «η DB δεν ξέρει», όχι «υπάρχει εκεί».
+                    let cert_sidecar = persisted_path.with_extension("json");
+                    let track_blob_path = if cert_sidecar.exists() {
+                        cert_sidecar.to_string_lossy().to_string()
+                    } else {
+                        String::new()
+                    };
                     let duration_ms = (output.num_frames as u64 * 1000) / output.sample_rate as u64;
                     let db_clone = state_bg.db.clone();
                     let created_at = chrono::Utc::now().to_rfc3339();
@@ -204,6 +220,7 @@ pub async fn trigger_mastering(
                     tokio::spawn(async move {
                         let sql = "CREATE tracks CONTENT {
                             blob_id: $blob_id,
+                            blob_path: $blob_path,
                             audio_path: $audio_path,
                             lufs: $lufs,
                             true_peak: $true_peak,
@@ -226,6 +243,7 @@ pub async fn trigger_mastering(
                         match db_clone
                             .query(sql)
                             .bind(("blob_id", track_blob))
+                            .bind(("blob_path", track_blob_path))
                             .bind(("audio_path", track_path))
                             .bind(("lufs", track_lufs))
                             .bind(("true_peak", track_tp))
