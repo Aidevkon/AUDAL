@@ -63,7 +63,8 @@ pub fn build_intent_and_config(
 
     let intent = MasteringIntent {
         target: LoudnessTarget {
-            target_lufs: -16.0,
+            target_lufs: target_lufs
+                .unwrap_or(preset_target.target_lufs),
             max_true_peak_db: preset_target.max_true_peak_db,
             max_lra_lu: preset_target.max_lra_lu,
             platform: preset_target.platform.clone(),
