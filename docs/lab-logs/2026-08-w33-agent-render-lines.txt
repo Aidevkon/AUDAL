@@ -1,0 +1,147 @@
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-10116.log:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-10126.log:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-10126.log:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1044.log:[W16] original_rms=0.047070 mix_rms=0.167967 gain=0.5000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1044.log:[W16] original_rms=0.047070 mix_rms=0.041328 gain=1.1389 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1166.log:[W16] original_rms=0.047070 mix_rms=0.053985 gain=0.8719 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1166.log:[W16] original_rms=0.047070 mix_rms=0.041328 gain=1.1389 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-11725.log:[DEDUP-GUARD] mean_core_mask_p: 0.5081, DRUM_DEDUP_ALPHA: 0.5
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-11725.log:[DEDUP-GUARD] srr: 1.2424
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-11725.log:[DEDUP-GUARD] corr: 0.9772
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-11725.log:[DEDUP-GUARD] rms(drums): 0.098944
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12169.log:[DEDUP-GUARD] mean_core_mask_p: 0.5081, DRUM_DEDUP_ALPHA: 0.5
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12169.log:[DEDUP-GUARD] srr: 1.2424
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12169.log:[DEDUP-GUARD] corr: 0.9772
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12169.log:[DEDUP-GUARD] rms(drums): 0.098944
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12510.log:[DEDUP-GUARD] mean_core_mask_p: 0.5081, DRUM_DEDUP_ALPHA: 0.5
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12510.log:[DEDUP-GUARD] srr: 1.2424
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12510.log:[DEDUP-GUARD] corr: 0.9772
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12510.log:[DEDUP-GUARD] rms(drums): 0.098944
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12682.log:[DEDUP-GUARD] mean_core_mask_p: 0.5081, DRUM_DEDUP_ALPHA: 0.5
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12682.log:[DEDUP-GUARD] srr: 1.2424
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12682.log:[DEDUP-GUARD] corr: 0.9772
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12682.log:[DEDUP-GUARD] rms(drums): 0.098944
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12971.log:[DEDUP-GUARD] mean_core_mask_p: 0.5081, DRUM_DEDUP_ALPHA: 0.5
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12971.log:[DEDUP-GUARD] srr: 1.2424
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12971.log:[DEDUP-GUARD] corr: 0.9772
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-12971.log:[DEDUP-GUARD] rms(drums): 0.098944
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.200033 mix_rms=0.211875 gain=0.9441 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=-2.1718 ceiling=-1.0000 armed=false
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042711 mix_rms=0.049553 gain=0.8619 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.041908 gain=1.0209 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=1.7915 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.004900 gain=2.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=2.4810 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.041908 gain=1.0209 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=5.5099 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.041908 gain=1.0209 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=2.4810 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=2.4810 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.200033 mix_rms=0.027251 gain=2.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.041908 gain=1.0209 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.000444 gain=2.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=4.2166 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=2.4810 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=-13.3702 ceiling=-1.0000 armed=false
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.034789 gain=1.2298 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042711 mix_rms=0.037266 gain=1.1461 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=8.2838 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=6.0889 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[W16] original_rms=0.042783 mix_rms=0.000444 gain=10.0000 ceiling=10.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13228.log:[ZERO-ARM] projected_tp=0.6091 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-13312.log:[W16] original_rms=0.200033 mix_rms=0.211875 gain=0.9441 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition_zeroarm.log:183:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/g1.log:116:[W16] original_rms=0.031498 mix_rms=0.030129 gain=1.0455 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/fd.log:59:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition_leveldown.log:183:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/g4_a05.log:180:[W16] original_rms=0.113746 mix_rms=0.124806 gain=0.9114 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/meas-0812.log:1977:[W16] original_rms=0.268328 mix_rms=0.227260 gain=1.1807 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/meas-0812.log:3186:[W16] original_rms=0.268328 mix_rms=0.224317 gain=1.1962 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/g4_a0.log:180:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1118:[W16] original_rms=0.070857 mix_rms=0.075802 gain=0.9348 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1193:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1237:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1280:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1364:[W16] original_rms=0.353493 mix_rms=0.359946 gain=0.9821 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1463:[W16] original_rms=0.707106 mix_rms=0.708569 gain=0.9979 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1507:[W16] original_rms=0.026471 mix_rms=0.034990 gain=0.7565 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1550:[W16] original_rms=0.324313 mix_rms=0.335746 gain=0.9659 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1593:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1636:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1679:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1722:[W16] original_rms=0.248744 mix_rms=0.258879 gain=0.9608 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1765:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1808:[W16] original_rms=0.324313 mix_rms=0.335746 gain=0.9659 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1851:[W16] original_rms=0.324284 mix_rms=0.338538 gain=0.9579 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/tests.log:1935:[W16] original_rms=0.203106 mix_rms=0.226599 gain=0.8963 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_GoldenAge_V3.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_GoldenAge_V1.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_Opus_V3.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_PinkMoon_V3.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_PinkMoon_V2.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_GoldenAge_V2.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_Opus_V1.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_Opus_V2.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14015.log:/tmp/audition/logs_PinkMoon_V1.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition_zeroarm.log:183:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/g1.log:116:[W16] original_rms=0.031498 mix_rms=0.030129 gain=1.0455 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/fd.log:59:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition_leveldown.log:183:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/g4_a05.log:180:[W16] original_rms=0.113746 mix_rms=0.124806 gain=0.9114 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/meas-0812.log:1977:[W16] original_rms=0.268328 mix_rms=0.227260 gain=1.1807 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/meas-0812.log:3186:[W16] original_rms=0.268328 mix_rms=0.224317 gain=1.1962 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/g4_a0.log:180:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1118:[W16] original_rms=0.070857 mix_rms=0.075802 gain=0.9348 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1193:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1237:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1280:[W16] original_rms=0.282818 mix_rms=0.286856 gain=0.9859 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1364:[W16] original_rms=0.353493 mix_rms=0.359946 gain=0.9821 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1463:[W16] original_rms=0.707106 mix_rms=0.708569 gain=0.9979 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1507:[W16] original_rms=0.026471 mix_rms=0.034990 gain=0.7565 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1550:[W16] original_rms=0.324313 mix_rms=0.335746 gain=0.9659 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1593:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1636:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1679:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1722:[W16] original_rms=0.248744 mix_rms=0.258879 gain=0.9608 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1765:[W16] original_rms=0.324307 mix_rms=0.346321 gain=0.9364 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1808:[W16] original_rms=0.324313 mix_rms=0.335746 gain=0.9659 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1851:[W16] original_rms=0.324284 mix_rms=0.338538 gain=0.9579 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/tests.log:1935:[W16] original_rms=0.203106 mix_rms=0.226599 gain=0.8963 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_GoldenAge_V3.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_GoldenAge_V1.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_Opus_V3.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_PinkMoon_V3.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_PinkMoon_V2.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_GoldenAge_V2.txt:140:[W16] original_rms=0.113746 mix_rms=0.132469 gain=0.8587 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_Opus_V1.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_Opus_V2.txt:140:[W16] original_rms=0.083781 mix_rms=0.091501 gain=0.9156 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14021.log:/tmp/audition/logs_PinkMoon_V1.txt:140:[W16] original_rms=0.106829 mix_rms=0.115054 gain=0.9285 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1452.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1452.log:[W16] original_rms=0.047070 mix_rms=0.032641 gain=1.4420 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1452.log:[W16] original_rms=0.047070 mix_rms=0.037621 gain=1.2512 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1452.log:[W16] original_rms=0.047070 mix_rms=0.049031 gain=0.9600 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14562.log:/tmp/w16on.log:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000 bypass=false
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-14562.log:/tmp/w16off.log:[W16] original_rms=0.141456 mix_rms=0.153141 gain=1.0000 ceiling=2.0000 bypass=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1467.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1467.log:[W16] original_rms=0.047070 mix_rms=0.049031 gain=0.9600 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1484.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1484.log:[W16] original_rms=0.047070 mix_rms=0.032641 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1484.log:[W16] original_rms=0.047070 mix_rms=0.037621 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1484.log:[W16] original_rms=0.047070 mix_rms=0.049031 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-15209.log:[W16] original_rms=0.141456 mix_rms=0.153141 gain=0.9237 ceiling=2.0000 bypass=false
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-15209.log:[ZERO-ARM] projected_tp=0.2569 ceiling=-1.0000 armed=true
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1631.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1631.log:[W16] original_rms=0.047070 mix_rms=0.032641 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1631.log:[W16] original_rms=0.047070 mix_rms=0.037621 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-1631.log:[W16] original_rms=0.047070 mix_rms=0.049031 gain=1.0000 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5526.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5526.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5526.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5526.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5553.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5553.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5553.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-5553.log:[W16] original_rms=0.047070 mix_rms=0.030465 gain=1.5451 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-7176.log:[W16] original_rms=0.268328 mix_rms=0.227260 gain=1.1807 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-7373.log:[W16] original_rms=0.268328 mix_rms=0.224317 gain=1.1962 ceiling=2.0000
+/home/aidevcon/.gemini/antigravity/brain/44b581b6-47a3-468f-8737-2fdb9acd821f/.system_generated/tasks/task-9768.log:[W16] original_rms=0.096696 mix_rms=0.121535 gain=0.7956 ceiling=2.0000
