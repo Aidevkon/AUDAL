@@ -3,19 +3,15 @@
 /// h8.flac = 1,287,664,344 bytes from 11,520,000 samples (37× raw 24-bit PCM).
 /// Same signal re-encoded by libsndfile → 10,449,041 bytes (normal).
 /// This test reproduces the issue and narrows the trigger.
-use flacenc::bitsink::ByteSink;
-use flacenc::component::BitRepr;
-use flacenc::config::Encoder as FlacencConfig;
-use flacenc::source::MemSource;
+use sp314_dsp::io::flac_encode::flac_encode;
 
 fn encode_and_measure(samples: &[i32], channels: usize, sample_rate: usize) -> usize {
-    let source = MemSource::from_samples(samples, channels, 24, sample_rate);
-    let config = FlacencConfig::default();
-    let stream = flacenc::encode_with_fixed_block_size(&config, source, 4096)
-        .expect("encode failed");
-    let mut sink = ByteSink::new();
-    stream.write(&mut sink).expect("write failed");
-    sink.into_inner().len()
+    let mut f32_samples = Vec::with_capacity(samples.len());
+    for &s in samples {
+        f32_samples.push(s as f32 / 8388607.0);
+    }
+    let bytes = flac_encode(&f32_samples, sample_rate as u32, channels as u32).expect("encode failed");
+    bytes.len()
 }
 
 fn read_raw_i32(path: &str) -> Vec<i32> {

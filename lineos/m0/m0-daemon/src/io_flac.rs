@@ -1,7 +1,4 @@
-use flacenc::bitsink::ByteSink;
-use flacenc::component::BitRepr;
-use flacenc::config::Encoder as FlacencConfig;
-use flacenc::source::MemSource;
+use sp314_dsp::io::flac_encode::flac_encode;
 use std::path::Path;
 
 /// Encode interleaved f32 (any channel count) to 24-bit FLAC.
@@ -16,31 +13,8 @@ pub fn encode_f32_flac_24(
     channels: u16,
     path: &Path,
 ) -> Result<(), String> {
-    if interleaved.is_empty() {
-        return Err("Cannot encode empty FLAC".to_string());
-    }
-
-    let mut quantized = Vec::with_capacity(interleaved.len());
-    let max_val = 8388607.0_f32; // 24-bit max (2^23 - 1)
-
-    for &s in interleaved {
-        let s_clamped = if s.is_nan() { 0.0 } else { s.clamp(-1.0, 1.0) };
-        let q = (s_clamped * max_val).round_ties_even() as i32;
-        quantized.push(q);
-    }
-
-    let block_size = 4096;
-    let source = MemSource::from_samples(&quantized, channels as usize, 24, sample_rate as usize);
-    let config = FlacencConfig::default();
-
-    let stream = flacenc::encode_with_fixed_block_size(&config, source, block_size)
-        .map_err(|e| format!("FLAC encode error: {:?}", e))?;
-
-    let mut sink = ByteSink::new();
-    stream
-        .write(&mut sink)
-        .map_err(|e| format!("FLAC write error: {:?}", e))?;
-    let bytes = sink.into_inner();
+    let bytes = flac_encode(interleaved, sample_rate, channels as u32)
+        .map_err(|e| format!("FLAC encode error: {}", e))?;
 
     // W17: το flacenc 0.3.1 παράγει 123× bloat σε
     // συγκεκριμένα σήματα. Trigger στα ~80s και εξαρτάται
@@ -67,9 +41,8 @@ pub fn encode_f32_flac_24(
 
     // W17 DIAGNOSTIC — TEMPORARY
     eprintln!(
-        "[W17-FLAC] input_samples={} quantized_samples={} output_bytes={} ratio={:.4} path={}",
+        "[W17-FLAC] input_samples={} output_bytes={} ratio={:.4} path={}",
         interleaved.len(),
-        quantized.len(),
         bytes.len(),
         bytes.len() as f64 / (interleaved.len() as f64 * 3.0),  // vs 24-bit PCM
         path.display()

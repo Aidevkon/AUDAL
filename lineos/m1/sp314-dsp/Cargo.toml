@@ -14,7 +14,7 @@ sha2 = { version = "0.10", optional = true }
 hex  = { version = "0.4", optional = true }
 ringbuf = { version = "0.3", optional = true }
 hound = { version = "3.5", optional = true }
-flacenc = { version = "0.3", optional = true }
+flac-codec = { version = "1.3", default-features = false, optional = true }
 lineos-types = { path = "../lineos-types" }
 lineos-corpus = { path = "../lineos-corpus" }
 xaak = { path = "../xaak" }
@@ -40,7 +40,7 @@ symphonia = { version = "0.5", features = ["all"] }
 
 [features]
 default = []
-cli = ["cpal", "hound", "flacenc", "ringbuf", "sha2", "hex"]
+cli = ["cpal", "hound", "flac-codec", "ringbuf", "sha2", "hex"]
 
 [[bin]]
 name = "sp314_stems"

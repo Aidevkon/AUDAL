@@ -1,5 +1,6 @@
 // src/io/mod.rs
 
+pub mod flac_encode;
 pub mod flac_writer;
 pub mod wav_reader;
 pub mod wav_writer;

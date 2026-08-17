@@ -1,17 +1,13 @@
 /// W17 diagnostic: narrow down the exact second where flacenc bloat starts
-use flacenc::bitsink::ByteSink;
-use flacenc::component::BitRepr;
-use flacenc::config::Encoder as FlacencConfig;
-use flacenc::source::MemSource;
+use sp314_dsp::io::flac_encode::flac_encode;
 
 fn encode_measure(samples: &[i32], channels: usize) -> usize {
-    let source = MemSource::from_samples(samples, channels, 24, 48000);
-    let config = FlacencConfig::default();
-    let stream = flacenc::encode_with_fixed_block_size(&config, source, 4096)
-        .expect("encode failed");
-    let mut sink = ByteSink::new();
-    stream.write(&mut sink).expect("write failed");
-    sink.into_inner().len()
+    let mut f32_samples = Vec::with_capacity(samples.len());
+    for &s in samples {
+        f32_samples.push(s as f32 / 8388607.0);
+    }
+    let bytes = flac_encode(&f32_samples, 48000, channels as u32).expect("encode failed");
+    bytes.len()
 }
 
 fn read_raw_i32(path: &str) -> Vec<i32> {

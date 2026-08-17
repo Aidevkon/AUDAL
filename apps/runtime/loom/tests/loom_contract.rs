@@ -198,26 +198,12 @@ fn engine_switches_section_glitch_free() {
 fn generate_test_flac_bytes(num_frames: usize, sample_rate: u32) -> Vec<u8> {
     let mut interleaved = Vec::with_capacity(num_frames * 2);
     for i in 0..num_frames {
-        let sample = ((i as f32 * 440.0 * 2.0 * std::f32::consts::PI / sample_rate as f32).sin()
-            * 0.5
-            * 8388607.0) as i32;
+        let sample = (i as f32 * 440.0 * 2.0 * std::f32::consts::PI / sample_rate as f32).sin() * 0.5;
         interleaved.push(sample); // left
         interleaved.push(sample); // right
     }
 
-    let source =
-        flacenc::source::MemSource::from_samples(&interleaved, 2, 24, sample_rate as usize);
-    let flac_stream = flacenc::encode_with_fixed_block_size(
-        &flacenc::config::Encoder::default(),
-        source,
-        flacenc::config::Encoder::default().block_sizes[0],
-    )
-    .unwrap();
-
-    let mut sink = flacenc::bitsink::ByteSink::new();
-    use flacenc::component::BitRepr;
-    flac_stream.write(&mut sink).unwrap();
-    sink.into_inner()
+    sp314_dsp::io::flac_encode::flac_encode(&interleaved, sample_rate, 2).unwrap()
 }
 
 #[test]

@@ -1,11 +1,12 @@
 // src/io/flac_writer.rs
 // f32 samples → FLAC encode.
-// Uses flacenc crate — Sony's pure Rust FLAC encoder (Apache-2.0).
+// Uses unified flac_encode home.
 // No DSP logic here — pure I/O.
 
-use flacenc::component::BitRepr;
+use crate::io::flac_encode::flac_encode;
+use std::io::Write;
 
-/// FLAC writer using `flacenc`.
+/// FLAC writer.
 /// Converts f32 audio to 24-bit lossless FLAC.
 pub struct FlacWriter;
 
@@ -26,38 +27,14 @@ impl FlacWriter {
 
         let mut interleaved = Vec::with_capacity(left.len() * 2);
         for i in 0..left.len() {
-            let l_i32 = (left[i] * 8388607.0_f32).clamp(-8388608.0, 8388607.0) as i32;
-            let r_i32 = (right[i] * 8388607.0_f32).clamp(-8388608.0, 8388607.0) as i32;
-            interleaved.push(l_i32);
-            interleaved.push(r_i32);
+            interleaved.push(left[i]);
+            interleaved.push(right[i]);
         }
 
-        let channels = 2;
-        let bits_per_sample = 24;
-
-        let source = flacenc::source::MemSource::from_samples(
-            &interleaved,
-            channels,
-            bits_per_sample,
-            sample_rate as usize,
-        );
-
-        let flac_stream = flacenc::encode_with_fixed_block_size(
-            &flacenc::config::Encoder::default(),
-            source,
-            flacenc::config::Encoder::default().block_sizes[0],
-        )
-        .map_err(|e| format!("FLAC encoding error: {:?}", e))?;
+        let flac_bytes = flac_encode(&interleaved, sample_rate, 2)?;
 
         let mut file = std::fs::File::create(path)?;
-
-        let mut sink = flacenc::bitsink::ByteSink::new();
-        flac_stream
-            .write(&mut sink)
-            .map_err(|e| format!("FLAC write error: {:?}", e))?;
-
-        use std::io::Write;
-        file.write_all(sink.as_slice())?;
+        file.write_all(&flac_bytes)?;
 
         Ok(())
     }
