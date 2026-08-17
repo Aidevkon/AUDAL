@@ -137,6 +137,8 @@ mod tests {
             transient_density: 0.5,
             global_phase_correlation: 1.0,
             dynamic_range_db: 10.0,
+            cv_ioi_sequence: Vec::new(),
+            cepstral_flux_sequence: Vec::new(),
         }
     }
 

@@ -48,6 +48,8 @@ pub struct TrunkMetrics {
     /// (run_trunk_metrics_with_acx). None means "not measured", never
     /// "passed" — consumers must not treat absence as compliance.
     pub acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
+    pub cv_ioi_sequence: Vec<f32>,
+    pub cepstral_flux_sequence: Vec<f32>,
 }
 
 pub struct TrunkReport {
@@ -339,6 +341,15 @@ fn run_trunk_internal(
     let hop_samples = (HOP_SECS * SAMPLE_RATE as f32) as usize; // 48_000
     let mut scout = SegmentScout::new();
     let mut decisions = Vec::new();
+    let dump_bytes = std::fs::metadata(dump_path).map(|m| m.len()).unwrap_or(0);
+    let frames_hint = dump_bytes / 8; // 2ch f32 = 8 bytes/frame
+    let expected_windows = if frames_hint > win_samples as u64 {
+        ((frames_hint - win_samples as u64) / hop_samples as u64 + 1) as usize
+    } else {
+        0
+    };
+    let mut cv_ioi_sequence = Vec::with_capacity(expected_windows);
+    let mut cepstral_flux_sequence = Vec::with_capacity(expected_windows);
 
     // History buffers — hold enough for one full window + chunk slack.
     // Periodically drained so memory stays bounded at ~win_samples + CHUNK_FRAMES.
@@ -498,6 +509,8 @@ fn run_trunk_internal(
                     cepstral_flux,
                     SAMPLE_RATE,
                 );
+                cv_ioi_sequence.push(meas.cv_ioi);
+                cepstral_flux_sequence.push(meas.cepstral_flux);
                 decisions.push((start_sec, compute_scout_decision(&meas)));
                 next_window_start += hop_samples;
             }
@@ -582,6 +595,8 @@ fn run_trunk_internal(
             transient_density,
             global_phase_correlation,
             dynamic_range_db: dyn_range,
+            cv_ioi_sequence,
+            cepstral_flux_sequence,
         },
     })
 }

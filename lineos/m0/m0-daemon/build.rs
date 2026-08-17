@@ -27,4 +27,10 @@ fn main() {
 
     println!("cargo:rustc-env=GIT_HASH={hash}");
     println!("cargo:rerun-if-changed=../../../.git/HEAD");
+
+    if let Ok(head_content) = std::fs::read_to_string("../../../.git/HEAD") {
+        if let Some(ref_path) = head_content.trim().strip_prefix("ref: ") {
+            println!("cargo:rerun-if-changed=../../../.git/{ref_path}");
+        }
+    }
 }
