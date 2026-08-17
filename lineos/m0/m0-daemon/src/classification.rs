@@ -135,6 +135,13 @@ mod tests {
             noise_floor_dbfs: Some(-60.0),
             spectral_profile_db: [sub_db, -20.0, -18.0, -15.0, mid_db, -18.0, -22.0, -30.0],
             transient_density: 0.5,
+            // The following fields are not read by guess_content_type.
+            // They are populated here with 0.0 placeholders to satisfy TrunkMetrics.
+            // In the real pipeline, they are measured dynamically from the audio.
+            zcr_mean: 0.0,
+            zcr_std: 0.0,
+            bpm_estimate: 0.0,
+            bpm_confidence: 0.0,
             global_phase_correlation: 1.0,
             dynamic_range_db: 10.0,
             cv_ioi_sequence: Vec::new(),

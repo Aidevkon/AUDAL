@@ -41,6 +41,15 @@ pub struct TrunkMetrics {
     pub noise_floor_dbfs: Option<f32>,
     pub spectral_profile_db: [f32; 8],
     pub transient_density: f32,
+    /// Zero-crossing rate mean across 1024-sample frames (hop 512) on the 48kHz mono downmix.
+    /// ZCR is normalized by (frame_size - 1), i.e., counts / 1023.0.
+    pub zcr_mean: f32,
+    /// Zero-crossing rate standard deviation across the same 1024-sample frames.
+    pub zcr_std: f32,
+    /// BPM estimate derived from 100Hz onset envelope autocorrelation (40-200 BPM range).
+    pub bpm_estimate: f32,
+    /// Confidence of the BPM estimate (0.0 to 1.0), derived from normalized autocorrelation peak.
+    pub bpm_confidence: f32,
     pub global_phase_correlation: f32,
     /// 95th-5th percentile RMS block spread, 50ms blocks (the real broadcast DR metric)
     pub dynamic_range_db: f32,
@@ -171,6 +180,9 @@ struct StreamingTransientDetector {
     was_above: bool,
     count: u32,
     total_samples: usize,
+    pub onset_envelope: Vec<f32>,
+    samples_since_env: usize,
+    current_env_val: f32,
 }
 
 impl StreamingTransientDetector {
@@ -194,6 +206,9 @@ impl StreamingTransientDetector {
             was_above: false,
             count: 0,
             total_samples: 0,
+            onset_envelope: Vec::new(),
+            samples_since_env: 0,
+            current_env_val: 0.0,
         }
     }
 
@@ -238,6 +253,19 @@ impl StreamingTransientDetector {
         let slow_ma = self.slow_sum / TD_SLOW_WIN as f32;
 
         let is_above = fast_ma > slow_ma * self.threshold_linear;
+        
+        let diff = fast_ma - slow_ma * self.threshold_linear;
+        if diff > self.current_env_val {
+            self.current_env_val = diff;
+        }
+        
+        self.samples_since_env += 1;
+        if self.samples_since_env >= TD_FAST_WIN {
+            self.onset_envelope.push(self.current_env_val.max(0.0));
+            self.current_env_val = 0.0;
+            self.samples_since_env = 0;
+        }
+
         if is_above && !self.was_above {
             self.count += 1;
         }
@@ -254,6 +282,58 @@ impl StreamingTransientDetector {
         }
         let duration = active_samples as f32 / SAMPLE_RATE as f32;
         self.count as f32 / duration
+    }
+}
+
+/// Computes ZCR on a mono stream using 1024-sample frames and 512-sample hop.
+/// Input must be the 48kHz mono downmix (L+R)/2.
+/// ZCR is defined as the number of sign changes divided by (frame_size - 1).
+struct StreamingZcrMeter {
+    frame_buf: Vec<f32>,
+    zcr_sum: f64,
+    zcr_sq_sum: f64,
+    count: usize,
+}
+
+impl StreamingZcrMeter {
+    fn new() -> Self {
+        Self {
+            frame_buf: Vec::with_capacity(1024),
+            zcr_sum: 0.0,
+            zcr_sq_sum: 0.0,
+            count: 0,
+        }
+    }
+
+    fn feed_chunk(&mut self, chunk: &[f32]) {
+        for &sample in chunk {
+            self.frame_buf.push(sample);
+            if self.frame_buf.len() == 1024 {
+                let mut crossings = 0;
+                for i in 1..1024 {
+                    if (self.frame_buf[i] >= 0.0 && self.frame_buf[i - 1] < 0.0)
+                        || (self.frame_buf[i] < 0.0 && self.frame_buf[i - 1] >= 0.0)
+                    {
+                        crossings += 1;
+                    }
+                }
+                let zcr = crossings as f64 / 1023.0;
+                self.zcr_sum += zcr;
+                self.zcr_sq_sum += zcr * zcr;
+                self.count += 1;
+
+                self.frame_buf.drain(0..512); // Hop 512
+            }
+        }
+    }
+
+    fn finish(&self) -> (f32, f32) {
+        if self.count == 0 {
+            return (0.0, 0.0);
+        }
+        let mean = self.zcr_sum / self.count as f64;
+        let var = (self.zcr_sq_sum / self.count as f64 - mean * mean).max(0.0);
+        (mean as f32, var.sqrt() as f32)
     }
 }
 
@@ -324,8 +404,9 @@ fn run_trunk_internal(
         .collect();
     let mut total_frames: usize = 0;
 
-    // === Transient density ===
+    // === Transient density & BPM ===
     let mut transient_det = StreamingTransientDetector::new();
+    let mut zcr_meter = StreamingZcrMeter::new();
 
     // === Phase Correlation ===
     let mut corr_cross: f32 = 0.0;
@@ -436,6 +517,9 @@ fn run_trunk_internal(
         for &s in m.iter() {
             transient_det.feed(f32::abs(s));
         }
+
+        // --- ZCR: feed mono downmix ---
+        zcr_meter.feed_chunk(m);
 
         // --- Noise floor: 1s energy windows ---
         for &s in m.iter() {
@@ -563,8 +647,47 @@ fn run_trunk_internal(
         }
     }
 
-    // === Finish transient density ===
+    // === Finish transient density & BPM ===
     let transient_density = transient_det.finish();
+    
+    let mut bpm_estimate = 0.0;
+    let mut bpm_confidence = 0.0;
+    if !transient_det.onset_envelope.is_empty() {
+        let env = &transient_det.onset_envelope;
+        let mean = env.iter().sum::<f32>() / env.len() as f32;
+        let mut zero_mean_env: Vec<f32> = env.iter().map(|&x| x - mean).collect();
+        
+        let mut r = vec![0.0; 151];
+        let n = zero_mean_env.len();
+        
+        // R[0]
+        for i in 0..n {
+            r[0] += zero_mean_env[i] * zero_mean_env[i];
+        }
+        
+        if r[0] > 1e-10 {
+            let mut peak_lag = 30;
+            let mut peak_val = -1.0;
+            
+            for lag in 30..=150 {
+                let mut sum = 0.0;
+                let end = n.saturating_sub(lag);
+                for i in 0..end {
+                    sum += zero_mean_env[i] * zero_mean_env[i + lag];
+                }
+                r[lag] = sum;
+                if sum > peak_val {
+                    peak_val = sum;
+                    peak_lag = lag;
+                }
+            }
+            
+            bpm_estimate = 6000.0 / peak_lag as f32;
+            bpm_confidence = (peak_val / r[0]).clamp(0.0, 1.0);
+        }
+    }
+
+    let (zcr_mean, zcr_std) = zcr_meter.finish();
 
     // === Finish phase correlation ===
     let denom = (corr_sum_l * corr_sum_r).sqrt();
@@ -593,6 +716,10 @@ fn run_trunk_internal(
             noise_floor_dbfs: min_nondead_dbfs,
             spectral_profile_db,
             transient_density,
+            zcr_mean,
+            zcr_std,
+            bpm_estimate,
+            bpm_confidence,
             global_phase_correlation,
             dynamic_range_db: dyn_range,
             cv_ioi_sequence,
