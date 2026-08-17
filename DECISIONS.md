@@ -192,3 +192,10 @@ master + certificate που ορκίζεται τι μετρήθηκε και τ
 - ΔΕΝ τρέχει ML στο runtime: teacher offline, student = Rust.
 - ΔΕΝ κρύβει τι έκανε: ό,τι μετριέται ταξιδεύει, ό,τι
   αποφασίζεται δηλώνεται.
+
+- ΑΝΕΤΡΑΠΗ→ΞΑΝΑΚΛΕΙΔΩΣΕ 2026-08-17: INV-DET-1 golden SHA
+  99791c1c → e682a3db (×2 τρεξίματα ταυτόσημα) — encoder swap
+  flacenc→flac-codec [10ead54] + ενοποίηση quantization
+  (round_ties_even, ένα σπίτι στο sp314). Το 99791c1c = έγκυρο
+  ιστορικό της flacenc εποχής. INV-PERSIST-1 επανεπιβεβαιώθηκε
+  με νέο encoder (3930e892 ×2).
