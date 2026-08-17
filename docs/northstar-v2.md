@@ -239,7 +239,7 @@ schema_version 0
 ΖΩΝΤΑΝΟΣ — το ArcSwap είναι ΠΑΡΑΜΕΤΡΟΣ της συνάρτησης
 που κάνει το render:
 
-  dsp_pipeline.rs:36   `pub fn run_dsp(`
+  dsp_pipeline.rs:72   `pub fn run_dsp(`
   app_state.rs:82      `pub head_state_ptr: Arc<ArcSwap<DspState>>,`
   conductor.rs:21      `head_state_ptr: Arc<ArcSwap<DspState>>,`
 
@@ -373,11 +373,11 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 Ο κώδικας απάντησε με τον compiler, πριν το κείμενο
 προλάβει να σχεδιάσει την απάντηση.
 
-  blob_store.rs:327 `Uncertified { reason: UncertifiedReason },`
+  blob_store.rs:645 `Uncertified { reason: UncertifiedReason },`
 
 Ένα χρέος που είναι ΤΥΠΟΣ έχει τέσσερα πράγματα που ένα
 χρέος σε παράγραφο δεν έχει:
-  ΟΝΟΜΑ            blob_store.rs:338 `SpatialPathHasNoTelemetry,`
+  ΟΝΟΜΑ            blob_store.rs:656 `SpatialPathHasNoTelemetry,`
   ΔΗΜΟΣΙΑ ΠΡΟΒΟΛΗ  γενική προς έξω («no_measurements»),
                    ειδική προς μέσα — το εσωτερικό όνομα
                    είναι ομολογία ελαττώματος με όνομα
@@ -445,6 +445,26 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
       apple_music ΛΕΙΠΕΙ από το CATALOGUE. Το v2 το
         κατέγραψε στα ΠΑΡΚΑΡΙΣΜΕΝΑ· ισχύει ακέραιο.
 ```
+
+### §Π  ΤΟ CERTIFICATE ΔΕΝ ΕΠΙΒΙΩΝΕΙ RESTART (ΛΥΘΗΚΕ)
+
+ΛΥΘΗΚΕ [338ba16] — envelope sidecar. Η αλυσίδα RAM→δίσκος→DB→404 έσπασε:
+λογική «cannot look ≠ does not exist». Το INV-PERSIST-1 τρέχει και αποδεικνύει
+byte-identical ανάσταση. Άγκιστρα μπήκαν στα νέα σημεία.
+Named leftovers: το `blob_path` (πλέον μόνο-όταν-sidecar) και identity inline
+μένουν ως ρητά υπόλοιπα.
+
+### §3Γ — ΤΟ SPOOL ΛΕΞΙΛΟΓΙΟ (ΛΥΘΗΚΕ)
+
+11 σημεία, 5 οικογένειες. writer/reader ανεξάρτητα `format!()`.
+ΛΥΣΗ: registry στο `blob_store` [14aa4b6].
+«Ίδιο μοτίβο, θεραπεία: λεξιλόγιο→λεξικό», ο θεσμικός grep ως φρουρός.
+
+### §W17 — ΑΝΤΙΚΑΤΑΣΤΑΣΗ FLAC ENCODER (ΛΥΘΗΚΕ)
+
+Ο encoder ΑΝΤΙΚΑΤΑΣΤΑΘΗΚΕ [10ead54] — flac-codec. 
+Ένα σπίτι (sp314 flac_encode), quantization ενοποιημένο (ήταν ΔΥΟ: ties-even vs truncate), 
+W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c1c → e682a3db [re-lock commit].
 
 ### §3Β — Ο ΑΞΟΝΑΣ ΤΩΝ FLAVOURS, ΑΛΥΤΟΣ
 
@@ -540,52 +560,6 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 ## ΑΝΟΙΧΤΑ (τεκμηριωμένα)
 
 ```
-§Π  ΤΟ CERTIFICATE ΔΕΝ ΕΠΙΒΙΩΝΕΙ RESTART
-    ⚠ ΠΡΟΫΠΟΘΕΣΗ ΤΟΥ §Σ — προηγείται των υπολοίπων
-    ΚΑΤΑΣΤΑΣΗ 2026-08-16: ΑΚΙΝΗΤΟ 70+ commits.
-
-    ΜΕΤΡΗΣΗ (2026-08-11, επαληθευμένη 2026-08-16):
-      SurrealDB kv-surrealkv, persistent on disk,
-      ΥΠΑΡΧΕΙ ΚΑΙ ΔΟΥΛΕΥΕΙ (lineos/m0/m0-daemon/src/db/mod.rs
-      — «kv-surrealkv: pure Rust, persistent on disk»)
-      γράφονται: Project · Session · Track
-      ΔΕΝ γράφεται: το blob.
-        grep StoredBlob στο db/ = ΜΗΔΕΝ, ακόμα
-      Το ΜΟΝΟ αντίγραφο είναι in-memory:
-        blob_store.rs:164 `inner: Arc<Mutex<HashMap<String, StoredBlobV2>>>,`
-
-    ⇒ το certificate χάνεται σε κάθε restart του m0d
-    ⇒ το delivery ΔΕΝ ΜΠΟΡΕΙ να το διαβάσει — γι' αυτό
-      φτιάχνει:
-        deliver.rs:304 `fn build_minimal_blob(audio_path: &str) -> StoredBlobV2 {`
-
-    ΤΟ ΧΡΕΟΣ ΔΕΝ ΕΙΝΑΙ "δεν έχουμε βάση".
-    Είναι "έχουμε βάση και δεν γράφουμε εκεί".
-
-    ΗΤΑΝ ΣΧΕΔΙΑΣΜΕΝΗ ΠΡΟΣΩΡΙΝΟΤΗΤΑ: το blob_store.rs λέει
-    ρητά «Phase 6: in-memory only. Blobs are dropped when
-    m0d restarts.» Υπάρχει πιθανώς σκέψη για το γιατί, σε
-    παλιό commit ή spec — ψάξ' την πριν το λύσεις.
-
-    ΔΕΝ ΕΙΝΑΙ ΜΙΑ ΚΛΗΣΗ .get(): η SurrealDB είναι async,
-    το run_deliver_core τρέχει σε blocking pool:
-      deliver.rs:513 `let result = tokio::task::spawn_blocking(move || run_deliver_core(&req, plan))`
-    Απαιτεί ή αναδιάταξη ώστε η ανάγνωση να γίνει ΠΡΙΝ το
-    blocking κομμάτι, ή block_on μέσα του.
-
-    ΓΙΑΤΙ ΠΡΟΗΓΕΙΤΑΙ: τα §Β §Θ αφορούν ΤΙ γράφεται. Αυτό
-    αφορά ΑΝ επιβιώνει. Χωρίς αυτό, το git-for-mastering
-    δεν στέκει — η ιστορία σβήνει όταν κλείσει ο daemon.
-
-    ⚠ ΜΕΤΡΗΜΕΝΗ ΑΝΤΙΣΤΡΟΦΗ ΣΕΙΡΑΣ (2026-08-16): το §Σ
-      προχώρησε ΠΟΛΥ (τύποι, variants, DTO) ενώ η
-      ΠΡΟΫΠΟΘΕΣΗ του δεν κουνήθηκε. Γι' αυτό ζει ακόμα το
-      build_minimal_blob και γι' αυτό υπάρχει το
-      UncertifiedReason::TransportOnlyNotASource.
-      Το χρέος πήρε τύπο αντί για λύση — σωστό βήμα,
-      αλλά ΔΕΝ είναι η λύση.
-
-
 §Β  INV-DET-2 — ΤΟ TEST ΥΠΑΡΧΕΙ, ΤΟ API ΟΧΙ
 
     ΜΕΤΡΗΣΗ (2026-08-16):
@@ -686,7 +660,7 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
       w17_mix_balance.rs:67 `fn w17_mix_balance() {`
       spatial_folddown_agrees_with_stereo.rs:115 `fn spatial_folddown_agrees_with_stereo() {`
       streaming_integration.rs:25 `fn streaming_pipeline_ducking_e2e() {`
-      w17_flacenc_bloat.rs:30 `fn w17_flacenc_bloat_repro() {`
+      w17_flacenc_bloat.rs:26 `fn w17_flacenc_bloat_repro() {`
       export_mp3_acx.rs:130 `fn test_export_mp3_acx_ffprobe() {`
       export_flac_real.rs:125 `fn test_export_flac_ffprobe() {`
 
@@ -792,7 +766,7 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
          ενώ το blake3 χασάρει LE:
          wav_to_raw.rs:82 `blake3.update(&left_buf[i].to_le_bytes());`
          ΕΝΕΡΓΗ διαδρομή:
-         executor.rs:371 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
+         executor.rs:369 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
          Σε LE μηχάνημα ταυτίζονται. Σε BE ΟΧΙ: η σχέση
          hash↔αρχείο σπάει ΣΙΩΠΗΛΑ, κανένα test δεν το
          πιάνει γιατί κανένα CI δεν τρέχει εκεί.
@@ -897,8 +871,8 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 
       Ο ΠΑΛΙΟΣ ΤΥΠΟΣ ΔΕΝ ΥΠΑΡΧΕΙ. grep `struct StoredBlob`
       (χωρίς V2) = ΜΗΔΕΝ. Το C-union χωρίστηκε:
-        blob_store.rs:279 `pub struct StoredBlobCore {`
-        blob_store.rs:327 `Uncertified { reason: UncertifiedReason },`
+        blob_store.rs:597 `pub struct StoredBlobCore {`
+        blob_store.rs:645 `Uncertified { reason: UncertifiedReason },`
       Ό,τι είναι ΠΑΝΤΑ παρόν ζει στον Core· ό,τι εξαρτάται
       από το αν μετρήθηκε, στο variant. Τα κενά πεδία δεν
       μπορούν πια να υπάρξουν — δεν είναι εκπρόσωπος του
@@ -909,7 +883,7 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
       έχει certificate; Invariant, όχι σύμβαση καλής
       θέλησης». Η απάντηση είναι το δόγμα Κ.
       Το spatial δεν παραδίδει πια σιωπηλά:
-        dsp_pipeline.rs:355 `reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,`
+        dsp_pipeline.rs:391 `reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,`
       ΔΕΝ μετρήθηκε ακόμα — αλλά η απουσία είναι ΤΥΠΩΜΕΝΗ
       και ΟΡΑΤΗ στο API, με συνθήκη λήξης γραμμένη.
 
@@ -922,9 +896,9 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 
       ΨΕΥΔΕΣ ΑΠΟ 2026-08-16. Το JSON ΔΕΝ αλλάζει σιωπηλά,
       γιατί δεν φεύγει ο εσωτερικός τύπος:
-        blob.rs:20 `pub async fn get_blob(`
-        blob.rs:23 `) -> Result<Json<BlobResponse>, StatusCode> {`
-        blob.rs:97 `impl From<StoredBlobV2> for BlobResponse {`
+        blob.rs:38 `pub async fn get_blob(`
+        blob.rs:40 `    Path(id): Path<String>,`
+        blob.rs:188 `impl From<StoredBlobV2> for BlobResponse {`
       Η μετάφραση γίνεται σε ΕΝΑ σημείο (DTO), όχι
       σκορπισμένη στους handlers — όπως το απαιτούσε το v2.
 
@@ -1439,6 +1413,13 @@ stereo stems → five_dot_one
   ⚠ ΠΟΤΕ ML runtime ή weights στο binary
   Ο λόγος είναι το certificate: ένα runtime που δεν
   ελέγχουμε καθιστά το «bit-exact» ανυπόγραφο.
+
+### ΕΞΑΓΩΓΗ ΧΑΡΑΚΤΗΡΙΣΤΙΚΩΝ (FEATURES CLI)
+
+[4157c60] — η μηχανή εκθέτει τις μετρήσεις της (envelope JSON, ίδια bytes με runtime).
+Ρυθμικά [b71952d]: ZCR αναλυτικά επιβεβαιωμένο, onset envelope 100Hz, BPM autocorr με confidence διπλά αποδεδειγμένο (IDM 0.017 / techno 0.523). 
+Πρώτος καταναλωτής: genre teacher, baseline 69.6%±1.1 στα 296 Jamendo tracks.
+
 ```
 
 ### ΓΕΝΝΗΜΕΝΑ ΜΕ ΜΕΤΡΗΣΗ
@@ -1518,7 +1499,14 @@ auto-duck για podcaster
 ## ΣΕΙΡΑ
 
 ```
-ΕΓΙΝΑΝ — ΤΟ LEDGER ΤΗΣ ΕΒΔΟΜΑΔΑΣ (f20cf28 → 7339f54)
+ΕΓΙΝΑΝ — ΤΟ LEDGER ΤΗΣ ΕΒΔΟΜΑΔΑΣ (f20cf28 → re-lock)
+
+  338ba16   §Π: Λύση persistence με envelope sidecar (RAM→δίσκος→DB→404).
+  14aa4b6   BUG-DECODE-1: spool registry στο blob_store.
+  4157c60   FEATURES CLI: εξαγωγή μετρήσεων.
+  b71952d   Ρυθμικά features (ZCR, onset 100Hz, BPM autocorr).
+  10ead54   encoder swap: flacenc → flac-codec.
+  re-lock   INV-DET-1 golden SHA κλειδωμένο στο e682a3db.
 
   ae2493f   πράσινο πάτωμα 1187/0/61 · --no-fail-fast
   9a34c39   sample rate: άρνηση αντί μαντεψιάς
@@ -1600,8 +1588,6 @@ auto-duck για podcaster
                         με ΛΟΓΟ (ratio 1.5525, 49207c4).
                         Ξεκλείδωμα: voice-aware send ή
                         per-stem reclaim.
-  flacenc → flac-codec  guard κρατάει (io_flac.rs)
-                        bug: 123× σε ~80s, state-dependent
   LTASS wiring          branch ltass-wiring-wip
                         391 γραμμές, 255 tests, 27 Ιουλ
                         ΤΟ ΦΡΑΓΜΑ ΕΦΥΓΕ (§3 λύθηκε) —
@@ -1613,7 +1599,11 @@ auto-duck για podcaster
   preset_id ως χωματερή ΜΕΡΙΚΩΣ ΛΥΘΗΚΕ με το §3: το
                         routing βγήκε ως τύπος, τα typos
                         έγιναν aliases, το άγνωστο γίνεται
-                        None. ΜΕΝΕΙ: apple_music λείπει
+                        None. ΜΕΝΕΙ: apple_music λείπει  guess_content_type    (classification.rs): ονομασμένος υποψήφιος
+                        ταφής/ανάστασης (μηδέν callers, hardcoded
+                        κατώφλια — το ερώτημα speech/music ζει,
+                        ο κώδικας δικάζεται σε δικό του βήμα).
+
                         από το CATALOGUE.
 ```
 

@@ -29,6 +29,11 @@
 - commit log — τα πλήρη αφηγήματα (git log -S είναι φίλος)
 
 ## Κρίσιμα paths
+- sp314-dsp/src/io/flac_encode.rs: ΤΟ σπίτι του FLAC
+  (encoder+quantization) — ποτέ inline encode/quantize
+- blob_store.rs: spool registry + sidecar — ποτέ inline
+  spool format!
+- tests/inv_persist_1: TRACK_ID βρόμικο ΕΠΙΤΗΔΕΣ, φρουρός
 - two_pass.rs:50 DRUM_DEDUP_ALPHA=0.5 — ταφόπλακα από πάνω,
   διάβασέ τη [bca262a]
 - render_node.rs ~:493 W16/Level-1 — BYPASS_W16 lever·
