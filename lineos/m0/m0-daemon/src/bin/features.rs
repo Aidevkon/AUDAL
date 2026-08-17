@@ -33,9 +33,43 @@ struct ExtractedFeatures {
     global_phase_correlation: f32,
     cv_ioi_sequence: Vec<f32>,
     cepstral_flux_sequence: Vec<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice_ratio: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice_posterior_mean: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice_posterior_std: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice_longest_run_s: Option<f32>,
+    mfcc_1_mean: f32,
+    mfcc_1_std: f32,
+    mfcc_2_mean: f32,
+    mfcc_2_std: f32,
+    mfcc_3_mean: f32,
+    mfcc_3_std: f32,
+    mfcc_4_mean: f32,
+    mfcc_4_std: f32,
+    mfcc_5_mean: f32,
+    mfcc_5_std: f32,
+    mfcc_6_mean: f32,
+    mfcc_6_std: f32,
+    mfcc_7_mean: f32,
+    mfcc_7_std: f32,
+    mfcc_8_mean: f32,
+    mfcc_8_std: f32,
+    mfcc_9_mean: f32,
+    mfcc_9_std: f32,
+    mfcc_10_mean: f32,
+    mfcc_10_std: f32,
+    mfcc_11_mean: f32,
+    mfcc_11_std: f32,
+    mfcc_12_mean: f32,
+    mfcc_12_std: f32,
+    mfcc_13_mean: f32,
+    mfcc_13_std: f32,
 }
 
-fn process_file(input: &Path, out_dir: &Path) -> Result<(), String> {
+fn process_file(input: &Path, out_dir: &Path, enable_vad: bool) -> Result<(), String> {
     eprintln!("Processing {}", input.display());
 
     // 1. Create a temporary dump file for the raw PCM.
@@ -50,7 +84,7 @@ fn process_file(input: &Path, out_dir: &Path) -> Result<(), String> {
     let duration_s = expected_frames as f32 / 48000.0;
 
     // 3. Run Trunk Pass on the raw dump.
-    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(temp_file.path())?;
+    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(temp_file.path(), enable_vad)?;
 
     // 4. Map into explicit schema.
     let m = &trunk_report.metrics;
@@ -79,6 +113,36 @@ fn process_file(input: &Path, out_dir: &Path) -> Result<(), String> {
             global_phase_correlation: m.global_phase_correlation,
             cv_ioi_sequence: m.cv_ioi_sequence.clone(),
             cepstral_flux_sequence: m.cepstral_flux_sequence.clone(),
+            voice_ratio: m.voice_ratio,
+            voice_posterior_mean: m.voice_posterior_mean,
+            voice_posterior_std: m.voice_posterior_std,
+            voice_longest_run_s: m.voice_longest_run_s,
+            mfcc_1_mean: m.mfcc_means[0],
+            mfcc_1_std: m.mfcc_stds[0],
+            mfcc_2_mean: m.mfcc_means[1],
+            mfcc_2_std: m.mfcc_stds[1],
+            mfcc_3_mean: m.mfcc_means[2],
+            mfcc_3_std: m.mfcc_stds[2],
+            mfcc_4_mean: m.mfcc_means[3],
+            mfcc_4_std: m.mfcc_stds[3],
+            mfcc_5_mean: m.mfcc_means[4],
+            mfcc_5_std: m.mfcc_stds[4],
+            mfcc_6_mean: m.mfcc_means[5],
+            mfcc_6_std: m.mfcc_stds[5],
+            mfcc_7_mean: m.mfcc_means[6],
+            mfcc_7_std: m.mfcc_stds[6],
+            mfcc_8_mean: m.mfcc_means[7],
+            mfcc_8_std: m.mfcc_stds[7],
+            mfcc_9_mean: m.mfcc_means[8],
+            mfcc_9_std: m.mfcc_stds[8],
+            mfcc_10_mean: m.mfcc_means[9],
+            mfcc_10_std: m.mfcc_stds[9],
+            mfcc_11_mean: m.mfcc_means[10],
+            mfcc_11_std: m.mfcc_stds[10],
+            mfcc_12_mean: m.mfcc_means[11],
+            mfcc_12_std: m.mfcc_stds[11],
+            mfcc_13_mean: m.mfcc_means[12],
+            mfcc_13_std: m.mfcc_stds[12],
         },
     };
 
@@ -96,12 +160,16 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut input_path = None;
     let mut out_dir = None;
+    let mut enable_vad = false;
 
     let mut i = 1;
     while i < args.len() {
         if args[i] == "--out" && i + 1 < args.len() {
             out_dir = Some(PathBuf::from(&args[i + 1]));
             i += 2;
+        } else if args[i] == "--vad" {
+            enable_vad = true;
+            i += 1;
         } else {
             input_path = Some(PathBuf::from(&args[i]));
             i += 1;
@@ -111,7 +179,7 @@ fn main() {
     let input = match input_path {
         Some(p) => p,
         None => {
-            eprintln!("Usage: features <input_file_or_dir> [--out <dir>]");
+            eprintln!("Usage: features <input_file_or_dir> [--out <dir>] [--vad]");
             std::process::exit(1);
         }
     };
@@ -140,7 +208,7 @@ fn main() {
 
     let mut has_errors = false;
     for file in files_to_process {
-        if let Err(e) = process_file(&file, &out_dir) {
+        if let Err(e) = process_file(&file, &out_dir, enable_vad) {
             eprintln!("Error processing {}: {}", file.display(), e);
             has_errors = true;
         }

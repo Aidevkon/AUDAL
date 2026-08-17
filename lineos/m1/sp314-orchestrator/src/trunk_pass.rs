@@ -59,6 +59,16 @@ pub struct TrunkMetrics {
     pub acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
     pub cv_ioi_sequence: Vec<f32>,
     pub cepstral_flux_sequence: Vec<f32>,
+    /// VAD ratio: percentage of frames where posterior > threshold
+    pub voice_ratio: Option<f32>,
+    pub voice_posterior_mean: Option<f32>,
+    pub voice_posterior_std: Option<f32>,
+    /// Longest continuous speech segment, using the Ducker VAD hysteresis (s)
+    pub voice_longest_run_s: Option<f32>,
+    /// Mean of the 13 MFCC coefficients across all 1024-frame windows
+    pub mfcc_means: [f32; 13],
+    /// Standard deviation of the 13 MFCC coefficients across all 1024-frame windows
+    pub mfcc_stds: [f32; 13],
 }
 
 pub struct TrunkReport {
@@ -342,7 +352,7 @@ impl StreamingZcrMeter {
 /// The dump was written by pass0_decode_to_dump through StandardizedDecoder,
 /// which guarantees 48k/2ch by construction [standardized_decoder.rs:70].
 pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
-    run_trunk_internal(dump_path, false, false).map(|r| r.metrics)
+    run_trunk_internal(dump_path, false, false, false).map(|r| r.metrics)
 }
 
 /// Same single pass, plus the ACX delivery check (sample peak, DC-removed
@@ -350,17 +360,18 @@ pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
 /// Costs one extra HP cascade + window min per mono sample; callers that
 /// aren't delivering to ACX use run_trunk_metrics and pay nothing.
 pub fn run_trunk_metrics_with_acx(dump_path: &Path) -> Result<TrunkMetrics, String> {
-    run_trunk_internal(dump_path, false, true).map(|r| r.metrics)
+    run_trunk_internal(dump_path, false, true, false).map(|r| r.metrics)
 }
 
-pub fn run_trunk_pass(dump_path: &Path) -> Result<TrunkReport, String> {
-    run_trunk_internal(dump_path, true, false)
+pub fn run_trunk_pass(dump_path: &Path, enable_vad: bool) -> Result<TrunkReport, String> {
+    run_trunk_internal(dump_path, true, false, enable_vad)
 }
 
 fn run_trunk_internal(
     dump_path: &Path,
     do_segmentation: bool,
     with_acx: bool,
+    enable_vad: bool,
 ) -> Result<TrunkReport, String> {
     // 2 channels: trunk dump is stereo f32 LE interleaved from StandardizedDecoder.
     let mut source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
@@ -408,6 +419,16 @@ fn run_trunk_internal(
     let mut transient_det = StreamingTransientDetector::new();
     let mut zcr_meter = StreamingZcrMeter::new();
 
+    // === VAD state ===
+    let mut vad_extractor = if enable_vad { Some(sp314_dsp::analysis::vad_features::VadFeatureExtractor::new()) } else { None };
+    let mut vad_classifier = if enable_vad { Some(sp314_dsp::analysis::vad_model::VadClassifier::new(
+        sp314_dsp::analysis::vad_model::FixedPriors,
+    )) } else { None };
+    let mut vad_posteriors = Vec::new();
+    let mut vad_is_speech_count = 0;
+    let mut vad_current_run = 0;
+    let mut vad_longest_run = 0;
+
     // === Phase Correlation ===
     let mut corr_cross: f32 = 0.0;
     let mut corr_sum_l: f32 = 0.0;
@@ -448,6 +469,9 @@ fn run_trunk_internal(
     let mut flux_distances = std::collections::VecDeque::<f32>::with_capacity(467);
     let mut flux_running_sum: f64 = 0.0;
     let mut next_mfcc_frame_start: usize = 0;
+    let mut mfcc_sums = [0.0f64; 13];
+    let mut mfcc_sq_sums = [0.0f64; 13];
+    let mut mfcc_count: usize = 0;
 
     // === Scratch buffers ===
     let mut interleaved = vec![0f32; CHUNK_FRAMES * 2];
@@ -521,6 +545,28 @@ fn run_trunk_internal(
         // --- ZCR: feed mono downmix ---
         zcr_meter.feed_chunk(m);
 
+        // --- VAD: Voice as a feature ---
+        if enable_vad {
+            if let (Some(ext), Some(clf)) = (vad_extractor.as_mut(), vad_classifier.as_mut()) {
+                let vad_features = ext.process_chunk(m, l, r);
+                // Χρησιμοποιούμε το streaming floor, όχι το τελικό — 
+                // τα posteriors του CLI μπορεί να αποκλίνουν ελαφρά από του render pass στα πρώτα δευτερόλεπτα.
+                let current_noise_floor = min_nondead_dbfs.unwrap_or(-144.0);
+
+                for f in vad_features {
+                    let decision = clf.process(&f, current_noise_floor);
+                    vad_posteriors.push(decision.posterior);
+                    if decision.is_speech {
+                        vad_is_speech_count += 1;
+                        vad_current_run += 1;
+                        vad_longest_run = vad_longest_run.max(vad_current_run);
+                    } else {
+                        vad_current_run = 0;
+                    }
+                }
+            }
+        }
+
         // --- Noise floor: 1s energy windows ---
         for &s in m.iter() {
             nf_sum_sq += s * s;
@@ -562,6 +608,13 @@ fn run_trunk_internal(
             while next_mfcc_frame_start + 1024 <= hist_end {
                 let local_start = next_mfcc_frame_start - hist_base;
                 let mfcc_curr = mfcc_analyzer.compute(&hist_mono[local_start..local_start + 1024]);
+
+                for k in 0..13 {
+                    let val = mfcc_curr[k] as f64;
+                    mfcc_sums[k] += val;
+                    mfcc_sq_sums[k] += val * val;
+                }
+                mfcc_count += 1;
 
                 if let Some(prev) = mfcc_prev {
                     let dist = lineos_corpus::scout::mfcc_euclidean_distance(&prev, &mfcc_curr);
@@ -689,6 +742,32 @@ fn run_trunk_internal(
 
     let (zcr_mean, zcr_std) = zcr_meter.finish();
 
+    // === Finish VAD metrics ===
+    let (voice_ratio, voice_posterior_mean, voice_posterior_std, voice_longest_run_s) = if enable_vad {
+        let ratio = if !vad_posteriors.is_empty() {
+            vad_is_speech_count as f32 / vad_posteriors.len() as f32
+        } else {
+            0.0
+        };
+        
+        let (mean, std) = if !vad_posteriors.is_empty() {
+            let m = vad_posteriors.iter().sum::<f32>() / vad_posteriors.len() as f32;
+            let mut var = 0.0;
+            for &p in &vad_posteriors {
+                var += (p - m) * (p - m);
+            }
+            var /= vad_posteriors.len() as f32;
+            (m, var.sqrt())
+        } else {
+            (0.0, 0.0)
+        };
+        // VAD frames are 10ms each (FRAME_SAMPLES=480 in 48kHz)
+        let longest_run_s = vad_longest_run as f32 * 0.01;
+        (Some(ratio), Some(mean), Some(std), Some(longest_run_s))
+    } else {
+        (None, None, None, None)
+    };
+
     // === Finish phase correlation ===
     let denom = (corr_sum_l * corr_sum_r).sqrt();
     let global_phase_correlation = if denom < 1e-10 {
@@ -703,6 +782,20 @@ fn run_trunk_internal(
     } else {
         Vec::new()
     };
+
+    // === Compute MFCC statistics ===
+    let mut mfcc_means = [0.0f32; 13];
+    let mut mfcc_stds = [0.0f32; 13];
+    if mfcc_count > 0 {
+        let n = mfcc_count as f64;
+        for k in 0..13 {
+            let mean = mfcc_sums[k] / n;
+            // Guard against floating point cancellation producing negative variance
+            let var = (mfcc_sq_sums[k] / n - mean * mean).max(0.0);
+            mfcc_means[k] = mean as f32;
+            mfcc_stds[k] = var.sqrt() as f32;
+        }
+    }
 
     Ok(TrunkReport {
         boundaries,
@@ -724,6 +817,12 @@ fn run_trunk_internal(
             dynamic_range_db: dyn_range,
             cv_ioi_sequence,
             cepstral_flux_sequence,
+            voice_ratio,
+            voice_posterior_mean,
+            voice_posterior_std,
+            voice_longest_run_s,
+            mfcc_means,
+            mfcc_stds,
         },
     })
 }

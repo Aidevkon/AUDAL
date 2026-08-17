@@ -62,7 +62,7 @@ fn test_trunk_parity() {
     // Path B: New P0 -> Trunk Dump Reader
     let (_metrics, _p0_decoder) =
         pass0_decode_to_dump(Path::new(wav_path), raw_path).expect("P0 dump failed");
-    let report = run_trunk_pass(Path::new(raw_path)).expect("trunk pass failed");
+    let report = run_trunk_pass(Path::new(raw_path), false).expect("trunk pass failed");
     let boundaries_new = report.boundaries.clone();
 
     // Assert: Length parity

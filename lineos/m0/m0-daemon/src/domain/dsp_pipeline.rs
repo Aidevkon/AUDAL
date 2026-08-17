@@ -1007,7 +1007,7 @@ fn run_dsp_internal(
     let scout_right = &scout_right_owned[..];
 
     let t_trunk_pass = std::time::Instant::now();
-    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(&raw_path)
+    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(&raw_path, false)
         .map_err(|e| format!("Trunk Pass failed: {e}"))?;
     let trunk_metrics = &trunk_report.metrics;
     eprintln!("[PERF-NODE] trunk_pass={}ms", t_trunk_pass.elapsed().as_millis());

@@ -216,7 +216,7 @@ pub async fn run(
                     // Single-pass segmentation + full-file metering from dump.
                     let trunk_report =
                         sp314_orchestrator::trunk_pass::run_trunk_pass(
-                            std::path::Path::new(&raw_tap_path),
+                            std::path::Path::new(&raw_tap_path), false
                         )
                         .map_err(|e| {
                             ExecutorError::DspFailed(format!("trunk pass failed: {e}"))

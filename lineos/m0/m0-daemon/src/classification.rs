@@ -146,6 +146,14 @@ mod tests {
             dynamic_range_db: 10.0,
             cv_ioi_sequence: Vec::new(),
             cepstral_flux_sequence: Vec::new(),
+            voice_ratio: None,
+            voice_posterior_mean: None,
+            voice_posterior_std: None,
+            voice_longest_run_s: None,
+            // MFCC statistics placeholders for classification synthetic helper.
+            // Measured dynamically in real extraction pipeline.
+            mfcc_means: [0.0; 13],
+            mfcc_stds: [0.0; 13],
         }
     }
 
