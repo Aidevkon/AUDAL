@@ -4,23 +4,44 @@
 **Size:** 24,576 bytes
 
 ## Components
-- **Slots 0-2 (Drums)**:
-  - Source: `w_drums_v1.bin`
-  - Training Data: MUSDB18-HQ (drums stems)
-  - Pre-processing: NO HIGHPASS FILTER
-  - Alignment: Attack aligned to tau=1
+- **Slots 0-2 (Drums)** [engine slots 4-6]:
+  - Source: `w_drums_v1` templates (factory: prototype_w_drums.py / generate_w_drums_v1.py)
+  - Training Data: MUSDB18-HQ test split, 20 full drum stems (456k frames)
+  - Pre-processing: NO HIGHPASS FILTER (drums need the lows)
+  - Alignment: Attack circular-shifted, peak at tau=1
+  - Routing: soak-and-discard (routed to NO output mask; drums output is HPSS-owned by design)
 
-- **Slots 3-5 (Sung Vocals)**:
-  - Source: `w_sung_v4.bin`
-  - Training Data: MUSDB18-HQ (vocals stems)
-  - Pre-processing: 200Hz HIGHPASS FILTER (sosfiltfilt, 8th order) applied to raw waveform before STFT. Silence masking applied.
-  - Alignment: Unaligned (natural NMFD convergence into harmonics vs consonants)
-  - Role assignments:
-    - K=4: Soak component (discard)
-    - K=3, K=5: Formants/Consonants (voice_mask)
+- **Slots 3-5 (Sung Vocals)** [engine slots 7-9]:
+  - Source: `w_sung_v5.bin` — DISCRIMINATIVE round (factory: factory_v5_discriminative.py)
+  - Training Data: MUSDB18-HQ test split, 20 vocal stems, silence-masked frames
+    JOINTLY with raw bass stems; 2 bass components trained separately and FROZEN
+    during the sung fit ("the bass's advocate"), forcing the 3 sung components to
+    learn only what voice has and bass does not.
+  - Pre-processing (vocals): 200Hz HIGHPASS FILTER (butterworth, sosfiltfilt)
+    applied to raw waveform before STFT. Silence masking applied.
+    (Bass negatives: raw, no filter.)
+  - Alignment: Unaligned (natural NMFD convergence)
+  - Role assignments (bin slot -> engine slot -> fate):
+    - K=3 -> engine 7: C0 formants/harmonics -> voice_mask (ROUTED — the only
+      routed sung component; synthetic leak R2 = 0.47%)
+    - K=4 -> engine 8: C1 "the jailer" (97.5% of L1 mass in the shared
+      200-330Hz band) -> soak, DISCARDED (works every fit, routes nowhere)
+    - K=5 -> engine 9: C2 consonants/transients -> DISCARDED 2026-08-18
+      (synthetic pad leak 29%; contributed only +0.25dB voice gain; candidate
+      for synthetic-negative retraining — see ledger)
+
+## Final voice routing
+voice_mask = engine slots [0, 1, 2, 3, 7] (4 speech + sung C0).
+Validated: bass-theft 4.95% (8% SIR-validated threshold), synthetic R1 0.32% /
+R2 0.47%, drone guard silent x3, voice gain +4.03dB, suite 212/0.
 
 ## Norms
-- L1 Norm is exactly 1.0 for all 6 components.
+- L1 Norm is exactly 1.0 for all 6 components (aligned with w_speech_v1 convention).
 
 ## Integrity
-- **SHA256**: 449ce8947736aa1133914ad81c622f50bf2c7fa39a5c8b5db6c1f7bd85a52543
+- **SHA256**: 1e27482c7f412de92ac72adf1220f6ee798b62d8e5023b248bffaff494f7e50c
+- Verify: `sha256sum lineos/m1/sp314-dsp/assets/w_music_v1.bin` must match the above.
+- History note: an earlier manifest revision described the v4 (non-discriminative)
+  sung merge with both C0 and C2 routed, and carried the v4 bin's SHA (449ce894...);
+  it shipped stale in commit 0422d10 and was corrected here. The .bin itself was
+  always the v5 discriminative merge — verified against the hash above.
