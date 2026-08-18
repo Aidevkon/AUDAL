@@ -75,6 +75,10 @@ impl UserSpatialProfile {
         }
     }
 
+    pub fn is_music(&self) -> bool {
+        self.width_tendency >= 0.5
+    }
+
     /// SP-P7: Apply Markov state prediction to modulate spatial params.
     /// Predicted Tail → increase rear_decay temporarily
     /// Predicted Consonant → increase width_tendency temporarily

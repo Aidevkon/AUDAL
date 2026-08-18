@@ -323,7 +323,7 @@ pub(crate) fn process_single_chunk(
         //
         // ΗΤΑΝ: «These hardcoded values mirror scout fit + W5.b
         // harness» — έπαψε να ισχύει όταν το scout πήγε στις 30.
-        let nmfd_k = 8;
+        let nmfd_k = scout.tensor_w.len() / (128 * 8);
         let nmfd_iter = 12;
         let init_val = 0.1_f32;
 
@@ -684,9 +684,22 @@ impl TwoPassEngine {
         left: &[f32],
         right: &[f32],
         sample_rate: u32,
+        quiet_window_start_frame: Option<usize>,
+        dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
+        run_nmfd: bool,
+    ) -> ScoutResult {
+        self.scout_with_profile(left, right, sample_rate, quiet_window_start_frame, dump_source, run_nmfd, None)
+    }
+
+    pub fn scout_with_profile(
+        &mut self,
+        left: &[f32],
+        right: &[f32],
+        sample_rate: u32,
         _quiet_window_start_frame: Option<usize>,
         _dump_source: Option<&crate::stft::raw_pcm_source::RawPcmFileSource>,
         run_nmfd: bool,
+        profile: Option<crate::spatial::user_profile::UserSpatialProfile>,
     ) -> ScoutResult {
         let t_scout = std::time::Instant::now();
 
@@ -781,8 +794,32 @@ impl TwoPassEngine {
 
             // fit_protocol_v3: K=8 (4 frozen slots seeded from LibriSpeech w_speech_v1.bin,
             // 4 free slots seeded randomly), 128 mel bins, all frames, 12 iterations, seed 314159, tau=8.
-            let nmfd_k = 8;
-            let nmfd_frozen_k = 4;
+            let decisions = crate::analysis::scout_scanner::scan_file(&signal, &signal, sample_rate);
+            let mut sum_conf = 0.0;
+            let mut sum_weighted_lean = 0.0;
+            for (_, d) in decisions {
+                sum_conf += d.confidence;
+                sum_weighted_lean += d.leaning_score * d.confidence;
+            }
+            let weighted_lean = if sum_conf > 0.0 { sum_weighted_lean / sum_conf } else { 1.0 };
+            
+            let is_music_profile = if let Some(p) = &profile {
+                p.is_music()
+            } else {
+                false
+            };
+            
+            let use_drums = is_music_profile && weighted_lean < 0.35 && sum_conf > 0.0;
+
+            println!("NMFD_INIT|mode={}|profile_music={}|lean={:.4}|gate={}", 
+                if run_nmfd { "active" } else { "bypass" }, 
+                is_music_profile,
+                weighted_lean,
+                if use_drums { "PASS" } else { "BYPASS" });
+
+            let nmfd_k = if use_drums { 11 } else { 8 };
+            let nmfd_frozen_k = if use_drums { 7 } else { 4 };
+            let free_start = if use_drums { 7 } else { 4 };
             let nmfd_num_iter = 30;
             let nmfd_seed = 314159;
 
@@ -800,12 +837,32 @@ impl TwoPassEngine {
                 w_speech[i] = f32::from_le_bytes(W_SPEECH_V1[i * 4..(i + 1) * 4].try_into().unwrap());
             }
 
-            // 2. Fill slots 0-3 frozen
+            // 1b. w_drums_v1.bin (K=3)
+            static W_DRUMS_V1: &[u8] = include_bytes!("../../assets/w_drums_v1.bin");
+            const _: () = assert!(W_DRUMS_V1.len() == 128 * 3 * 8 * 4);
+            let mut w_drums = vec![0.0_f32; 128 * 3 * 8];
+            for i in 0..128 * 3 * 8 {
+                w_drums[i] = f32::from_le_bytes(W_DRUMS_V1[i * 4..(i + 1) * 4].try_into().unwrap());
+            }
+
+            // 2. Fill slots 0-3 frozen (speech)
             for m in 0..128 {
                 for r in 0..4 {
                     for tau in 0..nmfd_tau {
                         init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] =
                             w_speech[(m * 4 * nmfd_tau) + (r * nmfd_tau) + tau];
+                    }
+                }
+            }
+            
+            // 2b. Fill slots 4-6 frozen (drums) if used
+            if use_drums {
+                for m in 0..128 {
+                    for r in 0..3 {
+                        for tau in 0..nmfd_tau {
+                            init_w[(m * nmfd_k * nmfd_tau) + ((r + 4) * nmfd_tau) + tau] =
+                                w_drums[(m * 3 * nmfd_tau) + (r * nmfd_tau) + tau];
+                        }
                     }
                 }
             }
@@ -818,7 +875,7 @@ impl TwoPassEngine {
             };
 
             for m in 0..128 {
-                for r in 4..8 {
+                for r in free_start..(free_start + 4) {
                     for tau in 0..nmfd_tau {
                         init_w[(m * nmfd_k * nmfd_tau) + (r * nmfd_tau) + tau] = next_rand();
                     }
@@ -857,7 +914,6 @@ impl TwoPassEngine {
             );
 
             // ── Free Slots Semantic Assignment (Report Only) ───────────────────────────────
-            let free_start = 4;
             let free_count = 4;
             let mut free_flatness = [0.0f32; 4];
             let mut free_centroids = [0.0f32; 4];
@@ -906,25 +962,25 @@ impl TwoPassEngine {
 
             println!(
                 "FREE_SLOTS|role=bass|slot={}|centroid={:.2}|flatness={:.4}",
-                bass_idx_free + 4,
+                bass_idx_free + free_start,
                 free_centroids[bass_idx_free],
                 free_flatness[bass_idx_free]
             );
             println!(
                 "FREE_SLOTS|role=drums|slot={}|centroid={:.2}|flatness={:.4}",
-                drums_idx_free + 4,
+                drums_idx_free + free_start,
                 free_centroids[drums_idx_free],
                 free_flatness[drums_idx_free]
             );
             println!(
                 "FREE_SLOTS|role=harmonics|slot={}|centroid={:.2}|flatness={:.4}",
-                harmonics_idx_free + 4,
+                harmonics_idx_free + free_start,
                 free_centroids[harmonics_idx_free],
                 free_flatness[harmonics_idx_free]
             );
             println!(
                 "FREE_SLOTS|role=ambience|slot={}|centroid={:.2}|flatness={:.4}",
-                ambience_idx_free + 4,
+                ambience_idx_free + free_start,
                 free_centroids[ambience_idx_free],
                 free_flatness[ambience_idx_free]
             );
@@ -988,10 +1044,10 @@ impl TwoPassEngine {
             }
 
             let roles: [(&str, usize); 4] = [
-                ("bass", bass_idx_free + 4),
-                ("harmonics", harmonics_idx_free + 4),
-                ("ambience", ambience_idx_free + 4),
-                ("drums", drums_idx_free + 4),
+                ("bass", bass_idx_free + free_start),
+                ("harmonics", harmonics_idx_free + free_start),
+                ("ambience", ambience_idx_free + free_start),
+                ("drums", drums_idx_free + free_start),
             ];
 
             for (name, c) in roles.iter() {
@@ -1222,7 +1278,7 @@ impl TwoPassEngine {
                 );
             }
 
-            (nmfd_tensor_w, nmfd_tau, bass_idx_free + 4, harmonics_idx_free + 4, ambience_idx_free + 4)
+            (nmfd_tensor_w, nmfd_tau, bass_idx_free + free_start, harmonics_idx_free + free_start, ambience_idx_free + free_start)
         } else {
             (
                 Vec::new(),
