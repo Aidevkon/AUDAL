@@ -51,12 +51,15 @@ fn compute_cplx_spectrogram(signal: &[f32]) -> Vec<Vec<Complex<f32>>> {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut is_semantic = false;
+    let mut is_music = false;
     let mut input_path = String::new();
     let mut output_dir = String::new();
     
     for arg in args.iter().skip(1) {
         if arg == "--semantic" {
             is_semantic = true;
+        } else if arg == "--music" {
+            is_music = true;
         } else if input_path.is_empty() {
             input_path = arg.clone();
         } else if output_dir.is_empty() {
@@ -65,7 +68,7 @@ fn main() {
     }
 
     if input_path.is_empty() || output_dir.is_empty() {
-        eprintln!("Usage: oracle_extract [--semantic] <input.wav> <output_dir>");
+        eprintln!("Usage: oracle_extract [--semantic] [--music] <input.wav> <output_dir>");
         std::process::exit(1);
     }
 
@@ -75,9 +78,14 @@ fn main() {
     let sample_rate = 48000;
 
     let mut engine = TwoPassEngine::new();
-    let scout = engine.scout(&signal, &signal, sample_rate, None, None, true);
+    let profile = if is_music {
+        Some(sp314_dsp::spatial::user_profile::UserSpatialProfile::default_music())
+    } else {
+        None
+    };
+    let scout = engine.scout_with_profile(&signal, &signal, sample_rate, None, None, true, profile);
 
-    let k_b = std::env::var("NMFD_K").unwrap_or("8".to_string()).parse::<usize>().unwrap();
+    let k_b = if is_music { 11 } else { std::env::var("NMFD_K").unwrap_or("8".to_string()).parse::<usize>().unwrap() };
     let n_frames = (signal.len() + 512) / 512 + 10; 
     let nmf_b = NmfEngine::new(k_b);
     
