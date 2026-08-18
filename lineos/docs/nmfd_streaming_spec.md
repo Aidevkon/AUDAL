@@ -25,9 +25,11 @@ TwoPassEngine (65536-sample chunks, 2048/512 STFT), e2e_latency oracle.
 
 ## 2. Two phases
 
-- **W_speech: offline pre-learned 2D templates** (the anatomy of a
-  consonant does not change at minute 5). Shipped as data, versioned,
-  hashed into the certificate like chaos_seed.
+- **W_speech / W_music: offline pre-learned 2D templates** (the anatomy of a
+  consonant or sung vocal prior does not change at minute 5). Shipped as data, versioned
+  (e.g., `w_speech_v1`, `w_music_v1.bin`), hashed into the certificate like chaos_seed.
+  (Updated 2026-08-18: K=8 podcast baseline remains intact; K=14 music profile activates
+  `w_music_v1.bin` under music UserProfile AND weighted_lean < 0.35).
 - **W_noise: seeded from the scout** — the AcxCheck quietest-window
   spectrum (Y-doc §2; analyzer exposes the window position, Phase-2
   step 4). Static per file.

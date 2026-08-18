@@ -150,6 +150,37 @@ confidence=1.0    confidence=posterior    │
    └────────┴────────┴────────┴────────┘         όχι στάδια
 ```
 
+### Learned Priors (NMFD-A)
+
+* **Το Y-Shape (Διακλάδωση)**: Ο κοινός κορμός ανάλυσης (`SegmentScout`) διακλαδώνεται στο NMFD ανάλογα με το προφίλ:
+  * **Podcast Profile ($K=8$)**: ΑΓΓΙΧΤΟ. Διατηρείται 1:1 η baseline identity συμπεριφορά (4 speech + 4 free components).
+  * **Music Profile ($K=14$)**: Ενεργοποιείται το εκπαιδευμένο λεξικό priors (`w_music_v1.bin`).
+  * **Διπλό Gate**: `user_profile == Music` **ΚΑΙ** `weighted_lean < 0.35`. Αν υπάρχει αμφιβολία ταξινόμησης (`lean >= 0.35`), η μηχανή υποχωρεί σκόπιμα σε `BYPASS` ($K=8$).
+
+* **Η Αρχιτεκτονική των Slots ($K=14$)**:
+  * `[0-3]` **speech**: 4 speech components (scout-fitted από τη φωνή του σήματος).
+  * `[4-6]` **drums soak**: 3 percussive templates (απορροφούν τα κρουστικά transients/residue στο fit, δεν δρομολογούνται στη φωνή).
+  * `[7]` **sung-C0 routed**: 1st sung vocal template (δρομολογείται στο `voice_mask`).
+  * `[8]` **jailer (C1)**: δεσμοφύλακας (97.5% της μάζας του στη shared ζώνη 200–330 Hz, εκτελείται σε κάθε fit, απορρίπτεται/DISCARD στο routing).
+  * `[9]` **C2 discarded**: 2nd sung vocal template (απορρίφθηκε/DISCARD λόγω 29.04% synthetic leak — υποψήφιο για synthetic-negative retraining).
+  * `[10-13]` **free**: 4 ελεύθερα NMFD components.
+
+* **Η Αλυσίδα Προέλευσης (Origin Chain)**:
+  * MUSDB $\rightarrow$ Factory scripts (`generate_w_drums_v1.py` / `prototype_w_sung.py`, mel matrix bit-exact από `mel_128.rs`, KL NMFD, $L1=1.0$, discriminative training με 2 frozen bass negatives) $\rightarrow$ `w_music_v1.bin` + `w_music_v1.manifest` + SHA256 checksum.
+  * **Ο Νόμος**: Machine Learning ΜΟΝΟ στο factory (offline Python/Rust tools) $\rightarrow$ Στατικοί πίνακες / binary blobs στο runtime Rust DSP.
+
+* **Οι Φρουροί (Guards)**:
+  * **Bass-theft 8%**: SIR-validated κατώφλι (από 1% σε 8%, SIR 32.89 dB, $\zeta$ -47%/-65%, επιβεβαιωμένο με διπλή ακρόαση).
+  * **Synthetic R1 / R2**: R1 (drums 4-6) $\le 8\%$ (μετρήθηκε 0.32%), R2 (routed-sung C0 slot 7) $\le 8\%$ (μετρήθηκε 0.47%).
+  * **Drone $\times 3$**: 3 συνθετικά fixtures / drone tests.
+  * **Podcast Bypass Identity**: Το podcast path παραμένει 100% bit-exact και ανεπηρέαστο.
+  * **w19 Silence Leak**: Το φάντασμα (silence leak $\sim -38\text{ dB}$ ορχήστρας στα 13s σιωπής του `am_contra`, προϋπάρχον legacy leak πριν τα learned priors). Cure: voice-H gating, καταγεγραμμένο στο ledger.
+
+* **Μετρημένα Αποτελέσματα**:
+  * Cross-talk $K=8 \rightarrow K=14$: $0.4812 \rightarrow 0.2162$ (ratio 0.5) / $0.1850 \rightarrow 0.0447$ (ratio 0.9).
+  * SIR: 34.5 dB.
+  * Voice Mask Energy Gain: $+4.03\text{ dB}$.
+
 ---
 
 ## ΠΙΣΤΟΠΟΙΗΤΙΚΟ = PROJECT FILE = COMMIT
@@ -1233,6 +1264,12 @@ HPSS mask_h → NMFD
     κατάτμηση σκόπιμα (time-domain multiply, το μόνο stem
     με ανέπαφη φάση — S1). Η αφαιρεμένη ενέργεια υπάρχει
     ήδη εκεί· η αφαίρεση είναι η λύση, όχι τρύπα.
+    (Υποσημείωση 2026-08-18: Το drums stem παραμένει
+    HPSS-owned ως προς το τελικό output routing. Όμως
+    στο NMFD K=14, τα slots [4-6] υπάρχουν πλέον ως
+    percussive soak slots στη συνθετική/μουσική διαδρομή
+    για να απορροφούν τα κρουστικά transients στο fit,
+    εμποδίζοντας τη διαρροή τους στη φωνή).
     ΜΕΤΡΗΜΕΝΟ ΑΠΟΤΕΛΕΣΜΑ: +0.7 dB level (LUFS −16.66 →
     −15.96), stereo ratio 1.0394 έναντι 1.0391 του
     decoder, τυφλή level-matched ακρόαση: καθαρότερος
