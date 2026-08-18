@@ -135,3 +135,73 @@ fn test_w18_nmfd_guard() {
         println!("ACOUSTIC DRUMS GUARD: PASS");
     }
 }
+
+#[test]
+fn test_k11_e2e_hash() {
+    use std::hash::{Hash, Hasher};
+    use std::collections::hash_map::DefaultHasher;
+
+    let acoustic_path = Path::new("tests/fixtures/am_contra_30s.wav");
+    if !acoustic_path.exists() {
+        println!("SKIPPED: am_contra_30s.wav missing");
+        return;
+    }
+
+    let (mut acoustic_sig, acoustic_sr) = read_audio_mono(acoustic_path);
+    // Use first 5 seconds to keep the test fast
+    acoustic_sig.truncate(acoustic_sr as usize * 5);
+
+    let mut two_pass = TwoPassEngine::new();
+    let scout = two_pass.scout_with_profile(
+        &acoustic_sig, 
+        &acoustic_sig, 
+        acoustic_sr, 
+        None, 
+        None, 
+        true, 
+        Some(sp314_dsp::spatial::user_profile::UserSpatialProfile::default_music())
+    );
+
+    let mut stft = StftEngine::new();
+    let (cplx_frames, n_frames) = stft.forward(&acoustic_sig);
+
+    let mut c_v = vec![0.0_f32; 128 * n_frames];
+    for f in 0..n_frames {
+        let mut mag_frame = [0.0_f32; 1025];
+        for b in 0..1025 {
+            mag_frame[b] = cplx_frames[f][b].norm();
+        }
+        let mel_frame = fold_to_mel(&mag_frame);
+        for b in 0..128 {
+            c_v[b * n_frames + f] = mel_frame[b];
+        }
+    }
+
+    let nmfd_k = 11;
+    let init_h = vec![0.1_f32; nmfd_k * n_frames];
+
+    let (nmfd_h, _) = nmfd_f32_h_only(
+        &c_v,
+        &scout.tensor_w,
+        &init_h,
+        128,
+        nmfd_k,
+        n_frames,
+        scout.tau,
+        12,
+    );
+
+    // Hash the resulting activations (nmfd_h) as a proxy for the entire e2e state
+    let mut hasher = DefaultHasher::new();
+    for &val in &nmfd_h {
+        // Hash the bit representation to ensure perfect determinism
+        val.to_bits().hash(&mut hasher);
+    }
+    let hash_val = hasher.finish();
+
+    println!("K=11 e2e Hash (5s am_contra): {}", hash_val);
+    
+    // We just enforce that we don't crash and we get a hash.
+    // If the golden changes, this will catch it in CI if we hardcode it.
+    assert_eq!(hash_val, 9828982911867054330);
+}

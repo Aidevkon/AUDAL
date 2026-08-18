@@ -1572,7 +1572,11 @@ impl TwoPassEngine {
         let mask = self
             .nmf
             .component_mask_chunk(component, &self.nmf.h, n_frames, n_bins);
-        apply_mask_to_chunk(proxy, &mask, n_frames)
+        let mut out = apply_mask_to_chunk(proxy, &mask, n_frames);
+        if out.len() % 2 != 0 {
+            out.push(0.0);
+        }
+        out
     }
 
     // ── Pass 2 — process_chunks ──────────────────────────────────────

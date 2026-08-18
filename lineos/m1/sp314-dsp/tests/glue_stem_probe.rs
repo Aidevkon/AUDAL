@@ -6,12 +6,15 @@ use sp314_dsp::analysis::phi1_sensor::{Phi2StreamingFrontend, Phi2Pcen, Phi2Sens
 #[test]
 fn test_glue_stem_probe() {
     let files = [
-        "/tmp/glue_amb/nmf5/ambience.wav",
-        "/tmp/glue_amb/nmf5/harmonics.wav",
-        "/tmp/glue_amb/nmf5/vocals.wav",
-        "/tmp/glue_amb/nmfd8/ambience.wav",
-        "/tmp/glue_amb/nmfd8/harmonics.wav",
-        "/tmp/glue_amb/nmfd8/vocals.wav",
+        "tests/fixtures/glue_amb/nmf5/ambience.wav",
+        "tests/fixtures/glue_amb/nmf5/harmonics.wav",
+        "tests/fixtures/glue_amb/nmf5/vocals.wav",
+        "tests/fixtures/glue_amb/nmfd8_k8/ambience.wav",
+        "tests/fixtures/glue_amb/nmfd8_k8/harmonics.wav",
+        "tests/fixtures/glue_amb/nmfd8_k8/vocals.wav",
+        "tests/fixtures/glue_amb/nmfd8_k11/ambience.wav",
+        "tests/fixtures/glue_amb/nmfd8_k11/harmonics.wav",
+        "tests/fixtures/glue_amb/nmfd8_k11/vocals.wav",
     ];
 
     println!("{:<35} | {:<7} | {:<7} | {:<8} | {:<8}", "file", "p_mean", "p_max", "ratio_05", "ratio_09");
