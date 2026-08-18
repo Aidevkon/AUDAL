@@ -271,13 +271,13 @@ fn test_nmfd_fit_cost() {
         false,
     );
 
-    // G: K=11 (Music config golden)
+    // G: K=14 (Music config golden)
     run_variant(
         "G_K11_MUSIC",
         &dec_mel_v,
         n_mels,
         dec_frames,
-        11,
+        14,
         tau,
         12,
         true,

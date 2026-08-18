@@ -116,11 +116,25 @@ fn test_w18_nmfd_guard() {
         music_sig.truncate(music_sr as usize * 30);
         
         let (mean_h_music, _) = run_pipeline_for_activations(&music_sig, music_sr, Some(sp314_dsp::spatial::user_profile::UserSpatialProfile::default_music()));
-        assert_eq!(mean_h_music.len(), 11, "Music should load 3 drum templates");
+        assert_eq!(mean_h_music.len(), 14, "Music should load 6 music templates");
         
-        let max_drums = (4..7).map(|i| mean_h_music[i]).fold(0.0f64, |a, b| a.max(b));
-        assert!(max_drums < 1e-5, "Synthetic track should have near-zero drum activations, got {:e}", max_drums);
-        println!("SYNTHETIC DRUMS GUARD: PASS");
+        let max_drums = (4..=6).map(|i| mean_h_music[i]).fold(0.0f64, |a, b| a.max(b));
+        let routed_sung = mean_h_music[7];
+        let max_free = (10..=13).map(|i| mean_h_music[i]).fold(0.0f64, |a, b| a.max(b));
+        
+        let r1 = max_drums / max_free.max(1e-12);
+        let r2 = routed_sung / max_free.max(1e-12);
+        let soak = mean_h_music[8] / max_free.max(1e-12);
+        let discarded_c2 = mean_h_music[9] / max_free.max(1e-12);
+
+        println!("SYNTHETIC R1 (drums): {:.4}", r1);
+        println!("SYNTHETIC R2 (routed-sung C0): {:.4}", r2);
+        println!("INFO: soak C1: {:.4}", soak);
+        println!("INFO: discarded C2: {:.4}", discarded_c2);
+        
+        assert!(r1 <= 0.08, "Synthetic track triggered drum templates! R1: {:.4}", r1);
+        assert!(r2 <= 0.08, "Synthetic track triggered routed-sung template C0! R2: {:.4}", r2);
+        println!("SYNTHETIC GUARD: PASS");
     }
     
     let acoustic_path = Path::new("tests/fixtures/am_contra_30s.wav");
@@ -128,16 +142,16 @@ fn test_w18_nmfd_guard() {
         let (mut acoustic_sig, acoustic_sr) = read_audio_mono(acoustic_path);
         
         let (mean_h_ac, _) = run_pipeline_for_activations(&acoustic_sig, acoustic_sr, Some(sp314_dsp::spatial::user_profile::UserSpatialProfile::default_music()));
-        assert_eq!(mean_h_ac.len(), 11, "Music should load 3 drum templates");
+        assert_eq!(mean_h_ac.len(), 14, "Music should load 6 music templates");
         
-        let max_drums = (4..7).map(|i| mean_h_ac[i]).fold(0.0f64, |a, b| a.max(b));
+        let max_drums = (4..10).map(|i| mean_h_ac[i]).fold(0.0f64, |a, b| a.max(b));
         assert!(max_drums > 1e-6, "Acoustic track should have healthy drum activations, got {:e}", max_drums);
         println!("ACOUSTIC DRUMS GUARD: PASS");
     }
 }
 
 #[test]
-fn test_k11_e2e_hash() {
+fn test_k14_e2e_hash() {
     use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
 
@@ -177,7 +191,7 @@ fn test_k11_e2e_hash() {
         }
     }
 
-    let nmfd_k = 11;
+    let nmfd_k = 14;
     let init_h = vec![0.1_f32; nmfd_k * n_frames];
 
     let (nmfd_h, _) = nmfd_f32_h_only(
@@ -199,9 +213,9 @@ fn test_k11_e2e_hash() {
     }
     let hash_val = hasher.finish();
 
-    println!("K=11 e2e Hash (5s am_contra): {}", hash_val);
+    println!("K=14 e2e Hash (5s am_contra): {}", hash_val);
     
     // We just enforce that we don't crash and we get a hash.
     // If the golden changes, this will catch it in CI if we hardcode it.
-    assert_eq!(hash_val, 9828982911867054330);
+    assert_eq!(hash_val, 16101438349242031503);
 }

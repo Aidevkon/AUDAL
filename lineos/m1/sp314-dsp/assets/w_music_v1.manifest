@@ -1,0 +1,26 @@
+# w_music_v1.bin Manifest
+
+**Dimensions:** 128 (mel bands) x 6 (components) x 8 (tau frames)
+**Size:** 24,576 bytes
+
+## Components
+- **Slots 0-2 (Drums)**:
+  - Source: `w_drums_v1.bin`
+  - Training Data: MUSDB18-HQ (drums stems)
+  - Pre-processing: NO HIGHPASS FILTER
+  - Alignment: Attack aligned to tau=1
+
+- **Slots 3-5 (Sung Vocals)**:
+  - Source: `w_sung_v4.bin`
+  - Training Data: MUSDB18-HQ (vocals stems)
+  - Pre-processing: 200Hz HIGHPASS FILTER (sosfiltfilt, 8th order) applied to raw waveform before STFT. Silence masking applied.
+  - Alignment: Unaligned (natural NMFD convergence into harmonics vs consonants)
+  - Role assignments:
+    - K=4: Soak component (discard)
+    - K=3, K=5: Formants/Consonants (voice_mask)
+
+## Norms
+- L1 Norm is exactly 1.0 for all 6 components.
+
+## Integrity
+- **SHA256**: 449ce8947736aa1133914ad81c622f50bf2c7fa39a5c8b5db6c1f7bd85a52543

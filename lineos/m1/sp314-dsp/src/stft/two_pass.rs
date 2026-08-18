@@ -358,9 +358,15 @@ pub(crate) fn process_single_chunk(
         // −8.7dB in final LUFS (−25.13 vs −16.42).
         let nmfd_engine = crate::stft::nmf::NmfEngine::new(nmfd_k);
 
+        let voice_routing: Vec<usize> = if nmfd_k >= 10 {
+            vec![0, 1, 2, 3, 7] // C2 routed->discarded 2026-08-18, synthetic leak 29% - candidate for synthetic-negative retraining, see ledger.
+        } else {
+            vec![0, 1, 2, 3]
+        };
+
         (
             nmfd_engine.nmfd_group_mask_chunk(
-                &[0, 1, 2, 3],
+                &voice_routing,
                 &nmfd_h,
                 &scout.tensor_w,
                 n_frames,
@@ -817,9 +823,9 @@ impl TwoPassEngine {
                 weighted_lean,
                 if use_drums { "PASS" } else { "BYPASS" });
 
-            let nmfd_k = if use_drums { 11 } else { 8 };
-            let nmfd_frozen_k = if use_drums { 7 } else { 4 };
-            let free_start = if use_drums { 7 } else { 4 };
+            let nmfd_k = if use_drums { 14 } else { 8 };
+            let nmfd_frozen_k = if use_drums { 10 } else { 4 };
+            let free_start = if use_drums { 10 } else { 4 };
             let nmfd_num_iter = 30;
             let nmfd_seed = 314159;
 
@@ -837,12 +843,12 @@ impl TwoPassEngine {
                 w_speech[i] = f32::from_le_bytes(W_SPEECH_V1[i * 4..(i + 1) * 4].try_into().unwrap());
             }
 
-            // 1b. w_drums_v1.bin (K=3)
-            static W_DRUMS_V1: &[u8] = include_bytes!("../../assets/w_drums_v1.bin");
-            const _: () = assert!(W_DRUMS_V1.len() == 128 * 3 * 8 * 4);
-            let mut w_drums = vec![0.0_f32; 128 * 3 * 8];
-            for i in 0..128 * 3 * 8 {
-                w_drums[i] = f32::from_le_bytes(W_DRUMS_V1[i * 4..(i + 1) * 4].try_into().unwrap());
+            // 1b. w_drums_v1.bin (K=3) (and sung vocals v4 K=3 as well, combined in w_music_v1)
+            static W_MUSIC_V1: &[u8] = include_bytes!("../../assets/w_music_v1.bin");
+            const _: () = assert!(W_MUSIC_V1.len() == 128 * 6 * 8 * 4);
+            let mut w_music = vec![0.0_f32; 128 * 6 * 8];
+            for i in 0..128 * 6 * 8 {
+                w_music[i] = f32::from_le_bytes(W_MUSIC_V1[i * 4..(i + 1) * 4].try_into().unwrap());
             }
 
             // 2. Fill slots 0-3 frozen (speech)
@@ -855,13 +861,13 @@ impl TwoPassEngine {
                 }
             }
             
-            // 2b. Fill slots 4-6 frozen (drums) if used
+            // 2b. Fill slots 4-9 frozen (drums 4-6, sung 7-9) if used
             if use_drums {
                 for m in 0..128 {
-                    for r in 0..3 {
+                    for r in 0..6 {
                         for tau in 0..nmfd_tau {
                             init_w[(m * nmfd_k * nmfd_tau) + ((r + 4) * nmfd_tau) + tau] =
-                                w_drums[(m * 3 * nmfd_tau) + (r * nmfd_tau) + tau];
+                                w_music[(m * 6 * nmfd_tau) + (r * nmfd_tau) + tau];
                         }
                     }
                 }
