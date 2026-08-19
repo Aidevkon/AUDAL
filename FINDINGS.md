@@ -18,6 +18,9 @@ Format per entry: ID, Status, Component, Trigger, one-paragraph context.
 
 ## ACTIVE / PARKED
 
+Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 paths updated. NOTE: τα 21 εναπομείναντα ACTIVE επαληθεύτηκαν ΜΟΝΟ ως προς ύπαρξη component, ΟΧΙ ως προς συμπεριφορά — per-entry επαλήθευση όταν πυροδοτηθεί ο trigger τους.
+
+
 ## CANDIDATES — unbaptized, 2026-08-18 (NMFD/gating era; ο Anestis βαφτίζει από NEXT FREE)
 
 - **[CAND-A] micro-VAD rejected for music gating.** Component: vad_model/scout. Μετρήθηκε (18/08): 97.35% leak σε tambura/violin (το tonality σήμα λέει «φωνή» σε κάθε αρμονικό sustained), 89.66% chop σε rock vocals. Στο podcast παραμένει άψογος (chop 0.12%). Trigger: οποιαδήποτε πρόταση επαναχρήσης VAD στο music path.
@@ -144,7 +147,7 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 
 ### F-005 — No mechanism to forward live UI parameter changes during an active crossfade
 - **Status:** PARKED (real feature, not a bug)
-- **Component:** `apps/runtime/loom/src/engine.rs`
+- **Component:** `lineos/m1/xaak/src/engine.rs` (path updated 2026-08-19)
 - **Trigger:** If users report "my knob change didn't apply" during
   playback near a section boundary.
 - **Context:** Discovered while fixing the crossfade dummy-clone bug.
@@ -192,7 +195,7 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 
 ### F-009 — sparse_scout: mono-channel handling reviewed but untested; ITU-R BS.1770-4 non-compliance in 5.1 documented but not fixed
 - **Status:** PARKED
-- **Component:** `m0-daemon/src/dsp/sparse_scout.rs`
+- **Component:** `lineos/m1/sp314-orchestrator/src/sparse_scout.rs` (path updated 2026-08-19)
 - **Trigger:** If mono input handling or 5.1 loudness gating produces a
   user-visible bug report.
 - **Context:** Doc-comment added (§11.6) noting the spec gap; no test
@@ -301,17 +304,6 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
   (νέο corpus version, ρητά σημειωμένο ως αλλαγή). Καμία σιωπηλή
   version drift ποτέ.
 
-### F-018 — measure_genre_centroids.rs has no sanity check for track duration
-- **Status:** PARKED (low risk, manual curation should catch this)
-- **Component:** `m0-daemon/tests/measure_genre_centroids.rs`
-- **Trigger:** Αν κατά λάθος μπει πολύ μεγάλο αρχείο (π.χ. ολόκληρο CD
-  rip αντί για ένα track) στο `genre_references/` folder.
-- **Context:** Δεν υπάρχει έλεγχος duration/file-size πριν το processing.
-  Discovered while automating reference-track download attempts —
-  some archive.org "tracks" were actually full album rips. Manual
-  curation (choosing individual, correctly-labeled tracks) should
-  avoid this in practice, but the tool itself doesn't defend against it.
-
 ### F-022 — GenreClassifier implemented, wiring pending
 - **Status:** ACTIVE
 - **Component:** `lineos/m1/sp314-dsp/src/analysis/genre_classifier.rs` (NOTE: relocated to lineos-corpus/src/classifier.rs in Βήμα C, 2026-07-10)
@@ -333,7 +325,7 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 
 ### F-025 — SBR band indices have two sources of truth
 - **Status:** PARKED
-- **Component:** aether-bridge/src/reference_resolver.rs
+- **Component:** `shared/aether-bridge/src/reference_resolver.rs` (path updated 2026-08-19)
 - **Trigger:** when SBR enters the resolve path or a music profile uses different SBR bands
 - **Context:** compute_sbr_delta uses the SBR_LO/SBR_HI consts while the schema-v2 profile carries sbr_lo/sbr_hi. Not in the production path today (tests only).
 
@@ -393,27 +385,9 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 - **Trigger:** Fix this test infrastructure bug (e.g., compute phase modulo 2*PI, or use f64) before trusting the 179s spectral baseline or post-swap numbers.
 - **Context:** The 178.86s fixture itself degrades over time due to f32 phase-accumulation error in the `sin()` argument. Specifically, `2.0 * PI * 440.0 * t` grows past `f32`'s usable mantissa precision at this duration (~494,435 radians leaves only ~5 bits for the fractional phase). This causes severe high-frequency quantization distortion, skewing the input centroid from 192Hz (at 4s) to 294Hz (at 179s) regardless of STFT pipeline correctness.
 
-### F-036 — pad_frames=20 undersized discard leaks history frames into output
-- **Status:** ACTIVE
-- **Component:** `lineos/m1/sp314-dsp/src/stft/two_pass.rs`
-- **Trigger:** Part of Cycle 1's definition of done — needs fixing alongside the `StreamingStftEncoder` boundary swap.
-- **Context:** The `pad_frames=20` logic discards exactly 10240 samples worth of frames at chunk boundaries to account for the prepended HPSS lookback history. However, it fails to account for the encoder's internal leading zero-pad (1024 samples / 2 frames for `StreamingStftEncoder`, 2560 samples / 5 frames for the old `StftStreamContext`) pushing the actual audio further into the matrix. A synthetic test directly inspecting frame magnitudes (100Hz history vs 2000Hz real data) proved that `pad_frames=20` leaves Frame 20 severely mixed and Frame 21 contaminated with history energy. This means 2 frames of prior-chunk history leak into the core output at every chunk boundary, causing an overlap/stutter every 1.3 seconds.
-
-### F-037 — two_pass.rs appends 1024 samples of hardcoded silence to every rendered output
-- **Status:** ACTIVE
-- **Component:** `lineos/m1/sp314-dsp/src/stft/two_pass.rs`
-- **Trigger:** My recommendation: Fix in Cycle 1 alongside F-036, since both touch the exact same chunk-boundary state logic in `process_chunks_with_params` and the subsequent test pass will verify both simultaneously.
-- **Context:** The streaming pipeline uses direct time-domain envelope masking (`apply_mask_to_chunk`), not Inverse STFT — there is no real OLA/ISTFT reconstruction anywhere in this path (the `OlaRingBuffer` struct exists but is dead code). Despite this, `two_pass.rs` unconditionally appends a 1024-sample all-zero `FiveStemsChunk` after the real chunk loop finishes, solely to match the byte-length the old ISTFT-based pipeline used to produce ("legacy OLA-tail compatibility hack"). This adds ~21.3ms of trailing silence to every single rendered master. It is not trimmed anywhere downstream — `frames_written` counts it as real audio and it lands directly in the output file on disk.
-
-### F-040 — n_total silently truncated all Music/Stereo final masters to 30s
-- **Status:** ACTIVE
-- **Component:** `lineos/m0/m0-daemon/src/domain/dsp_pipeline.rs`
-- **Trigger:** To be fixed immediately before A3 Step 1 commit.
-- **Context:** `dsp_pipeline.rs` used `mono.len()` (the 30s scout proxy length) instead of `chunk.left.len()` (the actual full track duration) to size `left_vec/right_vec` and set the processing boundaries. This was introduced in commit `0d90d21` (June 29, `lazy_scout`). This silently truncated the pre-allocated output buffers and the inner DSP loop to exactly 30 seconds regardless of the actual track length. Any track longer than 30s processed by the Music path produced a completely valid but brutally chopped 30s FLAC/WAV master file. It did not cause a panic or crash because all arrays (the proxy input and the destination vectors) were aligned to exactly 30s perfectly. The truncation was completely masked in CI because the existing integration test (`e2e_corpus_music_path_uses_30s_proxy`) only asserted the number of Markov transitions generated during the scout pass (which successfully proved the proxy was used) but never asserted the total audio duration or byte length of the final output payload.
-
 ### F-041 — Micro-VAD Scout classifier non-functional & audited feature replacement
 - **Status:** ACTIVE
-- **Component:** `m0-daemon/src/dsp/sparse_scout.rs`, `sp314-dsp/src/analysis/`, `genre_centroids_generated.rs`
+- **Component:** `lineos/m1/sp314-orchestrator/src/sparse_scout.rs`, `sp314-dsp/src/analysis/`, `genre_centroids_generated.rs` (path updated 2026-08-19)
 - **Trigger:** Before attempting to wire or re-enable the Micro-VAD Scout / Macro-Scout Router bypass.
 - **Context:** A comprehensive empirical audit across 170 audio files (130 consistently-extracted tracks + 40 held-out tracks) revealed:
 
@@ -465,12 +439,6 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 
   Not resolved. Recorded so that nothing else is built on the assumption that voice means voice.
 
-### F-042 — On the stereo path, separation is equivalent to a shelf EQ
-- **Status:** PARKED
-- **Component:** `sp314-dsp/src/spatial/stereo.rs`
-- **Trigger:** Revisit when attempting to optimize or redesign the stereo downmix for music or speech.
-- **Context:** Comparing a normal render against the same file forced through `skip_stems` yields a high correlation (0.86 for speech/classical, 0.65 for music). The spectral difference is a monotonic tilt (+3.66 dB at 63 Hz falling to -0.94 dB at 16 kHz). Applying a matching low-shelf to the unseparated render raises the correlation to >0.95. The entire audible contribution of NMF, HPSS, and the spatial stage on stereo output is reproducible with a two-pole filter, likely because the "bass" component (lfe_weight 0.8) gains low-frequency energy by construction. Separation is only genuinely required for the 5.1 render, MaskingEQ ratios, and corpus features, not for the stereo output.
-
 ### F-043 — The spatial stage produces no width, and its output is not consumed
 - **Status:** PARKED (Not repaired. Recorded so the cost of the spatial subsystem is known)
 - **Component:** `sp314-dsp/src/spatial/five_dot_one.rs`
@@ -479,7 +447,7 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 
 ### F-047 — THE PODCAST REFERENCE TARGET DESCRIBES A DIFFERENT RECORDING CONDITION THAN THE MATERIAL IT CORRECTS.
 - **Status:** ACTIVE
-- **Component:** `aether-bridge/src/reference_resolver.rs`, `shared/schema/reference-profiles/podcast-v1.json`
+- **Component:** `shared/aether-bridge/src/reference_resolver.rs`, `shared/schema/reference-profiles/podcast-v1.json` (path updated 2026-08-19)
 - **Trigger:** Revisit before altering targets or addressing LTASS miscalibrations.
 - **Context:** podcast-v1's spectral target comes from Byrne et al. 1994, which measured free-field speech. The material it corrects is close-mic podcast and audiobook recording. Measured on three known-good speech files, the deviations are systematic and directional:
 
@@ -651,48 +619,8 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
   parameterization instead of format!-escaping. One write site, correct
   data.
 
-### F-050 — hardcoded /tmp/ paths: test side RESOLVED, production side OPEN
-- **Status:** SPLIT — test side RESOLVED (tempfile migration, 9 files / 46
-  paths, one straggler beyond the original recon's 45-in-8 count, zero
-  test-logic changes, agent-executed in 9 reviewed cycles). Production
-  side OPEN: decode_node/dsp_pipeline/episode_render write m0d-raw/
-  master/scratch dumps, executor writes v3-streaming output, render_node
-  writes vad-trace CSVs — all to bare /tmp. Different risk than the test
-  collisions (blob ids unique, no cross-process clash): no cleanup on
-  failed renders (/tmp litter), tmpfs RAM pressure for GB-scale dumps on
-  RAM-backed /tmp, loss on reboot. RESOLVED in two steps: tiers 1+3
-  (cc1c78a — spool dir + RAII scratch guards) and tier 2 (fe0f209 —
-  persistent masters): renders carrying project_id+track_id FLAC-encode
-  the master to masters_path/<project>/<track>.flac via
-  io_flac::encode_f32_flac_24 (24-bit, deterministic round-half-even,
-  NO dither — reproducibility over -144 dB theoretical purity; a test
-  pins encode-twice-same-bytes), outside spool/ManagedPcm/sweep, never
-  auto-deleted. Track.audio_path points at the durable file; delivery
-  survives restarts with zero deliver.rs changes.
-  Accepted rough edges, deliberately recorded: (1) the persist block
-  exists TWICE — full-file path and O(1) streaming fast path (the acx
-  preset takes the latter, discovered by the persist test) — pending
-  extraction into a shared helper; (2) FLAC decode returns block-padded
-  length (+<4096 frames of trailing zeros) — harmless for MP3 delivery
-  (drowns in the codec's own padding), but any future consumer doing
-  exact-length math must truncate to the Track's real frame count;
-  (3) project/track id sanitization strips path separators rather than
-  rejecting them — two ids differing only in slashes collide;
-  (4) retention is 'never auto-delete' by design — when disks fill, the
-  answer is UI visibility of masters size, not silent deletion; project
-  delete (when it exists) removes the folder.
-  Process lesson from the four-phase run: phase gates listed named test
-  suites and missed that a suite OUTSIDE the list wouldn't even compile
-  (RenderArtifacts lacked Debug; e2e_tier1_abort caught it at workspace
-  time). Every multi-phase contract now gates on
-  cargo build --all-targets, not just named suites.
-- **Original status:** ACTIVE — mechanical fix deferred to its own session
-- **Component:** m0-daemon test code in 8 files: standardized_stream.rs, input_lufs.rs, six_channel_stream.rs, decode_node.rs, dsp_pipeline.rs, lazy_reader.rs, stream_core.rs, wav_to_raw.rs (tests within src/, plus tests/)
-- **Trigger:** Before setting up parallel CI runners sharing /tmp, and whenever a test fails with file-not-found or corrupt-WAV symptoms on fixture paths while another cargo test process is running.
-- **Context:** Agent recon 2026-07-30: 45 hardcoded /tmp/ fixture paths, zero use of the tempfile crate in tests even though tempfile already sits in the dependencies. Names are unique PER TEST, so a single cargo test run cannot collide with itself — the collision is BETWEEN two cargo test processes writing the same absolute paths (half-written WAV -> symphonia "No such file or directory"/corrupt header on the other side). This stopped being theoretical the day dev+agent parallel test runs became the routine workflow: it fired twice within one hour on 2026-07-30 (m0d WAV fixtures, initially misread as "a parallel race condition" in an agent report). Two files are only partially exposed: decode_node.rs interpolates blob ids and stream_core.rs uses a uuid for one path (safe) but keeps one fixed name (f047_dummy.wav). Fix is mechanical — tempfile::TempDir per test — and well-suited to an agent under a per-file write contract; 45 sites is a session of its own, not a drive-by. Distribution table in the 2026-07-30 transcript.
-
 ---
-## RESOLVED THIS SESSION (for traceability — see git log for full detail)
+## RESOLVED (for traceability — see git log for full detail)
 
 | ID | One-line summary | Commit |
 |----|----|----|
@@ -705,7 +633,20 @@ after a `grep -rn "F-0XX"` across the repo confirms the number is clean.
 | R-007 | GitHub CI never actually verified — 3 missing Linux/macOS system deps, clippy flags drifted from Justfile, Gate 5 OOM on shared runners | `775ccd4`, `cdd7a2f`, + 2 more |
 | R-008 | Item 10 (cross-platform float determinism) — verified non-issue via real ARM64 CI run, not theory | (same CI commits) |
 | R-009 | Two e2e tests (e2e_agent_pipeline.rs, e2e_album_sse.rs) used hardcoded personal-machine absolute paths with no portability guard — one masked by a race condition that made it appear to pass in earlier local runs | `1009def` |
-| F-023 | S-002 stem-count drift (4→5 stems) fixed to match real FiveStems code | `pending commit` |
+| F-023 | S-002 stem-count drift (4→5 stems) fixed to match real FiveStems code | `abfd100` |
+| F-036 | pad_frames=20 undersized discard leaks history | `524ab1f` |
+| F-037 | two_pass.rs appends 1024 samples of hardcoded silence | `524ab1f` |
+| F-040 | n_total silently truncated all Music/Stereo final masters to 30s | `f23102d` |
+| F-050 | hardcoded /tmp/ paths | `cc1c78a` |
+
+---
+
+## OBSOLETE (component deleted)
+
+| ID | One-line summary |
+|----|----|
+| F-018 | measure_genre_centroids.rs has no sanity check for track duration |
+| F-042 | On the stereo path, separation is equivalent to a shelf EQ |
 
 ---
 
