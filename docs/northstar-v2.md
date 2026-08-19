@@ -1709,3 +1709,13 @@ Jini vocabulary) — ΠΟΤΕ runtime εξάρτηση.
 άξονες → mastering συνταγές → Jini. Θεμέλιο: τα k=2/k=3
 centroids ως ονομασμένες άγκυρες αν χρειαστούν presets. Τεκμήρια:
 research/genre-teacher/out/ (ph3 / ph1_5 / ph1_6 summaries + png).
+
+ΔΥΟ ΔΙΕΥΚΡΙΝΙΣΕΙΣ, ΜΕΤΡΗΜΕΝΕΣ (2026-08-19):
+· Τα 57 features δεν είναι Essentia — βγαίνουν από το ΔΙΚΟ ΜΑΣ
+Rust CLI (target/release/features, extract_features_1800.py:9).
+⇒ τα Π1.5/Π1.6 μέτρησαν ακριβώς ό,τι βλέπει το runtime· η Φάση 2
+είναι wiring, όχι έρευνα.
+· Τα ονόματα των λεκανών (η φωνή της Jini) ΨΗΝΟΝΤΑΙ OFFLINE
+από τα CLAP tags του χάρτη — στο runtime είναι ΣΤΑΘΕΡΕΣ strings
+πάνω σε περιοχές αξόνων (δόγμα Ζ: η εξήγηση αλλάζει, τα
+νούμερα όχι). Μηδέν CLAP στο binary, μηδέν inference για λόγια.
