@@ -179,7 +179,7 @@ confidence=1.0    confidence=posterior    │
 * **Μετρημένα Αποτελέσματα**:
   * Cross-talk $K=8 \rightarrow K=14$: $0.4812 \rightarrow 0.2162$ (ratio 0.5) / $0.1850 \rightarrow 0.0447$ (ratio 0.9).
   * SIR: 34.5 dB.
-  * Voice Mask Energy Gain: $+4.03\text{ dB}$.
+  * Voice Mask Energy Gain: $+2.13\text{ dB}$ (corrected 2026-08-18: the +4.03 figure came from a stale K=13 test with the jailer in the mask).
 
 ---
 

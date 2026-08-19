@@ -59,7 +59,7 @@ fn test_voice_mask_gain() {
         }
     }
 
-    let nmfd_k = 13;
+    let nmfd_k = 14;
     let init_h = vec![0.1_f32; nmfd_k * n_frames];
 
     let (nmfd_h, _) = nmfd_f32_h_only(
@@ -75,7 +75,7 @@ fn test_voice_mask_gain() {
 
     let nmfd_engine = NmfEngine::new(nmfd_k);
     let mask_old = nmfd_engine.nmfd_group_mask_chunk(&[0, 1, 2, 3], &nmfd_h, &scout.tensor_w, n_frames, 1025, scout.tau);
-    let mask_new = nmfd_engine.nmfd_group_mask_chunk(&[0, 1, 2, 3, 7, 8], &nmfd_h, &scout.tensor_w, n_frames, 1025, scout.tau);
+    let mask_new = nmfd_engine.nmfd_group_mask_chunk(&[0, 1, 2, 3, 7], &nmfd_h, &scout.tensor_w, n_frames, 1025, scout.tau);
 
     let mut energy_old = 0.0f64;
     let mut energy_new = 0.0f64;
@@ -98,4 +98,7 @@ fn test_voice_mask_gain() {
     println!("RMS OLD (Speech Only): {:.6}", rms_old);
     println!("RMS NEW (Speech+Sung): {:.6}", rms_new);
     println!("GAIN (dB): {:+.4} dB", gain_db);
+
+    // Measured +2.13 dB baseline on 2026-08-18 (tolerance -0.5 dB)
+    assert!(gain_db >= 2.13 - 0.5, "Voice mask energy gain regressed! Gain: {:.4} dB", gain_db);
 }

@@ -94,5 +94,14 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - Agent recon χωρίς το chat context ΔΕΝ ξέρει τι έγινε στη σημερινή συνεδρία — δώσε του "state of the repo" section στο prompt, αλλιώς θα προτείνει δουλειά που έγινε (συνέβη: πρότεινε το ACX wiring μία ώρα αφού είχε γίνει merge).
 - Recon prompts: μικρά single-line anchors σε python patches, ΟΧΙ πολυγραμμικά string blocks — τρία whitespace ατυχήματα σε μία βραδιά (αόρατα \n\n).
 
+## Rediscovered 2026-08-18 (NMFD/gating session)
+
+- **duck_splice fixtures** (`sp314-dsp/tests/fixtures/duck_splice/`): speech_segment + skelpolu_bed + synth_bed + έτοιμα mixes σε SNR −15 + manifest.json. ΚΑΤΑΣΚΕΥΑΣΜΕΝΟ ground truth φωνής-πάνω-σε-μουσική (χτίστηκαν για τις W2 Ducker δίκες). Ξαναβρέθηκαν μέσω docs/lab-logs/inventory_dangling.md ενώ το gating κεφάλαιο χρειαζόταν ΑΚΡΙΒΩΣ αυτό.
+- **control_bus.rs** (`sp314-dsp/src/dsp/`): Ducker ballistics — attack ~30ms, release ~500ms, DUCK_DEADZONE 0.30, DUCK_FLOOR_DB −12, NaN/Inf freeze guard. Επαναχρησιμοποιήσιμο σχήμα envelope για per-frame control gain. Γενίκευση σε `EnvelopeFollower`: παρκαρισμένη.
+- **vad_observer κανάλι**: `Option<...>` observer μέσα στο `TwoPassEngine::process()`, 1:1 frame-aligned με το χτίσιμο των masks. Στο music path = `None`. Έτοιμη πρίζα για μελλοντικό per-frame σήμα — καμία αναδιάταξη.
+- **Non-western bench υλικό** (`~/Downloads/DATASET/nonwestern/`, ΕΚΤΟΣ repo): Beijing Opera percussion ×3 (CC-BY-4.0) · saraga/ mini (CC-BY-**NC**-SA — LOCAL BENCH ONLY: ποτέ git, ποτέ training, ποτέ προϊόν).
+- **docs/unused-pub-audit.md** (2026-08-12): 15 τεκμηριωμένα ασύνδετης-πρόθεσης items — αδελφός χάρτης αυτού του αρχείου.
+- ΜΕΘΟΔΟΣ — Ο ΑΦΗΓΗΤΗΣ ΑΝΤΙΣΤΡΕΦΕΙ (18/08): 8+ φορές σε μία συνεδρία, οι agents έδωσαν σωστά νούμερα με ρόδινο/ανάποδο συμπέρασμα (π.χ. CHOP=100% διαβάστηκε ως «πλήρης εξάλειψη chop»). ΚΑΝΕΝΑ συμπέρασμα agent δεν περνάει σε απόφαση χωρίς ανάγνωση του πίνακα από τον orchestrator.
+
 ## How to use this doc
 Πριν ξεκινήσεις νέο feature, ψάξε εδώ πρώτα: μπορεί να υπάρχει ήδη σχετικό schema/struct/primitive. Ενημέρωσε αυτό το doc όποτε βρίσκεις κάτι αντίστοιχο.
