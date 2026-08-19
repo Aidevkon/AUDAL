@@ -101,6 +101,7 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - **vad_observer κανάλι**: `Option<...>` observer μέσα στο `TwoPassEngine::process()`, 1:1 frame-aligned με το χτίσιμο των masks. Στο music path = `None`. Έτοιμη πρίζα για μελλοντικό per-frame σήμα — καμία αναδιάταξη.
 - **Non-western bench υλικό** (`~/Downloads/DATASET/nonwestern/`, ΕΚΤΟΣ repo): Beijing Opera percussion ×3 (CC-BY-4.0) · saraga/ mini (CC-BY-**NC**-SA — LOCAL BENCH ONLY: ποτέ git, ποτέ training, ποτέ προϊόν).
 - **docs/unused-pub-audit.md** (2026-08-12): 15 τεκμηριωμένα ασύνδετης-πρόθεσης items — αδελφός χάρτης αυτού του αρχείου.
+- **Clean-source υλικό ΗΔΗ στον δίσκο** (rediscovered 2026-08-19, clean-source recon): `~/Downloads/DATASET/librispeech/` (dev-clean, CC BY 4.0) · `~/Downloads/DATASET/fma/` με ΕΤΟΙΜΟ `fma_small_cc_allowlist.json` (CC-BY per-track allowlist) — προηγούμενη εποχή του project είχε ξεκινήσει clean-source προεργασία που το τεφτέρι είχε ξεχάσει. Σχετικό με CAND-E (ενδεχόμενο retrain).
 - ΜΕΘΟΔΟΣ — Ο ΑΦΗΓΗΤΗΣ ΑΝΤΙΣΤΡΕΦΕΙ (18/08): 8+ φορές σε μία συνεδρία, οι agents έδωσαν σωστά νούμερα με ρόδινο/ανάποδο συμπέρασμα (π.χ. CHOP=100% διαβάστηκε ως «πλήρης εξάλειψη chop»). ΚΑΝΕΝΑ συμπέρασμα agent δεν περνάει σε απόφαση χωρίς ανάγνωση του πίνακα από τον orchestrator.
 
 ## How to use this doc
