@@ -41,6 +41,7 @@ members = [
 # επειδή δεν υπάρχουν χρήστες ούτε δημοσιευμένα
 # certificates. northstar §Ρ.
 opt-level = 3
+codegen-units = 1  # declared 2026-08-20: explicit, stable, certificate-declarable (northstar §Ρ step 1)
 
 # cockpit-dioxus originally declared its own release profile
 # (opt-level=3, lto, codegen-units=1 — max-speed WASM) which cargo
