@@ -1,0 +1,5 @@
+# declared 2026-08-20: INV-PA-1 requires target-cpu=baseline;
+# until now it was required and enforced nowhere (northstar §Ρ step 2).
+# Pins the ISA floor so the certificate can declare it.
+[build]
+rustflags = ["-C", "target-cpu=x86-64"]

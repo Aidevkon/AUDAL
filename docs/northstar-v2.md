@@ -1661,15 +1661,33 @@ auto-duck για podcaster
 να κρίνει τον κορμό με ένα κατώφλι που δεν μετράει.
 ⇒ ΣΕΙΡΑ #0 προηγείται αυτού.
 
-ΕΝΗΜΕΡΩΣΗ, ΜΕΤΡΗΜΕΝΗ 2026-08-19: το INV-DET-1 ΕΤΡΕΞΕ —
-πρώτη φορά στο παραδιδόμενο profile (release, opt-level 3):
-PASS, SHA A = SHA B = e682a3db…, 16.66s, log 670 γραμμών
-sha 7f40f4de… (/tmp/invdet1_baseline.log). Η αιτία του «δεν
-τρέχει»: #[ignore] για ταχύτητα (4e28d43) και κανένα CI δεν
-περνάει --ignored — το test ήταν υγιές, ακάλεστο.
-ΜΕΝΟΥΝ από το ΣΕΙΡΑ #0: codegen-units αδήλωτο στο release
-(βήμα §Ρ.1) · target-cpu=baseline ανεπίβλητο (§Ρ.2) · καμία
-CI εκτέλεση του INV-DET-1 (§Ρ.0 εν μέρει).
+ΕΝΗΜΕΡΩΣΗ, ΜΕΤΡΗΜΕΝΗ 2026-08-19/20: το INV-DET-1 ΕΤΡΕΞΕ — τρεις
+φορές, στο παραδιδόμενο profile, και ο πυρήνας του ΣΕΙΡΑ #0
+ΕΚΛΕΙΣΕ:
+· 19/08 baseline (opt-level 3, cgu default-16): PASS,
+  SHA e682a3db…, 16.66s, log sha 7f40f4de…
+· 20/08 codegen-units = 1 δηλωμένο (§Ρ.1, commit 7da6676):
+  PASS, SHA ΤΑΥΤΟΣΗΜΟ e682a3db… — το output αναλλοίωτο across
+  codegen partitioning 16→1. Κόστος: full rebuild 13m25s.
+  Log sha 7c295ab8… (ένα πρώτο τρέξιμο μέτρησε κατά λάθος
+  ξανά το default — το άδειο diff το έπιασε πριν τον
+  ισχυρισμό· το λάθος μέτρησε τζάμπα το build-to-build:
+  ίδιο config μετά από reclean ⇒ ίδιο SHA).
+· 20/08 .cargo/config.toml target-cpu=x86-64 (§Ρ.2 — το
+  INV-PA-1 επιτέλους επιβάλλεται): PASS, SHA ΤΑΥΤΟΣΗΜΟ —
+  το σιωπηρό default ήταν ήδη baseline, τώρα είναι ΡΗΤΟ και
+  δηλώσιμο. Rebuild 13m55s, log 1201 γρ., sha 9a6b55db…
+Η αιτία του παλιού «δεν τρέχει»: #[ignore] για ταχύτητα
+(4e28d43) και κανένα CI δεν περνάει --ignored — υγιές,
+ακάλεστο.
+ΜΕΝΟΥΝ από το §Ρ: βήμα 3 (§Ρ πεδία στο certificate schema —
+πάει με το §Σ) · βήμα 4 (ci-arm: από ψευδο-determinism check →
+BUILD check, φεύγει το continue-on-error) · CI εκτέλεση του
+INV-DET-1 (στοχευμένα, όχι χύμα --ignored) · βήμα 5 (opt-level
+'z'→3 ΕΓΙΝΕ στο 47981e8 — η εκ των υστέρων σύγκριση hash που
+ζητούσε η ΑΤΖΕΝΤΑ καλύπτεται πλέον ΕΜΜΕΣΑ: το σημερινό
+profile είναι μετρημένο και κλειδωμένο· τα προ-47981e8 νούμερα
+παραμένουν άλλου binary, όπως το λέει).
 
 ---
 
