@@ -708,6 +708,31 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
 
     ⇒ `run_batch()` ως συνάρτηση, τότε ενεργοποιείται.
 
+    ΕΝΗΜΕΡΩΣΗ, ΜΕΤΡΗΜΕΝΗ 2026-08-21 — ΤΟ §Β ΕΚΛΕΙΣΕ:
+    · Το run_batch() ΥΠΑΡΧΕΙ (agents/batch.rs, 61da997):
+      cohesion pre-pass → EarFatigue delta αυστηρά σειριακά
+      → renders → AlbumCertificate. ΝΟΜΟΣ ΜΙΑΣ ΥΛΟΠΟΙΗΣΗΣ
+      τηρήθηκε και στις δύο όχθες: Conductor handler
+      337→25 γραμμές wrapper, executor streaming body
+      εξήχθη σε execute_streaming_plan (handler 5 γραμμές)
+      — τίποτα δεν αντιγράφηκε, όλα μετακόμισαν. Το
+      e2e_album_sse πράσινο = τα events αμετάβλητα.
+    · Το INV-DET-2 ΤΡΕΧΕΙ ΚΑΙ ΠΕΡΝΑΕΙ (6c15c57): 2 ανόμοια
+      tracks, 2 πλήρη runs σε φρέσκους κόσμους (τίποτα
+      κοινό πλην inputs), pcm_blake3 ΤΑΥΤΟΣΗΜΑ και στα δύο
+      — ΚΑΙ στο track #2, μέσα από το EarFatigue μονοπάτι:
+      το ΠΛΑΙΣΙΟ του δόγματος Α είναι ντετερμινιστικό,
+      μετρημένο. Album certificate ντετερμινιστικά πεδία
+      ταυτόσημα (created_at/blob_ids ρητά εκτός). 11.6s
+      για 4 renders release, log sha a7fb5aec…
+    · ΣΗΜΕΙΩΣΗ ΜΕΘΟΔΟΥ: το πρώτο τρέξιμο απέτυχε σε
+      ΜΑΝΤΕΜΕΝΟ cert filename με ΟΛΑ τα determinism asserts
+      ήδη περασμένα — δόγμα Ι μέσα στο ίδιο μας το test·
+      τώρα σαρώνει αντί να ονομάζει. Ψιλό καταγεγραμμένο:
+      το write_to_disk κόβει το album_id στα 8 chars
+      (collision αδιάφορο με UUID ids — αν ποτέ αλλάξουν,
+      εδώ ζει η υπενθύμιση).
+
 
 §Θ  ΤΡΕΙΣ ΕΛΕΓΧΟΙ, ΟΧΙ ΕΝΑΣ
       1. first-write ντετερμινιστικό
