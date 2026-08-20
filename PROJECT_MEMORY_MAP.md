@@ -102,6 +102,16 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - **Non-western bench υλικό** (`~/Downloads/DATASET/nonwestern/`, ΕΚΤΟΣ repo): Beijing Opera percussion ×3 (CC-BY-4.0) · saraga/ mini (CC-BY-**NC**-SA — LOCAL BENCH ONLY: ποτέ git, ποτέ training, ποτέ προϊόν).
 - **docs/unused-pub-audit.md** (2026-08-12): 15 τεκμηριωμένα ασύνδετης-πρόθεσης items — αδελφός χάρτης αυτού του αρχείου.
 - **Clean-source υλικό ΗΔΗ στον δίσκο** (rediscovered 2026-08-19, clean-source recon): `~/Downloads/DATASET/librispeech/` (dev-clean, CC BY 4.0) · `~/Downloads/DATASET/fma/` με ΕΤΟΙΜΟ `fma_small_cc_allowlist.json` (CC-BY per-track allowlist) — προηγούμενη εποχή του project είχε ξεκινήσει clean-source προεργασία που το τεφτέρι είχε ξεχάσει. Σχετικό με CAND-E (ενδεχόμενο retrain).
+
+## Rediscovered 2026-08-20 — ΤΟ ΒΡΑΔΥ ΠΟΥ ΠΑΡΑΛΙΓΟ ΝΑ ΞΑΝΑΧΤΙΣΟΥΜΕ ΤΟ ΧΤΙΣΜΕΝΟ
+
+Τέσσερα συστήματα βρέθηκαν πλήρως χτισμένα ενώ το northstar/τεφτέρι τα θυμόταν ως μελλοντικά — η ανακάλυψη έγινε κατά τύχη (ψάχνοντας «πώς δουλεύει το QR»):
+
+- **§Π sidecar υποδομή ΟΛΟΚΛΗΡΗ** (`blob_store.rs`, ενότητα «§Π: ΤΟ CERTIFICATE ΕΠΙΒΙΩΝΕΙ RESTART»): `CertificateSidecar` envelope (format/version/engine_commit μέσω GIT_HASH/**master_sha256 — η απόδειξη δένεται στα bytes του FLAC**) · `write_sidecar` (atomic tmp→rename, ποτέ update — νέο render = νέο ζεύγος) · `read_sidecar` (ΕΠΑΛΗΘΕΥΕΙ format+version+master hash — ονομασμένα σφάλματα) · `find_sidecar` (διακρίνει απουσία από αδυναμία) · spool naming registry. Γράφεται από και τα δύο render paths (dsp_pipeline 837/1414) όταν υπάρχει master+project_id. Root: `M0_MASTERS_PATH` (default `~/.creator_os/masters`).
+- **QR generator — OFFLINE-FIRST ΗΔΗ** (`handlers/certificate.rs::generate_qr_base64`): κωδικοποιεί ΑΥΤΟΤΕΛΕΣ JSON (cert id, filename, LUFS/TP/LRA, 5 stem fingerprints, pipeline hash, date) — ΚΑΝΕΝΑ URL, σκανάρεται offline για πάντα. Καλείται και από τα δύο certificate paths, ζει στο blob (qr_base64).
+- **Ed25519 υπογραφή — ΣΚΕΛΕΤΟΣ** (`handlers/certificate.rs::sign_certificate`): JWT-style, υπογράφει cert_id:pcm_hash:lufs. ⚠ ΤΟ ΚΛΕΙΔΙ παράγεται από το pipeline fingerprint = δημόσιο παράγωγο ⇒ ΔΕΝ είναι ακόμα ασφάλεια — θέλει αληθινό key management πριν το §Τ/.m0sig.
+- **Rehydration αλυσίδα** (`handlers/blob.rs`): RAM → find_sidecar → DB tracks.blob_path → load_and_cache (ξαναγεμίζει RAM), με σωστή διάκριση 404/500. Έγινε κοινός helper `get_or_rehydrate` (§Π/1, 20/08) — export/png_gen τον πατάνε πλέον· το deliver ΕΚΚΡΕΜΕΙ (§Π/2).
+- **ΜΕΘΟΔΟΣ — Ο ΚΑΝΟΝΑΣ ΤΟΥ ΔΙΠΛΟΧΤΙΣΙΜΑΤΟΣ (20/08):** κανένα IMPLEMENT prompt δεν φεύγει χωρίς προηγούμενο «ΥΠΑΡΧΕΙ ΗΔΗ;» grep των κεντρικών ουσιαστικών του feature (και στον κώδικα ΚΑΙ σε αυτό το αρχείο) — και κάθε συνεδρία που χτίζει υποδομή την καταγράφει ΕΔΩ πριν κλείσει.
 - ΜΕΘΟΔΟΣ — Ο ΑΦΗΓΗΤΗΣ ΑΝΤΙΣΤΡΕΦΕΙ (18/08): 8+ φορές σε μία συνεδρία, οι agents έδωσαν σωστά νούμερα με ρόδινο/ανάποδο συμπέρασμα (π.χ. CHOP=100% διαβάστηκε ως «πλήρης εξάλειψη chop»). ΚΑΝΕΝΑ συμπέρασμα agent δεν περνάει σε απόφαση χωρίς ανάγνωση του πίνακα από τον orchestrator.
 
 ## How to use this doc

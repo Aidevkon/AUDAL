@@ -28,6 +28,7 @@ use std::path::Path;
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
 use crate::blob_store::{StoredBlobV2, StoredLoudness, StoredQuality};
+use crate::handlers::blob::{get_or_rehydrate, RehydrateError};
 
 // ── Request/Response types ────────────────────────────────────────────────────
 
@@ -114,13 +115,27 @@ pub async fn export_audio(
     };
 
     // Fetch blob
-    let blob = match state.blob_store.get(&req.blob_id) {
-        Some(b) => b,
-        None => {
+    let blob = match get_or_rehydrate(&state, &req.blob_id).await {
+        Ok(b) => b,
+        Err(RehydrateError::NotFound) => {
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
                 message: Some(format!("blob not found: {}", req.blob_id)),
+            })
+        }
+        Err(RehydrateError::Io(e)) => {
+            return Json(ExportResponse {
+                status: "error".into(),
+                written_path: None,
+                message: Some(format!("blob io error {}: {e}", req.blob_id)),
+            })
+        }
+        Err(RehydrateError::Corrupt(e)) => {
+            return Json(ExportResponse {
+                status: "error".into(),
+                written_path: None,
+                message: Some(format!("blob corrupt {}: {e}", req.blob_id)),
             })
         }
     };

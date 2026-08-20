@@ -83,6 +83,7 @@ pub fn generate_certificate_png(blob: &StoredBlobV2, output_path: &str) {
 }
 
 use crate::app_state::AppState;
+use crate::handlers::blob::{get_or_rehydrate, RehydrateError};
 use axum::{
     extract::{Path, State},
     Json,
@@ -95,10 +96,19 @@ pub async fn export_cert_png(
     Json(req): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let output_path = req["output_path"].as_str().unwrap_or("certificate.png");
-    if let Some(blob) = state.blob_store.get(&blob_id) {
-        generate_certificate_png(&blob, output_path);
-        Json(serde_json::json!({"status": "ok"}))
-    } else {
-        Json(serde_json::json!({"status": "error", "message": "blob not found"}))
+    match get_or_rehydrate(&state, &blob_id).await {
+        Ok(blob) => {
+            generate_certificate_png(&blob, output_path);
+            Json(serde_json::json!({"status": "ok"}))
+        }
+        Err(RehydrateError::NotFound) => {
+            Json(serde_json::json!({"status": "error", "message": "blob not found"}))
+        }
+        Err(RehydrateError::Io(e)) => {
+            Json(serde_json::json!({"status": "error", "message": format!("blob io error: {e}")}))
+        }
+        Err(RehydrateError::Corrupt(e)) => {
+            Json(serde_json::json!({"status": "error", "message": format!("blob corrupt: {e}")}))
+        }
     }
 }
