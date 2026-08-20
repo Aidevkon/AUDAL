@@ -559,6 +559,30 @@ management · §Σ σχήμα (τι ακριβώς περιέχει η όψη-τ
 το πείραμα προβολών. ΣΕΙΡΑ: μετά το §Σ — η όψη δεν μπορεί να
 μπει στο αρχείο πριν οριστεί το πλήρες.
 
+ΤΟ ΟΧΗΜΑ — ΜΕΤΡΗΜΕΝΟ 2026-08-20 (§Τ-spike, /tmp, εκτός repo):
+Το FLAC container ΔΕΧΕΤΑΙ APPLICATION metadata block (type 2,
+ID 'm0sg' = 0x6d307367, payload 1258B mock-cert) με ΟΛΑ τα
+κατώφλια πράσινα, γραμμένα ΠΡΙΝ τρέξει:
+· decode audio MD5 (ffmpeg -f md5): ΤΑΥΤΟΣΗΜΟ πριν/μετά
+  (e43683d0…) — ΜΗΔΕΝ byte ήχου άγγιχτηκε
+· STREAMINFO md5: ΤΑΥΤΟΣΗΜΟ · payload sha256 in==out
+  (byte-identical roundtrip) · ffprobe καθαρό · ffplay παίζει
+· ΔΩΡΟ ΠΟΥ ΔΕΝ ΖΗΤΗΘΗΚΕ: το μέγεθος ΔΕΝ άλλαξε ΟΥΤΕ BYTE
+  (2.564.395) — το block μπήκε ΜΕΣΑ στο υπάρχον PADDING
+  (8192→6930). ⇒ DESIGN INSIGHT: αν ο ΔΙΚΟΣ μας encoder γράφει
+  PADDING στο μέγεθος της όψης, το embedding γίνεται
+  ZERO-REWRITE — σφραγίζεις την απόδειξη χωρίς να ξαναγράψεις
+  το αρχείο.
+· ΜΕΘΟΔΟΣ: το metaflac 1.4.3 δεν έχει --add-application· το
+  block κατασκευάστηκε δυαδικά (header type=2 + len + ID +
+  payload) και μπήκε με metaflac --append · ανάκτηση με
+  --list --data-format=binary-headerless --block-number=2.
+· ΟΡΙΟ ΤΗΣ ΜΕΤΡΗΣΗΣ: πηγή ffmpeg-encoded FLAC — το πέρασμα
+  σε FLAC του ΔΙΚΟΥ μας encoder (flac-codec) είναι ξεχωριστό
+  μελλοντικό βήμα (δόγμα Ε: η μέτρηση ισχύει εκεί που έγινε).
+⇒ Το FLAC-όχημα ΕΓΚΡΙΝΕΤΑΙ για το §Τ. Το ΠΕΡΙΕΧΟΜΕΝΟ της όψης
+παραμένει μετά το §Σ, όπως ορίζει η ΣΕΙΡΑ παραπάνω.
+
 ### §3Γ — ΤΟ SPOOL ΛΕΞΙΛΟΓΙΟ (ΛΥΘΗΚΕ)
 
 11 σημεία, 5 οικογένειες. writer/reader ανεξάρτητα `format!()`.
