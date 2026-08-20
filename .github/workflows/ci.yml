@@ -55,10 +55,11 @@ jobs:
       - name: Gate 6 — Full workspace
         run: cargo test --workspace
 
+  # Renamed per northstar §Ρ.4 (2026-08-21): verifies ARM64 workspace buildability.
+  # Does NOT check cross-platform bit-exact determinism (libm calls differ across archs).
   ci-arm:
-    name: Cross-Platform Determinism Check (ARM64)
+    name: ARM64 Build Check
     runs-on: macos-latest
-    continue-on-error: true
     env:
       LIBRARY_PATH: /opt/homebrew/lib
       LDFLAGS: -L/opt/homebrew/lib
@@ -82,21 +83,3 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Gate 1 — Check
         run: cargo check --workspace
-      - name: Gate 2 — Format
-        run: cargo fmt --check
-      - name: Gate 3 — Clippy
-        run: cargo clippy --workspace -- -D warnings -A clippy::needless_range_loop -A clippy::too_many_arguments -A clippy::new_without_default
-      - name: Gate 4 — Unit tests
-        run: cargo test --lib --workspace
-      - name: Gate 4b — Unit tests (Features)
-        run: cargo test --lib -p sp314-dsp --features cli
-      - name: Gate 5 — Domain quality
-        run: |
-          cargo test -p sp314-dsp --test four_stem_contract -- --test-threads=2
-          cargo test -p sp314-dsp --test stress -- --test-threads=2
-          cargo test -p m0d --test e2e_golden_pathway -- --test-threads=2
-          cargo test -p m0d --test e2e_corpus_integration -- --test-threads=2
-          cargo test -p m0d --test e2e_maestro_ducking -- --test-threads=2
-          cargo test -p m0d --test e2e_mastering_quality -- --test-threads=2
-      - name: Gate 6 — Full workspace
-        run: cargo test --workspace
