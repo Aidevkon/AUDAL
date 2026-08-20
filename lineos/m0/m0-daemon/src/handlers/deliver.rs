@@ -40,6 +40,8 @@ pub struct PlanEntry {
     pub track_id: String,
     #[serde(skip)]
     pub audio_path: String,
+    #[serde(skip)]
+    pub resolved_blob: Option<StoredBlobV2>,
 }
 
 #[derive(Debug, Serialize)]
@@ -192,6 +194,7 @@ pub fn validate_and_plan(
                 exists,
                 track_id: entry.track_id.clone(),
                 audio_path: t.audio_path.clone(),
+                resolved_blob: None,
             });
         } else {
             errors.push(format!("track_id {} not found in project", entry.track_id));
@@ -362,7 +365,10 @@ pub fn run_deliver_core(
             )]);
         }
 
-        let blob = build_minimal_blob(&plan_entry.audio_path);
+        let blob = match &plan_entry.resolved_blob {
+            Some(b) => b.clone(),
+            None => build_minimal_blob(&plan_entry.audio_path),
+        };
         let final_path = book_dir.join(&plan_entry.filename);
 
         let outcome = match export_mp3_acx(&blob, &final_path) {
@@ -508,7 +514,33 @@ pub async fn post_deliver(
         .collect();
 
     match validate_and_plan(&req, &db_tracks) {
-        Ok(plan) => {
+        Ok(mut plan) => {
+            // Rehydrate real blobs before spawn_blocking
+            for entry in &mut plan.entries {
+                match crate::handlers::blob::get_or_rehydrate(&app, &entry.track_id).await {
+                    Ok(blob) => {
+                        if blob.is_certified() {
+                            entry.resolved_blob = Some(blob);
+                        } else {
+                            tracing::warn!(
+                                track_id = %entry.track_id,
+                                reason = ?blob.variant,
+                                "Deliver rehydration fallback: blob is uncertified, using minimal blob fallback"
+                            );
+                            entry.resolved_blob = None;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            track_id = %entry.track_id,
+                            error = ?e,
+                            "Deliver rehydration fallback: blob rehydrate failed, using minimal blob fallback"
+                        );
+                        entry.resolved_blob = None;
+                    }
+                }
+            }
+
             // blocking IO in spawn_blocking
             let result = tokio::task::spawn_blocking(move || run_deliver_core(&req, plan))
                 .await
