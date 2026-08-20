@@ -485,6 +485,37 @@ byte-identical ανάσταση. Άγκιστρα μπήκαν στα νέα σ�
 Named leftovers: το `blob_path` (πλέον μόνο-όταν-sidecar) και identity inline
 μένουν ως ρητά υπόλοιπα.
 
+ΕΝΗΜΕΡΩΣΗ, ΜΕΤΡΗΜΕΝΗ 2026-08-20 — ΟΙ ΣΥΝΔΕΣΕΙΣ ΕΚΛΕΙΣΑΝ (§Π/1-3):
+Το 338ba16 είχε χτίσει τον ΔΡΟΜΟ· τρία endpoints δεν τον πατούσαν
+(μοτίβο §Ξ: χτισμένο-σωστά-ασύνδετο, 13η καταγεγραμμένη φορά):
+· §Π/1 [7e3a1bc]: η ιδιωτική αλυσίδα του GET έγινε κοινός
+  get_or_rehydrate (NotFound/Io/Corrupt — η διάκριση 404/500
+  διατηρείται)· export και cert-PNG τον πατάνε — ο 17ος blob και
+  το restart δεν τους σκοτώνουν πια.
+· §Π/2 [974b68a]: το delivery διαβάζει ΑΛΗΘΙΝΟΥΣ blobs — async
+  get_or_rehydrate ΠΡΙΝ το spawn_blocking (PlanEntry.resolved_blob,
+  serde(skip) ⇒ API αμετάβλητο)· το build_minimal_blob υποβιβάστηκε
+  σε ΡΗΤΟ warn-logged fallback. Το export_mp3_acx παίρνει πλέον το
+  αυθεντικό audio_path/channels. Το TransportOnlyNotASource πλησιάζει
+  τη συνθήκη λήξης του — σβήνει όταν μετρηθεί ότι το fallback
+  δεν χτυπάει σε κανονική ροή.
+· §Π/3 [INV-Π-1, tests/inv_pi_1_certificate_survival.rs]: το ΦΘΗΝΟ
+  ΔΟΝΤΙ του INV-PERSIST-1 — δεν είναι δίδυμο, είναι ο άλλος μισός
+  του ζεύγους: stub-based, 0.08s, ΧΩΡΙΣ ignore ⇒ τρέχει σε ΚΑΘΕ
+  cargo test, και είναι το ΜΟΝΟ σπίτι της ΑΡΝΗΤΙΚΗΣ ταξινομίας
+  (tamper→MasterHashMismatch · σβήσιμο→MasterMissing · άγνωστο→
+  Ok(None)). Το INV-PERSIST-1 (#[ignore], αληθινό render) κρατάει
+  την byte-identical απόδειξη· το INV-Π-1 φρουρεί το error contract.
+  ΣΗΜΕΙΩΣΗ ΜΕΘΟΔΟΥ: το βήμα-0 grep του νέου test έψαξε τα tokens
+  του ΝΕΟΥ ονόματος και όχι τις ΕΝΝΟΙΕΣ (persist/sidecar) — γι' αυτό
+  δεν είδε το αδερφάκι. Ο κανόνας του διπλοχτισίματος ακονίζεται:
+  grep ΕΝΝΟΙΩΝ, όχι ονομάτων.
+ΤΙ ΜΕΝΕΙ από το §Π: DB ευρετήριο blobs (σήμερα find_sidecar σαρώνει
+φακέλους — δουλεύει, κλιμακώνει άσχημα σε πολλά projects) · τα
+ad-hoc renders χωρίς project_id δεν γράφουν sidecar (ρητό κενό,
+όχι bug) · τα §Τ θεμέλια (embedded cert στο παραδοτέο) χτίζουν
+ΠΑΝΩ σε αυτό, δεν το αντικαθιστούν.
+
 ### §3Γ — ΤΟ SPOOL ΛΕΞΙΛΟΓΙΟ (ΛΥΘΗΚΕ)
 
 11 σημεία, 5 οικογένειες. writer/reader ανεξάρτητα `format!()`.
