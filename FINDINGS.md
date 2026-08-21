@@ -46,6 +46,29 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   MUSDB διαρροή ΜΕΤΡΗΜΕΝΗ (log sha 2c363e37…, script:
   research/musdb-lab/decontaminate_phase1.py).
   **DRUMSCAN — 2026-08-21:** 1329/1329, 0 σφάλματα, 76.6'.
+  **DRUMS ΑΠΟ FMA — ΚΛΕΙΣΤΟ ΜΕ ΜΗΔΕΝ (2026-08-21 νύχτα):**
+  ακρόαση top-40 v2: 0 κρατημένα — μουσική-με-κρουστά,
+  γραφομηχανές (038 = File Under Toner field recordings,
+  το δηλωμένο flatness bias του score επί το έργον), noise.
+  Ετυμηγορία: το fma_small ΔΕΝ περιέχει γυμνά κρουστά — δεν
+  φιλτράρεται αυτό που δεν υπάρχει. Το ranking έκανε τη
+  δουλειά του: μέτρησε, ακούστηκε, πέθανε τίμια.
+  **DRUMS gap — νέο σχέδιο:** PLAN A: Slakh2100 (MERL) —
+  CC-BY 4.0 ΕΠΙΒΕΒΑΙΩΜΕΝΟ σε slakh.com + github (2026-08-21),
+  2100 tracks/145h με ΑΛΗΘΙΝΑ απομονωμένα drums stems (MIDI+
+  VST σύνθεση, μηδέν bleed), 105GB πλήρες → στρατηγική:
+  BabySlakh validation πρώτα, μετά στοχευμένα ~5h drums από
+  train split (υπάρχει και 16kHz mono variant στο Zenodo —
+  κουμπώνει με συνταγή v6 αν το NMFD δεν θέλει stereo).
+  Drums patterns = νομικά το ασφαλέστερο slice (ρυθμοί δεν
+  προστατεύονται ως μελωδίες). PLAN B: Freesound αυστηρά
+  CC0-filtered (curation ανά αρχείο). PLAN C: Demucs stem
+  mining στα 437 (η CLAP-λογική το καλύπτει, αλλά pseudo 
+  αληθινά stems). ΑΠΟΡΡΙΦΘΗΚΑΝ με λόγο: Cymatics/Ghosthack
+  (EULA: χρήση σε μουσικά έργα, όχι datasets· Cymatics ρητό
+  AI-training ban), DAW built-in kits (Apple EULA απαγορεύει
+  standalone samples — «θέλει δικηγόρο» = έξω), SampleRadar
+  (EULA unverified — ίδια κατηγορία με tracks.csv).
   **⚠ ALLOWLIST v1 ΚΑΤΑΡΡΕΥΣΗ & v2 — 2026-08-21 αργά:** τα ID3
   tags που ξεχείλισαν σε ffplay banner αποκάλυψαν NC licences
   μέσα στο «καθαρό» allowlist. Recon: η στήλη 46 του tracks.csv
