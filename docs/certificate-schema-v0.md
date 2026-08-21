@@ -1,5 +1,21 @@
 # CERTIFICATE SCHEMA v0 — DRAFT
 
+ΙΣΤΟΡΙΚΟ ΥΛΟΠΟΙΗΣΗΣ (ενημερώνεται όσο το draft γίνεται κώδικας):
+· Ψ5 πλατφόρμα: IMPLEMENTED 96aa878 (8 πεδία με target_cpu
+  από CARGO_ENCODED_RUSTFLAGS, αποδεδειγμένο "x86-64")
+· Ψ6 ταυτότητα: IMPLEMENTED f23ec1e (identity.rs, per-install
+  Ed25519, key_id+signer_public_key στο envelope, 5 tests
+  μαζί με tamper-reject — payload_signature ΠΕΡΙΜΕΝΕΙ το
+  canonical spec, ως ορίζει το §6)
+· Ψ2+Ψ3 πεδία: IMPLEMENTED 788c1e0 (folddown_gain_db
+  μετρημένο RMS-vs-RMS στο ίδιο πέρασμα · declared_
+  latency_samples από ΜΙΑ πηγή lookahead_samples() που
+  καλεί και ο limiter). Παραπροϊόν: F-070 — το
+  quality.rms_db αποκαλύφθηκε ως lufs+3.0 προσέγγιση
+  ντυμένη μέτρηση (FINDINGS F-070, recon πριν αγγιχτεί).
+· Δ1α/Δ2γ honesty pass (Option-ποίηση + input_acx_* rename):
+  ΕΚΚΡΕΜΕΙ — το επόμενο μηχανικό βήμα.
+
 ΚΑΤΑΣΤΑΣΗ: DRAFT 2026-08-21, γραμμένο ΑΠΟ μετρήσεις
 (πείραμα προβολών 3/3) + αποφάσεις (ψηφοδέλτιο
 Ψ1-Ψ6, northstar §Σ 2026-08-21).
@@ -18,7 +34,7 @@ engine_commit · master_sha256 · technical{sample_rate, channels,
 num_frames} · payload`
 
 ΝΕΑ ΠΕΔΙΑ v0 (από αποφάσεις):
-- `key_id: String` — Ψ6, ΑΠΟ ΤΩΡΑ (hosted-future χωρίς API break)
+- `key_id: String` — Ψ6, ΑΠΟ ΤΩΡΑ — IMPLEMENTED f23ec1e
 - `signer_public_key: String` — Ed25519 per-install (Ψ6α),
   ~/.creator_os/identity/, γεννιέται στο πρώτο run
 - `payload_signature: String` — Ed25519 πάνω σε canonical
@@ -26,15 +42,20 @@ num_frames} · payload`
   κλειδί ΠΕΘΑΙΝΕΙ (ήταν δημόσιο παράγωγο, μετρημένο 20/08).
   ΑΝΟΙΧΤΟ v0: η canonical serialization (σειρά πεδίων) πρέπει
   να ΔΗΛΩΘΕΙ πριν την πρώτη υπογραφή — αλλιώς unverifiable.
-- `declared_latency_samples: u32` στο technical — Ψ3, ανά
-  αλυσίδα (μετρημένο 240 = limiter lookahead, episode). Χωρίς
+- `declared_latency_samples: u32` στο technical — Ψ3 —
+  IMPLEMENTED 788c1e0, από μία πηγή lookahead_samples()
+  (μετρημένο 240 = limiter lookahead, episode). Χωρίς
   αυτό κανένα null verification δεν στέκει (Πύλη 2).
 
-## 2. ΤΟ ΜΠΛΟΚ ΠΛΑΤΦΟΡΜΑΣ (Ψ5) — μέσα στο StoredProvenance
+## 2. ΤΟ ΜΠΛΟΚ ΠΛΑΤΦΟΡΜΑΣ (Ψ5) — IMPLEMENTED 96aa878
 
 Όλα build-time injected, όλα ΔΗΛΩΜΕΝΑ από το ΣΕΙΡΑ #0:
-`target_triple · libc · target_cpu · opt_level · codegen_units ·
-rustc_version` — ΚΑΙ η ΜΟΡΦΗ κάθε hash, ρητή:
+`target_triple · target_arch · target_os · target_env(libc) ·
+target_cpu · opt_level · codegen_units · rustc_version` —
+το target_cpu διαβάζεται από τα flags που ΠΡΑΓΜΑΤΙΚΑ
+ταξίδεψαν (CARGO_ENCODED_RUSTFLAGS, αποδεδειγμένο "x86-64"·
+απουσία = "default(unset)", ποτέ μαντεψιά) — ΚΑΙ η ΜΟΡΦΗ
+κάθε hash, ρητή:
 
 | hash πεδίο    | μορφή (ΔΗΛΩΝΕΤΑΙ, δεν συνάγεται)           |
 |---------------|---------------------------------------------|
@@ -50,9 +71,14 @@ spatial_folddown_agrees_with_stereo) + ΔΗΛΩΜΕΝΟ gain.
 ΟΧΙ null-ισότητα παραδοτέων (μετρημένο: διαφορετικά σημεία
 αλυσίδας + διαφορετικοί στόχοι· −28 raw, −47 μετά gain-match).
 
-ΝΕΟ ΠΕΔΙΟ: `folddown_gain_db: f32` στο StoredSpatial
-(μετρημένο δείγμα +2.19). Ο τρίτος κάνει null ΜΕΤΑ από
-αντιστάθμιση — χρειάζεται το νούμερο, όχι optimization.
+ΝΕΟ ΠΕΔΙΟ: `folddown_gain_db: Option<f32>` στο StoredSpatial —
+IMPLEMENTED 788c1e0: μετριέται RMS-vs-RMS στο ΙΔΙΟ πέρασμα
+(folded bed streaming RMS + conformance gain = παραδοτέο·
+stereo streaming RMS από τα τελικά master samples — ΡΗΤΑ ΟΧΙ
+το quality.rms_db, που αποκαλύφθηκε lufs+3.0 προσέγγιση,
+F-070). Μετρημένο δείγμα πειράματος: +2.19 dB. Ο τρίτος
+κάνει null ΜΕΤΑ από αντιστάθμιση — χρειάζεται το νούμερο,
+όχι optimization.
 Κατώφλι επαλήθευσης: null RMS <= −45 dBFS after-compensation
 (κλειδωμένο 2026-08-21, μετρημένο −47.17).
 
