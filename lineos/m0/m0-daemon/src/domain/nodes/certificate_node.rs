@@ -42,6 +42,9 @@ pub fn run(
     n_total: usize,
     processing_timeline: Vec<StageRecord>,
     folddown_gain_db: Option<f32>,
+    // F-070: ΜΕΤΡΗΜΕΝΟ stereo RMS (dB) από το render pass του Music.
+    // None = δεν μετρήθηκε (μελλοντικοί callers) ⇒ fallback lufs+3.0.
+    stereo_rms_measured: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
     let mut post_master_samples = Vec::with_capacity(n_total * 2);
@@ -127,6 +130,7 @@ pub fn run(
         crate::dsp::signal_health::DeadAirSummary::default(),
         None, // ACX check never runs on the Music path
         folddown_gain_db,
+        stereo_rms_measured,
     )
 }
 
@@ -244,6 +248,10 @@ pub fn run_streaming(
         cert_data.dead_air,
         cert_data.acx,
         folddown_gain_db,
+        // Episode: RMS ΔΕΝ μετριέται ακόμα στο streaming path —
+        // η lufs+3.0 προσέγγιση ΠΑΡΑΜΕΝΕΙ εδώ, F-070 μισάνοιχτο
+        // για το streaming σκέλος.
+        None,
     )
 }
 
@@ -283,6 +291,7 @@ fn assemble_blob(
     dead_air: crate::dsp::signal_health::DeadAirSummary,
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
     folddown_gain_db: Option<f32>,
+    stereo_rms_measured: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
@@ -350,7 +359,9 @@ fn assemble_blob(
                 phase_coherence: 0.97,
                 stereo_width: 0.5,
                 dynamic_range_db: dr,
-                rms_db: lufs + 3.0,
+                // ΜΕΤΡΗΜΕΝΟ streaming RMS (F-070 fix) — fallback lufs+3.0
+                // ΜΟΝΟ όπου δεν μετρήθηκε (Episode, βλ. run_streaming).
+                rms_db: stereo_rms_measured.unwrap_or(lufs + 3.0),
                 spectral_centroid: 3_200.0,
                 spectral_flatness: 0.12,
                 clips_detected: 0,

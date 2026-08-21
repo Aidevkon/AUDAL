@@ -1429,6 +1429,9 @@ fn run_dsp_internal(
         n_total,
         processing_timeline,
         computed_folddown_gain_db,
+        // F-070: το ΗΔΗ μετρημένο streaming RMS (γρ. ~1360) δεν πετιέται πια —
+        // μπαίνει αυτούσιο στο quality.rms_db αντί για την lufs+3.0 προσέγγιση.
+        Some(stereo_rms_db_measured),
     )?;
     eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
