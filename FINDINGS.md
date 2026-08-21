@@ -46,6 +46,20 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   MUSDB διαρροή ΜΕΤΡΗΜΕΝΗ (log sha 2c363e37…, script:
   research/musdb-lab/decontaminate_phase1.py).
   **DRUMSCAN — 2026-08-21:** 1329/1329, 0 σφάλματα, 76.6'.
+  **⚠ ALLOWLIST v1 ΚΑΤΑΡΡΕΥΣΗ & v2 — 2026-08-21 αργά:** τα ID3
+  tags που ξεχείλισαν σε ffplay banner αποκάλυψαν NC licences
+  μέσα στο «καθαρό» allowlist. Recon: η στήλη 46 του tracks.csv
+  (η πηγή του v1 φίλτρου) ΨΕΥΔΗΣ — απλοποιεί BY-NC-ND σε
+  «Attribution» (τεκμήριο: 054465). ffprobe και στα 1.329:
+  536 NC (40.3%) + 175 BY-SA + 180 χωρίς tag (μάρτυράς τους
+  μόνο ο ψεύτης csv) = ΟΛΑ ΕΞΩ. Πρότυπο: κόβουμε ό,τι θέλει
+  δικηγόρο (συνέπεια με MTG). **v2 = 437 tracks με ΡΗΤΟ
+  CC-BY/CC0/PD στο ίδιο το αρχείο, 3.64h** (rebuild_allowlist_v2
+  .py, v2 json sha 0223c4a8…, rejected sha c8ddc192…, license_raw
+  αποθηκευμένο ανά track). Το decon ΙΣΧΥΕΙ για το v2 (υποσύνολο
+  του μετρημένου 1.329). ranked_v2.tsv + audition_top40_v2.md
+  στο attic — η ακρόαση ξεκινά από το v2 φύλλο. Gap Table
+  διόρθωση: MUSIC BED 11.07h → **3.64h ρητά καθαρό**.
   score = z(onset_rate)+z(perc_ratio)+z(flatness), δηλωμένο bias:
   kick/bass-heavy υποτιμάται (χαμηλό flatness) — γι' αυτό audition.
   Top-40 → attic/drumscan-2026-08/ (ranked.tsv + audition_top40.md,
