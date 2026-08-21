@@ -5,13 +5,22 @@ use sp314_dsp::stft::two_pass::TwoPassEngine;
 use sp314_dsp::stft::nmf::find_most_diverse_window;
 use sp314_dsp::stft::{StftEngine, N_BINS};
 
-#[ignore]
 #[test]
+#[ignore = "compares NMFD scout window strategies — needs /tmp/w9/podcast_realistic.wav"]
 fn test_beta_scout_window() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
     if !input_path.exists() {
-        println!("SKIPPED: {:?} missing", input_path);
-        return;
+        panic!(
+            "missing fixture {}: 120 s of podcast material, 48 kHz, \
+             91.56% speech from LibriSpeech over a continuous FMA CC \
+             bed 18 dB down, normalized to peak 0.52. described in \
+             commit 52e2a31; the exact source clips are NOT recorded, \
+             so a rebuild reproduces the spec but not the file — any \
+             threshold in this test was tuned on the original and \
+             must be re-measured after a rebuild. sources present \
+             locally under Downloads/DATASET (librispeech, fma).",
+            input_path.display()
+        );
     }
 
     let mut reader = WavReader::open(input_path).unwrap();

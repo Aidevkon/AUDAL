@@ -3,21 +3,24 @@ use hound::WavReader;
 use sp314_dsp::analysis::phi1_sensor::{Phi2Pcen, Phi2StreamingFrontend};
 
 #[test]
-#[ignore]
+#[ignore = "measures PCEN IIR warmup convergence across chunk boundaries — needs /tmp/w9/podcast_realistic.wav"]
 fn w14_pcen_warmup() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
     if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
+        panic!(
+            "missing fixture {}: 120 s of podcast material, 48 kHz, \
+             91.56% speech from LibriSpeech over a continuous FMA CC \
+             bed 18 dB down, normalized to peak 0.52. described in \
+             commit 52e2a31; the exact source clips are NOT recorded, \
+             so a rebuild reproduces the spec but not the file — any \
+             threshold in this test was tuned on the original and \
+             must be re-measured after a rebuild. sources present \
+             locally under Downloads/DATASET (librispeech, fma).",
+            input_path.display()
+        );
     }
 
-    let mut reader = match WavReader::open(input_path) {
-        Ok(r) => r,
-        Err(_) => {
-            println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-            return;
-        }
-    };
+    let mut reader = WavReader::open(input_path).unwrap();
 
     let spec = reader.spec();
     let channels = spec.channels as usize;

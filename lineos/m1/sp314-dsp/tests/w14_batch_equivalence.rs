@@ -3,12 +3,21 @@ use hound::WavReader;
 use sp314_dsp::analysis::phi1_sensor::{Phi2StreamingFrontend, Phi2Pcen, Phi2Sensor};
 
 #[test]
-#[ignore]
+#[ignore = "verifies bit-exact equivalence between serial and batch sensor inference — needs /tmp/w9/podcast_realistic.wav"]
 fn w14_batch_equivalence() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
     if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
+        panic!(
+            "missing fixture {}: 120 s of podcast material, 48 kHz, \
+             91.56% speech from LibriSpeech over a continuous FMA CC \
+             bed 18 dB down, normalized to peak 0.52. described in \
+             commit 52e2a31; the exact source clips are NOT recorded, \
+             so a rebuild reproduces the spec but not the file — any \
+             threshold in this test was tuned on the original and \
+             must be re-measured after a rebuild. sources present \
+             locally under Downloads/DATASET (librispeech, fma).",
+            input_path.display()
+        );
     }
 
     let mut reader = WavReader::open(input_path).unwrap();

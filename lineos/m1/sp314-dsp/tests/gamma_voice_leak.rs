@@ -3,13 +3,22 @@ use std::path::Path;
 use sp314_dsp::analysis::phi1_sensor::{Phi2StreamingFrontend, Phi2Pcen, Phi2Sensor};
 use sp314_dsp::stft::two_pass::TwoPassEngine;
 
-#[ignore]
 #[test]
+#[ignore = "evaluates Phi-2 voice mask gating on NMFD stem leakage — needs /tmp/w9/podcast_realistic.wav"]
 fn test_gamma_voice_leak() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
     if !input_path.exists() {
-        println!("SKIPPED: {:?} missing", input_path);
-        return;
+        panic!(
+            "missing fixture {}: 120 s of podcast material, 48 kHz, \
+             91.56% speech from LibriSpeech over a continuous FMA CC \
+             bed 18 dB down, normalized to peak 0.52. described in \
+             commit 52e2a31; the exact source clips are NOT recorded, \
+             so a rebuild reproduces the spec but not the file — any \
+             threshold in this test was tuned on the original and \
+             must be re-measured after a rebuild. sources present \
+             locally under Downloads/DATASET (librispeech, fma).",
+            input_path.display()
+        );
     }
 
     let mut reader = WavReader::open(input_path).unwrap();

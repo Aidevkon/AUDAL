@@ -24,12 +24,21 @@ impl sp314_dsp::stft::sliding_overlap_reader::ChunkSource for TestMemorySource {
 }
 
 #[test]
-#[ignore]
+#[ignore = "checks batch boundary observation draining across streaming batches — needs /tmp/w9/podcast_realistic.wav"]
 fn w14_boundary_check() {
     let wav_path = "/tmp/w9/podcast_realistic.wav";
     if !std::path::Path::new(wav_path).exists() {
-        println!("SKIPPED: {} not found", wav_path);
-        return;
+        panic!(
+            "missing fixture {}: 120 s of podcast material, 48 kHz, \
+             91.56% speech from LibriSpeech over a continuous FMA CC \
+             bed 18 dB down, normalized to peak 0.52. described in \
+             commit 52e2a31; the exact source clips are NOT recorded, \
+             so a rebuild reproduces the spec but not the file — any \
+             threshold in this test was tuned on the original and \
+             must be re-measured after a rebuild. sources present \
+             locally under Downloads/DATASET (librispeech, fma).",
+            wav_path
+        );
     }
 
     let mut reader = WavReader::open(wav_path).unwrap();
