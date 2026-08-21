@@ -124,8 +124,22 @@ ACX · podcast · streaming · broadcast · 5.1 — μία ανά ΠΑΡΑΔΟΤ
 
 - Output-ACX μέτρηση στον deliver δρόμο (Δ2γ backlog) — το
   rename input_acx_* ισχύει ΑΠΟ το v0.
-- Canonical serialization spec για υπογραφή (1) — ΠΡΙΝ την
-  πρώτη υπογραφή, όχι αργότερα.
+- ~~Canonical serialization spec~~ ΚΛΕΙΔΩΣΕ 2026-08-21
+  (ψηφοδέλτιο Σ1α·Σ2·Σ3, ομόφωνα κατά εισήγηση):
+  **ΥΠΟΓΡΑΦΟΝΤΑΙ ΤΑ ΩΜΑ UTF-8 BYTES ΤΟΥ ΑΡΧΕΙΟΥ** όπως
+  γράφονται στον δίσκο, με την ΤΙΜΗ του payload_signature
+  αυστηρά "" (κενό string, ΟΧΙ απουσία πεδίου) κατά τον
+  υπολογισμό ΚΑΙ την επαλήθευση. Εμβέλεια: ΟΛΟΚΛΗΡΟ το
+  αρχείο (envelope+payload+platform+hashes) — ό,τι δεν
+  υπογράφεται δεν προστατεύεται. Υπογραφή: Ed25519 με το
+  per-install identity (Ψ6), base64url στο πεδίο.
+  Επαλήθευση: read bytes → αντικατάσταση της sig τιμής με
+  "" μέσω STRING manipulation (ΠΟΤΕ json parse→dump — το
+  float formatting σπάει υπογραφές μεταξύ γλωσσών) →
+  verify. Reformat του αρχείου = σπασμένη υπογραφή =
+  ΣΩΣΤΗ συμπεριφορά (tamper detection, όχι bug).
+  Παραδοτέο: scripts/verify_cert.py, ΜΗΔΕΝ Rust
+  dependency — ο τρίτος δεν χτίζει το workspace.
 - ~~Επαλήθευση μορφών hash με grep~~ ΕΓΙΝΕ 2026-08-21 — ο πίνακας του §2 είναι μετρημένος· παραπροϊόν: F-074 (input_hash = path hash).
 - F-074 κρίση: input_hash rename/αντικατάσταση με content hash — ΠΡΙΝ το freeze.
 - Content-addressing παραγώγων (W/posteriors) — μένει §Σ ανοιχτό.
