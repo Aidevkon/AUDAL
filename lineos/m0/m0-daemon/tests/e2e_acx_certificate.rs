@@ -98,15 +98,15 @@ fn acx_preset_populates_delivery_check_fields() {
     // A1: all three measurement fields are Some with sane dBFS ranges
     let peak = blob
         .loudness().expect("test expects Certified")
-        .acx_sample_peak_db
+        .input_acx_sample_peak_db
         .expect("acx_sample_peak_db must be Some for acx preset");
     let rms = blob
         .loudness().expect("test expects Certified")
-        .acx_rms_db
+        .input_acx_rms_db
         .expect("acx_rms_db must be Some for acx preset");
     let floor = blob
         .loudness().expect("test expects Certified")
-        .acx_noise_floor_db
+        .input_acx_noise_floor_db
         .expect("acx_noise_floor_db must be Some for acx preset");
 
     assert!(
@@ -127,7 +127,7 @@ fn acx_preset_populates_delivery_check_fields() {
     // silently diverge from the numbers it summarizes.
     let compliant = blob
         .loudness().expect("test expects Certified")
-        .acx_compliant
+        .input_acx_compliant
         .expect("acx_compliant must be Some for acx preset");
 
     // Recompute passes_acx from the stored numbers using the SOURCE
@@ -166,24 +166,24 @@ fn podcast_preset_omits_acx_fields() {
     let blob = run_pipeline(wav_path, "podcast", "podcast-ctrl");
 
     assert!(
-        blob.loudness().expect("test expects Certified").acx_sample_peak_db.is_none(),
+        blob.loudness().expect("test expects Certified").input_acx_sample_peak_db.is_none(),
         "acx_sample_peak_db must be None for podcast preset, got {:?}",
-        blob.loudness().expect("test expects Certified").acx_sample_peak_db
+        blob.loudness().expect("test expects Certified").input_acx_sample_peak_db
     );
     assert!(
-        blob.loudness().expect("test expects Certified").acx_rms_db.is_none(),
+        blob.loudness().expect("test expects Certified").input_acx_rms_db.is_none(),
         "acx_rms_db must be None for podcast preset, got {:?}",
-        blob.loudness().expect("test expects Certified").acx_rms_db
+        blob.loudness().expect("test expects Certified").input_acx_rms_db
     );
     assert!(
-        blob.loudness().expect("test expects Certified").acx_noise_floor_db.is_none(),
+        blob.loudness().expect("test expects Certified").input_acx_noise_floor_db.is_none(),
         "acx_noise_floor_db must be None for podcast preset, got {:?}",
-        blob.loudness().expect("test expects Certified").acx_noise_floor_db
+        blob.loudness().expect("test expects Certified").input_acx_noise_floor_db
     );
     assert!(
-        blob.loudness().expect("test expects Certified").acx_compliant.is_none(),
+        blob.loudness().expect("test expects Certified").input_acx_compliant.is_none(),
         "acx_compliant must be None for podcast preset, got {:?}",
-        blob.loudness().expect("test expects Certified").acx_compliant
+        blob.loudness().expect("test expects Certified").input_acx_compliant
     );
 
     // Cleanup

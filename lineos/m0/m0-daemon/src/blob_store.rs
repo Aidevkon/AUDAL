@@ -35,8 +35,10 @@ pub struct StageRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredLoudness {
     pub integrated_lufs: f32,
-    pub short_term_lufs: f32,
-    pub momentary_lufs: f32,
+    #[serde(default)]
+    pub short_term_lufs: Option<f32>, // None = δεν μετρήθηκε — Δ1α 2026-08-21, ΟΧΙ 0.0-ψέμα
+    #[serde(default)]
+    pub momentary_lufs: Option<f32>, // None = δεν μετρήθηκε — Δ1α 2026-08-21, ΟΧΙ 0.0-ψέμα
     pub true_peak_dbtp: f32,
     pub lra: f32,
     #[serde(default)]
@@ -95,16 +97,16 @@ pub struct StoredLoudness {
     // ενημερώνεται και κρατάει ΚΑΙ ΤΙΣ ΔΥΟ μετρήσεις,
     // ονομασμένες. northstar §Σ. Δόγμα Ι.
     // ────────────────────────────────────────────────
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acx_sample_peak_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acx_rms_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acx_noise_floor_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acx_quietest_window_start_frame: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acx_compliant: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_sample_peak_db")]
+    pub input_acx_sample_peak_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_rms_db")]
+    pub input_acx_rms_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_noise_floor_db")]
+    pub input_acx_noise_floor_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_quietest_window_start_frame")]
+    pub input_acx_quietest_window_start_frame: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_compliant")]
+    pub input_acx_compliant: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

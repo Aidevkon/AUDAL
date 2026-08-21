@@ -121,8 +121,8 @@ pub fn run(
         cert_json,
         config_json,
         telemetry_lra,
-        telemetry_short_term,
-        telemetry_momentary,
+        Some(telemetry_short_term),
+        Some(telemetry_momentary),
         crate::dsp::signal_health::DeadAirSummary::default(),
         None, // ACX check never runs on the Music path
         folddown_gain_db,
@@ -182,10 +182,8 @@ pub fn run_streaming(
     folddown_gain_db: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
-    // momentary / short-term stay 0.0.
+    // momentary / short-term stay None.
     let telemetry_lra = lra;
-    let telemetry_short_term = 0.0_f32;
-    let telemetry_momentary = 0.0_f32;
 
     // Certificate from the precomputed streaming
     // SHA-256 (identical to the batch certificate
@@ -239,8 +237,8 @@ pub fn run_streaming(
         cert_json,
         config_json,
         telemetry_lra,
-        telemetry_short_term,
-        telemetry_momentary,
+        None,
+        None,
         cert_data.dead_air,
         cert_data.acx,
         folddown_gain_db,
@@ -277,8 +275,8 @@ fn assemble_blob(
     cert_json: String,
     config_json: String,
     telemetry_lra: f32,
-    telemetry_short_term: f32,
-    telemetry_momentary: f32,
+    telemetry_short_term: Option<f32>,
+    telemetry_momentary: Option<f32>,
     dead_air: crate::dsp::signal_health::DeadAirSummary,
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
     folddown_gain_db: Option<f32>,
@@ -337,11 +335,11 @@ fn assemble_blob(
                 broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
                 tidal_compliant: platform_ok(lufs, -14.0, true_peak),
                 too_quiet_for_mobile: lufs < MIN_MOBILE_PLAYBACK_LUFS,
-                acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
-                acx_rms_db: acx.map(|a| a.rms_db),
-                acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
-                acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
-                acx_compliant: acx.map(|a| a.passes_acx()),
+                input_acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
+                input_acx_rms_db: acx.map(|a| a.rms_db),
+                input_acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
+                input_acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
+                input_acx_compliant: acx.map(|a| a.passes_acx()),
             },
             quality: crate::blob_store::StoredQuality {
                 stereo_correlation: sc,
