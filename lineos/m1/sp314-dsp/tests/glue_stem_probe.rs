@@ -2,7 +2,7 @@ use hound::WavReader;
 use std::path::{Path, PathBuf};
 use sp314_dsp::analysis::phi1_sensor::{Phi2StreamingFrontend, Phi2Pcen, Phi2Sensor};
 
-#[ignore]
+#[ignore = "probes Phi-2 VAD posterior stats on separated glue stems — needs tracked fixtures in tests/fixtures/glue_amb/"]
 #[test]
 fn test_glue_stem_probe() {
     let files = [
@@ -22,8 +22,11 @@ fn test_glue_stem_probe() {
 
     for file in files.iter() {
         if !Path::new(file).exists() {
-            println!("{:<35} | SKIPPED", file);
-            continue;
+            panic!(
+                "missing fixture {}: stem probe fixtures are tracked in-tree \
+                 under lineos/m1/sp314-dsp/tests/fixtures/glue_amb/.",
+                file
+            );
         }
 
         let mut reader = WavReader::open(file).unwrap();
