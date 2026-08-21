@@ -394,9 +394,20 @@ fn assemble_blob(
             },
         }
     };
-    // Generate PDF certificate — silent, never blocks pipeline
-    let pdf_path =
-        std::env::temp_dir().join(format!("m0d-cert-{}.pdf", &blob_v2.core.id[..blob_v2.core.id.len().min(8)]));
+    // Generate PDF certificate — silent, never blocks pipeline.
+    // F-067 (2026-08-21): writer ευθυγραμμισμένος με τον reader του
+    // GET /blob/:id/certificate.pdf — ΗΤΑΝ temp_dir()/m0d-cert-{short}.pdf
+    // ενώ ο reader ζητούσε {masters}/certs_render/{short}_certificate.pdf:
+    // το endpoint ήταν νεκρό (mismatch φακέλου ΚΑΙ ονόματος).
+    let certs_dir = std::path::PathBuf::from(format!(
+        "{}/certs_render",
+        crate::config::M0Config::from_env().masters_path
+    ));
+    let _ = std::fs::create_dir_all(&certs_dir);
+    let pdf_path = certs_dir.join(format!(
+        "{}_certificate.pdf",
+        &blob_v2.core.id[..blob_v2.core.id.len().min(8)]
+    ));
     let pdf_path_str = pdf_path.to_string_lossy();
     crate::handlers::pdf_gen::generate_silent_certificate(&blob_v2, &pdf_path_str);
 

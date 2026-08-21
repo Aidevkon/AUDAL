@@ -316,7 +316,9 @@ pub async fn get_track_certificate_pdf(
     Path(blob_id): Path<String>,
 ) -> Response {
     let short_id = &blob_id[..blob_id.len().min(8)];
-    let pdf_path = format!("{}_certificate.pdf", short_id);
+    let default_dir = format!("{}/certs_render", crate::config::M0Config::from_env().masters_path);
+    // ΗΤΑΝ CWD — 159 PDFs στη ρίζα του repo, F-067, fixed 2026-08-21
+    let pdf_path = format!("{}/{}_certificate.pdf", default_dir, short_id);
 
     match std::fs::read(&pdf_path) {
         Ok(bytes) => Response::builder()

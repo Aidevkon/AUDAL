@@ -95,11 +95,21 @@ pub async fn export_cert_png(
     State(state): State<AppState>,
     Json(req): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let output_path = req["output_path"].as_str().unwrap_or("certificate.png");
+    let default_dir = format!("{}/certs_render", crate::config::M0Config::from_env().masters_path);
+    let default_path_str = format!("{}/certificate.png", default_dir);
+    // ΗΤΑΝ CWD — 159 PDFs στη ρίζα του repo, F-067, fixed 2026-08-21
+    let output_path = req["output_path"].as_str().unwrap_or(&default_path_str);
+
     match get_or_rehydrate(&state, &blob_id).await {
         Ok(blob) => {
+            if let Some(parent) = std::path::Path::new(output_path).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
             generate_certificate_png(&blob, output_path);
-            Json(serde_json::json!({"status": "ok"}))
+            let abs_path = std::fs::canonicalize(output_path)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| output_path.to_string());
+            Json(serde_json::json!({"status": "ok", "path": abs_path}))
         }
         Err(RehydrateError::NotFound) => {
             Json(serde_json::json!({"status": "error", "message": "blob not found"}))
