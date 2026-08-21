@@ -1,8 +1,13 @@
 name: Constitutional Gates
 
+# ΗΤΑΝ push/pull_request-triggered — 2026-08-21 τα 2000 δωρεάν
+# private-repo λεπτά κάηκαν σε ΜΙΑ βάρδια (billing: 2000/2000,
+# όλα από αυτό το repo). Τα gates τρέχουν ΤΟΠΙΚΑ σε κάθε commit
+# block ούτως ή άλλως· το CI γίνεται on-demand + εβδομαδιαίο.
 on:
-  pull_request:
-    branches: [canonical]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Δευτέρα 06:00 UTC
 
 jobs:
   gates:
