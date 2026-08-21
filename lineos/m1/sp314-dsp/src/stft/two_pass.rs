@@ -477,16 +477,6 @@ pub(crate) fn process_single_chunk(
     let deduped_harm;
     let deduped_amb;
 
-    let mut sum_p = 0.0;
-    let mut count_p = 0;
-    for frame in core_mask_p {
-        for &val in frame {
-            sum_p += val as f32;
-            count_p += 1;
-        }
-    }
-    let mean_p = if count_p > 0 { sum_p / count_p as f32 } else { 0.0 };
-
     let (v_mask, b_mask, h_mask, a_mask) = if DRUM_DEDUP_ALPHA > 0.0 {
         let dedup = |mask: &[Vec<f32>]| -> Vec<Vec<f32>> {
             mask.iter().enumerate().map(|(t, frame)| {
@@ -504,10 +494,11 @@ pub(crate) fn process_single_chunk(
         deduped_amb = dedup(core_amb_mask);
         (deduped_voice.as_slice(), deduped_bass.as_slice(), deduped_harm.as_slice(), deduped_amb.as_slice())
     } else {
-        deduped_voice = Vec::new();
-        deduped_bass = Vec::new();
-        deduped_harm = Vec::new();
-        deduped_amb = Vec::new();
+        // ΔΕΝ ξαναγράφουμε deduped_* εδώ: v_mask κ.λπ.
+        // δένονται απευθείας στα core_*_mask παρακάτω,
+        // οπότε ένα άδειο Vec::new() θα ήταν ανάθεση
+        // που ποτέ δεν διαβάζεται — computed-never-read
+        // (a15d590).
         (core_voice_mask, core_bass_mask, core_harm_mask, core_amb_mask)
     };
 
