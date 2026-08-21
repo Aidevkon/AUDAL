@@ -23,6 +23,8 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
 ## CANDIDATES — ΒΑΦΤΙΣΤΗΚΑΝ 2026-08-20: CAND-A..H → F-062..F-069 (ίδια σειρά· παλιές αναφορές CAND-X σε chat/σημειώσεις αποκωδικοποιούνται από εδώ)
 
+- **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι.
+
 - **[F-062] micro-VAD rejected for music gating.** Component: vad_model/scout. Μετρήθηκε (18/08): 97.35% leak σε tambura/violin (το tonality σήμα λέει «φωνή» σε κάθε αρμονικό sustained), 89.66% chop σε rock vocals. Στο podcast παραμένει άψογος (chop 0.12%). Trigger: οποιαδήποτε πρόταση επαναχρήσης VAD στο music path.
 - **[F-063] voice_mask leak σε αρμονικό υλικό χωρίς φωνή.** Component: two_pass masks / w_speech+w_sung. Μετρήθηκε σε Saraga instr (tambura+violin, 60s): speech slots 31.6% + C0 14.65% του max free → ~46% της «ελεύθερης» ενέργειας καταλήγει στο voice stem. Γενίκευση του w19 silence ghost (−38dB, προϋπήρχε κάθε learned prior). Trigger: factory round 6/6b δίκες.
 - **[F-064] frame-heuristic gating: εξαντλήθηκε και απορρίφθηκε με μέτρηση.** 6 διαγνωστικά (r_s, smoothing, perc raw/weighted, VAD, persistence, ασύμμετρο) — προδεσμευμένος κανόνας 0/24. Υλοποιήθηκε mf-only πύλη (hysteresis+ballistics), μετρήθηκε: όφελος +0.46dB στο w19 έναντι 21.3% am_vocal chop και sar_instr 73% ανοιχτή — REVERTED αυθημερόν (18/08). Το sung-vs-strings/drums είναι πρόβλημα ΤΑΥΤΟΤΗΤΑΣ (templates), όχι χρόνου. Trigger: μόνο με θεμελιωδώς καλύτερο per-frame voice σήμα.
@@ -57,7 +59,7 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-070** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-071** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the

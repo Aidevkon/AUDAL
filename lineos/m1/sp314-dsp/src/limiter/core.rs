@@ -56,6 +56,11 @@ impl Default for LimiterConfig {
 /// fix and would let this shrink.
 pub const TRUE_PEAK_HEADROOM_DB: f32 = 0.35;
 
+#[inline]
+pub fn lookahead_samples(sample_rate: u32) -> u32 {
+    (sample_rate as f32 * 0.005).round() as u32
+}
+
 impl BrickwallLimiter {
     pub fn new(config: LimiterConfig, sample_rate: u32) -> Self {
         // F-048: aim below the requested ceiling to absorb the estimator's
@@ -66,7 +71,8 @@ impl BrickwallLimiter {
             config.ceiling_db
         };
         let ceiling_linear = libm::powf(10.0_f32, target_db / 20.0_f32);
-        let lookahead = (sample_rate as f32 * 0.005).round() as usize; // 5ms dynamic
+        let lookahead = lookahead_samples(sample_rate) as usize;
+
         Self {
             delay_l: RingBuffer::new(lookahead),
             delay_r: RingBuffer::new(lookahead),

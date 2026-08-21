@@ -41,6 +41,7 @@ pub fn run(
     input_pcm_hash: String,
     n_total: usize,
     processing_timeline: Vec<StageRecord>,
+    folddown_gain_db: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     // ── Phase 9: Telemetry pass — real LRA + windowed LUFS ───────────────────
     let mut post_master_samples = Vec::with_capacity(n_total * 2);
@@ -124,6 +125,7 @@ pub fn run(
         telemetry_momentary,
         crate::dsp::signal_health::DeadAirSummary::default(),
         None, // ACX check never runs on the Music path
+        folddown_gain_db,
     )
 }
 
@@ -177,6 +179,7 @@ pub fn run_streaming(
     n_total: usize,
     processing_timeline: Vec<StageRecord>,
     cert_data: StreamingCertData,
+    folddown_gain_db: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
     // momentary / short-term stay 0.0.
@@ -240,6 +243,7 @@ pub fn run_streaming(
         telemetry_momentary,
         cert_data.dead_air,
         cert_data.acx,
+        folddown_gain_db,
     )
 }
 
@@ -277,6 +281,7 @@ fn assemble_blob(
     telemetry_momentary: f32,
     dead_air: crate::dsp::signal_health::DeadAirSummary,
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
+    folddown_gain_db: Option<f32>,
 ) -> Result<CertificateOutput, String> {
     let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
@@ -370,6 +375,7 @@ fn assemble_blob(
                     pan_mean: spatial_metadata.spatial[4].pan_mean,
                     pan_width: spatial_metadata.spatial[4].pan_width,
                 },
+                folddown_gain_db,
             },
             provenance: crate::blob_store::StoredProvenance {
                 engine_id: "E11".into(),

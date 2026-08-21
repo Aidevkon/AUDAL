@@ -172,6 +172,10 @@ pub struct StoredSpatial {
     pub mid: BandSpatial,
     pub high_mid: BandSpatial,
     pub high: BandSpatial,
+    /// Gain ΠΟΥ ΕΦΑΡΜΟΖΕΙΣ στο fold (stereo_rms_db - folded_bed_rms_db) για να φτάσεις το stereo.
+    /// None = δεν υπάρχει spatial παραδοτέο ή δεν μετρήθηκε (§Σ, Δόγμα Ε)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folddown_gain_db: Option<f32>,
 }
 
 /// Thread-safe in-memory blob store.
@@ -245,6 +249,9 @@ pub struct SidecarTechnical {
     pub sample_rate: u32,
     pub channels: u16,
     pub num_frames: usize,
+    /// Limiter lookahead latency σε samples (0 = προ-πεδίου cert, §Σ)
+    #[serde(default)]
+    pub declared_latency_samples: u32,
 }
 
 /// Ο φάκελος. ΔΕΝ είναι το blob — το ΠΕΡΙΕΧΕΙ.
@@ -443,6 +450,17 @@ pub fn write_sidecar(
     let identity = crate::identity::load_or_generate_default()
         .map_err(|e| SidecarError::Io(e.to_string()))?;
 
+    let latency = if blob.core.sample_rate > 0 {
+        let l = sp314_dsp::limiter::core::lookahead_samples(blob.core.sample_rate);
+        assert!(
+            l > 0 && l < blob.core.sample_rate / 2,
+            "declared_latency_samples sanity check failed: {l}"
+        );
+        l
+    } else {
+        0
+    };
+
     let envelope = CertificateSidecar {
         format: SIDECAR_FORMAT.to_string(),
         format_version: SIDECAR_FORMAT_VERSION,
@@ -457,6 +475,7 @@ pub fn write_sidecar(
             sample_rate: blob.core.sample_rate,
             channels: blob.core.channels,
             num_frames: blob.core.num_frames,
+            declared_latency_samples: latency,
         },
         payload: blob.clone(),
     };

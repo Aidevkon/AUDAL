@@ -16,6 +16,7 @@ pub struct SpatialDumpWriter {
     writer: std::io::BufWriter<std::fs::File>,
     scratch: Vec<u8>, // bounded: chunk_len * 24, reused
     pub frames_written: usize,
+    pub fold_sum_sq: f64,
 }
 
 impl SpatialDumpWriter {
@@ -26,6 +27,7 @@ impl SpatialDumpWriter {
             writer: std::io::BufWriter::new(file),
             scratch: Vec::new(),
             frames_written: 0,
+            fold_sum_sq: 0.0,
         })
     }
 
@@ -46,11 +48,29 @@ impl SpatialDumpWriter {
             self.scratch.extend_from_slice(&stage.ls[i].to_le_bytes());
             self.scratch.extend_from_slice(&stage.rs[i].to_le_bytes());
         }
+
+        // Accumulate folddown sum of squares using StereoRenderer coefficients
+        let (sp_l, sp_r) = StereoRenderer::render(stage);
+        for i in 0..sp_l.len() {
+            let l = sp_l[i] as f64;
+            let r = sp_r[i] as f64;
+            self.fold_sum_sq += l * l + r * r;
+        }
+
         self.writer
             .write_all(&self.scratch)
             .map_err(|e| format!("SpatialDumpWriter: write: {e}"))?;
         self.frames_written += n;
         Ok(())
+    }
+
+    pub fn folded_bed_rms_db(&self) -> Option<f32> {
+        if self.frames_written > 0 && self.fold_sum_sq > 1e-12 {
+            let mean_sq = self.fold_sum_sq / (2.0 * self.frames_written as f64);
+            Some((10.0 * mean_sq.log10()) as f32)
+        } else {
+            None
+        }
     }
 
     /// Finalize the dump: if the engine emitted fewer frames than

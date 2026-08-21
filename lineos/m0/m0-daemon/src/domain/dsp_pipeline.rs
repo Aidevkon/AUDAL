@@ -139,6 +139,7 @@ fn spatial_conformance_path(
         crate::blob_store::StoredBlobV2,
         std::sync::Arc<lineos_types::audio::ManagedPcm>,
         Option<lineos_corpus::store::UserMarkovModel>,
+        f32,
     ),
     String,
 > {
@@ -392,7 +393,7 @@ fn spatial_conformance_path(
         },
     };
 
-    Ok((blob_v2, spatial_guard, None))
+    Ok((blob_v2, spatial_guard, None, gain_db))
 }
 
 /// Extracted helper: incrementally interleaves and writes 6-channel planar
@@ -791,6 +792,7 @@ fn run_dsp_internal(
             render_res.frames_written,
             processing_timeline,
             cert_data,
+            None,
         )?;
         eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
@@ -885,7 +887,7 @@ fn run_dsp_internal(
             // below; 6ch takes the spatial route here (A4-i).
             if decoded.pcm_channels == 6 {
                 let raw_path = crate::blob_store::raw_dump_path(&blob_id);
-                let (blob, path, model) = spatial_conformance_path(
+                let (blob, path, model, _gain_db) = spatial_conformance_path(
                     &raw_path,
                     decoded.pcm_sample_rate,
                     decoded.total_frames,
@@ -922,7 +924,7 @@ fn run_dsp_internal(
         }) => {
             // decode_node already wrote the raw 6ch dump for this blob_id
             let raw_path = crate::blob_store::raw_dump_path(&blob_id);
-            let (blob, path, model) = spatial_conformance_path(
+            let (blob, path, model, _gain_db) = spatial_conformance_path(
                 &raw_path,
                 sample_rate,
                 num_frames,
@@ -1210,7 +1212,9 @@ fn run_dsp_internal(
     };
     eprintln!("[PERF-NODE] render_node={}ms", t_render_node.elapsed().as_millis());
 
+    let mut folded_bed_rms_post = None;
     if let Some(writer) = spatial_writer {
+        let pre_conformance_rms = writer.folded_bed_rms_db();
         writer.finish(n_total)?;
         let spatial_blob = spatial_conformance_path(
             &spatial_raw_path,
@@ -1224,6 +1228,11 @@ fn run_dsp_internal(
             &input_sha256_hex,
         )?;
         spatial_blob_out = Some(spatial_blob.0);
+        
+        if let Some(pre_rms) = pre_conformance_rms {
+            let conformance_gain = spatial_blob.3;
+            folded_bed_rms_post = Some(pre_rms + conformance_gain);
+        }
     }
 
     eprintln!(
@@ -1336,12 +1345,27 @@ fn run_dsp_internal(
     }
 
     // Interleave planar slices into mmap for playback (xaak/cpal expect interleaved)
+    let mut stereo_sum_sq = 0.0_f64;
     let mmap_f32: &mut [f32] =
         unsafe { std::slice::from_raw_parts_mut(mmap.as_mut_ptr() as *mut f32, n_total * 2) };
     for i in 0..n_total {
+        let l = left_post[i] as f64;
+        let r = right_post[i] as f64;
+        stereo_sum_sq += l * l + r * r;
         mmap_f32[i * 2] = left_post[i];
         mmap_f32[i * 2 + 1] = right_post[i];
     }
+
+    let stereo_rms_db_measured = if n_total > 0 {
+        10.0 * (stereo_sum_sq / (n_total as f64 * 2.0)).log10() as f32
+    } else {
+        -144.0
+    };
+
+    let computed_folddown_gain_db = folded_bed_rms_post.map(|bed_post| {
+        // RMS-vs-RMS, ίδιος κόσμος μέτρησης — ΟΧΙ το quality.rms_db (LUFS+3 προσέγγιση, βλ. F-070)
+        stereo_rms_db_measured - bed_post
+    });
 
     // Persist Tier-2 Master if project_id and track_id are present
     let mut persisted_master = None;
@@ -1403,6 +1427,7 @@ fn run_dsp_internal(
         input_sha256_hex,
         n_total,
         processing_timeline,
+        computed_folddown_gain_db,
     )?;
     eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 

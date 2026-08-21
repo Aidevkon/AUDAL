@@ -441,6 +441,7 @@ pub fn execute_streaming_plan(
         measured.frames_written,
         profiler.finalize(),
         cert_data,
+        None,
     )
     .map_err(ExecutorError::DspFailed)?;
 
