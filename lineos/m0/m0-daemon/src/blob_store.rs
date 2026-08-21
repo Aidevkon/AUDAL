@@ -276,6 +276,11 @@ pub struct CertificateSidecar {
     /// Signer public key in HEX format (64 hex chars = 32 bytes)
     #[serde(default)]
     pub signer_public_key: String,
+    /// Ed25519 signature over the serialized sidecar bytes with THIS
+    /// field set to "" (byte-detached, v0 §6/Σ1α) — base64url no-pad.
+    /// "" = προ-Σ1α cert, δεν υπογράφηκε.
+    #[serde(default)]
+    pub payload_signature: String,
     pub technical: SidecarTechnical,
     pub payload: StoredBlobV2,
 }
@@ -290,6 +295,9 @@ pub enum SidecarError {
     UnknownFormatVersion { found: u32, supported: u32 },
     MasterMissing(std::path::PathBuf),
     MasterHashMismatch { expected: String, actual: String },
+    /// Ο anchor `"payload_signature": ""` δεν βρέθηκε ΑΚΡΙΒΩΣ μία φορά
+    /// στα serialized bytes — refuse to sign blind (Σ1α).
+    SignatureAnchorNotUnique { found: usize },
 }
 
 impl std::fmt::Display for SidecarError {
@@ -314,6 +322,11 @@ impl std::fmt::Display for SidecarError {
                 f,
                 "master_sha256 mismatch — certificate says {expected}, disk says {actual}. \
                  The certificate certifies BYTES; these are not those bytes"
+            ),
+            Self::SignatureAnchorNotUnique { found } => write!(
+                f,
+                "\"payload_signature\": \"\" anchor found {found} times in serialized sidecar \
+                 (expected exactly 1) — refusing to sign blind"
             ),
         }
     }
@@ -473,6 +486,7 @@ pub fn write_sidecar(
         master_sha256,
         key_id: identity.key_id.clone(),
         signer_public_key: identity.public_key_hex(),
+        payload_signature: String::new(),
         technical: SidecarTechnical {
             sample_rate: blob.core.sample_rate,
             channels: blob.core.channels,
@@ -482,9 +496,33 @@ pub fn write_sidecar(
         payload: blob.clone(),
     };
 
-    let json = serde_json::to_vec_pretty(&envelope)
+    // Σ1α — payload signature, byte-detached (v0 §6):
+    // (a) serialize with payload_signature = "" — these are the exact
+    //     bytes the signature covers.
+    let unsigned_json = serde_json::to_vec_pretty(&envelope)
         .map_err(|e| SidecarError::Serde(e.to_string()))?;
+    // (b) sign the unsigned bytes, base64url no-pad.
+    let signature = identity.sign(&unsigned_json);
+    let sig_b64 = {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    };
+    // (c) splice the signature into the SAME bytes via string replace —
+    // NOT a second struct serialize. A second serialize could reorder
+    // or reformat anything serde touches, and the signature would die
+    // silently (it would verify against bytes that no longer exist).
+    // The anchor must appear exactly once, or we refuse to sign blind.
+    let unsigned_str = String::from_utf8(unsigned_json)
+        .map_err(|e| SidecarError::Serde(format!("sidecar bytes not valid UTF-8: {e}")))?;
+    let anchor = "\"payload_signature\": \"\"";
+    let occurrences = unsigned_str.matches(anchor).count();
+    if occurrences != 1 {
+        return Err(SidecarError::SignatureAnchorNotUnique { found: occurrences });
+    }
+    let replacement = format!("\"payload_signature\": \"{sig_b64}\"");
+    let json = unsigned_str.replacen(anchor, &replacement, 1).into_bytes();
 
+    // (d) atomic write, unchanged: tmp -> rename.
     let final_path = blob_storage_path(masters_dir, project_id, &blob.core.id);
     if let Some(dir) = final_path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| SidecarError::Io(e.to_string()))?;

@@ -21,8 +21,16 @@
   πέρασμα ΣΥΝΕΔΕΣΕ αντί να σβήσει: Some(μέτρηση) στο
   Music, τίμιο None στο Episode. input_acx_* με serde
   aliases για παλιά sidecars.
-⇒ ΤΟ ΥΛΟΠΟΙΗΣΙΜΟ ΤΟΥ v0 ΕΙΝΑΙ ΠΛΗΡΕΣ ΣΕ ΚΩΔΙΚΑ
-(2026-08-21). Μένουν ΜΟΝΟ τα δομικά του §6.
+· Σ1α payload signature: IMPLEMENTED — byte-detached στο
+  write_sidecar (anchor-unique splice, ΟΧΙ δεύτερο serialize,
+  SignatureAnchorNotUnique guard) + scripts/verify_cert.py
+  (string-level, pynacl) + inv_sig_1 (tamper 240→241 ΚΑΙ
+  reformat απορρίπτονται — μετρημένο, python exit=0 σε
+  φρέσκο cert).
+⇒ ΤΟ v0 ΕΙΝΑΙ ΠΛΗΡΕΣ ΣΕ ΚΩΔΙΚΑ, ΥΠΟΓΕΓΡΑΜΜΕΝΟ ΚΑΙ
+ΕΠΑΛΗΘΕΥΣΙΜΟ ΑΠΟ ΤΡΙΤΟ (2026-08-21). Ανοιχτά: ΜΟΝΟ τα
+δηλωμένα post-v0 (output-ACX backlog, F-074 spatial ψιλό,
+§Τ ταξιδιώτης, content-addressing).
 
 ΚΑΤΑΣΤΑΣΗ: DRAFT 2026-08-21, γραμμένο ΑΠΟ μετρήσεις
 (πείραμα προβολών 3/3) + αποφάσεις (ψηφοδέλτιο
