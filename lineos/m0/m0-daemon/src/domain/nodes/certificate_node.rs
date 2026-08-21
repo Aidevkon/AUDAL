@@ -278,8 +278,9 @@ fn assemble_blob(
     dead_air: crate::dsp::signal_health::DeadAirSummary,
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
 ) -> Result<CertificateOutput, String> {
+    let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
-        crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, fingerprints);
+        crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, &identity);
 
     // TODO: wire real DR when this path carries trunk metrics (register item)
     let dr = 10.0;

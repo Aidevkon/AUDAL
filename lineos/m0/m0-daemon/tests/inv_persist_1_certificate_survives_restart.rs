@@ -96,6 +96,7 @@ fn inv_persist_1_certificate_survives_restart() {
 
     let masters = tempfile::TempDir::new().unwrap();
     let state_tmp = tempfile::TempDir::new().unwrap();
+    std::env::set_var("M0_IDENTITY_PATH", state_tmp.path().join("identity"));
     let masters_root = masters.path().to_str().unwrap().to_string();
 
     // ── RENDER ────────────────────────────────────────────────

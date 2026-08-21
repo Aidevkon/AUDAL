@@ -19,6 +19,7 @@ pub mod domain;
 pub mod dsp;
 pub mod handlers;
 mod health;
+pub mod identity;
 pub mod io_flac;
 pub mod jini;
 mod marketplace;

@@ -261,6 +261,12 @@ pub struct CertificateSidecar {
     pub engine_version: String,
     pub engine_commit: String,
     pub master_sha256: String,
+    /// Per-install Ed25519 key identity ID (§Σ/Ψ6)
+    #[serde(default)]
+    pub key_id: String,
+    /// Signer public key in HEX format (64 hex chars = 32 bytes)
+    #[serde(default)]
+    pub signer_public_key: String,
     pub technical: SidecarTechnical,
     pub payload: StoredBlobV2,
 }
@@ -434,6 +440,9 @@ pub fn write_sidecar(
     }
     let master_sha256 = sha256_file(master_flac)?;
 
+    let identity = crate::identity::load_or_generate_default()
+        .map_err(|e| SidecarError::Io(e.to_string()))?;
+
     let envelope = CertificateSidecar {
         format: SIDECAR_FORMAT.to_string(),
         format_version: SIDECAR_FORMAT_VERSION,
@@ -442,6 +451,8 @@ pub fn write_sidecar(
         engine_version: env!("CARGO_PKG_VERSION").to_string(),
         engine_commit: env!("GIT_HASH").to_string(),
         master_sha256,
+        key_id: identity.key_id.clone(),
+        signer_public_key: identity.public_key_hex(),
         technical: SidecarTechnical {
             sample_rate: blob.core.sample_rate,
             channels: blob.core.channels,

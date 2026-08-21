@@ -45,6 +45,9 @@ fn stub_certified_blob(id: &str) -> StoredBlobV2 {
 #[test]
 fn test_inv_pi_1_certificate_survival() {
     let masters_dir = tempdir().expect("failed to create tempdir");
+    let identity_dir = masters_dir.path().join("identity_test");
+    std::env::set_var("M0_IDENTITY_PATH", &identity_dir);
+
     let masters_root = masters_dir.path().to_str().expect("valid utf8 path");
 
     let project_id = "project_pi";
@@ -62,6 +65,16 @@ fn test_inv_pi_1_certificate_survival() {
     let sidecar_path = write_sidecar(masters_root, project_id, &blob, &master_flac_path)
         .expect("write_sidecar failed");
     assert!(sidecar_path.exists());
+
+    // Check envelope fields directly from raw JSON
+    let envelope_json: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&sidecar_path).expect("read sidecar file")).expect("parse sidecar json");
+    let key_id = envelope_json.get("key_id").and_then(|v| v.as_str()).expect("key_id must exist");
+    let signer_pk = envelope_json.get("signer_public_key").and_then(|v| v.as_str()).expect("signer_public_key must exist");
+
+    assert!(key_id.starts_with("m0-"), "key_id must start with m0-");
+    assert_ne!(key_id, "m0-", "key_id must not be empty");
+    assert_eq!(signer_pk.len(), 64, "signer_public_key must be 64 hex chars");
 
     let _empty_store = BlobStore::new();
 

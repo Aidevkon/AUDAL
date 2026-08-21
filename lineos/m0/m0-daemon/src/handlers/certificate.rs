@@ -53,24 +53,17 @@ pub fn blake3_pcm(pcm: &[f32]) -> String {
     blake3::hash(&bytes).to_hex().to_string()
 }
 
+/// Signs the certificate payload using the per-installation Ed25519 identity (§Σ/Ψ6α).
+/// Message signed remains: `cert_id:pcm_hash:lufs`
 pub fn sign_certificate(
     cert_id: &str,
     pcm_hash: &str,
     lufs: f32,
-    fingerprints: &StemFingerprints,
+    identity: &crate::identity::Identity,
 ) -> String {
-    // Deterministic signing key from pipeline hash
-    // NOT random — INV-AB-1: same input → same signature
-    use ed25519_dalek::SigningKey;
-    let seed = fingerprints.pipeline.as_bytes();
-    let mut key_bytes = [0u8; 32];
-    for (i, &b) in seed.iter().take(32).enumerate() {
-        key_bytes[i] = b;
-    }
-    let signing_key = SigningKey::from_bytes(&key_bytes);
     let payload = format!("{cert_id}:{pcm_hash}:{lufs:.2}");
     use ed25519_dalek::Signer;
-    let sig = signing_key.sign(payload.as_bytes());
+    let sig = identity.signing_key.sign(payload.as_bytes());
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     format!(
         "eyJhbGciOiJFZERTQSJ9.{}.{}",
