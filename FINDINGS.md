@@ -53,6 +53,20 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Ετυμηγορία: το fma_small ΔΕΝ περιέχει γυμνά κρουστά — δεν
   φιλτράρεται αυτό που δεν υπάρχει. Το ranking έκανε τη
   δουλειά του: μέτρησε, ακούστηκε, πέθανε τίμια.
+  **BABYSLAKH VALIDATION ΕΓΙΝΕ (2026-08-22 00:30):** δομή
+  TrackXXXXX/stems/SXX.wav + metadata.yaml με is_drum: true
+  μονοσήμαντο (Track00001/S01: inst_class Drums, program 128,
+  session_kit_full.nkm). 16k variant = 16000Hz mono pcm_s16le —
+  1:1 με builder (TARGET_SR=16000, mean(axis=1) στο
+  phi1_dataset_builder.py:33,120). Μέση διάρκεια 226s/track →
+  ~80 tracks = 5h drums. Licence: cc-by-4.0 στο Zenodo record
+  ΚΑΙ των δύο (4603870 baby, 4599666 full). ΕΤΥΜΗΓΟΡΙΑ: το
+  slakh2100_16k variant (Zenodo 7708270, YourMT3 redistribution
+  με licence attached — CC-BY κληρονομείται, προέλευση
+  σημειωμένη) αρκεί 100%, όχι το full 44k/105GB. ΕΠΟΜΕΝΟ ΒΗΜΑ
+  (δικό του, όχι απόψε): Zenodo API size check του 16k tarball
+  → download τη νύχτα → md5/checksum πύλη → εξαγωγή drums
+  stems από train split tracks μέχρι ~5h → provenance manifest.
   **DRUMS gap — νέο σχέδιο:** PLAN A: Slakh2100 (MERL) —
   CC-BY 4.0 ΕΠΙΒΕΒΑΙΩΜΕΝΟ σε slakh.com + github (2026-08-21),
   2100 tracks/145h με ΑΛΗΘΙΝΑ απομονωμένα drums stems (MIDI+
