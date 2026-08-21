@@ -129,6 +129,24 @@ pub struct StoredProvenance {
     pub created_by: String,
     pub aether_enriched: bool,
     pub aether_devices: Vec<String>,
+    // ── §Σ/Ψ5 Platform provenance block ──
+    // #[serde(default)] ώστε παλιά sidecars JSON να διαβάζονται (κενό string = προ-Ψ5 cert, ΟΧΙ σφάλμα)
+    #[serde(default)]
+    pub target_triple: String,
+    #[serde(default)]
+    pub target_arch: String,
+    #[serde(default)]
+    pub target_os: String,
+    #[serde(default)]
+    pub target_env: String,
+    #[serde(default)]
+    pub target_cpu: String,
+    #[serde(default)]
+    pub rustc_version: String,
+    #[serde(default)]
+    pub opt_level: String,
+    #[serde(default)]
+    pub codegen_units: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -311,6 +311,7 @@ mod tests {
                     created_by: "".into(),
                     aether_enriched: false,
                     aether_devices: vec![],
+                    ..Default::default()
                 },
                 spatial: StoredSpatial::default(),
                 stem_fingerprints: None,

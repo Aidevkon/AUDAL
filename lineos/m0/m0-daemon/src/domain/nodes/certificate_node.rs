@@ -378,6 +378,14 @@ fn assemble_blob(
                 created_by: "stillair-cockpit".into(),
                 aether_enriched: true,
                 aether_devices: vec![],
+                target_triple: env!("TARGET_TRIPLE").to_string(),
+                target_arch: env!("TARGET_ARCH").to_string(),
+                target_os: env!("TARGET_OS").to_string(),
+                target_env: env!("TARGET_ENV").to_string(),
+                target_cpu: env!("TARGET_CPU").to_string(),
+                rustc_version: env!("RUSTC_VERSION").to_string(),
+                opt_level: env!("PROFILE_OPT_LEVEL").to_string(),
+                codegen_units: env!("PROFILE_CODEGEN_UNITS").to_string(),
             },
         }
     };
