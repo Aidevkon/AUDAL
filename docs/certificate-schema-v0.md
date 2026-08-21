@@ -65,12 +65,19 @@ target_cpu · opt_level · codegen_units · rustc_version` —
 απουσία = "default(unset)", ποτέ μαντεψιά) — ΚΑΙ η ΜΟΡΦΗ
 κάθε hash, ρητή:
 
-| hash πεδίο    | μορφή (ΔΗΛΩΝΕΤΑΙ, δεν συνάγεται)           |
-|---------------|---------------------------------------------|
-| pcm_blake3    | ΑΝΟΙΧΤΟ: επιβεβαίωση με grep πριν το       |
-| input_hash    | freeze — το §Ρ μέτρησε blake3=LE left-ch,  |
-| master_sha256 | sha256=BE interleaved· γράφεται ΕΔΩ όταν   |
-|               | επαληθευτεί στο ζωντανό δέντρο             |
+| hash πεδίο       | μορφή (ΜΕΤΡΗΜΕΝΗ στο δέντρο 2026-08-21, γραμμές αυτούσιες στο recon) |
+|------------------|-----------------------------------------------|
+| pcm_blake3       | BLAKE3 · ΜΟΝΟ αριστερό κανάλι · f32 LE · float pre-quantize |
+| master_sha256 /  | SHA-256 · interleaved L+R · f32 BE · post-    |
+| output_sha256    | mastering, pre-quantize                       |
+| album_hash       | SHA-256 πάνω στα concatenated pcm_blake3 hex  |
+|                  | strings των tracks, με τη σειρά του batch     |
+| input_hash (core)| ⚠ SHA-256 του PATH STRING (UTF-8 bytes), ΟΧΙ |
+|                  | του ήχου — F-074. Αληθινό input content hash  |
+|                  | = input_pcm_hash (υπάρχει, ταξιδεύει στο      |
+|                  | aether cert). Το v0 ΔΕΝ υπόσχεται provenance  |
+|                  | περιεχομένου μέσω input_hash μέχρι το F-074   |
+|                  | να κριθεί (rename ή αντικατάσταση).           |
 
 ## 3. Η ΟΨΗ 5.1 — fold-down (Ψ1, Ψ2)
 
@@ -119,7 +126,8 @@ ACX · podcast · streaming · broadcast · 5.1 — μία ανά ΠΑΡΑΔΟΤ
   rename input_acx_* ισχύει ΑΠΟ το v0.
 - Canonical serialization spec για υπογραφή (1) — ΠΡΙΝ την
   πρώτη υπογραφή, όχι αργότερα.
-- Επαλήθευση μορφών hash με grep (2) — δόγμα Ι.
+- ~~Επαλήθευση μορφών hash με grep~~ ΕΓΙΝΕ 2026-08-21 — ο πίνακας του §2 είναι μετρημένος· παραπροϊόν: F-074 (input_hash = path hash).
+- F-074 κρίση: input_hash rename/αντικατάσταση με content hash — ΠΡΙΝ το freeze.
 - Content-addressing παραγώγων (W/posteriors) — μένει §Σ ανοιχτό.
 - §Τ όψη-ταξιδιώτης (FLAC APPLICATION 'm0sg', όχημα μετρημένο
   20/08) — ΜΕΤΑ το v0 freeze, διαβάζει από αυτό το σχήμα.
