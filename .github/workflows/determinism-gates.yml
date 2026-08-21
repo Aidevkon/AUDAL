@@ -1,0 +1,67 @@
+# Determinism Gates Workflow
+#
+# Guards:
+# - INV-DET-1: Single-track byte-identical render determinism across runs
+# - INV-DET-2: Batch album render byte-identical determinism across runs
+#
+# Schedule Rationale:
+# Scheduled weekly (Monday morning UTC) rather than per-push/PR because these tests
+# run two full release renders each.
+#
+# Measured Execution Times (from test attributes):
+# - INV-DET-1: ~15s measured in release mode
+# - INV-DET-2: ~12s measured in release mode
+#
+# Build Time Note:
+# Cold release build time of m0d on Ubuntu runner is UNMEASURED. The initial execution
+# of this workflow will establish the baseline build time measurement.
+#
+# Fixtures:
+# Fixture audio files (bodleasons_mid.wav, real_world_60s.wav) arrive automatically
+# with repository checkout and are resolved via CARGO_MANIFEST_DIR (zero setup required).
+
+name: Determinism Gates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  determinism:
+    name: Determinism Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install System Dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libmp3lame-dev
+      - name: Disk space before
+        run: df -h
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run Determinism Gates
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --release -p m0d \
+            --test inv_det_1_render_determinism \
+            --test inv_det_2_batch_determinism \
+            -- --ignored 2>&1 | tee /tmp/det.out
+          grep -E "test result" /tmp/det.out
+          test "$(grep -c '1 passed' /tmp/det.out)" -eq 2
