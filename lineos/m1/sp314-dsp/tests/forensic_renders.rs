@@ -113,7 +113,7 @@ fn render_triplet(
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/gate_45_dry.wav"]
 fn forensic_gate() {
     let mut sig_l = vec![0.0; 48000 * 3];
     let mut sig_r = vec![0.0; 48000 * 3];
@@ -153,7 +153,7 @@ fn forensic_gate() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/deess_dry.wav"]
 fn forensic_deess() {
     let mut sig_l = vec![0.0; 48000 * 3];
     let mut sig_r = vec![0.0; 48000 * 3];
@@ -183,7 +183,7 @@ fn forensic_deess() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/lowcut_dry.wav"]
 fn forensic_lowcut() {
     let mut sig_l = vec![0.0; 48000 * 3];
     let mut sig_r = vec![0.0; 48000 * 3];
@@ -214,7 +214,7 @@ fn forensic_lowcut() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/dehum_dry.wav"]
 fn forensic_dehum() {
     let mut sig_l = vec![0.0; 48000 * 3];
     let mut sig_r = vec![0.0; 48000 * 3];
@@ -246,7 +246,7 @@ fn forensic_dehum() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/combined_dry.wav"]
 fn forensic_combined() {
     let mut sig_l = vec![0.0; 48000 * 3];
     let mut sig_r = vec![0.0; 48000 * 3];
@@ -325,7 +325,7 @@ fn get_configs() -> Vec<(&'static str, RestorationConfig)> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/gate_ir.wav"]
 fn forensic_impulse_response() {
     for (name, config) in get_configs() {
         let mut sig_l = vec![0.0; 4096];
@@ -343,7 +343,7 @@ fn forensic_impulse_response() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions — writes to tests/outputs/gate_sweep_dry.wav"]
 fn forensic_sine_sweep() {
     for (name, config) in get_configs() {
         let mut sig_l = vec![0.0; 48000 * 5];

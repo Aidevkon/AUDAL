@@ -1,7 +1,7 @@
 use sp314_dsp::analysis::mel_128::expand_mask_to_linear;
 
 #[test]
-#[ignore]
+#[ignore = "diagnostic, prints only, no assertions"]
 fn w16_mel_inverse_probe() {
     let n_bins = 1025;
     let mel_bands = 128;
