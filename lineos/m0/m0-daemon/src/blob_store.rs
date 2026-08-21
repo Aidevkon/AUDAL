@@ -589,7 +589,8 @@ mod tests {
                 version: "1.0".into(),
                 blob_type: "audio".into(),
                 created_at: "2026-04-15T00:00:00Z".into(),
-                input_hash: "aabbccdd".into(),
+                input_path_sha256: "aabbccdd".into(),
+                input_pcm_hash: Some("pcm-aabbccdd".into()),
                 seed: 1,
                 pipeline_version: "0.4.0".into(),
                 schema_version: 1,
@@ -649,7 +650,13 @@ pub struct StoredBlobCore {
     pub version: String,
     pub blob_type: String,
     pub created_at: String,
-    pub input_hash: String,
+    /// ΗΤΑΝ input_hash — hash του PATH string, όχι του ήχου, F-074.
+    #[serde(alias = "input_hash")]
+    pub input_path_sha256: String,
+    /// content hash του decoded input — το αληθινό input provenance.
+    /// None = προ-F-074 cert.
+    #[serde(default)]
+    pub input_pcm_hash: Option<String>,
     pub seed: u64,
     pub pipeline_version: String,
     /// = 0. ΣΠΑΕΙ ΧΩΡΙΣ MIGRATION μέχρι το πρώτο

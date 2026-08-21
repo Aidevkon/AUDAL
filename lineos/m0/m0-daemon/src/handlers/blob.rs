@@ -162,7 +162,8 @@ pub struct BlobResponse {
     #[serde(rename = "type")]
     pub blob_type: String,
     pub created_at: String,
-    pub input_hash: String,
+    pub input_path_sha256: String,
+    pub input_pcm_hash: Option<String>,
     #[serde(serialize_with = "serialize_u64_as_string")]
     pub seed: u64,
     pub pipeline_version: String,
@@ -214,7 +215,8 @@ impl From<StoredBlobV2> for BlobResponse {
             version: v2.core.version.clone(),
             blob_type: v2.core.blob_type.clone(),
             created_at: v2.core.created_at.clone(),
-            input_hash: v2.core.input_hash.clone(),
+            input_path_sha256: v2.core.input_path_sha256.clone(),
+            input_pcm_hash: v2.core.input_pcm_hash.clone(),
             seed: v2.core.seed,
             pipeline_version: v2.core.pipeline_version.clone(),
             preset_id: v2.core.preset_id.clone(),
@@ -278,7 +280,8 @@ mod tests {
                 version: "1.0".into(),
                 blob_type: "audio".into(),
                 created_at: "2026-08-11T00:00:00Z".into(),
-                input_hash: "hash".into(),
+                input_path_sha256: "hash".into(),
+                input_pcm_hash: Some("pcm-hash".into()),
                 seed: 42,
                 pipeline_version: "v1".into(),
                 preset_id: "preset".into(),
@@ -333,7 +336,8 @@ mod tests {
         assert!(value.get("version").is_some());
         assert!(value.get("type").is_some());
         assert!(value.get("created_at").is_some());
-        assert!(value.get("input_hash").is_some());
+        assert!(value.get("input_path_sha256").is_some());
+        assert!(value.get("input_pcm_hash").is_some());
         assert!(value.get("seed").is_some());
         assert!(value.get("pipeline_version").is_some());
         assert!(value.get("preset_id").is_some());
@@ -383,7 +387,8 @@ mod tests {
                 version: "1.0".into(),
                 blob_type: "audio".into(),
                 created_at: "2026-08-11T00:00:00Z".into(),
-                input_hash: "hash".into(),
+                input_path_sha256: "hash".into(),
+                input_pcm_hash: None,
                 seed: 42,
                 pipeline_version: "v1".into(),
                 preset_id: "preset".into(),

@@ -376,7 +376,8 @@ fn spatial_conformance_path(
             version: "1.0".to_string(),
             blob_type: "spatial_bed".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
-            input_hash: input_hash_hex.to_string(),
+            input_path_sha256: input_hash_hex.to_string(),
+            input_pcm_hash: None,
             seed,
             pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
             schema_version: 0,
@@ -1464,7 +1465,7 @@ fn platform_ok(lufs: f32, target: f32, tp: f32) -> bool {
 }
 
 /// SHA-256 of input bytes — returns [u8; 32].
-/// Used for both `input_hash` audit field and determinism `seed`.
+/// Used for both `input_path_sha256` audit field and determinism `seed`.
 pub fn compute_sha256_bytes(data: &[u8]) -> [u8; 32] {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();

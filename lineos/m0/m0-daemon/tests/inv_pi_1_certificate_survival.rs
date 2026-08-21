@@ -11,7 +11,8 @@ fn stub_certified_blob(id: &str) -> StoredBlobV2 {
             version: "1.0".into(),
             blob_type: "audio".into(),
             created_at: "2026-08-20T22:00:00Z".into(),
-            input_hash: "aabb11223344".into(),
+            input_path_sha256: "aabb11223344".into(),
+            input_pcm_hash: Some("pcm-aabb11223344".into()),
             seed: 42,
             pipeline_version: "0.4.0".into(),
             schema_version: 1,
@@ -95,6 +96,12 @@ fn test_inv_pi_1_certificate_survival() {
     assert_eq!(rehydrated.core.sample_rate, 48000);
     assert_eq!(rehydrated.core.channels, 2);
     assert_eq!(rehydrated.core.num_frames, 96000);
+    // F-074: input_pcm_hash (the real content hash) must survive the
+    // sidecar roundtrip as Some(non-empty) on a fresh cert.
+    match &rehydrated.core.input_pcm_hash {
+        Some(h) => assert!(!h.is_empty(), "input_pcm_hash must not be empty"),
+        None => panic!("input_pcm_hash must be Some on a fresh cert"),
+    }
 
     // 4. Η ΑΡΝΗΤΙΚΗ ΠΛΕΥΡΑ:
     // (α) πείραξε ΕΝΑ byte του master.flac -> MasterHashMismatch

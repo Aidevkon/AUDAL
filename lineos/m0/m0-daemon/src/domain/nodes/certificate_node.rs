@@ -72,7 +72,7 @@ pub fn run(
 
     // Certificate generation
     let cert = aether_bridge::generate_certificate(
-        input_pcm_hash,
+        input_pcm_hash.clone(),
         &post_master_samples,
         aether_bridge::CertificateRequest {
             lra: telemetry_lra,
@@ -114,6 +114,7 @@ pub fn run(
         elapsed_ms,
         seed,
         preset_id,
+        input_pcm_hash,
         processing_timeline,
         n_total,
         pcm_blake3,
@@ -189,7 +190,7 @@ pub fn run_streaming(
     // SHA-256 (identical to the batch certificate
     // for the same audio).
     let cert = aether_bridge::generate_certificate_from_hash(
-        input_pcm_hash,
+        input_pcm_hash.clone(),
         cert_data.output_sha256,
         aether_bridge::CertificateRequest {
             lra: telemetry_lra,
@@ -230,6 +231,7 @@ pub fn run_streaming(
         elapsed_ms,
         seed,
         preset_id,
+        input_pcm_hash,
         processing_timeline,
         n_total,
         cert_data.pcm_blake3,
@@ -268,6 +270,7 @@ fn assemble_blob(
     elapsed_ms: u64,
     seed: u64,
     preset_id: &str,
+    input_pcm_hash: String,
     processing_timeline: Vec<StageRecord>,
     n_total: usize,
     pcm_blake3: String,
@@ -298,7 +301,8 @@ fn assemble_blob(
             version: "1.0".into(),
             blob_type: "audio".into(),
             created_at: Utc::now().to_rfc3339(),
-            input_hash: input_hash_hex.to_string(),
+            input_path_sha256: input_hash_hex.to_string(),
+            input_pcm_hash: Some(input_pcm_hash),
             seed,
             pipeline_version: env!("CARGO_PKG_VERSION").to_string(),
             preset_id: preset_id.to_string(),
