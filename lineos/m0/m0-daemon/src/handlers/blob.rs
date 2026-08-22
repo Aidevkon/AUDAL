@@ -162,7 +162,7 @@ pub struct BlobResponse {
     #[serde(rename = "type")]
     pub blob_type: String,
     pub created_at: String,
-    pub input_path_sha256: String,
+    pub input_path_hash: String,
     pub input_pcm_hash: Option<String>,
     #[serde(serialize_with = "serialize_u64_as_string")]
     pub seed: u64,
@@ -215,7 +215,7 @@ impl From<StoredBlobV2> for BlobResponse {
             version: v2.core.version.clone(),
             blob_type: v2.core.blob_type.clone(),
             created_at: v2.core.created_at.clone(),
-            input_path_sha256: v2.core.input_path_hash.clone(),
+            input_path_hash: v2.core.input_path_hash.clone(),
             input_pcm_hash: v2.core.input_pcm_hash.clone(),
             seed: v2.core.seed,
             pipeline_version: v2.core.pipeline_version.clone(),
@@ -336,7 +336,7 @@ mod tests {
         assert!(value.get("version").is_some());
         assert!(value.get("type").is_some());
         assert!(value.get("created_at").is_some());
-        assert!(value.get("input_path_sha256").is_some());
+        assert!(value.get("input_path_hash").is_some());
         assert!(value.get("input_pcm_hash").is_some());
         assert!(value.get("seed").is_some());
         assert!(value.get("pipeline_version").is_some());
