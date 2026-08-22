@@ -53,6 +53,25 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Ετυμηγορία: το fma_small ΔΕΝ περιέχει γυμνά κρουστά — δεν
   φιλτράρεται αυτό που δεν υπάρχει. Το ranking έκανε τη
   δουλειά του: μέτρησε, ακούστηκε, πέθανε τίμια.
+  **CERT ΥΠΟΓΡΑΦΗ — RECON 2026-08-22 (τι υπογράφει το Ed25519):**
+  ΔΥΟ στρώματα μετρημένα: (1) envelope payload_signature = raw
+  UTF-8 bytes ΟΛΟΥ του sidecar JSON (sig value κενή, χωρίς
+  re-serialize — blob_store.rs), περιέχει master_sha256 +
+  pcm_blake3 → ήχος↔metadata δεμένα· (2) cert_signature JWS =
+  cert_id:pcm_hash:lufs ΜΟΝΟ (certificate.rs) — peak/floor/LRA
+  καλύπτονται μόνο από το envelope· σημείωση για QR design.
+  verify_cert.py: pubkey ΑΠΟ ΜΕΣΑ στο JSON = self-contained
+  trust — αποδεικνύει tamper-evidence, ΟΧΙ προέλευση (καθένας
+  φτιάχνει «έγκυρο» cert με δικό του κλειδί). F-074 δηλωμένο:
+  input_hash = path hash, όχι content. ΔΟΓΜΑΤΙΚΗ ΓΡΑΜΜΗ (για
+  northstar, κρίση Anestis): «Υποσχόμαστε ΣΗΜΕΡΑ: ακεραιότητα
+  (tamper-evident, ήχος δεμένος στο cert) + ελέγξιμες μετρήσεις
+  (διαψεύσιμες με ffmpeg από οποιονδήποτε). ΔΕΝ υποσχόμαστε:
+  προέλευση χωρίς δημοσιευμένο κλειδί (trigger: key-identity
+  binding απόφαση) ούτε binary↔source αντιστοιχία (supply
+  chain, εκτός v0).» Marketing θέση: «να το εργαλείο να με
+  διαψεύσεις» — πατάει σε μετρημένο έδαφος. QR: περιέχει, δεν
+  δείχνει (offline verify, CBOR-compact, EC-M).
   **BABYSLAKH VALIDATION ΕΓΙΝΕ (2026-08-22 00:30):** δομή
   TrackXXXXX/stems/SXX.wav + metadata.yaml με is_drum: true
   μονοσήμαντο (Track00001/S01: inst_class Drums, program 128,
