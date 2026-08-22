@@ -139,10 +139,75 @@ ACX · podcast · streaming · broadcast · 5.1 — μία ανά ΠΑΡΑΔΟΤ
 ΠΑΡΑΓΟΝΤΑΙ από το πλήρες, δεν αποθηκεύονται ξεχωριστά.
 Το «μην αγγίξεις» ως μητρώο entry: Ψ4, POST-LAUNCH backlog.
 
+**ΠΛΗΡΗΣ ΟΡΙΣΜΟΣ — ΚΛΕΙΔΩΣΕ 2026-08-22 (§Σ session, Δ1+Δ2
+ετυμηγορίες Anestis/MAESTRO σύμφωνες):**
+
+**5.1 Η ΣΠΟΝΔΥΛΙΚΗ ΣΤΗΛΗ — σε ΚΑΘΕ όψη, χωρίς εξαίρεση:**
+ΤΑΥΤΟΤΗΤΑ: master_sha256 · pcm_blake3 · input_pcm_hash
+(F-074) · cert_id · ΥΠΟΓΡΑΦΗ: key_id + signer fingerprint
+(= Creator ID, origin kit) · ΜΗΧΑΝΗ: engine_version/commit +
+αναφορά §Ρ platform block · technical (sr/ch/frames +
+declared_latency_samples) · ΚΡΙΣΗ (5.3) · schema_version.
+
+**5.2 ΚΑΝΟΝΑΣ ΑΠΟΥΣΙΑΣ (καθολικός):** πεδίο που δεν
+μετρήθηκε = «not measured» ρητά στην όψη, ΠΟΤΕ σιωπηλή
+εξαφάνιση (θεραπεία F-076(3), το χάρτινο UncertifiedReason).
+Option::None στο JSON ↔ «not measured» στο χαρτί — 1:1.
+
+**5.3 ΚΡΙΣΗ — ΜΙΑ ΦΟΡΑ, ΣΤΟ RENDER, ΜΕ ΤΑ ΚΑΤΩΦΛΙΑ ΜΕΣΑ:**
+το verdict (PASS/FAIL/OVERRIDE) υπολογίζεται από πραγματικό
+validator στο render, έναντι των κατωφλιών της όψης του
+παραδοτέου, και αποθηκεύεται ΜΑΖΙ με τα κατώφλια που
+χρησιμοποίησε (μετρημένο · απαιτούμενο · verdict, τριάδα
+ανά μετρική). ΟΙ ΟΨΕΙΣ ΤΥΠΩΝΟΥΝ, ΔΕΝ ΚΡΙΝΟΥΝ — κανένας
+δεύτερος δικαστής στο print-time (αλλαγή preset μετά το
+render ΔΕΝ αλλάζει την κρίση — το cert μένει διαψεύσιμο
+αυτοτελώς και σε 5 χρόνια). Η hardcoded PASS γραμμή του
+F-076(1) πεθαίνει με αυτό.
+
+**5.4 ΟΙ ΜΕΤΡΙΚΕΣ ΑΝΑ ΟΨΗ** (κάθε γραμμή = μετρημένο δίπλα
+στο απαιτούμενο, frictionless audit):
+· streaming: integrated_lufs · true_peak_dbtp · lra
+· podcast: + short_term/momentary (Option — Δ1α: None ⇒
+  «not measured»)
+· broadcast: ίδιο σετ, κατώφλια EBU R128 (−23 ±0.5 / TP −1)
+· ACX: output_acx_rms_db (παράθυρο −23..−18) ·
+  output_acx_peak_db (≤ −3) · output_acx_noise_floor_db
+  (≤ −60) — ΜΕΤΡΗΜΕΝΑ ΣΤΟ ΠΑΡΑΔΟΤΕΟ (Δ2 ετυμηγορία
+  παρακάτω)· τα input_acx_* παραμένουν στο πλήρες ως
+  ιστορικό του input, ρητά ονομασμένα input.
+· 5.1: folddown_gain_db · null κατώφλι ≤ −45 dBFS
+  after-compensation · declared_latency_samples.
+  Uncertified spatial ⇒ ΚΑΜΙΑ όψη — NOT CERTIFIED +
+  γενική προβολή λόγου (μέτρηση 2026-08-11, νόμος· το
+  expect/catch_unwind του F-076(4) αντικαθίσταται από ρητή
+  άρνηση).
+
+**5.5 Δ1 — ΤΟ ΧΑΡΤΙ ΠΡΟΣΑΡΜΟΖΕΤΑΙ, ΤΟ JSON ΠΟΤΕ
+(ΚΛΕΙΔΩΣΕ):** το sidecar JSON = ΕΝΑ, περιέχει το 100%.
+Το PDF/οπτική όψη δίπλα σε κάθε παραδοτέο = ΑΥΣΤΗΡΑ η
+όψη του (το cert είναι συμβόλαιο ΠΑΡΑΔΟΣΗΣ — ο ACX
+εκδότης δεν βλέπει Spotify νούμερα). Η archive/master όψη
+με ΟΛΑ υπάρχει ΜΟΝΟ με ρητή κλήση (--view all). Ολες
+παράγονται, τίποτα δεν αποθηκεύεται (αρχή Δ — και το
+αποθηκευμένο QR string του F-076(5) πεθαίνει με αυτό).
+
+**5.6 Δ2 — OUTPUT-ACX ΠΡΟΑΓΕΤΑΙ ΠΡΙΝ ΤΟ FREEZE (ΚΛΕΙΔΩΣΕ):**
+«not measured» στο ναυαρχίδα use case = αυτοκτονία, όχι
+MVP. Mini-IMPLEMENT πριν το freeze: ACX RMS window + peak +
+noise floor στο ΤΕΛΙΚΟ παραδοτέο buffer. ΟΡΟΙ ΤΟΥ TICKET
+(κληρονομιά F-070 — καμία προσέγγιση ντυμένη μέτρηση):
+ο ΟΡΙΣΜΟΣ κάθε μεγέθους δηλώνεται στο prompt ΠΡΙΝ (π.χ.
+noise floor = RMS του ησυχότερου παραθύρου/room tone —
+ορισμός με πηγή, όχι αυτοσχέδιος)· κλείνει ΚΑΙ το
+ΜΙΣΑΝΟΙΧΤΟ του F-070 (episode path χωρίς αληθινό RMS).
+Τα πεδία: output_acx_* (νέα, Option μέχρι το implement).
+
 ## 6. ΤΙ ΔΕΝ ΚΛΕΙΝΕΙ ΤΟ v0 (ρητά)
 
-- Output-ACX μέτρηση στον deliver δρόμο (Δ2γ backlog) — το
-  rename input_acx_* ισχύει ΑΠΟ το v0.
+- ~~Output-ACX μέτρηση στον deliver δρόμο (Δ2γ backlog)~~
+  ΠΡΟΗΧΘΗ 2026-08-22 (Δ2 ετυμηγορία, §5.6): mini-IMPLEMENT
+  ΠΡΙΝ το freeze — το rename input_acx_* ισχύει ΑΠΟ το v0.
 - ~~Canonical serialization spec~~ ΚΛΕΙΔΩΣΕ 2026-08-21
   (ψηφοδέλτιο Σ1α·Σ2·Σ3, ομόφωνα κατά εισήγηση):
   **ΥΠΟΓΡΑΦΟΝΤΑΙ ΤΑ ΩΜΑ UTF-8 BYTES ΤΟΥ ΑΡΧΕΙΟΥ** όπως
@@ -163,6 +228,53 @@ ACX · podcast · streaming · broadcast · 5.1 — μία ανά ΠΑΡΑΔΟΤ
 - ~~F-074 κρίση~~ ΚΛΕΙΔΩΣΕ 2026-08-22 (§Σ session): rename +
   προαγωγή input_pcm_hash + internal-only δήλωση — βλ. §2
   και FINDINGS F-074. IMPLEMENT πριν το freeze.
-- Content-addressing παραγώγων (W/posteriors) — μένει §Σ ανοιχτό.
-- §Τ όψη-ταξιδιώτης (FLAC APPLICATION 'm0sg', όχημα μετρημένο
-  20/08) — ΜΕΤΑ το v0 freeze, διαβάζει από αυτό το σχήμα.
+- Content-addressing παραγώγων (W/posteriors) — ΡΗΤΑ POST-v0
+  (κρίση 2026-08-22): κανένα παραδοτέο δεν το χρειάζεται
+  για το launch, καμία μέτρηση δεν το ζητάει — μένει
+  ονομασμένο εδώ με διεύθυνση, όχι αόριστο «ανοιχτό».
+- ~~§Τ όψη-ταξιδιώτης~~ ΟΡΙΣΤΗΚΕ 2026-08-22 — §7 παρακάτω.
+  Η ΥΛΟΠΟΙΗΣΗ παραμένει ΜΕΤΑ το freeze — διαβάζει αυτό
+  το σχήμα (ΣΕΙΡΑ αμετάβλητη).
+
+## 7. Η ΟΨΗ-ΤΑΞΙΔΙΩΤΗΣ — ΚΛΕΙΔΩΣΕ 2026-08-22 (§Σ session,
+ετυμηγορία Anestis/MAESTRO σύμφωνη)
+
+ΔΥΟ ΜΕΤΑΦΟΡΕΙΣ, ΔΙΑΦΟΡΕΤΙΚΗ ΧΩΡΗΤΙΚΟΤΗΤΑ:
+
+**7.1 ΣΤΟ CHUNK (FLAC APPLICATION / MP3 ID3 PRIV / WAV RIFF
+'m0sg' — τα τρία μετρημένα οχήματα §Τ): το ΠΛΗΡΕΣ
+sidecar, τα ωμά bytes του, ΑΥΤΟΥΣΙΑ.** Κανένα υποσύνολο,
+καμία δεύτερη μορφή, καμία νέα υπογραφή: τα bytes στο
+chunk = τα bytes στον δίσκο ⇒ το verify_cert.py δουλεύει
+ΑΠΑΡΑΛΛΑΧΤΟ (εξαγωγή chunk → ίδιο script). Το μέγεθος
+δεν πιέζει μέσα σε audio αρχείο (spikes: 1.2KB άνετα,
+padding zero-rewrite).
+
+**7.2 ΣΤΟ QR: ο πραγματικός ΤΑΞΙΔΙΩΤΗΣ** (φυσικό ταβάνι
+~1.6KB σε EC-M): CBOR, δικό του traveler_version πεδίο,
+περιεχόμενο: σπονδυλική στήλη (cert_id · pcm_blake3 ·
+master_sha256 · key_id · pubkey · fingerprint) + ΟΙ ΤΡΙΑΔΕΣ
+ΤΗΣ ΟΨΗΣ ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ (μετρημένο·απαιτούμενο·
+verdict — για ACX ολόκληρο το output_acx προφίλ: το
+δίλημμα του cb1f9e3 «JWS βεβαιώνει μόνο LUFS» πεθαίνει
+εδώ). Υπογραφή: ΙΔΙΟ raw-bytes τελετουργικό με το Σ1α
+(sig πεδίο "" κατά τον υπολογισμό), ΙΔΙΟ identity κλειδί.
+Αντικαθιστά τον generate_qr_base64 (επαγγελματική κάρτα,
+F-076(5))· το QR string ΠΑΥΕΙ να αποθηκεύεται στο blob
+(αρχή Δ). Αν ξεπεράσει τη χωρητικότητα: περικοπή σε
+σπονδυλική+ΚΡΙΣΗ — ΠΟΤΕ δείκτης/lookup (DECISIONS γ).
+Περιτύλιγμα ευκολίας: URL hash-fragment του verifier
+(DECISIONS α) ΓΥΡΩ από το payload — το fragment ΕΙΝΑΙ το
+cert, ούτε εδώ δείκτης.
+
+**7.3 ΕΜΒΕΛΕΙΑ, ΔΗΛΩΜΕΝΗ ΣΤΟ ΣΧΗΜΑ:** το chunk πεθαίνει
+σε remux/transcode (copy-strip ΜΕΤΡΗΜΕΝΟ, §Τ 22/08) —
+QR/PDF = ο δεύτερος φορέας. Και οι δύο αποδεικνύουν το
+ΠΑΡΑΔΟΘΕΝ master (DECISIONS γ εμβέλεια).
+
+**7.4 ΠΑΡΟΥΣΙΑΣΗ ΣΤΟ PDF (design input για το refactor,
+όχι κανονιστικό):** QR (για την κάμερα, κουβαλάει τον
+ταξιδιώτη) + Creator ID hex fingerprint τυπωμένο (για το
+μάτι — eyeball σύγκριση πολλών αρχείων χωρίς σκανάρισμα)
++ προαιρετικό 1D barcode ως αισθητικό στοιχείο — αν
+κωδικοποιεί κάτι, κωδικοποιεί το fingerprint, ΠΟΤΕ δείκτη.
