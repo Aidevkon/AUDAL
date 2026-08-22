@@ -87,6 +87,17 @@ target_cpu · opt_level · codegen_units · rustc_version` —
 |                  | περιεχομένου μέσω input_hash μέχρι το F-074   |
 |                  | να κριθεί (rename ή αντικατάσταση).           |
 
+**F-074 ΕΤΥΜΗΓΟΡΙΑ 2026-08-22 (§Σ session, υπερισχύει της
+σημείωσης στον πίνακα):** rename input_hash → input_path_hash
+(serde alias για παλιά sidecars, μοτίβο f2c488c) + προαγωγή
+του ΥΠΑΡΧΟΝΤΟΣ input_pcm_hash στο core ως ΤΟ input
+provenance πεδίο που ο τρίτος επαληθεύει + δήλωση στο
+σχήμα: input_path_hash = internal (cache keys), ΟΧΙ υπόσχεση
+provenance. Σκεπτικό βαρύτητας: το πεδίο ΜΟΙΑΖΕΙ content
+hash — ο τρίτος που θα το ελέγξει παίρνει mismatch και
+συμπεραίνει πλαστογραφία. IMPLEMENT πριν το freeze.
+Πλήρης ετυμηγορία: FINDINGS F-074.
+
 ## 3. Η ΟΨΗ 5.1 — fold-down (Ψ1, Ψ2)
 
 Η υπόσχεση: ΔΟΜΙΚΗ ταύτιση (corr+lag — ο ένορκος του
@@ -149,7 +160,9 @@ ACX · podcast · streaming · broadcast · 5.1 — μία ανά ΠΑΡΑΔΟΤ
   Παραδοτέο: scripts/verify_cert.py, ΜΗΔΕΝ Rust
   dependency — ο τρίτος δεν χτίζει το workspace.
 - ~~Επαλήθευση μορφών hash με grep~~ ΕΓΙΝΕ 2026-08-21 — ο πίνακας του §2 είναι μετρημένος· παραπροϊόν: F-074 (input_hash = path hash).
-- F-074 κρίση: input_hash rename/αντικατάσταση με content hash — ΠΡΙΝ το freeze.
+- ~~F-074 κρίση~~ ΚΛΕΙΔΩΣΕ 2026-08-22 (§Σ session): rename +
+  προαγωγή input_pcm_hash + internal-only δήλωση — βλ. §2
+  και FINDINGS F-074. IMPLEMENT πριν το freeze.
 - Content-addressing παραγώγων (W/posteriors) — μένει §Σ ανοιχτό.
 - §Τ όψη-ταξιδιώτης (FLAC APPLICATION 'm0sg', όχημα μετρημένο
   20/08) — ΜΕΤΑ το v0 freeze, διαβάζει από αυτό το σχήμα.
