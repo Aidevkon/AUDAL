@@ -33,7 +33,7 @@ fn make_blob(pcm_path: PathBuf) -> StoredBlobV2 {
             blob_type: "audio".into(),
             created_at: "".into(),
             input_path_hash: "".into(),
-            input_pcm_hash: None,
+            input_pcm_sha256: None,
             seed: 1,
             pipeline_version: "".into(),
             schema_version: 1,

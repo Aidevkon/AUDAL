@@ -23,7 +23,7 @@ fn stub_signed_blob(id: &str) -> StoredBlobV2 {
             blob_type: "audio".into(),
             created_at: "2026-08-21T00:00:00Z".into(),
             input_path_hash: "aabb11223344".into(),
-            input_pcm_hash: Some("pcm-aabb11223344".into()),
+            input_pcm_sha256: Some("pcm-aabb11223344".into()),
             seed: 42,
             pipeline_version: "0.4.0".into(),
             schema_version: 1,

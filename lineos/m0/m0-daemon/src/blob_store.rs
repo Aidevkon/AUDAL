@@ -642,7 +642,7 @@ mod tests {
                 blob_type: "audio".into(),
                 created_at: "2026-04-15T00:00:00Z".into(),
                 input_path_hash: "aabbccdd".into(),
-                input_pcm_hash: Some("pcm-aabbccdd".into()),
+                input_pcm_sha256: Some("pcm-aabbccdd".into()),
                 seed: 1,
                 pipeline_version: "0.4.0".into(),
                 schema_version: 1,
@@ -720,6 +720,116 @@ mod tests {
         }
     }
 
+    /// F-hash-language (2026-08-23): input_pcm_hash -> input_pcm_sha256
+    /// rename must still accept sidecars written under the old key.
+    #[test]
+    fn test_stored_blob_core_input_pcm_sha256_alias() {
+        fn core_json(key: &str) -> String {
+            format!(
+                r#"{{
+                    "id": "blob-pcm-alias-test",
+                    "version": "1.0",
+                    "blob_type": "audio",
+                    "created_at": "2026-04-15T00:00:00Z",
+                    "input_path_hash": "aabbccdd",
+                    "{key}": "eeff0011",
+                    "seed": 1,
+                    "pipeline_version": "0.4.0",
+                    "schema_version": 1,
+                    "preset_id": "spotify",
+                    "pcm_blake3": null,
+                    "cert_signature": null
+                }}"#
+            )
+        }
+
+        for key in ["input_pcm_hash", "input_pcm_sha256"] {
+            let json = core_json(key);
+            let core: StoredBlobCore = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("failed to deserialize with key {key:?}: {e}"));
+            assert_eq!(
+                core.input_pcm_sha256,
+                Some("eeff0011".to_string()),
+                "wrong input_pcm_sha256 value for key {key:?}"
+            );
+        }
+    }
+
+    /// GUARD (F-hash-language, 2026-08-23) — external juror, not
+    /// self-comparison: independently verifies that the value which ends
+    /// up in input_pcm_sha256 really is a SHA-256 over the bytes the
+    /// schema claims.
+    ///
+    /// What is hashed, ΑΥΤΟΥΣΙΟ από τον κώδικα (stream_core.rs push_output,
+    /// ~L134-186):
+    ///   - channels:      interleaved L,R (stereo, N=2)
+    ///   - sample format: f32
+    ///   - endianness:    big-endian (`s.to_be_bytes()`, stream_core.rs:178)
+    ///   - sample rate:   48 kHz (TARGET_SR — this fixture is written at
+    ///                    44.1 kHz to exercise the resample step)
+    ///   - chain point:   POST resample, POST sanitize, PRE quantize (this
+    ///                    is float PCM; int quantization happens later, in
+    ///                    flac_encode.rs — not before this hash)
+    ///
+    /// The oracle side below never calls `input_hashes()` (stream_core.rs:241)
+    /// or anything downstream of it — it re-decodes the same fixture via
+    /// the independent decode_smart() batch path (handlers/decode.rs) and
+    /// hashes with its own fresh sha2::Sha256, exactly the e2e_acx_certificate
+    /// "external juror" pattern (verify by re-deriving from the source
+    /// bytes, not by re-reading the value under test).
+    #[test]
+    fn test_input_pcm_sha256_independent_guard() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path_buf = tmp.path().join("guard_fixture.wav");
+        let path = path_buf.to_str().unwrap();
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 44_100,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut w = hound::WavWriter::create(path, spec).unwrap();
+        let n = 44_100usize;
+        for i in 0..n {
+            let v = 0.25
+                * libm::sinf(2.0 * std::f32::consts::PI * 440.0 * (i as f32 / 44_100.0));
+            w.write_sample(v).unwrap(); // L
+            w.write_sample(v).unwrap(); // R
+        }
+        w.finalize().unwrap();
+
+        // The value under test: the real production path that ends up in
+        // StoredBlobCore.input_pcm_sha256 (decode_node -> dsp_pipeline ->
+        // certificate_node::assemble_blob).
+        let decoded = crate::domain::nodes::decode_node::run(path, "podcast", "guard-blob")
+            .expect("decode_node::run failed");
+
+        // The oracle: an independent decode (decode_smart batch path),
+        // hashed here with a hasher this test owns — no call into
+        // input_hashes() or the streaming path that produced `decoded`.
+        let payload = crate::handlers::decode::decode_smart(path).expect("decode_smart failed");
+        let buf = match payload {
+            lineos_types::AudioPayload::Stereo(b) => b,
+            _ => panic!("expected stereo payload for this fixture"),
+        };
+        let mut interleaved = Vec::with_capacity(buf.num_frames * 2);
+        for i in 0..buf.num_frames {
+            interleaved.push(buf.left[i]);
+            interleaved.push(buf.right[i]);
+        }
+        use sha2::Digest;
+        let mut oracle = sha2::Sha256::new();
+        for &sample in &interleaved {
+            oracle.update(sample.to_be_bytes());
+        }
+        let oracle_sha256 = format!("{:x}", oracle.finalize());
+
+        assert_eq!(
+            decoded.input_sha256_hex, oracle_sha256,
+            "input_pcm_sha256 must equal an independently re-derived SHA-256 of the decoded PCM"
+        );
+    }
+
 }
 
 /// ΒΗΜΑ 1 του certificate-as-type.
@@ -740,9 +850,12 @@ pub struct StoredBlobCore {
     /// SHA-256 του path string — internal (cache), ΟΧΙ provenance. F-074.
     #[serde(alias = "input_hash", alias = "input_path_sha256")]
     pub input_path_hash: String,
-    /// input provenance — αυτό επαληθεύει ο τρίτος. F-074 ετυμηγορία 2026-08-22.
-    #[serde(default)]
-    pub input_pcm_hash: Option<String>,
+    /// SHA-256 του decoded input PCM — input provenance, αυτό
+    /// επαληθεύει ο τρίτος. Ο αλγόριθμος ΣΤΟ ΟΝΟΜΑ κατά τον
+    /// κανόνα γλώσσας των hashes (σχήμα §6, 2026-08-23): αλλαγή
+    /// αλγορίθμου = ΝΕΟ πεδίο, ΠΟΤΕ ίδιο όνομα με άλλα bytes.
+    #[serde(default, alias = "input_pcm_hash")]
+    pub input_pcm_sha256: Option<String>,
     pub seed: u64,
     pub pipeline_version: String,
     /// = 0. ΣΠΑΕΙ ΧΩΡΙΣ MIGRATION μέχρι το πρώτο

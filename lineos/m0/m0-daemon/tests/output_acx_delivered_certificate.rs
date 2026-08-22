@@ -55,7 +55,7 @@ fn make_certified_blob(id: &str, pcm_path: std::path::PathBuf) -> StoredBlobV2 {
             blob_type: "audio".into(),
             created_at: "2026-08-22T00:00:00Z".into(),
             input_path_hash: "deadbeef".into(),
-            input_pcm_hash: Some("pcm-deadbeef".into()),
+            input_pcm_sha256: Some("pcm-deadbeef".into()),
             seed: 7,
             pipeline_version: "0.4.0".into(),
             schema_version: 1,

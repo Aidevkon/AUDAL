@@ -29,7 +29,7 @@ fn stub_blob_with_path(
             blob_type: "audio".into(),
             created_at: created_at.to_string(),
             input_path_hash: "aabbccdd".into(),
-            input_pcm_hash: Some("pcm-aabbccdd".into()),
+            input_pcm_sha256: Some("pcm-aabbccdd".into()),
             seed: 1,
             pipeline_version: "0.4.0".into(),
             schema_version: 1,
