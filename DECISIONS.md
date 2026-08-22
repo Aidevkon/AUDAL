@@ -60,6 +60,48 @@
   (per-bus faders/EQ/spatial) δουλεύει σε έτοιμα stems, O(1).
   Το microcontrol όραμα ΠΡΟΫΠΟΘΕΤΕΙ το cache — δένει με §Σ
   (blob store) και §Π (persistence).
+- ΠΡΟΕΛΕΥΣΗ CERTIFICATE & ΤΑΥΤΟΤΗΤΑ ΔΗΜΙΟΥΡΓΟΥ [ΑΠΟΦΑΣΗ
+  2026-08-22, recon cb1f9e3 + δόγμα 72e57ca]: προέλευση =
+  δημοσιευμένο κλειδί του δημιουργού, αποκεντρωμένο
+  (SSH/PGP μοντέλο: ο narrator δημοσιεύει, ο εκδότης ελέγχει
+  άπαξ). Ο vendor ΔΕΝ υπογράφει ΠΟΤΕ ως αρχή πιστοποίησης —
+  η CA ιδιότητα αντιφάσκει με το «δεν βλέπω τίποτα» και
+  γεννά αιώνια ευθύνη κλειδιού/revocation.
+  Επιτρεπτό μελλοντικά (το (γ) του Ψ6, key_id ήδη στο
+  σχήμα): hosted verifier/ευρετήριο ως ΕΥΚΟΛΙΑ, με τρεις
+  αδιαπραγμάτευτους όρους:
+  (α) CLIENT-SIDE — στατική σελίδα + WASM/JS, ΜΗΔΕΝ upload·
+      μηχανισμός: cert στο URL HASH FRAGMENT (RFC 3986 — δεν
+      φτάνει ποτέ στον server) + drag-and-drop τοπικό
+      hashing. Ο server = static host χωρίς καμία βάση·
+      μαθαίνει ΟΤΙ έγινε επίσκεψη, ποτέ ΤΙ ελέγχθηκε (τα
+      access logs υπάρχουν — η δήλωση ακριβής, όχι απόλυτη).
+  (β) το αποτέλεσμα δείχνει ΠΑΝΤΑ το signer fingerprint με
+      οδηγία σύγκρισης έναντι του δημοσιευμένου Creator
+      ID — σκέτο πράσινο τικ = self-contained trust με στολή.
+  (γ) ΤΟ QR ΚΟΥΒΑΛΑΕΙ ΤΟ CERT, ΠΟΤΕ ΔΕΙΚΤΗ: αυτοτελές
+      payload (compact CBOR στο fragment, ή γυμνό JSON για
+      offline scan — το generate_qr_base64 ήδη έτσι). cert_id
+      lookup = βάση certs = απαγορευμένο. ΕΜΒΕΛΕΙΑ ΔΗΛΩΜΕΝΗ:
+      η απόδειξη αφορά το ΠΑΡΑΔΟΘΕΝ master — επιβιώνει
+      tag-stripping (pcm hash ⊥ container, §Τ αξίωμα 1), ΔΕΝ
+      επιβιώνει platform transcode· δεν υπόσχεται ποτέ το
+      δεύτερο.
+  Το offline verify (verify_cert.py) παραμένει η ΟΥΣΙΑ· ο web
+  verifier πρόσθετη ευκολία (§Τ offline-first αξίωμα).
+  NAMED LEFTOVERS (product roadmap, όχι μπλόκερ):
+  (1) Identity Portability: export/import του κλειδιού,
+      passphrase-protected ΥΠΟΧΡΕΩΤΙΚΑ (το αρχείο ΕΙΝΑΙ η
+      ταυτότητα — επιφάνεια κλοπής αν γυμνό). Per-install =
+      default γέννηση· per-person = η προϊοντική υπόσχεση
+      («η υπογραφή μεταφέρεται στο νέο στούντιο»).
+  (2) UI ονοματολογία: το pubkey εμφανίζεται ως «Creator
+      ID» (hex/QR, fingerprint στο cert PDF) — ΕΙΝΑΙ το κλειδί
+      με όνομα, όχι μετάφρασή του (interop με standard
+      εργαλεία). Το όνομα ψήνεται στο λεξιλόγιο JINI, offline.
+  ΣΥΝΕΠΕΙΑ MARKETING: ένα σχήμα, δύο κοινά — μηχανικοί
+  (zero-infra κρυπτογραφική ανεξαρτησία) + narrators
+  (αποδείξιμη παράδοση χωρίς κρυπτογραφικό άγχος).
 
 ## 2. ΚΑΝΟΝΕΣ — πληρωμένοι με recon
 
