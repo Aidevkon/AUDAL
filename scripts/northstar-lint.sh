@@ -8,25 +8,32 @@ set -euo pipefail
 #   υποκατάλογο ΔΕΝ υποστηρίζεται. Πλήρες path ή καμία παράμετρος.
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-DOC="${1:-docs/northstar-v2.md}"
+DOC="${1:-northstar-v2.md}"
 
 STRICT=0
 if [ "$DOC" = "--strict" ]; then
     STRICT=1
-    DOC="docs/northstar-v2.md"
+    DOC="northstar-v2.md"
 fi
 
 if [ "${2:-}" = "--strict" ]; then
     STRICT=1
 fi
 
+# ΠΑΛΙΑ εδώ υπήρχε δεύτερο fallback σε "NORTHSTAR_v2.md" (κεφαλαία) για
+# τη στιγμή που το default ήταν ακόμα "docs/northstar-v2.md" — δύο
+# λάθη μαζί: το path είχε μετακομίσει στη ρίζα (git mv, 2944be4,
+# 2026-08-22) ΚΑΙ το fallback κυνηγούσε λάθος case. ΑΦΑΙΡΕΘΗΚΕ, όχι
+# απλώς διορθώθηκε: με το default ήδη σωστό ("northstar-v2.md"), ένα
+# fallback που ελέγχει ΤΟ ΙΔΙΟ string είναι αδύνατο να ενεργοποιηθεί
+# ποτέ (η ίδια γραμμή παρακάτω ήδη απέτυχε το -f σε αυτό ακριβώς το
+# path) — νεκρός κώδικας. Χειρότερα: αν ΠΟΤΕ υπήρχε στο μέλλον ένα
+# αρχείο σε λάθος case, ο φρουρός θα το χρησιμοποιούσε ΣΙΩΠΗΛΑ αντί να
+# σκάσει — ακριβώς το είδος «τυπώνει καθαρό ενώ το πραγματικό doc
+# λείπει» που αυτό το ticket ζητά να ΜΗΝ συμβαίνει ξανά.
 if [ ! -f "$DOC" ]; then
-    if [ "$DOC" = "docs/northstar-v2.md" ] && [ -f "NORTHSTAR_v2.md" ]; then
-        DOC="NORTHSTAR_v2.md"
-    else
-        echo "Σφάλμα: το αρχείο '$DOC' δεν βρέθηκε." >&2
-        exit 1
-    fi
+    echo "Σφάλμα: northstar not found at '$DOC'." >&2
+    exit 1
 fi
 
 c_tairiazei=0

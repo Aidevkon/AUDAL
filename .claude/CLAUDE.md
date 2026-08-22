@@ -21,7 +21,7 @@
    Εύρος task = ΜΟΝΟ τα δηλωμένα αρχεία.
 
 ## Πού ζει η αλήθεια
-- docs/northstar-v2.md — πρόθεση + κατάσταση (v2.1, lint-
+- northstar-v2.md — πρόθεση + κατάσταση (v2.1, lint-
   φρουρούμενο, λήγει: δες header)
 - scripts/northstar-lint.sh — ελέγχει τα άγκιστρα του κειμένου
   (8 καταστάσεις, --strict = CI-ready)

@@ -21,7 +21,7 @@ music streaming · broadcast · spatial 5.1.
 
 **Where truth lives:**
 
-- `docs/northstar-v2.md` — intent, doctrines, and the map of what
+- `northstar-v2.md` — intent, doctrines, and the map of what
   talks to what. The repo always outranks it.
 - `FINDINGS.md` — the findings registry (F-numbers, one allocator).
 - `PROJECT_MEMORY_MAP.md` — what already exists, so it is not built
