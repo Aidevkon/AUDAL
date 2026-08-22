@@ -11,7 +11,7 @@ fn stub_certified_blob(id: &str) -> StoredBlobV2 {
             version: "1.0".into(),
             blob_type: "audio".into(),
             created_at: "2026-08-20T22:00:00Z".into(),
-            input_path_sha256: "aabb11223344".into(),
+            input_path_hash: "aabb11223344".into(),
             input_pcm_hash: Some("pcm-aabb11223344".into()),
             seed: 42,
             pipeline_version: "0.4.0".into(),

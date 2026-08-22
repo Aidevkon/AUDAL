@@ -310,7 +310,7 @@ fn assemble_blob(
             version: "1.0".into(),
             blob_type: "audio".into(),
             created_at: Utc::now().to_rfc3339(),
-            input_path_sha256: input_hash_hex.to_string(),
+            input_path_hash: input_hash_hex.to_string(),
             input_pcm_hash: Some(input_pcm_hash),
             seed,
             pipeline_version: env!("CARGO_PKG_VERSION").to_string(),

@@ -376,7 +376,7 @@ fn spatial_conformance_path(
             version: "1.0".to_string(),
             blob_type: "spatial_bed".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
-            input_path_sha256: input_hash_hex.to_string(),
+            input_path_hash: input_hash_hex.to_string(),
             input_pcm_hash: None,
             seed,
             pipeline_version: env!("CARGO_PKG_VERSION").to_string(),

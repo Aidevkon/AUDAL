@@ -28,7 +28,7 @@ fn stub_blob_with_path(
             version: "1.0".into(),
             blob_type: "audio".into(),
             created_at: created_at.to_string(),
-            input_path_sha256: "aabbccdd".into(),
+            input_path_hash: "aabbccdd".into(),
             input_pcm_hash: Some("pcm-aabbccdd".into()),
             seed: 1,
             pipeline_version: "0.4.0".into(),

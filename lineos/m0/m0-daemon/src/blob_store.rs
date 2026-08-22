@@ -627,7 +627,7 @@ mod tests {
                 version: "1.0".into(),
                 blob_type: "audio".into(),
                 created_at: "2026-04-15T00:00:00Z".into(),
-                input_path_sha256: "aabbccdd".into(),
+                input_path_hash: "aabbccdd".into(),
                 input_pcm_hash: Some("pcm-aabbccdd".into()),
                 seed: 1,
                 pipeline_version: "0.4.0".into(),
@@ -671,6 +671,41 @@ mod tests {
         assert!(store.get("nonexistent").is_none());
     }
 
+    /// F-074: sidecars written between 964c96f and today carry the
+    /// intermediate key "input_path_sha256" (neither the oldest
+    /// "input_hash" nor the current "input_path_hash"). All three
+    /// must deserialize into input_path_hash.
+    #[test]
+    fn test_stored_blob_core_input_path_hash_aliases() {
+        fn core_json(key: &str) -> String {
+            format!(
+                r#"{{
+                    "id": "blob-alias-test",
+                    "version": "1.0",
+                    "blob_type": "audio",
+                    "created_at": "2026-04-15T00:00:00Z",
+                    "{key}": "aabbccdd",
+                    "seed": 1,
+                    "pipeline_version": "0.4.0",
+                    "schema_version": 1,
+                    "preset_id": "spotify",
+                    "pcm_blake3": null,
+                    "cert_signature": null
+                }}"#
+            )
+        }
+
+        for key in ["input_hash", "input_path_sha256", "input_path_hash"] {
+            let json = core_json(key);
+            let core: StoredBlobCore = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("failed to deserialize with key {key:?}: {e}"));
+            assert_eq!(
+                core.input_path_hash, "aabbccdd",
+                "wrong input_path_hash value for key {key:?}"
+            );
+        }
+    }
+
 }
 
 /// ΒΗΜΑ 1 του certificate-as-type.
@@ -688,11 +723,10 @@ pub struct StoredBlobCore {
     pub version: String,
     pub blob_type: String,
     pub created_at: String,
-    /// ΗΤΑΝ input_hash — hash του PATH string, όχι του ήχου, F-074.
-    #[serde(alias = "input_hash")]
-    pub input_path_sha256: String,
-    /// content hash του decoded input — το αληθινό input provenance.
-    /// None = προ-F-074 cert.
+    /// SHA-256 του path string — internal (cache), ΟΧΙ provenance. F-074.
+    #[serde(alias = "input_hash", alias = "input_path_sha256")]
+    pub input_path_hash: String,
+    /// input provenance — αυτό επαληθεύει ο τρίτος. F-074 ετυμηγορία 2026-08-22.
     #[serde(default)]
     pub input_pcm_hash: Option<String>,
     pub seed: u64,
