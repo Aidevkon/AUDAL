@@ -340,9 +340,15 @@ fn build_minimal_blob(audio_path: &str) -> StoredBlobV2 {
     blob_v2
 }
 
+/// `masters_dir`/`project_id`: μόνο για το output-ACX certificate
+/// rewrite (§5.6 Δ2) — None σε καλούντες χωρίς πρόσβαση στο store
+/// (π.χ. τεστ με build_minimal_blob fallback) απλώς παραλείπει το
+/// rewrite, δεν αγγίζει τίποτα άλλο στο deliver.
 pub fn run_deliver_core(
     req: &DeliverRequest,
     plan: DeliveryPlan,
+    masters_dir: Option<&str>,
+    project_id: Option<&str>,
 ) -> Result<DeliverResponse, Vec<String>> {
     let out_dir_str = match &req.output_dir {
         Some(d) => d,
@@ -381,6 +387,50 @@ pub fn run_deliver_core(
                 )])
             }
         };
+
+        // §5.6 Δ2, 2026-08-22: το `blob` πιο πάνω είναι ΚΛΩΝΟΣ του
+        // resolved_blob (ΒΗΜΑ 0 recon) — γράφοντας output_acx_* πάνω
+        // του δεν αγγίζει το sidecar στον δίσκο. Ξαναγράφουμε ρητά
+        // μέσω του ΥΠΑΡΧΟΝΤΟΣ blob_store::write_sidecar (ετυμηγορία
+        // κρίνοντα: deliver γίνεται ΜΕΤΑ την υπογραφή, η
+        // payload_signature ξαναϋπολογίζεται σκόπιμα — το cert
+        // αποδεικνύει το ΠΑΡΑΔΟΘΕΝ). ΜΟΝΟ όταν υπάρχει πραγματικό
+        // resolved_blob (άρα υπαρκτό sidecar να ξαναγραφεί) ΚΑΙ ο
+        // καλών έδωσε masters_dir/project_id· χωρίς αυτά (π.χ. τεστ
+        // με build_minimal_blob fallback) παραλείπεται σιωπηλά — ΔΕΝ
+        // υπάρχει τι να ξαναγραφεί.
+        if let (Some(_), Some(md), Some(pid)) = (&plan_entry.resolved_blob, masters_dir, project_id)
+        {
+            match crate::blob_store::find_sidecar(md, &blob.core.id) {
+                Ok(Some(sidecar_path)) => {
+                    let master_flac = sidecar_path.with_extension("flac");
+                    let mut updated = blob.clone();
+                    if let BlobVariant::Certified { loudness, .. } = &mut updated.variant {
+                        loudness.output_acx_sample_peak_db = Some(outcome.report.sample_peak_db);
+                        loudness.output_acx_rms_db = Some(outcome.report.rms_db);
+                        loudness.output_acx_noise_floor_db = outcome.report.noise_floor_db;
+                        loudness.output_acx_quietest_window_start_frame =
+                            outcome.report.quietest_window_start_frame;
+                        if let Err(e) =
+                            crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)
+                        {
+                            warnings.push(format!(
+                                "output-acx: sidecar rewrite failed for track {}: {e}",
+                                plan_entry.track_id
+                            ));
+                        }
+                    }
+                }
+                Ok(None) => warnings.push(format!(
+                    "output-acx: no existing sidecar found for track {} — certificate rewrite skipped",
+                    plan_entry.track_id
+                )),
+                Err(e) => warnings.push(format!(
+                    "output-acx: sidecar lookup failed for track {}: {e}",
+                    plan_entry.track_id
+                )),
+            }
+        }
 
         files.push(plan_entry.filename.clone());
         manifest_entries.push(ManifestEntry {
@@ -543,9 +593,12 @@ pub async fn post_deliver(
             }
 
             // blocking IO in spawn_blocking
-            let result = tokio::task::spawn_blocking(move || run_deliver_core(&req, plan))
-                .await
-                .unwrap_or_else(|e| Err(vec![e.to_string()]));
+            let masters_dir = app.config.masters_path.clone();
+            let result = tokio::task::spawn_blocking(move || {
+                run_deliver_core(&req, plan, Some(&masters_dir), Some(&project_id))
+            })
+            .await
+            .unwrap_or_else(|e| Err(vec![e.to_string()]));
 
             match result {
                 Ok(resp) => Json(resp),

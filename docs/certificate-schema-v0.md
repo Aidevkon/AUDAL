@@ -206,8 +206,20 @@ noise floor = RMS του ησυχότερου παραθύρου/room tone —
 ## 6. ΤΙ ΔΕΝ ΚΛΕΙΝΕΙ ΤΟ v0 (ρητά)
 
 - ~~Output-ACX μέτρηση στον deliver δρόμο (Δ2γ backlog)~~
-  ΠΡΟΗΧΘΗ 2026-08-22 (Δ2 ετυμηγορία, §5.6): mini-IMPLEMENT
-  ΠΡΙΝ το freeze — το rename input_acx_* ισχύει ΑΠΟ το v0.
+  ΕΓΙΝΕ 2026-08-22 (Δ2/§5.6 implement): output_acx_* ×4 στο
+  StoredLoudness, γεμίζουν στο deliver από το ήδη-μετρημένο
+  AcxCheckReport του export (ΙΔΙΟ όργανο με input_acx_*)· το
+  sidecar ξαναγράφεται/ξαναυπογράφεται μέσω του
+  υπάρχοντος write_sidecar (σχεδιασμένο: το cert
+  αποδεικνύει το ΠΑΡΑΔΟΘΕΝ). Τεκμήριο:
+  tests/output_acx_delivered_certificate.rs — ΠΡΟΣΟΧΗ:
+  audio-wire test, #[ignore] κατά τη σύμβαση — τρέχει ρητά
+  με --ignored σε κάθε αλλαγή που αγγίζει deliver/export/
+  sidecar. Το rename input_acx_* ισχύει ΑΠΟ το v0. Το
+  StoredQuality.rms_db episode fallback (F-070) μένει ΑΝΟΙΧΤΟ,
+  δηλωμένα — άλλο ticket.
+  ⇒ ΚΑΙ ΤΑ ΔΥΟ IMPLEMENT ΤΟΥ FREEZE ΕΓΙΝΑΝ (F-074 ec47696/
+  0e954a8 · output-ACX αυτό) — το v0 είναι ΕΤΟΙΜΟ ΓΙΑ FREEZE.
 - ~~Canonical serialization spec~~ ΚΛΕΙΔΩΣΕ 2026-08-21
   (ψηφοδέλτιο Σ1α·Σ2·Σ3, ομόφωνα κατά εισήγηση):
   **ΥΠΟΓΡΑΦΟΝΤΑΙ ΤΑ ΩΜΑ UTF-8 BYTES ΤΟΥ ΑΡΧΕΙΟΥ** όπως

@@ -107,6 +107,20 @@ pub struct StoredLoudness {
     pub input_acx_quietest_window_start_frame: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_compliant")]
     pub input_acx_compliant: Option<bool>,
+
+    // ── ΤΑ output_acx_* ΜΕΤΡΟΥΝ ΤΟ ΠΑΡΑΔΟΤΕΟ ──────────
+    // μετρημένα στο ΤΕΛΙΚΟ deliverable buffer (export.rs,
+    // AcxCheckAnalyzer — ΙΔΙΟ όργανο με τα input_acx_*·
+    // δηλωμένο bias: sample peak, ΟΧΙ true peak). §5.6 Δ2,
+    // 2026-08-22.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_acx_sample_peak_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_acx_rms_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_acx_noise_floor_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_acx_quietest_window_start_frame: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

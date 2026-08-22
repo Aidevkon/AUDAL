@@ -144,7 +144,7 @@ fn test_deliver_e2e_small() {
     };
 
     let plan = validate_and_plan(&req, &db_tracks).unwrap();
-    let resp = run_deliver_core(&req, plan).unwrap();
+    let resp = run_deliver_core(&req, plan, None, None).unwrap();
 
     let book_dir = resp.book_dir.unwrap();
     assert!(std::path::Path::new(&book_dir).exists());
@@ -186,7 +186,7 @@ fn test_deliver_acx_ffprobe() {
     };
 
     let plan = validate_and_plan(&req, &db_tracks).unwrap();
-    let resp = run_deliver_core(&req, plan).unwrap();
+    let resp = run_deliver_core(&req, plan, None, None).unwrap();
 
     let book_dir = resp.book_dir.unwrap();
     let f1 = std::path::Path::new(&book_dir).join(&resp.files[0]);

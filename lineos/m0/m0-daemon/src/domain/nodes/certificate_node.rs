@@ -353,6 +353,12 @@ fn assemble_blob(
                 input_acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
                 input_acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
                 input_acx_compliant: acx.map(|a| a.passes_acx()),
+                // output_acx_* δεν μετριέται εδώ — μόνο στο export path
+                // (run_deliver_core), μετά το certificate. §5.6 Δ2.
+                output_acx_sample_peak_db: None,
+                output_acx_rms_db: None,
+                output_acx_noise_floor_db: None,
+                output_acx_quietest_window_start_frame: None,
             },
             quality: crate::blob_store::StoredQuality {
                 stereo_correlation: sc,
