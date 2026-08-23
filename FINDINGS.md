@@ -94,6 +94,42 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   | RMS ≤ −18 (ανώτατο)  | διαβάζει ΨΗΛΟΤΕΡΑ  | +0.027 (n=1)  | **0.10** |
   | peak ≤ −3 (ανώτατο)  | διαβάζει ΨΗΛΟΤΕΡΑ  | +0.037 (n=1)  | **0.20** ⚠ |
   | lossless (FLAC/WAV)  | —                   | —              | **0.00** |
+  | floor ≤ −60 (ανώτατο) | διαβάζει ΨΗΛΟΤΕΡΑ | ΔΕΝ ΣΥΝΕΒΗ (βλ. κάτω) | **0.00** ⚠ |
+
+  **NOISE FLOOR — Η ΠΡΟΒΛΕΨΗ ΔΙΑΨΕΥΣΤΗΚΕ, ΜΕΤΡΗΜΕΝΟ
+  2026-08-23 (n=1, ΠΡΩΤΗ μέτρηση, ΟΧΙ κατανομή):**
+  Πρόβλεψη του κρίνοντος: το floor θα ΑΝΕΒΕΙ (ο
+  κβαντιστής προσθέτει θόρυβο στις παύσεις) ⇒
+  επικίνδυνη φορά για κατώφλι ≤ −60. **ΔΙΑΨΕΥΣΤΗΚΕ:
+  Δfloor = −2.5717 dB, ΑΡΝΗΤΙΚΟ** — ίδια φορά με
+  RMS/peak, και ~10× μεγαλύτερο από την ομοιόμορφη
+  μετατόπιση στάθμης (~0.26).
+  ΜΗΧΑΝΙΣΜΟΣ, ερμηνεία συνεπής με τα δεδομένα (ΟΧΙ
+  μετρημένη αιτία): στα −82 dB ο ψυχοακουστικός
+  μοντελοποιητής δίνει μηδέν bits — ο encoder ΣΒΗΝΕΙ
+  το room tone αντί να προσθέτει θόρυβο. Λιμοκτονία
+  bits, όχι κβαντισμός. Εξηγεί και το γιατί είναι 10×:
+  δεν είναι μετατόπιση στάθμης, είναι ΔΙΑΓΡΑΦΗ
+  περιεχομένου.
+  ΕΛΕΓΧΟΣ ΘΕΣΗΣ (ώστε ο ισχυρισμός να μη στηρίζεται σε
+  τυχερό παράθυρο): το ησυχότερο παράθυρο μετακινήθηκε
+  κατά ΕΝΑ sub-block (2.700s → 2.600s). Αποσύνθεση:
+  **99.4% = η ΙΔΙΑ σιωπή έγινε σιωπηλότερη** (−2.5569),
+  0.6% = βρέθηκε άλλη ελάχιστα ησυχότερη (−0.0148).
+  ΓΙΑ ΤΟ ACX Η ΦΟΡΑ ΕΙΝΑΙ ΑΣΦΑΛΗΣ ⇒ margin 0.00.
+  ⚠ ΟΡΙΟ: μετρήθηκε σε floor **−82 dB, δηλαδή 22 dB
+  ΚΑΤΩ από το κατώφλι**. Εκεί ο encoder πετάει το room
+  tone ολόκληρο. Η ΖΩΝΗ ΚΙΝΔΥΝΟΥ (floor κοντά στο −60,
+  όπου το room tone είναι 22 dB δυνατότερο) είναι
+  ΑΜΕΤΡΗΤΗ — εκεί ο encoder πιθανά το ΚΡΑΤΑΕΙ, και η
+  αρχική πρόβλεψη (προσθήκη θορύβου) μπορεί να ισχύει.
+  Υλικό: 154.88s αφήγηση, 44.1kHz stereo, 35 πραγματικές
+  παύσεις με room tone (RMS 0.000056, όχι ψηφιακή
+  σιωπή). ΟΡΓΑΝΟ: ο ΔΙΚΟΣ ΜΑΣ AcxCheckAnalyzer ΚΑΙ ΣΤΙΣ
+  ΔΥΟ πλευρές — το ffmpeg astats δεν έχει ισοδύναμο
+  HP-φιλτραρισμένου ολισθαίνοντος ελαχίστου· όταν
+  μετράς ΧΑΣΜΑ, ίδιο όργανο και στις δύο μεριές είναι
+  το σωστό. Διασταύρωση με astats σε RMS/peak: <0.05 dB.
 
   · Το −0.543 του peak (1988-147956-0028) είναι στην
     ΑΣΦΑΛΗ φορά για ένα ceiling — δεν δικαιολογεί margin.
@@ -210,7 +246,70 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 - **[F-063] voice_mask leak σε αρμονικό υλικό χωρίς φωνή.** Component: two_pass masks / w_speech+w_sung. Μετρήθηκε σε Saraga instr (tambura+violin, 60s): speech slots 31.6% + C0 14.65% του max free → ~46% της «ελεύθερης» ενέργειας καταλήγει στο voice stem. Γενίκευση του w19 silence ghost (−38dB, προϋπήρχε κάθε learned prior). Trigger: factory round 6/6b δίκες.
 - **[F-064] frame-heuristic gating: εξαντλήθηκε και απορρίφθηκε με μέτρηση.** 6 διαγνωστικά (r_s, smoothing, perc raw/weighted, VAD, persistence, ασύμμετρο) — προδεσμευμένος κανόνας 0/24. Υλοποιήθηκε mf-only πύλη (hysteresis+ballistics), μετρήθηκε: όφελος +0.46dB στο w19 έναντι 21.3% am_vocal chop και sar_instr 73% ανοιχτή — REVERTED αυθημερόν (18/08). Το sung-vs-strings/drums είναι πρόβλημα ΤΑΥΤΟΤΗΤΑΣ (templates), όχι χρόνου. Trigger: μόνο με θεμελιωδώς καλύτερο per-frame voice σήμα.
 - **[F-065] C2 (slot 9): discarded 29% → v6 retrain → πλήρης δίκη 18/08, ΔΙΧΑΣΜΕΝΗ ΕΤΥΜΗΓΟΡΙΑ — v5 ΜΕΝΕΙ.** Ιστορικό: v6 full (strings negatives με synthetic formants) → έσπασε C0 (R2 0.47→18.11%) ΚΑΙ bass (4.95→11.69%) — REJECTED από standing jury. Frankenmerge (C0/C1_v5 + C2_v6) → ΟΛΟ το πάνελ πράσινο (C2 29→1.37%, R2 0.43%, bass 6.08%, gain +4.91dB) — αλλά τυφλή ακρόαση (2 υλικά): ΦΩΝΗ καθαρότερη στο v5, ΣΙΩΠΗ καθαρότερη στο franken — το +4.91 ήταν φωνή+συνοδεία, όχι καθαρότητα. Ισοπαλία → προδεσμευμένος κανόνας: production αμετάβλητο. ΔΙΔΑΓΜΑΤΑ: (α) negatives πρέπει να περιέχουν ό,τι ΔΕΝ έχει το positive — ποτέ τα ορίζοντα χαρακτηριστικά του (τα formants στα synthetic strings δηλητηρίασαν τον C0)· (β) voice_gain μετράει ενέργεια, όχι ταυτότητα — καμία υιοθέτηση templates χωρίς τυφλή ακρόαση. Υλικό 6b: w_sung_v6.bin/png στο musdb-lab. ΣΤΟΧΟΣ 6b (γραμμένος από την ακρόαση): «το ghost relief του franken ΜΕ τη φωνή του v5» — real MUSDB other stems negatives, χωρίς synthetic formants. Trigger: όταν η ατζέντα ξανανοίξει factory lane. ΜΕΤΡΗΜΕΝΟ στα A/B renders (silence_diagnostic, 18/08): franken ghost relief −0.34 dB · vocal-side −0.46 dB — οι πραγματικές διαφορές ήταν υπο-μισού-dB, συνεπείς με το «τίποτα ξεκάθαρο» της ακρόασης: το frankenmerge δεν άξιζε production swap ούτε ως ghost θεραπεία.
-- **[F-066] Shipped assets provenance — ΠΛΗΡΗΣ ΑΠΟΓΡΑΦΗ 2026-08-19 (recon + επαλήθευση όρων στην πηγή).** ΤΕΣΣΕΡΑ trained assets στο binary (include_bytes!), όλα με πηγή MUSDB18-HQ: w_music_v1 (24KB, factory v5) · w_speech_v1 (16KB) · phi1_v3 (238KB, speech-presence classifier, phi1_train.py, commit 76c2a95) · phi2_pcen (238KB, PCEN sensor, df43772). Χωρίς trained δεδομένα: vad_model.rs (hardcoded αναλυτικές σταθερές) · CourierPrime font (OFL-1.1 — εκκρεμεί license notice) · synthetic fixtures (generator scripts). Οροι dataset, επαληθευμένοι στην πηγή 19/08 (Zenodo 1117372/3338373, sigsep — τοπικό LICENSE ΑΠΟΝ στο DATASET dir): «provided for educational purposes only… not… for any commercial purpose without the express permission of the copyright holders»· σύνθεση μικτή (100 Mixing Secrets/DSD100 · 46 MedleyDB CC BY-NC-SA 4.0 · 2 NI · 2 BY-NC-SA 3.0). ΑΠΟΝ provenance: tests/fixtures/bodleasons_mid.wav, real_world_60s.wav — κατά δήλωση Anestis (19/08, χωρίς όρκο): αν είναι ομιλία, προέρχονται από LibriSpeech ή FMA/Freesound — ανεπιβεβαίωτο. Σημείωση εμβέλειας: είναι test fixtures — ΔΕΝ σαλάρουν στο binary ⇒ αφορούν μόνο το public-repo checklist, όχι το launch gate του binary. Trigger: LAUNCH GATE — απόφαση πριν τις 30/09. **ΕΤΥΜΗΓΟΡΙΑ 2026-08-21 (Anestis, sequenced clean-room):** ΟΧΙ retrain τώρα, ΟΧΙ counsel — πρώτα Ο ΚΡΙΤΗΣ. Σειρά με εξαρτήσεις: (1) τελειώνει το verification tooling (schema v0 δομικά + E2E properties suite) → (2) MUSDB v5 metrics ΠΑΓΩΝΟΥΝ ως Oracle baseline (τα σημερινά νούμερα = ο χρυσός κανόνας που ξέρουμε ότι δουλεύει) → (3) εργοστάσιο ανάβει: clean-source retrain (LibriSpeech/VocalSet/FMA, phi1_train.py) → (4) αυτόματη σύγκριση v6-vs-Oracle μέσω του suite. ΔΙΟΡΘΩΣΗ ΑΞΟΝΑ (F-065, δεσμευτικό): το suite κόβει υποψηφίους στα ΜΕΤΡΗΣΙΜΑ σε δευτερόλεπτα, αλλά η ΤΥΦΛΗ ΑΚΡΟΑΣΗ παραμένει η τελική πύλη ταυτότητας templates — μικρότερη, όχι ανύπαρκτη. Launch με καθαρά weights, εντός των 40 ημερών. (Saraga NC = ποτέ training · fixtures σε τυχόν public repo = ίδιο checklist.) ΣΥΜΠΛΗΡΩΜΑ 19/08 — CLEAN-SOURCE ΧΑΡΤΗΣ (όροι διαβασμένοι στην πηγή, quoted+URL στο recon log): SPEECH → LibriSpeech/LibriVox (CC BY 4.0 / public domain — dev-clean ΗΔΗ τοπικά) · SUNG → VocalSet (CC BY 4.0 blanket, 10.1h isolated, Zenodo 1442513) · DRUMS/NEGATIVES → Freesound/FMA με per-item CC0/CC-BY allowlists (τοπικό fma_small_cc_allowlist.json ΗΔΗ υπάρχει) ή ιδίες ηχογραφήσεις — κενό curation, όχι κενό υλικού. ΑΠΟΝ (δεν βρέθηκε αυτούσιος όρος audio): Common Voice audio terms · OpenSinger (404) · MedleyDB audio. NC-verified (ακατάλληλα για εμπορικό retrain): MoisesDB (CC BY-NC-SA blanket) · MTG-Jamendo (NC + Jamendo S.A. authorization). RECON CURATION ΕΓΙΝΕ 2026-08-21 (soundfile.info στο 100% των αρχείων): SPEECH ΠΛΗΡΕΣ — LibriSpeech dev-clean 2.703 flac / 5.39h τοπικά. MUSIC BED ΠΛΗΡΕΣ — FMA allowlist 1.329/1.329 mp3 / 11.07h. SUNG ΑΠΟΝ — VocalSet download (Zenodo 1442513, 10.1h, CC BY). **SUNG ΕΚΛΕΙΣΕ 2026-08-22 (προσγείωση+απογραφή):** md5 πύλες ×2 OK, 7z διάσωση (32-bit zip overflow), cleanup 5.561 AppleDouble/junk (το νυχτερινό «17.9k» ήταν φουσκωμένο από ._*.wav resource forks). Πραγματικά wav: 14.300 σε 4 δομές — ΜΟΝΑΔΙΚΕΣ ΗΧΟΓΡΑΦΗΣΕΙΣ: **3.613 / ~10.8h** (συνεπές με τις δηλωμένες 10.1h Zenodo)· οι όψεις byte-identical επαληθευμένες (5/5 sha256 vs11↔by_singer). 44.1k mono PCM_16. **ΚΑΝΟΝΑΣ BUILDER: vs11/FULL ΜΟΝΟ** — σάρωση ολόκληρου του ραφιού = 4× τεχνητό βάρος ανά ηχογράφηση. MANIFEST.md + zips.sha256 στο ράφι (οι 32.36h του πρώτου manifest ανακλήθηκαν — μετρούσαν τον πλεονασμό ως υλικό). DRUMS/NEGATIVES ΑΠΟΝ — το ΜΟΝΟ curation κενό (~2-5h). fpcalc ΑΠΟΝ. v5 συνταγή μετρημένη: SNR sweep [10,3,-3,-9], 16kHz, 40/30/30 clean-speech/clean-music/mixed (phi1_dataset_builder.py:30-36,204-206). Το εργοστάσιο απέχει 1 download + 1 install + 1 curation session από ανάφλεξη.
+- **[F-066] Shipped assets provenance — ΠΛΗΡΗΣ ΑΠΟΓΡΑΦΗ 2026-08-19 (recon + επαλήθευση όρων στην πηγή).** ΤΕΣΣΕΡΑ trained assets στο binary (include_bytes!), όλα με πηγή MUSDB18-HQ: w_music_v1 (24KB, factory v5) · w_speech_v1 (16KB) · phi1_v3 (238KB, speech-presence classifier, phi1_train.py, commit 76c2a95) · phi2_pcen (238KB, PCEN sensor, df43772). Χωρίς trained δεδομένα: vad_model.rs (hardcoded αναλυτικές σταθερές) · CourierPrime font (OFL-1.1 — εκκρεμεί license notice) · synthetic fixtures (generator scripts). Οροι dataset, επαληθευμένοι στην πηγή 19/08 (Zenodo 1117372/3338373, sigsep — τοπικό LICENSE ΑΠΟΝ στο DATASET dir): «provided for educational purposes only… not… for any commercial purpose without the express permission of the copyright holders»· σύνθεση μικτή (100 Mixing Secrets/DSD100 · 46 MedleyDB CC BY-NC-SA 4.0 · 2 NI · 2 BY-NC-SA 3.0). ΑΠΟΝ provenance: tests/fixtures/bodleasons_mid.wav, real_world_60s.wav — κατά δήλωση Anestis (19/08, χωρίς όρκο): αν είναι ομιλία, προέρχονται από LibriSpeech ή FMA/Freesound — ανεπιβεβαίωτο. Σημείωση εμβέλειας: είναι test fixtures — ΔΕΝ σαλάρουν στο binary ⇒ αφορούν μόνο το public-repo checklist, όχι το launch gate του binary. Trigger: LAUNCH GATE — απόφαση πριν τις 30/09. **ΕΤΥΜΗΓΟΡΙΑ 2026-08-21 (Anestis, sequenced clean-room):** ΟΧΙ retrain τώρα, ΟΧΙ counsel — πρώτα Ο ΚΡΙΤΗΣ. Σειρά με εξαρτήσεις: (1) τελειώνει το verification tooling (schema v0 δομικά + E2E properties suite) → (2) MUSDB v5 metrics ΠΑΓΩΝΟΥΝ ως Oracle baseline (τα σημερινά νούμερα = ο χρυσός κανόνας που ξέρουμε ότι δουλεύει) → (3) εργοστάσιο ανάβει: clean-source retrain (LibriSpeech/VocalSet/FMA, phi1_train.py) → (4) αυτόματη σύγκριση v6-vs-Oracle μέσω του suite. ΔΙΟΡΘΩΣΗ ΑΞΟΝΑ (F-065, δεσμευτικό): το suite κόβει υποψηφίους στα ΜΕΤΡΗΣΙΜΑ σε δευτερόλεπτα, αλλά η ΤΥΦΛΗ ΑΚΡΟΑΣΗ παραμένει η τελική πύλη ταυτότητας templates — μικρότερη, όχι ανύπαρκτη. Launch με καθαρά weights, εντός των 40 ημερών. (Saraga NC = ποτέ training · fixtures σε τυχόν public repo = ίδιο checklist.) ΣΥΜΠΛΗΡΩΜΑ 19/08 — CLEAN-SOURCE ΧΑΡΤΗΣ (όροι διαβασμένοι στην πηγή, quoted+URL στο recon log): SPEECH → LibriSpeech/LibriVox (CC BY 4.0 / public domain — dev-clean ΗΔΗ τοπικά) · SUNG → VocalSet (CC BY 4.0 blanket, 10.1h isolated, Zenodo 1442513) · DRUMS/NEGATIVES → Freesound/FMA με per-item CC0/CC-BY allowlists (τοπικό fma_small_cc_allowlist.json ΗΔΗ υπάρχει) ή ιδίες ηχογραφήσεις — κενό curation, όχι κενό υλικού. ΑΠΟΝ (δεν βρέθηκε αυτούσιος όρος audio): Common Voice audio terms · OpenSinger (404) · MedleyDB audio. NC-verified (ακατάλληλα για εμπορικό retrain): MoisesDB (CC BY-NC-SA blanket) · MTG-Jamendo (NC + Jamendo S.A. authorization). RECON CURATION ΕΓΙΝΕ 2026-08-21 (soundfile.info στο 100% των αρχείων): SPEECH ΠΛΗΡΕΣ — LibriSpeech dev-clean 2.703 flac / 5.39h τοπικά. MUSIC BED ΠΛΗΡΕΣ — FMA allowlist 1.329/1.329 mp3 / 11.07h. SUNG ΑΠΟΝ — VocalSet download (Zenodo 1442513, 10.1h, CC BY). **SUNG ΕΚΛΕΙΣΕ 2026-08-22 (προσγείωση+απογραφή):** md5 πύλες ×2 OK, 7z διάσωση (32-bit zip overflow), cleanup 5.561 AppleDouble/junk (το νυχτερινό «17.9k» ήταν φουσκωμένο από ._*.wav resource forks). Πραγματικά wav: 14.300 σε 4 δομές — ΜΟΝΑΔΙΚΕΣ ΗΧΟΓΡΑΦΗΣΕΙΣ: **3.613 / ~10.8h** (συνεπές με τις δηλωμένες 10.1h Zenodo)· οι όψεις byte-identical επαληθευμένες (5/5 sha256 vs11↔by_singer). 44.1k mono PCM_16. **ΚΑΝΟΝΑΣ BUILDER: vs11/FULL ΜΟΝΟ** — σάρωση ολόκληρου του ραφιού = 4× τεχνητό βάρος ανά ηχογράφηση. MANIFEST.md + zips.sha256 στο ράφι (οι 32.36h του πρώτου manifest ανακλήθηκαν — μετρούσαν τον πλεονασμό ως υλικό). DRUMS/NEGATIVES ΑΠΟΝ — το ΜΟΝΟ curation κενό (~2-5h).
+  **DRUMS ΕΚΛΕΙΣΕ 2026-08-23 (Slakh redux 16k):** το
+  τελευταίο curation κενό του clean-source χάρτη.
+  ΠΗΓΗ: Zenodo 7708270, 48.689.473.348 bytes, md5
+  66a2301ed7b4d5f4f6d3383474e546c6 — ΠΥΛΗ ΠΕΡΑΣΕ
+  (ταυτίζεται με το Zenodo API), cc-by-4.0 στο ίδιο API.
+  ΔΟΜΗ, ΜΕΤΡΗΜΕΝΗ (διορθώνει το BabySlakh validation):
+  1710 tracks (redux = αφαιρεμένα διπλότυπα MIDI, ΟΧΙ
+  2100) σε train/validation/test (1289/270/151)· τα
+  stems είναι **FLAC, όχι WAV** — 16000 Hz mono PCM_16,
+  άρα η ισοδυναμία 1:1 με τον builder (TARGET_SR=16000,
+  mean(axis=1)) ΣΤΕΚΕΙ, μόνο το container αλλάζει.
+  is_drum:true μονοσήμαντο: **1289/1289 tracks του train
+  έχουν ΑΚΡΙΒΩΣ ΕΝΑ** drum stem (κανένα με μηδέν, κανένα
+  με πολλά). 88.928h διαθέσιμα, 8 διακριτά kits
+  (131-184 tracks, 8.9-13.0h έκαστο — ΟΧΙ μονοκρατορία).
+  ΠΥΛΗ ΔΡΑΣΤΗΡΙΟΤΗΤΑΣ (πριν αντιγραφεί byte): σε δείγμα
+  40 tracks (5/kit, seed 20260823), κλάσμα 100ms
+  παραθύρων με RMS > −60 dBFS: median **83.70%**
+  (πρόβλεψη >85% ΔΕΝ επιβεβαιώθηκε — καταγράφεται),
+  εύρος 34.62-96.80%, 3/40 κάτω από 50%. Κατώφλι
+  αποκλεισμού **50%** ΑΠΟ ΤΗ ΜΕΤΡΗΣΗ (κενό 40.35→57.61,
+  17 μονάδες), όχι από θεωρία.
+  ΔΙΟΡΘΩΣΗ BUDGET (κρίση κρίνοντος): το budget μετριέται
+  σε **ΕΝΕΡΓΕΣ** ώρες, όχι ώρες αρχείων — αλλιώς 5h
+  αρχείων = ~4.2h υλικού και το ξεχνάμε (το μοτίβο του
+  VocalSet που μετρούσε αντίγραφα ως υλικό).
+  ΕΠΙΛΟΓΗ: ΙΣΕΣ ΕΝΕΡΓΕΣ ΩΡΕΣ ανά kit (37.5' × 8), όχι
+  ίσα tracks (τα kits έχουν άνισες διάρκειες — ίσα
+  tracks θα έδιναν άνισο βάρος στο training)·
+  αποκλεισμός duration > p95 (356.17s) ώστε να μπουν
+  ΠΕΡΙΣΣΟΤΕΡΑ tracks μεσαίας διάρκειας — η ποικιλία
+  ΕΚΤΕΛΕΣΗΣ μετράει όσο η ποικιλία kit· seed 20260823.
+  ΑΠΟΤΕΛΕΣΜΑ: **96 tracks, 8 kits, κανένα shortfall —
+  6.3405h αρχείου / 5.1639h ΕΝΕΡΓΕΣ**, στο
+  ~/Downloads/DATASET/slakh/drums-v1/ με MANIFEST.md
+  (πηγή+md5+άδεια, seed, κριτήρια με προέλευση, ΔΥΟ
+  ρητά σύνολα, πίνακας 96 γραμμών, sha256 του ίδιου
+  του manifest). ΠΥΛΗ ΕΠΑΝΑ-ΜΕΤΡΗΣΗΣ από τα ΑΝΤΙΓΡΑΜΜΕΝΑ
+  αρχεία (όχι από τον πίνακα): 0 mismatches.
+  **ΑΚΡΟΑΣΗ 2026-08-23 (Anestis) — Η ΠΥΛΗ ΠΟΥ ΤΟ
+  ΞΕΧΩΡΙΖΕΙ ΑΠΟ ΤΟ FMA ΚΕΦΑΛΑΙΟ:** 8 clips 20", ένα ανά
+  kit, από ΕΝΕΡΓΟ σημείο (όχι από 0:00 — το μάθημα του
+  drumscan). Ετυμηγορία: **γυμνά ✓ αληθινά ✓ ΔΙΑΦΕΡΟΥΝ
+  μεταξύ τους ✓**. Το προηγούμενο DRUMS κεφάλαιο (FMA)
+  πέθανε ΣΤΗΝ ΑΚΡΟΑΣΗ με 0 κρατημένα ενώ οι μετρικές
+  έλεγαν ναι — εδώ η ακρόαση ΕΠΙΒΕΒΑΙΩΣΕ. ΕΥΡΗΜΑ
+  ΑΚΡΟΑΣΗΣ: το pop_kit έχει **distortion χαρακτήρα** —
+  ΚΡΑΤΗΘΗΚΕ ΣΥΝΕΙΔΗΤΑ (υπαρκτό ηχόχρωμα lo-fi/crushed
+  drums, κέρδος για ποικιλία· 1/8 = 12.5%, δεν
+  κυριαρχεί· έχει και το χαμηλότερο active_frac 68.9%).
+  Δηλωμένο στο manifest ώστε ο επόμενος που θα δει τον
+  classifier να συμπεριφέρεται περίεργα σε distorted
+  κρουστά να ξέρει ότι υπάρχουν και πόσα.
+  DATA QUIRK ΤΗΣ ΠΗΓΗΣ: Track00017/metadata.yaml έχει
+  leading space που σπάει αυστηρή YAML ανάλυση —
+  διορθώθηκε ΜΟΝΟ στην ανάγνωση (in-memory lstrip), το
+  αρχείο άθικτο. Ο επόμενος θα το ξαναβρεί.
+  ⇒ CLEAN-SOURCE ΧΑΡΤΗΣ ΠΛΗΡΗΣ: SPEECH ✓ (LibriSpeech
+  5.39h) · SUNG ✓ (VocalSet 3.613/~10.8h) · MUSIC BED ✓
+  (FMA v2 437/3.64h) · **DRUMS ✓ (Slakh 96/5.16h ενεργές)**.
+  ΜΕΝΕΙ: RoS bed extraction (mix-down μη-drums μη-vocal
+  stems με τα gains του yaml) — δικό του βήμα.
+  fpcalc ΑΠΟΝ. v5 συνταγή μετρημένη: SNR sweep [10,3,-3,-9], 16kHz, 40/30/30 clean-speech/clean-music/mixed (phi1_dataset_builder.py:30-36,204-206). Το εργοστάσιο απέχει 1 download + 1 install + 1 curation session από ανάφλεξη.
   **DECON ΦΑΣΗ 1 — 2026-08-21:** fpcalc fingerprints, 239 MUSDB
   mixtures × 1.329 FMA = 159.480 ζεύγη, max 4.63%, mean 0.00%,
   0 υποψήφιοι (κατώφλι 30%) — η καθαρότητα του allowlist από
