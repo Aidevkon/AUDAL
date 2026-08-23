@@ -1415,8 +1415,11 @@ dependencies = [
 name = "encoder-gap-speech"
 version = "0.1.0"
 dependencies = [
+ "libm",
  "lineos-types",
  "m0d",
+ "rubato",
+ "sp314-dsp",
 ]
 
 [[package]]

@@ -10,5 +10,12 @@ edition = "2021"
 [dependencies]
 m0d = { path = "../../lineos/m0/m0-daemon" }
 lineos-types = { path = "../../lineos/m1/lineos-types" }
+sp314-dsp = { path = "../../lineos/m1/sp314-dsp" }
+# F-077 round 2: needed to independently reconstruct the pre-encode
+# 44.1kHz mono buffer (same public rubato params export.rs documents),
+# since export_mp3_acx does not expose that buffer. Pinned to the exact
+# versions m0d/sp314-dsp resolve (Cargo.lock, root workspace) for fidelity.
+rubato = "0.15"
+libm = "0.2"
 
 [workspace]
