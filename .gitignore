@@ -47,3 +47,4 @@ lineos/m1/sp314-dsp/tests/fixtures/glue_amb/nmfd8_k14/
 stems_output/
 .prompts/
 .reports/
+.claude/settings.local.json

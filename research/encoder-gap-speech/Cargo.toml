@@ -1,0 +1,14 @@
+[package]
+name = "encoder-gap-speech"
+version = "0.1.0"
+edition = "2021"
+
+# F-077: standalone measurement crate, detached from the root workspace
+# (own [workspace] table below) — same pattern as research/musdb-lab's
+# oracle_extract/dbus_eval. Depends on m0d by path so it exercises the
+# REAL deliver-path function (export_mp3_acx), not a re-implementation.
+[dependencies]
+m0d = { path = "../../lineos/m0/m0-daemon" }
+lineos-types = { path = "../../lineos/m1/lineos-types" }
+
+[workspace]
