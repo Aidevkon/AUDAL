@@ -360,6 +360,7 @@ fn assemble_blob(
                 output_delivery_rms_db: None,
                 output_delivery_noise_floor_db: None,
                 output_delivery_quietest_window_start_frame: None,
+                delivery_checks: None,
                 delivery_profile: None,
             },
             quality: crate::blob_store::StoredQuality {
