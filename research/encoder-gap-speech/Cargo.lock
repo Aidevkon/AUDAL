@@ -1419,7 +1419,9 @@ dependencies = [
  "lineos-types",
  "m0d",
  "rubato",
+ "sha2",
  "sp314-dsp",
+ "sp314-nodes",
 ]
 
 [[package]]

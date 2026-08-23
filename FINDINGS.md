@@ -220,6 +220,77 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   προφίλ. ΔΕΝ μπλοκάρει τίποτα σήμερα — το margin το
   καλύπτει.
 
+- **[F-080] Το ducking υπολογίζεται και πετιέται — και
+  τα gates του μετρούν το ΣΗΜΑ ΕΛΕΓΧΟΥ, όχι το
+  ΑΠΟΤΕΛΕΣΜΑ.** Component: control_bus.rs + tests/
+  w2_duck_gate.rs. ΜΕΤΡΗΜΕΝΟ 2026-08-24 (DSP spine
+  recon): το duck_gain παράγεται με ballistics που
+  ΕΧΟΥΝ μετρηθεί (attack ~30ms, release ~500ms,
+  DUCK_DEADZONE 0.30, DUCK_FLOOR_DB −12, NaN/Inf
+  guard) και **ΔΕΝ πολλαπλασιάζεται ΠΟΤΕ σε buffer**.
+  Το μόνο duck_multiplier που εφαρμόζεται είναι στο
+  nmf.rs:755 — ΑΛΛΟ πράγμα.
+  ΤΑ GATES: 6 tests, όλα #[ignore], και ΜΟΝΟ 3 είναι
+  ducking. w2_duck_gate_synth: 5 asserts, ΟΛΑ πάνω
+  στο CSV του VAD posterior (pmax>0.7, pmin<0.2 κ.λπ.)
+  — τίποτα για ήχο. w2_duck_gate_real: ΕΝΑ assert,
+  «υπάρχει το csv». w2_duck_gate_synth_variance:
+  ΜΗΔΕΝ asserts. **Κανένα gate δεν ελέγχει ότι το
+  ducking εξασθενεί οτιδήποτε** — και γι' αυτό η
+  αποσύνδεση έζησε πράσινη.
+  ΙΔΙΟ DNA με το e2e_acx_certificate (μετρούσε το
+  input και περνούσε επί μήνες): το test επαληθεύει
+  ό,τι είναι εύκολο να μετρηθεί, όχι ό,τι υπόσχεται.
+  ΣΗΜΑΣΙΑ: το ducking είναι ΤΟ northstar της υπόσχεσης
+  για υλικό με SFX/bed (στήλες Β/Γ της ταξινομίας
+  24/08) — φωνή πάνω σε μουσική/εφέ. Χωρίς αυτό δεν
+  υπάρχει προϊόν για δραματοποιημένο audiobook,
+  podcast με bed, ή οτιδήποτε πέρα από σκέτη αφήγηση.
+  Trigger: ΠΡΙΝ οποιαδήποτε υπόσχεση για Β/Γ.
+- **[F-081] De-esser καλωδιωμένος στο production
+  topology με κατώφλι που τον κάνει ΔΟΜΙΚΑ αδύνατο να
+  πυροδοτηθεί.** Component: streaming_pipeline.rs:114
+  (threshold_db: 0.0) vs deesser.rs default (−24.0).
+  ΜΕΤΡΗΜΕΝΟ 2026-08-24 σε ΔΥΟ πραγματικά audiobook
+  flac (αγγλικό + γερμανικό, 44.1k, με πραγματικά
+  sibilants): **sha256 in == out, byte-for-byte
+  ταυτόσημο, max|Δ| = 0.00000000**.
+  ΜΗΧΑΝΙΣΜΟΣ (όχι τυχαία αδράνεια σε αυτό το δείγμα):
+  threshold_db 0.0 → threshold_lin 1.0, και το
+  HP-φιλτραρισμένο envelope ενός σήματος με peak ≤ 1.0
+  ΔΕΝ ΜΠΟΡΕΙ μαθηματικά να ξεπεράσει το 1.0 — η
+  συνθήκη ενεργοποίησης δεν πυροδοτείται ΠΟΤΕ για
+  μη-κομμένο υλικό.
+  ΑΝΤΙΘΕΤΑ, με το default (−24.0) ΔΡΑ: null −37.2 dB
+  (αγγλικό) / −36.5 dB (γερμανικό) — ~3 dB πιο δυνατά
+  από την πρόβλεψη (<−40), δηλαδή η κατεύθυνση σωστή,
+  το νούμερο αισιόδοξο.
+  ΧΕΙΡΟΤΕΡΟ ΑΠΟ ΟΡΦΑΝΟ: το ορφανό δεν προσποιείται.
+  Αυτός τρώει CPU σε κάθε chunk και εμφανίζεται στο
+  topology σαν να κάνει τη δουλειά — και οι
+  απαιτήσεις ACX ονομάζουν ρητά το sibilance ως αιτία
+  απόρριψης.
+  ΣΥΝΟΔΟ ΕΥΡΗΜΑ, ΥΠΟΨΙΑ ΟΧΙ ΝΙΚΗ: ο DeHum (POXVoice
+  params) δίνει null −32/−30 dB — ΔΥΝΑΤΟΤΕΡΑ από τον
+  de-esser στα defaults του. Ένα de-hum είναι
+  χειρουργικό (notch 50/60Hz + αρμονικές)· σε καθαρή
+  αφήγηση θα περίμενες −60/−70. ΑΝΟΙΧΤΟ: αφαιρεί hum
+  ή νόμιμη χαμηλόσυχνη ενέργεια φωνής; Θέλει
+  φασματική ανάλυση, δεν έγινε.
+  ΚΑΙ ΤΟ ΠΛΑΙΣΙΟ: η ΕΝΙΑΙΑ αλυσίδα restoration
+  ΥΠΑΡΧΕΙ ΟΛΟΚΛΗΡΗ (Flavor::POXVoice, flavor.rs:159-
+  177: Input→NoiseGate→DeHum→AutoLevel→DeEsser→Output)
+  και είναι καλωδιωμένη σε ΕΝΑ flavour: "broadcast"
+  (render_node.rs:164-166). Το "acx" είναι ΞΕΧΩΡΙΣΤΟ
+  flavour id (presets.rs:201) ⇒ **στη διαδρομή ACX
+  δεν τρέχει ΚΑΝΕΝΑ από αυτά**. Δεν λείπει κώδικας —
+  λείπει ένα καλώδιο. ΑΛΛΑ: καλωδίωση ΠΡΙΝ διορθωθεί
+  το threshold = σύνδεση αδρανούς κόμβου και ψεύτικη
+  υπόσχεση στο changelog.
+  Trigger: ΠΡΙΝ κάθε ισχυρισμό «κάνουμε ACX
+  mastering» — το sibilance είναι δηλωμένη αιτία
+  απόρριψης.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -420,7 +491,7 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-080** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-082** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the

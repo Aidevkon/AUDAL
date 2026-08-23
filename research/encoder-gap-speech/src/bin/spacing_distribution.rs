@@ -43,7 +43,7 @@ fn decode_to_mono_f32(path: &str) -> (Vec<f32>, u32) {
         .parse()
         .expect("bad sr");
 
-    let tmp = PathBuf::from("/tmp/spacing_distribution_decode.pcm");
+    let tmp = PathBuf::from(format!("/tmp/spacing_distribution_decode_{}.pcm", std::process::id()));
     let status = std::process::Command::new("ffmpeg")
         .args(["-y", "-v", "error", "-i"])
         .arg(path)
@@ -62,7 +62,9 @@ fn decode_to_mono_f32(path: &str) -> (Vec<f32>, u32) {
 }
 
 fn main() {
-    let input = "/home/aidevcon/Downloads/DATASET/24 - The Wise In The Desert.flac";
+    let default_input = "/home/aidevcon/Downloads/DATASET/24 - The Wise In The Desert.flac".to_string();
+    let input = std::env::args().nth(1).unwrap_or(default_input);
+    let input = input.as_str();
     let (mono, sr) = decode_to_mono_f32(input);
     let dur = mono.len() as f64 / sr as f64;
     println!("input: {input}");
@@ -178,7 +180,7 @@ fn main() {
         "\n(αναφορά μόνο) sub-blocks μέσα στη ΔΗΛΩΜΕΝΗ ζώνη BreathCut [-60,-30] dBFS ΑΠΟΛΥΤΟ: {breath_zone_count}/{num_sub_blocks}"
     );
 
-    println!("\n=== ΣΥΝΟΨΗ ===");
+    println!("\n=== ΣΥΝΟΨΗ (κενά) ===");
     println!("noise_floor_db = {noise_floor_db:.4}");
     println!("μέγιστο dB πάνω από floor παρατηρημένο = {max_above:.2}");
     println!("αριθμός κενών βρεθέντων = {}", gaps.len());
@@ -193,5 +195,129 @@ fn main() {
         println!("ΜΟΝΟ ΕΝΑ κενό βρέθηκε — δεν διακρίνεται ανάσα από ομιλία ξεχωριστά.");
     } else {
         println!("ΚΑΝΕΝΑ κενό — ο ενεργειακός ορισμός δεν διακρίνει καθόλου.");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ΣΥΝΕΧΕΙΑ ΒΗΜΑΤΟΣ Γ — 1: Η ΚΟΙΛΑΔΑ ΩΣ ΠΥΚΝΟΤΗΤΑ
+    // Όχι "άδειο bin" — density (sub-blocks/dB) ανά ζώνη, για να
+    // φανεί αν υπάρχει πτώση κατά τάξη μεγέθους (κοιλάδα) και όχι
+    // μόνο απόλυτα άδεια bins.
+    // ─────────────────────────────────────────────────────────────
+    println!("\n=== 1. ΠΥΚΝΟΤΗΤΑ ΑΝΑ ΖΩΝΗ (sub-blocks / dB-εύρος) ===");
+    let zone_a: usize = hist.get(0..1).map(|s| s.iter().sum()).unwrap_or(0);
+    let zone_b_bins = &hist[1.min(hist.len())..42.min(hist.len())];
+    let zone_b: usize = zone_b_bins.iter().sum();
+    let zone_b_width = zone_b_bins.len();
+    let zone_c_bins = &hist[42.min(hist.len())..hist.len().min(76)];
+    let zone_c: usize = zone_c_bins.iter().sum();
+    let zone_c_width = zone_c_bins.len();
+    println!(
+        "  [0,1) dB   (ζώνη A, room tone):   {zone_a:>4} sub-blocks σε 1 dB   -> density {:.2}/dB",
+        zone_a as f64 / 1.0
+    );
+    println!(
+        "  [1,41] dB  (ζώνη B, κοιλάδα;):    {zone_b:>4} sub-blocks σε {zone_b_width} dB  -> density {:.2}/dB",
+        zone_b as f64 / zone_b_width as f64
+    );
+    println!(
+        "  [42,75] dB (ζώνη C, ομιλία):      {zone_c:>4} sub-blocks σε {zone_c_width} dB  -> density {:.2}/dB",
+        zone_c as f64 / zone_c_width as f64
+    );
+    let density_a = zone_a as f64 / 1.0;
+    let density_b = zone_b as f64 / zone_b_width as f64;
+    let density_c = zone_c as f64 / zone_c_width as f64;
+    println!(
+        "  λόγος πυκνότητας A/B = {:.1}x, C/B = {:.1}x (τάξη μεγέθους αν >~10x)",
+        density_a / density_b.max(1e-9),
+        density_c / density_b.max(1e-9)
+    );
+    // Peak density MΕΣΑ στη ζώνη C (όχι μέσος όρος) — για σωστή σύγκριση
+    // με το μέγιστο της ζώνης B, αφού η C ανεβοκατεβαίνει έντονα.
+    let zone_b_peak = zone_b_bins.iter().cloned().max().unwrap_or(0);
+    let zone_c_peak = zone_c_bins.iter().cloned().max().unwrap_or(0);
+    println!(
+        "  peak bin B = {zone_b_peak} sub-blocks· peak bin C = {zone_c_peak} sub-blocks -> λόγος {:.1}x",
+        zone_c_peak as f64 / zone_b_peak.max(1) as f64
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // ΣΥΝΕΧΕΙΑ ΒΗΜΑΤΟΣ Γ — 2: ΤΟ ΤΡΙΤΟ ΠΛΑΙΣΙΟ (median ± X)
+    // ─────────────────────────────────────────────────────────────
+    let mut speech_values: Vec<f32> = above_floor.iter().cloned().filter(|&v| v > 42.0).collect();
+    speech_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median_speech = if speech_values.is_empty() {
+        f32::NAN
+    } else if speech_values.len() % 2 == 1 {
+        speech_values[speech_values.len() / 2]
+    } else {
+        let mid = speech_values.len() / 2;
+        (speech_values[mid - 1] + speech_values[mid]) / 2.0
+    };
+    println!("\n=== 2. ΔΙΑΜΕΣΟΣ ΤΗΣ ΜΑΖΑΣ ΟΜΙΛΙΑΣ (>42 dB πάνω από floor) ===");
+    println!(
+        "  n={} sub-blocks, διάμεσος = {median_speech:.2} dB πάνω από floor",
+        speech_values.len()
+    );
+
+    let block_dur_s = SUB_BLOCK_MS as f64 / 1000.0;
+    println!("\n=== head_spacing / tail_spacing για X κάτω από τη διάμεσο ===");
+    println!("  {:>4}  {:>14}  {:>10}  {:>12}  {:>12}", "X", "threshold(dB)", "head_idx", "head_s", "tail_s");
+    let mut spacing_by_x: Vec<(i32, f64, f64)> = Vec::new();
+    for &x in &[10.0f32, 15.0, 20.0, 25.0, 30.0] {
+        let threshold = median_speech - x;
+        let head_idx = above_floor.iter().position(|&v| v >= threshold);
+        let tail_idx = above_floor.iter().rposition(|&v| v >= threshold);
+        let head_s = head_idx.map(|i| i as f64 * block_dur_s).unwrap_or(f64::NAN);
+        let tail_s = tail_idx
+            .map(|i| (num_sub_blocks - 1 - i) as f64 * block_dur_s)
+            .unwrap_or(f64::NAN);
+        println!(
+            "  {:>4.0}  {:>14.2}  {:>10}  {:>12.2}  {:>12.2}",
+            x,
+            threshold,
+            head_idx.map(|i| i as i64).unwrap_or(-1),
+            head_s,
+            tail_s
+        );
+        spacing_by_x.push((x as i32, head_s, tail_s));
+    }
+    let head_min = spacing_by_x.iter().map(|&(_, h, _)| h).fold(f64::MAX, f64::min);
+    let head_max = spacing_by_x.iter().map(|&(_, h, _)| h).fold(f64::MIN, f64::max);
+    let tail_min = spacing_by_x.iter().map(|&(_, _, t)| t).fold(f64::MAX, f64::min);
+    let tail_max = spacing_by_x.iter().map(|&(_, _, t)| t).fold(f64::MIN, f64::max);
+    println!(
+        "\n  head_spacing εύρος στα X={{10..30}}: [{head_min:.2}, {head_max:.2}]s (spread {:.2}s)",
+        head_max - head_min
+    );
+    println!(
+        "  tail_spacing εύρος στα X={{10..30}}: [{tail_min:.2}, {tail_max:.2}]s (spread {:.2}s)",
+        tail_max - tail_min
+    );
+    println!(
+        "  ΠΛΑΤΟ αν το spread είναι μικρό σε σχέση με το εύρος 10-30dB του X (20dB) — \
+         δηλ. αν {:.2}s ή {:.2}s << όσο θα έδινε γραμμική ευαισθησία."
+        , head_max - head_min, tail_max - tail_min
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // ΣΥΝΕΧΕΙΑ ΒΗΜΑΤΟΣ Γ — 3: ΜΕ ΤΟ ΜΑΤΙ — πρώτα/τελευταία 3s
+    // ─────────────────────────────────────────────────────────────
+    println!("\n=== 3. ΜΕ ΤΟ ΜΑΤΙ: πρώτα 3.0s (30 sub-blocks των 100ms) ===");
+    for i in 0..30.min(num_sub_blocks) {
+        println!(
+            "  t={:>6.1}s  above_floor={:>7.2} dB",
+            i as f64 * block_dur_s,
+            above_floor[i]
+        );
+    }
+    println!("\n=== 3. ΜΕ ΤΟ ΜΑΤΙ: τελευταία 3.0s (30 sub-blocks των 100ms) ===");
+    let tail_start = num_sub_blocks.saturating_sub(30);
+    for i in tail_start..num_sub_blocks {
+        println!(
+            "  t={:>6.1}s (t_end-{:>4.1}s)  above_floor={:>7.2} dB",
+            i as f64 * block_dur_s,
+            (num_sub_blocks - 1 - i) as f64 * block_dur_s,
+            above_floor[i]
+        );
     }
 }

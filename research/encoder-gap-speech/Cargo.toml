@@ -11,11 +11,16 @@ edition = "2021"
 m0d = { path = "../../lineos/m0/m0-daemon" }
 lineos-types = { path = "../../lineos/m1/lineos-types" }
 sp314-dsp = { path = "../../lineos/m1/sp314-dsp" }
+# 2026-08-24: restoration_alive.rs needs the actual production DspNode
+# impls (DeEsserNode/DeHumNode/NoiseGateNode) to null-test them, not a
+# re-implementation.
+sp314-nodes = { path = "../../lineos/m1/sp314-nodes" }
 # F-077 round 2: needed to independently reconstruct the pre-encode
 # 44.1kHz mono buffer (same public rubato params export.rs documents),
 # since export_mp3_acx does not expose that buffer. Pinned to the exact
 # versions m0d/sp314-dsp resolve (Cargo.lock, root workspace) for fidelity.
 rubato = "0.15"
 libm = "0.2"
+sha2 = "0.10"
 
 [workspace]
