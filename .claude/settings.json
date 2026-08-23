@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/northstar-lint.sh *)"
+    ],
+    "deny": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git add*)",
+      "Bash(git reset*)",
+      "Bash(git checkout*)",
+      "Bash(git rebase*)",
+      "Bash(git merge*)",
+      "Bash(git stash pop*)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git clean*)",
+      "Bash(rm -rf*)",
+      "Bash(sudo*)"
+    ]
+  }
+}
