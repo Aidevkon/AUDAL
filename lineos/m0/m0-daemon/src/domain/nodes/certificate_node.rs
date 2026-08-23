@@ -348,17 +348,19 @@ fn assemble_blob(
                 broadcast_compliant: platform_ok(lufs, -23.0, true_peak),
                 tidal_compliant: platform_ok(lufs, -14.0, true_peak),
                 too_quiet_for_mobile: lufs < MIN_MOBILE_PLAYBACK_LUFS,
-                input_acx_sample_peak_db: acx.map(|a| a.sample_peak_db),
-                input_acx_rms_db: acx.map(|a| a.rms_db),
-                input_acx_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
-                input_acx_quietest_window_start_frame: acx.and_then(|a| a.quietest_window_start_frame),
+                input_delivery_peak_db: acx.map(|a| a.sample_peak_db),
+                input_delivery_rms_db: acx.map(|a| a.rms_db),
+                input_delivery_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
+                input_delivery_quietest_window_start_frame: acx
+                    .and_then(|a| a.quietest_window_start_frame),
                 input_acx_compliant: acx.map(|a| a.passes_acx()),
-                // output_acx_* δεν μετριέται εδώ — μόνο στο export path
+                // output_delivery_* δεν μετριέται εδώ — μόνο στο export path
                 // (run_deliver_core), μετά το certificate. §5.6 Δ2.
-                output_acx_sample_peak_db: None,
-                output_acx_rms_db: None,
-                output_acx_noise_floor_db: None,
-                output_acx_quietest_window_start_frame: None,
+                output_delivery_peak_db: None,
+                output_delivery_rms_db: None,
+                output_delivery_noise_floor_db: None,
+                output_delivery_quietest_window_start_frame: None,
+                delivery_profile: None,
             },
             quality: crate::blob_store::StoredQuality {
                 stereo_correlation: sc,

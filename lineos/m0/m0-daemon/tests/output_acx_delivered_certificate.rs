@@ -113,8 +113,18 @@ fn output_acx_writes_and_signs_the_delivered_certificate() {
         .expect("initial sign (pre-deliver state)");
     let before_text = std::fs::read_to_string(&sidecar_path_before).unwrap();
     assert!(
+        !before_text.contains("output_delivery_rms_db"),
+        "fixture assumption broken: output_delivery_* must be ABSENT before deliver"
+    );
+    // Ο φρουρός της απουσίας ΔΕΝ ξεχωρίζει «δεν γράφτηκε ΑΚΟΜΑ» από «δεν
+    // γράφεται ΠΟΤΕ» — μια μετονομασία τον αφήνει αυτόματα πράσινο. Το
+    // ζεύγος του (ΠΑΡΟΥΣΙΑ μετά το deliver) είναι στο assert μετά το
+    // run_deliver_core παρακάτω, και τα δύο πάνω στο ΙΔΙΟ literal.
+    // Ο παλιός τύπος ΔΕΝ πρέπει να επιβιώνει πουθενά στην εγγραφή: το
+    // serde alias διαβάζει παλιά sidecars, δεν τα ΞΑΝΑΓΡΑΦΕΙ (§5.1α).
+    assert!(
         !before_text.contains("output_acx_rms_db"),
-        "fixture assumption broken: output_acx_* must be ABSENT before deliver"
+        "παλιό κλειδί output_acx_rms_db γράφτηκε — το alias είναι read-only"
     );
 
     let out_tmp = tempdir().expect("out tempdir");
@@ -160,15 +170,24 @@ fn output_acx_writes_and_signs_the_delivered_certificate() {
     let after_json: serde_json::Value = serde_json::from_str(&after_text).unwrap();
     let loudness = &after_json["payload"]["variant"]["Certified"]["loudness"];
 
-    let sidecar_rms = loudness["output_acx_rms_db"]
+    // ΤΟ ΖΕΥΓΟΣ ΤΟΥ ΦΡΟΥΡΟΥ ΑΠΟΥΣΙΑΣ (γραμμή ~116): ΙΔΙΟ literal, ανάποδη
+    // φορά. Αν μια μετονομασία αφήσει το πάνω assert να περνάει κενό, αυτό
+    // εδώ πέφτει — η απουσία μόνη της δεν αποδεικνύει τίποτα.
+    assert!(
+        after_text.contains("output_delivery_rms_db"),
+        "output_delivery_rms_db ΛΕΙΠΕΙ μετά το deliver — ο φρουρός απουσίας \
+         της γραμμής ~116 θα περνούσε κενός"
+    );
+
+    let sidecar_rms = loudness["output_delivery_rms_db"]
         .as_f64()
-        .expect("output_acx_rms_db must be present after deliver");
-    let sidecar_peak = loudness["output_acx_sample_peak_db"]
+        .expect("output_delivery_rms_db must be present after deliver");
+    let sidecar_peak = loudness["output_delivery_peak_db"]
         .as_f64()
-        .expect("output_acx_sample_peak_db must be present after deliver");
-    let sidecar_floor = loudness["output_acx_noise_floor_db"]
+        .expect("output_delivery_peak_db must be present after deliver");
+    let sidecar_floor = loudness["output_delivery_noise_floor_db"]
         .as_f64()
-        .expect("output_acx_noise_floor_db must be present after deliver");
+        .expect("output_delivery_noise_floor_db must be present after deliver");
 
     // (α) — see prediction above. STOP and report if this does not hold;
     // do not loosen the tolerance to make it pass.

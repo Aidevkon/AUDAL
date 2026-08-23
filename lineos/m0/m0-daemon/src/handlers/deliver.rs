@@ -406,10 +406,10 @@ pub fn run_deliver_core(
                     let master_flac = sidecar_path.with_extension("flac");
                     let mut updated = blob.clone();
                     if let BlobVariant::Certified { loudness, .. } = &mut updated.variant {
-                        loudness.output_acx_sample_peak_db = Some(outcome.report.sample_peak_db);
-                        loudness.output_acx_rms_db = Some(outcome.report.rms_db);
-                        loudness.output_acx_noise_floor_db = outcome.report.noise_floor_db;
-                        loudness.output_acx_quietest_window_start_frame =
+                        loudness.output_delivery_peak_db = Some(outcome.report.sample_peak_db);
+                        loudness.output_delivery_rms_db = Some(outcome.report.rms_db);
+                        loudness.output_delivery_noise_floor_db = outcome.report.noise_floor_db;
+                        loudness.output_delivery_quietest_window_start_frame =
                             outcome.report.quietest_window_start_frame;
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)

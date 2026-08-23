@@ -205,19 +205,19 @@ fn external_ffmpeg_agrees_with_output_acx_certificate() {
     let delivered_mp3 = std::path::Path::new(&book_dir).join(&resp.files[0]);
     assert!(delivered_mp3.exists(), "delivered mp3 must exist on disk");
 
-    // ...and the 4 output_acx_* from the rewritten sidecar.
+    // ...and the 4 output_delivery_* from the rewritten sidecar.
     let sidecar_path = find_sidecar(&masters_root, blob_id)
         .unwrap()
         .expect("sidecar must exist after deliver");
     let sidecar_text = std::fs::read_to_string(&sidecar_path).unwrap();
     let sidecar_json: serde_json::Value = serde_json::from_str(&sidecar_text).unwrap();
     let loudness = &sidecar_json["payload"]["variant"]["Certified"]["loudness"];
-    let cert_rms = loudness["output_acx_rms_db"]
+    let cert_rms = loudness["output_delivery_rms_db"]
         .as_f64()
-        .expect("output_acx_rms_db must be present");
-    let cert_peak = loudness["output_acx_sample_peak_db"]
+        .expect("output_delivery_rms_db must be present");
+    let cert_peak = loudness["output_delivery_peak_db"]
         .as_f64()
-        .expect("output_acx_sample_peak_db must be present");
+        .expect("output_delivery_peak_db must be present");
 
     // 2. External measurement — NOT our own code.
     let output = std::process::Command::new("ffmpeg")

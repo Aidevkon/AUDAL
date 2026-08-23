@@ -97,30 +97,79 @@ pub struct StoredLoudness {
     // ενημερώνεται και κρατάει ΚΑΙ ΤΙΣ ΔΥΟ μετρήσεις,
     // ονομασμένες. northstar §Σ. Δόγμα Ι.
     // ────────────────────────────────────────────────
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_sample_peak_db")]
-    pub input_acx_sample_peak_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_rms_db")]
-    pub input_acx_rms_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_noise_floor_db")]
-    pub input_acx_noise_floor_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_quietest_window_start_frame")]
-    pub input_acx_quietest_window_start_frame: Option<usize>,
+    /// Sample peak in dBFS after DC removal: `max |sample - mean|`, computed
+    /// exactly as `max(max_sample - mean, mean - min_sample)`. SAMPLE peak —
+    /// no oversampling. The limiter's true peak is a stricter, separate
+    /// measurement. Source: AcxCheckAnalyzer (acx_check.rs:59, :144).
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "acx_sample_peak_db", alias = "input_acx_sample_peak_db")]
+    pub input_delivery_peak_db: Option<f32>,
+    /// Whole-file unweighted RMS in dBFS, DC removed. One pass via
+    /// `E[x^2] - mean^2` (identical to subtract-then-RMS).
+    /// Source: AcxCheckAnalyzer (acx_check.rs:61, :146-147).
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "acx_rms_db", alias = "input_acx_rms_db")]
+    pub input_delivery_rms_db: Option<f32>,
+    /// RMS of the quietest sliding 500 ms window (100 ms hop) after an
+    /// 8th-order Butterworth highpass at 10 Hz. None when the input is
+    /// shorter than 1 s. Source: AcxCheckAnalyzer (acx_check.rs:62-64,
+    /// :15-18, :149-168).
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "acx_noise_floor_db", alias = "input_acx_noise_floor_db")]
+    pub input_delivery_noise_floor_db: Option<f32>,
+    /// Start position of the quietest 500 ms window used for the noise floor,
+    /// in samples AT THE ANALYZER'S RATE (44.1k in the export path vs 48k in
+    /// the trunk — the count is relative to that stream).
+    /// Source: AcxCheckAnalyzer (acx_check.rs:66-70, :166).
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "acx_quietest_window_start_frame",
+            alias = "input_acx_quietest_window_start_frame")]
+    pub input_delivery_quietest_window_start_frame: Option<usize>,
+    /// ⚠ ΤΟ ΟΝΟΜΑ ΔΕΝ ΚΑΘΑΡΙΣΕ (§5.1α, 2026-08-23): "compliant"
+    /// ΕΝΑΝΤΙ ΠΟΙΟΥ; Μένει `acx` μέχρι να κριθεί ρητά — δίπλα του
+    /// θέλει το delivery_profile. Σήμερα: AcxCheckReport::passes_acx()
+    /// έναντι των τεσσάρων consts του acx_check.rs:30-33.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_compliant")]
     pub input_acx_compliant: Option<bool>,
 
-    // ── ΤΑ output_acx_* ΜΕΤΡΟΥΝ ΤΟ ΠΑΡΑΔΟΤΕΟ ──────────
+    // ── ΤΑ output_delivery_* ΜΕΤΡΟΥΝ ΤΟ ΠΑΡΑΔΟΤΕΟ ──────
     // μετρημένα στο ΤΕΛΙΚΟ deliverable buffer (export.rs,
-    // AcxCheckAnalyzer — ΙΔΙΟ όργανο με τα input_acx_*·
+    // AcxCheckAnalyzer — ΙΔΙΟ όργανο με τα input_delivery_*·
     // δηλωμένο bias: sample peak, ΟΧΙ true peak). §5.6 Δ2,
-    // 2026-08-22.
+    // 2026-08-22. Ορισμοί ανά μετρική: ίδιοι με τα input_delivery_*
+    // παραπάνω (ίδιο όργανο, άλλο buffer).
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "output_acx_sample_peak_db")]
+    pub output_delivery_peak_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "output_acx_rms_db")]
+    pub output_delivery_rms_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "output_acx_noise_floor_db")]
+    pub output_delivery_noise_floor_db: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none",
+            alias = "output_acx_quietest_window_start_frame")]
+    pub output_delivery_quietest_window_start_frame: Option<usize>,
+
+    /// ΤΟ ΕΜΠΟΡΙΚΟ ΟΝΟΜΑ ΩΣ ΤΙΜΗ, ΟΧΙ ΩΣ ΔΟΜΗ (§5.1α, 2026-08-23).
+    /// None = δεν δηλώθηκε προφίλ (κανόνας απουσίας 5.2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_acx_sample_peak_db: Option<f32>,
+    pub delivery_profile: Option<DeliveryProfileRef>,
+}
+
+/// Ποια δημοσιευμένη προδιαγραφή μετρήθηκε — ΕΛΕΓΞΙΜΟΣ ΙΣΧΥΡΙΣΜΟΣ
+/// δικός μας, ΟΧΙ σφραγίδα τρίτου (§5.1α).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct DeliveryProfileRef {
+    /// π.χ. "acx-audiobook".
+    pub id: String,
+    /// URL της δημοσιευμένης προδιαγραφής. None = ΔΕΝ ΕΧΕΙ ΓΡΑΦΤΕΙ
+    /// ΑΚΟΜΑ — το γράφει ΑΝΘΡΩΠΟΣ που το επαλήθευσε, ποτέ ο κώδικας.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_acx_rms_db: Option<f32>,
+    pub source: Option<String>,
+    /// Ημερομηνία ανάκτησης της παραπάνω πηγής. Ίδιος κανόνας: άνθρωπος.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_acx_noise_floor_db: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_acx_quietest_window_start_frame: Option<usize>,
+    pub retrieved_date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
