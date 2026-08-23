@@ -32,6 +32,36 @@ pub const ACX_MAX_RMS_DB: f32 = -18.0;
 pub const ACX_MIN_RMS_DB: f32 = -23.0;
 pub const ACX_MAX_NOISE_FLOOR_DB: f32 = -60.0;
 
+/// Encoder gap margins — ΑΠΟ ΜΕΤΡΗΣΗ, όχι θεωρία.
+/// F-077, 2026-08-23: 60 αρχεία LibriSpeech
+/// dev-clean + καθαρά ημίτονα + καθαρό ffmpeg,
+/// τρεις decoders συμφωνούν στα 0.0006 dB.
+/// Το χάσμα είναι ΣΤΑ BITS του LAME, ομοιόμορφο
+/// ×0.9698, ανεξάρτητο περιεχομένου.
+/// ΑΝΑ ΚΑΤΕΥΘΥΝΣΗ, γιατί το χάσμα είναι ΑΡΝΗΤΙΚΟ:
+/// σε ceiling απομακρύνει, σε floor πλησιάζει.
+///
+/// Ισχύει ΜΟΝΟ όπου μεσολαβεί πραγματικός encoder ανάμεσα
+/// στη μέτρηση και στο παραδοτέο — δηλ. στο
+/// `passes_acx_with_margin()` παρακάτω, ΟΧΙ στο `passes_acx()`.
+/// Το `passes_acx()` το καλεί και το `input_acx_compliant`
+/// (certificate_node.rs), που κρίνει το INPUT πριν από
+/// οποιοδήποτε render/encode· εκεί δεν υπάρχει χάσμα να
+/// αντισταθμιστεί, ΒΗΜΑ 0 F-implement-margin 2026-08-24.
+pub const ACX_MARGIN_RMS_FLOOR_DB: f32 = 0.35; // n=59, worst −0.280
+pub const ACX_MARGIN_RMS_CEILING_DB: f32 = 0.10; // ⚠ n=1, worst +0.027
+pub const ACX_MARGIN_PEAK_DB: f32 = 0.20; // ⚠ n=1, worst +0.037·
+                                           // ⚠ ΚΑΙ: το F-079
+                                           // μέτρησε 4× συχνοτική
+                                           // εξάρτηση, το δείγμα
+                                           // ήταν 16kHz· ΚΑΙ το
+                                           // ερώτημα sample-vs-
+                                           // true peak ΑΝΟΙΧΤΟ
+                                           // (ΑΤΖΕΝΤΑ 23/08)
+pub const ACX_MARGIN_NOISE_FLOOR_DB: f32 = 0.00; // ασφαλής φορά·
+                                                  // μετρημένο σε −82,
+                                                  // ζώνη −60 αμέτρητη
+
 const HP_CUTOFF_HZ: f32 = 10.0;
 const SUB_BLOCK_MS: usize = 100; // plugin hop
 const WINDOW_SUB_BLOCKS: usize = 5; // 5 x 100 ms = 500 ms window
@@ -76,6 +106,22 @@ impl AcxCheckReport {
             && self.rms_db <= ACX_MAX_RMS_DB
             && self.rms_db >= ACX_MIN_RMS_DB
             && matches!(self.noise_floor_db, Some(nf) if nf <= ACX_MAX_NOISE_FLOOR_DB)
+    }
+
+    /// Same verdict as `passes_acx()`, but against thresholds that have
+    /// already absorbed the measured LAME encoder gap (F-077) — i.e. the
+    /// gap between this pre-encode report and what the decoded mp3 will
+    /// actually measure. Use ONLY where `self` is the exact buffer about to
+    /// be lossy-encoded (e.g. `deliver.rs`'s manifest verdict, via
+    /// `export_mp3_acx`'s pre-LAME report). Do NOT use this for
+    /// `input_acx_compliant` — that report is measured on raw input, before
+    /// any render or encode step, so there is no encoder gap to correct
+    /// there; see the doc comment on the `ACX_MARGIN_*` consts above.
+    pub fn passes_acx_with_margin(&self) -> bool {
+        self.sample_peak_db <= ACX_MAX_PEAK_DB - ACX_MARGIN_PEAK_DB
+            && self.rms_db <= ACX_MAX_RMS_DB - ACX_MARGIN_RMS_CEILING_DB
+            && self.rms_db >= ACX_MIN_RMS_DB + ACX_MARGIN_RMS_FLOOR_DB
+            && matches!(self.noise_floor_db, Some(nf) if nf <= ACX_MAX_NOISE_FLOOR_DB - ACX_MARGIN_NOISE_FLOOR_DB)
     }
 }
 
@@ -309,6 +355,40 @@ mod tests {
         let loud = feed_all(&sine(997.0, 1.0, 2.0));
         assert!(!loud.passes_acx());
     }
+
+    /// ΠΡΟΒΛΕΨΗ (γραμμένη πριν το τρέξιμο):
+    /// rms −22.9 dB είναι ΜΕΣΑ στο ονομαστικό παράθυρο [−23, −18] αλλά
+    /// ΕΞΩ από το προσαρμοσμένο [−23+0.35, −18−0.10] = [−22.65, −18.10]
+    /// (−22.9 < −22.65). Άρα, στο ΙΔΙΟ report: passes_acx() == true ΚΑΙ
+    /// passes_acx_with_margin() == false. Peak/floor τίθενται άνετα μέσα
+    /// σε αμφότερα τα παράθυρα ώστε το RMS να είναι ο μόνος κριτής.
+    #[test]
+    fn margin_flips_verdict_at_the_edge_without_touching_passes_acx() {
+        let edge = AcxCheckReport {
+            sample_peak_db: -10.0,
+            rms_db: -22.9,
+            noise_floor_db: Some(-70.0),
+            quietest_window_start_frame: Some(0),
+        };
+        assert!(edge.passes_acx(), "{edge:?}");
+        assert!(!edge.passes_acx_with_margin(), "{edge:?}");
+    }
+
+    /// ΠΡΟΒΛΕΨΗ: rms −20.5 (μέσο του ονομαστικού παραθύρου) είναι ΜΕΣΑ
+    /// σε αμφότερα τα παράθυρα → PASS και στα δύο. Αποδεικνύει ότι το
+    /// margin δεν σπάει κανονικό υλικό.
+    #[test]
+    fn margin_agrees_with_nominal_at_mid_window() {
+        let mid = AcxCheckReport {
+            sample_peak_db: -10.0,
+            rms_db: -20.5,
+            noise_floor_db: Some(-70.0),
+            quietest_window_start_frame: Some(0),
+        };
+        assert!(mid.passes_acx(), "{mid:?}");
+        assert!(mid.passes_acx_with_margin(), "{mid:?}");
+    }
+
     #[test]
     fn oracle_quietest_window_position() {
         let mut seed = 42u32;

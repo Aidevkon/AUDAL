@@ -442,7 +442,12 @@ pub fn run_deliver_core(
             sample_peak_db: outcome.report.sample_peak_db,
             rms_db: outcome.report.rms_db,
             noise_floor_db: outcome.report.noise_floor_db.unwrap_or_default(),
-            passes_acx: outcome.report.passes_acx(),
+            // Margin-adjusted (F-077 encoder gap) — this report is the exact
+            // pre-LAME buffer from export_mp3_acx, so the measured gap
+            // applies here. NOT the same call as certificate_node.rs's
+            // input_acx_compliant, which measures raw input pre-render/
+            // pre-encode and must stay on the nominal passes_acx().
+            passes_acx: outcome.report.passes_acx_with_margin(),
             head_quiet_secs: outcome.head_quiet_secs,
             tail_quiet_secs: outcome.tail_quiet_secs,
         });
