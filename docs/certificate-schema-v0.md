@@ -277,6 +277,22 @@ render ΔΕΝ αλλάζει την κρίση — το cert μένει διαψ
 αυτοτελώς και σε 5 χρόνια). Η hardcoded PASS γραμμή του
 F-076(1) πεθαίνει με αυτό.
 
+**ΥΛΟΠΟΙΗΘΗΚΕ 2026-08-24** (απόφαση Anestis, "no
+discounts"): delivery_checks στο StoredLoudness, τέσσερις
+εγγραφές (rms-min, rms-max, peak, noise_floor), η καθεμία
+με μετρημένο · ΔΗΜΟΣΙΕΥΜΕΝΗ προδιαγραφή · margin που
+εφαρμόστηκε (F-077) · ετυμηγορία. Το required_db κρατά
+την προδιαγραφή ΟΠΩΣ ΤΗ ΔΗΜΟΣΙΕΥΕΙ Ο ΟΙΚΟΣ ώστε ο εκδότης
+να την αναγνωρίζει· το effective threshold προκύπτει από
+required ± margin. ΠΡΙΝ: το cert κουβαλούσε τους αριθμούς
+χωρίς ετυμηγορία και το verdict ζούσε μόνο στο
+manifest.json — εκτός σχήματος. Αυτό ξεκλειδώνει τον PDF
+refactor (F-076: το hardcoded PASS αντικαθίσταται από
+ΑΥΤΟ) και το verify kit. ΑΝΟΙΧΤΟ: το delivery_profile
+(source + retrieved_date) παραμένει άδειο μέχρι ΑΝΘΡΩΠΟΣ
+διαβάσει την πηγή — το required_db σήμερα έρχεται από τις
+σταθερές μας, ΟΧΙ από επαληθευμένη ανάγνωση.
+
 **5.4 ΟΙ ΜΕΤΡΙΚΕΣ ΑΝΑ ΟΨΗ** (κάθε γραμμή = μετρημένο δίπλα
 στο απαιτούμενο, frictionless audit):
 · streaming: integrated_lufs · true_peak_dbtp · lra

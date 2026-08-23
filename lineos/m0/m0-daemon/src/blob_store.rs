@@ -151,10 +151,41 @@ pub struct StoredLoudness {
             alias = "output_acx_quietest_window_start_frame")]
     pub output_delivery_quietest_window_start_frame: Option<usize>,
 
+    /// §5.3 — η κρίση υπολογίζεται ΜΙΑ φορά στο render/deliver και
+    /// αποθηκεύεται ΜΑΖΙ με τα κατώφλια που χρησιμοποίησε. Οι όψεις
+    /// ΤΥΠΩΝΟΥΝ, ΔΕΝ κρίνουν: αλλαγή preset μετά την έκδοση ΔΕΝ
+    /// ξαναγράφει ιστορία. Το required_db είναι η ΔΗΜΟΣΙΕΥΜΕΝΗ
+    /// προδιαγραφή (ώστε ο εκδότης να την αναγνωρίζει)· το
+    /// margin_applied_db είναι δικό μας, μετρημένο (F-077, 2026-08-23),
+    /// και το effective threshold προκύπτει από τα δύο. None/απουσία
+    /// εγγραφής = δεν μετρήθηκε (κανόνας απουσίας §5.2) — ΟΧΙ ψευδής
+    /// τιμή.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_checks: Option<Vec<DeliveryCheck>>,
+
     /// ΤΟ ΕΜΠΟΡΙΚΟ ΟΝΟΜΑ ΩΣ ΤΙΜΗ, ΟΧΙ ΩΣ ΔΟΜΗ (§5.1α, 2026-08-23).
     /// None = δεν δηλώθηκε προφίλ (κανόνας απουσίας 5.2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_profile: Option<DeliveryProfileRef>,
+}
+
+/// Μία γραμμή κρίσης του §5.3: ένα κατώφλι, το μετρημένο νούμερο που
+/// κρίθηκε έναντι αυτού, και η ετυμηγορία — ΟΥΔΕΤΕΡΑ ΟΝΟΜΑΤΑ, ο
+/// ένοικος (ποιο preset/profile) ζει στην ΤΙΜΗ (delivery_profile),
+/// όχι στο όνομα του πεδίου (§5.1α).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DeliveryCheck {
+    /// "rms" | "peak" | "noise_floor".
+    pub metric: String,
+    pub measured_db: f32,
+    /// Η ΔΗΜΟΣΙΕΥΜΕΝΗ προδιαγραφή, χωρίς margin.
+    pub required_db: f32,
+    /// "min" | "max" — προς ποια κατεύθυνση κρίνει το required_db.
+    pub bound: String,
+    /// Δικό μας, μετρημένο (F-077). 0.0 όπου δεν ισχύει.
+    pub margin_applied_db: f32,
+    /// "pass" | "fail".
+    pub verdict: String,
 }
 
 /// Ποια δημοσιευμένη προδιαγραφή μετρήθηκε — ΕΛΕΓΞΙΜΟΣ ΙΣΧΥΡΙΣΜΟΣ

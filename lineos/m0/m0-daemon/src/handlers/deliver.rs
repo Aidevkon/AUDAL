@@ -411,6 +411,27 @@ pub fn run_deliver_core(
                         loudness.output_delivery_noise_floor_db = outcome.report.noise_floor_db;
                         loudness.output_delivery_quietest_window_start_frame =
                             outcome.report.quietest_window_start_frame;
+                        // §5.3 — η κρίση μπαίνει στο certificate εδώ, μαζί με
+                        // τα κατώφλια που χρησιμοποίησε (ίδια λογική με
+                        // passes_acx_with_margin(), sp314_dsp::analysis::
+                        // acx_check::AcxCheckReport::margin_checks() — μία
+                        // υλοποίηση, δύο καλούντες). Απουσία μετρικής (π.χ.
+                        // noise_floor όταν το αρχείο < 1s) = καμία εγγραφή.
+                        loudness.delivery_checks = Some(
+                            outcome
+                                .report
+                                .margin_checks()
+                                .into_iter()
+                                .map(|c| crate::blob_store::DeliveryCheck {
+                                    metric: c.metric.to_string(),
+                                    measured_db: c.measured_db,
+                                    required_db: c.required_db,
+                                    bound: c.bound.to_string(),
+                                    margin_applied_db: c.margin_applied_db,
+                                    verdict: if c.verdict { "pass" } else { "fail" }.to_string(),
+                                })
+                                .collect(),
+                        );
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)
                         {

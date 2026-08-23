@@ -100,12 +100,75 @@ pub struct AcxCheckReport {
     pub quietest_window_start_frame: Option<usize>,
 }
 
+/// One margin-adjusted per-metric judgment: the published requirement, our
+/// measured F-077 margin, and the resulting verdict — the single source
+/// `passes_acx_with_margin()` and any caller building a `§5.3` record (e.g.
+/// `deliver.rs`'s `DeliveryCheck`) both read from, so the rule exists in
+/// exactly one place.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AcxMarginCheck {
+    /// "rms" | "peak" | "noise_floor".
+    pub metric: &'static str,
+    pub measured_db: f32,
+    /// The published requirement, no margin applied.
+    pub required_db: f32,
+    /// "min" | "max" — which direction `required_db` bounds.
+    pub bound: &'static str,
+    /// The F-077 margin actually applied for this bound.
+    pub margin_applied_db: f32,
+    pub verdict: bool,
+}
+
 impl AcxCheckReport {
     pub fn passes_acx(&self) -> bool {
         self.sample_peak_db <= ACX_MAX_PEAK_DB
             && self.rms_db <= ACX_MAX_RMS_DB
             && self.rms_db >= ACX_MIN_RMS_DB
             && matches!(self.noise_floor_db, Some(nf) if nf <= ACX_MAX_NOISE_FLOOR_DB)
+    }
+
+    /// The per-metric breakdown behind `passes_acx_with_margin()`. Omits the
+    /// noise-floor entry entirely when `noise_floor_db` is `None` — absence
+    /// rule (§5.2): a metric that was not measured produces no record, not a
+    /// fabricated one.
+    pub fn margin_checks(&self) -> Vec<AcxMarginCheck> {
+        let mut checks = vec![
+            AcxMarginCheck {
+                metric: "rms",
+                measured_db: self.rms_db,
+                required_db: ACX_MIN_RMS_DB,
+                bound: "min",
+                margin_applied_db: ACX_MARGIN_RMS_FLOOR_DB,
+                verdict: self.rms_db >= ACX_MIN_RMS_DB + ACX_MARGIN_RMS_FLOOR_DB,
+            },
+            AcxMarginCheck {
+                metric: "rms",
+                measured_db: self.rms_db,
+                required_db: ACX_MAX_RMS_DB,
+                bound: "max",
+                margin_applied_db: ACX_MARGIN_RMS_CEILING_DB,
+                verdict: self.rms_db <= ACX_MAX_RMS_DB - ACX_MARGIN_RMS_CEILING_DB,
+            },
+            AcxMarginCheck {
+                metric: "peak",
+                measured_db: self.sample_peak_db,
+                required_db: ACX_MAX_PEAK_DB,
+                bound: "max",
+                margin_applied_db: ACX_MARGIN_PEAK_DB,
+                verdict: self.sample_peak_db <= ACX_MAX_PEAK_DB - ACX_MARGIN_PEAK_DB,
+            },
+        ];
+        if let Some(nf) = self.noise_floor_db {
+            checks.push(AcxMarginCheck {
+                metric: "noise_floor",
+                measured_db: nf,
+                required_db: ACX_MAX_NOISE_FLOOR_DB,
+                bound: "max",
+                margin_applied_db: ACX_MARGIN_NOISE_FLOOR_DB,
+                verdict: nf <= ACX_MAX_NOISE_FLOOR_DB - ACX_MARGIN_NOISE_FLOOR_DB,
+            });
+        }
+        checks
     }
 
     /// Same verdict as `passes_acx()`, but against thresholds that have
@@ -117,11 +180,11 @@ impl AcxCheckReport {
     /// `input_acx_compliant` — that report is measured on raw input, before
     /// any render or encode step, so there is no encoder gap to correct
     /// there; see the doc comment on the `ACX_MARGIN_*` consts above.
+    ///
+    /// Missing noise floor still fails (matching `passes_acx()`): the
+    /// absence rule governs the §5.3 *record*, not this boolean.
     pub fn passes_acx_with_margin(&self) -> bool {
-        self.sample_peak_db <= ACX_MAX_PEAK_DB - ACX_MARGIN_PEAK_DB
-            && self.rms_db <= ACX_MAX_RMS_DB - ACX_MARGIN_RMS_CEILING_DB
-            && self.rms_db >= ACX_MIN_RMS_DB + ACX_MARGIN_RMS_FLOOR_DB
-            && matches!(self.noise_floor_db, Some(nf) if nf <= ACX_MAX_NOISE_FLOOR_DB - ACX_MARGIN_NOISE_FLOOR_DB)
+        self.noise_floor_db.is_some() && self.margin_checks().iter().all(|c| c.verdict)
     }
 }
 
