@@ -293,6 +293,20 @@ refactor (F-076: το hardcoded PASS αντικαθίσταται από
 διαβάσει την πηγή — το required_db σήμερα έρχεται από τις
 σταθερές μας, ΟΧΙ από επαληθευμένη ανάγνωση.
 
+**τροποποίηση 24/08:** πεδίο που λέει _db και κρατάει
+δευτερόλεπτα είναι το F-074 ξανά· η μονάδα γίνεται
+ΔΕΔΟΜΕΝΟ, το όνομα ουδέτερο. DeliveryCheck's
+`measured_db`/`required_db`/`margin_applied_db` →
+`measured`/`required`/`margin_applied`, + νέο πεδίο
+`unit: String` ("db" | "seconds"). Serde aliases στα
+παλιά ονόματα· sidecars γραμμένα πριν σήμερα δεν έχουν
+`unit` καθόλου — default "db" (κάθε check πριν το
+spacing ήταν dB, καμία ασάφεια). Trigger: το spacing
+(head_spacing/tail_spacing, ΒΗΜΑ Γ) χρειάζεται
+δευτερόλεπτα στο ΙΔΙΟ σχήμα — κόστος μηδέν σήμερα, η
+δομή είχε μπει μία ώρα πριν, κανείς έξω δεν την είχε
+δει ακόμα.
+
 **5.4 ΟΙ ΜΕΤΡΙΚΕΣ ΑΝΑ ΟΨΗ** (κάθε γραμμή = μετρημένο δίπλα
 στο απαιτούμενο, frictionless audit):
 · streaming: integrated_lufs · true_peak_dbtp · lra

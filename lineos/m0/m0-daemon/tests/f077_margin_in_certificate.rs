@@ -188,8 +188,9 @@ fn edge_fixture_fails_rms_floor_margin_in_certificate() {
 
     let rms_min = find_check(&checks, "rms", "min");
     assert_eq!(rms_min["verdict"], "fail", "{rms_min:?}");
-    assert_eq!(rms_min["required_db"], -23.0, "{rms_min:?}");
-    assert_eq!(rms_min["margin_applied_db"], 0.35, "{rms_min:?}");
+    assert_eq!(rms_min["required"], -23.0, "{rms_min:?}");
+    assert_eq!(rms_min["margin_applied"], 0.35, "{rms_min:?}");
+    assert_eq!(rms_min["unit"], "db", "{rms_min:?}");
 
     for (metric, bound) in [("rms", "max"), ("peak", "max"), ("noise_floor", "max")] {
         let c = find_check(&checks, metric, bound);
@@ -215,8 +216,9 @@ fn mid_window_fixture_passes_all_margin_checks_in_certificate() {
     ] {
         let c = find_check(&checks, metric, bound);
         assert_eq!(c["verdict"], "pass", "{metric}/{bound} unexpectedly failed: {c:?}");
-        assert_eq!(c["required_db"], required, "{metric}/{bound} required_db: {c:?}");
-        assert_eq!(c["margin_applied_db"], margin, "{metric}/{bound} margin: {c:?}");
+        assert_eq!(c["required"], required, "{metric}/{bound} required: {c:?}");
+        assert_eq!(c["margin_applied"], margin, "{metric}/{bound} margin: {c:?}");
+        assert_eq!(c["unit"], "db", "{metric}/{bound} unit: {c:?}");
     }
 
     common::verify_sidecar_bytes(&after_text).expect("rewritten sidecar must verify");

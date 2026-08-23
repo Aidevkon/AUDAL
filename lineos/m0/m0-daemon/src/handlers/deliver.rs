@@ -424,11 +424,12 @@ pub fn run_deliver_core(
                                 .into_iter()
                                 .map(|c| crate::blob_store::DeliveryCheck {
                                     metric: c.metric.to_string(),
-                                    measured_db: c.measured_db,
-                                    required_db: c.required_db,
+                                    measured: c.measured_db,
+                                    required: c.required_db,
                                     bound: c.bound.to_string(),
-                                    margin_applied_db: c.margin_applied_db,
+                                    margin_applied: c.margin_applied_db,
                                     verdict: if c.verdict { "pass" } else { "fail" }.to_string(),
+                                    unit: "db".to_string(),
                                 })
                                 .collect(),
                         );

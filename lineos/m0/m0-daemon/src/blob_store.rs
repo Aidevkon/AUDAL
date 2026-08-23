@@ -175,17 +175,34 @@ pub struct StoredLoudness {
 /// όχι στο όνομα του πεδίου (§5.1α).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DeliveryCheck {
-    /// "rms" | "peak" | "noise_floor".
+    /// "rms" | "peak" | "noise_floor" | "head_spacing" | "tail_spacing".
     pub metric: String,
-    pub measured_db: f32,
+    /// τροποποίηση 24/08 (F-074 ξανά): πεδίο που λέει _db και κρατάει
+    /// δευτερόλεπτα είναι ψέμα με τ' όνομά του — η μονάδα γίνεται ΔΕΔΟΜΕΝΟ
+    /// (`unit`), το όνομα ουδέτερο. Παλιό όνομα `measured_db` ήταν σωστό
+    /// μόνο όσο ΚΑΘΕ check ήταν dB· το spacing το έσπασε.
+    #[serde(alias = "measured_db")]
+    pub measured: f32,
     /// Η ΔΗΜΟΣΙΕΥΜΕΝΗ προδιαγραφή, χωρίς margin.
-    pub required_db: f32,
-    /// "min" | "max" — προς ποια κατεύθυνση κρίνει το required_db.
+    #[serde(alias = "required_db")]
+    pub required: f32,
+    /// "min" | "max" — προς ποια κατεύθυνση κρίνει το required.
     pub bound: String,
     /// Δικό μας, μετρημένο (F-077). 0.0 όπου δεν ισχύει.
-    pub margin_applied_db: f32,
+    #[serde(alias = "margin_applied_db")]
+    pub margin_applied: f32,
     /// "pass" | "fail".
     pub verdict: String,
+    /// "db" | "seconds" — τι μονάδα κρατούν measured/required/margin_applied
+    /// σε ΑΥΤΗ την εγγραφή. Absent στα παλιά sidecars (πριν 24/08): default
+    /// σε "db", σωστό εκ των υστέρων γιατί ΚΑΘΕ εγγραφή πριν το spacing ήταν
+    /// dB — δεν υπήρχε άλλη μονάδα να μπερδευτεί.
+    #[serde(default = "default_delivery_check_unit")]
+    pub unit: String,
+}
+
+fn default_delivery_check_unit() -> String {
+    "db".to_string()
 }
 
 /// Ποια δημοσιευμένη προδιαγραφή μετρήθηκε — ΕΛΕΓΞΙΜΟΣ ΙΣΧΥΡΙΣΜΟΣ
@@ -833,6 +850,51 @@ mod tests {
                 "wrong input_pcm_sha256 value for key {key:?}"
             );
         }
+    }
+
+    /// F-074 ξανά (2026-08-24): DeliveryCheck's *_db fields renamed to
+    /// unit-neutral names (measured_db -> measured, required_db ->
+    /// required, margin_applied_db -> margin_applied) because spacing
+    /// checks measure seconds, not dB — a field literally named "_db"
+    /// holding seconds is the same lie F-074 found in input_hash. Sidecars
+    /// written before this rename (all §5.3 checks so far are dB-only)
+    /// must still deserialize, WITHOUT a "unit" key present at all.
+    #[test]
+    fn test_delivery_check_old_db_suffixed_keys_alias_and_default_unit() {
+        let json = r#"{
+            "metric": "rms",
+            "measured_db": -22.9,
+            "required_db": -23.0,
+            "bound": "min",
+            "margin_applied_db": 0.35,
+            "verdict": "fail"
+        }"#;
+        let check: DeliveryCheck = serde_json::from_str(json)
+            .unwrap_or_else(|e| panic!("failed to deserialize old-key DeliveryCheck: {e}"));
+        assert_eq!(check.measured, -22.9);
+        assert_eq!(check.required, -23.0);
+        assert_eq!(check.margin_applied, 0.35);
+        assert_eq!(
+            check.unit, "db",
+            "unit absent in old sidecar must default to \"db\" — every \
+             pre-spacing check was dB, nothing else to confuse it with"
+        );
+
+        // ΤΟ ΖΕΥΓΟΣ: νέο-στυλ JSON (νέα κλειδιά, ρητό unit) διαβάζεται
+        // εξίσου — η αλλαγή δεν έσπασε τη γραφή προς τα εμπρός.
+        let json_new = r#"{
+            "metric": "head_spacing",
+            "measured": 6.2,
+            "required": 5.0,
+            "bound": "max",
+            "margin_applied": 0.0,
+            "verdict": "fail",
+            "unit": "seconds"
+        }"#;
+        let check_new: DeliveryCheck = serde_json::from_str(json_new)
+            .unwrap_or_else(|e| panic!("failed to deserialize new-key DeliveryCheck: {e}"));
+        assert_eq!(check_new.measured, 6.2);
+        assert_eq!(check_new.unit, "seconds");
     }
 
     /// GUARD (F-hash-language, 2026-08-23) — external juror, not
