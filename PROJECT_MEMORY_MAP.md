@@ -115,5 +115,98 @@ Source of truth: sp314-dsp's version (πιο ολοκληρωμένο, πρωτ�
 - **Per-install Ed25519 ΤΑΥΤΟΤΗΤΑ (built 2026-08-21, §Σ/Ψ6):** `src/identity.rs` — `load_or_generate(dir)` (32-byte seed, atomic tmp→rename, 0o600, ΠΟΤΕ overwrite) · key_id = "m0-"+16hex(sha256(pubkey)) · resolver: env `M0_IDENTITY_PATH` αλλιώς `~/.creator_os/identity` (ΚΑΘΕ test ΠΡΕΠΕΙ να θέτει το env — τα INV-Π-1/INV-PERSIST-1 το κάνουν ήδη). `sign_certificate` υπογράφει πλέον με αυτό (το fingerprint-derived ΠΕΘΑΝΕ)· το envelope κουβαλάει key_id+signer_public_key (hex 64). Payload signature ΔΕΝ υπάρχει ακόμα — περιμένει canonical serialization spec (schema v0 §6). 5 tests: roundtrip/env/sign-verify/distinct-dirs/tamper-reject.
 - ΜΕΘΟΔΟΣ — Ο ΑΦΗΓΗΤΗΣ ΑΝΤΙΣΤΡΕΦΕΙ (18/08): 8+ φορές σε μία συνεδρία, οι agents έδωσαν σωστά νούμερα με ρόδινο/ανάποδο συμπέρασμα (π.χ. CHOP=100% διαβάστηκε ως «πλήρης εξάλειψη chop»). ΚΑΝΕΝΑ συμπέρασμα agent δεν περνάει σε απόφαση χωρίς ανάγνωση του πίνακα από τον orchestrator.
 
+## Rediscovered 2026-08-24 — Η ΝΥΧΤΑ ΤΩΝ ΤΥΦΛΩΝ ΚΑΛΩΔΙΩΝ
+
+Ο κανόνας αυτού του αρχείου («κάθε συνεδρία που χτίζει
+υποδομή την καταγράφει ΕΔΩ πριν κλείσει») είχε να
+εφαρμοστεί από 21/08. Αυτή η ενότητα κλείνει το χρέος.
+
+**ΠΕΝΤΕ ΟΡΦΑΝΑ, ΟΛΑ ΕΠΑΛΗΘΕΥΜΕΝΑ ΜΕ ΚΩΔΙΚΑ (24/08):**
+| # | τι | κατάσταση | ποιος το σκότωσε |
+|---|---|---|---|
+| 1 | `write_extensible_fmt_chunk` (wav_writer.rs) | μόνο το δικό του test | ξεπεράστηκε από το ειδικευμένο `write_adm_bwf` |
+| 2 | `generate_album_certificate_pdf` | κανένας caller | — (και έχει ΛΟΓΟ ΥΠΑΡΞΗΣ: οι απαιτήσεις επιπέδου ΒΙΒΛΙΟΥ, βλ. ΑΤΖΕΝΤΑ 23/08) |
+| 3 | `cut_heal/` — SilenceCut · BreathCut · CrossfadeHeal (d8b539d, 3/6) | μόνο 5 unit tests | — · ΠΡΟΣΟΧΗ: τα crossfade primitives ΖΟΥΝ (δικό τους oracle test, μετρημένο +3.01dB null bump) |
+| 4 | `deterministic_upmix` | γνωστό παλιό ορφανό | — |
+| 5 | `HumRemoval` flavour + `MainsHumDetected` | αδύνατο να επιλεγεί ΠΟΤΕ | η ανίχνευση δεν υπάρχει (F-082) |
+
+**ΤΡΙΑ ΚΑΛΩΔΙΩΜΕΝΑ ΑΛΛΑ ΤΥΦΛΑ (χειρότερα από ορφανά —
+το ορφανό δεν προσποιείται):**
+· DeEsser: production threshold 0.0 ⇒ ΔΟΜΙΚΑ αδύνατο
+  να πυροδοτηθεί (F-081). Ακουστική ετυμηγορία 24/08:
+  **−24 dB** σε δύο γλώσσες.
+· DeHum: εφαρμόζει ΠΑΝΤΑ, 50 Hz μόνο, χωρίς ανίχνευση
+  (F-082). Κατώφλι ανίχνευσης **+8 dB** από μέτρηση.
+· duck_gain: υπολογίζεται με μετρημένες ballistics και
+  ΔΕΝ πολλαπλασιάζεται ΠΟΤΕ (F-080).
+
+**Η ΕΝΙΑΙΑ ΑΛΥΣΙΔΑ RESTORATION ΥΠΑΡΧΕΙ ΟΛΟΚΛΗΡΗ** —
+`Flavor::POXVoice` (flavor.rs:159-177):
+Input → NoiseGate → DeHum → AutoLevel → DeEsser →
+Output. Καλωδιωμένη σε ΕΝΑ flavour: `"broadcast"`
+(render_node.rs:164-166). Το `"acx"` είναι ΞΕΧΩΡΙΣΤΟ
+(presets.rs:201) ⇒ **στη διαδρομή ACX δεν τρέχει
+ΚΑΝΕΝΑ από αυτά.** Δεν λείπει κώδικας — λείπει ένα
+καλώδιο. ΠΡΙΝ ΤΟ ΚΑΛΩΔΙΟ: διόρθωση threshold + DeHum
+κοιμισμένος.
+
+**AutoLevel** (autolevel.rs): στόχος **−18.0 dB
+ΣΤΑΘΕΡΑ ΑΠΟ ΚΩΔΙΚΑ** (όχι μετρημένη· και συμπίπτει με
+το ΑΝΩΤΑΤΟ του ACX παραθύρου — ύποπτο, δεν
+διερευνήθηκε). ΔΥΝΑΜΙΚΟ ανά δείγμα, κυλιόμενο 500ms
+**broadband** RMS, clamp ±6 dB, 50ms smoothing.
+ΚΡΙΣΙΜΟ: broadband ⇒ ΔΕΝ βλέπει την υψίσυχνη ενέργεια
+που ελέγχει ο DeEsser ⇒ η κανονικοποίηση ΔΕΝ λύνει το
+πρόβλημα του απόλυτου threshold, μόνο το μετριάζει
+(μερική σύγκλιση, μετρημένη 24/08).
+
+**MaskingEQ ≠ NMF mask** — δυναμικό EQ 8 ζωνών για
+λάσπη (eq_mud), τρέχει **ΑΝΕΥ ΟΡΩΝ** (router.rs:48),
+7 contract tests. Το ΜΟΝΟ από τα έξι της ραχοκοκαλιάς
+που τρέχει πάντα. Το F-045 (ACTIVE) λέει ρητά ότι το
+LTASS chain «θα έπρεπε να το αντικαταστήσει» στο
+audiobook path.
+
+**GLUE/BED**: και τα 4 στάδια υπάρχουν (glue.rs:49-116)
+πίσω από `const GLUE_SEND_AMOUNT = 0.0` — ΝΕΚΡΟ. Και
+το σχόλιο δύο γραμμές πάνω λέει «Default 0.5»
+(dsp_pipeline.rs:18 vs :23).
+
+**ΤΙ ΧΤΙΣΤΗΚΕ 22-24/08 (όργανα, ΟΧΙ προϊόν):**
+· `research/encoder-gap-speech/` — crate μέτρησης με
+  9 bins (ΑΠΟ ΤΟ ΔΕΝΤΡΟ, `ls src/bin/`): autolevel_chain ·
+  candidate_probe · deess_threshold · dehum_what ·
+  gap_mechanism · lufs_round2 · noise_floor_case ·
+  restoration_alive · spacing_distribution. Γεννήθηκε
+  για το encoder χάσμα (F-077), επεκτάθηκε σε spacing,
+  restoration, dehum.
+· `scripts/audio_wire.sh` (924a5c9) — ο φρουρός των 39
+  ignored audio tests, μητρώο στο header, 22' πλήρες
+  πέρασμα.
+· `tests/external_acx_ffmpeg_agreement.rs` (6d7f5e9) —
+  εξωτερικός ένορκος: ffmpeg στο ΠΑΡΑΔΟΘΕΝ mp3.
+· `delivery_checks` + `margin_checks` — το verdict στο
+  certificate (§5.3) με τα κατώφλια αποθηκευμένα.
+· `~/Downloads/DATASET/slakh/drums-v1/` — 96 tracks /
+  8 kits / 5.16 ΕΝΕΡΓΕΣ ώρες + MANIFEST + sha256.
+· `.claude/settings.json` — ο τοίχος «git μόνο
+  Anestis» ως ΤΥΠΟΣ, όχι εντολή σε prompt.
+
+**ΜΕΘΟΔΟΣ — ΤΡΙΑ ΜΑΘΗΜΑΤΑ ΤΗΣ ΒΑΡΔΙΑΣ:**
+1. **Το null RMS λέει «πόσο», ΠΟΤΕ «πόσο ακούγεται».**
+   Σύγκριση null μεταξύ διαφορετικών ΠΕΡΙΟΧΩΝ ΦΑΣΜΑΤΟΣ
+   είναι ασύγκριτα μεγέθη (de-esser −37 vs de-hum −30
+   → λάθος συμπέρασμα του κρίνοντος, διορθώθηκε από
+   την ακρόαση).
+2. **Ο κόμβος μετριέται ΜΕΣΑ ΣΤΗΝ ΑΛΥΣΙΔΑ ΤΟΥ.**
+   Απομονωμένη μέτρηση του DeEsser έδωσε «αδρανής στο
+   ήσυχο αρχείο» — στην αλυσίδα (μετά AutoLevel) το
+   εύρος μειώθηκε. Και η ακρόαση έγινε εκτός αλυσίδας:
+   ό,τι ακούστηκε ΔΕΝ είναι ό,τι θα ακούει ο χρήστης.
+3. **Α/Β/Α, ΠΟΤΕ γραμμικά.** Πέντε εκδοχές στη σειρά =
+   άχρηστη ακρόαση (το αυτί προσαρμόζεται). Ωμό→
+   επεξεργασμένο→ωμό→επεξεργασμένο, ίδιο απόσπασμα,
+   δύο κύκλοι.
+
 ## How to use this doc
 Πριν ξεκινήσεις νέο feature, ψάξε εδώ πρώτα: μπορεί να υπάρχει ήδη σχετικό schema/struct/primitive. Ενημέρωσε αυτό το doc όποτε βρίσκεις κάτι αντίστοιχο.
