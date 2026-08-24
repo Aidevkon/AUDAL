@@ -1415,13 +1415,18 @@ dependencies = [
 name = "encoder-gap-speech"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
+ "hound",
  "libm",
  "lineos-types",
  "m0d",
  "rubato",
+ "rustfft",
  "sha2",
  "sp314-dsp",
  "sp314-nodes",
+ "tempfile",
+ "xaak",
 ]
 
 [[package]]

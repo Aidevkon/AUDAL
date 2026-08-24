@@ -22,5 +22,30 @@ sp314-nodes = { path = "../../lineos/m1/sp314-nodes" }
 rubato = "0.15"
 libm = "0.2"
 sha2 = "0.10"
+# 2026-08-24: deess_threshold.rs needs an FFT for spectral centroid of the
+# removed (in-out) signal. Pinned to the exact version sp314-dsp resolves.
+rustfft = "6"
+# 2026-08-24: execution_order.rs calls the REAL run_dsp() (dsp_pipeline.rs)
+# to capture graph.execution_order from a real render, not a re-implementation.
+# xaak::repo::DspState + arc-swap are run_dsp's head_state param; tempfile
+# matches INV-DET-1's fixture-isolation idiom. Pinned to the exact versions
+# m0d resolves (Cargo.lock, root workspace).
+xaak = { path = "../../lineos/m1/xaak" }
+arc-swap = "1.9"
+tempfile = "3.27.0"
+# 2026-08-24: restoration_chain_what.rs writes per-stage null-test wavs.
+# Same version sp314-dsp resolves (Cargo.lock, root workspace).
+hound = "3.5"
 
 [workspace]
+
+# ⚠ ΠΡΟΣΩΡΙΝΟ — 2026-08-24, execution_order recon.
+# Το graph.execution_order ίχνος ([BISECT-...-GRAPH-NODE], dsp/mod.rs)
+# ζει πίσω από `#[cfg(debug_assertions)]`, άρα ΑΠΑΙΤΕΙΤΑΙ debug build.
+# Τα opt-level και debug_assertions είναι ΑΝΕΞΑΡΤΗΤΑ στο Cargo: με
+# opt-level=3 ο κώδικας βελτιστοποιείται ΚΑΙ το debug_assertions
+# παραμένει true, οπότε το όργανο εξακολουθεί να τυπώνει.
+# ΑΦΟΡΑ ΜΟΝΟ αυτό το detached research workspace, ΟΧΙ το production.
+# Ο χρήστης αποφασίζει αν μένει.
+[profile.dev]
+opt-level = 3
