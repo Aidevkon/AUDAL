@@ -423,6 +423,75 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
 - **[F-086] Στοχεύουμε LUFS, μας κρίνουν σε RMS — και η απόσταση ΔΕΝ είναι σταθερή.** Component: `autotune.rs:70-72` · `AcxCheckAnalyzer`. ΜΕΤΡΗΜΕΝΟ 2026-08-24 σε **25 αρχεία αφήγησης**. Το mastering στοχεύει `target_lufs` ρητά· το streaming certificate έχει **`acx: None`** ⇒ **μηδέν RMS verdict παράγεται στο mastering**· ο έλεγχος συμβαίνει μόνο αργότερα, στο export. Το μετρημένο `rms_db` **δεν διαβάζεται ΠΟΥΘΕΝΑ** στη ζωντανή διαδρομή. **Η ΚΑΤΑΝΟΜΗ (LUFS − RMS):** median **4.504 dB**, spread **2.272 dB**, καμία αρνητική τιμή. Pearson r με `active_frac`: **−0.636** (σύνολο), **−0.765** εντός ενός βιβλίου. **Μέσα σε ομοιογενές σώμα ενός βιβλίου (13 κεφάλαια, active_frac spread 0.031): 0.274 dB.** ⇒ **Η απόσταση ΕΙΝΑΙ η πυκνότητα ομιλίας** (το LUFS κάνει gating, το RMS όχι). Σταθερή μόνο μέσα σε στενά ομοιογενές υλικό, **ΟΧΙ ως γενικός νόμος** ⇒ **το στοχεύειν LUFS ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΓΓΥΗΘΕΙ RMS συμμόρφωση.** **ΤΟ ΜΕΓΕΘΟΣ-ΣΤΟΧΟΣ ΕΙΝΑΙ ΙΔΙΟΤΗΤΑ ΤΟΥ ΠΡΟΟΡΙΣΜΟΥ:** ACX→RMS · streaming/podcast/broadcast→LUFS. Ίδιο μοτίβο με τους κόμβους που ξυπνούν από δεδομένα, ένα επίπεδο πιο βαθιά. Η μηχανή χτίστηκε LUFS-first και το ACX είναι το μόνο entry σε άλλον άξονα — γι' αυτό ήταν άβολο από την αρχή. **ΚΑΙ ΤΟ ΔΟΜΙΚΟ ΠΟΥ ΠΡΟΚΥΠΤΕΙ ΑΠΟ ΤΗΝ ΠΡΟΔΙΑΓΡΑΦΗ:** peak ≤ −3 ΚΑΙ RMS ≥ −23 ⇒ **crest ≤ 20 dB ως ΑΝΑΓΚΑΙΑ συνθήκη** (με τα σημερινά margins: 19.45). Το gain μετακινεί peak και RMS **μαζί** — δεν αλλάζει ποτέ την απόστασή τους. **Η ζωντανή αλυσίδα έχει ΜΟΝΟ gain** (impulse test: μηδέν latency, κανένας limiter, κανένας compressor) ⇒ **υλικό με crest > 20 αποτυγχάνει ΔΟΜΙΚΑ και δεν το λέμε.** **ΤΟ ΕΡΓΑΛΕΙΟ ΥΠΑΡΧΕΙ ΗΔΗ:** ο `Compressor` είναι `DspNode` στο **ίδιο factory** που χτίζει το vocal_graph· και υπάρχει **`LimiterNode` wrapper καταχωρημένος** (`"Limiter"` key) που **καμία topology δεν χρησιμοποιεί ποτέ**. Το «εκτός γραφήματος» ήταν **επιλογή σχεδίασης, όχι δομικός περιορισμός** — δύο γραμμές ο καθένας. ⚠ Ο `MultibandCompressorNode` υπάρχει στο factory και **καμία topology δεν τον χρησιμοποιεί πουθενά** — δέκατο έκτο ορφανό. Trigger: **ΦΑΣΗ 1 του sequencing** — η αλυσίδα γίνεται πλήρης πριν από κάθε άλλο.
 
+- **[F-087] ΚΑΘΕ ACX mp3 ΠΟΥ ΕΞΑΓΕΤΑΙ ΣΗΜΕΡΑ ΕΙΝΑΙ
+  ΣΙΩΠΗ. Η αλυσίδα DSP δουλεύει· το export την
+  καταστρέφει στα τελευταία εκατοστά.**
+  Component: `pcm_bytes_to_f32` · `export_mp3_acx` ·
+  `export.rs:521-522`. ΜΕΤΡΗΜΕΝΟ 2026-08-24 μέσω των
+  ΠΡΑΓΜΑΤΙΚΩΝ συναρτήσεων παραγωγής (in-process, όχι
+  harness, καμία επανυλοποίηση), σε πραγματικό αρχείο
+  αφήγησης.
+  ΑΛΥΣΙΔΑ ΕΥΘΥΝΗΣ: (1) το `/export` διαβάζει το
+  `blob.core.audio_path` ως ΑΡΧΕΙΟ, όχι bytes από blob
+  store. (2) Στη ζωντανή διαδρομή είναι γνήσιο WAV
+  γραμμένο με `hound` — έχει RIFF header. (3) Το
+  `pcm_bytes_to_f32` ΔΕΝ τον παρσάρει — εμπειρικά
+  **68 bytes = 17 float samples** επανερμηνευμένα ως
+  ήχος, σε ΚΑΘΕ export συνάρτηση. (4) Τα bytes
+  αποκωδικοποιούνται σε float **~1.5×10³³**. (5) Η
+  αυτο-διόρθωση RMS μετράει RMS ΟΛΟΚΛΗΡΟΥ buffer,
+  υπολογίζει **−560 dB** και τα εφαρμόζει σε ΟΛΟ το
+  buffer. (6) Peak trim: άλλα **−38.5 dB**. (7) **Η
+  ομιλία καταλήγει στα −620 dB. Δεν υπάρχει.**
+  ΑΠΟΔΕΙΞΗ: το `export_mp3_acx` επέστρεψε
+  `rms_db −57.051563`, `noise_floor_db −144.0`,
+  `tail_quiet_secs 6.4` σε render ~6.6s — και το
+  **ffmpeg astats στο παραδοθέν mp3 το επιβεβαίωσε
+  ανεξάρτητα**. Ξανατρέξιμο του πραγματικού
+  AcxCheckAnalyzer/TruePeakMeter στο ελαττωματικό σήμα
+  σε απομόνωση ταίριαξε **ψηφίο-προς-ψηφίο**.
+  Ο ΜΗΧΑΝΙΣΜΟΣ ΕΝΙΣΧΥΣΗΣ — ΤΟ ΔΙΔΑΚΤΙΚΟ: σφάλμα ΕΝΟΣ
+  δείγματος γίνεται σφάλμα ΟΛΟΚΛΗΡΟΥ αρχείου, επειδή
+  μια αυτο-διόρθωση που μετράει ολικό μέγεθος το
+  «οπλίζει». Ο κώδικας διόρθωσης είναι τίμιος ως προς
+  τη λογική του (γνήσια επανα-μέτρηση μετά τα trims) —
+  μετράει με ακρίβεια ένα ήδη κατεστραμμένο buffer.
+  Το `export_flac`/`export_wav` έχουν ΤΟ ΙΔΙΟ bug
+  ανάγνωσης αλλά είναι ακουστικά αμελητέο: δεν έχουν
+  αυτο-διόρθωση να το πολλαπλασιάσει. **Η ενίσχυση,
+  όχι η ανάγνωση, σκοτώνει.**
+  ΕΞΗΓΕΙ ΑΝΑΔΡΟΜΙΚΑ το «ταυτόσημα σε τρία διαφορετικά
+  αρχεία» του F-083: ο WAV header είναι σχεδόν
+  αναλλοίωτος σε κάθε render ⇒ ίδια εξαφάνιση κάθε
+  φορά, ΑΝΕΞΑΡΤΗΤΑ ΠΕΡΙΕΧΟΜΕΝΟΥ. Ο αστερίσκος του
+  F-083 ΑΙΡΕΤΑΙ: ΠΑΡΑΓΩΓΗΣ. Και η αρχική υπόθεση
+  μηχανισμού (L/R misalignment) ήταν ΛΑΘΟΣ — το swap
+  δεν αλλάζει RMS.
+  Η ΚΡΙΣΙΜΗ ΔΙΑΚΡΙΣΗ: η αλυσίδα DSP ΔΟΥΛΕΥΕΙ —
+  ακρόαση Α/Β/Α (Anestis, 24/08) στο stage_4 wav,
+  ΠΡΙΝ το export: «η μηχανή κάνει δουλειά καλή».
+  **Δεν φταίει το mastering. Φταίνε τα τελευταία
+  εκατοστά.**
+  ΑΝΟΙΧΤΑ, ΔΗΛΩΜΕΝΑ: (α) **ΕΧΕΙ ΔΟΥΛΕΨΕΙ ΠΟΤΕ;**
+  git log στο `pcm_bytes_to_f32` και στον writer — αν
+  ο writer άλλαξε από raw σε `hound`, είναι regression
+  με ημερομηνία· αν ήταν πάντα έτσι, το ACX export ΔΕΝ
+  ΛΕΙΤΟΥΡΓΗΣΕ ΠΟΤΕ και όλες οι μετρήσεις της βάρδιας
+  για margins/verdict/RMS αφορούσαν μονοπάτι που δεν
+  παρήγαγε ποτέ έγκυρο αρχείο. ΔΕΝ ΕΛΕΓΧΘΗΚΕ.
+  (β) **ΤΙ ΛΕΕΙ ΤΟ `delivery_checks`;** Αν το −57.05
+  τροφοδοτεί το verdict, το manifest λέει FAIL —
+  δηλαδή το σύστημα ΣΠΑΕΙ ΟΡΑΤΑ, δεν ψεύδεται.
+  «σπασμένο» ≠ «ψεύτικο». ΔΕΝ ΕΛΕΓΧΘΗΚΕ.
+  ΜΕΘΟΔΟΣ: το `curl` απαγορεύτηκε από το permission
+  system· αντί για επανυλοποίηση κλήθηκαν οι ΙΔΙΕΣ
+  συναρτήσεις in-process με πραγματικό daemon state
+  (`~/.creator_os/db`) και πραγματικό υλικό. **Ίδιος
+  κώδικας, χωρίς HTTP** — η σωστή παράκαμψη όταν
+  μπλοκάρει το κανάλι, όχι το τεκμήριο.
+  Trigger: **ΠΡΩΤΟ ΠΡΑΓΜΑ ΤΗΣ ΦΑΣΗΣ 1**, πριν από
+  compressor και limiter.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -623,7 +692,7 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-087** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-088** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
