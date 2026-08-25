@@ -1415,6 +1415,7 @@ dependencies = [
 name = "encoder-gap-speech"
 version = "0.1.0"
 dependencies = [
+ "aether-bridge",
  "arc-swap",
  "hound",
  "libm",
@@ -1422,6 +1423,8 @@ dependencies = [
  "m0d",
  "rubato",
  "rustfft",
+ "serde",
+ "serde_json",
  "sha2",
  "sp314-dsp",
  "sp314-nodes",

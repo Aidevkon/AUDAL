@@ -36,6 +36,11 @@ tempfile = "3.27.0"
 # 2026-08-24: restoration_chain_what.rs writes per-stage null-test wavs.
 # Same version sp314-dsp resolves (Cargo.lock, root workspace).
 hound = "3.5"
+# 2026-08-24: reference_resolver_oracle.rs calls the REAL ReferenceResolver
+# (shared/aether-bridge) to compare against the Python oracle fixture.
+aether-bridge = { path = "../../shared/aether-bridge" }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 
 [workspace]
 
