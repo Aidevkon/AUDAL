@@ -438,7 +438,6 @@ pub struct LoudnessMetricsJson {
 pub struct QualityMetricsJson {
     // Stereo / phase
     pub stereo_correlation: f32,
-    pub phase_coherence: f32,
     pub stereo_width: f32,
     // Dynamic range
     pub dynamic_range_db: f32,
@@ -541,7 +540,6 @@ mod tests {
             },
             quality: QualityMetricsJson {
                 stereo_correlation: 0.94,
-                phase_coherence: 0.97,
                 stereo_width: 0.74,
                 dynamic_range_db: 9.5,
                 rms_db: -16.0,

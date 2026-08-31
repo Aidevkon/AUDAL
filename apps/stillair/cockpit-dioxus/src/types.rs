@@ -39,7 +39,6 @@ pub struct LoudnessMetricsJson {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualityMetricsJson {
     pub stereo_correlation: f32,
-    pub phase_coherence: f32,
     pub stereo_width: f32,
     pub dynamic_range_db: f32,
     pub rms_db: f32,

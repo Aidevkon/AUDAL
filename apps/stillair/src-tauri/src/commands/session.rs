@@ -641,7 +641,6 @@ mod tests {
     fn make_quality() -> QualityMetricsJson {
         QualityMetricsJson {
             stereo_correlation: 0.94,
-            phase_coherence: 0.97,
             stereo_width: 0.74,
             dynamic_range_db: 9.5,
             rms_db: -16.0,

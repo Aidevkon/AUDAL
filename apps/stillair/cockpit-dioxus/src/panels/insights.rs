@@ -54,17 +54,28 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
 
     // Removed lissajous code to fix unused variable warnings since StereoScope is gone
 
-    let (_correlation, width, phase_coh) = match state.as_ref() {
-        Some(s) => (
-            s.quality.stereo_correlation,
-            s.quality.stereo_width,
-            s.quality.phase_coherence,
-        ),
-        None => (0.21_f32, 0.62_f32, 0.31_f32),
+    let (correlation, width) = match state.as_ref() {
+        Some(s) => (s.quality.stereo_correlation, s.quality.stereo_width),
+        None => (0.21_f32, 0.62_f32),
     };
 
+    // VECTOR: goniometer angle ΑΠΟ ΤΟ ΜΕΤΡΗΜΕΝΟ stereo_correlation.
+    // Σύμβαση, ρητή:
+    //   corr = +1 (mono, ταυτόσημα κανάλια) →  0°
+    //   corr =  0 (ασυσχέτιστα)             → 45°
+    //   corr = −1 (αντίθετη φάση)           → 90°
+    // ⇒ angle = 45 * (1 − corr), εύρος [0°, 90°].
+    //
+    // ΠΡΙΝ (F-085, ως 2026-08-25): `phase_coherence * 45.0`, με το
+    // phase_coherence σταθερό 0.97 ⇒ **πάντα «+44°»**, σε κάθε master,
+    // από 15/04. Και η μπάρα διαιρούσε με 90 ενώ η γωνία έφτανε ως 45
+    // ⇒ δεν ξεπερνούσε ποτέ το 50%. Δύο κλίμακες στην ίδια γραμμή.
+    // Το πεδίο αφαιρέθηκε (δεν είχε ορισμό πουθενά)· η γωνία παράγεται
+    // πλέον από μέγεθος που ΜΕΤΡΙΕΤΑΙ.
+    let angle_deg = 45.0 * (1.0 - correlation);
+
     let width_str = format!("{:.2}", width);
-    let angle_str = format!("+{:.0}°", phase_coh * 45.0);
+    let angle_str = format!("{:.0}°", angle_deg);
 
     rsx! {
         ModuleFrame {
@@ -140,7 +151,7 @@ pub fn InsightsPanel(props: InsightsPanelProps) -> Element {
                                     label: "VECTOR",
                                     value: angle_str,
                                     color: "var(--accent-amber)",
-                                    bar_pct: (phase_coh * 45.0 / 90.0 * 100.0).clamp(0.0, 100.0),
+                                    bar_pct: (angle_deg / 90.0 * 100.0).clamp(0.0, 100.0),
                                 }
                             }
                         }

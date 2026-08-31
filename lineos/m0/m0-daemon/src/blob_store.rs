@@ -222,8 +222,21 @@ pub struct DeliveryProfileRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredQuality {
+    // ΠΕΡΙΓΡΑΦΗ, ΟΧΙ ΕΤΥΜΗΓΟΡΙΑ: κανένας οίκος
+    // (ACX/podcast/music distributors) δεν απορρίπτει
+    // για συσχέτιση φάσης — μετρημένο 25/08. Κανένα
+    // δημοσιευμένο κατώφλι, καμία delivery_check.
+    // Το ΧΡΗΣΙΜΟ μέγεθος για μουσική είναι «τι
+    // χάνεται σε mono fold-down» (πρότυπο:
+    // folddown_gain_db + κατώφλι null ≤ −45 του 5.1)
+    // — ΝΕΟ πεδίο όταν φτάσει η στήλη Δ, ΟΧΙ
+    // επαναορισμός αυτού.
     pub stereo_correlation: f32,
-    pub phase_coherence: f32,
+    // F-085 (2026-08-25): το `phase_coherence` ΑΦΑΙΡΕΘΗΚΕ.
+    // Πεδίο ΧΩΡΙΣ ΟΡΙΣΜΟ σε κώδικα ΚΑΙ σε προδιαγραφή —
+    // δεν έγινε Option, γιατί το None θα δήλωνε «υπάρχει
+    // μέγεθος, δεν μετρήθηκε». Δεν υπήρχε μέγεθος.
+    // Τεκμήριο: docs/certificate-schema-v0.md §ΑΦΑΙΡΕΣΗ.
     pub stereo_width: f32,
     pub dynamic_range_db: f32,
     pub rms_db: f32,

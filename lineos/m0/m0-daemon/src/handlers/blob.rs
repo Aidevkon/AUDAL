@@ -297,7 +297,6 @@ mod tests {
                 loudness: StoredLoudness::default(),
                 quality: StoredQuality {
                     stereo_correlation: 0.0,
-                    phase_coherence: 0.0,
                     stereo_width: 0.0,
                     dynamic_range_db: 0.0,
                     rms_db: 0.0,

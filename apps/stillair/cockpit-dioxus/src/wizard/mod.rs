@@ -210,7 +210,6 @@ mod tests {
             },
             quality: QualityMetricsJson {
                 stereo_correlation: 0.85,
-                phase_coherence: 0.92,
                 stereo_width: 0.75,
                 dynamic_range_db: 8.5,
                 rms_db: -12.0,
