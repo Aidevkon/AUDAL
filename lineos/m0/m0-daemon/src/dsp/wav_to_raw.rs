@@ -34,6 +34,16 @@ pub struct MeasuredOutput {
     pub output_dynamic_range_db: f32,
     /// Μη-σταθμισμένο RMS του mono downmix του παραδοτέου.
     pub output_rms_db: f32,
+    /// 1 − |correlation| του παραδοτέου. ΠΑΡΑΓΩΓΟ του
+    /// `output_stereo_correlation` (stereo.rs:32) — ταξιδεύει επειδή το
+    /// σχήμα έχει το πεδίο, όχι επειδή προσθέτει πληροφορία.
+    pub output_stereo_width: f32,
+    /// Φασματικό κέντρο βάρους (Hz) του mono downmix του παραδοτέου,
+    /// μέσος όρος ανά STFT frame.
+    pub output_spectral_centroid: f32,
+    /// Φασματική επιπεδότητα (geom/arith) του mono downmix του
+    /// παραδοτέου, μέσος όρος ανά STFT frame. 0 = τόνος, 1 = θόρυβος.
+    pub output_spectral_flatness: f32,
 }
 
 const CHUNK_FRAMES: usize = 4096;
@@ -71,6 +81,14 @@ pub fn wav_to_raw_measured(
     let mut corr_cross = 0f64;
     let mut corr_sum_l = 0f64;
     let mut corr_sum_r = 0f64;
+    // F-085 wiring (φασματικά): ο ΥΠΑΡΧΩΝ streaming analyzer
+    // (spectral.rs:220), ταϊσμένος με το ΙΔΙΟ mono downmix του
+    // παραδοτέου. Τα per-frame μαθηματικά του είναι ταυτόσημα με τις
+    // batch `spectral_centroid_hz`/`spectral_flatness` — η ισοδυναμία
+    // είναι καρφωμένη με `assert_eq!` στα streaming_tests του ίδιου
+    // αρχείου, ΟΧΙ με ανοχή. Κρατάει έναν STFT encoder, όχι το σήμα.
+    let mut spectral =
+        sp314_dsp::analysis::spectral::StreamingSpectralAnalyzer::new(spec.sample_rate);
 
     let mut interleaved: Vec<f32> = Vec::with_capacity(CHUNK_FRAMES * channels);
     let mut left_buf = vec![0f32; CHUNK_FRAMES];
@@ -113,6 +131,7 @@ pub fn wav_to_raw_measured(
             corr_sum_r += (right_buf[i] as f64) * (right_buf[i] as f64);
         }
         dynamics.feed_chunk(&mono_buf[..frames]);
+        spectral.feed_chunk(&mono_buf[..frames]);
         for i in 0..frames {
             true_peak_linear = true_peak_linear
                 .max(left_buf[i].abs())
@@ -147,6 +166,11 @@ pub fn wav_to_raw_measured(
         (corr_cross / denom).clamp(-1.0, 1.0) as f32
     };
     let dyn_result = dynamics.finish();
+    // F-085: το width είναι ΠΑΡΑΓΩΓΟ — ο ίδιος τύπος με τη
+    // `stereo::stereo_width` (`1.0 - |corr|`), πάνω στη συσχέτιση που
+    // μόλις μετρήθηκε. ΔΕΝ ξαναδιαβάζει το σήμα.
+    let output_stereo_width = 1.0 - output_stereo_correlation.abs();
+    let (output_spectral_centroid, output_spectral_flatness, _crest) = spectral.finish();
 
     Ok(MeasuredOutput {
         frames_written,
@@ -159,11 +183,16 @@ pub fn wav_to_raw_measured(
         output_stereo_correlation,
         output_dynamic_range_db: dyn_result.dyn_range_db,
         output_rms_db: dyn_result.rms_db,
+        output_stereo_width,
+        output_spectral_centroid,
+        output_spectral_flatness,
     })
 }
 
-/// F-085: τα τρία μετρημένα πεδία του quality block, από ένα ΗΔΗ
+/// F-085: τα ΕΞΙ μετρημένα πεδία του quality block, από ένα ΗΔΗ
 /// γραμμένο raw master (interleaved f32 native-endian, 2ch).
+/// Επιστρέφει (correlation, dyn_range_db, rms_db, width,
+/// spectral_centroid, spectral_flatness).
 ///
 /// Για τον Episode/offline caller (`dsp_pipeline`), που δεν περνάει
 /// από το `wav_to_raw_measured` και του οποίου το `EpisodeRenderResult`
@@ -173,12 +202,14 @@ pub fn wav_to_raw_measured(
 pub fn measure_raw_master(
     raw_path: &std::path::Path,
     sample_rate: u32,
-) -> Result<(f32, f32, f32), String> {
+) -> Result<(f32, f32, f32, f32, f32, f32), String> {
     use std::io::Read;
     let file = std::fs::File::open(raw_path).map_err(|e| format!("open raw master: {e}"))?;
     let mut reader = std::io::BufReader::new(file);
 
     let mut dynamics = sp314_dsp::analysis::dynamics::StreamingDynamicsAnalyzer::new(sample_rate);
+    let mut spectral =
+        sp314_dsp::analysis::spectral::StreamingSpectralAnalyzer::new(sample_rate);
     let mut corr_cross = 0f64;
     let mut corr_sum_l = 0f64;
     let mut corr_sum_r = 0f64;
@@ -221,6 +252,7 @@ pub fn measure_raw_master(
             corr_sum_r += (r as f64) * (r as f64);
         }
         dynamics.feed_chunk(&mono_buf[..frames]);
+        spectral.feed_chunk(&mono_buf[..frames]);
         if filled < byte_buf.len() {
             break;
         }
@@ -233,7 +265,10 @@ pub fn measure_raw_master(
         (corr_cross / denom).clamp(-1.0, 1.0) as f32
     };
     let d = dynamics.finish();
-    Ok((correlation, d.dyn_range_db, d.rms_db))
+    // ΠΑΡΑΓΩΓΟ, ίδιος τύπος με stereo::stereo_width — δεν ξαναδιαβάζει.
+    let width = 1.0 - correlation.abs();
+    let (centroid, flatness, _crest) = spectral.finish();
+    Ok((correlation, d.dyn_range_db, d.rms_db, width, centroid, flatness))
 }
 
 /// Compatibility wrapper — the pre-C1 API. Callers migrate to

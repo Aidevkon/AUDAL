@@ -448,6 +448,9 @@ pub fn execute_streaming_plan(
         measured.output_stereo_correlation,
         measured.output_dynamic_range_db,
         measured.output_rms_db,
+        measured.output_stereo_width,
+        measured.output_spectral_centroid,
+        measured.output_spectral_flatness,
     )
     .map_err(ExecutorError::DspFailed)?;
 

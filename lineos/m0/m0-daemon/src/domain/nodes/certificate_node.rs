@@ -124,6 +124,23 @@ pub fn run(
         d.feed_chunk(&mono);
         d.finish().dyn_range_db
     };
+    // F-085 wiring (φασματικά + width), ίδιο σήμα, ίδιο σημείο.
+    // ΠΡΟΣΟΧΗ: οι batch spectral_* θέλουν ΟΛΟΚΛΗΡΟ το σήμα στη μνήμη —
+    // εδώ επιτρέπεται, ο offline caller ΗΔΗ κρατάει τα slices. Στο
+    // streaming μονοπάτι χρησιμοποιείται ο StreamingSpectralAnalyzer,
+    // που είναι bit-exact ισοδύναμος (assert_eq! στα streaming_tests).
+    let (spectral_centroid_measured, spectral_flatness_measured) = {
+        let n = left_slice.len().min(right_slice.len());
+        let mono: Vec<f32> = (0..n)
+            .map(|i| (left_slice[i] + right_slice[i]) * 0.5)
+            .collect();
+        (
+            sp314_dsp::analysis::spectral::spectral_centroid_hz(&mono, sample_rate),
+            sp314_dsp::analysis::spectral::spectral_flatness(&mono),
+        )
+    };
+    // ΠΑΡΑΓΩΓΟ του correlation (stereo.rs:32), όχι νέα ανάγνωση.
+    let stereo_width_measured = 1.0 - stereo_correlation_measured.abs();
 
     assemble_blob(
         blob_id,
@@ -155,6 +172,9 @@ pub fn run(
         stereo_rms_measured,
         stereo_correlation_measured,
         dynamic_range_measured,
+        stereo_width_measured,
+        spectral_centroid_measured,
+        spectral_flatness_measured,
     )
 }
 
@@ -216,6 +236,9 @@ pub fn run_streaming(
     output_stereo_correlation: f32,
     output_dynamic_range_db: f32,
     output_rms_db: f32,
+    output_stereo_width: f32,
+    output_spectral_centroid: f32,
+    output_spectral_flatness: f32,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
     // momentary / short-term stay None.
@@ -286,6 +309,9 @@ pub fn run_streaming(
         Some(output_rms_db),
         output_stereo_correlation,
         output_dynamic_range_db,
+        output_stereo_width,
+        output_spectral_centroid,
+        output_spectral_flatness,
     )
 }
 
@@ -329,6 +355,9 @@ fn assemble_blob(
     // F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ (post-master), όχι της εισόδου.
     stereo_correlation_measured: f32,
     dynamic_range_measured: f32,
+    stereo_width_measured: f32,
+    spectral_centroid_measured: f32,
+    spectral_flatness_measured: f32,
 ) -> Result<CertificateOutput, String> {
     let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
@@ -409,19 +438,23 @@ fn assemble_blob(
                 // όπου δεν μετρήθηκε (F-070).
                 rms_db: stereo_rms_measured.unwrap_or(lufs + 3.0),
 
-                // ── F-085: ΣΤΑΘΕΡΕΣ, ΟΧΙ ΜΕΤΡΗΣΕΙΣ. ──
-                // phase_coherence · clips_detected: ΑΠΟΝΤΑ — καμία
-                //   υλοποίηση στο δέντρο.
-                // stereo_width · spectral_centroid · spectral_flatness:
-                //   οι συναρτήσεις υπάρχουν (stereo.rs:32,
-                //   spectral.rs:18/60) αλλά καλούνται ΜΟΝΟ σε proxy
-                //   stems στα 12 kHz ΠΡΙΝ το mastering — ΛΑΘΟΣ ΣΗΜΑ.
-                //   Θέλουν την ίδια μεταχείριση με τα τρία από πάνω:
-                //   κλήση στο master buffer.
+                // ΜΕΤΡΗΜΕΝΑ στο master buffer (F-085 wiring, 25/08).
+                // stereo_width = 1 − |stereo_correlation|. ΠΑΡΑΓΩΓΟ,
+                // όχι ανεξάρτητη μέτρηση. Κατά §7.5 (παράγωγο δίπλα
+                // στην πηγή του), υποψήφιο για αφαίρεση σε επόμενη
+                // έκδοση σχήματος — σήμερα γίνεται τίμιο, δεν
+                // αφαιρείται (παγωμένο σχήμα + 5 προβολές UI).
+                stereo_width: stereo_width_measured,
+                spectral_centroid: spectral_centroid_measured,
+                spectral_flatness: spectral_flatness_measured,
+
+                // ── F-085: ΑΠΟΝΤΑ — καμία υλοποίηση στο δέντρο. ──
+                // phase_coherence: ΚΑΝΕΝΑΣ ΟΡΙΣΜΟΣ. Δεν είναι «δεν
+                //   καλωδιώθηκε» — δεν υπάρχει συνάρτηση να κληθεί.
+                //   (Το stereo_correlation από πάνω ΔΕΝ είναι αυτό:
+                //   άλλο μέγεθος, ήδη μετρημένο ξεχωριστά.)
+                // clips_detected: κανένας clip counter στο δέντρο.
                 phase_coherence: 0.97,
-                stereo_width: 0.5,
-                spectral_centroid: 3_200.0,
-                spectral_flatness: 0.12,
                 clips_detected: 0,
                 // clip_free: ΔΕΝ είναι σταθερά — παράγωγο του
                 // πραγματικού true_peak.
