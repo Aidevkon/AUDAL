@@ -15,6 +15,24 @@ use rustfft::{num_complex::Complex, FftPlanner};
 
 /// Compute spectral centroid in Hz from a mono signal.
 /// Averaged across all STFT frames.
+///
+/// F-089 (2026-08-25): το bin_hz διαιρούσε με
+/// (FFT_SIZE*2) — λόγος ΑΚΡΙΒΩΣ 0.500 έναντι
+/// ffmpeg aspectralstats σε τρία fixtures (1k, 8k,
+/// θόρυβος). Δεν είναι διαφορά ορισμού· εκείνη
+/// σκορπίζει. Η αδελφή measure_band_energy_hz
+/// (:176) το έκανε σωστά — ο τύπος ήταν γνωστός
+/// στο ίδιο αρχείο.
+/// ΑΟΡΑΤΟ ΕΠΙ ΜΗΝΕΣ: η συνάρτηση καλούνταν μόνο σε
+/// proxy stems που ποτέ δεν συγκρίθηκαν με γνωστή
+/// απάντηση. Το assert_eq! streaming↔batch ΔΕΝ
+/// μπορούσε να το πιάσει — και οι δύο πλευρές
+/// μοιράζονταν τη λάθος γραμμή.
+///
+/// ANALYSIS_FFT_SIZE είναι ΜΕΓΕΘΟΣ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ
+/// (το πλήθος κάδων λέγεται N_BINS = FFT_SIZE/2+1) και
+/// ο StftEngine δεν κάνει zero-pad (stft/mod.rs:60) ⇒
+/// η απόσταση κάδου είναι sr/FFT_SIZE, χωρίς ×2.
 pub fn spectral_centroid_hz(signal: &[f32], sample_rate: u32) -> f32 {
     if signal.is_empty() {
         return 1000.0;
@@ -27,7 +45,7 @@ pub fn spectral_centroid_hz(signal: &[f32], sample_rate: u32) -> f32 {
         return 1000.0;
     }
 
-    let bin_hz = sample_rate as f32 / (ANALYSIS_FFT_SIZE as f32 * 2.0);
+    let bin_hz = sample_rate as f32 / ANALYSIS_FFT_SIZE as f32;
     let mut total_centroid = 0.0_f32;
     let mut valid_frames = 0usize;
 
@@ -192,6 +210,80 @@ pub fn measure_band_energy_hz(signal: &[f32], sample_rate: u32, low_hz: f32, hig
 }
 
 #[cfg(test)]
+mod f089_centroid_scale_guard {
+    use super::*;
+
+    // F-089 ΦΡΟΥΡΟΣ: ημίτονα ΓΝΩΣΤΗΣ συχνότητας. Το προηγούμενο
+    // bin_hz (sr/(FFT_SIZE*2)) έδινε ΑΚΡΙΒΩΣ τα μισά — μετρημένο
+    // έναντι ffmpeg aspectralstats σε 1k/8k/θόρυβο, λόγος 0.500.
+    //
+    // ΔΥΟ ΣΗΜΕΙΑ, ΟΧΙ ΕΝΑ: σφάλμα κλίμακας (×k) μπορεί να περάσει από
+    // ένα σημείο με χαλαρή ανοχή· από δύο σε διαφορετικές δεκάδες,
+    // ποτέ. Ένα σταθερό offset θα περνούσε το ένα και θα έσπαγε το
+    // άλλο — γι' αυτό ελέγχονται ΣΧΕΤΙΚΑ (±5%), όχι απόλυτα.
+    //
+    // ΤΟ ΤΕΣΤ ΠΟΥ ΔΕΝ ΑΡΚΕΙ: το assert_eq! streaming↔batch παρακάτω
+    // συγκρίνει δύο υλοποιήσεις που μοιράζονται τη ΜΙΑ γραμμή bin_hz.
+    // Ήταν πράσινο σε όλη τη διάρκεια του σφάλματος. Ισοδυναμία δεν
+    // είναι ορθότητα — χρειάζεται ΓΝΩΣΤΗ ΣΩΣΤΗ ΑΠΑΝΤΗΣΗ.
+    fn sine(freq_hz: f32, sr: u32, secs: f32) -> Vec<f32> {
+        let n = (sr as f32 * secs) as usize;
+        (0..n)
+            .map(|i| {
+                0.5 * libm::sinf(
+                    2.0 * core::f32::consts::PI * freq_hz * (i as f32) / (sr as f32),
+                )
+            })
+            .collect()
+    }
+
+    fn assert_centroid_near(freq_hz: f32, sr: u32) {
+        let sig = sine(freq_hz, sr, 1.0);
+        let got = spectral_centroid_hz(&sig, sr);
+        let err = libm::fabsf(got - freq_hz) / freq_hz;
+        assert!(
+            err <= 0.05,
+            "centroid for {freq_hz} Hz sine: got {got:.1} Hz, \
+             relative error {:.1}% (limit 5%). Το προηγούμενο bin_hz \
+             θα έδινε ~{:.1} Hz.",
+            err * 100.0,
+            freq_hz / 2.0
+        );
+    }
+
+    #[test]
+    fn f089_centroid_1khz_is_1khz_not_half() {
+        assert_centroid_near(1000.0, 48_000);
+    }
+
+    #[test]
+    fn f089_centroid_8khz_is_8khz_not_half() {
+        assert_centroid_near(8000.0, 48_000);
+    }
+
+    #[test]
+    fn f089_streaming_twin_agrees_on_scale() {
+        // Ο δίδυμος έχει ΔΙΚΗ ΤΟΥ γραμμή bin_hz (:278). Αν διορθωθεί
+        // μόνο η μία, το assert_eq! ισοδυναμίας σπάει — αλλά αυτό εδώ
+        // το πιάνει με ΓΝΩΣΤΗ απάντηση, ανεξάρτητα.
+        let sr = 48_000u32;
+        let sig = sine(1000.0, sr, 1.0);
+        let mut a = StreamingSpectralAnalyzer::new(sr);
+        for chunk in sig.chunks(4096) {
+            a.feed_chunk(chunk);
+        }
+        let (centroid, _flat, _crest) = a.finish();
+        let err = libm::fabsf(centroid - 1000.0) / 1000.0;
+        assert!(
+            err <= 0.05,
+            "streaming centroid for 1 kHz: got {centroid:.1} Hz \
+             ({:.1}% off, limit 5%)",
+            err * 100.0
+        );
+    }
+}
+
+#[cfg(test)]
 mod band_energy_tests {
     use super::*;
 
@@ -257,7 +349,7 @@ impl StreamingSpectralAnalyzer {
     fn process_frame(&mut self, frame: &[Complex<f32>]) {
         use super::features::ANALYSIS_FFT_SIZE;
         let sample_rate = self.sample_rate;
-        let bin_hz = sample_rate as f32 / (ANALYSIS_FFT_SIZE as f32 * 2.0);
+        let bin_hz = sample_rate as f32 / ANALYSIS_FFT_SIZE as f32;
         let eps = 1e-10_f32;
         let n_bins = N_BINS as f32;
 

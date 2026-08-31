@@ -987,6 +987,91 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   persistence ο μετρητής του έργου δεν μπορεί να
   υπάρξει (16 < 30 κεφάλαια). **ΟΧΙ Φάση 1.**
 
+- **[F-089] Το spectral centroid μετρούσε στο ΜΙΣΟ
+  της κλίμακας — και ήταν αόρατο επειδή καμία
+  μέτρηση δεν συγκρίθηκε ποτέ με γνωστή απάντηση.**
+  Component: `sp314-dsp/analysis/spectral.rs:48`
+  (batch) + `:278` (streaming δίδυμος). ΜΕΤΡΗΜΕΝΟ
+  2026-08-25, ΔΙΟΡΘΩΘΗΚΕ ΑΥΘΗΜΕΡΟΝ.
+  `bin_hz = sample_rate / (ANALYSIS_FFT_SIZE * 2.0)`
+  ⇒ 11.72 Hz αντί 23.44. **ΤΕΚΜΗΡΙΟ: λόγος έναντι
+  ffmpeg `aspectralstats` ΑΚΡΙΒΩΣ 0.500 σε ΤΡΙΑ
+  fixtures** (ημίτονο 1k, ημίτονο 8k, λευκός θόρυβος).
+  **Διαφορά ορισμού σκορπίζει· ακριβώς μισό όχι.**
+  ΕΠΑΛΗΘΕΥΣΗ ΤΗΣ ΕΝΑΛΛΑΚΤΙΚΗΣ: το `ANALYSIS_FFT_SIZE`
+  είναι **μέγεθος μετασχηματισμού**, όχι πλήθος κάδων
+  — το πλήθος έχει δικό του όνομα (`N_BINS = 1025`) —
+  και **δεν υπάρχει zero-pad**. Η υπόθεση «×2 σωστό»
+  ελέγχθηκε και απορρίφθηκε.
+  ΚΑΙ: η **αδελφή** `measure_band_energy_hz` (`:176`)
+  το έκανε ΣΩΣΤΑ. **Ο τύπος ήταν γνωστός στο ίδιο
+  αρχείο.**
+
+  **ΓΙΑΤΙ ΕΖΗΣΕ — ΤΟ ΜΕΘΟΔΟΛΟΓΙΚΟ:** η συνάρτηση
+  καλούνταν **μόνο σε proxy stems στα 12 kHz** που
+  **ποτέ δεν συγκρίθηκαν με ground truth**. Ένα
+  συστηματικό σφάλμα κλίμακας είναι **εσωτερικά
+  συνεπές** — αόρατο μέχρι να μπει δίπλα σε γνωστή
+  απάντηση.
+  ⚠ **ΤΟ `assert_eq!` ΙΣΟΔΥΝΑΜΙΑΣ streaming↔batch ΔΕΝ
+  ΜΠΟΡΟΥΣΕ ΝΑ ΤΟ ΠΙΑΣΕΙ ΠΟΤΕ** — και οι δύο πλευρές
+  μοιράζονταν την ίδια λάθος γραμμή. **Πράσινο και
+  τυφλό.**
+  ⇒ ΤΡΙΤΟ ΔΕΙΓΜΑ ΑΥΤΟΑΝΑΦΟΡΙΚΟΥ ΕΛΕΓΧΟΥ ΣΕ ΜΙΑ ΜΕΡΑ:
+    `e2e_acx_certificate` (μετρούσε το δικό του input,
+    μήνες) · cert gates (υπογράφουν και επαληθεύουν
+    στο ίδιο τρέξιμο ⇒ τίποτα δεν καρφώνει το
+    ΠΕΡΙΕΧΟΜΕΝΟ) · αυτό.
+    **Μόνο εξωτερικός ένορκος με ΓΝΩΣΤΗ ΑΠΑΝΤΗΣΗ τους
+    σπάει.**
+
+  **ΑΚΤΙΝΑ, ΜΕΤΡΗΜΕΝΗ:** δύο ζωντανοί καταναλωτές
+  (`certificate_node:138` · `analyzer.rs:138`) και
+  **ΕΝΑ** πραγματικό κατώφλι σε όλο το δέντρο:
+  `channel_assign.rs:127`, `bass_lfe = if
+  spectral_centroid_hz < 80.0`. Προέλευση `e3024eb`
+  (03/06): «Authority: Spatial Engine Spec v1.0 §4» —
+  **σταθερά από προδιαγραφή, ΟΧΙ βαθμονόμηση** ⇒ ήταν
+  **ήδη λάθος κατά 2×** (πυροδοτούσε έως 160 Hz αντί
+  80) και **η διόρθωση το ΦΤΙΑΧΝΕΙ**. Καμία σύγκριση
+  centroid σε corpus/persona/rule-engine.
+
+  **Η ΔΙΟΡΘΩΣΗ:** μία γραμμή ×2 (batch + streaming
+  δίδυμος — **και οι δύο μαζί**, αλλιώς το
+  `assert_eq!` σπάει· έμεινε πράσινο, που είναι η μόνη
+  δουλειά που μπορούσε να κάνει).
+  **ΤΕΚΜΗΡΙΟ ΜΕΤΑ:** λόγος **1.000 / 1.000 / 1.001**
+  (μέγιστη απόκλιση 0.1%, πρόβλεψη ήταν ±5%). Το
+  `sine_8k` στο cert: **4047 → 8095.1**. Το flatness
+  αμετάβλητο, σωστά — δεν χρησιμοποιεί `bin_hz`.
+  **INV-DET-1/2 ΔΕΝ άλλαξαν** παρά την προειδοποίηση.
+  Ερμηνεία συνεπής με τα δεδομένα, **ΟΧΙ μετρημένη
+  αιτία**: το centroid τροφοδοτεί το `channel_assign`
+  → 5.1 στάδιο, που κατά το F-043 δεν φτάνει σε
+  ακροατή ούτε στα hash-αρισμένα δείγματα.
+
+  **Ο ΦΡΟΥΡΟΣ, ΜΕ ΔΟΝΤΙΑ:** τρία tests με ημίτονα
+  ΓΝΩΣΤΗΣ συχνότητας (1k και 8k — **δύο σημεία, γιατί
+  ένα δεν πιάνει σφάλμα κλίμακας**), ανοχή ±5%.
+  EXERCISE-PROOF: προσωρινή επαναφορά του παλιού τύπου
+  → **3 FAILED με σφάλμα 49.0% / 49.8%**. Καμία ανοχή
+  δεν χαλάρωσε. «Rename χωρίς test είναι υπόσχεση» —
+  εδώ έγινε invariant.
+
+  **ΑΝΟΙΧΤΟ, ΔΗΛΩΜΕΝΟ — ΔΕΥΤΕΡΟ, ΑΝΕΞΑΡΤΗΤΟ ΣΦΑΛΜΑ
+  ΚΛΙΜΑΚΑΣ:** το `channel_assign.rs:127` συγκρίνει
+  σταθερά σε **πραγματικά Hz** με τιμή που προέρχεται
+  από `analyze(&proxy_fivs, sample_rate /
+  SCOUT_DOWNSAMPLE)` — **proxy στα 12 kHz**. Δύο
+  μετασχηματισμοί κλίμακας εναντίον μιας σταθεράς. Η
+  σημερινή αλλαγή αφορά το `bin_hz`, **όχι ποιο
+  sample-rate περνιέται**. Ζει σε ορφανό μονοπάτι
+  (F-043). ΔΙΚΟ ΤΟΥ ΒΗΜΑ.
+
+  Trigger: κάθε φορά που πεδίο του cert μετριέται για
+  πρώτη φορά — **ο εξωτερικός ένορκος με γνωστή
+  απάντηση πριν το πεδίο θεωρηθεί σωστό**.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1187,7 +1272,7 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-089** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-090** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
