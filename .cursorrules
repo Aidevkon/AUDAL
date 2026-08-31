@@ -88,7 +88,7 @@ Key contracts:
 - `behaviour-vector.schema.json` — Behaviour Layer output
 - `reactor-intent.schema.json` — Reactor → Operator
 - `operator-surfacing.schema.json` — Operator → UI
-- `pipeline-execution.schema.json` — Operator → OpenClaw
+- `pipeline-execution.schema.json` — Operator → Executor
 - `session-vector.schema.json` — Session Agent → Operator
 - `hermes-command.schema.json` — remote automation gateway
 - `collab-session.schema.json` — WebRTC session state
@@ -103,7 +103,7 @@ access point for `project.schema.json`. Never read/write it directly.
 - `Reducer` — pure function, SOLE authority for CockpitMode transitions
 - `Reactor` — pure function, consumes BehaviourVector, produces ReactorIntent
 - `Operator` — stateful, SOLE DSP execution authority, SOLE JINI invocation authority
-- `OpenClaw` — deterministic executor, never self-triggers
+- `Executor` — deterministic executor, never self-triggers
 - `Behaviour Layer` — DSP findings → semantic BehaviourVector (firewall)
 
 ### DSP Execution Rules
@@ -126,7 +126,7 @@ access point for `project.schema.json`. Never read/write it directly.
 ### Collaboration Layer Rules
 - NEVER transmits DSP metrics, ML output, persona, pipeline lineage
 - NEVER triggers DSP execution
-- NEVER calls OpenClaw
+- NEVER calls Executor
 - Host migration is FORBIDDEN (host_peer_id is immutable)
 
 ## ENGINE REGISTRY
@@ -160,7 +160,7 @@ Core engine IDs are PERMANENT. Never reassign.
 14. apps/cockpit/reactor/
 15. apps/cockpit/operator/
 16. apps/cockpit/agents/
-17. apps/runtime/openclaw/
+17. apps/runtime/loom/
 18. apps/runtime/collaboration/
 19. apps/stillair/
 20. backend/
@@ -177,7 +177,7 @@ Core engine IDs are PERMANENT. Never reassign.
 | DSP execution requests | apps/cockpit/operator/ ONLY |
 | Remote command routing | apps/cockpit/agents/hermes/ ONLY |
 | WebRTC session | apps/runtime/collaboration/ |
-| Pipeline execution | apps/runtime/openclaw/ |
+| Pipeline execution | apps/runtime/loom/ |
 
 ## MAXIMS
 

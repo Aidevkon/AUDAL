@@ -821,6 +821,172 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   με το F-087, όχι μετά. Και **ΠΡΙΝ** υποσχεθεί το
   προϊόν «ο master σου σε περιμένει αύριο».
 
+  **ΔΙΟΡΘΩΣΗ 2026-08-25 — ΤΟ ΕΥΡΗΜΑ ΕΙΝΑΙ ΓΕΝΙΚΟΤΕΡΟ
+  ΚΑΙ Η ΠΡΩΤΗ ΓΡΑΦΗ ΕΙΧΕ ΔΥΟ ΛΑΘΗ.**
+
+  **ΛΑΘΟΣ 1 — ΔΕΝ ΕΙΝΑΙ RAM, ΕΙΝΑΙ ΔΙΣΚΟΣ. ΔΕΝ
+  ΥΠΑΡΧΕΙ ΣΕΝΑΡΙΟ OOM.** Το `audio_bytes: Vec<u8>`
+  (γνήσιο in-RAM PCM) καταργήθηκε στο `d7c161f`
+  (09/06, «Phase 2 — **Zero-allocation disk
+  streaming**»). Το `audio_path` είναι
+  `#[serde(skip)] Arc<ManagedPcm>` — κρατάει **PATH**.
+  Το σχόλιο του cap λέει ρητά **«DISK BACKSTOP»** και
+  **«bounds intermediate disk leaks»**. Η διατύπωση
+  «16 στη μνήμη» ήταν προσθήκη του κρίνοντα, όχι
+  μέτρηση.
+  ΤΟ ΜΕΓΕΘΟΣ ΣΤΕΚΕΙ ΟΜΩΣ, ΓΙΑ ΔΙΣΚΟ: 48k × 2ch × f32
+  = 384 kB/s ⇒ **~691 MB ανά 30λεπτο κεφάλαιο**, 16 ×
+  ≈ **11 GB**· για 90λεπτα, 16 × ≈ **33 GB**. Έλεγχος
+  **ΠΛΗΘΟΥΣ, όχι bytes** (`map.len() > MAX_BLOBS`) ⇒
+  16 κεφάλαια των 90 λεπτών είναι ΝΟΜΙΜΑ. Και το
+  spool καθαρίζεται ΜΟΝΟ σε restart ⇒ σώρευση μέσα σε
+  μακρά συνεδρία.
+
+  **ΛΑΘΟΣ 2 — ΔΕΝ ΕΙΝΑΙ «ΤΟ v3 ΕΧΑΣΕ ΤΗΝ
+  PERSISTENCE». ΚΑΝΕΝΑ ΜΟΝΟΠΑΤΙ ΔΕΝ ΤΗΝ ΕΙΧΕ ΠΟΤΕ
+  ΑΠΟ ΤΟ ΚΟΥΜΠΙ.**
+  Και οι **τρεις** πύλες της υποδομής (FLAC encode ·
+  `write_sidecar` · `CREATE tracks`) απαιτούν
+  **`Some(project_id)`**. Το UI στέλνει **ΠΕΝΤΕ**
+  πεδία:
+    audio_path · preset_id · flavour_id ·
+    intent_tone · intent_dynamics
+  Τα `project_id`/`track_id` **δεν υπάρχουν ούτε στον
+  Tauri-side τύπο** — grep σε όλο το `src-tauri/` +
+  `cockpit-dioxus/`: **μηδέν hits**.
+  ⇒ **Η υποδομή του `fe0f209` (31/07) ΔΕΝ
+  ΠΥΡΟΔΟΤΗΘΗΚΕ ΠΟΤΕ ΑΠΟ ΤΟ UI — ούτε στο v2.** Το
+  F-088 είναι ειδική περίπτωση ενός γενικότερου:
+  **κανένα blob από το κουμπί MASTER δεν περσιστάρει,
+  σε καμία διαδρομή, ποτέ.** Και το «a book rendered
+  Monday delivers after any restart» ήταν ισχυρισμός
+  **που δεν δοκιμάστηκε ποτέ από το κουμπί**.
+  ΙΔΙΟ ΜΟΤΙΒΟ ΜΕ ΤΟ AMBIENCE: μηχανισμός ζωντανός,
+  **πεδίο λείπει από το DTO**. Δεύτερη φορά.
+
+  **Η ΧΡΟΝΟΛΟΓΙΑ, ΜΕ COMMITS ΚΑΙ MESSAGES:**
+  `5f837e6` **16/07** γεννιέται το `/master/streaming`
+  — δηλωμένος σκοπός **ΠΑΡΑΓΩΓΗ**, ρητά: «Completes
+  the **production wiring chain**», «closes the full
+  **production wiring arc**». Αντιγράφει το
+  **async-job pattern** του `trigger_mastering` —
+  session_id, DISPATCHED, audit, dispatch, progress,
+  job_id — που ήταν **τότε το μόνο pattern που
+  υπήρχε**. Ρητά εκτός εμβέλειας: μόνο το playback
+  («StreamingOutput doesn't carry blob_id,
+  num_frames»). **Καμία αναφορά σε
+  persistence/sidecar/tracks — ούτε εντός, ούτε
+  εκτός.**
+  `706d237` **17/07** το UI στρέφεται: «**flip the
+  switch**», «the v3 **certified** streaming path»,
+  «the **retired** v2 batch endpoint». **ΟΧΙ
+  «preview», ΟΧΙ «faster».** Έγινε feature-parity
+  review, αλλά **με στενό όριο**: ελέγχθηκε το **σχήμα
+  αιτήματος** και το **λεξιλόγιο προόδου** — τα σωστά
+  για να μη σπάσει το UI, τα λάθος για να επιβιώσει
+  ένα βιβλίο. Και το v2 **παρκαρίστηκε ρητά** («Formal
+  v2 retirement … is a separate, deliberate decision»)
+  — δεν ξεχάστηκε, έγινε ορφανό συνειδητά.
+  `fe0f209` **31/07** χτίζεται η persistence —
+  **δεκατέσσερις μέρες αφότου το UI έφυγε**, και
+  μπαίνει στο `trigger_mastering` (v2). **ΚΑΙ ΤΟ v3
+  ΠΗΓΕ ΠΙΣΩ ΤΗΝ ΙΔΙΑ ΜΕΡΑ:** `executor.rs` **−36**
+  γραμμές, «the executor's hardcoded CREATE tracks …
+  is deleted»· `master.rs` **+45**. Το v3 **ΕΙΧΕ**
+  track write και **του αφαιρέθηκε**· το v2 πήρε
+  καινούργιο.
+  `338ba16` **16/08** το ίδιο ξανά με το
+  `write_sidecar`, στο `dsp_pipeline`.
+
+  **Η ΑΙΤΙΑ: ΕΝΑ ΟΜΩΝΥΜΟ.** Το `fe0f209` γράφει «Both
+  render paths persist — full-file **and the O(1)
+  streaming fast path**». Ο συγγραφέας πίστευε ότι
+  κάλυψε το streaming. **Εννοούσε δύο διακλαδώσεις
+  ΜΕΣΑ στο `run_dsp`** (`dsp_pipeline.rs:268, 773`) —
+  **όχι** το `/master/streaming`, που ζει σε **άλλο
+  αρχείο** (`agents/executor.rs`).
+  ⇒ **Ο έλεγχος κάλυψης έγινε στο επίπεδο του ΑΡΧΕΙΟΥ
+  αντί του ΜΟΝΟΠΑΤΙΟΥ ΤΟΥ ΧΡΗΣΤΗ.** Ίδια οικογένεια
+  με το ψευδές header σχόλιο του `streaming_pipeline`
+  και με το F-073: **το όνομα θεωρήθηκε ταυτότητα.**
+  Ο κανόνας που θα το έπιανε — «ξεκίνα από το κουμπί
+  του UI και ακολούθα προς τα κάτω» — διατυπώθηκε
+  στο `PRODUCT_MAP` §4 **έναν μήνα αργότερα**.
+
+  **ΤΟ ΠΛΑΦΟΝ, ΑΥΤΟΥΣΙΟ** (`blob_store.rs:302-334`):
+  `const MAX_BLOBS: usize = 16` — **σταθερά, όχι
+  config**. Το σχόλιο δηλώνει σκοπό αλλά **ΟΧΙ
+  προέλευση του 16**: καμία μέτρηση, κανένας
+  υπολογισμός. Και δηλώνει **ΠΡΟΣΩΡΙΝΟΤΗΤΑ**: «bounds
+  intermediate disk leaks **before the session
+  architecture ships**» ⇒ **σκαλωσιά που περιμένει
+  κάτι που δεν ήρθε.**
+  **EVICTION, ΟΧΙ ΣΦΑΛΜΑ**, πολιτική **oldest by
+  `created_at`** (FIFO κατά δημιουργία, **ΟΧΙ LRU**),
+  και **ΣΙΩΠΗΛΗ**: `map.remove(&id);` — καμία
+  επιστροφή, κανένα log.
+  ⇒ **Το 17ο κεφάλαιο σβήνει το 1ο χωρίς να το πει
+  κανείς.** Και επειδή το blob κρατάει τον τελευταίο
+  `Arc<ManagedPcm>`, το drop **διαγράφει και το
+  αρχείο**.
+  ⚠ Κατά `created_at`: κεφάλαιο που ο χρήστης **μόλις
+  άνοιξε ξανά** πεθαίνει **πριν** από ένα που δεν
+  άγγιξε ποτέ.
+
+  **ΤΟ ΕΜΠΟΔΙΟ ΤΗΣ ΔΙΟΡΘΩΣΗΣ — ΔΕΝ ΥΠΑΡΧΕΙ DECODE:**
+  στην παραγωγή το `tracks.audio_path` δείχνει σε
+  **`.flac`** (`master.rs:199 → :247`), και το
+  `/deliver` **δεν έχει decode μονοπάτι** (grep
+  `symphonia|flac|decode` στο `deliver.rs`: δύο hits,
+  κανένα decode). Και οι δύο κλάδοι σπάνε: `None` →
+  FLAC bytes ως raw f32· `Some` → rehydrated blob με
+  **κενό** `audio_path` (`#[serde(skip)]`, και το
+  `read_sidecar` ξαναγεμίζει **τρία** τεχνικά πεδία,
+  **όχι** αυτό).
+  ⚠ **Η ΔΙΟΡΘΩΣΗ ΤΟΥ F-087 ΔΕΝ ΤΟ ΠΙΑΝΕΙ** — ένα FLAC
+  ξεκινά με `"fLaC"`, όχι `"RIFF"`, άρα πέφτει στον
+  raw κλάδο. **Χρειάζεται decode, όχι καλωδίωση.**
+  **ΤΙ ΚΑΝΕΙ ΣΩΣΤΑ ΤΟ v2:** το FLAC encode διαβάζει
+  `render_res.pcm_path` — headerless raw f32 — άρα
+  **παράγει σωστό FLAC**. Το λάθος δεν είναι στο
+  γράψιμο· είναι ότι **κανείς δεν το ξαναδιαβάζει ως
+  FLAC**. Το v2 δουλεύει **μόνο όσο το blob είναι
+  ακόμα στη μνήμη**, οπότε το `audio_path` είναι το
+  spool `.pcm`. Μετά από eviction ή restart, **σπάνε
+  και οι δύο κλάδοι**.
+  **ΓΙΑΤΙ ΠΕΡΝΑΝΕ ΤΑ GATES:** τα fixtures ταΐζουν
+  `.pcm`, ποτέ το persisted `.flac`
+  (`deliver_acx.rs:118`,
+  `external_acx_ffmpeg_agreement.rs:196`). Το δεύτερο
+  φτιάχνει `.flac` (γρ. 167) **μόνο** για να
+  ικανοποιήσει την απαίτηση αδελφού αρχείου του
+  `read_sidecar` — το `PlanEntry.audio_path` δείχνει
+  στο `.pcm`. **Ο εξωτερικός ένορκος δοκιμάζει
+  μονοπάτι που η παραγωγή δεν χρησιμοποιεί** — ίδιο
+  DNA με το `e2e_acx_certificate`.
+
+  **ΤΙ ΔΕΝ ΕΙΝΑΙ:** το §Π του northstar λέει
+  «(ΛΥΘΗΚΕ)» — και είναι σωστό **για το
+  certificate**. Πουθενά δεν δηλώνεται ότι η
+  **ζωντανή** διαδρομή δεν γράφει sidecar καθόλου.
+  Καμία απόφαση δεν καταγράφηκε ότι η παραγωγή θα ζει
+  χωρίς persistence, **γιατί κανείς δεν το διατύπωσε
+  ποτέ ως επιλογή** — το `fe0f209` νόμιζε ότι το
+  είχε καλύψει.
+
+  **ΑΝΟΙΧΤΗ ΑΠΟΦΑΣΗ ΠΡΟΪΟΝΤΟΣ:** ποια είναι η **πηγή**
+  για το `/deliver`; (Α) το persisted FLAC + decode
+  στο deliver — ένα αρχείο, ήδη παράγεται σωστά,
+  επιβιώνει restart, symphonia **ήδη στο crate**·
+  (Β) δεύτερο persisted raw `.pcm` δίπλα — μηδέν
+  decode, **διπλός χώρος** (~691 MB/κεφάλαιο)· (Γ) το
+  FLAC ως το παραδοτέο, με decode — ταιριάζει με «ένας
+  master, πολλές όψεις» (§Δ1). **Κλίση κρίνοντος:
+  Α/Γ.**
+  Trigger: **ΠΡΟΑΠΑΙΤΟΥΜΕΝΟ ΤΗΣ ΦΑΣΗΣ 3** — χωρίς
+  persistence ο μετρητής του έργου δεν μπορεί να
+  υπάρξει (16 < 30 κεφάλαια). **ΟΧΙ Φάση 1.**
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
