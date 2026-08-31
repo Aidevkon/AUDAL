@@ -1417,6 +1417,7 @@ version = "0.1.0"
 dependencies = [
  "aether-bridge",
  "arc-swap",
+ "axum 0.7.9",
  "hound",
  "libm",
  "lineos-types",
@@ -1429,6 +1430,7 @@ dependencies = [
  "sp314-dsp",
  "sp314-nodes",
  "tempfile",
+ "tokio",
  "xaak",
 ]
 

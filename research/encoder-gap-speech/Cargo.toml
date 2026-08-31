@@ -41,6 +41,14 @@ hound = "3.5"
 aether-bridge = { path = "../../shared/aether-bridge" }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+# 2026-08-24: export_button_reality.rs drives the REAL axum handler
+# m0d::handlers::export::export_audio in-process (it is the only pub entry
+# that reaches the private export_mp3 — export_blob/export_mp3 are both
+# private). That handler is async and takes State<AppState>, so the
+# instrument needs a tokio runtime and the axum extractors. Pinned to the
+# versions m0d resolves (Cargo.lock, root workspace).
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+axum = "0.7"
 
 [workspace]
 
