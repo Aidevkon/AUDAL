@@ -987,10 +987,72 @@ fn export_mp3(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
     std::fs::write(path, &mp3_out).map_err(|e| format!("MP3: write failed: {e}"))
 }
 
-/// Decode f32 LE PCM bytes to sample slice.
-/// Samples stored as raw IEEE 754 little-endian floats, 4 bytes per sample.
+/// Locate the `data` chunk payload of a RIFF/WAVE buffer.
+///
+/// Walks the chunk list from offset 12 instead of assuming a fixed header
+/// length: a WAVE header is NOT fixed-size (`fact`, `LIST`, and other
+/// chunks may precede `data`, and our own writer's length has already
+/// varied). Chunk bodies are word-aligned, so an odd `size` carries one
+/// pad byte that is not part of the payload.
+///
+/// Returns `None` when the buffer is not RIFF/WAVE at all. Returns an
+/// empty slice when it IS RIFF/WAVE but carries no `data` chunk — a WAVE
+/// with no audio yields no samples, never its own header bytes.
+fn riff_wave_data(bytes: &[u8]) -> Option<&[u8]> {
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return None;
+    }
+    let mut pos = 12usize;
+    while pos.saturating_add(8) <= bytes.len() {
+        let size = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]) as usize;
+        let body = pos + 8;
+        if &bytes[pos..pos + 4] == b"data" {
+            // Clamp: a truncated file may declare more than it carries.
+            let end = body.saturating_add(size).min(bytes.len());
+            return Some(&bytes[body..end]);
+        }
+        pos = body.saturating_add(size).saturating_add(size & 1);
+    }
+    Some(&[])
+}
+
+/// Decode PCM bytes to samples: f32 **little-endian**, 4 bytes per sample.
+/// Accepts either a headerless raw dump or a RIFF/WAVE file, and reads only
+/// the audio payload in both cases.
+///
+/// F-087 (2026-08-25): πέντε καταναλωτές
+/// διάβαζαν 68 bytes RIFF header ως 17 float
+/// samples, ένα ~1.5×10³³. Αποτελέσματα: σιωπή
+/// (mp3_acx, −560dB auto-correction) · σφάλμα +
+/// 17MB leftover στα +603dB (wav) · κλικ 0.0 dBFS
+/// (flac, ΕΥΚΡΙΝΕΣ στην ακρόαση 25/08) · καθαρό
+/// (mp3) · αμέτρητο (aiff). Η ασυμφωνία γεννήθηκε
+/// στο bda7fe8 (17/07). Η ομιλία ΔΕΝ επηρεαζόταν:
+/// Α/Β έναντι reference ταυτόσημο στο 6ο δεκαδικό.
+///
+/// Η διόρθωση ζει ΕΔΩ και όχι στους καταναλωτές: ένα σφάλμα ανάγνωσης,
+/// πέντε αποτελέσματα — πέντε μπαλώματα θα άφηναν το έκτο.
+/// Ο εναλλακτικός δρόμος («πέρασε το headerless `mastered_raw_path` ως
+/// `audio_path`») ΑΠΟΡΡΙΦΘΗΚΕ με μέτρηση: το αρχείο σβήνεται από το
+/// επόμενο master (playback worker → `old.release()` → `_guard` drop)
+/// και από το startup sweep του spool.
+/// Τεκμήρια: `.reports/2026-08-25-raw-path-lifetime.md`,
+/// `.reports/2026-08-25-pcm-read-fix.md`.
+///
+/// ⚠ ΣΥΜΒΟΛΑΙΟ, ΔΗΛΩΜΕΝΟ ΩΣ ΑΝΟΙΧΤΟ: ο γραφέας της ζωντανής διαδρομής
+/// (`dsp/wav_to_raw.rs`, `wav_to_raw_measured`) γράφει `to_ne_bytes`
+/// (native-endian) ενώ εδώ διαβάζουμε little-endian. Ταυτίζονται σε
+/// x86-64/ARM64, άρα σήμερα δεν υπάρχει σφάλμα — είναι σιωπηλή παγίδα,
+/// όχι τρέχουσα βλάβη. Η ευθυγράμμιση αγγίζει ΑΛΛΟ αρχείο και μένει
+/// έξω από αυτή την αλλαγή, ρητά.
 fn pcm_bytes_to_f32(bytes: &[u8]) -> Vec<f32> {
-    bytes
+    let payload = riff_wave_data(bytes).unwrap_or(bytes);
+    payload
         .chunks_exact(4)
         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
         .collect()
@@ -1149,5 +1211,142 @@ mod tests {
     fn test_pcm_bytes_empty() {
         let decoded = pcm_bytes_to_f32(&[]);
         assert!(decoded.is_empty());
+    }
+
+    // ── F-087 read-fix oracles ───────────────────────────────────────────
+    // The defect these pin: a RIFF header read as audio. A fixed-length
+    // skip (68) passes (1) and (2) and FAILS (3) — that is exactly why (3)
+    // exists.
+
+    /// Interleaved stereo sine at −20 dBFS. Known peak, known even count.
+    fn f087_fixture_samples() -> Vec<f32> {
+        let amp = libm::powf(10.0, -20.0 / 20.0); // −20 dBFS, exact
+        let n_frames = 480usize;
+        let mut v = Vec::with_capacity(n_frames * 2);
+        for i in 0..n_frames {
+            // Quarter-cycle grid: sample 120 lands exactly on sin=1 ⇒ the
+            // peak is the amplitude itself, not an interpolation artefact.
+            let s = amp * libm::sinf(2.0 * std::f32::consts::PI * (i as f32) / 480.0);
+            v.push(s);
+            v.push(s);
+        }
+        v
+    }
+
+    fn f087_raw_bytes(samples: &[f32]) -> Vec<u8> {
+        samples.iter().flat_map(|s| s.to_le_bytes()).collect()
+    }
+
+    /// Build a RIFF/WAVE around `data`, optionally inserting extra chunks
+    /// before it (the "header is not a fixed length" case).
+    fn f087_wrap_riff(data: &[u8], extra_chunks: &[(&[u8; 4], Vec<u8>)]) -> Vec<u8> {
+        let mut body: Vec<u8> = Vec::new();
+        body.extend_from_slice(b"WAVE");
+
+        // fmt chunk — 16-byte PCM-float form, enough to be a real WAVE.
+        body.extend_from_slice(b"fmt ");
+        body.extend_from_slice(&16u32.to_le_bytes());
+        body.extend_from_slice(&3u16.to_le_bytes()); // WAVE_FORMAT_IEEE_FLOAT
+        body.extend_from_slice(&2u16.to_le_bytes()); // channels
+        body.extend_from_slice(&48000u32.to_le_bytes());
+        body.extend_from_slice(&(48000u32 * 8).to_le_bytes()); // byte rate
+        body.extend_from_slice(&8u16.to_le_bytes()); // block align
+        body.extend_from_slice(&32u16.to_le_bytes()); // bits
+
+        for (id, payload) in extra_chunks {
+            body.extend_from_slice(*id);
+            body.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+            body.extend_from_slice(payload);
+            if payload.len() % 2 == 1 {
+                body.push(0); // word alignment pad
+            }
+        }
+
+        body.extend_from_slice(b"data");
+        body.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        body.extend_from_slice(data);
+
+        let mut out = Vec::new();
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        out.extend_from_slice(&body);
+        out
+    }
+
+    fn f087_peak_db(samples: &[f32]) -> f32 {
+        let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        20.0 * libm::log10f(peak)
+    }
+
+    #[test]
+    fn f087_riff_wav_decodes_to_exact_content() {
+        let expected = f087_fixture_samples();
+        let wav = f087_wrap_riff(&f087_raw_bytes(&expected), &[]);
+        let decoded = pcm_bytes_to_f32(&wav);
+
+        assert_eq!(
+            decoded.len(),
+            expected.len(),
+            "sample count must match exactly what was written"
+        );
+        assert_eq!(decoded.len() % 2, 0, "stereo payload must stay even");
+        assert!(
+            (f087_peak_db(&decoded) - (-20.0)).abs() < 0.001,
+            "peak must be −20 dBFS, got {}",
+            f087_peak_db(&decoded)
+        );
+        assert_eq!(decoded, expected, "payload must be bit-identical");
+    }
+
+    #[test]
+    fn f087_headerless_raw_matches_riff() {
+        let expected = f087_fixture_samples();
+        let raw = f087_raw_bytes(&expected);
+        let wav = f087_wrap_riff(&raw, &[]);
+
+        let from_raw = pcm_bytes_to_f32(&raw);
+        let from_wav = pcm_bytes_to_f32(&wav);
+
+        // The offline path still hands us headerless .pcm — it must be
+        // untouched by the RIFF branch.
+        assert_eq!(from_raw, expected, "headerless raw must decode unchanged");
+        assert_eq!(
+            from_raw, from_wav,
+            "headerless and RIFF forms of the same audio must be identical"
+        );
+    }
+
+    #[test]
+    fn f087_riff_with_extra_chunk_before_data() {
+        let expected = f087_fixture_samples();
+        // A LIST chunk (odd length, so it also exercises the pad byte)
+        // sitting between fmt and data: any fixed-offset skip dies here.
+        let extras: Vec<(&[u8; 4], Vec<u8>)> = vec![
+            (b"LIST", b"INFOISFT\x05\x00\x00\x00probe".to_vec()),
+            (b"fact", 480u32.to_le_bytes().to_vec()),
+        ];
+        let raw = f087_raw_bytes(&expected);
+        let wav = f087_wrap_riff(&raw, &extras);
+
+        // EXERCISE-PROOF (E1): this fixture's header is NOT 68 bytes, so a
+        // fixed-offset skip cannot pass this test — it would land mid-header
+        // and misalign every sample. Pinning the number keeps the guard
+        // honest if the fixture is ever edited.
+        let header_len = wav.len() - raw.len();
+        assert_ne!(
+            header_len, 68,
+            "fixture must not accidentally have a 68-byte header"
+        );
+        assert_eq!(header_len, 82, "header length pinned by construction");
+
+        let decoded = pcm_bytes_to_f32(&wav);
+        assert_eq!(
+            decoded, expected,
+            "data chunk must be found past extra chunks, not at a fixed offset"
+        );
+        assert!(
+            (f087_peak_db(&decoded) - (-20.0)).abs() < 0.001,
+            "peak must still be −20 dBFS"
+        );
     }
 }
