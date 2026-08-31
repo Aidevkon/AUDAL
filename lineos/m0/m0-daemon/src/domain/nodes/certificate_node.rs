@@ -19,6 +19,10 @@ pub fn run(
     blob_id: &str,
     lufs: f32,
     true_peak: f32,
+    // F-085: ΔΕΝ χρησιμοποιείται για το quality block — περιγράφει την
+    // ΕΙΣΟΔΟ (χτίζεται από trunk_metrics ΠΡΙΝ τον render,
+    // dsp_pipeline.rs:662/1036). Τα quality πεδία μετρώνται στα
+    // post-master left_slice/right_slice παρακάτω.
     _pre_analysis: &PreAnalysisData,
     fingerprints: &StemFingerprints,
     spatial_metadata: &sp314_dsp::stft::two_pass::RenderMetadata,
@@ -103,6 +107,24 @@ pub fn run(
     );
 
     let pcm_blake3 = crate::handlers::certificate::blake3_pcm(left_slice);
+
+    // F-085 wiring (offline): οι μετρήσεις γίνονται ΕΔΩ, στα
+    // post-master slices που η συνάρτηση ΗΔΗ κρατάει — όχι στο
+    // pre_analysis, που περιγράφει την ΕΙΣΟΔΟ (dsp_pipeline.rs:662/1036
+    // το χτίζουν από trunk_metrics ΠΡΙΝ τον render).
+    // Υπάρχουσες συναρτήσεις, σωστό σήμα.
+    let stereo_correlation_measured =
+        sp314_dsp::analysis::stereo::stereo_correlation(left_slice, right_slice);
+    let dynamic_range_measured = {
+        let n = left_slice.len().min(right_slice.len());
+        let mono: Vec<f32> = (0..n)
+            .map(|i| (left_slice[i] + right_slice[i]) * 0.5)
+            .collect();
+        let mut d = sp314_dsp::analysis::dynamics::StreamingDynamicsAnalyzer::new(sample_rate);
+        d.feed_chunk(&mono);
+        d.finish().dyn_range_db
+    };
+
     assemble_blob(
         blob_id,
         lufs,
@@ -131,6 +153,8 @@ pub fn run(
         None, // ACX check never runs on the Music path
         folddown_gain_db,
         stereo_rms_measured,
+        stereo_correlation_measured,
+        dynamic_range_measured,
     )
 }
 
@@ -185,6 +209,13 @@ pub fn run_streaming(
     processing_timeline: Vec<StageRecord>,
     cert_data: StreamingCertData,
     folddown_gain_db: Option<f32>,
+    // F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ από το πέρασμα που διαβάζει το
+    // μασταραρισμένο σήμα — το ίδιο που δίνει output_lufs/output_lra/
+    // true_peak_dbtp. ΟΧΙ από το trunk pass: εκείνο μετράει το raw_tap
+    // ΠΡΙΝ τον render και περιγράφει την ΕΙΣΟΔΟ (executor.rs:282 vs :355).
+    output_stereo_correlation: f32,
+    output_dynamic_range_db: f32,
+    output_rms_db: f32,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
     // momentary / short-term stay None.
@@ -248,10 +279,13 @@ pub fn run_streaming(
         cert_data.dead_air,
         cert_data.acx,
         folddown_gain_db,
-        // Episode: RMS ΔΕΝ μετριέται ακόμα στο streaming path —
-        // η lufs+3.0 προσέγγιση ΠΑΡΑΜΕΝΕΙ εδώ, F-070 μισάνοιχτο
-        // για το streaming σκέλος.
-        None,
+        // F-070 ΚΛΕΙΝΕΙ ΚΑΙ ΓΙΑ ΤΟ STREAMING (F-085 wiring, 25/08):
+        // το RMS του παραδοτέου μετριέται πλέον στο ίδιο πέρασμα με
+        // LUFS/LRA/true-peak. Η lufs+3.0 προσέγγιση δεν χρησιμοποιείται
+        // πια εδώ.
+        Some(output_rms_db),
+        output_stereo_correlation,
+        output_dynamic_range_db,
     )
 }
 
@@ -292,14 +326,13 @@ fn assemble_blob(
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
     folddown_gain_db: Option<f32>,
     stereo_rms_measured: Option<f32>,
+    // F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ (post-master), όχι της εισόδου.
+    stereo_correlation_measured: f32,
+    dynamic_range_measured: f32,
 ) -> Result<CertificateOutput, String> {
     let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, &identity);
-
-    // TODO: wire real DR when this path carries trunk metrics (register item)
-    let dr = 10.0;
-    let sc = 1.0;
 
     // Extract early to avoid borrow-after-move when dead_air is consumed below.
     let noise_floor = dead_air.noise_floor_dbfs;
@@ -364,16 +397,34 @@ fn assemble_blob(
                 delivery_profile: None,
             },
             quality: crate::blob_store::StoredQuality {
-                stereo_correlation: sc,
+                // ── ΜΕΤΡΗΜΕΝΑ ΣΤΟ ΠΑΡΑΔΟΤΕΟ (F-085 wiring, 2026-08-25) ──
+                // Και τα τρία προέρχονται από το ΜΑΣΤΕΡΑΡΙΣΜΕΝΟ σήμα:
+                // offline από τα left_slice/right_slice, streaming από
+                // το wav_to_raw_measured πέρασμα. ΟΧΙ από το trunk pass —
+                // εκείνο μετράει το raw_tap ΠΡΙΝ τον render
+                // (executor.rs:282 vs :355) και περιγράφει την ΕΙΣΟΔΟ.
+                stereo_correlation: stereo_correlation_measured,
+                dynamic_range_db: dynamic_range_measured,
+                // ΜΕΤΡΗΜΕΝΟ RMS του παραδοτέου· fallback lufs+3.0 ΜΟΝΟ
+                // όπου δεν μετρήθηκε (F-070).
+                rms_db: stereo_rms_measured.unwrap_or(lufs + 3.0),
+
+                // ── F-085: ΣΤΑΘΕΡΕΣ, ΟΧΙ ΜΕΤΡΗΣΕΙΣ. ──
+                // phase_coherence · clips_detected: ΑΠΟΝΤΑ — καμία
+                //   υλοποίηση στο δέντρο.
+                // stereo_width · spectral_centroid · spectral_flatness:
+                //   οι συναρτήσεις υπάρχουν (stereo.rs:32,
+                //   spectral.rs:18/60) αλλά καλούνται ΜΟΝΟ σε proxy
+                //   stems στα 12 kHz ΠΡΙΝ το mastering — ΛΑΘΟΣ ΣΗΜΑ.
+                //   Θέλουν την ίδια μεταχείριση με τα τρία από πάνω:
+                //   κλήση στο master buffer.
                 phase_coherence: 0.97,
                 stereo_width: 0.5,
-                dynamic_range_db: dr,
-                // ΜΕΤΡΗΜΕΝΟ streaming RMS (F-070 fix) — fallback lufs+3.0
-                // ΜΟΝΟ όπου δεν μετρήθηκε (Episode, βλ. run_streaming).
-                rms_db: stereo_rms_measured.unwrap_or(lufs + 3.0),
                 spectral_centroid: 3_200.0,
                 spectral_flatness: 0.12,
                 clips_detected: 0,
+                // clip_free: ΔΕΝ είναι σταθερά — παράγωγο του
+                // πραγματικού true_peak.
                 clip_free: true_peak <= -1.0,
             },
             spatial: crate::blob_store::StoredSpatial {

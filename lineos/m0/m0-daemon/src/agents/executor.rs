@@ -442,6 +442,12 @@ pub fn execute_streaming_plan(
         profiler.finalize(),
         cert_data,
         None,
+        // F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ, από το ίδιο πέρασμα που
+        // έδωσε output_lufs/true_peak. ΟΧΙ trunk_report — εκείνο
+        // μέτρησε το raw_tap πριν τον render (:282 vs :355).
+        measured.output_stereo_correlation,
+        measured.output_dynamic_range_db,
+        measured.output_rms_db,
     )
     .map_err(ExecutorError::DspFailed)?;
 

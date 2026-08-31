@@ -22,6 +22,18 @@ pub struct MeasuredOutput {
     pub true_peak_dbtp: f32,
     pub pcm_blake3: String,
     pub output_sha256: String,
+    // ── F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ, όχι της εισόδου ──
+    // Ζουν ΕΔΩ, δίπλα στα output_lufs/output_lra/true_peak_dbtp,
+    // επειδή αυτό το πέρασμα διαβάζει το ΜΑΣΤΕΡΑΡΙΣΜΕΝΟ wav. Το
+    // trunk pass μετράει το raw_tap ΠΡΙΝ τον render (executor.rs:282
+    // vs :355) — οι τιμές του περιγράφουν την ΕΙΣΟΔΟ και δεν
+    // επιτρέπεται να μπουν σε μπλοκ που περιγράφει την ΕΞΟΔΟ.
+    /// Πλήρους αρχείου συσχέτιση L/R του παραδοτέου.
+    pub output_stereo_correlation: f32,
+    /// p95−p5 των per-block RMS του παραδοτέου (DynamicsAnalyzer).
+    pub output_dynamic_range_db: f32,
+    /// Μη-σταθμισμένο RMS του mono downmix του παραδοτέου.
+    pub output_rms_db: f32,
 }
 
 const CHUNK_FRAMES: usize = 4096;
@@ -46,9 +58,24 @@ pub fn wav_to_raw_measured(
     let mut blake3 = blake3::Hasher::new();
     let mut sha256 = Sha256::new();
 
+    // F-085 wiring: ο ΥΠΑΡΧΩΝ streaming accumulator, ταϊσμένος με το
+    // mono downmix του ΠΑΡΑΔΟΤΕΟΥ — ίδιο μοτίβο με το trunk pass
+    // (trunk_pass.rs:512 `dynamics.feed_chunk(m)`), άλλο σήμα.
+    // Δίνει rms_db ΚΑΙ dyn_range_db (p95−p5 των per-block RMS) σε ένα
+    // πέρασμα: κρατάει ένα f32 ανά block, όχι ανά δείγμα.
+    let mut dynamics = sp314_dsp::analysis::dynamics::StreamingDynamicsAnalyzer::new(spec.sample_rate);
+    // Συσχέτιση: η ΜΑΘΗΜΑΤΙΚΗ του trunk_pass.rs:524-526/772-777,
+    // αντιγραμμένη επειδή η `stereo::stereo_correlation` θέλει
+    // ΟΛΟΚΛΗΡΑ τα κανάλια στη μνήμη — αυτό το πέρασμα είναι O(1) RAM
+    // κατά σχεδίαση και δεν τα έχει.
+    let mut corr_cross = 0f64;
+    let mut corr_sum_l = 0f64;
+    let mut corr_sum_r = 0f64;
+
     let mut interleaved: Vec<f32> = Vec::with_capacity(CHUNK_FRAMES * channels);
     let mut left_buf = vec![0f32; CHUNK_FRAMES];
     let mut right_buf = vec![0f32; CHUNK_FRAMES];
+    let mut mono_buf = vec![0f32; CHUNK_FRAMES];
     let mut frames_written: usize = 0;
 
     let mut samples = reader.samples::<f32>();
@@ -75,6 +102,17 @@ pub fn wav_to_raw_measured(
 
         lufs_meter.process_chunk(&left_buf[..frames], &right_buf[..frames]);
         lra_calc.process_chunk(&left_buf[..frames], &right_buf[..frames]);
+        // F-085: ίδιο πέρασμα, ίδια δείγματα — mono downmix για τα
+        // dynamics (όπως trunk_pass.rs:504), σταυρωτά αθροίσματα για
+        // τη συσχέτιση. f64 συσσώρευση: σε 8ωρο audiobook τα Σ(L²)
+        // ξεπερνούν το χρήσιμο εύρος του f32.
+        for i in 0..frames {
+            mono_buf[i] = (left_buf[i] + right_buf[i]) * 0.5;
+            corr_cross += (left_buf[i] as f64) * (right_buf[i] as f64);
+            corr_sum_l += (left_buf[i] as f64) * (left_buf[i] as f64);
+            corr_sum_r += (right_buf[i] as f64) * (right_buf[i] as f64);
+        }
+        dynamics.feed_chunk(&mono_buf[..frames]);
         for i in 0..frames {
             true_peak_linear = true_peak_linear
                 .max(left_buf[i].abs())
@@ -100,6 +138,16 @@ pub fn wav_to_raw_measured(
         f32::NEG_INFINITY
     };
 
+    // F-085: ίδια μαθηματική με trunk_pass.rs:772-777 — denom-guard
+    // πρώτα, μετά clamp. Σιωπή/mono ⇒ 1.0, όπως εκεί.
+    let denom = (corr_sum_l * corr_sum_r).sqrt();
+    let output_stereo_correlation = if denom < 1e-10 {
+        1.0
+    } else {
+        (corr_cross / denom).clamp(-1.0, 1.0) as f32
+    };
+    let dyn_result = dynamics.finish();
+
     Ok(MeasuredOutput {
         frames_written,
         sample_rate: spec.sample_rate,
@@ -108,7 +156,84 @@ pub fn wav_to_raw_measured(
         true_peak_dbtp,
         pcm_blake3: blake3.finalize().to_hex().to_string(),
         output_sha256: format!("{:x}", sha256.finalize()),
+        output_stereo_correlation,
+        output_dynamic_range_db: dyn_result.dyn_range_db,
+        output_rms_db: dyn_result.rms_db,
     })
+}
+
+/// F-085: τα τρία μετρημένα πεδία του quality block, από ένα ΗΔΗ
+/// γραμμένο raw master (interleaved f32 native-endian, 2ch).
+///
+/// Για τον Episode/offline caller (`dsp_pipeline`), που δεν περνάει
+/// από το `wav_to_raw_measured` και του οποίου το `EpisodeRenderResult`
+/// δεν κουβαλάει correlation/DR/RMS. Διαβάζει το ΙΔΙΟ αρχείο που
+/// περιγράφει το certificate (`render_res.pcm_path`) — το ίδιο που
+/// mmap-άρει και ο FLAC encoder λίγο παρακάτω. Chunked: O(1) RAM.
+pub fn measure_raw_master(
+    raw_path: &std::path::Path,
+    sample_rate: u32,
+) -> Result<(f32, f32, f32), String> {
+    use std::io::Read;
+    let file = std::fs::File::open(raw_path).map_err(|e| format!("open raw master: {e}"))?;
+    let mut reader = std::io::BufReader::new(file);
+
+    let mut dynamics = sp314_dsp::analysis::dynamics::StreamingDynamicsAnalyzer::new(sample_rate);
+    let mut corr_cross = 0f64;
+    let mut corr_sum_l = 0f64;
+    let mut corr_sum_r = 0f64;
+
+    // 2ch × f32 = 8 bytes/frame
+    let mut byte_buf = vec![0u8; CHUNK_FRAMES * 8];
+    let mut mono_buf = vec![0f32; CHUNK_FRAMES];
+    loop {
+        let mut filled = 0usize;
+        while filled < byte_buf.len() {
+            let n = reader
+                .read(&mut byte_buf[filled..])
+                .map_err(|e| format!("read raw master: {e}"))?;
+            if n == 0 {
+                break;
+            }
+            filled += n;
+        }
+        if filled < 8 {
+            break;
+        }
+        let frames = filled / 8;
+        for i in 0..frames {
+            let o = i * 8;
+            let l = f32::from_ne_bytes([
+                byte_buf[o],
+                byte_buf[o + 1],
+                byte_buf[o + 2],
+                byte_buf[o + 3],
+            ]);
+            let r = f32::from_ne_bytes([
+                byte_buf[o + 4],
+                byte_buf[o + 5],
+                byte_buf[o + 6],
+                byte_buf[o + 7],
+            ]);
+            mono_buf[i] = (l + r) * 0.5;
+            corr_cross += (l as f64) * (r as f64);
+            corr_sum_l += (l as f64) * (l as f64);
+            corr_sum_r += (r as f64) * (r as f64);
+        }
+        dynamics.feed_chunk(&mono_buf[..frames]);
+        if filled < byte_buf.len() {
+            break;
+        }
+    }
+
+    let denom = (corr_sum_l * corr_sum_r).sqrt();
+    let correlation = if denom < 1e-10 {
+        1.0
+    } else {
+        (corr_cross / denom).clamp(-1.0, 1.0) as f32
+    };
+    let d = dynamics.finish();
+    Ok((correlation, d.dyn_range_db, d.rms_db))
 }
 
 /// Compatibility wrapper — the pre-C1 API. Callers migrate to

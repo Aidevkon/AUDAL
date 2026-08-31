@@ -769,6 +769,14 @@ fn run_dsp_internal(
             acx: trunk_metrics.acx,
         };
 
+        // F-085: οι τρεις μετρήσεις του παραδοτέου, από το raw master
+        // που μόλις γράφτηκε. Αποτυχία ανάγνωσης ⇒ ΔΕΝ σιωπά και ΔΕΝ
+        // εφευρίσκει: το σφάλμα ανεβαίνει, όπως κάθε άλλο εδώ.
+        let (om_corr, om_dr, om_rms) = crate::dsp::wav_to_raw::measure_raw_master(
+            &render_res.pcm_path,
+            render_res.sample_rate,
+        )?;
+
         let t_cert_node = std::time::Instant::now();
         let cert_out = crate::domain::nodes::certificate_node::run_streaming(
             &blob_id,
@@ -794,6 +802,13 @@ fn run_dsp_internal(
             processing_timeline,
             cert_data,
             None,
+            // F-085: μετρημένα στο ΙΔΙΟ raw master που περιγράφει το
+            // certificate. Ο Episode render δεν τα κουβαλάει στο
+            // EpisodeRenderResult, οπότε μετρώνται εδώ από το αρχείο
+            // του — ΟΧΙ από trunk_metrics, που περιγράφει την ΕΙΣΟΔΟ.
+            om_corr,
+            om_dr,
+            om_rms,
         )?;
         eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
