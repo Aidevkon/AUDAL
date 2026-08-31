@@ -451,6 +451,7 @@ pub fn execute_streaming_plan(
         measured.output_stereo_width,
         measured.output_spectral_centroid,
         measured.output_spectral_flatness,
+        measured.output_clips_detected,
     )
     .map_err(ExecutorError::DspFailed)?;
 

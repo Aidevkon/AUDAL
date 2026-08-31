@@ -772,7 +772,7 @@ fn run_dsp_internal(
         // F-085: οι τρεις μετρήσεις του παραδοτέου, από το raw master
         // που μόλις γράφτηκε. Αποτυχία ανάγνωσης ⇒ ΔΕΝ σιωπά και ΔΕΝ
         // εφευρίσκει: το σφάλμα ανεβαίνει, όπως κάθε άλλο εδώ.
-        let (om_corr, om_dr, om_rms, om_width, om_centroid, om_flat) =
+        let (om_corr, om_dr, om_rms, om_width, om_centroid, om_flat, om_clips) =
             crate::dsp::wav_to_raw::measure_raw_master(
             &render_res.pcm_path,
             render_res.sample_rate,
@@ -813,6 +813,7 @@ fn run_dsp_internal(
             om_width,
             om_centroid,
             om_flat,
+            om_clips,
         )?;
         eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 

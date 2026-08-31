@@ -3,6 +3,7 @@
 
 pub mod acx_check;
 pub mod analyzer;
+pub mod clipping;
 pub mod dynamics;
 pub mod features;
 pub mod mel_128;

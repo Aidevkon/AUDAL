@@ -141,6 +141,9 @@ pub fn run(
     };
     // ΠΑΡΑΓΩΓΟ του correlation (stereo.rs:32), όχι νέα ανάγνωση.
     let stereo_width_measured = 1.0 - stereo_correlation_measured.abs();
+    // F-085: γεγονότα clipping στα ΙΔΙΑ post-master slices.
+    let clips_measured =
+        sp314_dsp::analysis::clipping::count_clip_events(left_slice, right_slice);
 
     assemble_blob(
         blob_id,
@@ -175,6 +178,7 @@ pub fn run(
         stereo_width_measured,
         spectral_centroid_measured,
         spectral_flatness_measured,
+        clips_measured,
     )
 }
 
@@ -239,6 +243,7 @@ pub fn run_streaming(
     output_stereo_width: f32,
     output_spectral_centroid: f32,
     output_spectral_flatness: f32,
+    output_clips_detected: u32,
 ) -> Result<CertificateOutput, String> {
     // Episode: no array telemetry pass.
     // momentary / short-term stay None.
@@ -312,6 +317,7 @@ pub fn run_streaming(
         output_stereo_width,
         output_spectral_centroid,
         output_spectral_flatness,
+        output_clips_detected,
     )
 }
 
@@ -358,6 +364,7 @@ fn assemble_blob(
     stereo_width_measured: f32,
     spectral_centroid_measured: f32,
     spectral_flatness_measured: f32,
+    clips_measured: u32,
 ) -> Result<CertificateOutput, String> {
     let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
     let cert_sig =
@@ -448,14 +455,28 @@ fn assemble_blob(
                 spectral_centroid: spectral_centroid_measured,
                 spectral_flatness: spectral_flatness_measured,
 
-                // ── F-085: ΑΠΟΝΤΑ — καμία υλοποίηση στο δέντρο. ──
+                // ΜΕΤΡΗΜΕΝΟ: γεγονότα clipping του ΠΑΡΑΔΟΤΕΟΥ.
+                // ΟΡΙΣΜΟΣ (sp314_dsp::analysis::clipping): ≥3 ΔΙΑΔΟΧΙΚΑ
+                // δείγματα |x|≥0.999 στο ΙΔΙΟ κανάλι = ΕΝΑ γεγονός·
+                // ριπή 847 δειγμάτων μετράει ΜΙΑ φορά· μεμονωμένο
+                // δείγμα στο 1.0 ΔΕΝ είναι clip (κορυφή που ακουμπάει
+                // το ταβάνι)· τα δύο κανάλια ΑΘΡΟΙΖΟΝΤΑΙ.
+                // ⚠ ΜΕΤΡΑΕΙ ΤΗΝ ΕΞΟΔΟ — δικό μας clipping.
+                // ΔΕΝ ΑΝΙΧΝΕΥΕΙ clipping ΤΗΣ ΕΙΣΟΔΟΥ: μετά από
+                // gain/EQ/LTASS οι επίπεδες κορυφές μετακινούνται και
+                // δεν κάθονται πια στο ταβάνι. Η ζημιά μένει, ο
+                // ανιχνευτής δεν τη βλέπει. 0 εδώ ΔΕΝ σημαίνει «η
+                // ηχογράφηση είναι καθαρή».
+                // Input clipping = ΝΕΟ πεδίο στο input_delivery_*
+                // μπλοκ, δικό του βήμα (πύλη εισόδου).
+                clips_detected: clips_measured,
+
+                // ── F-085: ΑΠΟΝ — καμία υλοποίηση στο δέντρο. ──
                 // phase_coherence: ΚΑΝΕΝΑΣ ΟΡΙΣΜΟΣ. Δεν είναι «δεν
                 //   καλωδιώθηκε» — δεν υπάρχει συνάρτηση να κληθεί.
                 //   (Το stereo_correlation από πάνω ΔΕΝ είναι αυτό:
                 //   άλλο μέγεθος, ήδη μετρημένο ξεχωριστά.)
-                // clips_detected: κανένας clip counter στο δέντρο.
                 phase_coherence: 0.97,
-                clips_detected: 0,
                 // clip_free: ΔΕΝ είναι σταθερά — παράγωγο του
                 // πραγματικού true_peak.
                 clip_free: true_peak <= -1.0,
