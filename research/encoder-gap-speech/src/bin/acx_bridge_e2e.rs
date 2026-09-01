@@ -102,6 +102,27 @@ async fn main() {
             "MEASURED /export preset={tag:<16} status={} path={:?} msg={:?}",
             resp.status, resp.written_path, resp.message
         );
+        // Η ΕΤΥΜΗΓΟΡΙΑ, όπως τη γυρίζει ο handler.
+        match &resp.delivery_checks {
+            None => println!("          delivery_checks = ΚΑΝΕΝΑ (None)"),
+            Some(cs) => {
+                println!("          delivery_checks ({}):", cs.len());
+                for c in cs {
+                    println!(
+                        "            {:<12} {:>10.4} {} {:>8.2} (margin {:.2}) {} → {}",
+                        c.metric, c.measured, c.unit, c.required,
+                        c.margin_applied, c.bound, c.verdict.to_uppercase()
+                    );
+                }
+                let failed: Vec<&str> =
+                    cs.iter().filter(|c| c.verdict != "pass").map(|c| c.metric.as_str()).collect();
+                println!(
+                    "          ΣΥΝΟΛΙΚΑ: {}",
+                    if failed.is_empty() { "ΟΛΑ PASS".to_string() }
+                    else { format!("FAIL σε: {}", failed.join(", ")) }
+                );
+            }
+        }
         if let Ok(md) = std::fs::metadata(&out_path) {
             println!("          bytes = {}", md.len());
         }

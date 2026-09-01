@@ -417,21 +417,12 @@ pub fn run_deliver_core(
                         // acx_check::AcxCheckReport::margin_checks() — μία
                         // υλοποίηση, δύο καλούντες). Απουσία μετρικής (π.χ.
                         // noise_floor όταν το αρχείο < 1s) = καμία εγγραφή.
+                        // 2026-08-25: η αντιστοίχιση βγήκε στο
+                        // DeliveryCheck::from_margin_checks — δεύτερος
+                        // καλών (/export) τη χρειάζεται, και inline θα
+                        // σήμαινε δύο αντίγραφα. Ίδιες τιμές, ίδιος κανόνας.
                         loudness.delivery_checks = Some(
-                            outcome
-                                .report
-                                .margin_checks()
-                                .into_iter()
-                                .map(|c| crate::blob_store::DeliveryCheck {
-                                    metric: c.metric.to_string(),
-                                    measured: c.measured_db,
-                                    required: c.required_db,
-                                    bound: c.bound.to_string(),
-                                    margin_applied: c.margin_applied_db,
-                                    verdict: if c.verdict { "pass" } else { "fail" }.to_string(),
-                                    unit: "db".to_string(),
-                                })
-                                .collect(),
+                            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report),
                         );
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)

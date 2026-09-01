@@ -44,6 +44,20 @@ pub struct ExportResponse {
     pub status: String, // "ok" | "error"
     pub written_path: Option<String>,
     pub message: Option<String>,
+    /// Η ΕΤΥΜΗΓΟΡΙΑ ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ — μετρημένο · απαιτούμενο · margin ·
+    /// pass/fail ανά μετρική, στο ΙΔΙΟ σχήμα §5.3 που γράφει το
+    /// `/projects/:id/deliver`, από τον ΙΔΙΟ κανόνα (`margin_checks`).
+    ///
+    /// ⚠ ΕΙΝΑΙ ΔΙΠΛΑ ΣΤΟ `status`, ΟΧΙ ΑΝΤΙ ΓΙ' ΑΥΤΟ. Το `status` λέει αν
+    /// **το export** πέτυχε· αυτό λέει αν **το αρχείο** συμμορφώνεται. Ένα
+    /// αρχείο εκτός προδιαγραφής γράφεται κανονικά και επιστρέφει
+    /// `status: "ok"` — ο χρήστης παίρνει το αρχείο ΚΑΙ την αλήθεια.
+    ///
+    /// `None` = ο προορισμός δεν ορίζει τέτοιους ελέγχους (κάθε μη-ACX
+    /// διαδρομή σήμερα). Απουσία, όχι κενή λίστα: κενή λίστα θα δήλωνε
+    /// «ελέγχθηκε, τίποτα να πούμε».
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_checks: Option<Vec<crate::blob_store::DeliveryCheck>>,
 }
 
 // ── Format enum ───────────────────────────────────────────────────────────────
@@ -109,6 +123,7 @@ pub async fn export_audio(
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(e),
             })
         }
@@ -121,6 +136,7 @@ pub async fn export_audio(
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(format!("blob not found: {}", req.blob_id)),
             })
         }
@@ -128,6 +144,7 @@ pub async fn export_audio(
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(format!("blob io error {}: {e}", req.blob_id)),
             })
         }
@@ -135,6 +152,7 @@ pub async fn export_audio(
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(format!("blob corrupt {}: {e}", req.blob_id)),
             })
         }
@@ -148,6 +166,7 @@ pub async fn export_audio(
             return Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(format!("Cannot create export directory: {e}")),
             });
         }
@@ -160,15 +179,24 @@ pub async fn export_audio(
     let path_for_io = output_path.clone();
 
     let result = tokio::task::spawn_blocking(move || {
-        export_blob(&blob_clone, format, &path_for_io)
-            .and_then(|()| write_sidecar(&blob_clone, &format_str, &path_for_io))
+        // Η ετυμηγορία γεννιέται στον writer (μόνο εκείνος μετράει το
+        // ΤΕΛΙΚΟ σήμα) και ταξιδεύει ΚΑΙ στο sidecar ΚΑΙ στην απόκριση —
+        // μία μέτρηση, δύο αναγνώστες.
+        let checks = export_blob(&blob_clone, format, &path_for_io)?;
+        write_sidecar(
+            &blob_clone,
+            &format_str,
+            &path_for_io,
+            checks.as_deref(),
+        )?;
+        Ok(checks)
     })
     .await
     .map_err(|e| format!("Export task join error: {e}"))
-    .and_then(|r| r);
+    .and_then(|r: Result<_, String>| r);
 
     match result {
-        Ok(()) => {
+        Ok(delivery_checks) => {
             state
                 .audit
                 .write(AuditEntry::new(
@@ -181,6 +209,7 @@ pub async fn export_audio(
                 status: "ok".into(),
                 written_path: Some(path_str),
                 message: None,
+                delivery_checks,
             })
         }
         Err(e) => {
@@ -191,6 +220,7 @@ pub async fn export_audio(
             Json(ExportResponse {
                 status: "error".into(),
                 written_path: None,
+                delivery_checks: None,
                 message: Some(e),
             })
         }
@@ -200,17 +230,25 @@ pub async fn export_audio(
 // ── P10-002: Export format writers ────────────────────────────────────────────
 
 /// Route to format-specific writer.
-fn export_blob(blob: &StoredBlobV2, format: ExportFormat, path: &Path) -> Result<(), String> {
+///
+/// Επιστρέφει την **ετυμηγορία του παραδοτέου** όπου ο προορισμός ορίζει
+/// ελέγχους· `None` όπου δεν ορίζει. Οι μορφές που δεν κουβαλούν
+/// προδιαγραφή παράδοσης επιστρέφουν `Ok(None)` — απουσία, όχι κενή λίστα.
+fn export_blob(
+    blob: &StoredBlobV2,
+    format: ExportFormat,
+    path: &Path,
+) -> Result<Option<Vec<crate::blob_store::DeliveryCheck>>, String> {
     match format {
-        ExportFormat::Flac => export_flac(blob, path),
-        ExportFormat::Wav => export_wav(blob, path),
-        ExportFormat::Opus => export_opus(blob, path),
+        ExportFormat::Flac => export_flac(blob, path).map(|()| None),
+        ExportFormat::Wav => export_wav(blob, path).map(|()| None),
+        ExportFormat::Opus => export_opus(blob, path).map(|()| None),
         // MP3: LAME encoder — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
         ExportFormat::Mp3 => export_mp3_routed(blob, path),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
-        ExportFormat::Aiff => export_aiff(blob, path),
+        ExportFormat::Aiff => export_aiff(blob, path).map(|()| None),
         // ADM BWF: Apple Spatial Audio, 6-channel 24-bit LPCM (Spatial-4a)
-        ExportFormat::AdmBwf => export_adm_bwf(blob, path),
+        ExportFormat::AdmBwf => export_adm_bwf(blob, path).map(|()| None),
     }
 }
 
@@ -230,21 +268,27 @@ fn export_blob(blob: &StoredBlobV2, format: ExportFormat, path: &Path) -> Result
 /// ΑΣΦΑΛΗΣ ΠΛΕΥΡΑ: ένα 48k stereo mp3 είναι λάθος αρχείο για το ACX,
 /// αλλά ένα ACX-μορφοποιημένο αρχείο για κάποιον που δεν το ζήτησε
 /// είναι σιωπηλό mono-fold + resample που κανείς δεν διάλεξε.
-fn export_mp3_routed(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
+fn export_mp3_routed(
+    blob: &StoredBlobV2,
+    path: &Path,
+) -> Result<Option<Vec<crate::blob_store::DeliveryCheck>>, String> {
     let is_acx_delivery = lineos_types::presets::lookup(&blob.core.preset_id)
         .and_then(|p| p.delivery.rms_window_db)
         .is_some();
 
     if !is_acx_delivery {
-        return export_mp3(blob, path);
+        return export_mp3(blob, path).map(|()| None);
     }
 
-    // ΤΟ OUTCOME ΔΕΝ ΠΕΤΙΕΤΑΙ. Η `export_mp3_acx` μετράει το ΚΩΔΙΚΟΠΟΙΗΜΕΝΟ
-    // αρχείο (symphonia decode-back) και επιστρέφει τη μόνη μέτρηση του
-    // πραγματικού παραδοτέου που υπάρχει σε αυτή τη διαδρομή. Το `/export`
-    // επιστρέφει `Result<(), String>` και το ExportResponse δεν έχει πεδίο
-    // γι' αυτό (ΘΑ ΗΤΑΝ ΑΛΛΑΓΗ DTO — ξεχωριστό βήμα, δική του απόφαση),
-    // οπότε καταγράφεται στο tracing σε επίπεδο INFO αντί να χαθεί.
+    // ΤΟ OUTCOME ΔΕΝ ΠΕΤΙΕΤΑΙ ΚΑΙ ΠΛΕΟΝ ΔΕΝ ΜΕΝΕΙ ΣΤΟ LOG. Η
+    // `export_mp3_acx` μετράει το ΤΕΛΙΚΟ σήμα — μετά το resample, μετά το
+    // downmix, μετά από κάθε επέμβαση — και είναι η ΜΟΝΗ μέτρηση του
+    // πραγματικού παραδοτέου σε αυτή τη διαδρομή. Η ετυμηγορία της
+    // ανεβαίνει τώρα ως τιμή επιστροφής: sidecar + απόκριση.
+    //
+    // ⚠ ΔΕΝ γίνεται `Err` όταν το αρχείο δεν συμμορφώνεται. Το export
+    // ΠΕΤΥΧΕ — παρήγαγε το αρχείο. Το αν το ΑΡΧΕΙΟ περνάει είναι
+    // διαφορετικό πράγμα και ταξιδεύει ΔΙΠΛΑ στο `status`, όχι αντί του.
     let outcome = export_mp3_acx(blob, path)?;
     tracing::info!(
         event            = "m0d.export_acx_measured",
@@ -255,7 +299,9 @@ fn export_mp3_routed(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
         report           = ?outcome.report,
         "export: ACX deliverable written and measured"
     );
-    Ok(())
+    Ok(Some(crate::blob_store::DeliveryCheck::from_margin_checks(
+        &outcome.report,
+    )))
 }
 
 /// FLAC export — real encoding via io_flac (Phase 11 debt closed).
@@ -1115,6 +1161,21 @@ pub struct ExportSidecar<'a> {
     pub loudness: &'a StoredLoudness,
     pub quality: &'a StoredQuality,
     pub compliance: ComplianceSummary,
+    /// Ποιον προορισμό ζήτησε ο χρήστης — η ΤΙΜΗ του
+    /// `DeliverySpec.platform`, όχι όνομα πεδίου (§5.1α: το εμπορικό όνομα
+    /// ζει σε τιμή, ποτέ σε δομή). `None` όταν το preset δεν βρίσκεται στο
+    /// μητρώο.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_target: Option<&'a str>,
+    /// Η ετυμηγορία ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ, ίδιο σχήμα §5.3 με το `/deliver`.
+    ///
+    /// ⚠ ΤΟ `compliance` ΑΠΟ ΠΑΝΩ ΠΕΡΙΓΡΑΦΕΙ ΤΟΝ MASTER, ΟΧΙ ΑΥΤΟ ΤΟ
+    /// ΑΡΧΕΙΟ (F-090) — και απαριθμεί πέντε προορισμούς μουσικής χωρίς να
+    /// περιλαμβάνει αυτόν που διάλεξε ο χρήστης. ΔΕΝ διορθώνεται εδώ·
+    /// αυτό το πεδίο ΠΡΟΣΘΕΤΕΙ την ετυμηγορία που έλειπε, δεν αντικαθιστά
+    /// ό,τι υπάρχει.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_checks: Option<&'a [crate::blob_store::DeliveryCheck]>,
 }
 
 #[derive(Serialize)]
@@ -1128,7 +1189,12 @@ pub struct ComplianceSummary {
 
 /// Write sidecar JSON alongside audio file.
 /// Path: audio_path with extension replaced by "stillair.json".
-pub fn write_sidecar(blob: &StoredBlobV2, format: &str, audio_path: &Path) -> Result<(), String> {
+pub fn write_sidecar(
+    blob: &StoredBlobV2,
+    format: &str,
+    audio_path: &Path,
+    delivery_checks: Option<&[crate::blob_store::DeliveryCheck]>,
+) -> Result<(), String> {
     // ΑΡΝΗΣΗ, ΟΧΙ null: το ComplianceSummary έχει πέντε
     // bool και δεν υπάρχει null για bool. Το false θα
     // δήλωνε "ελέγχθηκε και απέτυχε" αντί για "δεν
@@ -1166,6 +1232,9 @@ pub fn write_sidecar(blob: &StoredBlobV2, format: &str, audio_path: &Path) -> Re
             tidal: l.tidal_compliant,
             broadcast: l.broadcast_compliant,
         },
+        delivery_target: lineos_types::presets::lookup(&blob.core.preset_id)
+            .map(|p| p.delivery.platform),
+        delivery_checks,
     };
 
     let json = serde_json::to_string_pretty(&sidecar)
