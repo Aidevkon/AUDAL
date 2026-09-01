@@ -1429,8 +1429,11 @@ dependencies = [
  "sha2",
  "sp314-dsp",
  "sp314-nodes",
+ "sp314-orchestrator",
  "tempfile",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
  "xaak",
 ]
 

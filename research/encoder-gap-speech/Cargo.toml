@@ -15,6 +15,9 @@ sp314-dsp = { path = "../../lineos/m1/sp314-dsp" }
 # impls (DeEsserNode/DeHumNode/NoiseGateNode) to null-test them, not a
 # re-implementation.
 sp314-nodes = { path = "../../lineos/m1/sp314-nodes" }
+# 2026-08-25: ltass_sibilance.rs καλεί τον ΠΡΑΓΜΑΤΙΚΟ run_trunk_pass
+# για το 8-band spectral profile — ό,τι κάνει ο executor.rs:282.
+sp314-orchestrator = { path = "../../lineos/m1/sp314-orchestrator" }
 # F-077 round 2: needed to independently reconstruct the pre-encode
 # 44.1kHz mono buffer (same public rubato params export.rs documents),
 # since export_mp3_acx does not expose that buffer. Pinned to the exact
@@ -49,6 +52,12 @@ serde = { version = "1.0", features = ["derive"] }
 # versions m0d resolves (Cargo.lock, root workspace).
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 axum = "0.7"
+
+# 2026-08-25: acx_bridge_e2e εγκαθιστά subscriber ώστε να ΑΠΟΔΕΙΧΘΕΙ ότι το
+# export_mp3_routed εκπέμπει το AcxExportOutcome αντί να το πετάει. Ίδιες
+# εκδόσεις με m0d (Cargo.lock, root workspace).
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [workspace]
 

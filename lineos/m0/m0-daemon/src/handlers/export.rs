@@ -206,12 +206,56 @@ fn export_blob(blob: &StoredBlobV2, format: ExportFormat, path: &Path) -> Result
         ExportFormat::Wav => export_wav(blob, path),
         ExportFormat::Opus => export_opus(blob, path),
         // MP3: LAME encoder — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
-        ExportFormat::Mp3 => export_mp3(blob, path),
+        ExportFormat::Mp3 => export_mp3_routed(blob, path),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
         ExportFormat::Aiff => export_aiff(blob, path),
         // ADM BWF: Apple Spatial Audio, 6-channel 24-bit LPCM (Spatial-4a)
         ExportFormat::AdmBwf => export_adm_bwf(blob, path),
     }
+}
+
+/// MP3 δρομολόγηση: ACX παραδοτέο ή γενικό MP3.
+///
+/// Η δρομολόγηση γίνεται από ΤΗ ΠΡΟΔΙΑΓΡΑΦΗ ΠΑΡΑΔΟΣΗΣ, όχι από το
+/// preset_id string — το rms_window_db είναι σήμερα ACX-only
+/// (presets.rs:76-82, δηλωμένο «today» εκεί).
+/// Αν αύριο άλλος προορισμός αποκτήσει παράθυρο RMS, ΑΥΤΗ Η ΓΡΑΜΜΗ
+/// ΘΕΛΕΙ ΞΑΝΑΚΟΙΤΑΓΜΑ.
+///
+/// Η ταφόπλακα του `preset_id` (blob_store.rs:1019 — «ΜΗΝ προσθέσεις
+/// λογική που το θεωρεί ενιαίο») τηρείται: δεν συγκρίνουμε string,
+/// ρωτάμε τον μεταφραστή. Ίδιο μοτίβο με `LoudnessTarget::from_preset`.
+///
+/// Άγνωστο preset ⇒ `lookup` → `None` ⇒ γενικό MP3. Η ΑΡΝΗΣΗ ΕΙΝΑΙ Η
+/// ΑΣΦΑΛΗΣ ΠΛΕΥΡΑ: ένα 48k stereo mp3 είναι λάθος αρχείο για το ACX,
+/// αλλά ένα ACX-μορφοποιημένο αρχείο για κάποιον που δεν το ζήτησε
+/// είναι σιωπηλό mono-fold + resample που κανείς δεν διάλεξε.
+fn export_mp3_routed(blob: &StoredBlobV2, path: &Path) -> Result<(), String> {
+    let is_acx_delivery = lineos_types::presets::lookup(&blob.core.preset_id)
+        .and_then(|p| p.delivery.rms_window_db)
+        .is_some();
+
+    if !is_acx_delivery {
+        return export_mp3(blob, path);
+    }
+
+    // ΤΟ OUTCOME ΔΕΝ ΠΕΤΙΕΤΑΙ. Η `export_mp3_acx` μετράει το ΚΩΔΙΚΟΠΟΙΗΜΕΝΟ
+    // αρχείο (symphonia decode-back) και επιστρέφει τη μόνη μέτρηση του
+    // πραγματικού παραδοτέου που υπάρχει σε αυτή τη διαδρομή. Το `/export`
+    // επιστρέφει `Result<(), String>` και το ExportResponse δεν έχει πεδίο
+    // γι' αυτό (ΘΑ ΗΤΑΝ ΑΛΛΑΓΗ DTO — ξεχωριστό βήμα, δική του απόφαση),
+    // οπότε καταγράφεται στο tracing σε επίπεδο INFO αντί να χαθεί.
+    let outcome = export_mp3_acx(blob, path)?;
+    tracing::info!(
+        event            = "m0d.export_acx_measured",
+        blob_id          = %blob.core.id,
+        preset_id        = %blob.core.preset_id,
+        head_quiet_secs  = outcome.head_quiet_secs,
+        tail_quiet_secs  = outcome.tail_quiet_secs,
+        report           = ?outcome.report,
+        "export: ACX deliverable written and measured"
+    );
+    Ok(())
 }
 
 /// FLAC export — real encoding via io_flac (Phase 11 debt closed).

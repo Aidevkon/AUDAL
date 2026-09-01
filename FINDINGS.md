@@ -1072,6 +1072,94 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   πρώτη φορά — **ο εξωτερικός ένορκος με γνωστή
   απάντηση πριν το πεδίο θεωρηθεί σωστό**.
 
+- **[F-090] Ο χρήστης παίρνει ΑΝΥΠΟΓΡΑΦΟ sidecar. Το
+  υπογεγραμμένο ζει σε μονοπάτι με μηδέν callers.**
+  Component: `handlers/export.rs:1087` (τοπική
+  `write_sidecar`) vs `blob_store::write_sidecar`.
+  ΜΕΤΡΗΜΕΝΟ 2026-08-25 με τρέξιμο.
+  **ΔΕΚΑΤΟ ΤΡΙΤΟ ΟΜΩΝΥΜΟ:** δύο `write_sidecar`, δύο
+  αρχεία, δύο σχήματα. Η κλήση στο `:164` είναι
+  ακάλυπτη ⇒ δείχνει στην τοπική. Το αρχείο κάνει
+  `use crate::blob_store::{...}` ΜΟΝΟ ΓΙΑ ΤΥΠΟΥΣ.
+  · `blob_store::write_sidecar` → `<track>.json`,
+    **ΥΠΟΓΕΓΡΑΜΜΕΝΟ Ed25519**, με technical block
+  · `handlers::export::write_sidecar` →
+    `<name>.stillair.json`, **ΑΝΥΠΟΓΡΑΦΟ**, 7 πεδία
+  **ΤΟ ΔΕΥΤΕΡΟ ΕΙΝΑΙ ΑΥΤΟ ΠΟΥ ΠΑΙΡΝΕΙ Ο ΧΡΗΣΤΗΣ** —
+  το `/export` είναι ένα από τα επτά endpoints του UI.
+  ⇒ **ΤΟ verify_cert.py ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΠΑΛΗΘΕΥΣΕΙ
+    Ο,ΤΙ ΠΑΡΑΔΙΔΕΤΑΙ.** Άλλο σχήμα, καμία υπογραφή.
+  ⇒ **Η ΘΕΣΗ «διάψευσέ με» ΔΕΝ ΣΤΕΚΕΙ ΣΤΗΝ ΠΡΑΞΗ.**
+  ⚠ ΧΕΙΡΟΤΕΡΟ ΑΠΟ ΑΠΟΥΣΙΑ: δεν λείπει — υποκαθίσταται.
+    Ο χρήστης βλέπει json δίπλα στο αρχείο του και
+    υποθέτει ότι είναι Η ΑΠΟΔΕΙΞΗ.
+
+  **ΔΕΝ ΕΙΝΑΙ ΑΓΝΟΙΑ — ΕΙΝΑΙ ΧΡΟΝΟΛΟΓΙΑ:**
+  `8abfa6b` 16/04 γεννιέται το ExportSidecar ·
+  `338ba16` 16/08 γεννιέται το υπογεγραμμένο.
+  **Τέσσερις μήνες, και το ανυπόγραφο ΠΡΟΗΓΕΙΤΑΙ.**
+  Το `338ba16` έλυσε άλλο πρόβλημα (επιβίωση σε
+  restart) και δεν ενοποίησε το προϋπάρχον.
+  **Ίδιο σχήμα με F-088: η νεότερη υποδομή χτίστηκε
+  ΔΙΠΛΑ, όχι ΠΑΝΩ.**
+
+  **ΤΟ `deliver` ΔΕΝ ΕΙΝΑΙ ΠΡΟΤΥΠΟ — ΕΙΝΑΙ ΗΜΙΤΕΛΗΣ
+  ΜΕΤΑΒΑΣΗ:** ξαναϋπογράφει με μετρήσεις **του
+  παραδοτέου** (`output_delivery_*`,
+  `delivery_checks`) αλλά κάνει `sha256_file` **στο
+  master FLAC**. «Το cert ΤΟΥ MASTER με τα νούμερα
+  ΤΟΥ MP3». Το mp3 δεν αποκτά ποτέ δικό του hash ή
+  υπογραφή. Το §6 λέει «το cert αποδεικνύει το
+  ΠΑΡΑΔΟΘΕΝ» — **η υλοποίηση δεν ακολουθεί το σχήμα**.
+
+  **ΤΟ ΔΟΜΙΚΟ ΕΡΩΤΗΜΑ (ΑΝΟΙΧΤΟ, ΑΠΟΦΑΣΗ ΠΡΟΪΟΝΤΟΣ):**
+  το certificate περιγράφει ΤΟΝ MASTER ή ΤΟ
+  ΠΑΡΑΔΟΤΕΟ; **ΕΠΤΑ από ΕΝΔΕΚΑ μεγέθη δεν ισχύουν**
+  για το εξαγόμενο ACX mp3: sample_rate 48000→44100 ·
+  channels 2→mono · num_frames (resample+LAME
+  padding) · declared_latency_samples (sinc group
+  delay, αμέτρητο) · quality ×8 (μετρήθηκαν σε 48k
+  stereo) · **master_sha256 ΚΑΙ pcm_blake3 — άλλα
+  bytes, και ΑΥΤΑ είναι το θεμέλιο του cert.**
+  Ισχύουν αυτούσια μόνο δύο: `input_pcm_sha256` και
+  η ταυτότητα.
+  **ΚΛΙΣΗ ΚΡΙΝΟΝΤΟΣ: ΔΥΟ CERTS ΣΥΝΔΕΔΕΜΕΝΑ** — master
+  cert αμετάβλητο, deliverable cert με δικό του hash
+  και δικές του μετρήσεις, **ΚΑΙ το pcm_blake3 του
+  master ως δεσμό προέλευσης**. Δεν είναι νέα ιδέα:
+  η αλυσίδα είναι input → master → παραδοτέο, το
+  `input_pcm_sha256` καλύπτει τον πρώτο κρίκο, **ο
+  τελευταίος λείπει**.
+  ΔΩΡΕΑΝ ΚΕΡΔΟΣ: το F-077 δηλώνει ότι τα
+  `output_delivery_*` περιγράφουν το PRE-ENCODE
+  buffer και ο τρίτος βλέπει −0.27 dB. Με cert του
+  παραδοτέου, **τα νούμερα είναι του αρχείου που
+  κρατάει** — το χάσμα παύει να χρειάζεται δήλωση.
+
+  **ΤΡΙΤΗ ΕΜΦΑΝΙΣΗ ΤΟΥ ΜΟΤΙΒΟΥ «ΠΕΔΙΟ ΛΕΙΠΕΙ ΑΠΟ ΤΟ
+  DTO»:** ambience → StreamingRequest (F-088) → εδώ.
+  Το `ExportRequest` έχει τρία πεδία (blob_id,
+  format, output_path), **κανένα project_id**. Η
+  ταυτότητα δεν λείπει (φορτώνεται μέσα στη
+  write_sidecar).
+
+  **ΔΥΟ ΠΕΔΙΑ ΘΑ ΧΑΝΟΝΤΑΝ σε ενοποίηση:**
+  `export_format` και `exported_at` (**άλλη στιγμή**
+  από το `written_at` του render). Το `compliance`
+  ΟΧΙ — πέντε bool που ήδη ζουν στο `StoredLoudness`,
+  ακριβώς το παράγωγο που το §7.5 ονομάζει «ευκαιρία
+  να πουν διαφορετικά πράγματα».
+
+  **ΚΑΛΟ ΝΕΟ, ΜΕΤΡΗΜΕΝΟ:** το `quality` μπλοκ του
+  ανυπόγραφου έδειξε **οκτώ πεδία, μηδέν σταθερές,
+  phase_coherence απόν** — η δουλειά της Φάσης 1
+  φτάνει στον χρήστη. **Λείπει μόνο η σφραγίδα.**
+
+  Trigger: **ΘΕΜΕΛΙΟ ΤΟΥ VERIFY KIT.** Δεν βγαίνει
+  δημόσιο δείγμα πριν λυθεί — ο πρώτος που θα τρέξει
+  τον verifier στο παραδοτέο παίρνει «άλλο σχήμα,
+  καμία υπογραφή».
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1272,7 +1360,78 @@ F-060 (cheap, and it collided instantly).
 | F-049 | butter_hp2/lp2 resonant Q=1.414 (pinned oracle) | Router concurrency test observes counter not clock (bbefeb7) |
 | F-052 | — see F-060 — | Stale head-trim / STFT_FLUSH_TAIL removal (35a05a7, dsp_pipeline.rs:819,974, alignment/latency tests) |
 
-**NEXT FREE: F-090** — this line is the ONLY allocator. Taking a number =
+---
+
+### ΜΕΤΡΗΣΗ R-01 — LTASS vs low-cut σύγκρουση σταδίων; (2026-09-01)
+
+**Ερώτημα:** Παλεύει το trunk_pass LTASS με το low-cut 80 Hz που τρέχει ΠΡΙΝ το vocal_graph;
+Δηλαδή: μετράει το LTASS ενέργεια σε bands 0-1 (20–80 / 80–250 Hz) από raw audio, ενώ
+ο low-cut θα αφαιρέσει αυτή την ενέργεια πριν φτάσει στους LTASS biquads;
+
+**Όργανο:** `research/encoder-gap-speech/src/bin/ltass_lowcut_conflict.rs`
+A-PATH = raw → `run_trunk_pass` → `ReferenceResolver` → gains
+B-PATH = lowcut HP 80 Hz Q=0.707 (ακριβώς `cleaner.rs:69`) → ίδιο
+
+**Αλυσίδα (streaming_pipeline.rs):**
+`rest_chain.process()` [low-cut→gate→dehum→deess] → `vocal_graph.process_block()` [LTASS×8 biquads]
+Το `run_trunk_pass` τρέχει σε RAW PCM dump (πριν restoration).
+BAND_EDGES `[20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]` Hz.
+
+**Αποτελέσματα — clip_speech_st.wav (48kHz stereo, 814464 frames):**
+
+```
+  band          normA(dB) gainA(dB)   normB(dB) gainB(dB)  Δgain
+  B0 20-80Hz      -9.282    -1.128     -11.124    +0.714   +1.841 ◄
+  B1 80-250Hz     +4.783    -0.773      +4.798    -0.788   -0.015
+  B2 250-500Hz    +6.619    +0.031      +7.061    -0.411   -0.442 ◄
+  B3 500-1kHz     +1.826    +4.394      +2.286    +3.934   -0.460 ◄
+  B4 1-2kHz       -1.016    +0.036      -0.554    -0.426   -0.462 ◄
+  B5 2-4kHz       -2.930    -2.560      -2.467    -3.023   -0.462 ◄
+  B6 4-8kHz       -4.375     0.000      -3.912     0.000   ±0.000
+  B7 8-20kHz     -14.294     0.000     -13.832     0.000   ±0.000
+```
+
+**Αποτελέσματα — stage_4_+deess (48kHz stereo, 2160000 frames — αυτό που βλέπει το LTASS):**
+
+```
+  band          normA(dB) gainA(dB)   normB(dB) gainB(dB)  Δgain
+  B0 20-80Hz     -19.931  +6.000★     -21.295  +6.000★    +0.000 (κλαμπαρισμένο)
+  B1 80-250Hz     +2.440  +1.570       +2.598  +1.412     -0.158 ◄
+  B2 250-500Hz    +6.661  -0.011       +6.945  -0.295     -0.284 ◄
+  B3 500-1kHz     +3.448  +2.772       +3.754  +2.466     -0.306 ◄
+  B4 1-2kHz       +4.335  -5.315       +4.642  -5.622     -0.308 ◄
+  B5 2-4kHz       +3.048  -6.000★      +3.356  -6.000★    +0.000 (κλαμπαρισμένο)
+  B6 4-8kHz       -0.668   0.000       -0.360   0.000     ±0.000
+  B7 8-20kHz     -12.152   0.000      -11.845   0.000     ±0.000
+```
+
+**ΑΠΟΤΕΛΕΣΜΑ ΠΡΟΒΛΕΨΗΣ:** ΟΧΙ — δεν επιβεβαιώθηκε.
+
+Πρόβλεψη: bands 0-1 πέφτουν δραστικά, gains αποκολλώνται από clamp.
+Πραγματικότητα:
+- Band 0 σε τυπικό voice material ήδη clamped (+6.000 dB) από raw measurement.
+  Ο low-cut βυθίζει το norm_B κι άλλο (-21.295 vs -19.931) αλλά δεν αλλάζει
+  το clamped gain. Band 1 αλλάζει -0.158 dB (ασήμαντο, όχι «δραστικό»).
+- Η mean-centering ripples: όταν band 0 κατεβαίνει, ο mean των n=6 ζωνών πέφτει,
+  ανεβάζει τα normalized[k] των υπόλοιπων ζωνών, και τα gains shifts κατά
+  ~0.15–0.46 dB σε bands 1-5. Συστηματικό, μικρό, δεν αλλάζει clamp.
+- Κανένα clamp state change ούτε σε Α ούτε σε Β path.
+
+**ΤΟ ΕΡΩΤΗΜΑ ΕΠΙΣΤΡΕΦΕΙ ΣΤΟΝ ΣΤΟΧΟ:**
+Το υλικό (voice recording 48k) δεν έχει σημαντική ενέργεια <80 Hz —
+ήδη κλαμπαρισμένο στο +6 dB από raw. Η σύγκρουση ΥΠΑΡΧΕΙ δομικά (trunk_pass
+μετράει raw, LTASS εφαρμόζεται post-low-cut), αλλά η επίδραση στα gains
+είναι δευτερεύουσα: band 0 LTASS biquad @50 Hz εφαρμόζει +6 dB boost σε
+περιεχόμενο που ο low-cut έχει αφαιρέσει → η ζώνη είναι διακοσμητική.
+Το F-049 (wrong Q) είναι η κυριότερη αιτία σφάλματος προφίλ, όχι ο low-cut.
+
+**Εκκρεμεί:** ίδια μέτρηση σε 20 BILLGATES clips (πλούσιο rumble / AC hum content)
+όταν κατεβούν — εκεί η sub-80 Hz ενέργεια μπορεί να είναι αρκετά μεγαλύτερη
+ώστε να αλλάξει το αποτέλεσμα.
+
+---
+
+**NEXT FREE: F-091** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the

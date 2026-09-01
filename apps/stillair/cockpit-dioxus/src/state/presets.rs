@@ -62,4 +62,17 @@ pub const PLATFORMS: &[PlatformDef] = &[
         label: "YouTube",
         lufs: -14.0,
     },
+    // 2026-08-25: ΤΟ ΠΡΩΤΟ ΣΗΜΕΙΟ ΟΠΟΥ ΤΟ ACX ΓΙΝΕΤΑΙ ΕΠΙΛΕΞΙΜΟ.
+    // Πριν από αυτή τη γραμμή, το `acx` υπήρχε στο lineos-types
+    // CATALOGUE (presets.rs:200, δικά του νούμερα: -20.5 LUFS,
+    // -3.0 dBTP, RMS window, noise floor) αλλά ΚΑΝΕΝΑ μενού δεν το
+    // πρόσφερε — άρα `blob.core.preset_id == "acx"` δεν μπορούσε ποτέ
+    // να συμβεί και το προϊόν δεν παρήγαγε αρχείο ACX καθόλου.
+    // Το `lufs` εδώ είναι ΜΟΝΟ ετικέτα οθόνης· η αυθεντία της τιμής
+    // είναι το CATALOGUE, μέσω LoudnessTarget::from_preset.
+    PlatformDef {
+        id: "acx",
+        label: "ACX / Audiobook",
+        lufs: -20.5,
+    },
 ];
