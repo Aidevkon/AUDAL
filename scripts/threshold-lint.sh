@@ -40,6 +40,12 @@ TARGETS=(
     "lineos/m1/lineos-types/src/presets.rs"
     "lineos/m0/m0-daemon/src/handlers/export.rs"
     "lineos/m0/m0-daemon/src/handlers/deliver.rs"
+    # 2026-08-25: ΠΑΡΑΓΕΙ ΚΑΘΕ delivery check (from_format · from_spacing ·
+    # η μετάφραση των margin_checks). Ήταν εκτός σάρωσης — δηλαδή ο
+    # φρουρός δεν έβλεπε ΑΚΡΙΒΩΣ εκεί που γεννιούνται οι κρίσεις, και
+    # οι σφραγίδες που μπήκαν εκεί ήταν αόρατες. Ίδιο σχήμα με το
+    # presets.rs δύο γύρους πριν.
+    "lineos/m0/m0-daemon/src/blob_store.rs"
     "shared/aether-bridge/src/reference_resolver.rs"
     "shared/aether-bridge/src/lib.rs"
 )
