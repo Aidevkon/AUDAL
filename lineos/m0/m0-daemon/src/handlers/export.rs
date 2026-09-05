@@ -718,7 +718,20 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     let report_first_pass = acx_pre.finish();
     let rms_before = report_first_pass.rms_db;
 
+    // PLACEHOLDER: αντιγράφηκε χωρίς πηγή — ο αριθμός είναι σχεδόν
+    // βέβαια σωστός (το `presets.rs` δηλώνει «Verified against ACX's
+    // published submission requirements, 2026-07-29»), αλλά **κανένα
+    // URL δεν καταγράφηκε ποτέ** και δεν εφευρίσκεται εδώ. Το ίδιο
+    // ζεύγος ζει ΚΑΙ στο `acx_check.rs:31-32` ΚΑΙ στο `presets.rs`
+    // (ACX DeliverySpec) — τρίτη γραφή, δική της απόφαση.
+    // TRIGGER: `DeliveryProfileRef.url` (blob_store.rs) γεμισμένο από
+    // ΑΝΘΡΩΠΟ που το επαλήθευσε — το ίδιο του το doc λέει «ποτέ ο
+    // κώδικας». Τότε γίνεται SOURCE: … RETRIEVED: ….
     const ACX_RMS_MIN: f32 = -23.0;
+    // PLACEHOLDER: αντιγράφηκε χωρίς πηγή — ίδια ιστορία με το MIN από
+    // πάνω· η σφραγίδα επαναλαμβάνεται επειδή ο φρουρός απαιτεί ΜΙΑ ΑΝΑ
+    // ΚΑΤΩΦΛΙ (ομαδική κάλυψη δοκιμάστηκε και παρήγαγε ψευδή σφραγίδα).
+    // TRIGGER: `DeliveryProfileRef.url` γεμισμένο από ΑΝΘΡΩΠΟ.
     const ACX_RMS_MAX: f32 = -18.0;
 
     // Στοχεύουμε λίγο ΜΕΣΑ από το όριο, όχι πάνω του.

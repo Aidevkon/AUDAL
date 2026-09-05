@@ -6,7 +6,7 @@
   "id": "podcast-v1",
 
   "g_max_db": 6.0,
-  "_g_max_db_comment": "placeholder — refined during tuning; per-profile clamp",
+  "_g_max_db_comment": "PLACEHOLDER: γεννήθηκε ως `const G_MAX_DB: f32 = 6.0;` με τη λέξη «placeholder» στο σχόλιο (dd1122b, 2026-07-02) και μετακόμισε εδώ αυτούσιο (ba29395, 2026-07-08). Το tuning που θα το εκλέπτυνε ΔΕΝ έγινε ποτέ — δύο μήνες. Σύγκριση που το τοποθετεί: τα τρία music profiles έχουν g_max_db 2.5 από `corpus.source: genre-corpus`, μετρημένο· η ομιλία — το ΜΟΝΟ profile που φτάνει στον ήχο — έχει 6.0 από paper. TRIGGER: corpus αφήγησης από >=3 ΔΙΑΚΡΙΤΕΣ παραγωγές (διαφορετικός narrator, δωμάτιο, οίκος). Το μετρημένο υλικό της 2026-08-25 ΔΕΝ αρκεί: 20 κεφάλαια ενός βιβλίου = μία συνθήκη x20. ΔΕΝ ΤΟ ΒΛΕΠΕΙ Ο threshold-lint: σαρώνει .rs, η τιμή ζει σε JSON.",
   "dead_zone_db": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 99.0, 99.0],
   "_dead_zone_db_comment": "deviations <= dead_zone are ignored; 0.0 = off. Music profiles will set these from measured per-band corpus σ",
   "_dead_zone_db_bands_6_7_rationale": "bands 6 and 7 carry no measured target — Byrne stops at 2520 Hz and these two are a -4 dB/oct extrapolation. Correcting toward a guess cut 4-6 dB from 4-8 kHz on every speech file, which measurement showed is more than half presence rather than sibilance, and which listening confirmed dulls consonants and narrows the stereo image. A dead zone above g_max_db disables correction there without changing the resolver.",

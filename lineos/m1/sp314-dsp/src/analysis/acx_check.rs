@@ -48,6 +48,7 @@ pub const ACX_MAX_NOISE_FLOOR_DB: f32 = -60.0;
 /// (certificate_node.rs), που κρίνει το INPUT πριν από
 /// οποιοδήποτε render/encode· εκεί δεν υπάρχει χάσμα να
 /// αντισταθμιστεί, ΒΗΜΑ 0 F-implement-margin 2026-08-24.
+/// MEASURED: n=59 2026-08-24 [ref: F-077 · tests/external_acx_ffmpeg_agreement.rs]
 pub const ACX_MARGIN_RMS_FLOOR_DB: f32 = 0.35; // n=59, worst −0.280
 pub const ACX_MARGIN_RMS_CEILING_DB: f32 = 0.10; // ⚠ n=1, worst +0.027
 pub const ACX_MARGIN_PEAK_DB: f32 = 0.20; // ⚠ n=1, worst +0.037·
