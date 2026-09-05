@@ -153,10 +153,27 @@ pub const PODCAST: DeliverySpec = DeliverySpec {
 /// stricter. Erring on the strict side is deliberate.
 pub const ACX: DeliverySpec = DeliverySpec {
     platform: "acx",
+    // PLACEHOLDER: proxy για το RMS παράθυρο — η ACX ορίζει RMS, ΟΧΙ LUFS.
+    // Η δημοσιευμένη σελίδα (βλ. SOURCE στα από κάτω) ΔΕΝ αναφέρει LUFS
+    // πουθενά. Το -20.5 είναι εικασία μέσου του [-23,-18].
+    // TRIGGER: στόχευση RMS (F-086)
     target_lufs: -20.5,
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «peak values no higher than -3dB»
+    // ⚠ ΑΣΥΜΦΩΝΙΑ ΟΝΟΜΑΤΟΣ, ΔΗΛΩΜΕΝΗ ΚΑΙ ΟΧΙ ΔΙΟΡΘΩΜΕΝΗ: η πηγή λέει
+    // «peak», ΧΩΡΙΣ αναφορά σε true peak ή oversampling· το πεδίο λέει
+    // `max_true_peak_db` και ο engine επιβάλλει true peak — ΑΥΣΤΗΡΟΤΕΡΟ
+    // από ό,τι ζητά η πηγή. Το όνομα ΔΕΝ αλλάζει εδώ (καταναλωτές).
     max_true_peak_db: -3.0,
     max_lra_lu: None,
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «RMS between -23dB and -18dB»
     rms_window_db: Some((-23.0, -18.0)),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «noise floor no higher than -60dB RMS»
     max_noise_floor_db: Some(-60.0),
 };
 

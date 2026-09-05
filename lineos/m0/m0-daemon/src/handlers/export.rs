@@ -844,6 +844,17 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
         lame_set_out_samplerate(gfp, target_sr as std::os::raw::c_int); // EXPLICIT - never let LAME pick
         lame_set_mode(gfp, MPEG_mode::MONO);
         lame_set_VBR(gfp, vbr_mode::vbr_off);
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3. You may
+        //  upload 256kbps or 320kbps»
+        // ⇒ Το 192 είναι το ΚΑΤΩΤΑΤΟ επιτρεπτό, όχι η απαίτηση. Καθόμαστε
+        //   ΑΚΡΙΒΩΣ στο πάτωμα: συμμορφούμενο, χωρίς περιθώριο προς τα κάτω.
+        //   ΤΟ ΟΡΙΟ ΕΙΝΑΙ >=192 — αν κάποιος το κατεβάσει, σπάει· αν το
+        //   ανεβάσει σε 256/320, εξακολουθεί να συμμορφώνεται.
+        // ⚠ Ο threshold-lint ΔΕΝ ΤΟ ΒΛΕΠΕΙ: δεν είναι const, ούτε σύγκριση,
+        //   ούτε πεδίο struct — είναι όρισμα κλήσης. Τρίτο δηλωμένο κενό
+        //   του φρουρού, μαζί με το g_max_db (JSON) και το f_cutoff.
         lame_set_brate(gfp, 192);
         lame_set_quality(gfp, 2);
         if lame_init_params(gfp) < 0 {

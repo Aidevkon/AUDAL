@@ -493,25 +493,63 @@ pub fn run_deliver_core(
 
     for e in &manifest_entries {
         if e.role == "chapter" || e.role.ends_with("credits") || e.role == "retail_sample" {
-            if e.head_quiet_secs < 0.5 {
+            // ΤΟ ΠΑΡΑΘΥΡΟ ΔΙΟΡΘΩΘΗΚΕ 2026-08-25. ΗΤΑΝ: head 0.5-1s,
+            // tail 1-5s — δύο διαφορετικά παράθυρα, και το head λάθος.
+            // Η πηγή δίνει ΕΝΑ παράθυρο, ΚΑΙ ΣΤΑ ΔΥΟ άκρα, αυτολεξεί:
+            //   «We recommend between 1 and 5 seconds of room tone at the
+            //    beginning and end of each file for an ideal listening
+            //    experience. Room tone spacing must not exceed 5 seconds.»
+            //
+            // ΔΥΟ ΚΛΑΣΕΙΣ, ΟΧΙ ΜΙΑ — η γλώσσα της πηγής τις χωρίζει:
+            //   «must not exceed 5 seconds» = ΑΠΑΙΤΗΣΗ
+            //   «We recommend between 1 and 5»  = ΣΥΣΤΑΣΗ
+            // Το κάτω όριο ΔΕΝ είναι απαίτηση. ΤΕΚΜΗΡΙΟ ΥΠΕΡ, ΜΕΤΡΗΜΕΝΟ
+            // 2026-08-25: 20/20 κεφάλαια BILLGATES έχουν head 0.60s —
+            // ΚΑΤΩ από τη σύσταση — και είναι εκδομένα, δηλαδή πέρασαν QC.
+            // Με τα ΠΑΛΙΑ όρια και τα 20 θα σημαιοφορούνταν δύο φορές
+            // (0.60 < 0.5 όχι, αλλά tail 3.5 εντός· το head 0.60 περνούσε
+            // οριακά) — και κάθε αρχείο με head 1-5s, που η πηγή ΣΥΣΤΗΝΕΙ,
+            // θα κοκκίνιζε ως «> 1.0s».
+            //
+            // ⚠ ΤΟ verdict ΔΕΝ ΜΠΑΙΝΕΙ ΕΔΩ: αυτοί οι έλεγχοι είναι
+            // `warnings` (ελεύθερο κείμενο), ΟΧΙ `DeliveryCheck` — δεν
+            // υπάρχει πεδίο verdict σε αυτή τη διαδρομή. Και το
+            // `DeliveryCheck.verdict` δέχεται ΜΟΝΟ "pass"|"fail"
+            // (blob_store.rs:194): μια ΣΥΣΤΑΣΗ σε πεδίο pass/fail θα ήταν
+            // ψέμα προς την αυστηρή πλευρά. Η δομημένη εγγραφή spacing
+            // είναι δουλειά του F-091.
+            //
+            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+            // ΑΠΑΙΤΗΣΗ — «must not exceed 5 seconds», head
+            if e.head_quiet_secs > 5.0 {
                 warnings.push(format!(
-                    "{}: head room tone {:.2}s < 0.5s (ACX wants 0.5-1s)",
+                    "{}: ΠΑΡΑΒΙΑΣΗ head room tone {:.2}s — η ACX απαιτεί <= 5s",
                     e.filename, e.head_quiet_secs
                 ));
-            } else if e.head_quiet_secs > 1.0 {
+            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+            // ΣΥΣΤΑΣΗ — «We recommend between 1 and 5 seconds», head
+            } else if e.head_quiet_secs < 1.0 {
                 warnings.push(format!(
-                    "{}: head room tone {:.2}s > 1.0s (ACX wants 0.5-1s)",
+                    "{}: ΣΥΣΤΑΣΗ head room tone {:.2}s — η ACX συστήνει 1-5s (ΟΧΙ παραβίαση)",
                     e.filename, e.head_quiet_secs
                 ));
             }
-            if e.tail_quiet_secs < 1.0 {
+            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+            // ΑΠΑΙΤΗΣΗ — «must not exceed 5 seconds», tail
+            if e.tail_quiet_secs > 5.0 {
                 warnings.push(format!(
-                    "{}: tail room tone {:.2}s < 1.0s (ACX wants 1-5s)",
+                    "{}: ΠΑΡΑΒΙΑΣΗ tail room tone {:.2}s — η ACX απαιτεί <= 5s",
                     e.filename, e.tail_quiet_secs
                 ));
-            } else if e.tail_quiet_secs > 5.0 {
+            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+            // ΣΥΣΤΑΣΗ — «We recommend between 1 and 5 seconds», tail
+            } else if e.tail_quiet_secs < 1.0 {
                 warnings.push(format!(
-                    "{}: tail room tone {:.2}s > 5.0s (ACX wants 1-5s)",
+                    "{}: ΣΥΣΤΑΣΗ tail room tone {:.2}s — η ACX συστήνει 1-5s (ΟΧΙ παραβίαση)",
                     e.filename, e.tail_quiet_secs
                 ));
             }
