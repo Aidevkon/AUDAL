@@ -21,6 +21,7 @@
 //! `verdict == "fail"`, με το ΜΕΤΡΗΜΕΝΟ νούμερο να επιβιώνει στην εγγραφή.
 
 use m0d::blob_store::DeliveryCheck;
+use lineos_types::presets::{ACX, SPOTIFY};
 use sp314_dsp::analysis::acx_check::AcxCheckReport;
 
 fn find<'a>(checks: &'a [DeliveryCheck], metric: &str, bound: &str) -> &'a DeliveryCheck {
@@ -145,7 +146,7 @@ fn the_record_agrees_with_the_single_rule_it_came_from() {
 /// σύσταση), tail 1.70 s (μέσα στο παράθυρο).
 #[test]
 fn a_recommendation_missed_is_advisory_not_failure() {
-    let checks = DeliveryCheck::from_spacing(0.10, 1.70);
+    let checks = DeliveryCheck::from_spacing(&ACX, 0.10, 1.70);
     assert_eq!(checks.len(), 4, "head×2 + tail×2");
 
     // ΣΥΣΤΑΣΗ αστοχεί ⇒ advisory
@@ -174,7 +175,7 @@ fn a_recommendation_missed_is_advisory_not_failure() {
 /// ταυτόχρονα, ώστε το fail να μην μπορεί να αποδοθεί στη σύσταση.
 #[test]
 fn a_requirement_breached_is_fail() {
-    let checks = DeliveryCheck::from_spacing(2.0, 6.0);
+    let checks = DeliveryCheck::from_spacing(&ACX, 2.0, 6.0);
 
     assert_eq!(find(&checks, "tail_spacing", "max").verdict, "fail");
     assert_eq!(find(&checks, "tail_spacing", "max").required, 5.0);
@@ -198,7 +199,7 @@ fn spacing_never_enters_the_overall_judgement() {
         quietest_window_start_frame: Some(119_070),
     };
     // Το ΙΔΙΟ report, με spacing που ΚΑΙ συστήνεται-εκτός ΚΑΙ παραβιάζει.
-    let spacing = DeliveryCheck::from_spacing(0.10, 6.0);
+    let spacing = DeliveryCheck::from_spacing(&ACX, 0.10, 6.0);
     assert!(spacing.iter().any(|c| c.verdict == "advisory"));
     assert!(spacing.iter().any(|c| c.verdict == "fail"));
 
@@ -254,7 +255,7 @@ fn a_pre_advisory_sidecar_still_deserialises() {
 #[test]
 fn bitrate_is_a_floor_not_an_equality() {
     for kbps in [192.0_f32, 256.0, 320.0, 192.2] {
-        let checks = DeliveryCheck::from_format(44_100, 1, kbps);
+        let checks = DeliveryCheck::from_format(&ACX, 44_100, 1, kbps);
         assert_eq!(
             find(&checks, "bitrate", "min").verdict,
             "pass",
@@ -263,7 +264,7 @@ fn bitrate_is_a_floor_not_an_equality() {
     }
     // ...και κάτω από το πάτωμα κόβει.
     for kbps in [128.0_f32, 191.9, 64.0] {
-        let checks = DeliveryCheck::from_format(44_100, 1, kbps);
+        let checks = DeliveryCheck::from_format(&ACX, 44_100, 1, kbps);
         assert_eq!(find(&checks, "bitrate", "min").verdict, "fail", "{kbps} kbps");
     }
 }
@@ -273,7 +274,7 @@ fn bitrate_is_a_floor_not_an_equality() {
 /// κρύβεται πίσω από μία μετρική.
 #[test]
 fn a_wrong_format_produces_three_fails_with_the_measured_numbers() {
-    let checks = DeliveryCheck::from_format(48_000, 2, 128.0);
+    let checks = DeliveryCheck::from_format(&ACX, 48_000, 2, 128.0);
     assert_eq!(checks.len(), 3);
 
     assert_eq!(find(&checks, "sample_rate", "max").verdict, "fail");
@@ -296,9 +297,53 @@ fn a_wrong_format_produces_three_fails_with_the_measured_numbers() {
 /// Χωρίς αυτό, ένα always-fail θα περνούσε τον ORACLE 10.
 #[test]
 fn the_real_acx_format_produces_three_passes() {
-    let checks = DeliveryCheck::from_format(44_100, 1, 192.0);
+    let checks = DeliveryCheck::from_format(&ACX, 44_100, 1, 192.0);
     assert!(
         checks.iter().all(|c| c.verdict == "pass"),
         "44.1k mono 192 kbps πρέπει να περνάει: {checks:#?}"
     );
+}
+
+/// ORACLE 12 — Ο ΚΑΝΟΝΑΣ ΑΠΟΥΣΙΑΣ ΣΤΟ ΕΠΙΠΕΔΟ ΤΟΥ ΠΑΡΑΓΩΓΟΥ.
+///
+/// Προορισμός που ΔΕΝ δηλώνει τα όρια (κάθε μη-ACX σήμερα: το SPOTIFY
+/// έχει `room_tone_max_s: None`, `required_sample_rate_hz: None`, …)
+/// παράγει **ΚΑΜΙΑ ΕΓΓΡΑΦΗ** — όχι ψευδές "pass", όχι κατασκευασμένο
+/// "fail". «Δεν το ορίζει ο οίκος» ≠ «το ελέγξαμε και πέρασε».
+///
+/// ΑΥΤΟ ΕΙΝΑΙ Η ΠΡΟΫΠΟΘΕΣΗ ΤΟΥ ΣΥΝΘΕΤΗ: το fold θα ρωτάει το
+/// `DeliverySpec` ποιες γραμμές περιμένει· αν ένας παραγωγός σιωπούσε
+/// ΕΝΩ το spec δηλώνει το όριο, η σιωπή θα διαβαζόταν ως pass.
+#[test]
+fn a_destination_that_declares_nothing_produces_no_rows() {
+    // Τιμές που θα ΑΠΟΤΥΓΧΑΝΑΝ αν κρίνονταν με τα όρια του ACX:
+    // tail 9 s (> 5), sample rate 48k, stereo, 96 kbps.
+    let spacing = DeliveryCheck::from_spacing(&SPOTIFY, 0.0, 9.0);
+    let format = DeliveryCheck::from_format(&SPOTIFY, 48_000, 2, 96.0);
+
+    assert!(spacing.is_empty(), "spotify δεν ορίζει room tone: {spacing:#?}");
+    assert!(format.is_empty(), "spotify δεν ορίζει μορφή: {format:#?}");
+
+    // ΚΑΙ ΤΟ ΑΝΤΙΣΤΡΟΦΟ, στο ίδιο test: ο ACX ΤΑ ΟΡΙΖΕΙ, άρα μιλάει.
+    assert_eq!(DeliveryCheck::from_spacing(&ACX, 0.0, 9.0).len(), 4);
+    assert_eq!(DeliveryCheck::from_format(&ACX, 48_000, 2, 96.0).len(), 3);
+}
+
+/// ORACLE 13 — ΤΟ ΚΡΙΤΗΡΙΟ ΤΟΥ REFACTOR: ο αριθμός ζει ΜΙΑ φορά.
+/// Οι παραγωγοί ΔΙΑΒΑΖΟΥΝ από το συμβόλαιο· δεν κρατούν αντίγραφο.
+/// Αν κάποιος ξαναβάλει const, οι τιμές θα αποκλίνουν από το spec και
+/// αυτό σπάει.
+#[test]
+fn the_producers_read_the_contract_they_do_not_copy_it() {
+    let checks = DeliveryCheck::from_spacing(&ACX, 3.0, 3.0);
+    assert_eq!(find(&checks, "head_spacing", "max").required, ACX.room_tone_max_s.unwrap());
+    assert_eq!(
+        find(&checks, "head_spacing", "min").required,
+        ACX.room_tone_recommend_min_s.unwrap()
+    );
+
+    let f = DeliveryCheck::from_format(&ACX, 44_100, 1, 192.0);
+    assert_eq!(find(&f, "sample_rate", "max").required, ACX.required_sample_rate_hz.unwrap() as f32);
+    assert_eq!(find(&f, "channels", "max").required, ACX.emitted_channels.unwrap() as f32);
+    assert_eq!(find(&f, "bitrate", "min").required, ACX.min_bitrate_kbps.unwrap() as f32);
 }

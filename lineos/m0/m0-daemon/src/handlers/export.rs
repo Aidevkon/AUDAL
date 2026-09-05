@@ -303,12 +303,21 @@ fn export_mp3_routed(
     // `margin_checks()`: εκείνο τροφοδοτεί τη ΣΥΝΟΛΙΚΗ κρίση
     // (`passes_acx_with_margin`, acx_check.rs:188) και ένα `advisory`
     // εκεί θα τη μόλυνε. Χωριστά, η μόλυνση είναι δομικά αδύνατη.
+    // ΤΟ ΣΥΜΒΟΛΑΙΟ ΤΟΥ ΠΡΟΟΡΙΣΜΟΥ ΠΟΥ ΖΗΤΗΘΗΚΕ — δυναμικά, από το preset.
+    // Εδώ (σε αντίθεση με την export_mp3_acx) η δρομολόγηση ΗΔΗ έγινε με
+    // βάση το preset, άρα το spec που διάλεξε τη διαδρομή είναι το ίδιο
+    // που κρίνει το αποτέλεσμα. Μία απόφαση, μία πηγή.
+    let spec = &lineos_types::presets::lookup(&blob.core.preset_id)
+        .expect("η δρομολόγηση πιο πάνω το βρήκε ήδη")
+        .delivery;
     let mut checks = crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
     checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
+        spec,
         outcome.head_quiet_secs,
         outcome.tail_quiet_secs,
     ));
     checks.extend(crate::blob_store::DeliveryCheck::from_format(
+        spec,
         outcome.delivered_sample_rate,
         outcome.delivered_channels,
         outcome.delivered_bitrate_kbps,
@@ -736,22 +745,23 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     }
     let report_first_pass = acx_pre.finish();
     let rms_before = report_first_pass.rms_db;
-
-    // PLACEHOLDER: αντιγράφηκε χωρίς πηγή — ο αριθμός είναι σχεδόν
-    // βέβαια σωστός (το `presets.rs` δηλώνει «Verified against ACX's
-    // published submission requirements, 2026-07-29»), αλλά **κανένα
-    // URL δεν καταγράφηκε ποτέ** και δεν εφευρίσκεται εδώ. Το ίδιο
-    // ζεύγος ζει ΚΑΙ στο `acx_check.rs:31-32` ΚΑΙ στο `presets.rs`
-    // (ACX DeliverySpec) — τρίτη γραφή, δική της απόφαση.
-    // TRIGGER: `DeliveryProfileRef.url` (blob_store.rs) γεμισμένο από
-    // ΑΝΘΡΩΠΟ που το επαλήθευσε — το ίδιο του το doc λέει «ποτέ ο
-    // κώδικας». Τότε γίνεται SOURCE: … RETRIEVED: ….
-    const ACX_RMS_MIN: f32 = -23.0;
-    // PLACEHOLDER: αντιγράφηκε χωρίς πηγή — ίδια ιστορία με το MIN από
-    // πάνω· η σφραγίδα επαναλαμβάνεται επειδή ο φρουρός απαιτεί ΜΙΑ ΑΝΑ
-    // ΚΑΤΩΦΛΙ (ομαδική κάλυψη δοκιμάστηκε και παρήγαγε ψευδή σφραγίδα).
-    // TRIGGER: `DeliveryProfileRef.url` γεμισμένο από ΑΝΘΡΩΠΟ.
-    const ACX_RMS_MAX: f32 = -18.0;
+    // ΤΟ ΠΑΡΑΘΥΡΟ ΕΡΧΕΤΑΙ ΑΠΟ ΤΟ ΣΥΜΒΟΛΑΙΟ — 2026-08-25.
+    //
+    // ΗΤΑΝ: `const ACX_RMS_MIN/MAX` εδώ, ΤΡΙΤΟ αντίγραφο των ίδιων δύο
+    // αριθμών (presets.rs `rms_window_db` · acx_check.rs `ACX_MIN/MAX_RMS_DB`).
+    // Το acx_check έχει ΔΗΛΩΜΕΝΟ λόγο (το sp314-dsp δεν εξαρτάται από
+    // lineos-types)· αυτό εδώ **δεν είχε κανέναν** — το m0d ήδη καλεί
+    // `lineos_types::presets::lookup` δύο συναρτήσεις πιο πάνω.
+    // Ιστορικό ατύχημα, όχι όριο στρώσης.
+    //
+    // ΓΙΑΤΙ `presets::ACX` ΡΗΤΑ ΚΑΙ ΟΧΙ lookup(preset_id): ΑΥΤΗ Η
+    // ΣΥΝΑΡΤΗΣΗ **ΕΙΝΑΙ** ο ACX κωδικοποιητής — resample σε 44.1k, mono
+    // fold, CBR 192. Αν διάβαζε το preset του blob και εκείνο έλεγε
+    // «spotify», θα εφάρμοζε κενό παράθυρο σε αρχείο που παράγεται ως
+    // ACX: ο κωδικοποιητής και το συμβόλαιο θα διαφωνούσαν σιωπηλά.
+    let (acx_rms_min, acx_rms_max) = lineos_types::presets::ACX
+        .rms_window_db
+        .expect("presets::ACX ορίζει rms_window_db εξ ορισμού");
 
     // Στοχεύουμε λίγο ΜΕΣΑ από το όριο, όχι πάνω του.
     // ΟΧΙ για δική μας μέτρηση — ο analyzer τρέχει ΠΡΙΝ
@@ -763,10 +773,10 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     // στα -23.00 μπορεί να διαβαστεί -23.02 και να κοπεί.
     const RMS_MARGIN_DB: f32 = 0.5;
 
-    let rms_correction_db = if rms_before < ACX_RMS_MIN {
-        ACX_RMS_MIN + RMS_MARGIN_DB - rms_before
-    } else if rms_before > ACX_RMS_MAX {
-        ACX_RMS_MAX - RMS_MARGIN_DB - rms_before
+    let rms_correction_db = if rms_before < acx_rms_min {
+        acx_rms_min + RMS_MARGIN_DB - rms_before
+    } else if rms_before > acx_rms_max {
+        acx_rms_max - RMS_MARGIN_DB - rms_before
     } else {
         0.0
     };

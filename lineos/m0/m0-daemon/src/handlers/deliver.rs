@@ -435,13 +435,25 @@ pub fn run_deliver_core(
                         // υλοποίηση, δύο καλούντες. Χωριστά από τα
                         // margin_checks ώστε το "advisory" να μη φτάνει
                         // ποτέ στη συνολική κρίση.
+                        // ΤΟ ΣΥΜΒΟΛΑΙΟ: `presets::ACX` ΡΗΤΑ. Αυτή η
+                        // διαδρομή καλεί `export_mp3_acx` ΑΝΕΥ ΟΡΩΝ και
+                        // το `build_minimal_blob` βάζει `preset_id: "acx"`
+                        // ό,τι κι αν ζήτησε ο χρήστης — είναι ο ACX
+                        // δρόμος εκ κατασκευής. Ανάγνωση από το preset
+                        // του blob θα επέτρεπε στον κωδικοποιητή και στο
+                        // συμβόλαιο να διαφωνήσουν σιωπηλά.
+                        // ⇒ Όταν το /deliver γίνει πολυ-προορισμός, ΑΥΤΗ
+                        //   η γραμμή είναι που αλλάζει.
+                        let spec = &lineos_types::presets::ACX;
                         let mut checks =
                             crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
                         checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
+                            spec,
                             outcome.head_quiet_secs,
                             outcome.tail_quiet_secs,
                         ));
                         checks.extend(crate::blob_store::DeliveryCheck::from_format(
+                            spec,
                             outcome.delivered_sample_rate,
                             outcome.delivered_channels,
                             outcome.delivered_bitrate_kbps,
@@ -486,7 +498,9 @@ pub fn run_deliver_core(
             passes_acx: outcome.report.passes_acx_with_margin(),
             head_quiet_secs: outcome.head_quiet_secs,
             tail_quiet_secs: outcome.tail_quiet_secs,
+            // Ίδιο συμβόλαιο με παραπάνω — ο ACX δρόμος.
             spacing_checks: crate::blob_store::DeliveryCheck::from_spacing(
+                &lineos_types::presets::ACX,
                 outcome.head_quiet_secs,
                 outcome.tail_quiet_secs,
             ),

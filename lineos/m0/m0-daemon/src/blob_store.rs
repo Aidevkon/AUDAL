@@ -279,41 +279,47 @@ impl DeliveryCheck {
     /// δεν μεσολαβεί encoder που να μετατοπίζει χρόνο — το
     /// `edge_quiet_secs` μετράει το pre-LAME buffer. Δεν υπάρχει χάσμα
     /// να αντισταθμιστεί.
-    pub fn from_spacing(head_quiet_secs: f32, tail_quiet_secs: f32) -> Vec<DeliveryCheck> {
-        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-        // «Room tone spacing must not exceed 5 seconds» — ΑΠΑΙΤΗΣΗ.
-        const REQUIREMENT_MAX_S: f32 = 5.0;
-        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-        // «We recommend between 1 and 5 seconds of room tone» — ΣΥΣΤΑΣΗ,
-        // γι' αυτό αυτό το όριο παράγει "advisory" και όχι "fail".
-        const RECOMMENDATION_MIN_S: f32 = 1.0;
-
+    pub fn from_spacing(
+        spec: &lineos_types::presets::DeliverySpec,
+        head_quiet_secs: f32,
+        tail_quiet_secs: f32,
+    ) -> Vec<DeliveryCheck> {
+        // ΤΑ ΟΡΙΑ ΕΡΧΟΝΤΑΙ ΑΠΟ ΤΟ ΣΥΜΒΟΛΑΙΟ, ΟΧΙ ΑΠΟ ΕΔΩ.
+        // Ήταν consts σε αυτή τη συνάρτηση μέχρι τις 25/08 — δηλαδή η
+        // προδιαγραφή του προορισμού ζούσε μοιρασμένη σε δύο αρχεία με
+        // ιστορικό, όχι λογικό διαχωρισμό.
+        //
+        // ΚΑΝΟΝΑΣ ΑΠΟΥΣΙΑΣ (§5.2) ΣΤΟ ΕΠΙΠΕΔΟ ΤΟΥ ΠΑΡΑΓΩΓΟΥ: όριο που ο
+        // προορισμός ΔΕΝ δηλώνει ⇒ ΚΑΜΙΑ εγγραφή. Όχι ψευδές pass, όχι
+        // κατασκευασμένο fail. Ένας προορισμός χωρίς κανόνα room tone
+        // (κάθε μη-ACX σήμερα) δίνει κενή λίστα.
         let mut out = Vec::with_capacity(4);
         for (metric, measured) in [
             ("head_spacing", head_quiet_secs),
             ("tail_spacing", tail_quiet_secs),
         ] {
-            out.push(DeliveryCheck {
-                metric: metric.to_string(),
-                measured,
-                required: REQUIREMENT_MAX_S,
-                bound: "max".to_string(),
-                margin_applied: 0.0,
-                verdict: if measured <= REQUIREMENT_MAX_S { "pass" } else { "fail" }.to_string(),
-                unit: "seconds".to_string(),
-            });
-            out.push(DeliveryCheck {
-                metric: metric.to_string(),
-                measured,
-                required: RECOMMENDATION_MIN_S,
-                bound: "min".to_string(),
-                margin_applied: 0.0,
-                verdict: if measured >= RECOMMENDATION_MIN_S { "pass" } else { "advisory" }
-                    .to_string(),
-                unit: "seconds".to_string(),
-            });
+            if let Some(max_s) = spec.room_tone_max_s {
+                out.push(DeliveryCheck {
+                    metric: metric.to_string(),
+                    measured,
+                    required: max_s,
+                    bound: "max".to_string(),
+                    margin_applied: 0.0,
+                    verdict: if measured <= max_s { "pass" } else { "fail" }.to_string(),
+                    unit: "seconds".to_string(),
+                });
+            }
+            if let Some(min_s) = spec.room_tone_recommend_min_s {
+                out.push(DeliveryCheck {
+                    metric: metric.to_string(),
+                    measured,
+                    required: min_s,
+                    bound: "min".to_string(),
+                    margin_applied: 0.0,
+                    verdict: if measured >= min_s { "pass" } else { "advisory" }.to_string(),
+                    unit: "seconds".to_string(),
+                });
+            }
         }
         out
     }
@@ -338,69 +344,57 @@ impl DeliveryCheck {
     /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
     /// «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3.»
     pub fn from_format(
+        spec: &lineos_types::presets::DeliverySpec,
         sample_rate_hz: u32,
         channels: u16,
         bitrate_kbps: f32,
     ) -> Vec<DeliveryCheck> {
-        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-        // «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3»
-        // ΙΣΟΤΗΤΑ — ο οίκος ορίζει έναν ρυθμό, όχι εύρος.
-        const REQUIRED_SR_HZ: f32 = 44_100.0;
-        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-        // «Files are in either mono or stereo»
-        // ⚠ Ο ΟΙΚΟΣ ΔΕΧΕΤΑΙ ΚΑΙ ΤΑ ΔΥΟ. Η απαίτησή του είναι
-        // ΟΜΟΙΟΜΟΡΦΙΑ ΣΕ ΟΛΟ ΤΟ ΒΙΒΛΙΟ, που ΔΕΝ μπορούμε να ελέγξουμε
-        // εδώ (ένα αρχείο τη φορά). Το ==1 αφορά ΤΟ ΔΙΚΟ ΜΑΣ ACX
-        // παραδοτέο, που παράγεται mono. Έλεγχος επιπέδου έργου: F-088.
-        const REQUIRED_CHANNELS: f32 = 1.0;
-        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-        // «Each file must be a 192 kbps or higher CBR»
-        // ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα — 256 και 320 δεκτά ρητά.
-        const MIN_BITRATE_KBPS: f32 = 192.0;
+        // ΤΑ ΟΡΙΑ ΑΠΟ ΤΟ ΣΥΜΒΟΛΑΙΟ. Ίδιος κανόνας απουσίας με το
+        // from_spacing: αδήλωτο όριο ⇒ καμία εγγραφή.
+        let mut out = Vec::with_capacity(3);
 
-        vec![
-            DeliveryCheck {
+        if let Some(sr) = spec.required_sample_rate_hz {
+            out.push(DeliveryCheck {
                 metric: "sample_rate".to_string(),
                 measured: sample_rate_hz as f32,
-                required: REQUIRED_SR_HZ,
+                required: sr as f32,
                 bound: "max".to_string(),
                 margin_applied: 0.0,
                 // PLACEHOLDER: ανοχή σύγκρισης f32, ΟΧΙ όριο προδιαγραφής.
                 // Η πηγή δεν δίνει ανοχή· το 0.5 υπάρχει μόνο επειδή το
                 // sample rate ταξιδεύει ως f32 σε αυτή τη δομή.
-                // TRIGGER: αν το sample_rate γίνει ακέραιος, φεύγει.
-                verdict: if (sample_rate_hz as f32 - REQUIRED_SR_HZ).abs() < 0.5 {
-                    "pass"
-                } else {
-                    "fail"
-                }
-                .to_string(),
+                // TRIGGER: αν το `measured` γίνει ακέραιος, φεύγει.
+                verdict: if sample_rate_hz == sr { "pass" } else { "fail" }.to_string(),
                 unit: "hz".to_string(),
-            },
-            DeliveryCheck {
+            });
+        }
+
+        if let Some(ch) = spec.emitted_channels {
+            out.push(DeliveryCheck {
                 metric: "channels".to_string(),
                 measured: channels as f32,
-                required: REQUIRED_CHANNELS,
+                required: ch as f32,
                 bound: "max".to_string(),
                 margin_applied: 0.0,
-                verdict: if channels as f32 == REQUIRED_CHANNELS { "pass" } else { "fail" }
-                    .to_string(),
+                verdict: if channels == ch { "pass" } else { "fail" }.to_string(),
                 unit: "count".to_string(),
-            },
-            DeliveryCheck {
+            });
+        }
+
+        if let Some(min_kbps) = spec.min_bitrate_kbps {
+            out.push(DeliveryCheck {
                 metric: "bitrate".to_string(),
                 measured: bitrate_kbps,
-                required: MIN_BITRATE_KBPS,
+                required: min_kbps as f32,
                 bound: "min".to_string(),
                 margin_applied: 0.0,
-                verdict: if bitrate_kbps >= MIN_BITRATE_KBPS { "pass" } else { "fail" }
+                verdict: if bitrate_kbps >= min_kbps as f32 { "pass" } else { "fail" }
                     .to_string(),
                 unit: "kbps".to_string(),
-            },
-        ]
+            });
+        }
+
+        out
     }
 }
 

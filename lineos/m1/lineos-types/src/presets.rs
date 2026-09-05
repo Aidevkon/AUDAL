@@ -83,6 +83,51 @@ pub struct DeliverySpec {
     /// the floor together, so a recording whose SNR is too low cannot be
     /// rescued by mastering at all.
     pub max_noise_floor_db: Option<f32>,
+    // ── ΤΑ ΤΕΣΣΕΡΑ ΠΟΥ ΕΛΕΙΠΑΝ, 2026-08-25 ────────────────────────────
+    // Ζούσαν ως consts μέσα στους παραγωγούς των delivery checks —
+    // ΙΣΤΟΡΙΚΟΣ διαχωρισμός, όχι λογικός: ό,τι χρειάστηκε πρώτο μπήκε
+    // εδώ, ό,τι χρειάστηκε αργότερα μπήκε όπου γραφόταν. Ο έλεγχος
+    // απουσίας του συνθέτη στηρίζεται σε ΑΥΤΟ το struct· με τέσσερα από
+    // τα οκτώ κριτήρια αδήλωτα, θα φύλαγε τα μισά.
+    //
+    // ΟΛΑ Option: άλλοι προορισμοί δεν τα δηλώνουν, και η ΑΠΟΥΣΙΑ είναι
+    // δεδομένο — «δεν το ορίζει ο οίκος», όχι «δεν το ελέγξαμε».
+    /// Ανώτατο room tone σε κάθε άκρο, δευτερόλεπτα. **ΑΠΑΙΤΗΣΗ.**
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «Room tone spacing must not exceed 5 seconds»
+    pub room_tone_max_s: Option<f32>,
+    /// Κατώτατο room tone σε κάθε άκρο, δευτερόλεπτα. **ΣΥΣΤΑΣΗ, ΟΧΙ
+    /// απαίτηση** — γι' αυτό το κατώφλι παράγει `advisory` και όχι
+    /// `fail`.
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «We recommend between 1 and 5 seconds of room tone»
+    pub room_tone_recommend_min_s: Option<f32>,
+    /// Ρυθμός δειγματοληψίας του παραδοτέου, Hz. ΙΣΟΤΗΤΑ — ο οίκος
+    /// ορίζει έναν ρυθμό, όχι εύρος.
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3»
+    pub required_sample_rate_hz: Option<u32>,
+    /// Κατώτατο bitrate, kbps. **ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα** — 256 και 320
+    /// δεκτά ρητά.
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «Each file must be a 192 kbps or higher CBR»
+    pub min_bitrate_kbps: Option<u32>,
+    /// Κανάλια που **ΕΜΕΙΣ ΠΑΡΑΓΟΥΜΕ** για αυτόν τον προορισμό.
+    ///
+    /// ⚠ ΤΟ ΟΝΟΜΑ ΕΙΝΑΙ `emitted_`, ΟΧΙ `required_`, ΚΑΙ Η ΔΙΑΦΟΡΑ ΕΙΝΑΙ
+    /// ΟΥΣΙΑΣ: ο οίκος **δέχεται mono Ή stereo**· η απαίτησή του είναι
+    /// **ΟΜΟΙΟΜΟΡΦΙΑ ΣΕ ΟΛΟ ΤΟ ΒΙΒΛΙΟ**, που δεν κρίνεται σε ένα αρχείο
+    /// (έλεγχος επιπέδου έργου: F-088). Ένα πεδίο `required_channels`
+    /// θα έλεγε ψέματα με τ' όνομά του — θα ισχυριζόταν απαίτηση του
+    /// οίκου εκεί που υπάρχει δική μας επιλογή.
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «Files are in either mono or stereo»
+    pub emitted_channels: Option<u16>,
 }
 
 impl From<DeliverySpec> for LoudnessTarget {
@@ -103,6 +148,11 @@ pub const SPOTIFY: DeliverySpec = DeliverySpec {
     max_lra_lu: None,
     rms_window_db: None,
     max_noise_floor_db: None,
+    room_tone_max_s: None,
+    room_tone_recommend_min_s: None,
+    required_sample_rate_hz: None,
+    min_bitrate_kbps: None,
+    emitted_channels: None,
 };
 
 pub const YOUTUBE: DeliverySpec = DeliverySpec {
@@ -112,6 +162,11 @@ pub const YOUTUBE: DeliverySpec = DeliverySpec {
     max_lra_lu: None,
     rms_window_db: None,
     max_noise_floor_db: None,
+    room_tone_max_s: None,
+    room_tone_recommend_min_s: None,
+    required_sample_rate_hz: None,
+    min_bitrate_kbps: None,
+    emitted_channels: None,
 };
 
 pub const BROADCAST: DeliverySpec = DeliverySpec {
@@ -121,6 +176,11 @@ pub const BROADCAST: DeliverySpec = DeliverySpec {
     max_lra_lu: Some(20.0),
     rms_window_db: None,
     max_noise_floor_db: None,
+    room_tone_max_s: None,
+    room_tone_recommend_min_s: None,
+    required_sample_rate_hz: None,
+    min_bitrate_kbps: None,
+    emitted_channels: None,
 };
 
 pub const PODCAST: DeliverySpec = DeliverySpec {
@@ -130,6 +190,11 @@ pub const PODCAST: DeliverySpec = DeliverySpec {
     max_lra_lu: None,
     rms_window_db: None,
     max_noise_floor_db: None,
+    room_tone_max_s: None,
+    room_tone_recommend_min_s: None,
+    required_sample_rate_hz: None,
+    min_bitrate_kbps: None,
+    emitted_channels: None,
 };
 
 /// ACX (Audiobook Creation Exchange — the submission path to Audible).
@@ -175,6 +240,32 @@ pub const ACX: DeliverySpec = DeliverySpec {
     // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
     // «noise floor no higher than -60dB RMS»
     max_noise_floor_db: Some(-60.0),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «Room tone spacing must not exceed 5 seconds» — ΑΠΑΙΤΗΣΗ.
+    room_tone_max_s: Some(5.0),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «We recommend between 1 and 5 seconds of room tone» — ΣΥΣΤΑΣΗ,
+    // γι' αυτό αυτό το όριο παράγει "advisory" και όχι "fail".
+    room_tone_recommend_min_s: Some(1.0),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3»
+    // ΙΣΟΤΗΤΑ — ο οίκος ορίζει έναν ρυθμό, όχι εύρος.
+    required_sample_rate_hz: Some(44_100),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «Each file must be a 192 kbps or higher CBR»
+    // ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα — 256 και 320 δεκτά ρητά.
+    min_bitrate_kbps: Some(192),
+    // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    // «Files are in either mono or stereo»
+    // ⚠ Ο ΟΙΚΟΣ ΔΕΧΕΤΑΙ ΚΑΙ ΤΑ ΔΥΟ — αυτό είναι ΤΙ ΠΑΡΑΓΟΥΜΕ ΕΜΕΙΣ,
+    // όχι τι απαιτεί. Η απαίτησή του είναι ΟΜΟΙΟΜΟΡΦΙΑ σε όλο το
+    // βιβλίο· έλεγχος επιπέδου έργου: F-088.
+    emitted_channels: Some(1),
 };
 
 pub struct PresetEntry {
