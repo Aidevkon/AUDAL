@@ -58,6 +58,16 @@ pub struct ExportResponse {
     /// «ελέγχθηκε, τίποτα να πούμε».
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delivery_checks: Option<Vec<crate::blob_store::DeliveryCheck>>,
+    /// Η ΣΥΝΟΛΙΚΗ ΕΤΥΜΗΓΟΡΙΑ — fold πάνω στις παραπάνω γραμμές.
+    ///
+    /// ΓΙΑΤΙ ΜΠΑΙΝΕΙ ΚΑΙ ΔΕΝ ΑΦΗΝΕΤΑΙ ΣΤΟΝ ΚΑΤΑΝΑΛΩΤΗ: επιστρέφοντας
+    /// γραμμές χωρίς σύνοψη, προσκαλούσαμε κάθε αναγνώστη να συνθέσει
+    /// μόνος του — και **θα το έκανε λάθος**. Το ξέρουμε γιατί έγινε:
+    /// το πρώτο πράγμα που έσπασε με την είσοδο του `advisory` ήταν
+    /// ένας συναθροιστής με `!= "pass"`, που ανέφερε «FAIL» για αρχείο
+    /// πλήρως συμμορφούμενο.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_verdict: Option<crate::blob_store::DeliveryVerdict>,
 }
 
 // ── Format enum ───────────────────────────────────────────────────────────────
@@ -124,6 +134,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(e),
             })
         }
@@ -137,6 +148,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(format!("blob not found: {}", req.blob_id)),
             })
         }
@@ -145,6 +157,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(format!("blob io error {}: {e}", req.blob_id)),
             })
         }
@@ -153,6 +166,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(format!("blob corrupt {}: {e}", req.blob_id)),
             })
         }
@@ -167,6 +181,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(format!("Cannot create export directory: {e}")),
             });
         }
@@ -195,6 +210,9 @@ pub async fn export_audio(
     .map_err(|e| format!("Export task join error: {e}"))
     .and_then(|r: Result<_, String>| r);
 
+    // Ο ΣΥΝΘΕΤΗΣ — ένας, δύο καλούντες (εδώ και στο /deliver).
+    let delivery_verdict = delivery_checks_verdict(&blob, &result);
+
     match result {
         Ok(delivery_checks) => {
             state
@@ -210,6 +228,7 @@ pub async fn export_audio(
                 written_path: Some(path_str),
                 message: None,
                 delivery_checks,
+                delivery_verdict,
             })
         }
         Err(e) => {
@@ -221,6 +240,7 @@ pub async fn export_audio(
                 status: "error".into(),
                 written_path: None,
                 delivery_checks: None,
+                delivery_verdict: None,
                 message: Some(e),
             })
         }
@@ -228,6 +248,18 @@ pub async fn export_audio(
 }
 
 // ── P10-002: Export format writers ────────────────────────────────────────────
+
+/// Ο ΣΥΝΘΕΤΗΣ στη διαδρομή του `/export`: βρίσκει το συμβόλαιο του
+/// προορισμού και κάνει το fold. `None` όπου δεν υπάρχουν γραμμές —
+/// δεν κατασκευάζεται ετυμηγορία από το πουθενά.
+fn delivery_checks_verdict(
+    blob: &StoredBlobV2,
+    result: &Result<Option<Vec<crate::blob_store::DeliveryCheck>>, String>,
+) -> Option<crate::blob_store::DeliveryVerdict> {
+    let checks = result.as_ref().ok()?.as_ref()?;
+    let spec = &lineos_types::presets::lookup(&blob.core.preset_id)?.delivery;
+    Some(crate::blob_store::DeliveryVerdict::compose(spec, checks))
+}
 
 /// Route to format-specific writer.
 ///

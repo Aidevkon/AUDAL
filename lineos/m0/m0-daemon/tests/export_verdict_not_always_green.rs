@@ -347,3 +347,125 @@ fn the_producers_read_the_contract_they_do_not_copy_it() {
     assert_eq!(find(&f, "channels", "max").required, ACX.emitted_channels.unwrap() as f32);
     assert_eq!(find(&f, "bitrate", "min").required, ACX.min_bitrate_kbps.unwrap() as f32);
 }
+
+// ── Ο ΣΥΝΘΕΤΗΣ (προσθήκη 2026-08-25) ────────────────────────────────
+//
+// Το fold ΕΙΝΑΙ ΠΟΛΙΤΙΚΗ: «advisory δεν μετράει» είναι απόφαση, όχι
+// ταυτότητα. Γι' αυτό έχει δικό του oracle, όπως κάθε παραγωγός.
+
+use m0d::blob_store::DeliveryVerdict;
+
+/// Οι πλήρεις γραμμές ενός ACX παραδοτέου με δοσμένο spacing.
+fn acx_rows(report: AcxCheckReport, head: f32, tail: f32) -> Vec<DeliveryCheck> {
+    let mut v = DeliveryCheck::from_margin_checks(&report);
+    v.extend(DeliveryCheck::from_spacing(&ACX, head, tail));
+    v.extend(DeliveryCheck::from_format(&ACX, 44_100, 1, 192.0));
+    v
+}
+
+fn good_report() -> AcxCheckReport {
+    AcxCheckReport {
+        sample_peak_db: -4.768217,
+        rms_db: -22.500002,
+        noise_floor_db: Some(-90.42713),
+        quietest_window_start_frame: Some(119_070),
+    }
+}
+
+/// ORACLE 14 — ΤΟ ΚΡΙΣΙΜΟ: `tail 6 s` ⇒ fail ⇒ **ΔΕΝ ΣΥΜΜΟΡΦΩΝΕΤΑΙ**.
+///
+/// ΑΥΤΟ ΑΚΡΙΒΩΣ θα είχε πιάσει την αντίφαση της 25/08 την ώρα που
+/// γεννήθηκε: τότε το ίδιο αρχείο έγραφε "fail" στις γραμμές ΚΑΙ
+/// `passes_acx: true` στο manifest.
+#[test]
+fn a_requirement_breach_makes_the_whole_file_non_compliant() {
+    let v = DeliveryVerdict::compose(&ACX, &acx_rows(good_report(), 1.5, 6.0));
+
+    assert!(!v.complies, "tail 6 s παραβιάζει το «must not exceed 5»: {v:#?}");
+    assert!(v.failed.contains(&"tail_spacing/max".to_string()));
+    assert!(v.missing.is_empty());
+}
+
+/// ORACLE 15 — ΣΥΣΤΑΣΗ εκτός ⇒ **ΣΥΜΜΟΡΦΩΝΕΤΑΙ**, με το advisory
+/// ΟΡΑΤΟ. Χωρίς το δεύτερο σκέλος, η τρίτη κατάσταση θα
+/// υπολογιζόταν και θα πεταγόταν στη σύνοψη.
+#[test]
+fn a_recommendation_missed_still_complies_but_is_reported() {
+    let v = DeliveryVerdict::compose(&ACX, &acx_rows(good_report(), 0.1, 1.7));
+
+    assert!(v.complies, "σύσταση εκτός ΔΕΝ είναι παραβίαση: {v:#?}");
+    assert!(v.failed.is_empty());
+    assert_eq!(v.advisory, vec!["head_spacing/min".to_string()]);
+}
+
+/// ORACLE 16 — όλα εντός ⇒ συμμορφώνεται, **μηδέν advisory**.
+/// Χωρίς αυτό, ένα always-advisory θα περνούσε τον 15.
+#[test]
+fn a_fully_conformant_file_has_no_advisories() {
+    let v = DeliveryVerdict::compose(&ACX, &acx_rows(good_report(), 2.0, 3.0));
+
+    assert!(v.complies);
+    assert!(v.failed.is_empty());
+    assert!(v.advisory.is_empty(), "{v:#?}");
+    assert!(v.missing.is_empty());
+}
+
+/// ORACLE 17 — ΛΕΙΠΕΙ γραμμή που το συμβόλαιο δήλωνε ⇒ **ΟΧΙ pass**.
+/// Ένας παραγωγός που σιωπά θα διαβαζόταν αλλιώς ως «όλα καλά».
+#[test]
+fn a_missing_expected_row_is_not_a_pass() {
+    let full = acx_rows(good_report(), 2.0, 3.0);
+    assert!(DeliveryVerdict::compose(&ACX, &full).complies, "βάση");
+
+    // Ο παραγωγός της μορφής σιωπά — καμία γραμμή sample_rate/channels/bitrate.
+    let silent: Vec<DeliveryCheck> = full
+        .iter()
+        .filter(|c| !matches!(c.metric.as_str(), "sample_rate" | "channels" | "bitrate"))
+        .cloned()
+        .collect();
+    let v = DeliveryVerdict::compose(&ACX, &silent);
+
+    assert!(!v.complies, "σιωπή παραγωγού ΔΕΝ είναι συμμόρφωση: {v:#?}");
+    assert!(v.failed.is_empty(), "δεν είναι fail — ΛΕΙΠΕΙ");
+    assert_eq!(v.missing.len(), 3);
+    assert!(v.missing.contains(&"bitrate/min".to_string()));
+}
+
+/// ORACLE 18 — ΤΟ ΠΡΑΓΜΑΤΙΚΟ παραδοτέο συμμορφώνεται.
+/// Χωρίς αυτό, ένα always-fail θα περνούσε τον 14 και τον 17.
+/// Οι τιμές είναι ΜΕΤΡΗΜΕΝΕΣ 25/08 στην πλήρη διαδρομή.
+#[test]
+fn the_real_deliverable_composes_to_compliant() {
+    let v = DeliveryVerdict::compose(&ACX, &acx_rows(good_report(), 0.1, 1.7));
+    assert!(v.complies);
+    assert_eq!(v.failed.len(), 0);
+    assert_eq!(v.missing.len(), 0);
+}
+
+/// ORACLE 19 — ΤΟ ΑΠΟΘΗΚΕΥΜΕΝΟ ΣΥΜΦΩΝΕΙ ΜΕ ΤΙΣ ΓΡΑΜΜΕΣ.
+///
+/// Η ετυμηγορία γράφεται ως πεδίο ώστε ο τρίτος να μη χρειάζεται να
+/// υλοποιήσει το fold (και να το κάνει λάθος — έγινε). Το τίμημα είναι
+/// ότι μπορεί να αποκλίνει. Αυτό το test ΞΑΝΑΚΑΝΕΙ το fold πάνω στις
+/// σειριοποιημένες γραμμές και απαιτεί συμφωνία: **η απόκλιση γίνεται
+/// αδύνατη σιωπηλά.**
+#[test]
+fn the_stored_verdict_agrees_with_the_stored_rows() {
+    for (head, tail) in [(0.1_f32, 1.7_f32), (1.5, 6.0), (2.0, 3.0)] {
+        let rows = acx_rows(good_report(), head, tail);
+        let stored = DeliveryVerdict::compose(&ACX, &rows);
+
+        // Round-trip μέσα από JSON, όπως θα το διάβαζε ο τρίτος.
+        let rows_json = serde_json::to_string(&rows).unwrap();
+        let verdict_json = serde_json::to_string(&stored).unwrap();
+        let rows_back: Vec<DeliveryCheck> = serde_json::from_str(&rows_json).unwrap();
+        let verdict_back: DeliveryVerdict = serde_json::from_str(&verdict_json).unwrap();
+
+        assert_eq!(
+            verdict_back,
+            DeliveryVerdict::compose(&ACX, &rows_back),
+            "η αποθηκευμένη ετυμηγορία απέκλινε από τις αποθηκευμένες γραμμές \
+             (head {head}, tail {tail})"
+        );
+    }
+}

@@ -124,8 +124,14 @@ async fn main() {
                     cs.iter().filter(|c| c.verdict == "fail").map(|c| c.metric.as_str()).collect();
                 let advis: Vec<&str> =
                     cs.iter().filter(|c| c.verdict == "advisory").map(|c| c.metric.as_str()).collect();
+                if let Some(v) = &resp.delivery_verdict {
+                    println!(
+                        "          ΕΤΥΜΗΓΟΡΙΑ (fold): complies={} · failed={:?} · advisory={:?} · missing={:?}",
+                        v.complies, v.failed, v.advisory, v.missing
+                    );
+                }
                 println!(
-                    "          ΣΥΝΟΛΙΚΑ: {}{}",
+                    "          ΣΥΝΟΨΗ ΟΡΓΑΝΟΥ: {}{}",
                     if failed.is_empty() { "ΚΑΜΙΑ ΠΑΡΑΒΙΑΣΗ".to_string() }
                     else { format!("FAIL σε: {}", failed.join(", ")) },
                     if advis.is_empty() { String::new() }

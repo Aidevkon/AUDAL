@@ -285,7 +285,26 @@ pub struct ManifestEntry {
     pub sample_peak_db: f32,
     pub rms_db: f32,
     pub noise_floor_db: f32,
-    pub passes_acx: bool,
+    /// Η ΣΥΝΟΛΙΚΗ ΕΤΥΜΗΓΟΡΙΑ ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ — fold πάνω σε ΟΛΕΣ τις
+    /// γραμμές (επίπεδα · spacing · μορφή).
+    ///
+    /// ⚠ ΜΕΤΟΝΟΜΑΣΙΑ ΑΠΟ `passes_acx`, 2026-08-25 — ΟΧΙ κοσμητική.
+    /// Το `passes_acx` σήμαινε **ΜΟΝΟ ΕΠΙΠΕΔΑ**: ήταν
+    /// `AcxCheckReport::passes_acx_with_margin()`, που τρέχει πάνω σε
+    /// rms/peak/noise_floor και **δεν γνωρίζει spacing ούτε μορφή**.
+    /// Να του δώσουμε τη ΝΕΑ, πλήρη σημασία κρατώντας το όνομα θα
+    /// σήμαινε ότι κάθε παλιό manifest λέει **άλλο πράγμα με το ίδιο
+    /// κλειδί** — ακριβώς η παγίδα του F-074 (`input_hash`).
+    ///
+    /// ⚠ ΤΟ serde alias ΘΑ ΗΤΑΝ ΑΔΡΑΝΕΣ: το `ManifestEntry` είναι
+    /// `Serialize` ΜΟΝΟ — κανείς δεν το αποσειριοποιεί σε αυτό το
+    /// δέντρο. Η επιφάνεια συμβατότητας είναι **εξωτερικοί αναγνώστες
+    /// του manifest.json**, και γι' αυτούς αλλάζει το σχήμα, όχι ένα
+    /// alias. Καταγράφεται στο certificate-schema-v0.md.
+    ///
+    /// ΕΝΑ πεδίο, όχι δύο: μόλις υπάρχει η πλήρης ετυμηγορία, η μερική
+    /// δεν έχει καταναλωτή.
+    pub delivery_verdict: crate::blob_store::DeliveryVerdict,
     pub head_quiet_secs: f32,
     pub tail_quiet_secs: f32,
     /// Η ΚΡΙΣΗ του spacing, §5.3 σχήμα — ΑΝΤΙΚΑΤΕΣΤΗΣΕ τα τέσσερα
@@ -397,6 +416,30 @@ pub fn run_deliver_core(
             }
         };
 
+        // ΟΙ ΓΡΑΜΜΕΣ ΜΙΑ ΦΟΡΑ, ΑΝΕΥ ΟΡΩΝ — τις μοιράζονται το sidecar
+        // (που γράφεται ΥΠΟ ΟΡΟΥΣ) και το manifest (που γράφεται ΠΑΝΤΑ).
+        // Υπολογίζονταν μέσα στο υπό-όρους μπλοκ· έτσι η ετυμηγορία του
+        // manifest θα ήταν χτισμένη σε ΑΛΛΟ σύνολο γραμμών από του
+        // sidecar. Ένα σύνολο, δύο αναγνώστες.
+        //
+        // ΤΟ ΣΥΜΒΟΛΑΙΟ: `presets::ACX` ΡΗΤΑ — αυτή η διαδρομή καλεί
+        // `export_mp3_acx` ΑΝΕΥ ΟΡΩΝ και το `build_minimal_blob` βάζει
+        // `preset_id: "acx"` ό,τι κι αν ζήτησε ο χρήστης.
+        let spec = &lineos_types::presets::ACX;
+        let mut entry_checks =
+            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
+        entry_checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
+            spec,
+            outcome.head_quiet_secs,
+            outcome.tail_quiet_secs,
+        ));
+        entry_checks.extend(crate::blob_store::DeliveryCheck::from_format(
+            spec,
+            outcome.delivered_sample_rate,
+            outcome.delivered_channels,
+            outcome.delivered_bitrate_kbps,
+        ));
+
         // §5.6 Δ2, 2026-08-22: το `blob` πιο πάνω είναι ΚΛΩΝΟΣ του
         // resolved_blob (ΒΗΜΑ 0 recon) — γράφοντας output_acx_* πάνω
         // του δεν αγγίζει το sidecar στον δίσκο. Ξαναγράφουμε ρητά
@@ -435,30 +478,7 @@ pub fn run_deliver_core(
                         // υλοποίηση, δύο καλούντες. Χωριστά από τα
                         // margin_checks ώστε το "advisory" να μη φτάνει
                         // ποτέ στη συνολική κρίση.
-                        // ΤΟ ΣΥΜΒΟΛΑΙΟ: `presets::ACX` ΡΗΤΑ. Αυτή η
-                        // διαδρομή καλεί `export_mp3_acx` ΑΝΕΥ ΟΡΩΝ και
-                        // το `build_minimal_blob` βάζει `preset_id: "acx"`
-                        // ό,τι κι αν ζήτησε ο χρήστης — είναι ο ACX
-                        // δρόμος εκ κατασκευής. Ανάγνωση από το preset
-                        // του blob θα επέτρεπε στον κωδικοποιητή και στο
-                        // συμβόλαιο να διαφωνήσουν σιωπηλά.
-                        // ⇒ Όταν το /deliver γίνει πολυ-προορισμός, ΑΥΤΗ
-                        //   η γραμμή είναι που αλλάζει.
-                        let spec = &lineos_types::presets::ACX;
-                        let mut checks =
-                            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
-                        checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
-                            spec,
-                            outcome.head_quiet_secs,
-                            outcome.tail_quiet_secs,
-                        ));
-                        checks.extend(crate::blob_store::DeliveryCheck::from_format(
-                            spec,
-                            outcome.delivered_sample_rate,
-                            outcome.delivered_channels,
-                            outcome.delivered_bitrate_kbps,
-                        ));
-                        loudness.delivery_checks = Some(checks);
+                        loudness.delivery_checks = Some(entry_checks.clone());
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)
                         {
@@ -495,15 +515,24 @@ pub fn run_deliver_core(
             // applies here. NOT the same call as certificate_node.rs's
             // input_acx_compliant, which measures raw input pre-render/
             // pre-encode and must stay on the nominal passes_acx().
-            passes_acx: outcome.report.passes_acx_with_margin(),
+            // ΤΟ FOLD, όχι το μερικό. Το `passes_acx_with_margin()`
+            // ΔΕΝ αγγίχτηκε — παραμένει σωστό για ό,τι καλύπτει και
+            // τροφοδοτεί τις γραμμές `rms`/`peak`/`noise_floor` μέσω
+            // του `from_margin_checks`. Απλώς έπαψε να είναι η ΤΕΛΙΚΗ
+            // κρίση: είναι ΕΝΑΣ παραγωγός ανάμεσα σε τρεις.
+            delivery_verdict: crate::blob_store::DeliveryVerdict::compose(
+                &lineos_types::presets::ACX,
+                &entry_checks,
+            ),
             head_quiet_secs: outcome.head_quiet_secs,
             tail_quiet_secs: outcome.tail_quiet_secs,
-            // Ίδιο συμβόλαιο με παραπάνω — ο ACX δρόμος.
-            spacing_checks: crate::blob_store::DeliveryCheck::from_spacing(
-                &lineos_types::presets::ACX,
-                outcome.head_quiet_secs,
-                outcome.tail_quiet_secs,
-            ),
+            // ΤΟ ΙΔΙΟ σύνολο γραμμών, φιλτραρισμένο — όχι δεύτερη κλήση
+            // του παραγωγού. Δύο κλήσεις θα μπορούσαν να αποκλίνουν.
+            spacing_checks: entry_checks
+                .iter()
+                .filter(|c| c.metric.ends_with("_spacing"))
+                .cloned()
+                .collect(),
         });
     }
 
