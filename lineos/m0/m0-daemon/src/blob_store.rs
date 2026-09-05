@@ -310,6 +310,80 @@ impl DeliveryCheck {
         }
         out
     }
+
+    /// Οι ΤΡΕΙΣ εγγραφές μορφής — Ο ΜΟΝΟΣ παραγωγός τους.
+    /// `/export` και `/deliver` καλούν ΑΥΤΗΝ.
+    ///
+    /// ΟΛΑ ΤΑ `measured` ΕΙΝΑΙ ΜΕΤΡΗΣΕΙΣ ΤΟΥ ΠΑΡΑΓΟΜΕΝΟΥ ΑΡΧΕΙΟΥ, ΟΧΙ
+    /// ΠΡΟΘΕΣΕΙΣ: sample_rate και channels από το decode-back του
+    /// symphonia (`export.rs:951-956`), bitrate από bytes×8/διάρκεια.
+    /// Έλεγχος πάνω στο τι ΖΗΤΗΣΑΜΕ θα ήταν αυτοαναφορικός.
+    ///
+    /// ⚠ ΔΗΛΩΣΗ ΕΠΑΛΗΘΕΥΜΕΝΟΥ ΓΕΓΟΝΟΤΟΣ, ΟΧΙ ΝΕΑ ΠΥΛΗ (sample_rate και
+    /// channels): η `export_mp3_acx` ΗΔΗ επιστρέφει `Err` αν αποκλίνουν
+    /// (`export.rs:1013-1020`). Verdict "fail" σε αυτές τις δύο είναι
+    /// **μη-προσβάσιμο στην παραγωγή** — το export θα είχε αποτύχει
+    /// πρώτο. Η αξία τους είναι ότι η επιτυχία **αφήνει πλέον ίχνος**
+    /// που φτάνει στον χρήστη. Το bitrate είναι το μόνο από τα τρία που
+    /// δεν ελεγχόταν πουθενά.
+    ///
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    /// «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3.»
+    pub fn from_format(
+        sample_rate_hz: u32,
+        channels: u16,
+        bitrate_kbps: f32,
+    ) -> Vec<DeliveryCheck> {
+        // SOURCE: … «44.1kHz MP3» — ΙΣΟΤΗΤΑ, ο οίκος ορίζει έναν ρυθμό.
+        const REQUIRED_SR_HZ: f32 = 44_100.0;
+        // SOURCE: … ο οίκος δέχεται mono Ή stereo· η απαίτησή του είναι
+        // ΟΜΟΙΟΜΟΡΦΙΑ ΣΕ ΟΛΟ ΤΟ ΒΙΒΛΙΟ, που ΔΕΝ μπορούμε να ελέγξουμε
+        // εδώ (ένα αρχείο τη φορά — F-088). Για το ACX preset ΕΜΕΙΣ
+        // παράγουμε mono, άρα ελέγχουμε ==1 ΓΙΑ ΤΟ ΔΙΚΟ ΜΑΣ παραδοτέο.
+        // Ο έλεγχος επιπέδου έργου είναι F-088.
+        const REQUIRED_CHANNELS: f32 = 1.0;
+        // SOURCE: … «192 kbps **or higher**» — ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα.
+        // 256 και 320 ΠΕΡΝΑΝΕ ρητά κατά την πηγή.
+        const MIN_BITRATE_KBPS: f32 = 192.0;
+
+        vec![
+            DeliveryCheck {
+                metric: "sample_rate".to_string(),
+                measured: sample_rate_hz as f32,
+                required: REQUIRED_SR_HZ,
+                bound: "max".to_string(),
+                margin_applied: 0.0,
+                verdict: if (sample_rate_hz as f32 - REQUIRED_SR_HZ).abs() < 0.5 {
+                    "pass"
+                } else {
+                    "fail"
+                }
+                .to_string(),
+                unit: "hz".to_string(),
+            },
+            DeliveryCheck {
+                metric: "channels".to_string(),
+                measured: channels as f32,
+                required: REQUIRED_CHANNELS,
+                bound: "max".to_string(),
+                margin_applied: 0.0,
+                verdict: if channels as f32 == REQUIRED_CHANNELS { "pass" } else { "fail" }
+                    .to_string(),
+                unit: "count".to_string(),
+            },
+            DeliveryCheck {
+                metric: "bitrate".to_string(),
+                measured: bitrate_kbps,
+                required: MIN_BITRATE_KBPS,
+                bound: "min".to_string(),
+                margin_applied: 0.0,
+                verdict: if bitrate_kbps >= MIN_BITRATE_KBPS { "pass" } else { "fail" }
+                    .to_string(),
+                unit: "kbps".to_string(),
+            },
+        ]
+    }
 }
 
 /// Ποια δημοσιευμένη προδιαγραφή μετρήθηκε — ΕΛΕΓΞΙΜΟΣ ΙΣΧΥΡΙΣΜΟΣ

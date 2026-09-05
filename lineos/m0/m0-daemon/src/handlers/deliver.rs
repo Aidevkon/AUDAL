@@ -441,6 +441,11 @@ pub fn run_deliver_core(
                             outcome.head_quiet_secs,
                             outcome.tail_quiet_secs,
                         ));
+                        checks.extend(crate::blob_store::DeliveryCheck::from_format(
+                            outcome.delivered_sample_rate,
+                            outcome.delivered_channels,
+                            outcome.delivered_bitrate_kbps,
+                        ));
                         loudness.delivery_checks = Some(checks);
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)

@@ -241,3 +241,64 @@ fn a_pre_advisory_sidecar_still_deserialises() {
     // Και ΚΑΝΕΝΑ advisory — η τρίτη κατάσταση είναι ΠΡΟΣΘΕΤΙΚΗ.
     assert!(!checks.iter().any(|c| c.verdict == "advisory"));
 }
+
+// ── ΟΙ ΤΡΕΙΣ ΤΗΣ ΜΟΡΦΗΣ (προσθήκη 2026-08-25) ───────────────────────
+//
+// sample_rate · channels · bitrate. Τα δύο πρώτα ΜΕΤΡΙΟΥΝΤΑΙ από το
+// decode-back του symphonia· το τρίτο από το μέγεθος του αρχείου (το
+// symphonia δεν εκθέτει bitrate).
+
+/// ORACLE 9 — ΤΟ ΚΡΙΣΙΜΟ ΤΟΥ ΚΑΤΩ ΟΡΙΟΥ: το bitrate ΔΕΝ είναι ισότητα.
+/// Η πηγή λέει «192 kbps **or higher**» — 256 και 320 ΠΕΡΝΑΝΕ ρητά.
+/// Αν αυτό σπάσει, ο έλεγχος γράφτηκε ως `== 192` και είναι ΛΑΘΟΣ.
+#[test]
+fn bitrate_is_a_floor_not_an_equality() {
+    for kbps in [192.0_f32, 256.0, 320.0, 192.2] {
+        let checks = DeliveryCheck::from_format(44_100, 1, kbps);
+        assert_eq!(
+            find(&checks, "bitrate", "min").verdict,
+            "pass",
+            "{kbps} kbps πρέπει να ΠΕΡΝΑΕΙ — η πηγή λέει «192 or higher»"
+        );
+    }
+    // ...και κάτω από το πάτωμα κόβει.
+    for kbps in [128.0_f32, 191.9, 64.0] {
+        let checks = DeliveryCheck::from_format(44_100, 1, kbps);
+        assert_eq!(find(&checks, "bitrate", "min").verdict, "fail", "{kbps} kbps");
+    }
+}
+
+/// ORACLE 10 — ΝΑ ΜΠΟΡΕΙ ΝΑ ΠΕΙ FAIL: λάθος ρυθμός, λάθος κανάλια,
+/// λάθος bitrate — και τα τρία ταυτόχρονα, ώστε ένα always-pass να μην
+/// κρύβεται πίσω από μία μετρική.
+#[test]
+fn a_wrong_format_produces_three_fails_with_the_measured_numbers() {
+    let checks = DeliveryCheck::from_format(48_000, 2, 128.0);
+    assert_eq!(checks.len(), 3);
+
+    assert_eq!(find(&checks, "sample_rate", "max").verdict, "fail");
+    assert_eq!(find(&checks, "channels", "max").verdict, "fail");
+    assert_eq!(find(&checks, "bitrate", "min").verdict, "fail");
+
+    // Το ΝΟΥΜΕΡΟ επιβιώνει, και οι μονάδες είναι ρητές.
+    assert_eq!(find(&checks, "sample_rate", "max").measured, 48_000.0);
+    assert_eq!(find(&checks, "sample_rate", "max").required, 44_100.0);
+    assert_eq!(find(&checks, "sample_rate", "max").unit, "hz");
+    assert_eq!(find(&checks, "channels", "max").measured, 2.0);
+    assert_eq!(find(&checks, "channels", "max").unit, "count");
+    assert_eq!(find(&checks, "bitrate", "min").measured, 128.0);
+    assert_eq!(find(&checks, "bitrate", "min").unit, "kbps");
+    // Μηδέν margin σε όλα — δηλωμένο.
+    assert!(checks.iter().all(|c| c.margin_applied == 0.0));
+}
+
+/// ORACLE 11 — και το αντίστροφο: το ΠΡΑΓΜΑΤΙΚΟ παραδοτέο περνάει.
+/// Χωρίς αυτό, ένα always-fail θα περνούσε τον ORACLE 10.
+#[test]
+fn the_real_acx_format_produces_three_passes() {
+    let checks = DeliveryCheck::from_format(44_100, 1, 192.0);
+    assert!(
+        checks.iter().all(|c| c.verdict == "pass"),
+        "44.1k mono 192 kbps πρέπει να περνάει: {checks:#?}"
+    );
+}

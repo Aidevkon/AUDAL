@@ -308,6 +308,11 @@ fn export_mp3_routed(
         outcome.head_quiet_secs,
         outcome.tail_quiet_secs,
     ));
+    checks.extend(crate::blob_store::DeliveryCheck::from_format(
+        outcome.delivered_sample_rate,
+        outcome.delivered_channels,
+        outcome.delivered_bitrate_kbps,
+    ));
     Ok(Some(checks))
 }
 
@@ -540,6 +545,13 @@ pub struct AcxExportOutcome {
     pub report: sp314_dsp::analysis::acx_check::AcxCheckReport,
     pub head_quiet_secs: f32,
     pub tail_quiet_secs: f32,
+    /// ΜΕΤΡΗΜΕΝΟ από το παραγόμενο mp3 (symphonia, `codec_params`).
+    pub delivered_sample_rate: u32,
+    /// ΜΕΤΡΗΜΕΝΟ από το παραγόμενο mp3 (symphonia, `codec_params`).
+    pub delivered_channels: u16,
+    /// ΜΕΤΡΗΜΕΝΟ από το αρχείο (bytes×8/διάρκεια) — το symphonia δεν
+    /// εκθέτει bitrate. Προσεγγιστικό κατά την επιβάρυνση των tags.
+    pub delivered_bitrate_kbps: f32,
 }
 
 /// Duration in seconds of contiguous sub-threshold signal at each end.
@@ -919,7 +931,12 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     out_file.flush().map_err(|e| e.to_string())?;
 
     // 7. symphonia decode-back
-    {
+    //
+    // ΤΟ ΜΠΛΟΚ ΕΠΙΣΤΡΕΦΕΙ ΤΩΡΑ ΤΑ ΔΥΟ ΜΕΓΕΘΗ ΠΟΥ ΔΙΑΒΑΖΕΙ ΑΠΟ ΤΟ
+    // ΠΑΡΑΓΟΜΕΝΟ ΑΡΧΕΙΟ. Ήταν ήδη μετρημένα εδώ και ήδη ελεγμένα
+    // σκληρά (`return Err` παρακάτω) — αλλά η επιτυχία δεν άφηνε ίχνος:
+    // ο χρήστης δεν μάθαινε ποτέ ότι επαληθεύτηκαν.
+    let (delivered_sample_rate, delivered_channels) = {
         let file =
             std::fs::File::open(path).map_err(|e| format!("Could not open encoded file: {e}"))?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
@@ -997,15 +1014,46 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
                 expected_frames, decoded_frames, diff_sec
             ));
         }
-    }
+        (dec_sr, dec_ch)
+    };
 
     let (head_quiet_secs, tail_quiet_secs) = edge_quiet_secs(&mono, target_sr as u32);
+
+    // ΤΟ BITRATE — ΜΕΤΡΗΜΕΝΟ ΑΠΟ ΤΟ ΑΡΧΕΙΟ, ΟΧΙ ΔΗΛΩΜΕΝΟ.
+    //
+    // Το `symphonia::core::codecs::CodecParameters` ΔΕΝ έχει πεδίο
+    // `bit_rate` (πεδία: codec · sample_rate · time_base · n_frames ·
+    // start_ts · sample_format · bits_per_sample · bits_per_coded_sample ·
+    // channels · channel_layout · delay). Άρα το decode-back δεν μπορεί
+    // να το δώσει, και το `192` του `lame_set_brate` είναι ΠΡΟΘΕΣΗ —
+    // έλεγχος πάνω του θα ήταν αυτοαναφορικός.
+    //
+    // ⚠ ΠΡΟΣΕΓΓΙΣΤΙΚΟ, ΔΗΛΩΜΕΝΟ: bytes×8/διάρκεια περιλαμβάνει την
+    // επιβάρυνση των tags (ID3/Xing — μερικά KB σε ~3.7 MB, ~0.1%).
+    // ΔΕΝ στρογγυλοποιείται στο 192 «για να βγει»: ο έλεγχος είναι
+    // ΚΑΤΩ ΟΡΙΟ, οπότε μια μικρή υπερεκτίμηση δεν κρύβει τίποτα ενώ
+    // μια υποεκτίμηση θα ΦΑΙΝΟΤΑΝ ως αποτυχία — η ασφαλής φορά.
+    let delivered_bitrate_kbps = if mono.is_empty() {
+        // Κενό buffer ⇒ καμία διάρκεια να διαιρέσουμε. Ο έλεγχος είναι
+        // στο ΜΗΚΟΣ, όχι σε αριθμητική σύγκριση: το `secs > 0.0` που
+        // έγραψα πρώτα το σημαία­φόρησε ο threshold-lint ως κατώφλι — και
+        // είχε δίκιο να ρωτήσει. Δεν είναι κατώφλι· είναι φρουρός
+        // διαίρεσης, και εκφράζεται καθαρότερα έτσι.
+        0.0
+    } else {
+        let bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0) as f64;
+        let secs = mono.len() as f64 / target_sr as f64;
+        (bytes * 8.0 / secs / 1000.0) as f32
+    };
 
     // 8. Return report
     Ok(AcxExportOutcome {
         report,
         head_quiet_secs,
         tail_quiet_secs,
+        delivered_sample_rate,
+        delivered_channels,
+        delivered_bitrate_kbps,
     })
 }
 
