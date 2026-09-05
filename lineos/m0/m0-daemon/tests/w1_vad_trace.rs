@@ -16,7 +16,7 @@ fn fixture_path() -> std::path::PathBuf {
 }
 
 #[test]
-#[ignore]
+#[ignore = "όχημα παραγωγής του VAD trace CSV (W1), ΟΧΙ φρουρός — δες module doc. ~31s. ⚠ το αδελφό ab_render_full παραπέμπει σε render_variants.sh που ΔΕΝ ΥΠΑΡΧΕΙ. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn render_vad_trace_vehicle() {
     let path = fixture_path();
     assert!(path.exists(), "Missing fixture: {}", path.display());

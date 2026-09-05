@@ -111,7 +111,7 @@ fn max_correlation(a: &[f32], b: &[f32], max_lag: i32) -> (f32, i32) {
     /// Δηλαδή το stereo output είναι στην πράξη mono.
     /// ΔΕΝ διορθώνεται εδώ· καταγράφεται.
 #[test]
-#[ignore]
+#[ignore = "ΚΑΤΑΓΡΑΦΗ γνωστού ελαττώματος, όχι φρουρός: το doc από πάνω λέει ratio=1.0000 ⇒ το stereo output είναι στην πράξη mono, «ΔΕΝ διορθώνεται εδώ· καταγράφεται». Επίσης ΑΡΓΟ, ~62s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn spatial_folddown_agrees_with_stereo() {
     // ΠΡΑΓΜΑΤΙΚΟ ΥΛΙΚΟ, ΟΧΙ ΗΜΙΤΟΝΟ.
     //

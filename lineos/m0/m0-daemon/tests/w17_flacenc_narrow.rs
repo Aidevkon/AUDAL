@@ -18,7 +18,7 @@ fn read_raw_i32(path: &str) -> Vec<i32> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει /tmp/w17_nonorm/h8_i32.raw (F-072) ΧΩΡΙΣ φύλακα ύπαρξης: σε καθαρό μηχάνημα σκάει ⇒ ΜΟΝΙΜΟ ΚΟΚΚΙΝΟ. Γι' αυτό είναι δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: scripts/audio_wire.sh"]
 fn w17_flacenc_narrow() {
     let samples = read_raw_i32("/tmp/w17_nonorm/h8_i32.raw");
 

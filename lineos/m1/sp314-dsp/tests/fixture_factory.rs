@@ -139,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "ΓΕΝΝΗΤΡΙΑ fixtures (γράφει tests/fixtures/audiobook/), όχι φρουρός· ΚΑΙ δεν χτίζεται στο default build — θέλει --features cli. Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
     fn build_fixtures() {
         let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/audiobook");
         std::fs::create_dir_all(base_out).unwrap();
@@ -264,7 +264,7 @@ mod tests {
     //   skelpolu_bed.flac             — scaled Skelpolu bed alone
     //   manifest.json                 — ground truth + 28-candidate bed scan
     #[test]
-    #[ignore]
+    #[ignore = "ΓΕΝΝΗΤΡΙΑ του duck_splice fixture (τα παραγόμενα απαριθμούνται στο σχόλιο από πάνω), όχι φρουρός· θέλει --features cli. Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
     fn build_duck_splice_fixture() {
         let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/duck_splice");
         std::fs::create_dir_all(base_out).unwrap();

@@ -127,7 +127,7 @@ fn test_export_mp3_acx() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει ffprobe στο PATH. ~3.1s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn test_export_mp3_acx_ffprobe() {
     let pcm_path = std::path::PathBuf::from("/tmp/test_export_mp3_acx_ffprobe_in.pcm");
     let out_path = std::path::PathBuf::from("/tmp/test_export_mp3_acx_ffprobe_out.mp3");

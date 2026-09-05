@@ -17,7 +17,7 @@ fn fixture_path() -> std::path::PathBuf {
 }
 
 #[test]
-#[ignore]
+#[ignore = "όχημα A/B render, ΟΧΙ φρουρός: γράφει master WAV και δεν κρίνει τίποτα. ~28s. ⚠ το module doc στέλνει στο render_variants.sh — ΤΟ SCRIPT ΔΕΝ ΥΠΑΡΧΕΙ στο repo (μετρημένο 25/08). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn render_ab_full_pipeline() {
     let path = fixture_path();
     assert!(path.exists(), "Missing fixture: {}", path.display());

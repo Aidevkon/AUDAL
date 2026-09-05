@@ -68,7 +68,7 @@ fn render_boost(
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει /tmp/w9/podcast_realistic.wav (F-072). ⚠ ΧΩΡΙΣ ΤΟ FIXTURE ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s («SKIPPED»). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn w17_bed_sweep() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
     if !input_path.exists() {

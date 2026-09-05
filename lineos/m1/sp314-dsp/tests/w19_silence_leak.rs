@@ -54,7 +54,7 @@ fn measure_rms_db_silent(signal: &[f32], sr: u32) -> f32 {
 // Cure: voice-H gating — see ledger.
 // This test is the cure's baseline.
 #[test]
-#[ignore]
+#[ignore = "baseline της θεραπείας γνωστής διαρροής (δες σχόλιο από πάνω: 18/08, cure = voice-H gating), ΟΧΙ ελεύθερος φρουρός· ΑΡΓΟ ~43s στο in-repo am_contra_30s.wav. Το ξυπνά: scripts/run-ignored.sh"]
 fn test_w19_silence_leak() {
     let input_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/am_contra_30s.wav");
     let (left, right) = decode_wav(&input_path);

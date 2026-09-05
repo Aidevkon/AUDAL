@@ -362,7 +362,7 @@ fn ensure_downloaded(url: &str, out_path: &str) -> bool {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΚΑΤΕΒΑΖΕΙ ΑΠΟ ΔΙΚΤΥΟ: github.com/voxserv/audio_quality_testing_samples → /tmp/narration_dream.wav. Χωρίς δίκτυο (ή cache στο /tmp) δεν τρέχει. ~22s μαζί με τα άλλα δύο του αρχείου. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn vad_narration_dream() {
     let url = "https://github.com/voxserv/audio_quality_testing_samples/raw/master/mono_44100/156550__acclivity__a-dream-within-a-dream.wav";
     let path = "/tmp/narration_dream.wav";
@@ -381,7 +381,7 @@ fn vad_narration_dream() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΚΑΤΕΒΑΖΕΙ ΑΠΟ ΔΙΚΤΥΟ: voxserv → /tmp/narration_crossing.wav. Χωρίς δίκτυο ή cache δεν τρέχει. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn vad_narration_crossing() {
     let url = "https://github.com/voxserv/audio_quality_testing_samples/raw/master/mono_44100/382326__scott-simpson__crossing-the-bar.wav";
     let path = "/tmp/narration_crossing.wav";
@@ -411,7 +411,7 @@ fn vad_music_negative() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΚΑΤΕΒΑΖΕΙ ΑΠΟ ΔΙΚΤΥΟ: voxserv (dream + music negative) → /tmp. Χωρίς δίκτυο ή cache δεν τρέχει. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn vad_transient_probe() {
     use sp314_dsp::analysis::vad_sensors::TransientSensor;
 

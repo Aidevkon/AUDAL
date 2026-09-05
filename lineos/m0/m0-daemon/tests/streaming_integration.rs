@@ -21,7 +21,7 @@ fn dummy_ducking_topology() -> DspTopology {
     DspTopology::from_json(&json.to_string()).unwrap()
 }
 #[test]
-#[ignore]
+#[ignore = "θέλει το untracked dataset flight_clips_stereo/ (:29, .gitignore:30). ~11s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn streaming_pipeline_ducking_e2e() {
     use sp314_orchestrator::pass1_pipeline::build_timeline_map;
     let topology = dummy_ducking_topology();

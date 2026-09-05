@@ -103,7 +103,7 @@ fn test_nmfd_golden_master() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΔΙΑΓΝΩΣΤΙΚΟ drift: τυπώνει πίνακα σφάλματος W/H ανά iteration με ΜΗΔΕΝ assert — δεν κρίνει, παρατηρεί. Θέλει τα .bin του research/erlangen-nmfd. ~7s. Το ξυπνά: scripts/run-ignored.sh"]
 fn test_nmfd_drift_diagnostic() {
     let v = load_bin("V.bin", NUM_BINS * NUM_FRAMES);
     let init_w = load_bin("init_W_nmfd.bin", NUM_BINS * K * T_FRAMES);

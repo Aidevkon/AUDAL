@@ -71,7 +71,7 @@ fn run_pipeline_for_activations(signal: &[f32], sample_rate: u32) -> (Vec<f64>, 
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει /tmp/w17_pure/speech_only.wav + music_only.wav (F-072). ⚠ ΧΩΡΙΣ ΤΑ FIXTURES ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s τυπώνοντας «SKIPPED». Το ξυπνά: scripts/run-ignored.sh"]
 fn w17_voice_activation() {
     let speech_path = Path::new("/tmp/w17_pure/speech_only.wav");
     let music_path = Path::new("/tmp/w17_pure/music_only.wav");

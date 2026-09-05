@@ -180,7 +180,7 @@ fn test_deliver_e2e_small() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει ffprobe στο PATH (Command::new :207) — εξωτερικό εργαλείο, όχι fixture. ~1.3s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn test_deliver_acx_ffprobe() {
     let pcm1 = std::path::PathBuf::from("/tmp/deliver_test_ffprobe.pcm");
     generate_test_pcm(&pcm1);

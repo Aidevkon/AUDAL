@@ -5,7 +5,7 @@ use sp314_dsp::stft::nmf::NmfEngine;
 /// and h_chunk are structured for k=8. This causes wrong indexing
 /// into tensor_w and an incomplete denominator sum, inflating masks.
 #[test]
-#[ignore]
+#[ignore = "W16 ΔΙΑΓΝΩΣΤΙΚΟ (δες doc από πάνω): αποδεικνύει το k=5 vs k=8 mismatch τυπώνοντας τιμές. Το assert φρουρεί την ΠΡΟΫΠΟΘΕΣΗ (n_components==5), ΟΧΙ το μετρούμενο ⇒ δεν είναι πύλη. Γρήγορο (~0.01s). Το ξυπνά: scripts/run-ignored.sh"]
 fn w16_nmfd_k_mismatch() {
     let k_real = 8usize;
     let k_nmf = 5usize;   // NmfEngine::default().n_components

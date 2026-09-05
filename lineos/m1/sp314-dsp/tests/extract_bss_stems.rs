@@ -39,7 +39,7 @@ fn write_wav(path: &str, left: &[f32], right: &[f32]) {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΑΓΝΩΣΤΟΣ ΛΟΓΟΣ — δεν υπάρχει doc/σχόλιο πουθενά και δεν το βρήκα στο repo. ΤΙ ΠΑΡΑΤΗΡΕΙΤΑΙ: γράφει voice_k*/bass_k*.wav από το in-repo am_contra_30s.wav με ΜΗΔΕΝ assert — παράγει, δεν κρίνει· και είναι ΑΡΓΟ (~43s). Όποιος ξέρει την πρόθεση: γράψ' την εδώ. Το ξυπνά: scripts/run-ignored.sh"]
 fn extract_bss_stems() {
     let input_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/am_contra_30s.wav");
     let (left, right) = decode_wav(&input_path);

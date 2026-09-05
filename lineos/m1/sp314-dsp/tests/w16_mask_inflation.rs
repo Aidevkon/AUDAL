@@ -4,7 +4,7 @@ use sp314_dsp::stft::nmf::NmfEngine;
 /// Uses the full two-pass pipeline internally to get the real scout data,
 /// then compares masks with k=5 (buggy) vs k=8 (correct).
 #[test]
-#[ignore]
+#[ignore = "W16 ΔΙΑΓΝΩΣΤΙΚΟ (δες doc από πάνω): τυπώνει τον λόγο ενέργειας mask k=5 vs k=8. Το μοναδικό assert φρουρεί την ΠΡΟΫΠΟΘΕΣΗ (n_components==5), ΟΧΙ το μετρούμενο ⇒ δεν είναι πύλη. Γρήγορο (~0.03s). Το ξυπνά: scripts/run-ignored.sh"]
 fn w16_mask_inflation_real_data() {
     // We can't easily extract the real scout here, but we CAN prove the
     // mechanism with a focused test: what happens when you sum 4 masks

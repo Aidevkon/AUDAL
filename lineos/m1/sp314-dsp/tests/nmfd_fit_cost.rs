@@ -128,7 +128,7 @@ fn decode_wav(path: &std::path::Path) -> Vec<f32> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "ΑΓΝΩΣΤΟΣ ΛΟΓΟΣ — δεν υπάρχει doc/σχόλιο πουθενά. ΤΙ ΠΑΡΑΤΗΡΕΙΤΑΙ: σάρωση κόστους/χρόνου (std::time::Instant) σε 20s του in-repo fixture, ΑΡΓΟ ~42s. Όποιος ξέρει την πρόθεση: γράψ' την εδώ. Το ξυπνά: scripts/run-ignored.sh"]
 fn test_nmfd_fit_cost() {
     let path = fixture_path();
     let mono = decode_wav(&path);

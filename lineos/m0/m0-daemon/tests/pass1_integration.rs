@@ -3,7 +3,7 @@ use sp314_orchestrator::pass1_pipeline::build_timeline_map;
 use m0d::dsp::file_decoder::FileDecoder;
 
 #[test]
-#[ignore]
+#[ignore = "θέλει το untracked dataset flight_clips_stereo/ στη ρίζα του repo (.gitignore:30) — χωρίς αυτό σκάει στο unwrap, ΔΕΝ σιωπά. ~10s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn test_build_timeline_map() {
     let path = "../../../flight_clips_stereo/clip_transition_st.wav";
     let decoder = FileDecoder {

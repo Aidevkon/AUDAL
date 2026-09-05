@@ -41,7 +41,7 @@ fn decode_wav(path: &std::path::Path) -> (Vec<f32>, Vec<f32>) {
 }
 
 #[test]
-#[ignore]
+#[ignore = "όχημα A/B render του TwoPassEngine, ΟΧΙ φρουρός: γράφει WAV και δεν κρίνει. ~2s. ⚠ το module doc στέλνει στο render_variants.sh — ΤΟ SCRIPT ΔΕΝ ΥΠΑΡΧΕΙ στο repo (μετρημένο 25/08). Το ξυπνά: scripts/run-ignored.sh"]
 fn render_ab_variant() {
     let path = fixture_path();
     assert!(path.exists(), "Missing fixture: {}", path.display());

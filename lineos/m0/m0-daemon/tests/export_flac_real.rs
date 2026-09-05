@@ -122,7 +122,7 @@ fn test_export_flac_real() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "θέλει ffprobe στο PATH (Command::new :136). ~0.2s. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn test_export_flac_ffprobe() {
     let tmp = tempfile::TempDir::new().unwrap();
     let pcm_path = tmp.path().join("input_ffprobe.pcm");

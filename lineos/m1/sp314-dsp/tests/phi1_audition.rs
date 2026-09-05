@@ -44,7 +44,7 @@ fn read_wav_interleaved(path: &str) -> Vec<f32> {
     }
 }
 
-#[ignore]
+#[ignore = "θέλει /tmp/w6b/AM_Contra_-_Heart_Peripheral__snrp3/mix.wav (F-072, research/musdb-lab). Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh."]
 #[test]
 fn test_phi1_audition() {
     let dir = "/tmp/w6b/AM_Contra_-_Heart_Peripheral__snrp3";

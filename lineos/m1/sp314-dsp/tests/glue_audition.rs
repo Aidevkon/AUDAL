@@ -33,7 +33,7 @@ fn get_energies(l: &[f32], r: &[f32]) -> (f32, f32, f32, f32, f32) {
     (rms, peak, side_rms, e_lo, e_hi)
 }
 
-#[ignore]
+#[ignore = "όργανο ΑΚΡΟΑΣΗΣ: θέλει το τοπικό MUSDB18HQ σε ΑΠΟΛΥΤΟ path /home/aidevcon/Downloads/DATASET/musdb18hq (:39) ⇒ περνάει ΜΟΝΟ σε αυτό το μηχάνημα, σε άλλο σκάει. Το ξυπνά: scripts/run-ignored.sh"]
 #[test]
 fn test_glue_audition() {
     let tracks = [

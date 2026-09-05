@@ -2,7 +2,7 @@ use sp314_dsp::dsp::glue::{GlueChain, WidthMode};
 use sp314_dsp::dsp::biquad::{butter_hp2_prewarped, butter_lp2_prewarped, Biquad};
 use std::f32::consts::PI;
 
-#[ignore]
+#[ignore = "όργανο χαρακτηρισμού (τυπώνει καμπύλη THD, δεν κρίνει)· θέλει /tmp/blue/nmf5/ambience.wav (:86, F-072). Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh."]
 #[test]
 fn test_glue_characterize() {
     println!("=== 1. THD CURVE ===");
