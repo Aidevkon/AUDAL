@@ -2,7 +2,7 @@
 //! certificate's `delivery_checks` (StoredLoudness), written by
 //! `run_deliver_core` at the same site as `output_delivery_*`, from
 //! `AcxCheckReport::margin_checks()` — the SAME per-metric rule
-//! `passes_acx_with_margin()` uses (no second implementation, §Ξ).
+//! `levels_within_limits_with_margin()` uses (no second implementation, §Ξ).
 //!
 //! Fixture math (validated against acx_export_rms_window.rs's measured
 //! output — burst_amp=0.2 -> -20.00 dB, burst_amp=0.35 -> -15.14 dB,
@@ -180,11 +180,20 @@ fn edge_fixture_fails_rms_floor_margin_in_certificate() {
     let (after_text, checks) = deliver_and_read_checks("edge", 0.143244);
 
     let arr = checks.as_array().expect("delivery_checks array");
-    assert_eq!(
-        arr.len(),
-        4,
-        "expected 4 delivery_checks (rms-min, rms-max, peak, noise_floor), got {arr:?}"
-    );
+    // ΑΛΛΑΞΕ 2026-08-25: το `delivery_checks` ΔΕΝ περιέχει πια ΜΟΝΟ τα
+    // τέσσερα margin. Από τα βήματα spacing (b878d18) και μορφής, φέρνει
+    // ΚΑΙ ΤΑ ΟΚΤΩ κριτήρια του οίκου — 11 γραμμές (rms×2 · peak ·
+    // noise_floor · head/tail_spacing×2 · sample_rate · channels ·
+    // bitrate). Το `len() == 4` κάρφωνε ΤΟ ΠΕΡΙΕΧΟΜΕΝΟ, ενώ η ΠΡΟΘΕΣΗ
+    // αυτού του test είναι το F-077: ότι τα ΜΑΡΓΙΝ φτάνουν σωστά στο
+    // πιστοποιητικό. Ελέγχεται τώρα ρητά ότι τα τέσσερα margin ΥΠΑΡΧΟΥΝ
+    // — πιο αυστηρό από ένα πλήθος, γιατί ένα πλήθος δεν λέει ΠΟΙΑ.
+    for (metric, bound) in [("rms", "min"), ("rms", "max"), ("peak", "max"), ("noise_floor", "max")] {
+        assert!(
+            arr.iter().any(|c| c["metric"] == metric && c["bound"] == bound),
+            "λείπει η γραμμή margin {metric}/{bound} από το certificate: {arr:?}"
+        );
+    }
 
     let rms_min = find_check(&checks, "rms", "min");
     assert_eq!(rms_min["verdict"], "fail", "{rms_min:?}");
@@ -206,7 +215,20 @@ fn mid_window_fixture_passes_all_margin_checks_in_certificate() {
     let (after_text, checks) = deliver_and_read_checks("mid", 0.188812);
 
     let arr = checks.as_array().expect("delivery_checks array");
-    assert_eq!(arr.len(), 4, "expected 4 delivery_checks, got {arr:?}");
+    // ΑΛΛΑΞΕ 2026-08-25: το `delivery_checks` ΔΕΝ περιέχει πια ΜΟΝΟ τα
+    // τέσσερα margin. Από τα βήματα spacing (b878d18) και μορφής, φέρνει
+    // ΚΑΙ ΤΑ ΟΚΤΩ κριτήρια του οίκου — 11 γραμμές (rms×2 · peak ·
+    // noise_floor · head/tail_spacing×2 · sample_rate · channels ·
+    // bitrate). Το `len() == 4` κάρφωνε ΤΟ ΠΕΡΙΕΧΟΜΕΝΟ, ενώ η ΠΡΟΘΕΣΗ
+    // αυτού του test είναι το F-077: ότι τα ΜΑΡΓΙΝ φτάνουν σωστά στο
+    // πιστοποιητικό. Ελέγχεται τώρα ρητά ότι τα τέσσερα margin ΥΠΑΡΧΟΥΝ
+    // — πιο αυστηρό από ένα πλήθος, γιατί ένα πλήθος δεν λέει ΠΟΙΑ.
+    for (metric, bound) in [("rms", "min"), ("rms", "max"), ("peak", "max"), ("noise_floor", "max")] {
+        assert!(
+            arr.iter().any(|c| c["metric"] == metric && c["bound"] == bound),
+            "λείπει η γραμμή margin {metric}/{bound} από το certificate: {arr:?}"
+        );
+    }
 
     for (metric, bound, required, margin) in [
         ("rms", "min", -23.0, 0.35),

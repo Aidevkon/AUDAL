@@ -123,14 +123,14 @@ fn acx_preset_populates_delivery_check_fields() {
     );
 
     // A2: acx_compliant is Some, and its value agrees with recomputing
-    // passes_acx() from the three stored numbers — the flag can never
+    // levels_within_limits() from the three stored numbers — the flag can never
     // silently diverge from the numbers it summarizes.
     let compliant = blob
         .loudness().expect("test expects Certified")
         .input_acx_compliant
         .expect("acx_compliant must be Some for acx preset");
 
-    // Recompute passes_acx from the stored numbers using the SOURCE
+    // Recompute levels_within_limits from the stored numbers using the SOURCE
     // constants — copies here would go stale silently if the limits
     // ever moved.
     use sp314_dsp::analysis::acx_check::{
@@ -144,7 +144,7 @@ fn acx_preset_populates_delivery_check_fields() {
     assert_eq!(
         compliant, recomputed,
         "acx_compliant ({compliant}) disagrees with recomputed \
-         passes_acx ({recomputed}) from peak={peak}, rms={rms}, floor={floor}"
+         levels_within_limits ({recomputed}) from peak={peak}, rms={rms}, floor={floor}"
     );
 
     eprintln!(

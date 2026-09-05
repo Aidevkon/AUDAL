@@ -422,7 +422,18 @@ fn assemble_blob(
                 input_delivery_noise_floor_db: acx.and_then(|a| a.noise_floor_db),
                 input_delivery_quietest_window_start_frame: acx
                     .and_then(|a| a.quietest_window_start_frame),
-                input_acx_compliant: acx.map(|a| a.passes_acx()),
+                // ⚠ ΤΙ ΑΚΡΙΒΩΣ ΚΑΛΥΠΤΕΙ: ΤΡΙΑ από τα οκτώ κριτήρια του
+                // οίκου — rms · peak · noise floor. ΟΧΙ spacing, ΟΧΙ
+                // μορφή (sample rate/κανάλια/bitrate).
+                // ⚠ ΚΑΙ ΤΙ ΚΡΙΝΕΙ: ΤΗΝ ΕΙΣΟΔΟ, πριν από κάθε render και
+                // encode — ΟΧΙ το παραδοτέο. Άλλο ερώτημα: «μπορεί αυτή
+                // η ηχογράφηση να γίνει ACX;», όχι «είναι το αρχείο που
+                // παραδίδω συμμορφούμενο;». Η δεύτερη απάντηση είναι το
+                // DeliveryVerdict::compose (blob_store.rs).
+                // ΤΟ ΟΝΟΜΑ ΤΟΥ ΠΕΔΙΟΥ ΔΕΝ ΑΛΛΑΖΕΙ ΕΔΩ: ταξιδεύει στο
+                // ΥΠΟΓΕΓΡΑΜΜΕΝΟ cert — αλλαγή ονόματος = αλλαγή σχήματος,
+                // ξεχωριστή απόφαση.
+                input_acx_compliant: acx.map(|a| a.levels_within_limits()),
                 // output_delivery_* δεν μετριέται εδώ — μόνο στο export path
                 // (run_deliver_core), μετά το certificate. §5.6 Δ2.
                 output_delivery_peak_db: None,

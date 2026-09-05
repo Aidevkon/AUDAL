@@ -333,7 +333,7 @@ fn export_mp3_routed(
     );
     // ΔΥΟ ΠΑΡΑΓΩΓΟΙ, ΣΚΟΠΙΜΑ ΧΩΡΙΣΤΟΙ. Το spacing ΔΕΝ μπαίνει μέσα στο
     // `margin_checks()`: εκείνο τροφοδοτεί τη ΣΥΝΟΛΙΚΗ κρίση
-    // (`passes_acx_with_margin`, acx_check.rs:188) και ένα `advisory`
+    // (`levels_within_limits_with_margin`, acx_check.rs:188) και ένα `advisory`
     // εκεί θα τη μόλυνε. Χωριστά, η μόλυνση είναι δομικά αδύνατη.
     // ΤΟ ΣΥΜΒΟΛΑΙΟ ΤΟΥ ΠΡΟΟΡΙΣΜΟΥ ΠΟΥ ΖΗΤΗΘΗΚΕ — δυναμικά, από το preset.
     // Εδώ (σε αντίθεση με την export_mp3_acx) η δρομολόγηση ΗΔΗ έγινε με
@@ -841,7 +841,7 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
     // ξεκίνησες.
     // ΔΕΝ κάνουμε δεύτερο γύρο. Ο analyzer του βήματος 5
     // θα το πει με τα πραγματικά νούμερα και το
-    // passes_acx() θα είναι false — ΠΡΑΓΜΑΤΙΚΗ
+    // levels_within_limits() θα είναι false — ΠΡΑΓΜΑΤΙΚΗ
     // πληροφορία για τον narrator (το υλικό δεν έχει
     // αρκετό headroom και θέλει compression ή
     // επανηχογράφηση), όχι σιωπηλός συμβιβασμός.

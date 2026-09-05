@@ -636,7 +636,7 @@ fn run_dsp_internal(
                 acx.sample_peak_db,
                 acx.rms_db,
                 acx.noise_floor_db,
-                acx.passes_acx()
+                acx.levels_within_limits()
             );
         }
 

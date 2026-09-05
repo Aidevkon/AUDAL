@@ -127,7 +127,7 @@ pub struct StoredLoudness {
     pub input_delivery_quietest_window_start_frame: Option<usize>,
     /// ⚠ ΤΟ ΟΝΟΜΑ ΔΕΝ ΚΑΘΑΡΙΣΕ (§5.1α, 2026-08-23): "compliant"
     /// ΕΝΑΝΤΙ ΠΟΙΟΥ; Μένει `acx` μέχρι να κριθεί ρητά — δίπλα του
-    /// θέλει το delivery_profile. Σήμερα: AcxCheckReport::passes_acx()
+    /// θέλει το delivery_profile. Σήμερα: AcxCheckReport::levels_within_limits()
     /// έναντι των τεσσάρων consts του acx_check.rs:30-33.
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "acx_compliant")]
     pub input_acx_compliant: Option<bool>,
@@ -204,7 +204,7 @@ pub struct DeliveryCheck {
     /// ένα αρχείο κάτω από σύσταση είναι **πλήρως συμμορφούμενο**.
     ///
     /// ⚠ ΤΟ advisory ΔΕΝ ΜΕΤΡΑΕΙ ΣΤΗ ΣΥΝΟΛΙΚΗ ΣΥΜΜΟΡΦΩΣΗ. Η συνολική
-    /// κρίση (`AcxCheckReport::passes_acx_with_margin`, acx_check.rs:188)
+    /// κρίση (`AcxCheckReport::levels_within_limits_with_margin`, acx_check.rs:188)
     /// τρέχει πάνω σε `AcxMarginCheck` με **bool** verdict και **δεν
     /// περιέχει spacing** — δομικά αδύνατο να μολυνθεί. Το spacing
     /// μπαίνει από ΞΕΧΩΡΙΣΤΟ παραγωγό (`from_spacing`), ποτέ μέσα στο

@@ -43,8 +43,8 @@ pub const ACX_MAX_NOISE_FLOOR_DB: f32 = -60.0;
 ///
 /// Ισχύει ΜΟΝΟ όπου μεσολαβεί πραγματικός encoder ανάμεσα
 /// στη μέτρηση και στο παραδοτέο — δηλ. στο
-/// `passes_acx_with_margin()` παρακάτω, ΟΧΙ στο `passes_acx()`.
-/// Το `passes_acx()` το καλεί και το `input_acx_compliant`
+/// `levels_within_limits_with_margin()` παρακάτω, ΟΧΙ στο `levels_within_limits()`.
+/// Το `levels_within_limits()` το καλεί και το `input_acx_compliant`
 /// (certificate_node.rs), που κρίνει το INPUT πριν από
 /// οποιοδήποτε render/encode· εκεί δεν υπάρχει χάσμα να
 /// αντισταθμιστεί, ΒΗΜΑ 0 F-implement-margin 2026-08-24.
@@ -103,7 +103,7 @@ pub struct AcxCheckReport {
 
 /// One margin-adjusted per-metric judgment: the published requirement, our
 /// measured F-077 margin, and the resulting verdict — the single source
-/// `passes_acx_with_margin()` and any caller building a `§5.3` record (e.g.
+/// `levels_within_limits_with_margin()` and any caller building a `§5.3` record (e.g.
 /// `deliver.rs`'s `DeliveryCheck`) both read from, so the rule exists in
 /// exactly one place.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,14 +121,25 @@ pub struct AcxMarginCheck {
 }
 
 impl AcxCheckReport {
-    pub fn passes_acx(&self) -> bool {
+    /// ΜΕΡΙΚΟ ΕΞ ΟΡΙΣΜΟΥ: κρίνει ΜΟΝΟ τα τρία επίπεδα σήματος
+    /// (rms · peak · noise floor). ΔΕΝ βλέπει spacing/format — ζουν σε
+    /// άλλο crate. Η ΠΛΗΡΗΣ ετυμηγορία είναι το
+    /// `DeliveryVerdict::compose` (m0d, 1a40772).
+    /// ΜΗΝ το χρησιμοποιήσεις ως τελική κρίση.
+    ///
+    /// ⚠ ΜΕΤΟΝΟΜΑΣΙΑ ΑΠΟ `passes_acx`, 2026-08-25. Το παλιό όνομα έλεγε
+    /// «περνάει το ΑΡΧΕΙΟ το ACX» ενώ απαντά «είναι τα τρία επίπεδα
+    /// εντός ορίων;» — F-074 σε boolean αντί για hash. ΚΑΙ: το «acx»
+    /// μέσα σε συνάρτηση του sp314-dsp είναι εμπορικό όνομα σε στρώμα
+    /// DSP (§5.1α, κεφάλι/πλοκάμι). Το νέο όνομα δηλώνει ΕΜΒΕΛΕΙΑ.
+    pub fn levels_within_limits(&self) -> bool {
         self.sample_peak_db <= ACX_MAX_PEAK_DB
             && self.rms_db <= ACX_MAX_RMS_DB
             && self.rms_db >= ACX_MIN_RMS_DB
             && matches!(self.noise_floor_db, Some(nf) if nf <= ACX_MAX_NOISE_FLOOR_DB)
     }
 
-    /// The per-metric breakdown behind `passes_acx_with_margin()`. Omits the
+    /// The per-metric breakdown behind `levels_within_limits_with_margin()`. Omits the
     /// noise-floor entry entirely when `noise_floor_db` is `None` — absence
     /// rule (§5.2): a metric that was not measured produces no record, not a
     /// fabricated one.
@@ -172,7 +183,7 @@ impl AcxCheckReport {
         checks
     }
 
-    /// Same verdict as `passes_acx()`, but against thresholds that have
+    /// Same verdict as `levels_within_limits()`, but against thresholds that have
     /// already absorbed the measured LAME encoder gap (F-077) — i.e. the
     /// gap between this pre-encode report and what the decoded mp3 will
     /// actually measure. Use ONLY where `self` is the exact buffer about to
@@ -182,9 +193,16 @@ impl AcxCheckReport {
     /// any render or encode step, so there is no encoder gap to correct
     /// there; see the doc comment on the `ACX_MARGIN_*` consts above.
     ///
-    /// Missing noise floor still fails (matching `passes_acx()`): the
+    /// Missing noise floor still fails (matching `levels_within_limits()`): the
     /// absence rule governs the §5.3 *record*, not this boolean.
-    pub fn passes_acx_with_margin(&self) -> bool {
+    /// ΜΕΡΙΚΟ ΕΞ ΟΡΙΣΜΟΥ — ίδια εμβέλεια με το `levels_within_limits`,
+    /// με τα κατώφλια προσαρμοσμένα στο μετρημένο χάσμα του encoder
+    /// (F-077). ΔΕΝ βλέπει spacing/format. Η ΠΛΗΡΗΣ ετυμηγορία είναι το
+    /// `DeliveryVerdict::compose` (m0d, 1a40772).
+    /// ΜΗΝ το χρησιμοποιήσεις ως τελική κρίση.
+    ///
+    /// ⚠ ΜΕΤΟΝΟΜΑΣΙΑ ΑΠΟ `passes_acx_with_margin`, 2026-08-25.
+    pub fn levels_within_limits_with_margin(&self) -> bool {
         self.noise_floor_db.is_some() && self.margin_checks().iter().all(|c| c.verdict)
     }
 }
@@ -402,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn passes_acx_checks_all_three() {
+    fn levels_within_limits_checks_all_three() {
         let mut seed = 7u32;
         let mut sig = Vec::new();
         for _ in 0..3 {
@@ -414,28 +432,28 @@ mod tests {
             sig.extend(noise(-72.0, 1.0, &mut seed));
         }
         let r = feed_all(&sig);
-        assert!(r.passes_acx(), "{r:?}");
+        assert!(r.levels_within_limits(), "{r:?}");
         // and each failure mode flips it
         let loud = feed_all(&sine(997.0, 1.0, 2.0));
-        assert!(!loud.passes_acx());
+        assert!(!loud.levels_within_limits());
     }
 
     /// ΠΡΟΒΛΕΨΗ (γραμμένη πριν το τρέξιμο):
     /// rms −22.9 dB είναι ΜΕΣΑ στο ονομαστικό παράθυρο [−23, −18] αλλά
     /// ΕΞΩ από το προσαρμοσμένο [−23+0.35, −18−0.10] = [−22.65, −18.10]
-    /// (−22.9 < −22.65). Άρα, στο ΙΔΙΟ report: passes_acx() == true ΚΑΙ
-    /// passes_acx_with_margin() == false. Peak/floor τίθενται άνετα μέσα
+    /// (−22.9 < −22.65). Άρα, στο ΙΔΙΟ report: levels_within_limits() == true ΚΑΙ
+    /// levels_within_limits_with_margin() == false. Peak/floor τίθενται άνετα μέσα
     /// σε αμφότερα τα παράθυρα ώστε το RMS να είναι ο μόνος κριτής.
     #[test]
-    fn margin_flips_verdict_at_the_edge_without_touching_passes_acx() {
+    fn margin_flips_verdict_at_the_edge_without_touching_nominal_levels() {
         let edge = AcxCheckReport {
             sample_peak_db: -10.0,
             rms_db: -22.9,
             noise_floor_db: Some(-70.0),
             quietest_window_start_frame: Some(0),
         };
-        assert!(edge.passes_acx(), "{edge:?}");
-        assert!(!edge.passes_acx_with_margin(), "{edge:?}");
+        assert!(edge.levels_within_limits(), "{edge:?}");
+        assert!(!edge.levels_within_limits_with_margin(), "{edge:?}");
     }
 
     /// ΠΡΟΒΛΕΨΗ: rms −20.5 (μέσο του ονομαστικού παραθύρου) είναι ΜΕΣΑ
@@ -449,8 +467,8 @@ mod tests {
             noise_floor_db: Some(-70.0),
             quietest_window_start_frame: Some(0),
         };
-        assert!(mid.passes_acx(), "{mid:?}");
-        assert!(mid.passes_acx_with_margin(), "{mid:?}");
+        assert!(mid.levels_within_limits(), "{mid:?}");
+        assert!(mid.levels_within_limits_with_margin(), "{mid:?}");
     }
 
     #[test]

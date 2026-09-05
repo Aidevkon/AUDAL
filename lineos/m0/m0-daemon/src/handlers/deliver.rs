@@ -290,7 +290,7 @@ pub struct ManifestEntry {
     ///
     /// ⚠ ΜΕΤΟΝΟΜΑΣΙΑ ΑΠΟ `passes_acx`, 2026-08-25 — ΟΧΙ κοσμητική.
     /// Το `passes_acx` σήμαινε **ΜΟΝΟ ΕΠΙΠΕΔΑ**: ήταν
-    /// `AcxCheckReport::passes_acx_with_margin()`, που τρέχει πάνω σε
+    /// `AcxCheckReport::levels_within_limits_with_margin()`, που τρέχει πάνω σε
     /// rms/peak/noise_floor και **δεν γνωρίζει spacing ούτε μορφή**.
     /// Να του δώσουμε τη ΝΕΑ, πλήρη σημασία κρατώντας το όνομα θα
     /// σήμαινε ότι κάθε παλιό manifest λέει **άλλο πράγμα με το ίδιο
@@ -465,7 +465,7 @@ pub fn run_deliver_core(
                             outcome.report.quietest_window_start_frame;
                         // §5.3 — η κρίση μπαίνει στο certificate εδώ, μαζί με
                         // τα κατώφλια που χρησιμοποίησε (ίδια λογική με
-                        // passes_acx_with_margin(), sp314_dsp::analysis::
+                        // levels_within_limits_with_margin(), sp314_dsp::analysis::
                         // acx_check::AcxCheckReport::margin_checks() — μία
                         // υλοποίηση, δύο καλούντες). Απουσία μετρικής (π.χ.
                         // noise_floor όταν το αρχείο < 1s) = καμία εγγραφή.
@@ -514,8 +514,8 @@ pub fn run_deliver_core(
             // pre-LAME buffer from export_mp3_acx, so the measured gap
             // applies here. NOT the same call as certificate_node.rs's
             // input_acx_compliant, which measures raw input pre-render/
-            // pre-encode and must stay on the nominal passes_acx().
-            // ΤΟ FOLD, όχι το μερικό. Το `passes_acx_with_margin()`
+            // pre-encode and must stay on the nominal levels_within_limits().
+            // ΤΟ FOLD, όχι το μερικό. Το `levels_within_limits_with_margin()`
             // ΔΕΝ αγγίχτηκε — παραμένει σωστό για ό,τι καλύπτει και
             // τροφοδοτεί τις γραμμές `rms`/`peak`/`noise_floor` μέσω
             // του `from_margin_checks`. Απλώς έπαψε να είναι η ΤΕΛΙΚΗ

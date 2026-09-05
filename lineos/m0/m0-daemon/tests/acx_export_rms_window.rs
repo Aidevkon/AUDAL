@@ -48,7 +48,7 @@ fn make_blob(pcm_path: PathBuf) -> StoredBlobV2 {
 /// ώστε να πετύχουμε συγκεκριμένο RMS.
 ///
 /// Το ποσοστό παύσης ΕΧΕΙ ΣΗΜΑΣΙΑ: χωρίς παύσεις το
-/// noise floor ισούται με το RMS και το passes_acx()
+/// noise floor ισούται με το RMS και το levels_within_limits()
 /// κόβει για λάθος λόγο.
 fn generate_pcm_at_amplitude(path: &Path, burst_amp: f32) {
     let mut file = std::fs::File::create(path).unwrap();

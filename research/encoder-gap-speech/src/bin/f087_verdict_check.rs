@@ -4,7 +4,7 @@
 //!
 //! Calls the REAL production chain in-process (execute_streaming_plan →
 //! export_mp3_acx) and then the REAL verdict functions
-//! (AcxCheckReport::passes_acx / passes_acx_with_margin / margin_checks —
+//! (AcxCheckReport::levels_within_limits / …_with_margin / margin_checks —
 //! sp314_dsp, the SAME ones deliver.rs:471 and deliver.rs:420 call to fill
 //! ManifestEntry.passes_acx and StoredLoudness.delivery_checks).
 //! No reimplementation. Read-only: writes only to temp dir.
@@ -58,9 +58,9 @@ fn main() {
 
     println!();
     println!("=== THE VERDICT (real sp314_dsp fns — same ones deliver.rs calls) ===");
-    println!("MEASURED passes_acx()             = {}", report.passes_acx());
-    println!("MEASURED passes_acx_with_margin() = {}   <-- this is ManifestEntry.passes_acx (deliver.rs:472)",
-        report.passes_acx_with_margin());
+    println!("MEASURED levels_within_limits()             = {}", report.levels_within_limits());
+    println!("MEASURED levels_within_limits_with_margin() = {}   <-- ΗΤΑΝ το ManifestEntry.passes_acx· τώρα delivery_verdict (1a40772)",
+        report.levels_within_limits_with_margin());
 
     println!();
     println!("=== delivery_checks AS run_deliver_core WOULD WRITE THEM (deliver.rs:420) ===");

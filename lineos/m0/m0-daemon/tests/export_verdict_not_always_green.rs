@@ -126,10 +126,10 @@ fn the_record_agrees_with_the_single_rule_it_came_from() {
             assert_eq!(d.margin_applied, r.margin_applied_db);
             assert_eq!(d.verdict, if r.verdict { "pass" } else { "fail" });
         }
-        // ΚΑΙ η συνολική κρίση συμφωνεί με το passes_acx_with_margin().
+        // ΚΑΙ η συνολική κρίση συμφωνεί με το levels_within_limits_with_margin().
         assert_eq!(
             records.iter().all(|c| c.verdict == "pass") && report.noise_floor_db.is_some(),
-            report.passes_acx_with_margin()
+            report.levels_within_limits_with_margin()
         );
     }
 }
@@ -185,7 +185,7 @@ fn a_requirement_breached_is_fail() {
 }
 
 /// ORACLE 7 — ΤΟ ΚΡΙΣΙΜΟΤΕΡΟ: το spacing ΔΕΝ μπαίνει στη συνολική
-/// κρίση. Το `passes_acx_with_margin()` τρέχει πάνω στα
+/// κρίση. Το `levels_within_limits_with_margin()` τρέχει πάνω στα
 /// `margin_checks()`, που περιέχουν rms×2 + peak + noise_floor και
 /// ΤΙΠΟΤΑ άλλο — άρα κανένα advisory ή spacing-fail δεν μπορεί να το
 /// μολύνει. Αν κάποιος μελλοντικά χώσει το spacing μέσα στο
@@ -205,7 +205,7 @@ fn spacing_never_enters_the_overall_judgement() {
 
     // Η συνολική κρίση παραμένει TRUE — δομικά, όχι κατά τύχη.
     assert!(
-        report.passes_acx_with_margin(),
+        report.levels_within_limits_with_margin(),
         "το spacing ΔΕΝ πρέπει να επηρεάζει τη συνολική κρίση"
     );
     // Και τα margin_checks δεν περιέχουν καμία εγγραφή spacing.

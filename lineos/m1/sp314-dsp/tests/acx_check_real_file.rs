@@ -102,7 +102,7 @@ fn acx_check_real_file() {
         Some(nf) => println!("noise floor : {:>8.2} dBFS   (ACX limit: <= -60.0)", nf),
         None => println!("noise floor :     None   (file under 1 s)"),
     }
-    println!("passes_acx  : {}", report.passes_acx());
+    println!("levels_within_limits : {}", report.levels_within_limits());
     if let Some(start) = report.quietest_window_start_frame {
         println!(
             "quietest 500ms window starts at frame {} = {:.1} s (at the fed stream's rate)",
