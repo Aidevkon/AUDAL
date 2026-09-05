@@ -280,7 +280,14 @@ impl DeliveryCheck {
     /// `edge_quiet_secs` μετράει το pre-LAME buffer. Δεν υπάρχει χάσμα
     /// να αντισταθμιστεί.
     pub fn from_spacing(head_quiet_secs: f32, tail_quiet_secs: f32) -> Vec<DeliveryCheck> {
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «Room tone spacing must not exceed 5 seconds» — ΑΠΑΙΤΗΣΗ.
         const REQUIREMENT_MAX_S: f32 = 5.0;
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «We recommend between 1 and 5 seconds of room tone» — ΣΥΣΤΑΣΗ,
+        // γι' αυτό αυτό το όριο παράγει "advisory" και όχι "fail".
         const RECOMMENDATION_MIN_S: f32 = 1.0;
 
         let mut out = Vec::with_capacity(4);
@@ -335,16 +342,23 @@ impl DeliveryCheck {
         channels: u16,
         bitrate_kbps: f32,
     ) -> Vec<DeliveryCheck> {
-        // SOURCE: … «44.1kHz MP3» — ΙΣΟΤΗΤΑ, ο οίκος ορίζει έναν ρυθμό.
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «Each file must be a 192 kbps or higher CBR, 44.1kHz MP3»
+        // ΙΣΟΤΗΤΑ — ο οίκος ορίζει έναν ρυθμό, όχι εύρος.
         const REQUIRED_SR_HZ: f32 = 44_100.0;
-        // SOURCE: … ο οίκος δέχεται mono Ή stereo· η απαίτησή του είναι
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «Files are in either mono or stereo»
+        // ⚠ Ο ΟΙΚΟΣ ΔΕΧΕΤΑΙ ΚΑΙ ΤΑ ΔΥΟ. Η απαίτησή του είναι
         // ΟΜΟΙΟΜΟΡΦΙΑ ΣΕ ΟΛΟ ΤΟ ΒΙΒΛΙΟ, που ΔΕΝ μπορούμε να ελέγξουμε
-        // εδώ (ένα αρχείο τη φορά — F-088). Για το ACX preset ΕΜΕΙΣ
-        // παράγουμε mono, άρα ελέγχουμε ==1 ΓΙΑ ΤΟ ΔΙΚΟ ΜΑΣ παραδοτέο.
-        // Ο έλεγχος επιπέδου έργου είναι F-088.
+        // εδώ (ένα αρχείο τη φορά). Το ==1 αφορά ΤΟ ΔΙΚΟ ΜΑΣ ACX
+        // παραδοτέο, που παράγεται mono. Έλεγχος επιπέδου έργου: F-088.
         const REQUIRED_CHANNELS: f32 = 1.0;
-        // SOURCE: … «192 kbps **or higher**» — ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα.
-        // 256 και 320 ΠΕΡΝΑΝΕ ρητά κατά την πηγή.
+        // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+        // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+        // «Each file must be a 192 kbps or higher CBR»
+        // ΚΑΤΩ ΟΡΙΟ, ΟΧΙ ισότητα — 256 και 320 δεκτά ρητά.
         const MIN_BITRATE_KBPS: f32 = 192.0;
 
         vec![
@@ -354,6 +368,10 @@ impl DeliveryCheck {
                 required: REQUIRED_SR_HZ,
                 bound: "max".to_string(),
                 margin_applied: 0.0,
+                // PLACEHOLDER: ανοχή σύγκρισης f32, ΟΧΙ όριο προδιαγραφής.
+                // Η πηγή δεν δίνει ανοχή· το 0.5 υπάρχει μόνο επειδή το
+                // sample rate ταξιδεύει ως f32 σε αυτή τη δομή.
+                // TRIGGER: αν το sample_rate γίνει ακέραιος, φεύγει.
                 verdict: if (sample_rate_hz as f32 - REQUIRED_SR_HZ).abs() < 0.5 {
                     "pass"
                 } else {
