@@ -80,23 +80,36 @@ fn run(tag: &str, head: f32, speech: f32, tail: f32) {
 
     let plan = m0d::handlers::deliver::validate_and_plan(&req, &tracks).unwrap();
     let resp = m0d::handlers::deliver::run_deliver_core(&req, plan, None, None).unwrap();
+    let book_dir = resp.book_dir.clone().unwrap_or_default();
 
     println!("── {tag}  (head {head}s · ομιλία {speech}s · tail {tail}s)");
-    let spacing: Vec<&String> = resp
-        .warnings
-        .iter()
-        .filter(|w| w.contains("room tone"))
-        .collect();
-    if spacing.is_empty() {
-        println!("     ΚΑΜΙΑ προειδοποίηση room tone");
-    } else {
-        for w in spacing {
-            println!("     {w}");
+
+    // Οι ΔΟΜΗΜΕΝΕΣ εγγραφές, διαβασμένες από το sidecar που έγραψε η
+    // ΠΑΡΑΓΩΓΗ — όχι από ενδιάμεση δομή.
+    let sc = std::path::Path::new(&book_dir).join(format!("{}.stillair.json", "01_Chap_1"));
+    let alt = std::path::Path::new(&book_dir).join("01_Chap_1.mp3.stillair.json");
+    let path = if sc.exists() { sc } else { alt };
+    if let Ok(txt) = std::fs::read_to_string(&path) {
+        let v: serde_json::Value = serde_json::from_str(&txt).unwrap();
+        if let Some(cs) = v.get("delivery_checks").and_then(|c| c.as_array()) {
+            for c in cs {
+                let m = c["metric"].as_str().unwrap_or("?");
+                if !m.contains("spacing") { continue; }
+                println!("     {:<13} measured {:>6.2} {} required {:>5.1} {:<4} → {}",
+                    m, c["measured"].as_f64().unwrap_or(0.0),
+                    c["unit"].as_str().unwrap_or("?"),
+                    c["required"].as_f64().unwrap_or(0.0),
+                    c["bound"].as_str().unwrap_or("?"),
+                    c["verdict"].as_str().unwrap_or("?").to_uppercase());
+            }
+        } else {
+            println!("     (sidecar χωρίς delivery_checks: {})", path.display());
         }
+    } else {
+        println!("     (κανένα sidecar στο {})", path.display());
     }
-    for w in resp.warnings.iter().filter(|w| !w.contains("room tone")) {
-        println!("     (άλλο) {w}");
-    }
+    println!("     warnings room tone: {}",
+        resp.warnings.iter().filter(|w| w.contains("room tone")).count());
     println!();
 }
 
@@ -107,4 +120,6 @@ fn main() {
     run("A_simerino", 0.1, 6.0, 1.7);
     // Β — ουρά πάνω από το ΑΝΩ όριο («must not exceed 5 seconds»).
     run("B_tail_6s", 1.5, 6.0, 6.0);
+    // Γ — μέσα στο παράθυρο και στα δύο άκρα: μηδέν advisory, μηδέν fail.
+    run("C_head2_tail3", 2.0, 6.0, 3.0);
 }

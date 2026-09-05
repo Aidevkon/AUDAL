@@ -299,9 +299,16 @@ fn export_mp3_routed(
         report           = ?outcome.report,
         "export: ACX deliverable written and measured"
     );
-    Ok(Some(crate::blob_store::DeliveryCheck::from_margin_checks(
-        &outcome.report,
-    )))
+    // ΔΥΟ ΠΑΡΑΓΩΓΟΙ, ΣΚΟΠΙΜΑ ΧΩΡΙΣΤΟΙ. Το spacing ΔΕΝ μπαίνει μέσα στο
+    // `margin_checks()`: εκείνο τροφοδοτεί τη ΣΥΝΟΛΙΚΗ κρίση
+    // (`passes_acx_with_margin`, acx_check.rs:188) και ένα `advisory`
+    // εκεί θα τη μόλυνε. Χωριστά, η μόλυνση είναι δομικά αδύνατη.
+    let mut checks = crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
+    checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
+        outcome.head_quiet_secs,
+        outcome.tail_quiet_secs,
+    ));
+    Ok(Some(checks))
 }
 
 /// FLAC export — real encoding via io_flac (Phase 11 debt closed).

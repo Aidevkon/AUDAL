@@ -159,7 +159,20 @@ fn test_deliver_e2e_small() {
     assert!(manifest_str.contains("rms_spread_db"));
     assert!(manifest_str.contains("head_quiet_secs"));
     assert!(manifest_str.contains("tail_quiet_secs"));
-    assert!(manifest_str.contains("head room tone"));
+    // ΑΛΛΑΞΕ 2026-08-25: η κρίση του spacing έπαψε να είναι ελεύθερο
+    // κείμενο («head room tone …» σε `warnings`) και έγινε ΔΟΜΗΜΕΝΗ
+    // εγγραφή §5.3 στο `spacing_checks` κάθε manifest entry.
+    // Η ΠΡΟΘΕΣΗ του assert ΔΕΝ αλλάζει — «η κρίση του spacing φτάνει
+    // στο manifest» — αλλά τώρα ελέγχεται σε μορφή που διαβάζεται από
+    // μηχανή. Το test ΕΠΙΑΣΕ πραγματικό κενό: χωρίς αυτό το πεδίο, η
+    // αφαίρεση των warnings άφηνε τη διαδρομή fallback χωρίς κρίση.
+    assert!(manifest_str.contains("spacing_checks"));
+    assert!(manifest_str.contains("head_spacing"));
+    assert!(manifest_str.contains("tail_spacing"));
+    // ΚΑΙ ότι η τρίτη κατάσταση ταξιδεύει: το fixture έχει σχεδόν
+    // μηδενικό room tone στα άκρα ⇒ ΣΥΣΤΑΣΗ, ΟΧΙ παραβίαση.
+    assert!(manifest_str.contains("advisory"));
+    assert!(!manifest_str.contains("\"verdict\": \"fail\""));
 
     let _ = std::fs::remove_file(pcm1);
     let _ = std::fs::remove_file(pcm2);

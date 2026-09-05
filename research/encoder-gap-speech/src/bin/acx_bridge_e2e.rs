@@ -114,12 +114,22 @@ async fn main() {
                         c.margin_applied, c.bound, c.verdict.to_uppercase()
                     );
                 }
+                // ⚠ ΤΟ advisory ΔΕΝ ΕΙΝΑΙ ΑΠΟΤΥΧΙΑ. Η πρώτη μορφή αυτής της
+                // σύνοψης έγραφε `c.verdict != "pass"` και ανέφερε
+                // «FAIL σε: head_spacing» για αρχείο ΠΛΗΡΩΣ συμμορφούμενο.
+                // Είναι ακριβώς το λάθος που η τρίτη κατάσταση προσκαλεί:
+                // κάθε συναθροιστής που ρωτάει «είναι pass;» αντί «είναι
+                // fail;» μετατρέπει σύσταση σε αποτυχία.
                 let failed: Vec<&str> =
-                    cs.iter().filter(|c| c.verdict != "pass").map(|c| c.metric.as_str()).collect();
+                    cs.iter().filter(|c| c.verdict == "fail").map(|c| c.metric.as_str()).collect();
+                let advis: Vec<&str> =
+                    cs.iter().filter(|c| c.verdict == "advisory").map(|c| c.metric.as_str()).collect();
                 println!(
-                    "          ΣΥΝΟΛΙΚΑ: {}",
-                    if failed.is_empty() { "ΟΛΑ PASS".to_string() }
-                    else { format!("FAIL σε: {}", failed.join(", ")) }
+                    "          ΣΥΝΟΛΙΚΑ: {}{}",
+                    if failed.is_empty() { "ΚΑΜΙΑ ΠΑΡΑΒΙΑΣΗ".to_string() }
+                    else { format!("FAIL σε: {}", failed.join(", ")) },
+                    if advis.is_empty() { String::new() }
+                    else { format!("  ·  ΣΥΣΤΑΣΗ σε: {}", advis.join(", ")) }
                 );
             }
         }

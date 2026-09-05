@@ -132,3 +132,112 @@ fn the_record_agrees_with_the_single_rule_it_came_from() {
         );
     }
 }
+
+// ── ΤΡΙΤΗ ΚΑΤΑΣΤΑΣΗ: "advisory" (προσθήκη 2026-08-25) ────────────────
+//
+// Η πηγή διακρίνει ΑΠΑΙΤΗΣΗ («must not exceed 5 seconds») από ΣΥΣΤΑΣΗ
+// («we recommend between 1 and 5»). Οι δύο oracles παρακάτω πινάρουν
+// ότι η διάκριση επιβιώνει στην εγγραφή — και, ΤΟ ΚΡΙΣΙΜΟ, ότι το
+// advisory ΔΕΝ αγγίζει τη συνολική κρίση.
+
+/// ORACLE 5 — ΣΥΣΤΑΣΗ εκτός ⇒ "advisory", ΟΧΙ "fail".
+/// Το σχήμα του σημερινού παραδοτέου: head 0.10 s (κάτω από τη
+/// σύσταση), tail 1.70 s (μέσα στο παράθυρο).
+#[test]
+fn a_recommendation_missed_is_advisory_not_failure() {
+    let checks = DeliveryCheck::from_spacing(0.10, 1.70);
+    assert_eq!(checks.len(), 4, "head×2 + tail×2");
+
+    // ΣΥΣΤΑΣΗ αστοχεί ⇒ advisory
+    let h_min = find(&checks, "head_spacing", "min");
+    assert_eq!(h_min.verdict, "advisory");
+    assert_eq!(h_min.required, 1.0);
+    assert_eq!(h_min.measured, 0.10);
+    assert_eq!(h_min.unit, "seconds");
+    // ΜΗΔΕΝ margin — δηλωμένο (F-077: ΜΕΤΡΗΣΗ ΟΧΙ GATE)
+    assert_eq!(h_min.margin_applied, 0.0);
+
+    // ΑΠΑΙΤΗΣΗ τηρείται ⇒ pass
+    assert_eq!(find(&checks, "head_spacing", "max").verdict, "pass");
+    // tail εντός παραθύρου ⇒ pass ΚΑΙ στα δύο
+    assert_eq!(find(&checks, "tail_spacing", "min").verdict, "pass");
+    assert_eq!(find(&checks, "tail_spacing", "max").verdict, "pass");
+
+    // ΚΑΝΕΝΑ "fail" πουθενά — σύσταση δεν είναι αποτυχία.
+    assert!(
+        !checks.iter().any(|c| c.verdict == "fail"),
+        "σύσταση εκτός ΔΕΝ παράγει fail: {checks:#?}"
+    );
+}
+
+/// ORACLE 6 — ΑΠΑΙΤΗΣΗ εκτός ⇒ "fail". Και το κάτω όριο τηρείται
+/// ταυτόχρονα, ώστε το fail να μην μπορεί να αποδοθεί στη σύσταση.
+#[test]
+fn a_requirement_breached_is_fail() {
+    let checks = DeliveryCheck::from_spacing(2.0, 6.0);
+
+    assert_eq!(find(&checks, "tail_spacing", "max").verdict, "fail");
+    assert_eq!(find(&checks, "tail_spacing", "max").required, 5.0);
+    assert_eq!(find(&checks, "tail_spacing", "min").verdict, "pass");
+    assert_eq!(find(&checks, "head_spacing", "max").verdict, "pass");
+    assert_eq!(find(&checks, "head_spacing", "min").verdict, "pass");
+}
+
+/// ORACLE 7 — ΤΟ ΚΡΙΣΙΜΟΤΕΡΟ: το spacing ΔΕΝ μπαίνει στη συνολική
+/// κρίση. Το `passes_acx_with_margin()` τρέχει πάνω στα
+/// `margin_checks()`, που περιέχουν rms×2 + peak + noise_floor και
+/// ΤΙΠΟΤΑ άλλο — άρα κανένα advisory ή spacing-fail δεν μπορεί να το
+/// μολύνει. Αν κάποιος μελλοντικά χώσει το spacing μέσα στο
+/// `margin_checks()`, ΑΥΤΟ ΕΔΩ ΣΠΑΕΙ.
+#[test]
+fn spacing_never_enters_the_overall_judgement() {
+    let report = AcxCheckReport {
+        sample_peak_db: -4.768217,
+        rms_db: -22.500002,
+        noise_floor_db: Some(-90.42713),
+        quietest_window_start_frame: Some(119_070),
+    };
+    // Το ΙΔΙΟ report, με spacing που ΚΑΙ συστήνεται-εκτός ΚΑΙ παραβιάζει.
+    let spacing = DeliveryCheck::from_spacing(0.10, 6.0);
+    assert!(spacing.iter().any(|c| c.verdict == "advisory"));
+    assert!(spacing.iter().any(|c| c.verdict == "fail"));
+
+    // Η συνολική κρίση παραμένει TRUE — δομικά, όχι κατά τύχη.
+    assert!(
+        report.passes_acx_with_margin(),
+        "το spacing ΔΕΝ πρέπει να επηρεάζει τη συνολική κρίση"
+    );
+    // Και τα margin_checks δεν περιέχουν καμία εγγραφή spacing.
+    assert!(
+        !report
+            .margin_checks()
+            .iter()
+            .any(|c| c.metric.contains("spacing")),
+        "το margin_checks() ΔΕΝ πρέπει να περιέχει spacing"
+    );
+}
+
+/// ORACLE 8 — ΣΥΜΒΑΤΟΤΗΤΑ ΠΡΟΣ ΤΑ ΠΙΣΩ: sidecar γραμμένο ΠΡΙΝ την
+/// 25/08 δεν περιέχει "advisory" και διαβάζεται αμετάβλητο.
+/// Το JSON παρακάτω είναι στη ΠΑΛΙΑ μορφή (κλειδιά `*_db`, ΧΩΡΙΣ
+/// `unit`) — ίδιο ιδίωμα με το test συμβατότητας του blob_store.
+/// ΑΠΟΔΕΙΞΗ ΜΕ ΤΡΕΞΙΜΟ, όχι υπόθεση.
+#[test]
+fn a_pre_advisory_sidecar_still_deserialises() {
+    let old = r#"[
+        {"metric":"rms","measured_db":-22.9,"required_db":-23.0,
+         "bound":"min","margin_applied_db":0.35,"verdict":"pass"},
+        {"metric":"peak","measured_db":-4.7,"required_db":-3.0,
+         "bound":"max","margin_applied_db":0.20,"verdict":"fail"}
+    ]"#;
+    let checks: Vec<DeliveryCheck> = serde_json::from_str(old)
+        .unwrap_or_else(|e| panic!("παλιό sidecar ΔΕΝ διαβάζεται: {e}"));
+
+    assert_eq!(checks.len(), 2);
+    assert_eq!(checks[0].verdict, "pass");
+    assert_eq!(checks[1].verdict, "fail");
+    // Το `unit` απουσιάζει στο παλιό ⇒ default "db" (F-074).
+    assert!(checks.iter().all(|c| c.unit == "db"));
+    // Και ΚΑΝΕΝΑ advisory — η τρίτη κατάσταση είναι ΠΡΟΣΘΕΤΙΚΗ.
+    assert!(!checks.iter().any(|c| c.verdict == "advisory"));
+}

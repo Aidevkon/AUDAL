@@ -191,7 +191,28 @@ pub struct DeliveryCheck {
     /// Δικό μας, μετρημένο (F-077). 0.0 όπου δεν ισχύει.
     #[serde(alias = "margin_applied_db")]
     pub margin_applied: f32,
-    /// "pass" | "fail".
+    /// "pass" | "fail" | "advisory".
+    ///
+    /// ΤΡΙΤΗ ΚΑΤΑΣΤΑΣΗ, ΠΡΟΣΘΗΚΗ 2026-08-25 (απόφαση Anestis). Η
+    /// δημοσιευμένη πηγή διακρίνει δύο κλάσεις κανόνα με διαφορετική
+    /// γλώσσα: «Room tone spacing **must not exceed** 5 seconds»
+    /// (ΑΠΑΙΤΗΣΗ) έναντι «We **recommend** between 1 and 5 seconds»
+    /// (ΣΥΣΤΑΣΗ). Δύο κλάσεις, δύο καταστάσεις.
+    ///
+    /// "advisory" περιγράφει **ΤΗΝ ΚΛΑΣΗ ΤΟΥ ΚΑΝΟΝΑ**, όχι σοβαρότητα.
+    /// ΓΙ' ΑΥΤΟ ΔΕΝ ΛΕΓΕΤΑΙ "warning": το warning υπονοεί πρόβλημα, ενώ
+    /// ένα αρχείο κάτω από σύσταση είναι **πλήρως συμμορφούμενο**.
+    ///
+    /// ⚠ ΤΟ advisory ΔΕΝ ΜΕΤΡΑΕΙ ΣΤΗ ΣΥΝΟΛΙΚΗ ΣΥΜΜΟΡΦΩΣΗ. Η συνολική
+    /// κρίση (`AcxCheckReport::passes_acx_with_margin`, acx_check.rs:188)
+    /// τρέχει πάνω σε `AcxMarginCheck` με **bool** verdict και **δεν
+    /// περιέχει spacing** — δομικά αδύνατο να μολυνθεί. Το spacing
+    /// μπαίνει από ΞΕΧΩΡΙΣΤΟ παραγωγό (`from_spacing`), ποτέ μέσα στο
+    /// `margin_checks()`.
+    ///
+    /// ⚠ ΠΑΛΙΑ SIDECARS: η αλλαγή είναι **ΠΡΟΣΘΕΤΙΚΗ στο σύνολο τιμών**
+    /// — το πεδίο ήταν και μένει `String`. Sidecar γραμμένο πριν την
+    /// 25/08 δεν περιέχει "advisory" και διαβάζεται αμετάβλητο.
     pub verdict: String,
     /// "db" | "seconds" — τι μονάδα κρατούν measured/required/margin_applied
     /// σε ΑΥΤΗ την εγγραφή. Absent στα παλιά sidecars (πριν 24/08): default
@@ -235,6 +256,59 @@ impl DeliveryCheck {
                 unit: "db".to_string(),
             })
             .collect()
+    }
+
+    /// Οι ΤΕΣΣΕΡΙΣ εγγραφές spacing — Ο ΜΟΝΟΣ παραγωγός τους.
+    /// `/deliver` και `/export` καλούν ΑΥΤΗΝ. Μία υλοποίηση, δύο καλούντες.
+    ///
+    /// ΤΕΣΣΕΡΙΣ ΚΑΙ ΟΧΙ ΔΥΟ — δηλωμένη απόφαση: το σχήμα κρατάει **ένα**
+    /// `required` με **ένα** `bound` ("min"|"max"), όχι εύρος. Ένα
+    /// παράθυρο [1,5] χρειάζεται δύο εγγραφές ανά άκρο. Είναι ακριβώς το
+    /// μοτίβο που ήδη ακολουθεί το `rms` (min ΚΑΙ max), και τηρεί το
+    /// «ΜΙΑ ΚΡΙΣΗ ΑΝΑ ΓΡΑΜΜΗ» του threshold-lint.
+    ///
+    /// ΟΙ ΔΥΟ ΚΛΑΣΕΙΣ, από τη γλώσσα της πηγής:
+    ///   bound "max", required 5.0 → ΑΠΑΙΤΗΣΗ  ⇒ "pass" | "fail"
+    ///   bound "min", required 1.0 → ΣΥΣΤΑΣΗ   ⇒ "pass" | "advisory"
+    ///
+    /// SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+    /// RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
+    ///
+    /// ⚠ `margin_applied = 0.0`, ΔΗΛΩΜΕΝΟ ΚΑΙ ΟΧΙ ΕΦΕΥΡΗΜΕΝΟ: το
+    /// spacing margin τέθηκε 0.0 στο F-077 («ΜΕΤΡΗΣΗ ΟΧΙ GATE») επειδή
+    /// δεν μεσολαβεί encoder που να μετατοπίζει χρόνο — το
+    /// `edge_quiet_secs` μετράει το pre-LAME buffer. Δεν υπάρχει χάσμα
+    /// να αντισταθμιστεί.
+    pub fn from_spacing(head_quiet_secs: f32, tail_quiet_secs: f32) -> Vec<DeliveryCheck> {
+        const REQUIREMENT_MAX_S: f32 = 5.0;
+        const RECOMMENDATION_MIN_S: f32 = 1.0;
+
+        let mut out = Vec::with_capacity(4);
+        for (metric, measured) in [
+            ("head_spacing", head_quiet_secs),
+            ("tail_spacing", tail_quiet_secs),
+        ] {
+            out.push(DeliveryCheck {
+                metric: metric.to_string(),
+                measured,
+                required: REQUIREMENT_MAX_S,
+                bound: "max".to_string(),
+                margin_applied: 0.0,
+                verdict: if measured <= REQUIREMENT_MAX_S { "pass" } else { "fail" }.to_string(),
+                unit: "seconds".to_string(),
+            });
+            out.push(DeliveryCheck {
+                metric: metric.to_string(),
+                measured,
+                required: RECOMMENDATION_MIN_S,
+                bound: "min".to_string(),
+                margin_applied: 0.0,
+                verdict: if measured >= RECOMMENDATION_MIN_S { "pass" } else { "advisory" }
+                    .to_string(),
+                unit: "seconds".to_string(),
+            });
+        }
+        out
     }
 }
 

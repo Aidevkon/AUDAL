@@ -288,6 +288,15 @@ pub struct ManifestEntry {
     pub passes_acx: bool,
     pub head_quiet_secs: f32,
     pub tail_quiet_secs: f32,
+    /// Η ΚΡΙΣΗ του spacing, §5.3 σχήμα — ΑΝΤΙΚΑΤΕΣΤΗΣΕ τα τέσσερα
+    /// `warnings.push(format!(...))` της 25/08.
+    ///
+    /// ΓΙΑΤΙ ΕΔΩ ΚΑΙ ΟΧΙ ΜΟΝΟ ΣΤΟ SIDECAR: η επανεγγραφή του sidecar
+    /// είναι ΥΠΟ ΟΡΟΥΣ (θέλει resolved_blob + masters_dir + project_id)·
+    /// το manifest γράφεται ΠΑΝΤΑ. Χωρίς αυτό το πεδίο, η αφαίρεση των
+    /// warnings θα άφηνε τη διαδρομή fallback ΧΩΡΙΣ καμία κρίση
+    /// spacing — κενό που έπιασε το `test_deliver_e2e_small`.
+    pub spacing_checks: Vec<crate::blob_store::DeliveryCheck>,
 }
 
 #[derive(Serialize)]
@@ -421,9 +430,18 @@ pub fn run_deliver_core(
                         // DeliveryCheck::from_margin_checks — δεύτερος
                         // καλών (/export) τη χρειάζεται, και inline θα
                         // σήμαινε δύο αντίγραφα. Ίδιες τιμές, ίδιος κανόνας.
-                        loudness.delivery_checks = Some(
-                            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report),
-                        );
+                        // 2026-08-25: ΚΑΙ το spacing, από τον ΙΔΙΟ
+                        // παραγωγό με το /export (from_spacing) — μία
+                        // υλοποίηση, δύο καλούντες. Χωριστά από τα
+                        // margin_checks ώστε το "advisory" να μη φτάνει
+                        // ποτέ στη συνολική κρίση.
+                        let mut checks =
+                            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
+                        checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
+                            outcome.head_quiet_secs,
+                            outcome.tail_quiet_secs,
+                        ));
+                        loudness.delivery_checks = Some(checks);
                         if let Err(e) =
                             crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)
                         {
@@ -463,6 +481,10 @@ pub fn run_deliver_core(
             passes_acx: outcome.report.passes_acx_with_margin(),
             head_quiet_secs: outcome.head_quiet_secs,
             tail_quiet_secs: outcome.tail_quiet_secs,
+            spacing_checks: crate::blob_store::DeliveryCheck::from_spacing(
+                outcome.head_quiet_secs,
+                outcome.tail_quiet_secs,
+            ),
         });
     }
 
@@ -478,7 +500,6 @@ pub fn run_deliver_core(
             }
         }
     }
-
     let rms_spread = if min_rms <= max_rms {
         max_rms - min_rms
     } else {
@@ -491,70 +512,24 @@ pub fn run_deliver_core(
         ));
     }
 
-    for e in &manifest_entries {
-        if e.role == "chapter" || e.role.ends_with("credits") || e.role == "retail_sample" {
-            // ΤΟ ΠΑΡΑΘΥΡΟ ΔΙΟΡΘΩΘΗΚΕ 2026-08-25. ΗΤΑΝ: head 0.5-1s,
-            // tail 1-5s — δύο διαφορετικά παράθυρα, και το head λάθος.
-            // Η πηγή δίνει ΕΝΑ παράθυρο, ΚΑΙ ΣΤΑ ΔΥΟ άκρα, αυτολεξεί:
-            //   «We recommend between 1 and 5 seconds of room tone at the
-            //    beginning and end of each file for an ideal listening
-            //    experience. Room tone spacing must not exceed 5 seconds.»
-            //
-            // ΔΥΟ ΚΛΑΣΕΙΣ, ΟΧΙ ΜΙΑ — η γλώσσα της πηγής τις χωρίζει:
-            //   «must not exceed 5 seconds» = ΑΠΑΙΤΗΣΗ
-            //   «We recommend between 1 and 5»  = ΣΥΣΤΑΣΗ
-            // Το κάτω όριο ΔΕΝ είναι απαίτηση. ΤΕΚΜΗΡΙΟ ΥΠΕΡ, ΜΕΤΡΗΜΕΝΟ
-            // 2026-08-25: 20/20 κεφάλαια BILLGATES έχουν head 0.60s —
-            // ΚΑΤΩ από τη σύσταση — και είναι εκδομένα, δηλαδή πέρασαν QC.
-            // Με τα ΠΑΛΙΑ όρια και τα 20 θα σημαιοφορούνταν δύο φορές
-            // (0.60 < 0.5 όχι, αλλά tail 3.5 εντός· το head 0.60 περνούσε
-            // οριακά) — και κάθε αρχείο με head 1-5s, που η πηγή ΣΥΣΤΗΝΕΙ,
-            // θα κοκκίνιζε ως «> 1.0s».
-            //
-            // ⚠ ΤΟ verdict ΔΕΝ ΜΠΑΙΝΕΙ ΕΔΩ: αυτοί οι έλεγχοι είναι
-            // `warnings` (ελεύθερο κείμενο), ΟΧΙ `DeliveryCheck` — δεν
-            // υπάρχει πεδίο verdict σε αυτή τη διαδρομή. Και το
-            // `DeliveryCheck.verdict` δέχεται ΜΟΝΟ "pass"|"fail"
-            // (blob_store.rs:194): μια ΣΥΣΤΑΣΗ σε πεδίο pass/fail θα ήταν
-            // ψέμα προς την αυστηρή πλευρά. Η δομημένη εγγραφή spacing
-            // είναι δουλειά του F-091.
-            //
-            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-            // ΑΠΑΙΤΗΣΗ — «must not exceed 5 seconds», head
-            if e.head_quiet_secs > 5.0 {
-                warnings.push(format!(
-                    "{}: ΠΑΡΑΒΙΑΣΗ head room tone {:.2}s — η ACX απαιτεί <= 5s",
-                    e.filename, e.head_quiet_secs
-                ));
-            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-            // ΣΥΣΤΑΣΗ — «We recommend between 1 and 5 seconds», head
-            } else if e.head_quiet_secs < 1.0 {
-                warnings.push(format!(
-                    "{}: ΣΥΣΤΑΣΗ head room tone {:.2}s — η ACX συστήνει 1-5s (ΟΧΙ παραβίαση)",
-                    e.filename, e.head_quiet_secs
-                ));
-            }
-            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-            // ΑΠΑΙΤΗΣΗ — «must not exceed 5 seconds», tail
-            if e.tail_quiet_secs > 5.0 {
-                warnings.push(format!(
-                    "{}: ΠΑΡΑΒΙΑΣΗ tail room tone {:.2}s — η ACX απαιτεί <= 5s",
-                    e.filename, e.tail_quiet_secs
-                ));
-            // SOURCE: https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
-            // RETRIEVED: 2026-08-25 (σελίδα: Apr 15, 2026)
-            // ΣΥΣΤΑΣΗ — «We recommend between 1 and 5 seconds», tail
-            } else if e.tail_quiet_secs < 1.0 {
-                warnings.push(format!(
-                    "{}: ΣΥΣΤΑΣΗ tail room tone {:.2}s — η ACX συστήνει 1-5s (ΟΧΙ παραβίαση)",
-                    e.filename, e.tail_quiet_secs
-                ));
-            }
-        }
-    }
+    // ΤΟ SPACING ΕΦΥΓΕ ΑΠΟ ΤΑ warnings — 2026-08-25.
+    //
+    // ΗΤΑΝ: τέσσερα `warnings.push(format!(...))` με ελεύθερο κείμενο.
+    // ΕΙΝΑΙ: τέσσερις εγγραφές `DeliveryCheck` (head/tail x
+    // ΑΠΑΙΤΗΣΗ/ΣΥΣΤΑΣΗ) από τον `DeliveryCheck::from_spacing`, παραπάνω.
+    //
+    // ΓΙΑΤΙ ΕΦΥΓΑΝ ΑΝΤΙ ΝΑ ΜΕΙΝΟΥΝ ΔΙΠΛΑ: ελεύθερο κείμενο δεν
+    // ταξιδεύει — δεν φτάνει στο /export, δεν μπαίνει στο sidecar, δεν
+    // διαβάζεται από μηχανή. Κρατώντας ΚΑΙ τα δύο, το ίδιο γεγονός θα
+    // λεγόταν σε δύο μορφές που μπορούν να αποκλίνουν: ακριβώς το
+    // μοτίβο των «τριών αγκυρών» που έχει ήδη κοστίσει.
+    //
+    // Η ΜΕΤΡΗΣΗ δεν χάνεται σε καμία περίπτωση: το `ManifestEntry`
+    // κουβαλάει `head_quiet_secs`/`tail_quiet_secs` αυτούσια, και όταν
+    // η επανεγγραφή του sidecar παραλείπεται, ΑΥΤΟ ήδη προειδοποιείται
+    // ρητά («no existing sidecar found ... certificate rewrite
+    // skipped»). Ο μετρητής καταγράφει· ο ερμηνευτής μεταφράζει.
+
 
     let roles: HashSet<&str> = manifest_entries.iter().map(|e| e.role.as_str()).collect();
     if !roles.contains("opening_credits") {
