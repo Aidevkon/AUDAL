@@ -53,13 +53,19 @@ pub struct ZoneActivationFlags {
 /// Computed BEFORE NMF and BEFORE Aether, from raw stereo PCM.
 /// Same input = same output always. (INV-PA-1)
 ///
-/// Band indices for `spectral_profile_db` and `band_phase_correlation`:
+/// ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: prior comment referenced nonexistent `band_phase_correlation`
+/// field and listed only 6 bands. ΨΕΥΔΕΣ — the field is `global_phase_correlation`
+/// (line 88), and `spectral_profile_db` is [f32; 8] with 8 bands (see below).
+///
+/// Band indices for `spectral_profile_db` (8 bands):
 ///   [0] Sub      20–80 Hz
 ///   [1] Bass     80–250 Hz
 ///   [2] LowMid   250–500 Hz
-///   [3] Mid      500–2000 Hz
-///   [4] HighMid  2000–8000 Hz
-///   [5] Air      8000–20000 Hz
+///   [3] Mid-Low  500–1000 Hz
+///   [4] Mid-High 1000–2000 Hz
+///   [5] HighMid  2000–4000 Hz
+///   [6] Treble   4000–8000 Hz
+///   [7] Air      8000–20000 Hz
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreAnalysisData {
     // ── Dynamics Baseline ──

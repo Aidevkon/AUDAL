@@ -69,7 +69,9 @@ impl M0Client {
             .map_err(|e| M0Error::ParseError(e.to_string()))
     }
 
-    /// POST /master — trigger mastering pipeline.
+    /// POST /master/streaming — trigger mastering pipeline.
+    /// ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: prior comment said "POST /master".
+    /// ΨΕΥΔΕΣ — actual endpoint is POST /master/streaming (changed in 706d237, 2026-07-17).
     /// Returns MasterResponse with blob_id on success.
     /// Timeout: 300s — mastering a large file takes 60-120s.
     pub async fn trigger_mastering(&self, req: MasterRequest) -> Result<MasterResponse, M0Error> {

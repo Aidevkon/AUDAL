@@ -35,6 +35,11 @@ pub struct TrunkMetrics {
     /// syllable rather than the ambient floor ACX means. Unverified as an ACX
     /// noise-floor proxy; do not surface it to a user as a pass/fail number
     /// without checking it against real accepted/rejected ACX files first.
+    ///
+    /// ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: Field name is misleading. NOT the AcxCheckAnalyzer
+    /// algorithm (which uses LS window after HP8 Butterworth @10Hz, step 100ms).
+    /// This IS p5 block RMS. Name kept to avoid breaking callers; the calculation
+    /// is what matters. Also: this metric is computed but DISCARDED in to_pre_analysis().
     pub acx_noise_floor_proxy_db: f32,
     pub crest_db: f32,
     pub lra: f32,

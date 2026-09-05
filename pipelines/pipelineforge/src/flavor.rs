@@ -110,7 +110,10 @@ impl Flavor {
                 ]
             }),
             Flavor::LufsNormalization => json!({
-
+                // ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: The name LufsNormalization is misleading.
+                // The topology does NOT perform LUFS normalization — it contains
+                // MaskingEQ, Reverb (ambience), and Width. No LUFS-based math.
+                // This is an orphaned path (never called from production routing).
                 "topology_id": "lufs_norm",
                 "nodes": [
                     { "node_id": "Input", "node_type": "Input", "parameters": {} },

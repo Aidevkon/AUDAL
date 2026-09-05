@@ -1,13 +1,11 @@
 //! Streaming DSP pipeline — chunked
 //! processing via DspGraph::process_block.
 //!
-//! STATUS: Not yet wired to any HTTP
-//! endpoint. Built for the planned
-//! "2.5 Neon Canvas" instrument: live A/B
-//! preview + delta visualization for the
-//! Single Track Session onboarding flow
-//! (vs. the Batch/Album/Episode flow, which
-//! uses the offline path in dsp/mod.rs).
+//! STATUS: LIVE. Wired to POST /master/streaming endpoint.
+//! ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: prior comment said "Not yet wired to any HTTP endpoint".
+//! ΨΕΥΔΕΣ — active via POST /master/streaming (and batch). Misled three separate
+//! recons on 2026-08-24 before measured by running code. Callers: executor.rs,
+//! and streaming mode from CLI entry point.
 //!
 //! Decode parity with the batch path is
 //! already proven by
@@ -16,10 +14,10 @@
 //! DSP-graph output parity (this module vs.
 //! mod.rs, same input) has NOT yet been
 //! verified end-to-end — do that before
-//! wiring this to a real endpoint.
+//! the implementation ships.
 //!
-//! Currently only exercised by
-//! bin/benchmark_streaming.rs.
+//! NOTE: bin/benchmark_streaming.rs reference is stale;
+//! that file no longer exists in the tree.
 
 use crate::decode_provider::DecodeProvider;
 use lineos_corpus::scout::{SegmentBoundary, SegmentType, TimelineRouter};

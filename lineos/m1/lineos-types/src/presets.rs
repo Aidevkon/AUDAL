@@ -184,11 +184,14 @@ pub struct PresetEntry {
     pub delivery: DeliverySpec,
 }
 
-/// The catalogue as it stands today. Deliberately a transcription of the two
-/// existing match arms, not an improvement on them: "acx" and "apple_podcasts"
-/// are aliases of "podcast" here because that is what they are in the code
-/// being replaced. Giving ACX its own numbers is a later, separate step with
-/// its own measurements.
+/// The catalogue as it stands today.
+/// ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: prior comment said '"acx" and "apple_podcasts" are aliases
+/// of "podcast"' and 'Giving ACX its own numbers is a later, separate step'.
+/// ΨΕΥΔΕΣ — ACX NOW HAS ITS OWN ENTRY (line 217+) with sourced measurements from
+/// https://help.acx.com/s/article/what-are-the-acx-audio-submission-requirements
+/// (retrieved 2026-08-25). The step is DONE. Only "apple_podcasts" remains an alias
+/// of "podcast" (line 213). This misleading comment would cause the next developer
+/// to repeat completed work.
 pub static CATALOGUE: &[PresetEntry] = &[
     PresetEntry {
         id: "spotify",

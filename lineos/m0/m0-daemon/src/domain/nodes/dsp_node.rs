@@ -76,7 +76,9 @@ pub fn build_intent_and_config(
             // Control Plane: lerp here,
             // NOT in DSP engine.
             // 0.0 (Smooth) -> 200ms
-            // 0.5 (default) -> 95ms
+            // 0.5 (default) -> 105ms
+            // ⚠ ΔΙΟΡΘΩΣΗ 2026-08-25: prior comment said "95ms".
+            // Formula 200.0 - (0.5 × 190.0) = 105ms. Endpoints correct (0→200✓, 1→10✓).
             // 1.0 (Punchy) -> 10ms
             let d = req_dynamics.unwrap_or(0.5).clamp(0.0, 1.0);
             200.0 - (d * 190.0)
