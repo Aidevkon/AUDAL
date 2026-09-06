@@ -2,7 +2,11 @@
 name    = "lame-sys"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 description = "LGPL-compliant dynamic bindings to system libmp3lame (lame-sys)"
 
 # Authority: docs/licenses/LAME-LGPL-NOTICE.md §1 — dynamic linking only

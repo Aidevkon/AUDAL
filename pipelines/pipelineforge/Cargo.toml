@@ -2,7 +2,11 @@
 name    = "pipelineforge"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 
 [dependencies]
 sp314-nodes = { path = "../../lineos/m1/sp314-nodes" }

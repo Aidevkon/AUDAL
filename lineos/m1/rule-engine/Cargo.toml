@@ -2,7 +2,11 @@
 name        = "lineos-rule-engine"
 version     = "0.1.0"
 edition     = "2021"
-license     = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 # Authority: LineOS Constitution v2.0 §07 · Coach-Core README v1.0
 # Deterministic rule engine — no LLM, no randomness, no side effects.
 # Pure functions only. Static RULES array. Zero dynamic dispatch.

@@ -3,7 +3,11 @@ name    = "stillair-cockpit"
 version = "0.1.0"
 edition = "2021"
 description = "Still Air — Dioxus 0.6 Cockpit (Phase 11)"
-license = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 
 # Dioxus web: WASM target, served to Tauri WebView via trunk
 # window.__TAURI_INTERNALS__ is injected by Tauri (withGlobalTauri: true)

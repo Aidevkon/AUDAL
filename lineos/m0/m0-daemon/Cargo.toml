@@ -1,7 +1,11 @@
 [package]
 name = "m0d"
 version = "0.1.0"
-license = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 edition = "2021"
 # M0 Constitution v2.0
 # inherits_from = ["creator-os-invariants", "lineos-constitution"]

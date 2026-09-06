@@ -2,7 +2,11 @@
 name        = "lineos-telemetry"
 version     = "0.1.0"
 edition     = "2021"
-license     = "MIT"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
 # Authority: LineOS Constitution v2.0 §07
 # Comparator rule: reads Golden Blob only — never re-measures raw audio.
 
