@@ -201,7 +201,7 @@ pub async fn export_audio(
         // ΤΕΛΙΚΟ σήμα) και ταξιδεύει ΚΑΙ στο sidecar ΚΑΙ στην απόκριση —
         // μία μέτρηση, δύο αναγνώστες.
         let checks = export_blob(&blob_clone, format, &path_for_io, Some(&masters_for_io))?;
-        write_sidecar(
+        write_unsigned_export_sidecar(
             &blob_clone,
             &format_str,
             &path_for_io,
@@ -1508,7 +1508,11 @@ pub struct ComplianceSummary {
 
 /// Write sidecar JSON alongside audio file.
 /// Path: audio_path with extension replaced by "stillair.json".
-pub fn write_sidecar(
+// ⚠ ΔΕΝ ΥΠΟΓΡΑΦΕΙ. Ομώνυμη με την blob_store::write_sidecar που
+// ΥΠΟΓΡΑΦΕΙ· η διαφορά ήταν ένα πρόθεμα αόρατο στο σημείο κλήσης, και
+// αυτό έστειλε ανυπόγραφο έγγραφο στον χρήστη επί μήνες (F-090, 25/08).
+// Το υπογεγραμμένο παραδοτέο γράφεται χωριστά (e34df1a).
+pub fn write_unsigned_export_sidecar(
     blob: &StoredBlobV2,
     format: &str,
     audio_path: &Path,
