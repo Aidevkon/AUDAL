@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 description = "LGPL-compliant dynamic bindings to system libmp3lame (lame-sys)"
 
-# Authority: LAME-LGPL-NOTICE.md §1 — dynamic linking only
+# Authority: docs/licenses/LAME-LGPL-NOTICE.md §1 — dynamic linking only
 # This crate links libmp3lame.so DYNAMICALLY via pkg-config (fallback: rustc-link-lib=dylib).
 # NEVER link statically — that is an LGPL violation.
 # System install: sudo apt install libmp3lame-dev

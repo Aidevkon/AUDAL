@@ -77,7 +77,7 @@ pub enum ExportFormat {
     Flac,
     Opus,
     /// MP3 via LAME — LGPL, dynamic linking only.
-    /// See: lineos/plan/phase-13/LAME-LGPL-NOTICE.md
+    /// See: docs/licenses/LAME-LGPL-NOTICE.md
     Mp3,
     /// AIFF — Logic Pro native, uncompressed 32-bit float BE PCM.
     /// Pure Rust, no new crate. P13-003b.
@@ -94,7 +94,7 @@ impl ExportFormat {
             "wav" => Ok(Self::Wav),
             "flac" => Ok(Self::Flac),
             "opus" => Ok(Self::Opus),
-            // MP3 via LAME — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
+            // MP3 via LAME — LGPL dynamic linking only (see docs/licenses/LAME-LGPL-NOTICE.md)
             "mp3" => Ok(Self::Mp3),
             // AIFF — Logic Pro native, uncompressed 32-bit float big-endian
             "aiff" | "aif" => Ok(Self::Aiff),
@@ -279,7 +279,7 @@ fn export_blob(
         ExportFormat::Flac => export_flac(blob, path).map(|()| None),
         ExportFormat::Wav => export_wav(blob, path).map(|()| None),
         ExportFormat::Opus => export_opus(blob, path).map(|()| None),
-        // MP3: LAME encoder — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
+        // MP3: LAME encoder — LGPL dynamic linking only (see docs/licenses/LAME-LGPL-NOTICE.md)
         ExportFormat::Mp3 => export_mp3_routed(blob, path, masters_dir),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
         ExportFormat::Aiff => export_aiff(blob, path).map(|()| None),
@@ -775,7 +775,7 @@ fn f64_to_80bit_extended(val: f64) -> [u8; 10] {
 /// MP3 export via LAME encoder.
 ///
 /// LGPL compliance: uses local lame-sys crate which links libmp3lame DYNAMICALLY.
-/// See: lineos/plan/phase-13/LAME-LGPL-NOTICE.md
+/// See: docs/licenses/LAME-LGPL-NOTICE.md
 /// System: libmp3lame.so.0 at /lib/x86_64-linux-gnu/libmp3lame.so.0
 ///
 /// Quality preset 2: mastering grade (0=best, 9=worst).

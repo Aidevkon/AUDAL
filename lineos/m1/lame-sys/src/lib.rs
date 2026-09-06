@@ -1,6 +1,6 @@
 //! lame-sys — FFI bindings to libmp3lame (LGPL, dynamically linked).
 //!
-//! Authority: LAME-LGPL-NOTICE.md §1 · Creator OS Constitution v2.6
+//! Authority: docs/licenses/LAME-LGPL-NOTICE.md §1 · Creator OS Constitution v2.6
 //!
 //! Only the subset of the LAME C API needed for MP3 export is exposed here:
 //!   - lame_init         — create encoder context
@@ -14,7 +14,7 @@
 //!   - lame_get_lametag_frame — not used by Creator OS (no ID3 tag needed)
 //!
 //! The library is linked DYNAMICALLY (see build.rs). Static linking is forbidden
-//! by the LGPL v2.1 — see LAME-LGPL-NOTICE.md.
+//! by the LGPL v2.1 — see docs/licenses/LAME-LGPL-NOTICE.md.
 //!
 //! Header reference: /usr/include/lame/lame.h
 

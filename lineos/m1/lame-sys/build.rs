@@ -1,6 +1,6 @@
 //! lame-sys build.rs — LGPL-compliant dynamic linking to system libmp3lame.
 //!
-//! Authority: LAME-LGPL-NOTICE.md §1 · Creator OS Constitution v2.6 §07.3
+//! Authority: docs/licenses/LAME-LGPL-NOTICE.md §1 · Creator OS Constitution v2.6 §07.3
 //!
 //! Linking strategy:
 //!   1. Try pkg-config (prefers libmp3lame-dev package).
