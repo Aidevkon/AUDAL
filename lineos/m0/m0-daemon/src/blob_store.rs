@@ -539,6 +539,36 @@ pub struct StoredQuality {
     pub clip_free: bool,
 }
 
+/// Δηλώνει ΑΝ ο μετρητής είναι και ο παραγωγός του ήχου.
+///
+// SOURCE: https://portal.amazonstudios.com/hc/en-us/articles/15986851525147-Delivery-QC
+// RETRIEVED: 2026-09-06
+// Η Amazon απαιτεί ο QC vendor να ΜΗΝ είναι αυτός που δημιούργησε τα
+// αρχεία (video/SDH/FN/AD· ΔΕΝ αναφέρει ρητά ήχο — δηλωμένη επιφύλαξη),
+// και η παράκαμψη θέλει έγκριση Post Executive.
+// Το πεδίο υπάρχει ώστε ο αναγνώστης να ξέρει ΑΝ ο μετρητής είναι και ο
+// παραγωγός, ΧΩΡΙΣ να ρωτήσει. ΔΕΝ είναι αποτυχία — είναι δηλωμένο όριο,
+// όπως ο κανόνας απουσίας §5.2.
+///
+/// ⚠ ΟΧΙ bool. Ένα `self_certified: true` διαβάζεται ως ντροπή· ένα enum
+/// περιγράφει ΚΑΤΑΣΤΑΣΗ. Ίδιο μάθημα με το "advisory" του DeliveryCheck:
+/// η τιμή περιγράφει ΚΛΑΣΗ, όχι σοβαρότητα.
+///
+/// ⚠ ΔΕΝ μετράει στη συμμόρφωση. Ο DeliveryVerdict::compose παίρνει
+/// (spec, checks) — δομικά δεν μπορεί να το δει.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioOrigin {
+    /// Ο ήχος παρήχθη από ΑΥΤΗ τη μηχανή, και η ίδια μηχανή τον μετράει.
+    /// ΣΗΜΕΡΑ ΠΑΝΤΑ ΑΥΤΟ: δεν υπάρχει διαδρομή εισόδου τρίτου.
+    #[default]
+    SelfProduced,
+    /// Ο ήχος ήρθε απ' έξω· μετρήθηκε μόνο, δεν παρήχθη εδώ.
+    /// ΔΕΝ ΥΠΑΡΧΕΙ ΔΙΑΔΡΟΜΗ ΠΟΥ ΤΟ ΠΑΡΑΓΕΙ — η τιμή υπάρχει ώστε το
+    /// σχήμα να μη χρειαστεί αλλαγή όταν αποκτήσει.
+    ThirdParty,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoredProvenance {
     pub engine_id: String,
@@ -566,6 +596,11 @@ pub struct StoredProvenance {
     pub opt_level: String,
     #[serde(default)]
     pub codegen_units: String,
+    /// ΠΡΟΣΘΗΚΗ 2026-09-06 — δες AudioOrigin για την πηγή και την
+    /// επιφύλαξη. #[serde(default)] ώστε παλιά sidecars (που ήταν ΟΛΑ
+    /// self-produced) να διαβάζονται· απουσία = SelfProduced, ΟΧΙ σφάλμα.
+    #[serde(default)]
+    pub audio_origin: AudioOrigin,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

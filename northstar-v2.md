@@ -435,11 +435,11 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 Ο κώδικας απάντησε με τον compiler, πριν το κείμενο
 προλάβει να σχεδιάσει την απάντηση.
 
-  blob_store.rs:1349 `Uncertified { reason: UncertifiedReason },`
+  blob_store.rs:1384 `Uncertified { reason: UncertifiedReason },`
 
 Ένα χρέος που είναι ΤΥΠΟΣ έχει τέσσερα πράγματα που ένα
 χρέος σε παράγραφο δεν έχει:
-  ΟΝΟΜΑ            blob_store.rs:1360 `SpatialPathHasNoTelemetry,`
+  ΟΝΟΜΑ            blob_store.rs:1395 `SpatialPathHasNoTelemetry,`
   ΔΗΜΟΣΙΑ ΠΡΟΒΟΛΗ  γενική προς έξω («no_measurements»),
                    ειδική προς μέσα — το εσωτερικό όνομα
                    είναι ομολογία ελαττώματος με όνομα
@@ -1121,8 +1121,8 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
 
       Ο ΠΑΛΙΟΣ ΤΥΠΟΣ ΔΕΝ ΥΠΑΡΧΕΙ. grep `struct StoredBlob`
       (χωρίς V2) = ΜΗΔΕΝ. Το C-union χωρίστηκε:
-        blob_store.rs:1293 `pub struct StoredBlobCore {`
-        blob_store.rs:1349 `Uncertified { reason: UncertifiedReason },`
+        blob_store.rs:1328 `pub struct StoredBlobCore {`
+        blob_store.rs:1384 `Uncertified { reason: UncertifiedReason },`
       Ό,τι είναι ΠΑΝΤΑ παρόν ζει στον Core· ό,τι εξαρτάται
       από το αν μετρήθηκε, στο variant. Τα κενά πεδία δεν
       μπορούν πια να υπάρξουν — δεν είναι εκπρόσωπος του

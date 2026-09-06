@@ -469,3 +469,81 @@ fn the_stored_verdict_agrees_with_the_stored_rows() {
         );
     }
 }
+
+// ── audio_origin — ΠΡΟΣΘΗΚΗ 2026-09-06 ───────────────────────────────
+//
+// Το cert δηλώνει πλέον ΑΝ ο μετρητής είναι και ο παραγωγός. Οι τρεις
+// oracles που ακολουθούν φρουρούν ό,τι ΔΕΝ πρέπει να αλλάξει: η τιμή που
+// ισχύει σήμερα, η ΑΝΕΞΑΡΤΗΣΙΑ της ετυμηγορίας από αυτήν, και το ότι τα
+// παλιά sidecars εξακολουθούν να διαβάζονται.
+
+#[test]
+fn the_certificate_declares_who_produced_the_audio() {
+    let prov = m0d::blob_store::StoredProvenance::default();
+    assert_eq!(
+        prov.audio_origin,
+        m0d::blob_store::AudioOrigin::SelfProduced,
+        "σήμερα ΔΕΝ υπάρχει διαδρομή εισόδου τρίτου — η μόνη ειλικρινής τιμή"
+    );
+
+    // Όπως το διαβάζει ο τρίτος, από το JSON και όχι από τον τύπο.
+    let json = serde_json::to_string(&prov).unwrap();
+    assert!(
+        json.contains("\"audio_origin\":\"self_produced\""),
+        "το πεδίο πρέπει να φαίνεται στο sidecar με τη γραμμένη του μορφή: {json}"
+    );
+}
+
+/// ΤΟ ΚΡΙΣΙΜΟ: το audio_origin ΔΕΝ μετράει στη συμμόρφωση.
+///
+/// Ο `DeliveryVerdict::compose` παίρνει `(spec, checks)` — δομικά δεν
+/// μπορεί να δει provenance. Αυτός ο oracle το κάνει ΕΚΤΕΛΕΣΤΟ: αν κάποτε
+/// κάποιος περάσει το origin στον συνθέτη, η ετυμηγορία θα αλλάξει και ο
+/// φρουρός θα κοκκινίσει.
+#[test]
+fn the_origin_does_not_move_the_verdict() {
+    let rows = acx_rows(good_report(), 0.6, 2.0);
+    let baseline = DeliveryVerdict::compose(&ACX, &rows);
+
+    for origin in [
+        m0d::blob_store::AudioOrigin::SelfProduced,
+        m0d::blob_store::AudioOrigin::ThirdParty,
+    ] {
+        let prov = m0d::blob_store::StoredProvenance {
+            audio_origin: origin,
+            ..Default::default()
+        };
+        // Το ίδιο υλικό, άλλη προέλευση.
+        assert_eq!(prov.audio_origin, origin);
+        assert_eq!(
+            DeliveryVerdict::compose(&ACX, &rows),
+            baseline,
+            "η ετυμηγορία άλλαξε με την προέλευση — το audio_origin ΔΕΝ είναι κριτήριο"
+        );
+    }
+}
+
+/// Παλιό sidecar ΧΩΡΙΣ το πεδίο ΔΙΑΒΑΖΕΤΑΙ.
+///
+/// Δεν είναι θεωρητικό: κάθε cert που γράφτηκε πριν τις 06/09 δεν το έχει,
+/// και ήταν ΟΛΑ self-produced. Απουσία = SelfProduced, ΟΧΙ σφάλμα.
+#[test]
+fn an_old_sidecar_without_the_field_still_reads() {
+    let old = r#"{
+        "engine_id": "E11",
+        "engine_version": "0.1.0",
+        "processing_time_ms": 1234,
+        "host_os": "linux",
+        "created_by": "stillair-cockpit",
+        "aether_enriched": true,
+        "aether_devices": []
+    }"#;
+    let prov: m0d::blob_store::StoredProvenance =
+        serde_json::from_str(old).expect("παλιό sidecar ΠΡΕΠΕΙ να διαβάζεται");
+    assert_eq!(prov.engine_id, "E11", "τα υπάρχοντα πεδία δεν χάθηκαν");
+    assert_eq!(
+        prov.audio_origin,
+        m0d::blob_store::AudioOrigin::SelfProduced,
+        "απουσία του πεδίου σημαίνει self_produced — ήταν ΟΛΑ self-produced"
+    );
+}

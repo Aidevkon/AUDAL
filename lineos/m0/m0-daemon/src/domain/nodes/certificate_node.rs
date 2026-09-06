@@ -525,6 +525,8 @@ fn assemble_blob(
                 rustc_version: env!("RUSTC_VERSION").to_string(),
                 opt_level: env!("PROFILE_OPT_LEVEL").to_string(),
                 codegen_units: env!("PROFILE_CODEGEN_UNITS").to_string(),
+                // Η ίδια μηχανή παρήγαγε ΚΑΙ μετράει. Δηλώνεται, δεν κρύβεται.
+                audio_origin: crate::blob_store::AudioOrigin::SelfProduced,
             },
         }
     };
