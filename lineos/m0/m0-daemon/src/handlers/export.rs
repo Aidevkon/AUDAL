@@ -192,12 +192,15 @@ pub async fn export_audio(
     let path_str = req.output_path.clone();
     let format_str = req.format.clone();
     let path_for_io = output_path.clone();
+    // Ο δεσμός προς τον master χρειάζεται τη ρίζα των masters. Είναι ήδη
+    // στο config — ίδια πηγή με το /deliver (deliver.rs:675).
+    let masters_for_io = state.config.masters_path.clone();
 
     let result = tokio::task::spawn_blocking(move || {
         // Η ετυμηγορία γεννιέται στον writer (μόνο εκείνος μετράει το
         // ΤΕΛΙΚΟ σήμα) και ταξιδεύει ΚΑΙ στο sidecar ΚΑΙ στην απόκριση —
         // μία μέτρηση, δύο αναγνώστες.
-        let checks = export_blob(&blob_clone, format, &path_for_io)?;
+        let checks = export_blob(&blob_clone, format, &path_for_io, Some(&masters_for_io))?;
         write_sidecar(
             &blob_clone,
             &format_str,
@@ -270,13 +273,14 @@ fn export_blob(
     blob: &StoredBlobV2,
     format: ExportFormat,
     path: &Path,
+    masters_dir: Option<&str>,
 ) -> Result<Option<Vec<crate::blob_store::DeliveryCheck>>, String> {
     match format {
         ExportFormat::Flac => export_flac(blob, path).map(|()| None),
         ExportFormat::Wav => export_wav(blob, path).map(|()| None),
         ExportFormat::Opus => export_opus(blob, path).map(|()| None),
         // MP3: LAME encoder — LGPL dynamic linking only (see LAME-LGPL-NOTICE.md)
-        ExportFormat::Mp3 => export_mp3_routed(blob, path),
+        ExportFormat::Mp3 => export_mp3_routed(blob, path, masters_dir),
         // AIFF: uncompressed 32-bit float big-endian PCM (P13-003b)
         ExportFormat::Aiff => export_aiff(blob, path).map(|()| None),
         // ADM BWF: Apple Spatial Audio, 6-channel 24-bit LPCM (Spatial-4a)
@@ -300,9 +304,175 @@ fn export_blob(
 /// ΑΣΦΑΛΗΣ ΠΛΕΥΡΑ: ένα 48k stereo mp3 είναι λάθος αρχείο για το ACX,
 /// αλλά ένα ACX-μορφοποιημένο αρχείο για κάποιον που δεν το ζήτησε
 /// είναι σιωπηλό mono-fold + resample που κανείς δεν διάλεξε.
+// ── ΤΟ CERT ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ (F-090) ───────────────────────────────────
+//
+// ΤΟ ΠΡΟΒΛΗΜΑ, ΜΕΤΡΗΜΕΝΟ: ο χρήστης κρατάει mp3 44.1k mono και δίπλα του
+// ένα έγγραφο που περιγράφει τον master — 48k stereo, peak πριν τον
+// encoder. ΚΑΝΕΝΑ μέγεθος του master cert δεν ισχύει για το εξαγόμενο
+// αρχείο· τα στερεοφωνικά πεδία είναι ΑΝΕΥ ΝΟΗΜΑΤΟΣ σε mono.
+//
+// Η ΑΠΟΦΑΣΗ (06/09): ΔΥΟ ΣΥΝΔΕΔΕΜΕΝΑ έγγραφα. Το master cert μένει
+// ΑΜΕΤΑΒΛΗΤΟ· αυτό εδώ περιγράφει ΜΟΝΟ το παραδοτέο και δένεται πάνω
+// του με δύο δεσμούς.
+//
+// ΤΕΚΜΗΡΙΟ ΥΠΕΡ ΤΗΣ ΜΟΡΦΗΣ: το C2PA προσθέτει ΝΕΟ manifest ανά
+// επεξεργασία, σχηματίζοντας αλυσίδα (spec.c2pa.org, ανακτ. 06/09).
+// Δεν εφευρίσκουμε — ακολουθούμε.
+//
+// ⚠⚠ Ο ΚΑΝΟΝΑΣ ΑΠΟΥΣΙΑΣ §5.2, ΣΕ ΕΠΙΠΕΔΟ ΕΓΓΡΑΦΟΥ: ΑΝ ΔΕΝ ΜΕΤΡΗΘΗΚΕ
+// ΣΤΟ ΠΑΡΑΔΟΤΕΟ, ΔΕΝ ΜΠΑΙΝΕΙ. Ούτε LUFS, ούτε LRA, ούτε quality block,
+// ούτε stereo πεδία, ούτε οι πέντε συμμορφώσεις μουσικής. Κάθε μέγεθος
+// εδώ μετρήθηκε πάνω στο αρχείο που παραδίδεται.
+
+/// Ό,τι διαβάστηκε ΑΠΟ ΤΟ ΠΑΡΑΓΟΜΕΝΟ ΑΡΧΕΙΟ, μετά τον encoder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliverableTechnical {
+    /// symphonia decode-back του mp3 — όχι το `blob.core.sample_rate`.
+    pub sample_rate: u32,
+    pub channels: u16,
+    /// bytes×8/secs του τελικού αρχείου.
+    pub bitrate_kbps: f32,
+}
+
+/// Ο ΔΕΣΜΟΣ προς τον master. Δύο, γιατί απαντούν σε δύο ερωτήματα.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterBond {
+    pub blob_id: String,
+    /// SHA-256 του master FLAC — δεσμός προς το ΕΓΓΡΑΦΟ.
+    /// `None` = το master FLAC δεν βρέθηκε τη στιγμή του export.
+    /// ΓΡΑΦΕΤΑΙ ΩΣ ΑΠΟΝ, δεν παραλείπεται: δεσμός προς `None` δεν είναι
+    /// δεσμός, και ο αναγνώστης πρέπει να το ξέρει ΧΩΡΙΣ να ρωτήσει.
+    pub master_sha256: Option<String>,
+    /// BLAKE3 του master PCM — ταυτότητα ΗΧΟΥ, επιβιώνει αλλαγής
+    /// container. `None` = δεν μετρήθηκε στον master (είναι `Option` και
+    /// στο `StoredBlobCore`).
+    pub master_pcm_blake3: Option<String>,
+}
+
+/// Το υπογεγραμμένο cert ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ.
+///
+/// Ίδιος φάκελος υπογραφής με το master cert (`key_id` ·
+/// `signer_public_key` · `payload_signature` byte-detached), ώστε ο
+/// ΜΟΝΟΣ υπάρχων αναγνώστης — το `scripts/verify_cert.py` — να το
+/// διαβάζει ΧΩΡΙΣ καμία αλλαγή: απαιτεί μοναδικό άγκιστρο
+/// `payload_signature`, `signer_public_key` 64 hex, και έγκυρο JSON.
+/// Τίποτα από το σχήμα.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliverableCertificate {
+    pub format: String,
+    pub format_version: u32,
+    pub written_at: String,
+    pub engine_version: String,
+    pub engine_commit: String,
+    /// SHA-256 ΤΟΥ ΑΡΧΕΙΟΥ ΠΟΥ ΠΑΡΑΔΙΔΕΤΑΙ. Υπολογισμένο ΜΕΤΑ τη
+    /// συγγραφή, με την ΥΠΑΡΧΟΥΣΑ `blob_store::sha256_file` — μία
+    /// υλοποίηση hash, όχι δεύτερη.
+    pub deliverable_sha256: String,
+    pub technical: DeliverableTechnical,
+    /// Η ΤΙΜΗ του προορισμού, όχι όνομα πεδίου (§5.1α).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_target: Option<String>,
+    /// Οι γραμμές §5.3, μετρημένες πάνω στο παραδοτέο.
+    pub delivery_checks: Vec<crate::blob_store::DeliveryCheck>,
+    /// Το fold πάνω στις γραμμές — ίδιος συνθέτης, καμία νέα κρίση.
+    pub delivery_verdict: crate::blob_store::DeliveryVerdict,
+    /// Δηλώνει αν ο μετρητής είναι και ο παραγωγός.
+    pub audio_origin: crate::blob_store::AudioOrigin,
+    pub master: MasterBond,
+    pub key_id: String,
+    pub signer_public_key: String,
+    /// ΤΟ ΑΓΚΙΣΤΡΟ ΤΗΣ ΥΠΟΓΡΑΦΗΣ. Serialize με "" ⇒ υπογραφή ⇒ splice.
+    pub payload_signature: String,
+}
+
+pub const DELIVERABLE_CERT_FORMAT: &str = "creator-os-deliverable-cert";
+// ΔΕΝ είναι κατώφλι — είναι η μεμβράνη του σχήματος, όπως το
+// SIDECAR_FORMAT_VERSION. Ο φρουρός κατωφλιών το πιάνει επειδή είναι
+// αριθμητική σταθερά, και σφραγίζεται για να μη μείνει ασφράγιστο.
+// PLACEHOLDER: πρώτη έκδοση του σχήματος του παραδοτέου.
+// TRIGGER: κάθε αλλαγή πεδίου — νέα έκδοση, ΠΟΤΕ σιωπηλή μετάλλαξη.
+pub const DELIVERABLE_CERT_FORMAT_VERSION: u32 = 1;
+
+/// Γράφει το υπογεγραμμένο cert του παραδοτέου **δίπλα στο αρχείο**.
+///
+/// ΟΝΟΜΑ: `<αρχείο>.deliverable.json`.
+/// ⚠ ΔΙΑΦΟΡΕΤΙΚΗ ΚΑΤΑΛΗΞΗ ΑΠΟ ΤΟ `.stillair.json`, ΣΚΟΠΙΜΑ. Το
+/// ανυπόγραφο `ExportSidecar` ΜΕΝΕΙ ΩΣ ΕΧΕΙ σε αυτό το βήμα· δύο αρχεία
+/// με ΤΟ ΙΔΙΟ όνομα θα ήταν σύγκρουση, δύο με το ίδιο ΝΟΗΜΑ είναι
+/// σύγχυση. Ο καθαρισμός του `ExportSidecar` είναι ΞΕΧΩΡΙΣΤΟ βήμα, με
+/// απόφαση.
+#[allow(clippy::too_many_arguments)]
+fn write_deliverable_cert(
+    blob: &StoredBlobV2,
+    audio_path: &Path,
+    technical: DeliverableTechnical,
+    delivery_target: Option<String>,
+    checks: &[crate::blob_store::DeliveryCheck],
+    spec: &lineos_types::presets::DeliverySpec,
+    masters_dir: &str,
+) -> Result<std::path::PathBuf, String> {
+    // (Α) ΤΟ HASH ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ — η ΥΠΑΡΧΟΥΣΑ συνάρτηση, στο τελικό
+    // αρχείο, ΜΕΤΑ τη συγγραφή του.
+    let deliverable_sha256 = crate::blob_store::sha256_file(audio_path)
+        .map_err(|e| format!("deliverable hash failed: {e:?}"))?;
+
+    // (Γ) Ο ΔΕΣΜΟΣ. Το master FLAC ζει δίπλα στο sidecar του master —
+    // ίδιο μοτίβο με το /deliver.
+    let master_sha256 = match crate::blob_store::find_sidecar(masters_dir, &blob.core.id) {
+        Ok(Some(sidecar_path)) => {
+            let master_flac = sidecar_path.with_extension("flac");
+            if master_flac.exists() {
+                crate::blob_store::sha256_file(&master_flac).ok()
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    let identity = crate::identity::load_or_generate_default()
+        .map_err(|e| format!("identity load failed: {e}"))?;
+
+    let cert = DeliverableCertificate {
+        format: DELIVERABLE_CERT_FORMAT.to_string(),
+        format_version: DELIVERABLE_CERT_FORMAT_VERSION,
+        written_at: Utc::now().to_rfc3339(),
+        engine_version: env!("CARGO_PKG_VERSION").to_string(),
+        engine_commit: env!("GIT_HASH").to_string(),
+        deliverable_sha256,
+        technical,
+        delivery_target,
+        delivery_checks: checks.to_vec(),
+        delivery_verdict: crate::blob_store::DeliveryVerdict::compose(spec, checks),
+        audio_origin: blob
+            .provenance()
+            .map(|p| p.audio_origin)
+            .unwrap_or_default(),
+        master: MasterBond {
+            blob_id: blob.core.id.clone(),
+            master_sha256,
+            master_pcm_blake3: blob.core.pcm_blake3.clone(),
+        },
+        key_id: identity.key_id.clone(),
+        signer_public_key: identity.public_key_hex(),
+        payload_signature: String::new(),
+    };
+
+    let json = crate::blob_store::sign_json_envelope(&cert)
+        .map_err(|e| format!("deliverable cert signing failed: {e:?}"))?;
+
+    let cert_path = audio_path.with_extension("deliverable.json");
+    std::fs::write(&cert_path, &json)
+        .map_err(|e| format!("deliverable cert write failed: {e}"))?;
+    Ok(cert_path)
+}
+
 fn export_mp3_routed(
     blob: &StoredBlobV2,
     path: &Path,
+    // `None` = ο καλών δεν έχει masters_dir (π.χ. test χωρίς store) ⇒
+    // ΚΑΝΕΝΑ deliverable cert. Απουσία, όχι σιωπή.
+    masters_dir: Option<&str>,
 ) -> Result<Option<Vec<crate::blob_store::DeliveryCheck>>, String> {
     let is_acx_delivery = lineos_types::presets::lookup(&blob.core.preset_id)
         .and_then(|p| p.delivery.rms_window_db)
@@ -354,6 +524,34 @@ fn export_mp3_routed(
         outcome.delivered_channels,
         outcome.delivered_bitrate_kbps,
     ));
+    // ΤΟ CERT ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ γράφεται ΕΔΩ και όχι ψηλότερα, γιατί ΕΔΩ
+    // υπάρχουν στο scope ΚΑΙ τα τρία: το `outcome` (decode-back), οι
+    // γραμμές, και το `spec` που τις έκρινε. Ψηλότερα θα έπρεπε να
+    // ταξιδέψουν ως νέος τύπος επιστροφής — περισσότερη επιφάνεια για
+    // την ίδια πληροφορία.
+    if let Some(md) = masters_dir {
+        let technical = DeliverableTechnical {
+            sample_rate: outcome.delivered_sample_rate,
+            channels: outcome.delivered_channels,
+            bitrate_kbps: outcome.delivered_bitrate_kbps,
+        };
+        let target = lineos_types::presets::lookup(&blob.core.preset_id)
+            .map(|p| p.delivery.platform.to_string());
+        match write_deliverable_cert(blob, path, technical, target, &checks, spec, md) {
+            Ok(cert_path) => tracing::info!(
+                event = "m0d.deliverable_cert_written",
+                path = %cert_path.display(),
+                "export: deliverable certificate written and signed"
+            ),
+            // ΔΕΝ σκοτώνει το export: το αρχείο ΓΡΑΦΤΗΚΕ. Αλλά ΔΕΝ
+            // σιωπά — μια απόδειξη που δεν γράφτηκε είναι γεγονός.
+            Err(e) => tracing::error!(
+                event = "m0d.deliverable_cert_failed",
+                error = %e,
+                "export: deliverable certificate NOT written"
+            ),
+        }
+    }
     Ok(Some(checks))
 }
 

@@ -888,7 +888,7 @@ pub fn vad_trace_path(blob_id: &str) -> std::path::PathBuf {
     ))
 }
 
-fn sha256_file(path: &std::path::Path) -> Result<String, SidecarError> {
+pub(crate) fn sha256_file(path: &std::path::Path) -> Result<String, SidecarError> {
     use sha2::{Digest, Sha256};
     let bytes = std::fs::read(path).map_err(|e| SidecarError::Io(e.to_string()))?;
     let mut h = Sha256::new();
@@ -902,6 +902,45 @@ fn sha256_file(path: &std::path::Path) -> Result<String, SidecarError> {
 /// από κανένα, γιατί ΜΟΙΑΖΕΙ με certificate.
 ///
 /// ΔΕΝ ΕΝΗΜΕΡΩΝΕΙ ΠΟΤΕ υπάρχον sidecar: το certificate πιστοποιεί BYTES.
+/// Υπογράφει έναν φάκελο JSON **byte-detached** (v0 §6/Σ1α) και γυρίζει τα
+/// τελικά bytes.
+///
+/// ⚠ ΤΟ ΤΕΛΕΤΟΥΡΓΙΚΟ ΕΙΝΑΙ ΛΕΠΤΟ ΚΑΙ ΓΡΑΦΕΤΑΙ ΜΙΑ ΦΟΡΑ: serialize με
+/// `payload_signature: ""`, υπογραφή πάνω σε ΑΥΤΑ ΑΚΡΙΒΩΣ τα bytes, και
+/// splice με string replace στα ΙΔΙΑ bytes — ΟΧΙ δεύτερο serialize. Ένα
+/// δεύτερο serialize μπορεί να αναδιατάξει ό,τι αγγίζει ο serde, και η
+/// υπογραφή θα πέθαινε ΣΙΩΠΗΛΑ (θα επαλήθευε bytes που δεν υπάρχουν πια).
+/// Το άγκιστρο πρέπει να εμφανίζεται ΑΚΡΙΒΩΣ μία φορά, αλλιώς αρνούμαστε
+/// να υπογράψουμε στα τυφλά.
+///
+/// ⚠ ΧΡΕΟΣ, ΔΗΛΩΜΕΝΟ 2026-09-06: η `write_sidecar` παραπάνω κρατάει ΤΟ
+/// ΔΙΚΟ ΤΗΣ inline αντίγραφο αυτού του τελετουργικού. ΔΕΝ ενοποιήθηκε
+/// εδώ — θα άγγιζε τη διαδρομή του master cert, που αυτό το βήμα δεν
+/// αγγίζει. Η ενοποίηση είναι ξεχωριστό βήμα, με απόφαση.
+pub(crate) fn sign_json_envelope<T: Serialize>(
+    envelope: &T,
+) -> Result<Vec<u8>, SidecarError> {
+    let identity = crate::identity::load_or_generate_default()
+        .map_err(|e| SidecarError::Io(e.to_string()))?;
+
+    let unsigned_json =
+        serde_json::to_vec_pretty(envelope).map_err(|e| SidecarError::Serde(e.to_string()))?;
+    let signature = identity.sign(&unsigned_json);
+    let sig_b64 = {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+        URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    };
+    let unsigned_str = String::from_utf8(unsigned_json)
+        .map_err(|e| SidecarError::Serde(format!("sidecar bytes not valid UTF-8: {e}")))?;
+    let anchor = "\"payload_signature\": \"\"";
+    let occurrences = unsigned_str.matches(anchor).count();
+    if occurrences != 1 {
+        return Err(SidecarError::SignatureAnchorNotUnique { found: occurrences });
+    }
+    let replacement = format!("\"payload_signature\": \"{sig_b64}\"");
+    Ok(unsigned_str.replacen(anchor, &replacement, 1).into_bytes())
+}
+
 /// Re-encode = ΝΕΟ render = νέο ζεύγος. Τα παλιά μένουν έγκυρο ιστορικό.
 pub fn write_sidecar(
     masters_dir: &str,
