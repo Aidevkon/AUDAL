@@ -1,0 +1,72 @@
+   Compiling sp314-dsp v3.0.0 (/home/aidevcon/Documents/creator-os/lineos/m1/sp314-dsp)
+   Compiling m0d v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon)
+warning: m0d@0.1.0: TARGET_CPU=x86-64
+   Compiling sp314-nodes v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m1/sp314-nodes)
+   Compiling lineos-telemetry v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m1/telemetry)
+   Compiling sp314-orchestrator v0.1.0 (/home/aidevcon/Documents/creator-os/lineos/m1/sp314-orchestrator)
+   Compiling pipelineforge v0.1.0 (/home/aidevcon/Documents/creator-os/pipelines/pipelineforge)
+warning: variable does not need to be mutable
+   --> /home/aidevcon/Documents/creator-os/lineos/m1/sp314-orchestrator/src/trunk_pass.rs:716:13
+    |
+716 | ...   let mut zero_mean_env: Vec<f32> = env.iter().map(|&x| x - mean).c...
+    |           ----^^^^^^^^^^^^^
+    |           |
+    |           help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sp314-orchestrator` (lib) generated 1 warning (run `cargo fix --lib -p sp314-orchestrator` to apply 1 suggestion)
+warning: unused variable: `input_blake3_hex`
+   --> /home/aidevcon/Documents/creator-os/lineos/m0/m0-daemon/src/domain/dsp_pipeline.rs:135:5
+    |
+135 |     input_blake3_hex: &str,
+    |     ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_input_blake3_hex`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling encoder-gap-speech v0.1.0 (/home/aidevcon/Documents/creator-os/research/encoder-gap-speech)
+warning: `m0d` (lib) generated 1 warning (run `cargo fix --lib -p m0d` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 59.60s
+     Running `target/release/wav_header_offset_measured`
+MEASURED total file bytes: 148
+MEASURED true header length (RIFF-parsed, up to start of audio bytes): 68
+MEASURED true_header_len % 4 == 0 (byte alignment vs f32 samples)
+MEASURED true_header_len / 4 == 17 f32 samples of header-as-audio garbage
+MEASURED (true_header_len/4) % 2 == 1 (0 = stays L/R aligned, 1 = channel-swaps everything after)
+MEASURED pcm_bytes_to_f32 (no header skip) recovered 37 f32 samples (18 frames if stereo)
+MEASURED expected real frames written: 10
+MEASURED first 24 recovered f32 values (garbage-then-real boundary):
+  [0] = 12690.33
+  [1] = 0.000000000000000000000000000000000000000000196
+  [2] = 3428.0837
+  [3] = 0.00000000000000000020703801
+  [4] = 0.000000000000000000000000000000000000000000056
+  [5] = 0.000000000000000000000000000000000000000275504
+  [6] = 0.000000000000000000000000000000000000000067262
+  [7] = 0.000000000000000000000000000000000000000538099
+  [8] = 0.000000000000000000000000000000000000002938747
+  [9] = 0.000000000000000000000000000000000000002938767
+  [10] = 0.000000000000000000000000000000000000000000004
+  [11] = 0.000000000000000000000000000000000000000000004
+  [12] = 0.000000000000000000000000000000000000001469368
+  [13] = -0.00000000000011368857
+  [14] = 1537212000000000000000000000000
+  [15] = 281751460000000000000
+  [16] = 0.000000000000000000000000000000000000000000112
+  [17] = 100
+  [18] = -100
+  [19] = 101
+  [20] = -101
+  [21] = 102
+  [22] = -102
+  [23] = 103
+MEASURED correctly-parsed (header skipped) sample count: 20 (10 frames)
+MEASURED correctly-parsed first 8 values (should be 100,-100,101,-101,...):
+  [0] = 100
+  [1] = -100
+  [2] = 101
+  [3] = -101
+  [4] = 102
+  [5] = -102
+  [6] = 103
+  [7] = -103
