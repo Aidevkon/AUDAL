@@ -1366,6 +1366,49 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
     delivery_profile από ΑΝΘΡΩΠΟ, όχι με συλλογισμό.**
   Trigger: **ΑΠΟΣΥΡΘΗΚΕ ως εμπόδιο.** Παραμένει ως καταγραφή ευαισθησίας οργάνου.
 
+- **[F-093] Εξήντα τέσσερις συντελεστές σε
+  production, από εργαλείο που ΔΕΝ ΥΠΗΡΞΕ ΠΟΤΕ ΣΤΟ
+  REPO.** Component: `dsp/mod.rs` `A_INV` ·
+  `dsp/mod.rs:585` `EXPECTED` · `flag_oracle.rs:876`
+  `EXPECTED_DB`. ΜΕΤΡΗΜΕΝΟ 2026-08-25.
+  Το σχόλιο (993f7cd, 28/07) λέει αυτούσια:
+  «Regenerating this requires rerunning
+  compute_ainv.py in the scratch dir; it is valid
+  only for Q = 1.0 at 48 kHz.»
+  **ΤΟ ΕΡΓΑΛΕΙΟ ΔΕΝ ΣΒΗΣΤΗΚΕ — ΔΕΝ ΠΡΟΣΤΕΘΗΚΕ ΠΟΤΕ:**
+  `git log --all --diff-filter=AD --name-only --
+  '*compute_ainv*'` → **ΚΕΝΟ**. Ο φάκελος `scratch`
+  δεν υπάρχει. Ήταν εξωτερικό εργαλείο, εκτός
+  ελέγχου εκδόσεων.
+  **ΤΙ ΕΙΝΑΙ:** αντίστροφος πίνακας 8×8 της
+  αλληλεπίδρασης των φίλτρων — «row i column j is
+  how much of band j's gain must be removed from
+  band i to cancel its skirt», από RBJ peaking
+  response σε Q=1.0, fs=48000, στις οκτώ LTASS_CFS.
+  Συν **δύο διανύσματα επαλήθευσης** (16 αριθμοί).
+  **ΖΩΝΤΑΝΟ, ΜΕ ΑΛΥΣΙΔΑ:** `executor.rs:72` →
+  `dsp_pipeline.rs:92` → `run_dsp_internal` →
+  `:733 build_graph_only` → `dsp/mod.rs:73
+  apply_topology_overrides` → **`:470 A_INV.iter()`**.
+  Υπό συνθήκη `zone_bands` μη κενά
+  (`integration/src/firewall.rs:102`).
+  **ΓΙΑΤΙ ΒΑΡΥΤΕΡΟ ΑΠΟ ΤΑ ΛΕΙΠΟΝΤΑ FIXTURES (F-072):**
+  ζει **ΜΕΣΑ** στο repo, άρα **δεν φαίνεται ως
+  λείπον** — ένα fixture που λείπει σκάει· ένας
+  πίνακας που δεν αναπαράγεται **δουλεύει μια χαρά**.
+  Και είναι **production data, όχι test input**.
+  **Η ΔΗΛΩΜΕΝΗ ΠΡΟΫΠΟΘΕΣΗ ΕΙΝΑΙ Η ΠΑΓΙΔΑ:** «valid
+  only for Q = 1.0 at 48 kHz» ⇒ **κάθε αλλαγή Q ή
+  TARGET_SR απαιτεί εργαλείο που δεν υπάρχει.**
+  ⚠ ΘΕΡΑΠΕΙΑ ΑΠΑΓΟΡΕΥΜΕΝΗ ΣΗΜΕΡΑ: το LTASS είναι
+  stash (Νόμος 6). Καταγράφεται, δεν αγγίζεται.
+  ΠΩΣ ΒΡΕΘΗΚΕ: από τον φρουρό παραπομπών
+  (reference-lint, ba2d89d) — τέσσερις αναφορές σε
+  ανύπαρκτο script. Ο φρουρός γράφτηκε για σάπια
+  σχόλια και βρήκε **δεδομένα χωρίς συνταγή**.
+  Trigger: ΠΡΙΝ κάθε αλλαγή Q, TARGET_SR ή
+  LTASS_CFS.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1637,7 +1680,7 @@ BAND_EDGES `[20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]` Hz.
 
 ---
 
-**NEXT FREE: F-093** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-094** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
