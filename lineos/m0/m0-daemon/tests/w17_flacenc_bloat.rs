@@ -22,7 +22,7 @@ fn read_raw_i32(path: &str) -> Vec<i32> {
 }
 
 #[test]
-#[ignore = "διαγνωστικό του flacenc 0.3.1 bloat (δες doc): θέλει /tmp/w17_nonorm/h8_i32.raw + h1_i32.raw (F-072). ⚠ ΧΩΡΙΣ ΤΑ RAW ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s («SKIPPED»). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
+#[ignore = "διαγνωστικό του flacenc 0.3.1 bloat (δες doc): θέλει /tmp/w17_nonorm/h8_i32.raw + h1_i32.raw (F-072). ΑΓΝΩΣΤΟΣ ΤΡΟΠΟΣ ΑΝΑΚΑΤΑΣΚΕΥΗΣ — χειροκίνητο fixture (F-078). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn w17_flacenc_bloat_repro() {
     let h8_path = "/tmp/w17_nonorm/h8_i32.raw";
     let h1_path = "/tmp/w17_nonorm/h1_i32.raw";

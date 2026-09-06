@@ -70,7 +70,7 @@ fn print_dynamics(left: &[f32], right: &[f32], label: &str) {
 }
 
 #[test]
-#[ignore = "θέλει /tmp/w9/podcast_loud_bed.wav (F-072, untracked). ⚠ ΧΩΡΙΣ ΤΟ FIXTURE ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s τυπώνοντας «SKIPPED» — δεν μέτρησε τίποτα. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
+#[ignore = "θέλει /tmp/w9/podcast_loud_bed.wav (F-072, untracked). ΑΓΝΩΣΤΟΣ ΤΡΟΠΟΣ ΑΝΑΚΑΤΑΣΚΕΥΗΣ — δεν βρέθηκε συνταγή πουθενά στο repo. Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn w10_duck_dynamics() {
     let input_path = Path::new("/tmp/w9/podcast_loud_bed.wav");
     assert!(input_path.exists(), "Missing fixture: {} — ΑΓΝΩΣΤΟΣ ΤΡΟΠΟΣ ΑΝΑΚΑΤΑΣΚΕΥΗΣ — δεν βρέθηκε συνταγή πουθενά στο repo", input_path.display());
