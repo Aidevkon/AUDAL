@@ -303,7 +303,7 @@ schema_version 0
 
   dsp_pipeline.rs:72   `pub fn run_dsp(`
   app_state.rs:82      `pub head_state_ptr: Arc<ArcSwap<DspState>>,`
-  conductor.rs:21      `head_state_ptr: Arc<ArcSwap<DspState>>,`
+  conductor.rs:19      `head_state_ptr: Arc<ArcSwap<DspState>>,`
 
 Περνάει από app_state · conductor · operator · executor ·
 xaak::repo. Η ΤΙΜΗ φαίνεται νεκρή (μηδέν αναφορές
@@ -905,8 +905,8 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
       spatial_folddown_agrees_with_stereo.rs:115 `fn spatial_folddown_agrees_with_stereo() {`
       streaming_integration.rs:25 `fn streaming_pipeline_ducking_e2e() {`
       w17_flacenc_bloat.rs:26 `fn w17_flacenc_bloat_repro() {`
-      export_mp3_acx.rs:130 `fn test_export_mp3_acx_ffprobe() {`
-      export_flac_real.rs:125 `fn test_export_flac_ffprobe() {`
+      export_mp3_acx.rs:131 `fn test_export_mp3_acx_ffprobe() {`
+      export_flac_real.rs:126 `fn test_export_flac_ffprobe() {`
 
     ΕΠΑΛΗΘΕΥΣΗ ΤΟΥ ΑΡΙΘΜΟΥ (δεν χωράει ως άγκιστρο):
       grep -rn '#\[ignore\]' --include="*.rs" \
@@ -1016,7 +1016,7 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
          ενώ το blake3 χασάρει LE:
          wav_to_raw.rs:82 `blake3.update(&left_buf[i].to_le_bytes());`
          ΕΝΕΡΓΗ διαδρομή:
-         executor.rs:369 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
+         executor.rs:385 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
          Σε LE μηχάνημα ταυτίζονται. Σε BE ΟΧΙ: η σχέση
          hash↔αρχείο σπάει ΣΙΩΠΗΛΑ, κανένα test δεν το
          πιάνει γιατί κανένα CI δεν τρέχει εκεί.
@@ -1133,7 +1133,7 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
       έχει certificate; Invariant, όχι σύμβαση καλής
       θέλησης». Η απάντηση είναι το δόγμα Κ.
       Το spatial δεν παραδίδει πια σιωπηλά:
-        dsp_pipeline.rs:391 `reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,`
+        dsp_pipeline.rs:393 `reason: crate::blob_store::UncertifiedReason::SpatialPathHasNoTelemetry,`
       ΔΕΝ μετρήθηκε ακόμα — αλλά η απουσία είναι ΤΥΠΩΜΕΝΗ
       και ΟΡΑΤΗ στο API, με συνθήκη λήξης γραμμένη.
 
@@ -1148,7 +1148,7 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
       γιατί δεν φεύγει ο εσωτερικός τύπος:
         blob.rs:81 `pub async fn get_blob(`
         blob.rs:83 `    Path(id): Path<String>,`
-        blob.rs:188 `impl From<StoredBlobV2> for BlobResponse {`
+        blob.rs:199 `impl From<StoredBlobV2> for BlobResponse {`
       Η μετάφραση γίνεται σε ΕΝΑ σημείο (DTO), όχι
       σκορπισμένη στους handlers — όπως το απαιτούσε το v2.
 
@@ -1522,7 +1522,7 @@ HPSS mask_h → NMFD
     ΑΛΛΗ. Δεν έλειπε το residual — περίσσευε η ενέργεια.
     Η λύση είναι ΑΦΑΙΡΕΣΗ ΧΩΡΙΣ ΑΝΑΚΑΤΑΝΟΜΗ:
       two_pass.rs:50 `pub const DRUM_DEDUP_ALPHA: f32 = 0.5;`
-      two_pass.rs:491 `m * (1.0 - DRUM_DEDUP_ALPHA * p)`
+      two_pass.rs:487 `m * (1.0 - DRUM_DEDUP_ALPHA * p)`
     Σωστό ΕΔΩ γιατί δεν υπάρχει spectral mask των drums
     να επιστραφεί η ενέργεια: τα drums ζουν ΕΞΩ από την
     κατάτμηση σκόπιμα (time-domain multiply, το μόνο stem
@@ -1662,7 +1662,7 @@ dsp_node target_lufs → intent   ΞΑΝΑΕΜΦΑΝΙΣΤΗΚΕ ΚΑΙ ΕΦΥΓ
 
 ```
 FiveDotOneStage → StereoRenderer → stereo blob
-  ΑΓΚΙΣΤΡΟ  render_node.rs:357 `let (sp_l, sp_r) = StereoRenderer::render(&stage);`
+  ΑΓΚΙΣΤΡΟ  render_node.rs:377 `let (sp_l, sp_r) = StereoRenderer::render(&stage);`
   ΕΞΩ από το spatial conditional. Τρέχει για ΚΑΘΕ preset.
   ⚠ Το stereo master ΕΙΝΑΙ το fold-down. Οι δύο έξοδοι
     δεν είναι αδέλφια — η μία είναι παράγωγη της άλλης.
