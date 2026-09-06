@@ -10,10 +10,7 @@ use xaak::repo::DspState;
 #[ignore = "θέλει /tmp/w9/podcast_realistic.wav (F-072, untracked). ⚠ ΧΩΡΙΣ ΤΟ FIXTURE ΤΥΠΩΝΕΙ «SKIPPED» ΚΑΙ ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s — πράσινο που δεν μέτρησε τίποτα. Ανακατασκευή: research/musdb-lab (W9). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn glue_full_render() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
-    if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
-    }
+    assert!(input_path.exists(), "Missing fixture: {} — συνταγή ΜΟΝΟ περιγραφική στο 52e2a31, πηγές ακαταγράφητες (F-072) — το rebuild δίνει ΑΛΛΟ αρχείο", input_path.display());
 
     let state_tmp = tempfile::TempDir::new().unwrap();
     let out_dir = tempfile::TempDir::new().unwrap();

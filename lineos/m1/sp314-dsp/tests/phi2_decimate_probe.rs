@@ -4,6 +4,15 @@ use sp314_dsp::analysis::phi1_sensor::Phi1MelFrontend;
 #[test]
 fn test_phi2_decimate_probe() {
     let wav_path = "/tmp/phi1/eq_test_48k.wav";
+    // ⚠ F-071: ΠΕΡΝΑΕΙ ΚΕΝΟ ΣΤΟ CI. Το fixture
+    // /tmp/phi1/eq_test_48k.wav δεν υπάρχει και ΔΕΝ ΑΝΑΠΑΡΑΓΕΤΑΙ
+    // (καμία συνταγή πουθενά στο repo — μετρήθηκε 25/08).
+    // ΔΕΝ γίνεται panic ΓΙΑΤΙ τρέχει σε τρία CI workflows με
+    // cargo test --workspace (ci.yml:59 · constitutional-gates.yml:61 ·
+    // red-freeze.yml:37)· μόνιμα κόκκινο CI είναι ο ίδιος μηχανισμός με
+    // μόνιμα πράσινο ψεύτικο.
+    // ΞΥΠΝΑΕΙ ΟΤΑΝ: το fixture μπει in-repo (F-072).
+    // ΜΕΤΡΙΕΤΑΙ ΑΠΟ: scripts/empty-pass-lint.sh
     if !std::path::Path::new(wav_path).exists() {
         println!("SKIPPED: {} not found", wav_path);
         return;

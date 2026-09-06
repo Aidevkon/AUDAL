@@ -76,10 +76,7 @@ fn w17_voice_activation() {
     let speech_path = Path::new("/tmp/w17_pure/speech_only.wav");
     let music_path = Path::new("/tmp/w17_pure/music_only.wav");
 
-    if !speech_path.exists() || !music_path.exists() {
-        println!("SKIPPED: /tmp/w17_pure files missing");
-        return;
-    }
+    assert!(speech_path.exists() && music_path.exists(), "Missing fixture: {} / {} — επαναφορά από ~/creator-os-attic/tmp-fixtures-2026-08/w17_pure/ (διασώθηκε 21/08, F-072)", speech_path.display(), music_path.display());
 
     let (speech_sig, speech_sr) = read_audio_mono(speech_path);
     let (music_sig, music_sr) = read_audio_mono(music_path);

@@ -9,10 +9,7 @@ use xaak::repo::DspState;
 #[ignore = "θέλει /tmp/w9/podcast_realistic.wav (F-072). ⚠ ΧΩΡΙΣ ΤΟ FIXTURE ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s («SKIPPED»). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn w6c_nmfd_cost() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
-    if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
-    }
+    assert!(input_path.exists(), "Missing fixture: {} — συνταγή ΜΟΝΟ περιγραφική στο 52e2a31, πηγές ακαταγράφητες (F-072) — το rebuild δίνει ΑΛΛΟ αρχείο", input_path.display());
 
     // RUN A: NMF5 (use_nmfd = false)
     let state_tmp_a = tempfile::TempDir::new().unwrap();

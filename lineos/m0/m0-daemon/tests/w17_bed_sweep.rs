@@ -71,10 +71,7 @@ fn render_boost(
 #[ignore = "θέλει /tmp/w9/podcast_realistic.wav (F-072). ⚠ ΧΩΡΙΣ ΤΟ FIXTURE ΠΕΡΝΑΕΙ ΠΡΑΣΙΝΟ ΣΕ 0.00s («SKIPPED»). Το ξυπνά: scripts/audio_wire.sh · scripts/run-ignored.sh"]
 fn w17_bed_sweep() {
     let input_path = Path::new("/tmp/w9/podcast_realistic.wav");
-    if !input_path.exists() {
-        println!("SKIPPED: /tmp/w9/podcast_realistic.wav missing");
-        return;
-    }
+    assert!(input_path.exists(), "Missing fixture: {} — συνταγή ΜΟΝΟ περιγραφική στο 52e2a31, πηγές ακαταγράφητες (F-072) — το rebuild δίνει ΑΛΛΟ αρχείο", input_path.display());
 
     let out_dir = Path::new("/tmp/w17_nonorm");
     fs::create_dir_all(out_dir).unwrap();

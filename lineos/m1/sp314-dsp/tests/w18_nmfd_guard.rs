@@ -85,6 +85,15 @@ fn test_w18_nmfd_guard() {
     let speech_path = Path::new("/tmp/w9/podcast_realistic.wav");
     let music_path = Path::new("/tmp/blue/comp0.wav");
 
+    // ⚠ F-071: ΠΕΡΝΑΕΙ ΚΕΝΟ ΣΤΟ CI. Το fixture
+    // /tmp/w9/podcast_realistic.wav δεν υπάρχει και ΔΕΝ ΑΝΑΠΑΡΑΓΕΤΑΙ
+    // (F-072: συνταγή μόνο περιγραφική στο 52e2a31, το rebuild δίνει ΑΛΛΟ αρχείο).
+    // ΔΕΝ γίνεται panic ΓΙΑΤΙ τρέχει σε τρία CI workflows με
+    // cargo test --workspace (ci.yml:59 · constitutional-gates.yml:61 ·
+    // red-freeze.yml:37)· μόνιμα κόκκινο CI είναι ο ίδιος μηχανισμός με
+    // μόνιμα πράσινο ψεύτικο.
+    // ΞΥΠΝΑΕΙ ΟΤΑΝ: το fixture μπει in-repo (F-072).
+    // ΜΕΤΡΙΕΤΑΙ ΑΠΟ: scripts/empty-pass-lint.sh
     if !speech_path.exists() {
         println!("SKIPPED: speech missing");
         return;
@@ -156,10 +165,7 @@ fn test_k14_e2e_hash() {
     use std::collections::hash_map::DefaultHasher;
 
     let acoustic_path = Path::new("tests/fixtures/am_contra_30s.wav");
-    if !acoustic_path.exists() {
-        println!("SKIPPED: am_contra_30s.wav missing");
-        return;
-    }
+    assert!(acoustic_path.exists(), "Missing fixture: {} — in-repo tracked fixture — αν λείπει, το checkout είναι ελλιπές (git lfs / sparse checkout;)", acoustic_path.display());
 
     let (mut acoustic_sig, acoustic_sr) = read_audio_mono(acoustic_path);
     // Use first 5 seconds to keep the test fast

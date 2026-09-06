@@ -27,10 +27,7 @@ fn w17_flacenc_bloat_repro() {
     let h8_path = "/tmp/w17_nonorm/h8_i32.raw";
     let h1_path = "/tmp/w17_nonorm/h1_i32.raw";
 
-    if !std::path::Path::new(h8_path).exists() {
-        println!("SKIPPED: /tmp/w17_nonorm/h8_i32.raw missing");
-        return;
-    }
+    assert!(std::path::Path::new(h8_path).exists(), "Missing fixture: {h8_path} (+ {h1_path}) — ΑΓΝΩΣΤΟΣ ΤΡΟΠΟΣ ΑΝΑΚΑΤΑΣΚΕΥΗΣ — χειροκίνητο fixture (F-078), δεν βρέθηκε συνταγή");
 
     let samples_h8 = read_raw_i32(h8_path);
     let samples_h1 = read_raw_i32(h1_path);

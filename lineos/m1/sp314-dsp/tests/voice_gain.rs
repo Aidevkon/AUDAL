@@ -8,10 +8,7 @@ use std::path::Path;
 #[test]
 fn test_voice_mask_gain() {
     let acoustic_path = Path::new("tests/fixtures/am_contra_30s.wav");
-    if !acoustic_path.exists() {
-        println!("SKIPPED: am_contra_30s.wav missing");
-        return;
-    }
+    assert!(acoustic_path.exists(), "Missing fixture: {} — in-repo tracked fixture — αν λείπει, το checkout είναι ελλιπές (git lfs / sparse checkout;)", acoustic_path.display());
 
     let mut reader = hound::WavReader::open(acoustic_path).unwrap();
     let spec = reader.spec();
