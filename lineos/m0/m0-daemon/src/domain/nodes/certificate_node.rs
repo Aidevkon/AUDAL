@@ -371,7 +371,9 @@ fn assemble_blob(
         crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, &identity);
 
     // Extract early to avoid borrow-after-move when dead_air is consumed below.
-    let noise_floor = dead_air.noise_floor_dbfs;
+    // ΟΡΙΟ ΜΕΤΟΝΟΜΑΣΙΑΣ [F-097]: το πεδίο πηγή μετονομάστηκε, το πεδίο
+    // προορισμού (StoredLoudness) ΟΧΙ — είναι σχήμα υπογεγραμμένου cert.
+    let quietest_active = dead_air.quietest_active_window_dbfs;
 
     let blob_v2 = crate::blob_store::StoredBlobV2 {
         core: crate::blob_store::StoredBlobCore {
@@ -406,7 +408,7 @@ fn assemble_blob(
                 momentary_lufs: telemetry_momentary,
                 true_peak_dbtp: true_peak,
                 lra: telemetry_lra,
-                noise_floor_dbfs: noise_floor,
+                noise_floor_dbfs: quietest_active,
                 k_weighted: true,
                 ebu_r128_target_lufs: -23.0,
                 ebu_r128_compliant: lufs <= -23.0 && true_peak <= -1.0,

@@ -53,7 +53,9 @@ pub struct DeadAirSummary {
     /// events.len()).
     pub truncated: bool,
     /// Minimum dBFS of any non-dead-air window. None if stream is 100% dead air.
-    pub noise_floor_dbfs: Option<f32>,
+    /// ΔΕΝ είναι πάτωμα θορύβου — είναι η πιο ήσυχη ΕΝΕΡΓΗ στιγμή, χωρίς
+    /// φιλτράρισμα. ΗΤΑΝ `noise_floor_dbfs` [F-097].
+    pub quietest_active_window_dbfs: Option<f32>,
 }
 
 /// Default = a clean summary: no dead air observed.
@@ -69,7 +71,7 @@ impl Default for DeadAirSummary {
             total_sec: 0.0,
             longest_sec: 0.0,
             truncated: false,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
         }
     }
 }
@@ -385,7 +387,7 @@ impl SignalHealthMonitor {
             total_count: self.dead_air_total_count,
             total_sec: self.dead_air_total_sec,
             longest_sec: self.dead_air_longest_sec,
-            noise_floor_dbfs: self.min_nondead_dbfs,
+            quietest_active_window_dbfs: self.min_nondead_dbfs,
         }
     }
 }
@@ -608,7 +610,7 @@ mod tests {
         m.observe(&interleave(&tone(3.5, 0.01)));
         let summary = m.finish();
 
-        let floor = summary.noise_floor_dbfs.expect("expected Some");
+        let floor = summary.quietest_active_window_dbfs.expect("expected Some");
         // Tolerance ±1 dB
         assert!(
             (floor - (-43.0)).abs() < 1.0,
@@ -627,7 +629,7 @@ mod tests {
 
         let summary = m.finish();
 
-        let floor = summary.noise_floor_dbfs.expect("expected Some");
+        let floor = summary.quietest_active_window_dbfs.expect("expected Some");
         // Noise floor should ignore the dead-air silence and only reflect the -30 dBFS tone.
         assert!(
             floor >= -35.0,
@@ -645,7 +647,7 @@ mod tests {
         let summary = m.finish();
 
         assert_eq!(
-            summary.noise_floor_dbfs, None,
+            summary.quietest_active_window_dbfs, None,
             "100% dead air -> no non-dead measurement ever occurred"
         );
     }
@@ -664,7 +666,7 @@ mod tests {
         m.observe(&interleave(&vec![0.0f32; SR as usize * 3]));
 
         let summary = m.finish();
-        let floor = summary.noise_floor_dbfs.expect("expected Some");
+        let floor = summary.quietest_active_window_dbfs.expect("expected Some");
 
         // a) Tight ±1.0 dB around -43.0
         assert!(

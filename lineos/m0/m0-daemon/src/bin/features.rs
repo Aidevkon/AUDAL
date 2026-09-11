@@ -103,7 +103,7 @@ fn process_file(input: &Path, out_dir: &Path, enable_vad: bool) -> Result<(), St
             lra_lu: m.lra,
             dynamic_range_db: m.dynamic_range_db,
             acx_noise_floor_proxy_db: m.acx_noise_floor_proxy_db,
-            noise_floor_dbfs: m.noise_floor_dbfs,
+            noise_floor_dbfs: m.quietest_active_window_dbfs,
             spectral_profile_db: m.spectral_profile_db,
             transient_density: m.transient_density,
             zcr_mean: m.zcr_mean,

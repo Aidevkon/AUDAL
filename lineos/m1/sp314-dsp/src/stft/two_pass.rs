@@ -1624,7 +1624,7 @@ impl TwoPassEngine {
         use_nmfd: bool,
         boundaries: &[SegmentBoundary],
         sample_rate: f32,
-        noise_floor_dbfs: Option<f32>,
+        quietest_active_window_dbfs: Option<f32>,
         mut vad_observer: Option<&mut dyn FnMut(crate::analysis::vad_model::VadObservation)>,
         phi1_enabled: bool,
         mut callback: F,
@@ -1679,7 +1679,10 @@ impl TwoPassEngine {
             crate::analysis::vad_model::VadDecision,
         )> = Vec::new();
         let mut vad_frame_index: u64 = 0;
-        let noise_floor = noise_floor_dbfs.unwrap_or(-144.0);
+        // ΟΡΙΟ ΜΕΤΟΝΟΜΑΣΙΑΣ [F-097]: από εδώ και κάτω η τιμή ταξιδεύει στο
+        // VadContext/VadObservation, που κρατούν ακόμη το όνομα
+        // `noise_floor_dbfs` — ξεχωριστή απόφαση, δηλωμένη.
+        let noise_floor = quietest_active_window_dbfs.unwrap_or(-144.0);
         let mut t_read = 0u128;
         let mut t_vad_dsp = 0u128;
         let mut t_phi1 = 0u128;

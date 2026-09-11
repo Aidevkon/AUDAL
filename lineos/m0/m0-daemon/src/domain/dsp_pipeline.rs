@@ -646,7 +646,7 @@ fn run_dsp_internal(
             trunk_metrics.integrated_lufs,
             trunk_metrics.crest_db,
             trunk_metrics.lra,
-            trunk_metrics.noise_floor_dbfs,
+            trunk_metrics.quietest_active_window_dbfs,
             trunk_metrics.spectral_profile_db,
             trunk_metrics.transient_density,
         );
@@ -1213,7 +1213,7 @@ fn run_dsp_internal(
                 normalizer_ceiling_db: req.normalizer_ceiling_db,
                 flavour_id: req.flavour_id.as_deref(),
                 sample_rate: decoded.pcm_sample_rate,
-                noise_floor_dbfs: trunk_metrics.noise_floor_dbfs,
+                quietest_active_window_dbfs: trunk_metrics.quietest_active_window_dbfs,
                 restoration_enabled: req.restoration_enabled.unwrap_or(false),
                 macro_router_enabled: req.macro_router_enabled.unwrap_or(false),
                 boundaries: &trunk_report.boundaries,

@@ -132,7 +132,7 @@ mod tests {
             acx: None,
             crest_db,
             lra,
-            noise_floor_dbfs: Some(-60.0),
+            quietest_active_window_dbfs: Some(-60.0),
             spectral_profile_db: [sub_db, -20.0, -18.0, -15.0, mid_db, -18.0, -22.0, -30.0],
             transient_density: 0.5,
             // The following fields are not read by guess_content_type.

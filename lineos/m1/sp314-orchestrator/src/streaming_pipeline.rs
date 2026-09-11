@@ -53,11 +53,12 @@ pub struct StreamingConfig<'a> {
     /// stream produces, today's pre-fix behavior — passthrough
     /// files with no resampling have no artifact to trim anyway).
     pub expected_output_frames: Option<u64>,
-    /// Full-file noise floor from the trunk (Y1). None when
-    /// unmeasured. Y4-b's adaptive gate reads it; the -45 dBFS
+    /// Το πιο ήσυχο παράθυρο 1 s του trunk που ΔΕΝ είναι σιωπή (Y1).
+    /// None όταν δεν μετρήθηκε. Y4-b's adaptive gate reads it; the -45 dBFS
     /// default policy lives here in the orchestrator, never in
     /// the DSP core.
-    pub noise_floor_dbfs: Option<f32>,
+    /// ΗΤΑΝ `noise_floor_dbfs` — ΔΕΝ είναι πάτωμα θορύβου [F-097].
+    pub quietest_active_window_dbfs: Option<f32>,
     /// Bypass flag for A/B testing (Y4-c TODO: plumb to UI)
     pub restoration_enabled: bool,
 }
@@ -208,7 +209,9 @@ pub fn run_streaming_pipeline_with_timeline(
         .map_err(|e| format!("{:?}", e))?;
 
     // The -45 default policy lives HERE, in the orchestrator, never in the DSP core.
-    let gate_threshold_db = config.noise_floor_dbfs.unwrap_or(-45.0);
+    // ΟΡΙΟ ΜΕΤΟΝΟΜΑΣΙΑΣ [F-097]: το `gate_threshold_db` είναι ΣΩΣΤΟ όνομα —
+    // από εδώ και κάτω η τιμή είναι κατώφλι πύλης, όχι μέτρηση.
+    let gate_threshold_db = config.quietest_active_window_dbfs.unwrap_or(-45.0);
     let mut rest_chain = sp314_dsp::restoration::RestorationChain::new(
         sample_rate as f32,
         sp314_dsp::restoration::RestorationConfig::voice(),

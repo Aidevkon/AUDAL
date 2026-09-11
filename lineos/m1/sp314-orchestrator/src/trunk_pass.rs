@@ -43,7 +43,13 @@ pub struct TrunkMetrics {
     pub acx_noise_floor_proxy_db: f32,
     pub crest_db: f32,
     pub lra: f32,
-    pub noise_floor_dbfs: Option<f32>,
+    /// Το πιο ήσυχο παράθυρο 1 s ΠΟΥ ΔΕΝ ΕΙΝΑΙ σιωπή — ελάχιστο RMS πάνω από
+    /// το DEAD_AIR_GATE_DBFS, ΧΩΡΙΣ φιλτράρισμα. ΔΕΝ είναι πάτωμα θορύβου:
+    /// σε καθαρή αφήγηση αυτό που μετριέται είναι η ΠΙΟ ΗΣΥΧΗ ΟΜΙΛΙΑ.
+    /// Το πραγματικό πάτωμα είναι το AcxCheckReport::noise_floor_db
+    /// (HP8 @10 Hz, ελάχιστο κυλιόμενο 500 ms) — άλλο μέγεθος [F-097].
+    /// ΗΤΑΝ `noise_floor_dbfs`· η ομωνυμία γέννησε το F-096.
+    pub quietest_active_window_dbfs: Option<f32>,
     pub spectral_profile_db: [f32; 8],
     pub transient_density: f32,
     /// Zero-crossing rate mean across 1024-sample frames (hop 512) on the 48kHz mono downmix.
@@ -811,7 +817,7 @@ fn run_trunk_internal(
             acx,
             crest_db,
             lra,
-            noise_floor_dbfs: min_nondead_dbfs,
+            quietest_active_window_dbfs: min_nondead_dbfs,
             spectral_profile_db,
             transient_density,
             zcr_mean,

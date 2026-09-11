@@ -124,7 +124,8 @@ pub struct RenderSettings<'a> {
     pub normalizer_ceiling_db: Option<f32>,
     pub flavour_id: Option<&'a str>,
     pub sample_rate: u32,
-    pub noise_floor_dbfs: Option<f32>,
+    /// Το πιο ήσυχο παράθυρο 1 s που δεν είναι σιωπή — ΟΧΙ πάτωμα θορύβου [F-097].
+    pub quietest_active_window_dbfs: Option<f32>,
     pub restoration_enabled: bool,
     pub macro_router_enabled: bool,
     pub boundaries: &'a [lineos_corpus::scout::SegmentBoundary],
@@ -230,7 +231,7 @@ pub fn run(
     let mut vocal_gate = sp314_dsp::restoration::gate::NoiseGate::new(
         settings.sample_rate as f32,
         0.0,
-        settings.noise_floor_dbfs.unwrap_or(-45.0),
+        settings.quietest_active_window_dbfs.unwrap_or(-45.0),
     );
 
     const GLUE_PAD_LINEAR: f32 = 0.125_892_54; // 10^(-18/20)
@@ -474,7 +475,7 @@ pub fn run(
             settings.use_nmfd,
             settings.boundaries,
             settings.sample_rate as f32,
-            settings.noise_floor_dbfs,
+            settings.quietest_active_window_dbfs,
             vad_observer,
             false,
             callback,

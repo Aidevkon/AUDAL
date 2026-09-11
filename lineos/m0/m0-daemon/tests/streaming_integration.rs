@@ -57,7 +57,7 @@ fn streaming_pipeline_ducking_e2e() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -99,7 +99,7 @@ fn streaming_pipeline_ducking_e2e() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -222,7 +222,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -337,7 +337,7 @@ fn test_streaming_pipeline_jit_fallback() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -399,7 +399,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -440,7 +440,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -638,7 +638,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             music_gain: 1.0,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -674,7 +674,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             music_gain: 1.0,
             pre_gain_linear: 2.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -837,7 +837,7 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             music_gain: 1.0,
             pre_gain_linear: 1.0,
             expected_output_frames: expected,
-            noise_floor_dbfs: None,
+            quietest_active_window_dbfs: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -914,7 +914,7 @@ fn test_restoration_speech_gated() {
             music_gain: 0.501,
             pre_gain_linear: 1.0,
             expected_output_frames: None,
-            noise_floor_dbfs: None,    // Exercises the -45 default gate
+            quietest_active_window_dbfs: None,    // Exercises the -45 default gate
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
         },
         TimelinePlan {

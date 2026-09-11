@@ -97,8 +97,8 @@ fn test_trunk_parity() {
         "Expected non-empty LUFS for 12s signal"
     );
     assert!(
-        report.noise_floor_dbfs.is_some(),
-        "Expected non-empty noise floor for non-silent signal"
+        report.quietest_active_window_dbfs.is_some(),
+        "Expected non-empty quietest active window for non-silent signal"
     );
 
     // ═══ Y2a Oracle: spectral_profile_db + transient_density parity ═══

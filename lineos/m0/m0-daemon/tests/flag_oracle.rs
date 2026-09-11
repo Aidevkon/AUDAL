@@ -125,7 +125,7 @@ fn render_once(
             normalizer_ceiling_db: None,
             flavour_id: None,
             sample_rate: SR,
-            noise_floor_dbfs: Some(-45.0),
+            quietest_active_window_dbfs: Some(-45.0),
             restoration_enabled,
             macro_router_enabled,
             boundaries,
