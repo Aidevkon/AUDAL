@@ -1614,7 +1614,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Trigger: ΠΡΙΝ ανοίξει η πόρτα του
   flagged_hybrid_indices (§σχέδιο δράσης, Βήμα 2).
 
-  ΤΕΚΜΗΡΙΟ: docs/lab-logs/f096-restoration-assets/
+  ΤΕΚΜΗΡΙΟ ΑΚΡΟΑΣΗΣ: ΔΕΝ ΜΠΗΚΕ ΣΤΟ ΔΕΝΤΡΟ — το υλικό είναι εμπορικό audiobook τρίτου και δεν διανέμεται με τον κώδικα. Αναπαράγεται από τις παραμέτρους και τα hashes αυτής της εγγραφής, από όποιον έχει το αρχείο
   (A_bypass, C_lowcut_gate — τα B και D
   αναπαράγονται· hashes στο F-096 και στην αναφορά της μέτρησης).
 
