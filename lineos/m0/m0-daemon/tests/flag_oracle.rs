@@ -189,7 +189,7 @@ fn pearson(a: &[f32], b: &[f32]) -> f64 {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEST 1 — vocal gate closes in the quiet region
+// TEST 1 — vocal expander attenuates the quiet region, bounded by the floor
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // ISOLATION: mix_levels = { voice: 1.0, rest: 0.0 }
@@ -212,13 +212,38 @@ fn pearson(a: &[f32], b: &[f32]) -> f64 {
 //   Loud: gate is fully open (target_gain = 1.0, start gain = 1.0 → no delta).
 //     Expect diff << 0.1% of off energy. Spatial stage may add fixed gains but
 //     applies identically to both runs — cancels in the diff.
-//   Quiet: gate closed → on output ≈ 0, off output = voice stem.
-//     Expect diff > 10% of off energy, and on is quieter than off.
-//     Even 1% of signal energy in the voice stem at −60 dBFS gives a
-//     relative diff well above 10%.
+//   Quiet: expander engaged → on output = off attenuated, NEVER below the
+//     −12 dB floor. Expect on quieter than off, AND on above off × floor².
+//     ΗΤΑΝ «gate closed → on output ≈ 0» — ο γκρεμός, που έφυγε στο a323bf9.
 
+// ΗΤΑΝ «gate must close», diff > 4% του off.
+// Ο κόμβος ΔΕΝ κλείνει πια — είναι downward
+// expander με floor −12 dB (a323bf9), γιατί το
+// κλείσιμο σβήνει το room tone που ο προορισμός
+// απαιτεί. Το τεστ δεν χαλάρωσε· ελέγχει το νέο
+// συμβόλαιο, με το αναμενόμενο να προκύπτει από
+// το floor και όχι από χαλαρωμένο κατώφλι.
+// Δεύτερο τεστ που κωδικοποιούσε τον γκρεμό,
+// μετά το noise_gate_closes_on_silence.
+//
+// ⚠ ΔΗΛΩΜΕΝΟ ΟΡΙΟ ΤΟΥ ΟΡΓΑΝΟΥ — ΜΕΤΡΗΘΗΚΕ 2026-09-12:
+//   Σε αυτό το επίπεδο (πλήρες render, voice-only mix) ο κόμβος συνεισφέρει
+//   ΕΛΑΧΙΣΤΑ στην ενέργεια της ήσυχης περιοχής, ακόμη και τελείως κλειστός:
+//     γκρεμός    on/off = 0.871035   (−1.20 dB)   mse/off = 0.106835
+//     expander   on/off = 0.937159   (−0.56 dB)   mse/off = 0.015769
+//   (παράθυρο 88_000..96_000· ίδια εικόνα στο 92_000..96_000)
+//   Δηλαδή ~87% της ενέργειας εκεί ΔΕΝ περνάει από τον vocal gate.
+//   ⇒ ΚΑΝΕΝΑ φράγμα προερχόμενο ΑΠΟ ΤΟ FLOOR δεν ξεχωρίζει γκρεμό από
+//     expander εδώ· η μόνη ποσότητα που τα ξεχωρίζει (mse/off, 0.107 vs
+//     0.016) ΔΕΝ προκύπτει από το floor — προκύπτει από την κατανομή
+//     στάθμης του stem, και κάθε κατώφλι ανάμεσά τους θα ήταν ΚΟΥΡΔΙΣΜΑ.
+//   ⇒ Ο ΔΙΑΚΡΙΤΙΚΟΣ ΦΡΟΥΡΟΣ ΤΟΥ FLOOR ΕΙΝΑΙ ΜΟΝΑΔΙΚΟΣ ΚΑΙ ΖΕΙ ΣΕ ΕΠΙΠΕΔΟ
+//     ΚΟΜΒΟΥ — στο συμβόλαιο restoration του sp314-dsp, δοκίμιο
+//     `expander_floors_silence_never_zeroes`: εκεί το exercise-proof
+//     ΚΟΚΚΙΝΙΖΕΙ με τον γκρεμό. Εδώ ΔΕΝ κοκκινίζει, και αυτό δηλώνεται
+//     αντί να καλυφθεί με νούμερο διαλεγμένο ώστε να βγει.
 #[test]
-fn restoration_vocal_gate_closes_in_quiet_region() {
+fn restoration_vocal_expander_attenuates_quiet_region_within_floor() {
     let fixture = require_fixture();
     let fixture_str = fixture.to_str().unwrap();
     let n_frames = 3 * SR_US;
@@ -311,16 +336,37 @@ fn restoration_vocal_gate_closes_in_quiet_region() {
         loud1_mse / loud1_msq_off.max(1e-30)
     );
 
-    // (β) Quiet: gate closed → diff > 4% of off energy, AND on is quieter.
-    // spectral stems are cleaner before the gate — less broadband leak to cut; ratio re-pinned from the measured post-6α value (ear-validated 2026-08-01)
+    // (β) Quiet: ο expander ΜΕΙΩΝΕΙ, δεν μηδενίζει, και δεν ξεπερνάει το floor.
+    //
+    // Το φράγμα ΠΡΟΚΥΠΤΕΙ ΑΠΟ ΤΟ FLOOR, δεν επιλέγεται: κανένα δείγμα δεν
+    // εξασθενεί περισσότερο από EXPANDER_FLOOR_DB (−12 dB, gate.rs), άρα η
+    // ενέργεια εξόδου δεν μπορεί να πέσει κάτω από off × floor_linear².
+    // floor_linear = 10^(−12/20); ιδιωτική σταθερά στο gate.rs, οπότε
+    // επαναδιατυπώνεται εδώ ως το συμβόλαιο που ελέγχεται.
+    let floor_linear = libm::powf(10.0, -12.0 / 20.0) as f64;
+    let floor_energy_bound = quiet_msq_off * floor_linear * floor_linear;
+
+    // (β1) ΔΕΝ μηδενίζεται — ποτέ ψηφιακό μηδέν στην ήσυχη περιοχή.
     assert!(
-        quiet_mse > quiet_msq_off * 0.04,
-        "Quiet: gate must close (diff > 4% of off energy) — is vocal gate wired in render_node? ratio={:.6}",
-        quiet_mse / quiet_msq_off.max(1e-30)
+        quiet_msq_on > 0.0,
+        "Quiet: ο expander δεν επιτρέπεται να μηδενίσει την περιοχή· on_msq={:.3e}",
+        quiet_msq_on
     );
+
+    // (β2) Η μείωση ΔΕΝ ΞΕΠΕΡΝΑΕΙ το floor.
+    assert!(
+        quiet_msq_on > floor_energy_bound,
+        "Quiet: η εξασθένηση ξεπέρασε το floor −12 dB — ο κόμβος ξανάγινε γκρεμός. \
+         on_msq={:.3e}, φράγμα floor={:.3e}, off_msq={:.3e}",
+        quiet_msq_on,
+        floor_energy_bound,
+        quiet_msq_off,
+    );
+
+    // (β3) ΜΕΙΩΝΕΤΑΙ — ο κόμβος εξασθενεί, δεν ενισχύει.
     assert!(
         quiet_msq_on < quiet_msq_off,
-        "Quiet: restoration=on must be quieter (gate attenuates, not amplifies). \
+        "Quiet: restoration=on must be quieter (expander attenuates, not amplifies). \
          on_msq={:.3e}, off_msq={:.3e}",
         quiet_msq_on,
         quiet_msq_off,
