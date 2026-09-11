@@ -1409,6 +1409,65 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Trigger: ΠΡΙΝ κάθε αλλαγή Q, TARGET_SR ή
   LTASS_CFS.
 
+- **[F-094] Το ACX render-άρεται στα −16 LUFS με
+  ταβάνι −1 dBTP ενώ το preset δηλώνει −20.5 και
+  −3.0: πέφτει στο κλαδί του ΑΓΝΩΣΤΟΥ preset.**
+  Component: `dsp_pipeline.rs:539-547` ·
+  `episode_render.rs:197` ·
+  `lineos/shared/schema/bmr-128.schema.json` ·
+  `presets.rs` εγγραφή acx. ΜΕΤΡΗΜΕΝΟ 2026-09-06.
+
+  Η ΑΙΤΙΑ, ΑΥΤΟΥΣΙΑ:
+  ```rust
+  let episode_target_lufs = match schema_value {
+      Some(entry) => entry.get("target_lufs")…,
+      None => Some(-16.0),
+  };
+  ```
+  Κλειδιά του schema: spotify · youtube ·
+  apple_music · apple_podcast · tidal · broadcast ·
+  raw · apple_spatial_bed · stem_to_spatial.
+  **ΤΟ «acx» ΔΕΝ ΥΠΑΡΧΕΙ** ⇒ fallback αγνώστου.
+  Και το ταβάνι είναι σταθερά:
+  `episode_render.rs:197  ceiling_db: -1.0,`
+
+  ⚠⚠ **ΣΕ ΔΙΑΔΡΟΜΗ ΠΟΥ Η ΔΙΕΠΑΦΗ ΔΕΝ ΚΑΛΕΙ.**
+  Μετρήθηκε 2026-09-06: το κουμπί του Cockpit →
+  `trigger_mastering` → `m0_client.rs:82` → POST
+  `/master/streaming`. Το `m0_client` έχει ΜΙΑ
+  μέθοδο mastering (σχόλιο :74 χρονολογεί την
+  αλλαγή στο 706d237, 2026-07-17). Η streaming
+  διαδρομή διαβάζει το preset σωστά
+  (`executor.rs:257` target_lufs → autotune).
+  **Ζωντανό μόνο για όποιον χτυπήσει το endpoint
+  απευθείας.**
+
+  ΤΡΙΤΟ ΜΗΤΡΩΟ: οι τιμές παράδοσης ζουν σε ΤΡΙΑ
+  σημεία — presets.rs (τεκμηριωμένο, με πηγή) ·
+  bmr-128.schema.json (χωρίς το acx) · σταθερές
+  στον κώδικα. Κερδίζει αυτό που δεν τεκμηριώθηκε
+  ποτέ. ΚΑΙ ΤΟ ΚΑΤΟΠΤΡΟ: τα
+  `apple_music`/`apple_podcast` υπάρχουν στο schema
+  και ΟΧΙ στο CATALOGUE.
+
+  ΤΡΙΑ ΤΑΒΑΝΙΑ, ΔΥΟ ΣΤΑΘΕΡΑ:
+  · `dsp/mod.rs:204` Music ⇒ ΑΠΟ ΤΟ SPEC ✓
+  · `episode_render.rs:197` ⇒ −1.0 ΣΤΑΘΕΡΑ
+  · `export.rs:1055` ⇒ στατικό trim στα −3.05
+  · `limiter.rs:12` ⇒ −0.5, **ΝΕΚΡΟΣ ΚΩΔΙΚΑΣ**
+  ⚠ ΤΟ −0.5 ΤΟ ΦΡΟΥΡΟΥΝ TESTS
+    (`e2e_mastering_quality.rs:625,675` ·
+     `test_engine.rs:138`) — ταβάνι που η παραγωγή
+    δεν εφαρμόζει πουθενά. Ψευδής φρουρός.
+  ⚠ ΚΑΙ Η streaming ΔΕΝ ΕΧΕΙ LIMITER ΚΑΘΟΛΟΥ
+    (grep BrickwallLimiter → κενό).
+
+  ΔΕΝ ΔΙΟΡΘΩΝΕΤΑΙ ΧΩΡΙΣ ΑΠΟΦΑΣΗ: προσθήκη του
+  «acx» αλλάζει στάθμη. Το INV-DET θα κοκκινίσει
+  σωστά.
+  Trigger: ΠΡΙΝ κάθε δουλειά στο episode_render ή
+  στο bmr-128 schema.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1680,7 +1739,7 @@ BAND_EDGES `[20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]` Hz.
 
 ---
 
-**NEXT FREE: F-094** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-095** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
