@@ -1468,6 +1468,67 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Trigger: ΠΡΙΝ κάθε δουλειά στο episode_render ή
   στο bmr-128 schema.
 
+- **[F-095] Δύο topologies με ταυτόσημα ονόματα
+  κόμβων και διαφορετικό Q· η μία αντισταθμίζει την
+  επικάλυψη, η άλλη —αυτή του χρήστη— όχι.**
+  Component: `flavor.rs:90-97` ·
+  `streaming_pipeline.rs:117-156,227` ·
+  `dsp/mod.rs:452-470`. ΜΕΤΡΗΜΕΝΟ 2026-09-06.
+
+  ```
+  flavor.rs (LtassCorrection)   q: 1.0
+  streaming_pipeline.rs          q: 0.707
+  ΟΝΟΜΑΤΑ: ltass_band_0..7      ΤΑΥΤΟΣΗΜΑ
+  ΣΥΧΝΟΤΗΤΕΣ 50…12000           ΤΑΥΤΟΣΗΜΕΣ
+  ⇒ ΜΟΝΟ ΤΟ Q ΔΙΑΦΕΡΕΙ. Γι' αυτό δεν το είδε
+    κανείς.
+  ```
+
+  Η ΕΠΙΚΑΛΥΨΗ, ΜΕΤΡΗΜΕΝΗ (λευκός θόρυβος LCG seed
+  0x5EED1234, 30 s @48k, Welch N=16384, 174 frames,
+  gains [+6,0,0,0,0,0,0,0]):
+
+  | Q | b0 @50 | b1 @150 | b0 ολοκλ 20-80 |
+  |---|---|---|---|
+  | **0.707** | +5.964 | **+1.370** | **+4.908** |
+  | 1.0 | +5.939 | +0.786 | +4.404 |
+  | 2.0 | +5.830 | +0.221 | +3.195 |
+
+  ⇒ Στο 0.707 το **23%** διαρρέει στη γειτονική.
+  ⇒ ΚΑΙ ΔΕΥΤΕΡΟ ΕΥΡΗΜΑ: ζητάει +6, εισπράττει
+    **+4.908** εκεί που κοιτάζει — **82% παράδοση**.
+
+  Η ΑΙΤΙΑ ΕΙΝΑΙ ΓΕΩΜΕΤΡΙΚΗ: 150/50 = 1.585 οκτάβες
+  απόσταση, peaking Q=0.707 έχει εύρος ~2 οκτάβες.
+  Επικαλύπτονται πριν μπει σήμα. Και το τίμημα του
+  υψηλού Q μετρήθηκε: στο Q=4 η κάλυψη της ίδιας
+  της μπάντας πέφτει στο +2.031. **Κανένα Q δεν
+  λύνει και τα δύο.**
+
+  Ο ΛΥΤΗΣ ΥΠΑΡΧΕΙ ΚΑΙ ΕΙΝΑΙ ΣΤΗ ΛΑΘΟΣ ΔΙΑΔΡΟΜΗ:
+  `dsp/mod.rs:452` A_INV 8×8 · `:470`
+  πολλαπλασιασμός ⇒ Μόνο στη Music διαδρομή
+  (/master). `streaming_pipeline.rs:227` γράφει τα
+  gains ΑΠΕΥΘΕΙΑΣ, χωρίς αντιστάθμιση.
+  ⚠ ΚΑΙ ΤΟ F-093 ΤΟ ΕΙΧΕ ΠΡΟΒΛΕΨΕΙ: ο πίνακας
+    δηλώνεται **valid only Q=1.0 at 48kHz**. Ακόμα
+    κι αν αντιγραφόταν στη streaming ως έχει, θα
+    ήταν λάθος πίνακας για q=0.707.
+
+  ΕΞΗΓΕΙ ΤΑ 12/28 ΣΤΟ ΤΑΒΑΝΙ g_max: ο resolver
+  ζητάει διόρθωση που το φίλτρο δεν παραδίδει.
+  **Το g_max=6.0 δεν ήταν λάθος κατώφλι — ήταν
+  σωστό κατώφλι σε σπασμένο βρόχο.** Το LTASS
+  μέτωπο δεν μπλοκάρει στο corpus· μπλοκάρει στον
+  παραδότη.
+
+  ΔΕΝ ΔΙΟΡΘΩΝΕΤΑΙ ΤΩΡΑ: τα φίλτρα δεν τρέχουν
+  καθόλου σε καθαρή αφήγηση (πόρτα
+  flagged_hybrid_indices). Η διόρθωση έχει νόημα
+  ΜΟΝΟ αφού ανοίξει η πόρτα, και τότε: q→1.0,
+  A_INV, ΚΑΙ ακρόαση.
+  Trigger: ΠΡΙΝ κάθε δουλειά στα LTASS ή στο g_max.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1739,7 +1800,7 @@ BAND_EDGES `[20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]` Hz.
 
 ---
 
-**NEXT FREE: F-095** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-096** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
