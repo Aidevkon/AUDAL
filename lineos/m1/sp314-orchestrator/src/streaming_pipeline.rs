@@ -109,10 +109,20 @@ pub fn run_streaming_pipeline_with_timeline(
 
     let mut vb = sp314_nodes::topology::DspTopologyBuilder::new("vocal_graph_topology");
     let v_in = vb.add_node("in", "Input", serde_json::json!({}));
+    // HEARD 2026-08-24 — Α/Β/Α, αγγλικά + γερμανικά.
+    // −24 dB· στα −18/−12 μεγεθύνεται η αντήχηση της
+    // ηχογράφησης: τα sibilants διεγείρουν την ουρά
+    // του χώρου, ο κόμβος δεν την προσθέτει, την
+    // αποκαλύπτει.
+    // ΗΤΑΝ 0.0, που σκότωνε το default του κόμβου
+    // (−24) — η μείωση ενεργοποιείται μόνο πάνω από
+    // το κατώφλι, άρα ποτέ.
+    // ΔΗΛΩΜΕΝΟ ΟΡΙΟ: ίδιο threshold, άλλη
+    // επιθετικότητα ανά στάθμη αρχείου.
     let v_deesser = vb.add_node(
         "deesser",
         "DeEsser",
-        serde_json::json!({ "threshold_db": 0.0, "frequency_hz": 6000.0 }),
+        serde_json::json!({ "threshold_db": -24.0, "frequency_hz": 6000.0 }),
     );
     let v_eq0 = vb.add_node(
         "ltass_band_0",
