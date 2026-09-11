@@ -1618,6 +1618,121 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   (A_bypass, C_lowcut_gate — τα B και D
   αναπαράγονται· hashes στο F-096 και στην αναφορά της μέτρησης).
 
+- **[F-097] Πέντε πράγματα λέγονται «noise floor»,
+  δύο μετρητές του ίδιου ορισμού διαφωνούν στην
+  αναγωγή καναλιών, και τέσσερα διαφορετικά defaults
+  απαντούν στο «δεν ξέρω».** Component:
+  `trunk_pass.rs:38-46,136,504-509,579-593,814` ·
+  `signal_health.rs:55-56,91,178-181,214-218` ·
+  `acx_check.rs:93-95` · `blob_store.rs:44-45,113-119`
+  · `presets.rs:85` · `streaming_pipeline.rs:211` ·
+  `render_node.rs:233` · `two_pass.rs:1682` ·
+  `vad_model.rs:76`. ΜΕΤΡΗΜΕΝΟ 2026-09-11.
+
+  **ΠΕΝΤΕ ΟΝΟΜΑΤΑ, ΔΥΟ ΟΡΙΣΜΟΙ ΜΕΤΡΗΣΗΣ:**
+  ```
+  [Π] noise_floor_db        AcxCheckAnalyzer —
+      ελάχιστο κυλιόμενο 500ms μετά HP8@10Hz
+      ⇒ ΠΡΑΓΜΑΤΙΚΟ ΠΑΤΩΜΑ. Πάει στο cert.
+  [Ο] noise_floor_dbfs      ελάχιστο παράθυρο 1s
+      ΠΟΥ ΔΕΝ ΕΙΝΑΙ dead air (gate −60)
+      ⇒ Η ΠΙΟ ΗΣΥΧΗ ΟΜΙΛΙΑ (F-096)
+  [Ο] ΔΕΥΤΕΡΗ ΥΛΟΠΟΙΗΣΗ    signal_health
+  [Ρ] max_noise_floor_db    ΟΡΙΟ προδιαγραφής, όχι
+      μέτρηση. Ξεχωρίζει από το πρόθεμα max_.
+  [;] acx_noise_floor_proxy_db  ΗΔΗ σημειωμένο ως
+      παραπλανητικό (trunk_pass.rs:38-43), και
+      πεταμένο στο to_pre_analysis
+  ```
+
+  ⚠⚠ **ΤΟ ΚΥΡΙΟ: ΟΙ ΔΥΟ ΜΕΤΡΗΤΕΣ ΤΟΥ [Ο] ΔΕΝ ΔΙΝΟΥΝ
+  ΤΟ ΙΔΙΟ ΝΟΥΜΕΡΟ.**
+  Ίδιο παράθυρο (1s), ίδιο gate (−60), ίδιο όνομα
+  τοπικής (`min_nondead_dbfs`), και το ένα δηλώνει
+  ρητά ότι «mirrors» το άλλο. Διαφέρει η αναγωγή:
+  ```
+  trunk_pass.rs:509      mono[i] = (l + r) * 0.5
+                         ⇒ ((L+R)/2)²
+  signal_health.rs:180   sq = (l*l + r*r) * 0.5
+                         ⇒ (L²+R²)/2
+  ```
+  Ταυτίζονται ΜΟΝΟ όταν L == R. Σε ασυσχέτιστο
+  στερεοφωνικό το δεύτερο είναι πάντα ≥ του πρώτου.
+  **ΚΑΙ ΟΙ ΔΥΟ ΜΕΤΡΟΥΝ ΤΗΝ ΙΔΙΑ ΕΙΣΟΔΟ.**
+
+  **ΚΑΙ ΟΙ ΠΡΟΟΡΙΣΜΟΙ ΕΙΝΑΙ ΔΙΑΦΟΡΕΤΙΚΟΙ:**
+  ```
+  certificate_node.rs:374  dead_air.noise_floor_dbfs
+                           → ΥΠΟΓΕΓΡΑΜΜΕΝΟ CERT
+  executor.rs:367          trunk_report.noise_floor_dbfs
+                           → Η ΠΥΛΗ
+  ```
+  ⇒ Δύο διαφορετικά νούμερα, ίδιο όνομα,
+    διαφορετικοί καταναλωτές. Ο χρήστης βλέπει το
+    ένα και ακούει το άλλο.
+
+  **ΤΕΣΣΕΡΑ DEFAULTS ΓΙΑ ΤΗΝ ΙΔΙΑ ΑΠΟΥΣΑ ΤΙΜΗ:**
+  ```
+  streaming_pipeline.rs:211  unwrap_or(-45.0)
+  render_node.rs:233         unwrap_or(-45.0)
+  two_pass.rs:1682           unwrap_or(-144.0)
+  vad_model.rs:76            .max(-70.0)   ← clamp
+  ```
+  ⇒ 99 dB απόσταση ανάμεσα στο −45 και στο −144 για
+    το ΙΔΙΟ «δεν μετρήθηκε».
+
+  **Ο ΑΟΡΑΤΟΣ ΚΡΙΚΟΣ** (`trunk_pass.rs:84-90`):
+  `impl Deref for TrunkReport`. Το
+  `trunk_report.noise_floor_dbfs` ΔΕΝ είναι πεδίο του
+  TrunkReport — λύνεται μέσω Deref.
+  ⇒ Μετονομασία στο TrunkMetrics ΔΕΝ φαίνεται ως
+    σφάλμα στο σημείο κλήσης, και κανένα grep για
+    «TrunkReport» δεν τη βρίσκει. **Ο compiler είναι
+    ο μόνος που το βλέπει.**
+
+  ⚠ **ΓΙΑΤΙ Η ΜΕΤΟΝΟΜΑΣΙΑ ΔΕΝ ΕΙΝΑΙ Ο ΔΡΟΜΟΣ:**
+  Το `StoredLoudness.noise_floor_dbfs` (blob_store:45)
+  ταξιδεύει στο ΥΠΟΓΕΓΡΑΜΜΕΝΟ cert και **δεν έχει
+  κανένα alias**. Ο ίδιος ο κώδικας το δηλώνει
+  (certificate_node.rs:427-433): «ΤΟ ΟΝΟΜΑ ΤΟΥ ΠΕΔΙΟΥ
+  ΔΕΝ ΑΛΛΑΖΕΙ ΕΔΩ: ταξιδεύει στο ΥΠΟΓΕΓΡΑΜΜΕΝΟ cert —
+  αλλαγή ονόματος = αλλαγή σχήματος, ξεχωριστή
+  απόφαση.»
+  Ο μηχανισμός υπάρχει και είναι δοκιμασμένος — τρεις
+  γενιές alias στο ίδιο struct, με
+  delivery_field_alias_roundtrip να τις διαβάζει
+  όλες — αλλά αυτό το πεδίο δεν τον έχει.
+
+  ⚠ **ΚΑΙ ΓΙΑΤΙ ΔΕΝ ΜΠΟΡΕΙ Η ΠΥΛΗ ΝΑ ΠΑΡΕΙ ΤΟ [Π]:**
+  ```
+  trunk_pass.rs:371-373
+    run_trunk_pass(...) → run_trunk_internal(..., false, ...)
+                                                ↑ with_acx
+  ```
+  Ο AcxCheckAnalyzer **δεν τρέχει καθόλου** στις
+  διαδρομές που χτίζουν την πύλη — ούτε streaming,
+  ούτε render. Και το κόστος είναι δηλωμένο
+  (trunk_pass.rs:365-366): «one extra HP cascade +
+  window min per mono sample». Θα το πλήρωνε **κάθε**
+  render, για μια τιμή που μόνο το preset «acx»
+  απαιτεί.
+
+  **ΤΙ ΜΕΝΕΙ ΕΦΙΚΤΟ, ΚΑΙ ΕΙΝΑΙ ΜΙΚΡΟ:** ο υπολογισμός
+  του trunk_pass σταματάει να εξαιρεί τα ήσυχα
+  παράθυρα. Το cert παίρνει το signal_health, όχι
+  αυτό — άρα **δεν αγγίζεται καθόλου**, και το όνομα
+  μένει ως έχει. Ένα αρχείο.
+  ⚠ Αλλάζει τη στάθμη της πύλης ⇒ αλλάζει ήχο ⇒
+    ΑΚΡΟΑΣΗ, και INV-DET που θα κοκκινίσει ΜΟΝΟ αν ο
+    κόμβος τρέχει.
+  Trigger: πριν κάθε δουλειά στο κατώφλι της πύλης.
+
+  ΤΕΣΣΕΡΑ ΑΣΑΦΗ, ΟΛΑ ΣΕ ΕΓΓΡΑΦΑ/TODO για μελλοντικό
+  podcast cert, κανένα σε ζωντανό κώδικα:
+  reference-driven-sonic-vision-podcast-v1_1.md:298 ·
+  future-roadmap.md:151 · certificate_node.rs:211 ·
+  episode_render.rs:43.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2054,7 +2169,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-097** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-098** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
