@@ -1,0 +1,627 @@
+[2026-09-11T18:45:45Z INFO  cargo_workspace_unused_pub] Running on "/home/aidevcon/Documents/creator-os" with SCIP "/home/aidevcon/Documents/creator-os/index.scip"
+[2026-09-11T18:45:58Z INFO  cargo_workspace_unused_pub] Found 388 possibly unused functions
+aether/tests/corpus_contract.rs
+37   fn corpus_protocol_version_is_900() {
+55   fn corpus_session_id_matches_blob_id() {
+74   fn corpus_has_all_five_stems() {
+97   fn corpus_events_have_session_id_guard() {
+121  fn corpus_confidence_within_bounds() {
+144  fn corpus_no_audio_content() {
+167  fn corpus_deterministic() {
+
+apps/runtime/loom/src/engine.rs
+145      pub fn seek_to_ms(&mut self, position_ms: f64) {
+168      pub fn current_position_ms(&self) -> f64 {
+
+apps/runtime/loom/src/stem_engine.rs
+37       pub fn swap_graph(&mut self, mut new_graph: DspGraph) {
+
+apps/runtime/loom/tests/loom_contract.rs
+28   fn engine_initializes_from_topology_json() {
+35   fn engine_processes_silence_without_panic() {
+48   fn engine_processes_sine_wave() {
+72   fn set_node_parameter_does_not_panic() {
+84   fn engine_reset_produces_identical_output() {
+127  fn scheduler_advances_and_detects_boundary() {
+150  fn crossfader_produces_valid_output() {
+179  fn engine_switches_section_glitch_free() {
+210  fn stem_buffer_decodes_flac_bytes() {
+224  fn stem_buffer_read_block_pads_silence() {
+244  fn stem_engine_processes_without_panic() {
+263  fn process_stems_sums_four_channels() {
+286  fn stem_seek_advances_correctly() {
+308  fn glider_reaches_target_after_glide_duration() {
+319  fn glider_is_linear() {
+330  fn biquad_glide_produces_no_nan() {
+349  fn set_stem_node_parameter_updates_correct_stem() {
+374  fn global_glide_ms_applies_to_all_nodes() {
+
+apps/stillair/cockpit-dioxus/src/components/active_processing_chain/readout.rs
+4    pub fn ReadoutItem(label: String, value: String, lit: bool) -> Element {
+
+apps/stillair/cockpit-dioxus/src/panels/jini_panel.rs
+30   pub fn JiniPanel(
+355  fn DemoFindingRow(finding: FindingData) -> Element {
+518  fn MetricMini(label: &'static str, value: String) -> Element {
+
+apps/stillair/cockpit-dioxus/src/state/cockpit_mode.rs
+76       pub fn is_interactive(&self) -> bool {
+107      pub fn is_mastering(&self) -> bool {
+112      pub fn has_file(&self) -> bool {
+
+apps/stillair/cockpit-dioxus/src/wizard/mod.rs
+175      pub fn filter_findings<'a>(
+
+integration/src/proof_log.rs
+60       pub fn record_intent(&mut self, intent: &Intent) {
+64       pub fn record_zone_adj(&mut self, zones: &ZoneAdjustments) {
+
+lineos/m0/m0-daemon/src/agents/corpus_agent.rs
+12   pub async fn record_feedback(
+
+lineos/m0/m0-daemon/src/agents/git_agent.rs
+22   pub async fn create_commit(
+
+lineos/m0/m0-daemon/src/agents/persona_agent.rs
+3    pub async fn update_persona(
+
+lineos/m0/m0-daemon/src/audit.rs
+114      pub fn write_fatal(&self, entry: AuditEntry) {
+
+lineos/m0/m0-daemon/src/dsp/autotune.rs
+21   pub fn autotune_dsp(audio: &StereoBuffer, intent: &MasteringIntent) -> AutotuneResult {
+
+lineos/m0/m0-daemon/src/dsp/wav_to_raw.rs
+302  pub fn wav_to_raw_pcm(wav_path: &str, raw_path: &std::path::Path) -> Result<(usize, u32), String> {
+
+lineos/m0/m0-daemon/src/health.rs
+150  pub async fn await_health_gate(gate: &HealthGate) -> anyhow::Result<()> {
+
+lineos/m0/m0-daemon/src/jini/mod.rs
+177  pub async fn jini_suggest_album_name(
+
+lineos/m0/m0-daemon/src/policy.rs
+93       pub fn check_inbound(&self, path: &str) -> PolicyDecision {
+
+lineos/m0/m0-daemon/src/registry.rs
+139      pub fn registry_data(&self) -> &M0RegistryJson {
+144      pub fn checksums_data(&self) -> &ChecksumsJson {
+
+lineos/m0/m0-daemon/tests/ab_render_full.rs
+21   fn render_ab_full_pipeline() {
+
+lineos/m0/m0-daemon/tests/bench_ram_spatial.rs
+18   fn bench_decoupled_fork_ram_and_latency() {
+
+lineos/m0/m0-daemon/tests/db_track_write.rs
+12   async fn all_declared_fields_round_trip() {
+70   async fn unknown_field_is_rejected_by_schemafull() {
+119  async fn without_migrate_the_table_is_schemaless() {
+
+lineos/m0/m0-daemon/tests/deliverable_cert_binds_the_file.rs
+118  fn the_cert_agrees_with_an_outside_tool() {
+169  fn tampering_one_byte_breaks_the_bond() {
+212  fn no_master_measurement_leaks_into_the_deliverable_cert() {
+270  fn a_route_that_does_not_measure_does_not_certify() {
+
+lineos/m0/m0-daemon/tests/delivery_field_alias_roundtrip.rs
+18   fn old_and_new_delivery_keys_deserialize_identically() {
+
+lineos/m0/m0-daemon/tests/e2e_acx_certificate.rs
+90   fn acx_preset_populates_delivery_check_fields() {
+161  fn podcast_preset_omits_acx_fields() {
+195  fn cert_json_has_no_acx_keys() {
+
+lineos/m0/m0-daemon/tests/e2e_corpus_integration.rs
+12   async fn e2e_corpus_integration_writes_model_to_disk() {
+116  async fn e2e_corpus_music_path_uses_30s_proxy() {
+
+lineos/m0/m0-daemon/tests/e2e_dead_air.rs
+6    async fn dead_air_reaches_the_real_certificate() {
+
+lineos/m0/m0-daemon/tests/e2e_decoupled_fork.rs
+9    fn e2e_stereo_input_spatial_upmix_produces_both_blobs() {
+99   fn e2e_stereo_master_preset_no_spatial_blob() {
+152  fn e2e_pro_bundle_both_produces_both_blobs() {
+
+lineos/m0/m0-daemon/tests/e2e_episode_streaming.rs
+99   fn episode_render_produces_valid_master() {
+161  fn episode_render_is_deterministic() {
+179  fn episode_render_heap_is_scale_invariant() {
+243  fn full_pipeline_heap_is_scale_invariant() {
+332  fn music_pipeline_heap_is_scale_invariant() {
+
+lineos/m0/m0-daemon/tests/e2e_maestro_calibration.rs
+9    fn maestro_calibration_bpm_thresholds() {
+
+lineos/m0/m0-daemon/tests/e2e_maestro_proof.rs
+10   fn maestro_more_aggressive_ducking_for_low_bpm() {
+
+lineos/m0/m0-daemon/tests/e2e_mastering_quality.rs
+109  fn inv_qa_1_output_integrity() {
+149  fn inv_qa_5_nmfd_true_path_active() {
+187  fn inv_qa_2_crest_factor_survival() {
+302  fn inv_qa_3_spectral_balance_20s() {
+354  fn inv_qa_3_spectral_balance_full() {
+421  fn inv_qa_4_compressor_is_active() {
+508  fn inv_qa_5_headroom_enforcement() {
+588  fn inv_qa_8_true_peak_ceiling() {
+693  fn inv_qa_7_stereo_phase_coherence() {
+820  fn inv_qa_9_multi_genre() {
+938  fn inv_qa_6_mud_correction() {
+1062 fn inv_qa_10_overscale_stress() {
+1167 fn inv_mus_2_podcast_bit_exactness() {
+
+lineos/m0/m0-daemon/tests/e2e_mfcc_verification.rs
+64   fn mfcc_analyzer_produces_nonzero_output() {
+83   fn mfcc_distinguishes_bass_from_treble() {
+113  fn markov_model_incremental_learning() {
+
+lineos/m0/m0-daemon/tests/e2e_run_analysis.rs
+43   async fn run_analysis_produces_sane_streaming_metrics() {
+
+lineos/m0/m0-daemon/tests/e2e_spatial_conformance.rs
+17   fn e2e_5dot1_wav_produces_spatial_blob() {
+
+lineos/m0/m0-daemon/tests/e2e_tier1_abort.rs
+190  fn run_dsp_counts_dead_air_gaps() {
+
+lineos/m0/m0-daemon/tests/export_verdict_not_always_green.rs
+38   fn a_failing_report_produces_fail_records_with_the_measured_numbers() {
+63   fn the_real_first_acx_deliverable_produces_four_passes() {
+83   fn an_unmeasured_metric_produces_no_record_at_all() {
+103  fn the_record_agrees_with_the_single_rule_it_came_from() {
+148  fn a_recommendation_missed_is_advisory_not_failure() {
+177  fn a_requirement_breached_is_fail() {
+194  fn spacing_never_enters_the_overall_judgement() {
+227  fn a_pre_advisory_sidecar_still_deserialises() {
+256  fn bitrate_is_a_floor_not_an_equality() {
+276  fn a_wrong_format_produces_three_fails_with_the_measured_numbers() {
+299  fn the_real_acx_format_produces_three_passes() {
+318  fn a_destination_that_declares_nothing_produces_no_rows() {
+337  fn the_producers_read_the_contract_they_do_not_copy_it() {
+381  fn a_requirement_breach_makes_the_whole_file_non_compliant() {
+393  fn a_recommendation_missed_still_complies_but_is_reported() {
+404  fn a_fully_conformant_file_has_no_advisories() {
+416  fn a_missing_expected_row_is_not_a_pass() {
+438  fn the_real_deliverable_composes_to_compliant() {
+453  fn the_stored_verdict_agrees_with_the_stored_rows() {
+481  fn the_certificate_declares_who_produced_the_audio() {
+504  fn the_origin_does_not_move_the_verdict() {
+531  fn an_old_sidecar_without_the_field_still_reads() {
+
+lineos/m0/m0-daemon/tests/f077_margin_in_certificate.rs
+179  fn edge_fixture_fails_rms_floor_margin_in_certificate() {
+214  fn mid_window_fixture_passes_all_margin_checks_in_certificate() {
+
+lineos/m0/m0-daemon/tests/flag_oracle.rs
+221  fn restoration_vocal_gate_closes_in_quiet_region() {
+360  fn restoration_glue_bus_pads_ambience() {
+455  fn macro_router_bypasses_nmf_exact() {
+822  fn ltass_correction_changes_spectral_balance() {
+
+lineos/m0/m0-daemon/tests/glue_full_render.rs
+11   fn glue_full_render() {
+
+lineos/m0/m0-daemon/tests/inv_det_2_batch_determinism.rs
+38   async fn inv_det_2_batch_determinism() {
+
+lineos/m0/m0-daemon/tests/inv_persist_1_certificate_survives_restart.rs
+88   fn inv_persist_1_certificate_survives_restart() {
+238  fn blob_storage_path_sanitises_like_the_flac_persist() {
+
+lineos/m0/m0-daemon/tests/oracle_certificate.rs
+40   fn oracle_certificate() {
+
+lineos/m0/m0-daemon/tests/output_acx_delivered_certificate.rs
+91   fn output_acx_writes_and_signs_the_delivered_certificate() {
+
+lineos/m0/m0-daemon/tests/spatial_folddown_agrees_with_stereo.rs
+115  fn spatial_folddown_agrees_with_stereo() {
+317  fn correlation_identical_is_one_at_zero_lag() {
+335      fn correlation_inverted_at_zero_lag_is_minus_one() {
+362      fn sweep_cannot_distinguish_inversion_from_half_period() {
+381  fn correlation_finds_the_shift() {
+397  fn correlation_unrelated_is_low() {
+
+lineos/m0/m0-daemon/tests/stem_independence.rs
+82   fn the_five_stems_are_distinct_signals() {
+
+lineos/m0/m0-daemon/tests/streaming_integration.rs
+25   fn streaming_pipeline_ducking_e2e() {
+500  fn tapped_decoder_dump_is_byte_identical_to_source_stream() {
+546  fn standardized_decoder_resamples_and_hashes() {
+607  fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
+715  fn expected_output_frames_is_exact_for_resampled_audio() {
+751  fn expected_output_frames_matches_source_for_passthrough_48k() {
+784  fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
+
+lineos/m0/m0-daemon/tests/unit_concurrency_limit.rs
+19       fn poll_ready(
+
+lineos/m0/m0-daemon/tests/vad_validation_real.rs
+366  fn vad_narration_dream() {
+385  fn vad_narration_crossing() {
+403  fn vad_music_negative() {
+415  fn vad_transient_probe() {
+
+lineos/m0/m0-daemon/tests/w10_duck_dynamics.rs
+74   fn w10_duck_dynamics() {
+
+lineos/m0/m0-daemon/tests/w17_bed_sweep.rs
+72   fn w17_bed_sweep() {
+
+lineos/m0/m0-daemon/tests/w17_flacenc_bloat.rs
+26   fn w17_flacenc_bloat_repro() {
+
+lineos/m0/m0-daemon/tests/w17_flacenc_narrow.rs
+22   fn w17_flacenc_narrow() {
+
+lineos/m0/m0-daemon/tests/w17_mix_balance.rs
+67   fn w17_mix_balance() {
+
+lineos/m0/m0-daemon/tests/w1_vad_trace.rs
+20   fn render_vad_trace_vehicle() {
+
+lineos/m0/m0-daemon/tests/w2_duck_gate.rs
+161  fn w2_duck_gate_real() {
+275  fn w2_duck_gate_synth_variance() {
+339  fn w3b_mix_levels_gate() {
+438  fn w4_ceiling_gate() {
+600  fn w4_ceiling_sweep() {
+
+lineos/m0/m0-daemon/tests/w6c_nmfd_cost.rs
+10   fn w6c_nmfd_cost() {
+
+lineos/m1/lame-sys/src/lib.rs
+125      pub fn get_lame_version() -> *const std::os::raw::c_char;
+
+lineos/m1/lineos-corpus/src/store.rs
+102      pub fn total_sessions(&self) -> usize {
+
+lineos/m1/lineos-types/src/onboarding.rs
+82       pub fn resolve_persona(&mut self) {
+92       pub fn is_completed(&self) -> bool {
+
+lineos/m1/lineos-types/tests/types_contract.rs
+7    fn stereo_buffer_duration_correct() {
+13   fn loudness_target_spotify_correct() {
+20   fn golden_blob_serializes_roundtrip() {
+54   fn mastering_intent_spotify() {
+61   fn v29_aliases_work() {
+
+lineos/m1/rule-engine/src/types/coach_findings.rs
+63       pub fn issues_at_least(&self, min: &Severity) -> Vec<&Issue> {
+
+lineos/m1/sp314-dsp/src/analysis/sdr.rs
+32       pub fn all_above(&self, threshold_db: f32) -> bool {
+
+lineos/m1/sp314-dsp/src/analysis/spectral.rs
+255      fn f089_centroid_1khz_is_1khz_not_half() {
+260      fn f089_centroid_8khz_is_8khz_not_half() {
+265      fn f089_streaming_twin_agrees_on_scale() {
+
+lineos/m1/sp314-dsp/src/limiter/true_peak.rs
+183  pub fn measure_true_peak_dbtp_mono(signal: &[f32]) -> f32 {
+
+lineos/m1/sp314-dsp/src/pipeline/autotune.rs
+49   pub fn measure_clipping_ratio_post_process(left: &[f32], right: &[f32]) -> f32 {
+
+lineos/m1/sp314-dsp/src/pipeline/gain.rs
+33       pub fn apply_output_makeup_no_clip(&self, left: &mut [f32], right: &mut [f32]) {
+
+lineos/m1/sp314-dsp/src/realtime/audio_io.rs
+28   pub fn setup_streams(
+
+lineos/m1/sp314-dsp/src/stft/mod.rs
+229      pub fn inverse_chunk(&mut self, frames: &[Vec<Complex<f32>>], original_len: usize) -> Vec<f32> {
+
+lineos/m1/sp314-dsp/src/stft/two_pass.rs
+106      pub fn bass_drums_distance(&self) -> f32 {
+
+lineos/m1/sp314-dsp/src/transforms/pca.rs
+25       pub fn is_wide(&self) -> bool {
+29       pub fn dominance(&self) -> f32 {
+
+lineos/m1/sp314-dsp/tests/ab_render_fixture.rs
+45   fn render_ab_variant() {
+
+lineos/m1/sp314-dsp/tests/adm_bwf_integration.rs
+4    fn adm_bwf_riff_header_is_valid() {
+
+lineos/m1/sp314-dsp/tests/autotune_contract.rs
+4    fn autotuner_transparent_returns_zero_immediately() {
+11   fn autotuner_calculates_gain_correctly() {
+18   fn autotuner_respects_clamping_limit() {
+29   fn autotuner_is_fully_deterministic() {
+38   fn autotuner_chunk_finds_loudest_section() {
+
+lineos/m1/sp314-dsp/tests/clipper_contract.rs
+2    fn soft_clipper_transparent_on_low_signals() {
+31   fn soft_clipper_limits_massive_peaks() {
+60   fn soft_clipper_bypass_is_transparent() {
+
+lineos/m1/sp314-dsp/tests/compressor_contract.rs
+27   fn crossover_lr4_sum_is_flat() {
+64   fn crossover_lr4_split_at_crossover_freq() {
+105  fn crossover_lr4_no_phase_inversion() {
+150  fn crossover_lr4_deterministic() {
+167  fn crossover_lr4_reset_clears_state() {
+181  fn envelope_rc_coeff_matches_reference() {
+198  fn envelope_attack_follows_linear_domain() {
+210  fn envelope_release_sample_rate_correct() {
+225  fn envelope_no_denormals_on_silence() {
+239  fn envelope_output_is_db() {
+255  fn gain_computer_matches_reference() {
+273  fn gain_computer_zero_below_knee() {
+279  fn gain_computer_c1_continuous() {
+307  fn gain_computer_output_always_negative() {
+315  fn gain_computer_zero_at_ratio_1() {
+339  fn compressor_band_reduces_loud_signal() {
+357  fn compressor_band_passes_quiet_signal() {
+376  fn compressor_band_no_nan_no_inf() {
+386  fn compressor_band_deterministic_100_runs() {
+403  fn compressor_band_reset_produces_identical_output() {
+418  fn compressor_band_output_within_headroom() {
+438  fn compressor_v3_identity_no_gain_reduction() {
+465  fn compressor_v3_mono_signal_side_is_zero() {
+485  fn compressor_v3_ms_encode_decode_roundtrip() {
+509  fn compressor_v3_mid_independent_of_side() {
+540  fn compressor_v3_deterministic_100_runs() {
+563  fn compressor_v3_output_within_headroom() {
+575  fn compressor_v3_reset_produces_identical_output() {
+
+lineos/m1/sp314-dsp/tests/crossover3_contract.rs
+12   fn crossover3_sum_is_flat() {
+60   fn crossover3_split_at_crossover_freqs() {
+110  fn crossover3_no_sign_inversion() {
+
+lineos/m1/sp314-dsp/tests/extract_bss_stems.rs
+43   fn extract_bss_stems() {
+
+lineos/m1/sp314-dsp/tests/forensic_renders.rs
+117  fn forensic_gate() {
+157  fn forensic_deess() {
+187  fn forensic_lowcut() {
+218  fn forensic_dehum() {
+250  fn forensic_combined() {
+329  fn forensic_impulse_response() {
+347  fn forensic_sine_sweep() {
+
+lineos/m1/sp314-dsp/tests/four_stem_contract.rs
+2    fn four_stem_lengths_match_input() {
+18   fn four_stem_reconstruction_within_mastering_tolerance() {
+64   fn four_stem_drums_captures_transient() {
+100  fn four_stem_sdr_above_gate() {
+
+lineos/m1/sp314-dsp/tests/harmonic_contract.rs
+19   fn harmonic_k_compensation_matches_reference() {
+
+lineos/m1/sp314-dsp/tests/harmonic_oversample_contract.rs
+4    fn harmonic_no_aliasing_at_high_freq() {
+56   fn harmonic_bypass_when_mix_zero() {
+71   fn harmonic_unity_gain_on_silence() {
+
+lineos/m1/sp314-dsp/tests/hpss_contract.rs
+6    fn hpss_masks_sum_to_unity() {
+57   fn hpss_separates_harmonic_content() {
+107  fn hpss_separates_percussive_content() {
+
+lineos/m1/sp314-dsp/tests/io_contract.rs
+10   fn wav_roundtrip_preserves_samples() {
+37   fn wav_reader_handles_mono() {
+64   fn wav_reader_handles_16bit_pcm() {
+98   fn wav_output_path_logic() {
+107  fn flac_output_path_logic() {
+114  fn flac_roundtrip_preserves_samples() {
+
+lineos/m1/sp314-dsp/tests/limiter_contract.rs
+12   fn limiter_ring_buffer_delays_by_n_samples() {
+33   fn limiter_ring_buffer_wraps_correctly() {
+47   fn limiter_peak_follower_linear_attack_ramp() {
+64   fn limiter_peak_follower_stereo_linked() {
+110  fn limiter_ceiling_never_exceeded() {
+136  fn limiter_decay_floor_prevents_pumping() {
+153  fn limiter_no_denormals_after_silence() {
+166  fn limiter_deterministic() {
+183  fn limiter_reset_clears_state() {
+201  fn limiter_lookahead_alignment() {
+
+lineos/m1/sp314-dsp/tests/limiter_headroom_calibration.rs
+64   fn headroom_survey() {
+
+lineos/m1/sp314-dsp/tests/limiter_true_peak_oracle.rs
+41   fn limiter_holds_true_peak_ceiling() {
+
+lineos/m1/sp314-dsp/tests/lufs_meter_parity.rs
+53   fn parity_chunk_512() {
+59   fn parity_chunk_4096() {
+65   fn parity_chunk_1() {
+76   fn parity_misaligned_chunk() {
+85   fn parity_low_amplitude() {
+
+lineos/m1/sp314-dsp/tests/masking_eq_contract.rs
+12   fn biquad_stable_no_nan_no_inf() {
+28   fn cold_start_no_silence() {
+56   fn denormal_flush_prevents_subnormal_states() {
+72   fn coeff_transition_linear_step() {
+96   fn coeff_hard_clamp_at_hop_boundary() {
+117  fn process_block_no_allocation() {
+167  fn process_block_no_nan_no_inf() {
+
+lineos/m1/sp314-dsp/tests/mel_128_oracle.rs
+124  fn diagnose_mismatch() {
+
+lineos/m1/sp314-dsp/tests/memory_streaming_test.rs
+15   fn two_pass_engine_peak_heap_under_50mb() {
+
+lineos/m1/sp314-dsp/tests/metering_contract.rs
+19   fn kweight_filter_coefficients_match_standard() {
+26   fn kweight_filter_boosts_high_frequencies() {
+60   fn kweight_filter_attenuates_sub_bass() {
+83   fn lufs_silence_returns_floor() {
+91   fn lufs_absolute_gate_removes_quiet_blocks() {
+104  fn lufs_relative_gate_removes_quiet_blocks() {
+128  fn lufs_1khz_sine_matches_reference() {
+145  fn lufs_integrated_is_deterministic() {
+162  fn telemetry_includes_lufs() {
+
+lineos/m1/sp314-dsp/tests/midside_contract.rs
+4    fn midside_preserves_mono() {
+14   fn midside_kills_out_of_phase_dc() {
+
+lineos/m1/sp314-dsp/tests/phi1_sensor_equivalence.rs
+7    fn phi1_sensor_equivalence() {
+
+lineos/m1/sp314-dsp/tests/pipeline_primitives_contract.rs
+23   fn phase_aligner_magnitude_is_flat() {
+54   fn phase_aligner_matches_crossover_phase() {
+181  fn phase_aligner_deterministic() {
+202  fn phase_aligner_reset_clears_state() {
+227  fn headroom_input_pad_is_minus_6db() {
+238  fn headroom_output_makeup_is_plus_6db() {
+249  fn headroom_output_clips_at_unity() {
+263  fn stereo_eq_linked_analysis_preserves_center_image() {
+285  fn stereo_eq_process_block_deterministic() {
+319  fn stereo_eq_reset_restores_identity() {
+360  fn dither_seeded_deterministic() {
+376  fn dither_noise_bounded_by_plus_minus_1_lsb() {
+387  fn dither_prng_never_zero_state() {
+
+lineos/m1/sp314-dsp/tests/pre_analysis_contract.rs
+72   fn gen_white_noise_decorrelated() -> (Vec<f32>, Vec<f32>) {
+142  fn serde_roundtrip() {
+195  fn sine_1000_semantics() {
+237  fn zone_flags_problem_mix() {
+300  fn empty_input_silent() {
+317  fn short_input_silent() {
+343  fn spectral_profile_levels_wrapper() {
+386  fn spectral_slope_contract() {
+445  fn spectral_slope_broadband_density() {
+521  fn loudness_range_contract() {
+
+lineos/m1/sp314-dsp/tests/psychoacoustic_contract.rs
+24   fn iso226_returns_exact_value_at_reference_points() {
+44   fn iso226_c1_continuity_at_interior_points() {
+66   fn iso226_phon_interpolation_valid_range() {
+82   fn iso226_boundary_clamping_low_frequency() {
+92   fn iso226_boundary_clamping_high_frequency() {
+102  fn iso226_no_panic_on_boundary_inputs() {
+124  fn bark_bin_to_band_spot_checks() {
+140  fn bark_no_panic_on_any_valid_bin() {
+149  fn bark_result_always_in_valid_range() {
+163  fn spreading_spot_checks() {
+182  fn spreading_always_non_negative() {
+190  fn spreading_zero_at_zero_distance() {
+195  fn spreading_monotonic_increasing() {
+206  fn spreading_capped_at_noise_floor() {
+217  fn mask_per_bin_no_panic_fft_sizes() {
+230  fn mask_deterministic_100_runs() {
+
+lineos/m1/sp314-dsp/tests/recon_butter_q_response.rs
+47   fn pinned_current_hp_is_resonant_and_corrected_hp_is_flat() {
+107  fn pinned_current_lp_is_resonant_too() {
+
+lineos/m1/sp314-dsp/tests/restoration_contract.rs
+12   fn dehum_removes_50hz_sine() {
+93   fn deess_reduces_high_frequency_bursts() {
+147  fn noise_gate_closes_on_silence() {
+163  fn noise_gate_opens_on_signal() {
+181  fn noise_gate_hold_prevents_chatter() {
+209  fn lowcut_removes_sub_80hz() {
+240  fn deess_preserves_music_bed() {
+303  fn deess_preserves_stereo_image() {
+343  fn noise_gate_mono_equals_stereo() {
+359  fn glue_bus_lpf_and_pad_attenuates_correctly() {
+
+lineos/m1/sp314-dsp/tests/spectral_flux_contract.rs
+2    fn spectral_flux_detects_correct_beats() {
+
+lineos/m1/sp314-dsp/tests/stem_render_contract.rs
+8    fn stem_render_percussive_captures_impulse() {
+45   fn stem_render_harmonic_captures_sine() {
+80   fn stem_render_lengths_match_input() {
+91   fn stem_render_reconstruction_within_mastering_tolerance() {
+
+lineos/m1/sp314-dsp/tests/stft_contract.rs
+2    fn stft_perfect_reconstruction_sine() {
+40   fn stft_perfect_reconstruction_noise() {
+79   fn stft_output_dimensions() {
+
+lineos/m1/sp314-dsp/tests/stft_oracle_contract.rs
+46   fn oracle_params_match_rust_constants() {
+53   fn stft_oracle_sine_440hz_passes() {
+75   fn stft_oracle_noise_passes() {
+99   fn stft_oracle_deterministic() {
+109  fn stft_fixture_sha256_locked() {
+
+lineos/m1/sp314-dsp/tests/stress/generators.rs
+49   pub fn assert_no_nan_inf(pcm: &[f32], context: &str) {
+62   pub fn assert_bounded(pcm: &[f32], context: &str) {
+76   pub fn kick_drum(duration_s: f32, sample_rate: u32) -> Vec<f32> {
+97   pub fn bass_line(freq_hz: f32, duration_s: f32, sample_rate: u32) -> Vec<f32> {
+114  pub fn hi_hat(duration_s: f32, sample_rate: u32, seed: u64) -> Vec<f32> {
+
+lineos/m1/sp314-dsp/tests/true_peak_contract.rs
+6    fn true_peak_exceeds_digital_peak() {
+48   fn true_peak_stereo_independent() {
+73   fn true_peak_silence_is_zero() {
+
+lineos/m1/sp314-dsp/tests/w14_batch_equivalence.rs
+7    fn w14_batch_equivalence() {
+
+lineos/m1/sp314-dsp/tests/w14_boundary_check.rs
+28   fn w14_boundary_check() {
+
+lineos/m1/sp314-dsp/tests/w14_pcen_warmup.rs
+7    fn w14_pcen_warmup() {
+
+lineos/m1/sp314-dsp/tests/w16_mask_inflation.rs
+8    fn w16_mask_inflation_real_data() {
+
+lineos/m1/sp314-dsp/tests/w16_mel_inverse_probe.rs
+5    fn w16_mel_inverse_probe() {
+
+lineos/m1/sp314-dsp/tests/w16_nmfd_k_mismatch.rs
+9    fn w16_nmfd_k_mismatch() {
+
+lineos/m1/sp314-dsp/tests/w17_stem_spectrum.rs
+60   fn w17_stem_spectrum() {
+
+lineos/m1/sp314-dsp/tests/w17_voice_activation.rs
+75   fn w17_voice_activation() {
+
+lineos/m1/sp314-nodes/src/graph.rs
+551      pub fn set_node_glide_ms(&mut self, node_id: &str, glide_ms: f32) -> Result<(), GraphError> {
+
+lineos/m1/sp314-nodes/tests/nodes_contract.rs
+27   fn biquad_lowpass_attenuates_high_frequencies() {
+60   fn rms_detector_exposes_envelope() {
+72   fn ms_matrix_roundtrip() {
+92   fn gain_node_unity_is_passthrough() {
+107  fn dynamic_eq_from_topology() {
+155  fn graph_reset_produces_identical_output() {
+
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs
+6    fn builder_produces_identical_vocal_graph() {
+
+pipelines/pipelineforge/tests/pipelineforge_contract.rs
+15   fn muddy_mix_selects_lowmid_clarity() {
+35   fn muddy_and_pump_produces_valid_dag() {
+54   fn lufs_normalization_always_last() {
+68   fn hum_removal_always_first() {
+80   fn empty_conditions_produces_lufs_only() {
+95   fn forged_topology_loads_into_dsp_graph() {
+
+shared/aether-bridge/tests/reference_resolver_integration.rs
+60   fn balanced_input_yields_near_zero_gains() {
+92   fn clamp_gains_bounded_by_g_max_and_firewall() {
+130  fn muddy_input_cuts_low_end() {
+163  fn thin_input_boosts_low_end() {
+189  fn inv_mus_3_unclassified_music_produces_zero_speech_zones() {
+225  fn firewall_clamps_malicious_50db_injection() {
+293  fn inv_mus_4_classified_acoustic_gets_acoustic_zones() {
+302  fn inv_mus_5_classified_techno_gets_techno_zones() {
+311  fn inv_mus_6_acoustic_and_techno_routes_are_distinct() {
+
+[2026-09-11T18:45:58Z ERROR cargo_workspace_unused_pub] Found 388 possibly unused functions
