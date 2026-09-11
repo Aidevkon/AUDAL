@@ -1529,6 +1529,95 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   A_INV, ΚΑΙ ακρόαση.
   Trigger: ΠΡΙΝ κάθε δουλειά στα LTASS ή στο g_max.
 
+- **[F-096] Δύο μετρήσεις λέγονται `noise_floor_dbfs`
+  και διαφέρουν κατά 43 dB. Το gate παίρνει τη
+  λάθος, και το λάθος ΑΝΤΙΣΤΡΕΦΕΤΑΙ με την ποιότητα
+  του δωματίου.** Component: `trunk_pass.rs:136,
+  580-593` · `acx_check.rs` (noise_floor_db) ·
+  `streaming_pipeline.rs:202` · `restoration/gate.rs`.
+  ΜΕΤΡΗΜΕΝΟ ΚΑΙ ΑΚΟΥΣΜΕΝΟ 2026-09-06.
+
+  ΤΟ ΥΛΙΚΟ: Random House Audio, πραγματική αφήγηση
+  audiobook, 45 s, 48 kHz mono.
+  sha256 3cb8c473f2bf58dde7dfe56999ac4b073a9e0dce61dfd4cdb213e4698275388e
+  Το ίδιο αρχείο, δύο όργανα:
+  ```
+  AcxCheckAnalyzer   −78,65 dBFS   ← το room tone
+  trunk_pass         −35,36 dBFS   ← αυτό πήρε το gate
+  ΔΙΑΦΟΡΑ             43,29 dB
+  ```
+
+  Η ΑΙΤΙΑ, ΑΥΤΟΥΣΙΑ (`trunk_pass.rs:586-593`):
+  ```rust
+  // Gate: only non-dead-air windows contribute to noise floor.
+  // Mirrors DEAD_AIR_WINDOW_DBFS = -60.0 [signal_health.rs:92].
+  if dbfs >= DEAD_AIR_GATE_DBFS {
+      min_nondead_dbfs = Some(match min_nondead_dbfs {
+  ```
+  Το room tone είναι −78,65 ⇒ ΚΑΤΩ από το −60 ⇒ κάθε
+  παράθυρο ησυχίας εξαιρείται ως dead air ⇒ μένει το
+  χαμηλότερο παράθυρο **που έχει ομιλία**.
+  **Το `min_nondead_dbfs` δεν είναι πάτωμα θορύβου.
+  Είναι η πιο ήσυχη ομιλία. Και λέγεται
+  `noise_floor_dbfs`.** Δέκατο τρίτο ομώνυμο.
+
+  ΤΟ GATE ΚΟΒΕΙ ΕΚΕΙ: `streaming_pipeline.rs:202`
+  `config.noise_floor_dbfs.unwrap_or(-45.0)` →
+  `RestorationChain::new(... gate_threshold_db)`.
+  Ο gate κλείνει σκληρά στο 0.0 (`gate.rs:38-46`).
+  ⇒ ΕΓΓΥΗΜΕΝΑ ΤΡΩΕΙ ΦΩΝΗ. Δεν γίνεται αλλιώς.
+
+  ⚠ **Η ΑΝΤΙΣΤΡΟΦΗ ΕΙΝΑΙ ΤΟ ΧΕΙΡΟΤΕΡΟ:** όσο
+  καθαρότερο το δωμάτιο, τόσο περισσότερα παράθυρα
+  πέφτουν κάτω από −60, τόσο ψηλότερα κόβει.
+  **Τιμωρεί τον καλό αφηγητή.**
+
+  ΜΕΤΡΗΜΕΝΟ ΣΤΗ ΔΙΑΦΟΡΑ (A_bypass − C_lowcut_gate,
+  highpass 1 kHz ώστε να αποκλειστεί η φάση του
+  lowcut, 4219 παράθυρα):
+  ```
+  διάμεσος −39,3 dB   90ό −27,0 dB   σήμα −19,8
+  ⇒ το 10% του χρόνου αφαιρείται υλικό 7 dB κάτω
+    από το σήμα
+  ```
+  **ΑΚΟΥΣΤΗΚΕ:** στο +20 dB, καθαρή ομιλία πάνω από
+  1 kHz — όπου το lowcut δεν έχει ούτε πλάτος ούτε
+  φάση. **Η υπόθεση ότι ήταν φάση του lowcut
+  ελέγχθηκε και έπεσε.**
+
+  ⚠ **ΚΑΙ Η ΑΛΥΣΙΔΑ ΔΕΝ ΕΙΧΕ ΤΙΠΟΤΑ ΝΑ ΔΙΟΡΘΩΣΕΙ:**
+  πάτωμα εισόδου −78,65 έναντι ορίου ACX −60 ⇒
+  περνούσε με 18 dB περιθώριο. Το gate έλυσε
+  ανύπαρκτο πρόβλημα και έφαγε φωνή.
+
+  ⚠ **ΚΑΙ ΣΒΗΝΕΙ ΤΟ ROOM TONE ΠΟΥ ΤΟ ACX ΑΠΑΙΤΕΙ:**
+  1-5 s στα άκρα (πηγή: help.acx.com, ανακτ.
+  25/08). Το πάτωμα εξόδου μετρήθηκε −180,62 dBFS.
+
+  ΤΟ ΟΡΓΑΝΟ ΠΟΥ ΑΠΕΤΥΧΕ: η ίδια μέτρηση είχε δηλώσει
+  «στην ομιλία το gate είναι εντελώς ανοιχτό, 0,00
+  σε όλες τις μπάντες» — βασισμένη σε ΦΑΣΜΑ 8
+  μπαντών σε ΕΝΑ παράθυρο 1 s. Ένα gate που
+  ανοιγοκλείνει αφήνει το ίδιο μέσο φάσμα.
+  **Το φάσμα δεν βλέπει διαμόρφωση πλάτους.
+  Ακατάλληλος ένορκος για αυτό το ερώτημα** — η
+  ακρόαση και η χρονική RMS το έπιασαν.
+
+  ΔΕΝ ΔΙΟΡΘΩΝΕΤΑΙ ΧΩΡΙΣ ΑΠΟΦΑΣΗ. Τρία ξεχωριστά:
+  (α) τα δύο μεγέθη θέλουν διαφορετικά ονόματα ·
+  (β) το gate θέλει το ΠΡΑΓΜΑΤΙΚΟ πάτωμα, και
+  συνθήκη — τρέχει μόνο αν το πάτωμα υπερβαίνει το
+  όριο του προορισμού · (γ) ο gate που κλείνει στο
+  0.0 με release 100 ms δεν είναι κατάλληλος για
+  αφήγηση· downward expander με floor (−12/−18 dB)
+  είναι άλλο σχήμα.
+  Trigger: ΠΡΙΝ ανοίξει η πόρτα του
+  flagged_hybrid_indices (§σχέδιο δράσης, Βήμα 2).
+
+  ΤΕΚΜΗΡΙΟ: docs/lab-logs/f096-restoration-assets/
+  (A_bypass, C_lowcut_gate — τα B και D
+  αναπαράγονται· hashes στο F-096 και στην αναφορά της μέτρησης).
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -1800,7 +1889,7 @@ BAND_EDGES `[20, 80, 250, 500, 1000, 2000, 4000, 8000, 20000]` Hz.
 
 ---
 
-**NEXT FREE: F-096** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-097** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
