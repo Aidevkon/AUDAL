@@ -143,20 +143,37 @@ fn deess_reduces_high_frequency_bursts() {
 use sp314_dsp::restoration::gate::NoiseGate;
 use sp314_dsp::restoration::RestorationConfig;
 
+// ΗΤΑΝ noise_gate_closes_on_silence με
+// epsilon 1e-8 — δηλαδή απαιτούσε ψηφιακό μηδέν.
+// Αυτό είναι ακριβώς το συμβόλαιο που η ACX
+// απαγορεύει: room tone 1-5 s στα άκρα.
+// Το τεστ δεν χαλάρωσε· εκφράζει το αντίθετο
+// συμβόλαιο. Το epsilon ΕΓΙΝΕ ΑΥΣΤΗΡΟΤΕΡΟ (1e-9),
+// γιατί τώρα ελέγχει ΤΑΥΤΟΤΗΤΑ, όχι μηδενισμό.
 #[test]
-fn noise_gate_closes_on_silence() {
+fn expander_floors_silence_never_zeroes() {
     let mut gate = NoiseGate::new(48000.0, -6.0_f32, -45.0_f32);
-    let mut _last_l = 1.0;
 
-    // warm up with silence for 48000 samples (1 second) to fully close
+    // warm up with silence for 48000 samples (1 second) to fully settle on the floor
     for _ in 0..48000 {
-        let (l, _) = gate.process_stereo(0.0, 0.0);
-        _last_l = l;
+        gate.process_stereo(0.0, 0.0);
     }
 
-    // Now pass a small signal and see if it's muted
-    let (out_l, _) = gate.process_stereo(1e-6, 1e-6);
-    assert_abs_diff_eq!(out_l, 0.0_f32, epsilon = 1e-8);
+    // Now pass a small signal: it must come out attenuated by the floor, NOT muted.
+    let in_l = 1e-6_f32;
+    let (out_l, _) = gate.process_stereo(in_l, in_l);
+
+    // ΤΟ ΠΡΩΤΟ ΣΚΕΛΟΣ: ποτέ ψηφιακό μηδέν.
+    assert!(
+        out_l > 0.0,
+        "ο expander δεν επιτρέπεται να μηδενίσει την είσοδο· out_l = {out_l}"
+    );
+
+    // ΤΟ ΔΕΥΤΕΡΟ: η έξοδος είναι ΑΚΡΙΒΩΣ η είσοδος επί το floor.
+    // floor = EXPANDER_FLOOR_DB (−12 dB) του restoration/gate.rs — ιδιωτική
+    // σταθερά εκεί, οπότε επαναδιατυπώνεται εδώ ως το συμβόλαιο που ελέγχεται.
+    let floor_linear = libm::powf(10.0, -12.0 / 20.0);
+    assert_abs_diff_eq!(out_l, in_l * floor_linear, epsilon = 1e-9);
 }
 
 #[test]
