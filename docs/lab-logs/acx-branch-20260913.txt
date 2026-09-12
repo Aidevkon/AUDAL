@@ -1,0 +1,52 @@
+=== MEASURE: τρέχει ο analyzer για ACX, και πόσο κοστίζει; ===
+
+ΥΛΙΚΟ
+  /home/aidevcon/Downloads/DATASET/librivox-hq/swiss_family_robinson_01_wyss.mp3
+  sha256   bb80f9df97304aa8ca088372605b77c5c5710f178f11c51aa2dcede4b9adf7ec
+  1127.079184 s · 44100 Hz · 1 κανάλι · 128 kbps
+  ⚠ MONO 44.1k ⇒ η αλυσίδα κάνει ΚΑΙ resample 44.1→48 ΚΑΙ upmix mono→stereo.
+
+ΓΝΩΣΤΗ ΑΠΑΝΤΗΣΗ (docs/lab-logs/interior-floor-20260912.txt, corpus_floor_filter
+απευθείας στο mp3, χωρίς resample/upmix):
+  absolute -87.51 @ 1123.6 s   ·   interior -68.50 @ 160.2 s   ·   SLEEPING
+
+ΠΡΟΒΛΕΨΗ — ΓΡΑΜΜΕΝΗ ΠΡΙΝ ΤΟ ΤΡΕΞΙΜΟ
+  Α  acx.is_some() = true   · interior = Some(~ -68.5, το γνωστό του log)
+  Β  acx.is_some() = false  · interior = None
+  ΚΑΙ ΤΑ ΔΥΟ  boundaries.len() ΤΑΥΤΟΣΗΜΟ
+  Κόστος: άγνωστο — δεν προβλέπεται νούμερο.
+
+────────────────────────────────────────────────────────────────
+── acx_branch_cost ────────────────────────────────────────────
+υλικό      /home/aidevcon/Downloads/DATASET/librivox-hq/swiss_family_robinson_01_wyss.mp3
+input LUFS Some(-20.460648)
+edge_s 5 · limit -60 dB (και τα δύο από presets.rs)
+τρεξίματα ανά κλάδο: 3
+
+ΒΗΜΑ 1 — τι δίνει κάθε κλάδος
+  Β (run_trunk_pass)          acx=None  interior=None  boundaries=8
+  Α (run_trunk_pass_with_acx) acx=Some((Some(-87.74448), Some(54076800)))  interior=Some((-68.54918, 7689600))  boundaries=8
+  boundaries ταυτόσημα: ΝΑΙ
+
+ΒΗΜΑ 2 — κόστος (ms, ΜΟΝΟ το run_trunk_*)
+  ΧΩΡΙΣ  21034.0 · 21165.3 · 21651.5
+  ΜΕ     22168.7 · 21738.0 · 21556.4
+  μέσοι  ΧΩΡΙΣ 21283.6  ·  ΜΕ 21821.0
+  διαφορά 537.5 ms  =  2.53% του ΧΩΡΙΣ
+  ήχος 1127.1 s ⇒ 0.477 ms ανά δευτερόλεπτο ήχου
+  διακύμανση ΧΩΡΙΣ 617.5 ms · ΜΕ 612.3 ms
+  ⇒ Η ΔΙΑΚΥΜΑΝΣΗ ΚΑΛΥΠΤΕΙ ΤΗ ΔΙΑΦΟΡΑ — η μέτρηση ΔΕΝ διακρίνει
+
+────────────────────────────────────────────────────────────────
+ΒΗΜΑ 1β — Ο ΚΛΑΔΟΣ ΤΟΥ EXECUTOR (probe, 20 s συνθετικό δοκίμιο)
+  Ο κλάδος δεν εξαρτάται από περιεχόμενο, μόνο από preset. Το probe μπήκε
+  ΠΡΟΣΩΡΙΝΑ στον executor.rs και αφαιρέθηκε (grep PROBE-BRANCH → 0).
+
+  PROBE-BRANCH preset=acx     floor_limit=Some(-60.0) arm=with_acx acx_is_some=true  interior=Some((-13.469402, 614400)) boundaries=1
+  PROBE-BRANCH preset=podcast floor_limit=None        arm=plain    acx_is_some=false interior=None                       boundaries=1
+
+ΒΗΜΑ 3 — log vs render
+  interior   log -68.50    render -68.54918   διαφορά 0.0492 dB   θέση 160.2 s ↔ 160.2 s
+  absolute   log -87.51    render -87.74448   διαφορά 0.2345 dB   θέση 1123.6 s ↔ 1126.6 s
+  Αναφορά: trunk_pass.rs:493-494 «resampling 44.1k->48k moves the three ACX
+  numbers by <=0.05 dB near the -60 limit (0.31 dB at -94)».
