@@ -1,0 +1,108 @@
+=== RECON: noise floor 20 LibriVox με ΠΡΑΓΜΑΤΙΚΟ AcxCheckAnalyzer 2026-09-12T20:08:56+03:00 ===
+
+─── ΤΟ ΟΡΓΑΝΟ (διαβασμένο, lineos/m1/sp314-dsp/src/analysis/acx_check.rs) ───
+AcxCheckAnalyzer::new(sr) -> feed_chunk(mono f32) -> finish() -> AcxCheckReport.noise_floor_db
+
+Μηχανισμός noise_floor_db (γραμμές 210-296):
+  1. 8th-order Butterworth HP στα 10 Hz (HP_CUTOFF_HZ=10.0) — αφαιρεί
+     ΜΟΝΟ DC/subsonic, ΟΧΙ voice-range hiss.
+  2. sub-blocks 100ms (SUB_BLOCK_MS=100).
+  3. sliding window 500ms = 5 συνεχόμενα sub-blocks (WINDOW_SUB_BLOCKS=5).
+  4. παίρνει το ΑΠΟΛΥΤΟ ΕΛΑΧΙΣΤΟ window energy σε ΟΛΟ το αρχείο (όχι percentile).
+  5. απαιτεί τουλάχιστον MIN_SUB_BLOCKS=10 sub-blocks (1s) αλλιώς None.
+
+─── ΤΟ PROXY ΜΟΥ (χθεσινό, measure_librivox.py) ───
+  5ο percentile RMS σε 100ms windows σε ΟΛΟ το αρχείο, ΧΩΡΙΣ HP filter.
+
+─── ΔΟΜΙΚΗ ΔΙΑΦΟΡΑ (πριν δω αριθμό) ───
+  minimum-of-500ms-window ΔΙΑΦΕΡΕΙ ΔΟΜΙΚΑ από p5-percentile-of-100ms.
+  Minimum-of-N είναι σχεδόν πάντα <= p5-of-N για τυπική κατανομή —
+  ΕΙΔΙΚΑ αν υπάρχει έστω ΜΙΑ γνήσια σιωπή >=500ms (π.χ. πριν την πρώτη
+  λέξη κεφαλαίου — σύνηθες σε audiobook readers: πατάνε record, κάνουν
+  παύση, μετά διαβάζουν). Το HP filter στα 10Hz είναι σχεδόν αδιάφορο
+  (δεν αγγίζει hiss/hum σε voice band).
+
+─── ΠΡΟΒΛΕΨΗ (πριν τρέξει ο κώδικας) ───
+Περιμένω το AcxCheckAnalyzer να διαβάζει ΣΥΣΤΗΜΑΤΙΚΑ χαμηλότερο
+(πιο αρνητικό/καλύτερο) από το proxy, λόγω minimum vs percentile.
+ΠΡΟΒΛΕΨΗ ΑΡΙΘΜΟΣ: του λιγότερο ~10/20 (αντί για 4/20) θα περάσουν
+-60dBFS. Περιμένω ΤΟΥΛΑΧΙΣΤΟΝ 6 αρχεία να αλλάξουν πλευρά (OXI->NAI).
+ΑΝ ΔΕΝ αλλάξει τίποτα ή αλλάξει προς ΤΗΝ ΑΝΤΙΘΕΤΗ κατεύθυνση, ΕΥΡΗΜΑ.
+
+─── ΑΠΟΤΕΛΕΣΜΑ ───
+
+ΠΙΝΑΚΑΣ: αρχείο · proxy floor (p5/100ms, χθεσινό) · AcxCheckAnalyzer floor (min/500ms, ΣΗΜΕΡΑ, πραγματικό όργανο) · Δ · quietest_window θέση · ΝΑΙ/ΟΧΙ (ACX)
+
+| αρχείο | proxy dB | AcxCheck dB | Δ (Acx-proxy) | window θέση | proxy ΝΑΙ/ΟΧΙ | Acx ΝΑΙ/ΟΧΙ | άλλαξε πλευρά; |
+|---|---|---|---|---|---|---|---|
+| adventureholmes_01_doyle | -49.87 | -65.56 | -15.69 | interior (31.3s) | ΟΧΙ | ΝΑΙ | ΝΑΙ |
+| adventuresholmes_01_doyle | -92.19 | -97.77 | -5.58 | interior (546.4s) | ΝΑΙ | ΝΑΙ | - |
+| adventurespinocchio_01_collodi | -50.94 | -52.50 | -1.56 | BOUNDARY (0.0s) | ΟΧΙ | ΟΧΙ | - |
+| anne_of_green_gables_01_montgomery | -46.29 | -90.03 | -43.74 | BOUNDARY (end-4.1s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary) |
+| count_of_monte_cristo_001_dumas | -51.40 | -76.65 | -25.25 | BOUNDARY (end-0.3s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary) |
+| dracula_01_stoker | -51.67 | -56.16 | -4.49 | interior (95.4s) | ΟΧΙ | ΟΧΙ | - |
+| emma_01_01_austen | -52.72 | -60.01 | -7.29 | interior (16.3s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (οριακό, -60.01) |
+| huckfinn_01_twain_apc | -52.72 | -57.26 | -4.54 | BOUNDARY (end-0.1s) | ΟΧΙ | ΟΧΙ | - |
+| janeeyre_01_bronte | -51.20 | -144.00 | -92.80 | BOUNDARY (end-0.9s) — ΨΗΦΙΑΚΗ ΣΙΩΠΗ | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary, ψηφιακή σιωπή) |
+| mobydick_000_melville | -71.15 | -74.23 | -3.08 | BOUNDARY (end-0.4s) | ΝΑΙ | ΝΑΙ | - |
+| odyssey_01_homer_butler | -57.74 | -64.82 | -7.08 | interior (22.6s) | ΟΧΙ | ΝΑΙ | ΝΑΙ |
+| peterpan_01_barrie | -55.94 | -144.00 | -88.06 | BOUNDARY (end-0.7s) — ΨΗΦΙΑΚΗ ΣΙΩΠΗ | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary, ψηφιακή σιωπή) |
+| prideandprejudice_10-11_austen | -59.60 | -61.35 | -1.75 | BOUNDARY (end-0.1s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (οριακό, boundary) |
+| returnofholmes_01_doyle | -56.25 | -97.86 | -41.61 | BOUNDARY (end-3.9s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary) |
+| robinson_crusoe_01_defoe | -65.49 | -144.00 | -78.51 | BOUNDARY (end-0.9s) — ΨΗΦΙΑΚΗ ΣΙΩΠΗ | ΝΑΙ | ΝΑΙ | - |
+| secretgarden_01_burnett | -57.49 | -58.36 | -0.87 | interior (32.1s) | ΟΧΙ | ΟΧΙ | - |
+| swiss_family_robinson_01_wyss | -64.41 | -87.51 | -23.10 | BOUNDARY (end-2.9s) | ΝΑΙ | ΝΑΙ | - |
+| tale_of_two_cities_01_dickens | -57.47 | -58.63 | -1.16 | interior (34.2s) | ΟΧΙ | ΟΧΙ | - |
+| treasure_island_01-02_stevenson | -58.63 | -60.99 | -2.36 | BOUNDARY (end-0.0s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (οριακό, boundary) |
+| uncletom_01_stowe | -52.51 | -62.61 | -10.10 | BOUNDARY (0.0s) | ΟΧΙ | ΝΑΙ | ΝΑΙ (boundary) |
+
+ΣΥΝΟΨΗ:
+  proxy (p5/100ms, χθεσινό):      4/20 ΝΑΙ
+  AcxCheckAnalyzer (min/500ms):  15/20 ΝΑΙ  ← ΤΟ ΠΡΑΓΜΑΤΙΚΟ ΟΡΓΑΝΟ
+  Άλλαξαν πλευρά (OXI->NAI):     11/20
+  Κανένα δεν άλλαξε NAI->OXI.
+
+ΤΑΞΙΝΟΜΗΣΗ ΤΩΝ 15 "ΝΑΙ" ΚΑΤΑ ΘΕΣΗ ΕΛΑΧΙΣΤΟΥ ΠΑΡΑΘΥΡΟΥ:
+  BOUNDARY (<5s από άκρο αρχείου):  11/15
+  interior (>5s από κάθε άκρο):      4/15
+
+  Interior-only "ΝΑΙ": adventureholmes (31.3s), adventuresholmes (546.4s),
+  emma (16.3s, ΟΡΙΑΚΟ -60.01), odyssey (22.6s) = 4/20
+
+─── ΤΟ ΕΥΡΗΜΑ (§4 — όχι μέσος όρος, όχι διάλεξη) ───
+
+ΤΑ ΔΥΟ ΟΡΓΑΝΑ ΔΙΑΦΩΝΟΥΝ ΣΥΣΤΗΜΑΤΙΚΑ, ΚΑΙ ΓΙΑΤΙ:
+
+Το proxy (p5 percentile σε ΟΛΑ τα 100ms windows του αρχείου) μετράει
+«πόσο ήσυχο είναι ΤΥΠΙΚΑ το κατώτερο 5% του αρχείου» — αραιώνεται από
+ολόκληρη τη διάρκεια, δύσκολα επηρεάζεται από 1-2 δευτερόλεπτα padding
+στην αρχή/τέλος.
+
+Το AcxCheckAnalyzer (ΑΠΟΛΥΤΟ ΕΛΑΧΙΣΤΟ 500ms window σε ΟΛΟ το αρχείο)
+μετράει «υπάρχει ΕΣΤΩ ΕΝΑ μισό δευτερόλεπτο οπουδήποτε στο αρχείο κάτω
+από το κατώφλι» — και σε 11/15 περιπτώσεις εκείνο το μισό δευτερόλεπτο
+είναι ΤΟ ΤΕΛΕΥΤΑΙΟ (ή πρώτο) του αρχείου, δηλαδή ΤΕΧΝΗΤΟ padding από
+λογισμικό επεξεργασίας ή server-side εγκοπή, ΟΧΙ το δωμάτιο της
+ηχογράφησης ΚΑΤΑ ΤΗ διάρκεια ανάγνωσης. ΤΡΙΑ αρχεία (janeeyre, peterpan,
+robinson_crusoe) δείχνουν ΑΚΡΙΒΩΣ -144.00dB = ψηφιακή απόλυτη σιωπή
+(linear<1e-10) στο ΤΕΛΕΥΤΑΙΟ ~1-1.5s — ΟΧΙ «ήσυχο δωμάτιο», microphone
+noise floor μηδέν bit-depth, δηλαδή ΠΡΑΓΜΑΤΙΚΑ μηδενικά δείγματα.
+
+ΑΥΤΟ ΔΕΝ ΕΙΝΑΙ ΣΦΑΛΜΑ ΤΟΥ ΟΡΓΑΝΟΥ — είναι ΑΚΡΙΒΩΣ τι λέει ο κώδικας
+ότι κάνει (minimum 500ms window, τεκμηριωμένο, tested). ΕΙΝΑΙ ΟΜΩΣ
+ΛΑΘΟΣ ΕΡΩΤΗΜΑ για ΤΟΝ ΣΚΟΠΟ ΜΑΣ (corpus ground truth): η ACX ζητά ένα
+ήσυχο δείγμα ΣΤΗΝ ΑΡΧΗ/ΤΕΛΟΣ του υποβληθέντος αρχείου επίτηδες (room
+tone lead-in/out) — το εργαλείο μιμείται σωστά τι ελέγχει η ACX. ΑΛΛΑ
+ΓΙΑ ΤΟ ΔΙΚΟ ΜΑΣ CORPUS χρειαζόμαστε καθαρή ΗΧΟΓΡΑΦΗΣΗ σε ΟΛΗ τη
+διάρκεια, όχι μόνο ένα καθαρό δείγμα στην άκρη — δηλαδή το proxy
+(percentile σε όλο το αρχείο) είναι ΠΙΟ ΚΟΝΤΑ στο σωστό ερώτημα για
+ΑΥΤΟ το σκοπό, ΟΧΙ το AcxCheckAnalyzer ως έχει.
+
+─── ΠΡΟΒΛΕΨΗ vs ΑΠΟΤΕΛΕΣΜΑ ───
+
+Πρόβλεψη: >=10/20 ΝΑΙ, >=6 αλλαγές πλευράς.
+Αποτέλεσμα: 15/20 ΝΑΙ (ξεπέρασε), 11/20 αλλαγές πλευράς (ξεπέρασε).
+Η ΚΑΤΕΥΘΥΝΣΗ ήταν σωστή (AcxCheckAnalyzer πιο "περιχαρής"), ΑΛΛΑ ο
+μηχανισμός ΔΕΝ ήταν αυτός που προβλέφθηκε (γνήσιες παύσεις ομιλίας) —
+ήταν ΚΥΡΙΩΣ boundary padding/ψηφιακή σιωπή (11/15), όχι εσωτερικές
+παύσεις (μόνο 4/15). Η ΠΟΣΟΤΙΚΗ πρόβλεψη επαληθεύτηκε, ο ΜΗΧΑΝΙΣΜΟΣ όχι.

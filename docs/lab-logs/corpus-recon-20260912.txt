@@ -1,0 +1,1192 @@
+=== CORPUS RECON 2026-09-12T18:16:02+03:00 ===
+
+─── 1a. ~/Downloads/DATASET/ ───
+total 22174364
+drwxrwxr-x 14 aidevcon aidevcon        4096 Sep  5 01:36 .
+drwxr-xr-x 44 aidevcon aidevcon        4096 Sep 12 12:09 ..
+-rw-rw-r--  1 aidevcon aidevcon       12361 Aug 24 00:14 0000-j.r.r._tolkien-the_lord_of_the_rings-audiobook-10cd-flac-1999.sfv
+-rw-rw-r--  1 aidevcon aidevcon     3507180 Aug 24 00:49 0000-j.r.r._tolkien-the_lord_of_the_rings-audiobook-10cd-flac-1999.srr
+-rw-rw-r--  1 aidevcon aidevcon    12487994 Aug 24 00:40 01 - Vor-Vorwort.flac
+-rw-rw-r--  1 aidevcon aidevcon    21471676 Aug 24 00:37 21 - The Road Of Creation.flac
+drwxrwxr-x  2 aidevcon aidevcon       20480 Sep  5 13:33 acx
+drwxrwxr-x  3 aidevcon aidevcon        4096 Aug 24 12:39 AUDIOBFLAC
+-rw-r--r--  1 aidevcon aidevcon        1014 Aug 18 22:41 check_archive_metadata.py
+drwxrwxr-x 25 aidevcon aidevcon        4096 Aug  3 23:04 excerpts
+drwxrwxr-x  3 aidevcon aidevcon        4096 Aug  3 09:04 extracted
+drwxrwxr-x  4 aidevcon aidevcon        4096 Aug 21 23:27 fma
+-rw-rw-r--  1 aidevcon aidevcon        5843 Aug 19 04:46 https compmusic upf edu.txt
+drwxrwxr-x  3 aidevcon aidevcon        4096 Aug  7 15:17 librispeech
+drwxrwxr-x  4 aidevcon aidevcon        4096 Aug 18 22:36 musdb18hq
+-rw-rw-r--  1 aidevcon aidevcon 22656664047 Aug  3 08:47 musdb18hq.zip
+-rw-r--r--  1 aidevcon aidevcon        6190 Aug 18 22:36 musdb_inventory.py
+drwxrwxr-x  3 aidevcon aidevcon        4096 Aug 19 01:47 nonwestern
+drwxrwxr-x  2 aidevcon aidevcon        4096 Aug 19 01:07 NONWESTERN
+-rw-r--r--  1 aidevcon aidevcon        4272 Aug 18 22:37 search_archive.py
+drwxrwxr-x  6 aidevcon aidevcon        4096 Aug 23 10:11 slakh
+drwxrwxr-x  3 aidevcon aidevcon        4096 Aug  3 23:05 speech
+-rw-rw-r--  1 aidevcon aidevcon    12273846 Aug 24 00:52 The Talisman - 022.flac
+drwxrwxr-x  4 aidevcon aidevcon        4096 Sep  5 01:36 vocalset
+
+--- du -sh per subfolder ---
+16K	/home/aidevcon/Downloads/DATASET/0000-j.r.r._tolkien-the_lord_of_the_rings-audiobook-10cd-flac-1999.sfv
+3.4M	/home/aidevcon/Downloads/DATASET/0000-j.r.r._tolkien-the_lord_of_the_rings-audiobook-10cd-flac-1999.srr
+12M	/home/aidevcon/Downloads/DATASET/01 - Vor-Vorwort.flac
+21M	/home/aidevcon/Downloads/DATASET/21 - The Road Of Creation.flac
+7.5G	/home/aidevcon/Downloads/DATASET/acx
+1.5G	/home/aidevcon/Downloads/DATASET/AUDIOBFLAC
+4.0K	/home/aidevcon/Downloads/DATASET/check_archive_metadata.py
+1.5G	/home/aidevcon/Downloads/DATASET/excerpts
+586M	/home/aidevcon/Downloads/DATASET/extracted
+17G	/home/aidevcon/Downloads/DATASET/fma
+8.0K	/home/aidevcon/Downloads/DATASET/https compmusic upf edu.txt
+672M	/home/aidevcon/Downloads/DATASET/librispeech
+23G	/home/aidevcon/Downloads/DATASET/musdb18hq
+22G	/home/aidevcon/Downloads/DATASET/musdb18hq.zip
+8.0K	/home/aidevcon/Downloads/DATASET/musdb_inventory.py
+174M	/home/aidevcon/Downloads/DATASET/nonwestern
+4.0K	/home/aidevcon/Downloads/DATASET/NONWESTERN
+8.0K	/home/aidevcon/Downloads/DATASET/search_archive.py
+96G	/home/aidevcon/Downloads/DATASET/slakh
+350M	/home/aidevcon/Downloads/DATASET/speech
+12M	/home/aidevcon/Downloads/DATASET/The Talisman - 022.flac
+18G	/home/aidevcon/Downloads/DATASET/vocalset
+
+─── 1b. LICENSE/README/manifest per subfolder ───
+=== acx ===
+
+=== AUDIOBFLAC ===
+
+=== excerpts ===
+
+=== extracted ===
+
+=== fma ===
+/home/aidevcon/Downloads/DATASET/fma/fma_metadata/README.txt
+/home/aidevcon/Downloads/DATASET/fma/fma_small/README.txt
+
+=== librispeech ===
+/home/aidevcon/Downloads/DATASET/librispeech/LibriSpeech/README.TXT
+/home/aidevcon/Downloads/DATASET/librispeech/LibriSpeech/LICENSE.TXT
+
+=== musdb18hq ===
+
+=== nonwestern ===
+/home/aidevcon/Downloads/DATASET/nonwestern/README.md
+/home/aidevcon/Downloads/DATASET/nonwestern/saraga/README.md
+
+=== NONWESTERN ===
+
+=== slakh ===
+/home/aidevcon/Downloads/DATASET/slakh/drums-v1/MANIFEST.md
+
+=== speech ===
+/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/README.TXT
+/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/LICENSE.TXT
+
+=== vocalset ===
+/home/aidevcon/Downloads/DATASET/vocalset/MANIFEST.md
+/home/aidevcon/Downloads/DATASET/vocalset/licence_zenodo.txt
+/home/aidevcon/Downloads/DATASET/vocalset/vs1-2/readme-anon.txt
+/home/aidevcon/Downloads/DATASET/vocalset/vs11/readme-anon.txt
+
+
+─── 1b (cont). head -30 of each found file ───
+===== /home/aidevcon/Downloads/DATASET/fma/fma_metadata/README.txt =====
+This .zip archive is part of the FMA, a dataset for music analysis.
+Code & data: https://github.com/mdeff/fma
+Paper: https://arxiv.org/abs/1612.01840
+
+Each .mp3 is licensed by its artist.
+
+The content's integrity can be verified with sha1sum -c checksums.
+
+===== /home/aidevcon/Downloads/DATASET/fma/fma_small/README.txt =====
+This .zip archive is part of the FMA, a dataset for music analysis.
+Code & data: https://github.com/mdeff/fma
+Paper: https://arxiv.org/abs/1612.01840
+
+Each .mp3 is licensed by its artist.
+
+The content's integrity can be verified with sha1sum -c checksums.
+
+===== /home/aidevcon/Downloads/DATASET/librispeech/LibriSpeech/README.TXT =====
+1. General information
+======================
+
+LibriSpeech is a corpus of read speech, based on LibriVox's public domain
+audio books. Its purpose is to enable the training and testing of automatic
+speech recognition(ASR) systems. 
+
+
+2. Structure
+============
+
+The corpus is split into several parts to enable users to selectively download
+subsets of it, according to their needs. The subsets with "clean" in their name
+are supposedly "cleaner"(at least on average), than the rest of the audio and
+US English accented. That classification was obtained using very crude automated 
+means, and should not be considered completely reliable. The subsets are
+disjoint, i.e. the audio of each speaker is assigned to exactly one subset.
+
+The parts of the corpus are as follows:
+
+* dev-clean, test-clean - development and test set containing "clean" speech.
+* train-clean-100 - training set, of approximately 100 hours of "clean" speech
+* train-clean-360 - training set, of approximately 360 hours of "clean" speech
+* dev-other, test-other - development and test set, with speech which was 
+                          automatically selected to be more "challenging" to
+                          recognize
+* train-other-500 - training set of approximately 500 hours containing speech
+                    that was not classified as "clean", for some (possibly wrong)
+                    reason
+* intro - subset containing only the LibriVox's intro disclaimers for some of the
+
+===== /home/aidevcon/Downloads/DATASET/librispeech/LibriSpeech/LICENSE.TXT =====
+LibriSpeech (c) 2014 by Vassil Panayotov
+
+LibriSpeech ASR corpus is licensed under a
+Creative Commons Attribution 4.0 International License.
+
+See <http://creativecommons.org/licenses/by/4.0/>.
+
+===== /home/aidevcon/Downloads/DATASET/nonwestern/README.md =====
+This directory contains synthesized gap-filler tracks created from the **Beijing Opera Percussion Instrument Dataset** (UPF / C4DM). The purpose is to provide rich transient/gong/cymbal content to balance the NMFD training engine without overlapping with western drum components.
+
+**ΣΗΜΑΝΤΙΚΗ ΔΙΕΥΚΡΙΝΙΣΗ ΧΡΗΣΗΣ (ΠΛΑΙΣΙΟ):**
+1. **ΜΟΝΟ ΓΙΑ ΤΟΝ ADVERSARIAL ΠΑΓΚΟ (Δίκες Guards):** Το υλικό αυτό ΔΕΝ είναι "για προπόνηση" (training). Κανένα template δεν πρόκειται να μάθει ποτέ από αυτά τα χτυπήματα. Χρησιμοποιούνται αποκλειστικά για να τεστάρουμε την αντοχή των guards.
+2. **SCOUT BYPASS:** Λόγω των αραιών χτυπημάτων (μεγάλα κενά 1s), ο macro Scout πιθανότατα θα κάνει BYPASS αυτό το υλικό. Οι δίκες του πάγκου θα πρέπει να τρέχουν με `force-K14` (ο μηχανισμός ήδη υπάρχει).
+
+## Inventory
+
+| Filename | Source / Origin | License | Duration | Format | Content Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `bo_daluo_strokes.wav` | [Zenodo (1285212)](https://zenodo.org/record/1285212) | CC-BY-4.0 | 199s (3m 19s) | 44.1kHz WAV | Concatenated strokes of **Daluo** (Large Gong). Pure low/mid metallophone strikes. |
+| `bo_xiaoluo_strokes.wav` | [Zenodo (1285212)](https://zenodo.org/record/1285212) | CC-BY-4.0 | 120s (2m 00s) | 44.1kHz WAV | Concatenated strokes of **Xiaoluo** (Small Gong). High-pitched, sharp transient strikes. |
+| `bo_naobo_strokes.wav` | [Zenodo (1285212)](https://zenodo.org/record/1285212) | CC-BY-4.0 | 235s (3m 55s) | 44.1kHz WAV | Concatenated strokes of **Naobo** (Cymbals). Noisy, broad-spectrum metallic crashes. |
+
+*Notes:*
+- The individual strokes from the original dataset (1-3s each) were concatenated using a Python script with 1-second silence gaps inserted between each strike to ensure clean onset detection for the NMFD model.
+- These three files fully replace the need for the previously suggested Gamelan tracks, offering identical (if not superior) isolated metallophone transients.
+
+===== /home/aidevcon/Downloads/DATASET/nonwestern/saraga/README.md =====
+# SARAGA DATASET (CARNATIC / HINDUSTANI)
+
+**ΠΡΟΣΟΧΗ - ΑΔΕΙΑ ΧΡΗΣΗΣ (CC-BY-NC-SA)**
+ΤΑ ΑΡΧΕΙΑ ΑΥΤΑ ΕΙΝΑΙ ΑΥΣΤΗΡΑ ΚΑΙ ΜΟΝΟ ΓΙΑ ΤΟΝ LOCAL BENCH ΠΑΓΚΟ (ADVERSARIAL TESTING).
+- **ΠΟΤΕ** ΔΕΝ ΑΝΕΒΑΙΝΟΥΝ ΣΤΟ GIT REPOSITORY (ΤΟ REPO ΕΙΝΑΙ PUBLIC).
+- **ΠΟΤΕ** ΔΕΝ ΧΡΗΣΙΜΟΠΟΙΟΥΝΤΑΙ ΩΣ ΜΟΝΙΜΑ FIXTURES ΠΟΥ COMMIT-ΑΡΟΝΤΑΙ.
+- **ΠΟΤΕ** ΔΕΝ ΕΝΣΩΜΑΤΩΝΟΝΤΑΙ ΣΕ ΠΡΟΪΟΝ.
+
+Αυτός ο φάκελος χρησιμεύει αποκλειστικά για την τοπική εκτέλεση του `adversarial_drone` guard και του VAD routing, αξιοποιώντας τις έντονες μικροτονικότητες (Vocals) και τα Indian Drones (Tambura) που περιέχονται στα μιξαρισμένα stems της Saraga.
+
+## Inventory
+
+| Filename | Source / Origin | License | Duration | SR / Format | Content Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `saraga_mini_vocal_stem.wav` | [Zenodo 16411600 (Saraga Audiovisual: Mini)](https://zenodo.org/record/16411600) | CC-BY-NC-SA | 753s (12m 33s) | 44.1kHz WAV | Carnatic Vocal Stem (*Aditi Prahlad - Ananda Natana Prakasham*). Αγνό ινδικό vocal stem με melismata και glissandi. (Σημείωση: Περιέχει ελαφρύ bleed από τα κρουστά και το drone λόγω live ηχογράφησης). |
+| `saraga_mini_mix.wav` | [Zenodo 16411600 (Saraga Audiovisual: Mini)](https://zenodo.org/record/16411600) | CC-BY-NC-SA | 753s (12m 33s) | 44.1kHz WAV | Full Mix του ίδιου κομματιού. Χρησιμοποιείται ως proxy για **Tambura Drone test** αφού στο Saraga τα drones περιλαμβάνονται αυτούσια στα mix files και σπάνια παρέχονται ως μεμονωμένα stems. |
+
+
+===== /home/aidevcon/Downloads/DATASET/slakh/drums-v1/MANIFEST.md =====
+# Slakh2100 redux 16k — γυμνά drum stems, v1
+
+## Πηγή
+
+- Zenodo record 7708270, αρχείο `slakh2100_redux_16k.tar.gz`
+- md5 `66a2301ed7b4d5f4f6d3383474e546c6` — ΕΠΑΛΗΘΕΥΜΕΝΟ έναντι Zenodo API, 2026-08-23
+- Άδεια: CC BY 4.0
+- Split: `train` (1289 tracks συνολικά διαθέσιμα, 1289/1289 με ΑΚΡΙΒΩΣ ένα `is_drum:true` stem — μηδέν με κανένα, μηδέν με πολλά)
+- Ολόκληρο το `is_drum:true` σύνολο τεκμηριωμένο σε `.reports/2026-08-23-slakh-drums.md` (ΒΗΜΑ 1, πλήρης απογραφή 1289 tracks, 8 kits, 88.928 ώρες αρχείου διαθέσιμες)
+
+## Επιλογή — μέθοδος και seed
+
+**seed = 20260823** — `random.Random(20260823)`, ΦΡΕΣΚΙΑ instance ανά kit
+(όχι ένα shuffle συνεχόμενο σε όλα τα kits), εφαρμοσμένη σε
+`sorted(kit_tracks, key=track_id)` πριν το shuffle, ώστε η σειρά να
+είναι πλήρως αναπαραγώγιμη από seed + κατάλογο αρχείων μόνο.
+
+**Budget: ΕΝΕΡΓΕΣ ώρες, όχι ώρες αρχείου.**
+```
+active_hours(track) = duration_s × active_frac
+5h ΕΝΕΡΓΕΣ / 8 kits = 37.5 λεπτά ΕΝΕΡΓΑ ανά kit (στόχος)
+```
+Ορισμός `active_frac`: κλάσμα των 100ms παραθύρων του stem με
+RMS > −60 dBFS (πλήρες αρχείο, όχι δείγμα).
+
+**Κριτήρια αποκλεισμού, με την προέλευσή τους:**
+- `active_frac < 50%` — κατώφλι ΑΠΟ ΤΗ ΜΕΤΡΗΣΗ (ΒΗΜΑ 2α: δείγμα 40
+  tracks, 5/kit, ίδιο seed· κενό στην κατανομή ανάμεσα σε 40.35% και
+  57.61% — τα τρία χειρότερα του δείγματος έπεσαν κάτω από 41%, το
+  επόμενο ήταν ήδη πάνω από 57%. ΚΑΝΕΝΑ κατώφλι από θεωρία).
+
+===== /home/aidevcon/Downloads/DATASET/vocalset/MANIFEST.md =====
+# VocalSet Dataset Manifest
+
+- **Date:** 2026-08-22
+- **Source:** Zenodo (Record 1442513)
+- **License:** cc-by-4.0 (as per `licence_zenodo.txt`)
+
+## Archives (Zips)
+- `VocalSet11.zip` (MD5: OK) -> Extracted to `vs11/`
+- `VocalSet1-2.zip` (MD5: OK, extracted with 7z due to 32-bit overflow) -> Extracted to `vs1-2/`
+- *Note: SHA256 hashes of the zip files are stored alongside this manifest in `zips.sha256`.*
+
+## Format & Health
+Based on a random sample of 200 files across the dataset:
+- **Sample Rate:** 44,100 Hz
+- **Channels:** 1 (Mono)
+- **Bit Depth / Format:** 16-bit PCM (`PCM_16`)
+- **Duration:** **~10.8 hours of UNIQUE material** (estimate: mean
+  ~8.15s × 3,613 unique recordings — consistent with the 10.1h the
+  Zenodo record declares). The earlier ~32.36h figure counted the
+  same recordings 3-4 times across the redundant views and is
+  retracted (2026-08-22).
+
+## Counts (Post-Cleanup)
+- **vs11:** 3,613 `.wav` files
+- **vs1-2:** 10,687 `.wav` files
+  *(Note: `vs1-2` organizes the same core files in three redundant structures: `data_by_singer`, `data_by_technique`, and `data_by_vowel`)*
+- **Total Valid WAV files:** 14,300
+- **UNIQUE recordings: 3,613** — verified 2026-08-22: 5/5 random
+  sha256 comparisons vs11/FULL ↔ vs1-2/data_by_singer came back
+  byte-identical. The three vs1-2 roots are copies/views of the
+
+===== /home/aidevcon/Downloads/DATASET/vocalset/licence_zenodo.txt =====
+ZENODO LICENCE: cc-by-4.0
+
+===== /home/aidevcon/Downloads/DATASET/vocalset/vs1-2/readme-anon.txt =====
+Thanks for checking out the VocalSet dataset.
+
+Included in this repo: 
+-Full vocalset data - 20 singers (11 male, 9 female)
+-'train_singers_technique.txt' and `test_singers_technique.txt` - this includes the list of singers used in the train and test sets to train our optimal technique classifier model
+-'DataSetVocalises.pdf' - PDF that singers sang from to collect the data. For example, 'f3_arpeggios_vocal_fry_a.wav' will be a sample of the f3 singer singing from the 'Arpeggios' section with 10. vocal fry on the vowel 'a'.
+
+voice types of singers (anonymous):
+
+f1 - soprano 
+f2 - soprano 
+f3 - soprano 
+f4 - soprano 
+f5 - mezzo-soprano
+f6 - soprano 
+f7 - soprano
+f8 - mezzo-soprano 
+f9 - soprano
+
+m1 - baritone
+m2 - tenor 
+m3 - tenor
+m4 - bass(?)
+m5 - baritone
+m6 - baritone 
+m7 - tenor(?) 
+m8 - bass 
+m9 - countertenor
+m10 - bass-baritone 
+m11 - tenor
+
+─── 1b (cont2). Deeper look: acx, AUDIOBFLAC, excerpts, extracted, musdb18hq, NONWESTERN ───
+=== acx (top-level listing, 7.5G) ===
+total 7813356
+drwxrwxr-x  2 aidevcon aidevcon     20480 Sep  5 13:33 .
+drwxrwxr-x 14 aidevcon aidevcon      4096 Sep  5 01:36 ..
+-rw-rw-r--  1 aidevcon aidevcon 247692138 Sep  5 03:04 002.flac
+-rw-rw-r--  1 aidevcon aidevcon 236544619 Sep  5 02:55 003.flac
+-rw-rw-r--  1 aidevcon aidevcon 218933414 Sep  5 03:23 004.flac
+-rw-rw-r--  1 aidevcon aidevcon 256436621 Sep  5 03:47 005.flac
+-rw-rw-r--  1 aidevcon aidevcon 236463148 Sep  5 04:03 006.flac
+-rw-rw-r--  1 aidevcon aidevcon    824187 Sep  5 12:06 00-asterix-41_asterix_in_lusitanien-de-audiobook-cd-flac-2026.jpg
+-rw-rw-r--  1 aidevcon aidevcon      1025 Sep  5 12:06 00-asterix-41_asterix_in_lusitanien-de-audiobook-cd-flac-2026.m3u
+-rw-rw-r--  1 aidevcon aidevcon      3362 Sep  5 12:06 00-asterix-41_asterix_in_lusitanien-de-audiobook-cd-flac-2026.nfo
+-rw-rw-r--  1 aidevcon aidevcon      1275 Sep  5 12:06 00-asterix-41_asterix_in_lusitanien-de-audiobook-cd-flac-2026.sfv
+-rw-rw-r--  1 aidevcon aidevcon   1175861 Sep  5 12:28 00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.jpg
+-rw-rw-r--  1 aidevcon aidevcon       864 Sep  5 12:08 00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.m3u
+-rw-rw-r--  1 aidevcon aidevcon      2326 Sep  5 12:08 00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.nfo
+-rw-rw-r--  1 aidevcon aidevcon       984 Sep  5 12:08 00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.sfv
+-rw-rw-r--  1 aidevcon aidevcon    622020 Sep  5 12:08 00-hui_buh-48_ein_echtes_gruseltalent-de-audiobook-cd-flac-2026.jpg
+-rw-rw-r--  1 aidevcon aidevcon       645 Sep  5 12:08 00-hui_buh-48_ein_echtes_gruseltalent-de-audiobook-cd-flac-2026.m3u
+-rw-rw-r--  1 aidevcon aidevcon      2524 Sep  5 12:08 00-hui_buh-48_ein_echtes_gruseltalent-de-audiobook-cd-flac-2026.nfo
+-rw-rw-r--  1 aidevcon aidevcon       795 Sep  5 12:08 00-hui_buh-48_ein_echtes_gruseltalent-de-audiobook-cd-flac-2026.sfv
+--- any doc file inside? ---
+
+=== AUDIOBFLAC ===
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/24 - The Wise In The Desert.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/03 - Verwandelt.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/38 - Ouch!.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/631-daniel_holbe_andreas_franz-blutwette_kapitel_210.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/533-daniel_holbe_andreas_franz-blutwette_kapitel_176.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/The Outsider - 003.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/09 - Irgendwo Zwischen Den Welten.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/509-anne_moll_ini_lorentz-tage_des_sturms_kapitel_083.flac
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 14 - Chapter Ten - Precocious.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 02 - Dedication.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 13 - Chapter Nine - One Act and Five Nines.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 18 - Chapter Fourteen - Source Code.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 01 - Opening Credits.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/bill gates - source code (2025) [audiobook]
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 10 - Chapter Six - Free Time.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 04 - Prologue.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 17 - Chapter Thirteen - Micro-Soft.mp3
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 03 - Epigraph.mp3
+
+=== excerpts ===
+Al_James_-_Schoolboy_Facination
+AM_Contra_-_Heart_Peripheral
+Arise_-_Run_Run_Run
+Ben_Carrigan_-_Well_Talk_About_It_All_Tonight
+Buitraker_-_Revo_X
+Forkupines_-_Semantics
+Hollow_Ground_-_Ill_Fate
+Little_Chicagos_Finest_-_My_Own
+Louis_Cressy_Band_-_Good_Time
+MERC_Music_-_Knockout
+Moosmusic_-_Big_Dummy_Shake
+Motor_Tapes_-_Shore
+PR_-_Oh_No
+Punkdisco_-_Oral_Hygiene
+Secretariat_-_Borderline
+Signe_Jakobsen_-_What_Have_You_Done_To_Me
+Skelpolu_-_Resurrection
+Speak_Softly_-_Like_Horses
+The_Mountaineering_Club_-_Mallory
+The_Sunshine_Garcia_Band_-_For_I_Am_The_Moon
+Timboz_-_Pony
+Tom_McKenzie_-_Directions
+Zeno_-_Signs
+
+=== extracted ===
+/home/aidevcon/Downloads/DATASET/extracted
+/home/aidevcon/Downloads/DATASET/extracted/test
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene/bass.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene/vocals.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene/other.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene/mixture.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Punkdisco - Oral Hygiene/drums.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination/bass.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination/vocals.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination/other.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination/mixture.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Al James - Schoolboy Facination/drums.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics/bass.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics/vocals.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics/other.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics/mixture.wav
+/home/aidevcon/Downloads/DATASET/extracted/test/Forkupines - Semantics/drums.wav
+
+=== musdb18hq (extracted dir) ===
+/home/aidevcon/Downloads/DATASET/musdb18hq/INVENTORY.md
+/home/aidevcon/Downloads/DATASET/musdb18hq/track_notes.md
+INVENTORY.md
+test
+track_notes.md
+train
+
+=== NONWESTERN (caps, separate from nonwestern) ===
+total 8
+drwxrwxr-x  2 aidevcon aidevcon 4096 Aug 19 01:07 .
+drwxrwxr-x 14 aidevcon aidevcon 4096 Sep  5 01:36 ..
+
+─── ⚠ FLAG: acx/ and AUDIOBFLAC/ appear to be scene-release audiobook rips ───
+acx: .sfv/.nfo/.m3u scene format, no LICENSE/manifest anywhere
+                 Musical Over Dose
+                is proud to present
+                Since January 2002
+
+	another new release, have fun
+
+   .: about release :.
+
+      Name       .:. Asterix - 41 Asterix in Lusitanien
+
+      Genre       :  Speech
+      Source      :  CDDA
+      Type       .:. Album
+
+      Artist      :  Asterix
+      Label       :  Universal Vertrieb
+      Titel       :  41 Asterix in Lusitanien
+
+
+      Tracks      :  25
+      Playtime    :  77:42
+      Size        :  441,34MB
+
+      Encoder     :  FLAC 1.3.1
+      Quality     :  794 kbps
+
+
+
+
+     [ Tracklist ]
+
+--- AUDIOBFLAC/BILLGATES_BOOK — same scene naming for a commercial 2025 audiobook ---
+total 711864
+drwxrwxr-x 3 aidevcon aidevcon     4096 Aug 24 12:55 .
+drwxrwxr-x 3 aidevcon aidevcon     4096 Aug 24 12:39 ..
+drwxrwxr-x 2 aidevcon aidevcon     4096 Aug 24 13:04 bill gates - source code (2025) [audiobook]
+-rw-rw-r-- 1 aidevcon aidevcon   354238 Aug 24 12:40 Bill Gates - Source Code.jpg
+-rw-rw-r-- 1 aidevcon aidevcon   388645 Aug 24 12:40 Source Code - 01 - Opening Credits.mp3
+-rw-rw-r-- 1 aidevcon aidevcon   249433 Aug 24 12:41 Source Code - 02 - Dedication.mp3
+-rw-rw-r-- 1 aidevcon aidevcon   195326 Aug 24 12:41 Source Code - 03 - Epigraph.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 16049127 Aug 24 12:42 Source Code - 04 - Prologue.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 55410914 Aug 24 12:43 Source Code - 05 - Chapter One - Trey.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 42892669 Aug 24 12:43 Source Code - 06 - Chapter Two - View Ridge.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 44268669 Aug 24 12:44 Source Code - 07 - Chapter Three - Rational.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 54413865 Aug 24 12:44 Source Code - 08 - Chapter Four - Lucky Kid.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 50802173 Aug 24 12:45 Source Code - 09 - Chapter Five - Lakeside.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 41893619 Aug 24 12:45 Source Code - 10 - Chapter Six - Free Time.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 60294895 Aug 24 12:46 Source Code - 11 - Chapter Seven - Just Kids.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 61200725 Aug 24 12:47 Source Code - 12 - Chapter Eight - The Real World.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 44138465 Aug 24 12:47 Source Code - 13 - Chapter Nine - One Act and Five Nines.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 65379735 Aug 24 12:48 Source Code - 14 - Chapter Ten - Precocious.mp3
+-rw-rw-r-- 1 aidevcon aidevcon 31810204 Aug 24 12:48 Source Code - 16 - Chapter Twelve - Be So Correct.mp3
+
+─── 1c. research/w-speech/ ───
+total 56
+drwxrwxr-x  3 aidevcon aidevcon  4096 Aug  1 04:51 .
+drwxrwxr-x 10 aidevcon aidevcon  4096 Aug 23 05:27 ..
+drwxrwxr-x  2 aidevcon aidevcon  4096 Aug  1 02:15 corpus
+-rw-r--r--  1 aidevcon aidevcon   797 Aug  1 02:14 download_librispeech.py
+-rw-r--r--  1 aidevcon aidevcon  4479 Aug  1 04:47 gen_mel128_rust.rs
+-rw-r--r--  1 aidevcon aidevcon  1743 Aug  1 02:15 gen_readme.py
+-rw-r--r--  1 aidevcon aidevcon    30 Aug  1 04:51 .gitignore
+-rw-r--r--  1 aidevcon aidevcon  3803 Aug  1 02:15 README.md
+-rw-rw-r--  1 aidevcon aidevcon 16384 Sep  5 18:14 w_speech_v1.bin
+-rw-rw-r--  1 aidevcon aidevcon  3281 Sep  5 18:14 w_speech_v1_params.json
+2.7M	research/w-speech/corpus
+4.0K	research/w-speech/download_librispeech.py
+8.0K	research/w-speech/gen_mel128_rust.rs
+4.0K	research/w-speech/gen_readme.py
+4.0K	research/w-speech/README.md
+16K	research/w-speech/w_speech_v1.bin
+4.0K	research/w-speech/w_speech_v1_params.json
+
+─── 1d. ~/nmfd-phase2-backup, ~/research/genre-teacher ───
+total 20784
+drwxrwxr-x  2 aidevcon aidevcon     4096 Aug 18 10:35 .
+drwxr-x--- 59 aidevcon aidevcon     4096 Sep 12 18:16 ..
+-rw-r--r--  1 aidevcon aidevcon     4782 Aug 18 10:35 adversarial_drone.rs
+-rw-r--r--  1 aidevcon aidevcon     5799 Aug 18 10:35 bass_theft_guard.rs
+-rw-r--r--  1 aidevcon aidevcon     3111 Aug 18 10:35 extract_bss_stems.rs
+-rw-r--r--  1 aidevcon aidevcon     9117 Aug 18 10:35 factory_v5_discriminative.py
+-rw-rw-r--  1 aidevcon aidevcon 10584068 Aug 18 10:35 voice_k14_v2.wav
+-rw-rw-r--  1 aidevcon aidevcon 10584068 Aug 18 10:35 voice_k8_v2.wav
+-rw-rw-r--  1 aidevcon aidevcon    24576 Aug 18 10:35 w_music_v1.bin
+-rw-rw-r--  1 aidevcon aidevcon    24576 Aug 18 10:35 w_music_v1_k14.bin
+-rw-r--r--  1 aidevcon aidevcon      879 Aug 18 10:35 w_music_v1.manifest
+-rw-rw-r--  1 aidevcon aidevcon    12288 Aug 18 10:35 w_sung_v5.bin
+21M	/home/aidevcon/nmfd-phase2-backup
+--- license docs in nmfd-phase2-backup? ---
+/home/aidevcon/nmfd-phase2-backup/w_music_v1.manifest
+
+total 532
+drwxrwxr-x 9 aidevcon aidevcon   4096 Aug 19 10:02 .
+drwxrwxr-x 3 aidevcon aidevcon   4096 Aug 17 02:46 ..
+-rw-r--r-- 1 aidevcon aidevcon   9862 Aug 19 09:37 analyze_flavours_ph1_5.py
+-rw-r--r-- 1 aidevcon aidevcon   9201 Aug 19 10:02 analyze_flavours_ph1_6.py
+-rw-r--r-- 1 aidevcon aidevcon   9961 Aug 19 08:00 analyze_flavours_ph3.py
+drwxrwxr-x 9 aidevcon aidevcon   4096 Aug 18 01:41 data
+-rw-rw-r-- 1 aidevcon aidevcon  13411 Aug 17 05:32 durations.txt
+-rw-r--r-- 1 aidevcon aidevcon   8101 Aug 17 09:58 extract_and_train.py
+drwxrwxr-x 2 aidevcon aidevcon   4096 Aug 17 03:38 features_out
+-rw-r--r-- 1 aidevcon aidevcon   1162 Aug 17 02:48 NOTES.md
+drwxrwxr-x 2 aidevcon aidevcon   4096 Aug 19 10:03 out
+drwxrwxr-x 2 aidevcon aidevcon   4096 Aug 17 10:19 __pycache__
+drwxrwxr-x 3 aidevcon aidevcon   4096 Aug 18 02:53 scripts
+-rw-r--r-- 1 aidevcon aidevcon   3077 Aug 17 21:52 smoke_teachers_music.py
+-rw-r--r-- 1 aidevcon aidevcon   3045 Aug 17 21:03 smoke_teachers.py
+-rw-r--r-- 1 aidevcon aidevcon    878 Aug 17 11:13 test_threads.py
+-rw-rw-r-- 1 aidevcon aidevcon     84 Aug 17 05:32 time1.txt
+-rw-rw-r-- 1 aidevcon aidevcon     84 Aug 17 05:33 time2.txt
+-rw-rw-r-- 1 aidevcon aidevcon     84 Aug 17 05:34 time3.txt
+13G	/home/aidevcon/research/genre-teacher
+--- license docs in genre-teacher? ---
+
+─── 1e. existing license-tracking docs in repo ───
+docs/lab-logs/corpus-recon-20260912.txt
+docs/licenses/LAME-LGPL-NOTICE.md
+research/musdb-lab/rebuild_allowlist_v2.py
+research/musdb-lab/drumscan.py
+research/musdb-lab/manifest.csv
+research/musdb-lab/phi1_dataset_builder.py
+research/musdb-lab/results/phi2_manifest.csv
+research/musdb-lab/results/phi1_manifest.csv
+research/musdb-lab/ingest.sh
+research/silero-lab/README.md
+research/superflux/README.md
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/lz4hc.h
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/lz4file.h
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/lz4frame_static.h
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/lz4frame.h
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/xxhash.h
+research/encoder-gap-speech/target/release/build/rav1e-c23e23cd960b08ff/out/built.rs
+research/encoder-gap-speech/target/release/build/lz4-sys-29b3b9217035228d/out/include/lz4.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/lz4frame.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/lz4hc.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/lz4.h
+research/encoder-gap-speech/target/debug/build/rav1e-dbc8e736747e5976/out/built.rs
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/lz4file.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-d2e3c4cb7b415db7/out/include/lz4frame.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-d2e3c4cb7b415db7/out/include/lz4.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-d2e3c4cb7b415db7/out/include/lz4hc.h
+research/encoder-gap-speech/target/debug/build/rav1e-6175c3530cad4599/out/built.rs
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/xxhash.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-5d0602ec78a5732c/out/include/lz4frame_static.h
+research/encoder-gap-speech/target/debug/build/lz4-sys-d2e3c4cb7b415db7/out/include/xxhash.h
+
+─── 1e (cont). manifest.csv / allowlist / musdb-lab (likely the 40.3% contamination incident) ───
+=== research/musdb-lab/manifest.csv (head) ===
+track,excerpt_start,musdb_version,sha256_mix,sha256_vocals,sha256_bass,sha256_drums,sha256_other,rms_mix,rms_vocals,rms_bass,rms_drums,rms_other,active_mix,active_vocals,active_bass,active_drums,active_other,roles,license_note
+"Al James - Schoolboy Facination","00:00:30","MUSDB18-HQ","f6336f98d761d24186f583b068c0b54fd0567601f32fbbf1795d305d87c1178b","2a4cef360e386f4a957b98420cff0396ae4f80ce38e535b98a747a89377df844","b9d9e6862ace10f1bc9b2c342d86bf7a9b25d4ad787c4adbce9434b9cfe1c852","66be01ccd727805012a6b649fd31be48b5c8420fc0ebbcd527c9ec9ce4fe803d","6b8023d66853435454b9843c640298fe119429b4f5448da08557b2814f317c65","-18.8","-22.9","-24.9","-26.9","-25.6","30","29","30","30","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"Punkdisco - Oral Hygiene","00:00:30","MUSDB18-HQ","5f226befa17a213a62ca57c3bffbcc19768447b371d6d6ecdad86af6d4a740c8","e81209f9794e17e2db601b2485c64f22c5a85a833e1ca3c760ddc998e5230d71","cfbf53cb9ee6b3692b3bb2a518acc7ffedb6a5ad764ffefea925f8d1aa1342e9","7c5946a19cd2f7f35da187dc9a3b8456e3c9e1b12f58735ecb033f8fa34f770f","7e182b0d2aadaabb629b22f219f2e2a8bcb3dde5e6cd60f7f89f64b41c13338f","-18.9","-30.8","-22.3","-22.5","-31.0","30","14","30","30","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"Forkupines - Semantics","00:00:30","MUSDB18-HQ","7f33cb98824df8f53e8a8464765696d9c003c16790264673e22cb57c2e73ae09","6440335906592228ecadd02d989b2dbc8fff2b1f3c13ce4b82a9b99258c8d2bf","a543d04efa031c1bd7bb1704b47fc00c0f49b5f076921a8961488981c181cad4","4bd777ab9cfc107277393570ee0127c9fdccc542da8b0b0ba37c7ade87186545","38013b724826a6e1ebdf739950523799ee78db3b7b05e0b8e59800220712fa54","-16.2","-24.8","-26.2","-18.2","-24.9","30","23","30","30","26","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"Buitraker - Revo X","00:00:30","MUSDB18-HQ","aa62ae5009d8823a74da18b347bbddd4aa6d202b3fee07c66aa189cb90e436ad","e7851a9a61602fe202af802180b9c2a9fff9d7369dbf8dde201252c2604fc96e","75dab5307dd72bfb601b9c00ab1573a6771a103db6592f4a33050a16423ae043","85a536f7631ee500110e37b4005e902fc458fef75b040024a9209b919a77a121","3e1ed8e1df0122e3aaac38a0b3fe56aa6fa052435d784f472809524d63bcfa65","-18.6","-33.3","-24.4","-20.7","-29.2","30","10","30","30","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"M.E.R.C. Music - Knockout","00:00:30","MUSDB18-HQ","034a4c15a4c737f7a0ac19cac4a5c05a5294aeeb4ab1167b2d1f3fb3f8a5296a","1ec50ecc86f3de4cf33062c5178ad66c317c68e109d9a0b77551a25c82559259","c375177add261c02cde3510c1405ab380b6ae18bdf1325b5514a9e95113f238c","4e27ff9994fe004dc6533f8e7a96daaade5060c563461acffec81265f7d43bbd","024be4819ad2a3c8826f9e328214d9cc3ae1fa1597a5db4103c66066eccb34f6","-19.1","-23.0","-28.8","-25.3","-25.3","30","30","22","30","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"The Sunshine Garcia Band - For I Am The Moon","00:00:30","MUSDB18-HQ","1598c6438b245e96362fddd12024b1e0f697beac580bbda67238bd89fcdc68b7","f69c32822454ce7031b66dea88708f243163ec8a305d6f33944a44b6119189d6","18bda30c3c99211d7669bad101cbed0ac5755a0015e9ecdc271dd7eb48faaa9f","9016b7d9eabd29cfdd17a8f8f9c992ced929cc8fa74520957fb6aae3b1b1fdf6","aad4064eb4e08632bf5e38e3fa614e1bc6b9c512f50f913a2817437ac67f1a07","-18.8","-24.5","-24.2","-23.3","-29.8","30","29","29","30","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"PR - Oh No","00:00:30","MUSDB18-HQ","17656e7066645a8cb10d696ec060c580f72985b4f52e820b8ff992573dc3b14e","b33b5cd907d20fa428536ba004fb833717aade17edd3c24e6e6f8bdbbc9fb22d","f01ae4df6ad8e1e2f458c024d1a7951b89d518db6aa461b0e7d96c4a27c47321","8ba4da52eaf1893daba132863ec0785c580db9cd3c0228aa965f008cf6ccbd7a","5906e59af85f516d785d9038251c0b7fe50ab75dcef3a6204b54942096b215a2","-17.1","-33.8","-23.7","-16.8","-25.6","30","16","28","30","27","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"Little Chicago's Finest - My Own","00:00:30","MUSDB18-HQ","fcd4cd58e718c969d57f2154c9f34d708b0e99a69fc4d33ceaa18c559e4d8dc1","0734c2dd27f91c2e03372fc3991cd96f86bb8323f75708638607796e3addea17","21645b69de0e579ca2cad93d3e554f3b56465c1f432f2270ffbc466de0299e5a","273224c06520ca7961ff019fd2ba30807aaf9b3aab10e463a1f318c26ad4bdc0","a7cb7e1131f277f3b95de4371620dc19d64036ac724fcc7b6c476d5db81f27e1","-22.1","-29.3","-33.0","-23.9","-35.1","30","30","30","29","30","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+"Signe Jakobsen - What Have You Done To Me","00:00:30","MUSDB18-HQ","1a25d7ae1140b40d20b0ba947549e5eb989dcadc221247d5a59791043b2493f0","7121f2a9ad7a1ca15c21a47f790c488b09adba5018db76d7ca9f24e2d293c920","491cd82138681feb25fea04edd95075157934ac018b804a7ea64012ccb7bd5c1","2fa16de6bb1b4fca83a8808834780a8c1fd36a02fcb7d8c9f7f8b05c7a814964","0646e1fe8df75312f80c72dc264cb1d6a2063302ad92626774af376ca55453e6","-18.4","-23.2","-26.2","-25.8","-23.2","30","30","29","30","29","vocals,bass,drums,other","CC BY-NC-SA 4.0 or Educational"
+... total lines:
+24 research/musdb-lab/manifest.csv
+
+=== research/musdb-lab/rebuild_allowlist_v2.py (head -60) ===
+#!/usr/bin/env python3
+"""
+rebuild_allowlist_v2.py — Rebuild FMA allowlist from embedded ID3 tags (v2 clean-room)
+"""
+
+import os
+import sys
+import csv
+import json
+import time
+import subprocess
+import numpy as np
+from pathlib import Path
+from datetime import datetime, timezone
+from multiprocessing import Pool
+
+OLD_ALLOWLIST = Path("/home/aidevcon/Downloads/DATASET/fma/fma_small_cc_allowlist.json")
+V2_ALLOWLIST = Path("/home/aidevcon/Downloads/DATASET/fma/fma_small_cc_allowlist_v2.json")
+REJECTED_V2 = Path("/home/aidevcon/Downloads/DATASET/fma/rejected_v2.json")
+
+ATTIC_DIR = Path("/home/aidevcon/creator-os-attic/drumscan-2026-08")
+RANKED_TSV = ATTIC_DIR / "ranked.tsv"
+RANKED_V2_TSV = ATTIC_DIR / "ranked_v2.tsv"
+AUDITION_V2_MD = ATTIC_DIR / "audition_top40_v2.md"
+
+def inspect_track(item):
+    path = item["path"]
+    tid = str(item["track_id"])
+    
+    cmd = ["ffprobe", "-v", "quiet", "-show_format", "-of", "json", path]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        return (item, False, "ffprobe_error", "")
+        
+    data = json.loads(res.stdout) if res.stdout else {}
+    tags = data.get("format", {}).get("tags", {})
+    
+    # Extract copyright / comment / license or all tags text
+    tag_values = [str(v) for v in tags.values()]
+    tag_text = " | ".join(tag_values)
+    lower_text = tag_text.lower()
+    
+    if not lower_text.strip():
+        return (item, False, "empty_metadata_tags", "")
+        
+    # License checks
+    # 1. Explicit CC-BY / CC0 / Public Domain URL or tag
+    has_by = ("creativecommons.org/licenses/by/" in lower_text) or \
+             ("/publicdomain/" in lower_text) or \
+             ("cc0" in lower_text) or \
+             ("attribution 3.0" in lower_text and "noncommercial" not in lower_text and "share-alike" not in lower_text)
+             
+    # 2. Check forbidden NC, ND, SA restrictions
+    import re
+    has_nc = bool(re.search(r"\b(nc|noncommercial|non-commercial|fma-limited|by-nc|nc-sa|nc-nd)\b", lower_text))
+    has_nd = bool(re.search(r"\b(nd|noderivatives|no-derivatives|no derivatives|by-nd)\b", lower_text))
+    has_sa = bool(re.search(r"\b(sa|sharealike|share-alike|share alike|by-sa)\b", lower_text))
+    
+    if not has_by:
+        return (item, False, "missing_explicit_cc_by_or_cc0_tag", tag_text)
+
+=== research/silero-lab/README.md ===
+# Silero VAD Lab
+
+This directory is an isolated Python lab used to run the Silero VAD teacher model over our fixtures to generate p-maps. 
+
+## Doctrine
+Silero is a LAB INSTRUMENT. Its outputs (per-frame probability maps) are saved as sidecar `.pmap.json` files and may be consumed by our Rust pipeline for verification/evaluation. The ONNX runtime and PyTorch dependencies NEVER enter any product crate.
+
+## Environment & Version
+- Route: PyPI via `pip install silero-vad`
+- Version pinned: 6.2.1
+- Model: Built-in ONNX weights distributed with silero-vad pip package.
+
+## License
+Silero VAD is distributed under the MIT License:
+
+```
+MIT License
+
+Copyright (c) 2020-present Silero Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Installation Recipe
+To avoid downloading large GPU binaries for inference, the environment was explicitly constructed with CPU-only wheels:
+```bash
+python3 -m venv venv
+./venv/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+./venv/bin/pip install silero-vad soundfile
+```
+Versions installed during validation:
+- `torch==2.13.0+cpu`
+- `torchaudio==2.11.0+cpu`
+- `silero-vad==6.2.1`
+- `soundfile==0.14.0`
+
+=== research/superflux/README.md ===
+# Superflux References
+
+## Provenance
+- `bodleasons_mid.wav`: `../../lineos/m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav`
+- `clip_speech.wav`: `../../flight_clips/clip_speech.wav`
+- `clip_podcast_st.wav`: `../../flight_clips_stereo/clip_podcast_st.wav`
+
+## License
+The reference implementation used here (`librosa`) is distributed under the **ISC License**.
+
+**Filterbank Deviation Note**: 24-band MEL (not log) — librosa-native; deviation from the paper's log bands, accepted at review 2026-08-01 because the oracle compares identical filterbanks on both sides. The Rust port MUST read its band mapping from params.json, never assume log spacing.
+
+**CLEAN-ROOM NOTE**: Madmom is strictly forbidden. Madmom carries a CC BY-NC-SA license, which prevents commercial porting. Our implementation must be built clean-room from the Böck & Widmer 2013 paper and the observable outputs of the librosa oracle.
+
+=== ~/nmfd-phase2-backup/w_music_v1.manifest ===
+# w_music_v1.bin Manifest
+
+**Dimensions:** 128 (mel bands) x 6 (components) x 8 (tau frames)
+**Size:** 24,576 bytes
+
+## Components
+- **Slots 0-2 (Drums)**:
+  - Source: `w_drums_v1.bin`
+  - Training Data: MUSDB18-HQ (drums stems)
+  - Pre-processing: NO HIGHPASS FILTER
+  - Alignment: Attack aligned to tau=1
+
+- **Slots 3-5 (Sung Vocals)**:
+  - Source: `w_sung_v4.bin`
+  - Training Data: MUSDB18-HQ (vocals stems)
+  - Pre-processing: 200Hz HIGHPASS FILTER (sosfiltfilt, 8th order) applied to raw waveform before STFT. Silence masking applied.
+  - Alignment: Unaligned (natural NMFD convergence into harmonics vs consonants)
+  - Role assignments:
+    - K=4: Soak component (discard)
+    - K=3, K=5: Formants/Consonants (voice_mask)
+
+## Norms
+- L1 Norm is exactly 1.0 for all 6 components.
+
+## Integrity
+- **SHA256**: 449ce8947736aa1133914ad81c622f50bf2c7fa39a5c8b5db6c1f7bd85a52543
+
+=== research/w-speech/README.md ===
+# W_speech Workshop
+
+## Corpus v1: LibriSpeech (dev-clean)
+
+**Source:** http://www.openslr.org/resources/12/dev-clean.tar.gz
+**License:** CC BY 4.0 (Commercial-compatible with attribution)
+**Attribution Requirement:** The product NOTICE must credit LibriSpeech (Panayotov et al.) per CC BY.
+
+**Note:** The previous `voxserv` audio quality testing samples are legally unclear and remain restricted. They stay legitimate ONLY as TEST input (ACX/VAD harnesses — data not baked into the product); the training line is what it cannot cross.
+
+### Resampling & HF Implication
+**Resampling Method:** Rust `rubato` FastFixedIn (or equivalent high-quality sync interpolator) from 16kHz to 48kHz.
+**LOUD FLAG ON HF IMPLICATION:** LibriSpeech is native 16kHz. This means absolutely nothing above 8kHz exists in the source audio! The 4-10kHz consonant band is only HALF covered. The resulting templates will have ZERO energy in the 8kHz-24kHz bins. This is a measured-world fact for v2 planning. We proceed anyway for v1.
+
+### Fit Protocol (fit_protocol_v1)
+- 128 mel bands (triangle)
+- ALL frames
+- 12 iterations
+- Seed: 314159
+- tau: 8
+- K: 4
+
+### File Hashes
+```text
+fead3e0c481f1c637fe6ec8edef42506c7c2d33a3fb7519bfdf5815b31150303  2277-149896-0000.flac
+f9c3371b4d1c6e95e7c01298a26215c2be97bee22c5408885d8d29b6e0e4171c  2277-149896-0001.flac
+ade2caad47934462292358ba49acf7f048ced0595615492b4b20866d118bf901  2277-149896-0002.flac
+a99595b53e5d48524c2ba4903071f2498b05c25c509f0a78d60dc15ee46a4836  2277-149896-0003.flac
+ed54e3c104353811fe907ea4042fca210ee4dc2db29067ee7d29b9a51c954a46  2277-149896-0004.flac
+05013da97856ccce8ef62b3408643f144ae6b88d581731675fd1a70b03288849  2277-149896-0005.flac
+3d63f01a67b524514d7bee6b966b58d4b6f18f6cfa1f92c847353b824593ee8c  2277-149896-0006.flac
+addaf4f4264c7db2284e5517d1120f22c2b39c1bc58bbc46bc4f3625666891b4  2277-149896-0007.flac
+fff4a9ac06e5a85348e1d12a498da564c7de250917e8733577b86f64cec7198c  2277-149896-0008.flac
+91f02445f3a28cf518aaf8667368e1aba09997cca55208a40bddf1d2d1f2936e  2277-149896-0009.flac
+13151a1366282c4b67916c6c266663ee52c84c88a0df264085066668b0ea0573  2277-149896-0010.flac
+1c4046f47f1398e9cc33f3bb673c4802f8baa5c018172d5acbb2c625802bfb6a  2277-149896-0011.flac
+33382f7634da27eeba65f1e8f945672c9ed3a9cf8c005e53e7f30cd53555f4f0  2277-149896-0012.flac
+91d24f91ba4da2e1d10c302f4fc624ecda2bb73577e1dc1642d28613667a3dd8  2277-149896-0013.flac
+d626ac1858e0a373bcd84d81a631ebe57ff7fea3fc83beae15bcc613d6e3c179  2277-149896-0015.flac
+35535a9a29d599998fb7addaa884a9272da4a80f2e92487008b4bcb66e2b7dfa  2277-149896-0016.flac
+b92316c9aa49903883f601ffcbfe67a7647569be7454aa59c10467228f4cefca  2277-149896-0017.flac
+6a52810a9b4656d86ef50cda41415f6d242e43939e0c501b9a02c63b9a869461  2277-149896-0018.flac
+5eb7bd90711107c2910b74d43f164ef66b162de88106c6ef610c2a8fe1139bf3  2277-149896-0019.flac
+c6bcb66167d4562cf90e876dead087625d1ac5058656bd053432266f54933044  2277-149896-0021.flac
+4ae7a40d4cd554616da367bc0464a56caee0658ea5af7db328ee03ae1a5964c4  2277-149896-0023.flac
+d67e8a52aaee3822c461bb21eda0cbbb61201a67c03700f6f44d4814bbceeaa5  2277-149896-0024.flac
+3909a6c5ae93112518681fcbf0a74df43615a4f88bd6d5cd788775255296e3f6  2277-149896-0026.flac
+a4831606b567c1a81940e11ccafa0ae14767ab43dde5ce7dbba56d54500bb13e  2277-149896-0027.flac
+1329424372f495a29b6f58485b377bbda860056606425f15c2f402afdb1d98af  2277-149896-0028.flac
+c6344911546ea7bfc243fba7e723f6d20bf89328629080100459924a81acdd32  2277-149896-0030.flac
+74a08b4880512f6e43f5f2e45eaf2b6078184f46a89f6b862a2eb1c5f25ebbcd  2277-149896-0031.flac
+56b640a079f27f9473478a20f068b8bd8af3afa7030d7a07cbbc7b3f19211689  2277-149896-0032.flac
+23009ec1ed5c704bb4b1c0bc75953121f38b2a2136cf8380f98e512517427473  2277-149896-0033.flac
+aa063190b3125aa8400908460213bafb71226b4980bef44b81c7dd2658cebacb  2277-149896-0034.flac
+```
+
+─── 2a. Restoration chain stage names (αυτούσια από τον κώδικα) ───
+11:pub struct RestorationChain {
+42:impl RestorationChain {
+82:    pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {
+
+3:pub mod gate;
+5:pub use gate::NoiseGate;
+12:    pub lowcut_enabled: bool,
+16:    pub deess_enabled: bool,
+17:    /// Noise gate (silence background noise)
+18:    pub gate_enabled: bool,
+25:            lowcut_enabled: true,
+27:            deess_enabled: true,
+28:            gate_enabled: true,
+32:    /// For music mastering — no gate, no hum (assume clean source)
+35:            lowcut_enabled: true,
+37:            deess_enabled: true,
+38:            gate_enabled: false,
+45:            lowcut_enabled: false,
+47:            deess_enabled: false,
+48:            gate_enabled: false,
+
+--- cleaner.rs:82 process() body — stage ORDER ---
+    pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {
+        for i in 0..left.len() {
+            let mut l = left[i];
+            let mut r = right[i];
+
+            // 1. First, remove low-frequency rumble so it doesn't trigger the gate
+            if self.lowcut_enabled {
+                let (l1, r1) = self.lowcut_hp.process_stereo(l, r);
+                l = l1;
+                r = r1;
+            }
+
+            // 2. Now apply the Noise Gate on the cleaned signal
+            //    The gate detector sees only voice-range frequencies — not 30Hz truck rumble
+            if self.gate_enabled {
+                let (gl, gr) = self.gate.process_stereo(l, r);
+                l = gl;
+                r = gr;
+            }
+
+            // 3. De-Hum (static notch cascade)
+            if self.hum_enabled {
+                let (l1, r1) = self.notch_50.process_stereo(l, r);
+                let (l2, r2) = self.notch_100.process_stereo(l1, r1);
+                let (l3, r3) = self.notch_150.process_stereo(l2, r2);
+                l = l3;
+                r = r3;
+            }
+
+            // 4. Split-Band De-Ess (LR4 crossover at 6kHz)
+            // SPLIT-BAND: only the HF band is ducked — low/mid content passes
+            //   through untouched, so music beds don't pump.
+            // LINKED STEREO: one envelope from max(|high_l|, |high_r|) drives
+            //   identical reduction on both channels — no image wander.
+            if self.deess_enabled {
+                let (low_l, high_l) = self.deess_xover_l.process(l);
+                let (low_r, high_r) = self.deess_xover_r.process(r);
+
+                // Linked stereo detection: max of both HF bands
+                let rect = fabsf(high_l).max(fabsf(high_r));
+                self.env_deess = if rect > self.env_deess {
+                    self.env_deess + (rect - self.env_deess) * (1.0 - self.attack_coef)
+                } else {
+                    self.env_deess + (rect - self.env_deess) * (1.0 - self.release_coef)
+                };
+
+                // Single reduction applied identically to both HF bands
+                let reduction = if self.env_deess > self.deess_threshold {
+                    let overshoot = self.env_deess - self.deess_threshold;
+
+─── 2b. Trained model weights on disk ───
+=== research/w-speech ===
+-rw-rw-r-- 1 aidevcon aidevcon 16384 Sep  5 18:14 research/w-speech/w_speech_v1.bin
+-rw-rw-r-- 1 aidevcon aidevcon  3281 Sep  5 18:14 research/w-speech/w_speech_v1_params.json
+
+=== ~/nmfd-phase2-backup weights ===
+-rw-rw-r-- 1 aidevcon aidevcon 24576 Aug 18 10:35 /home/aidevcon/nmfd-phase2-backup/w_music_v1.bin
+-rw-rw-r-- 1 aidevcon aidevcon 24576 Aug 18 10:35 /home/aidevcon/nmfd-phase2-backup/w_music_v1_k14.bin
+-rw-rw-r-- 1 aidevcon aidevcon 12288 Aug 18 10:35 /home/aidevcon/nmfd-phase2-backup/w_sung_v5.bin
+
+─── 2c. quality_oracle.rs doc comment (αυτούσιο) ───
+//! F-085 wiring ORACLE: γνωστές σωστές απαντήσεις, όχι μεταβλητότητα.
+//!
+//! ΜΕΤΑΒΛΗΤΟΤΗΤΑ ≠ ΑΛΗΘΕΙΑ. Μετρήσεις της ΕΙΣΟΔΟΥ θα μετέβαλλαν κι
+//! αυτές ανά αρχείο — άρα το «τα τρία διαφέρουν» δεν αποδεικνύει
+//! τίποτα. Εδώ φτιάχνουμε σήματα με ΓΝΩΣΤΗ απάντηση και ελέγχουμε τι
+//! γράφει το cert.
+//!
+//! Τρέχει τη ΖΩΝΤΑΝΗ διαδρομή (execute_streaming_plan) — ό,τι ακριβώς
+//! spawn-άρει το POST /master/streaming.
+
+use m0d::blob_store::BlobVariant;
+
+fn write_wav(path: &str, left: &[f32], right: &[f32], sr: u32) {
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(path, spec).expect("create wav");
+    for i in 0..left.len() {
+        w.write_sample(left[i]).unwrap();
+        w.write_sample(right[i]).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+fn run_live(path: &str, tag: &str) -> Option<(f32, f32, f32, f32, f32, f32, f32)> {
+    let abs = std::fs::canonicalize(path).expect("resolve");
+    let plan = m0d::agents::operator::StreamingPlan {
+        audio_path: abs.to_string_lossy().into_owned(),
+        preset_id: "acx".to_string(),
+        flavour_id: None,
+        intent_tone: None,
+        intent_dynamics: None,
+        target_lufs_override: None,
+        session_id: format!("oracle-{tag}"),
+    };
+    match m0d::agents::executor::execute_streaming_plan(&plan, None) {
+        Ok((_out, blob)) => {
+
+─── 2d. Grep codebase for references to §3 candidate corpora (training/eval intent) ───
+ΑΤΖΕΝΤΑ.md
+FINDINGS.md
+lineos/m1/sp314-dsp/tests/acx_check_real_file.rs
+(τέλος grep — αν κενό, ΑΠΟΝ οποιαδήποτε αναφορά στον κώδικα)
+
+--- ΑΤΖΕΝΤΑ.md context ---
+261-## ΠΕΡΙΜΕΝΟΥΝ
+262-
+263-· Non-western timbre bias: γνωστό όριο v6 bed. Θεραπεία
+264:  post-launch: Freesound CC0 curation + IA με per-file PD
+265-  verify (user-tagged = αναξιόπιστο). VST/Ethno route
+266-  ΚΟΜΜΕΝΟ (EULA: μουσικά έργα ≠ training corpora, ίδια
+267-  απόφαση με DAW kits/Cymatics). Trigger: F-065 ή user
+
+--- FINDINGS.md context ---
+1759-- **[F-063] voice_mask leak σε αρμονικό υλικό χωρίς φωνή.** Component: two_pass masks / w_speech+w_sung. Μετρήθηκε σε Saraga instr (tambura+violin, 60s): speech slots 31.6% + C0 14.65% του max free → ~46% της «ελεύθερης» ενέργειας καταλήγει στο voice stem. Γενίκευση του w19 silence ghost (−38dB, προϋπήρχε κάθε learned prior). Trigger: factory round 6/6b δίκες.
+1760-- **[F-064] frame-heuristic gating: εξαντλήθηκε και απορρίφθηκε με μέτρηση.** 6 διαγνωστικά (r_s, smoothing, perc raw/weighted, VAD, persistence, ασύμμετρο) — προδεσμευμένος κανόνας 0/24. Υλοποιήθηκε mf-only πύλη (hysteresis+ballistics), μετρήθηκε: όφελος +0.46dB στο w19 έναντι 21.3% am_vocal chop και sar_instr 73% ανοιχτή — REVERTED αυθημερόν (18/08). Το sung-vs-strings/drums είναι πρόβλημα ΤΑΥΤΟΤΗΤΑΣ (templates), όχι χρόνου. Trigger: μόνο με θεμελιωδώς καλύτερο per-frame voice σήμα.
+1761-- **[F-065] C2 (slot 9): discarded 29% → v6 retrain → πλήρης δίκη 18/08, ΔΙΧΑΣΜΕΝΗ ΕΤΥΜΗΓΟΡΙΑ — v5 ΜΕΝΕΙ.** Ιστορικό: v6 full (strings negatives με synthetic formants) → έσπασε C0 (R2 0.47→18.11%) ΚΑΙ bass (4.95→11.69%) — REJECTED από standing jury. Frankenmerge (C0/C1_v5 + C2_v6) → ΟΛΟ το πάνελ πράσινο (C2 29→1.37%, R2 0.43%, bass 6.08%, gain +4.91dB) — αλλά τυφλή ακρόαση (2 υλικά): ΦΩΝΗ καθαρότερη στο v5, ΣΙΩΠΗ καθαρότερη στο franken — το +4.91 ήταν φωνή+συνοδεία, όχι καθαρότητα. Ισοπαλία → προδεσμευμένος κανόνας: production αμετάβλητο. ΔΙΔΑΓΜΑΤΑ: (α) negatives πρέπει να περιέχουν ό,τι ΔΕΝ έχει το positive — ποτέ τα ορίζοντα χαρακτηριστικά του (τα formants στα synthetic strings δηλητηρίασαν τον C0)· (β) voice_gain μετράει ενέργεια, όχι ταυτότητα — καμία υιοθέτηση templates χωρίς τυφλή ακρόαση. Υλικό 6b: w_sung_v6.bin/png στο musdb-lab. ΣΤΟΧΟΣ 6b (γραμμένος από την ακρόαση): «το ghost relief του franken ΜΕ τη φωνή του v5» — real MUSDB other stems negatives, χωρίς synthetic formants. Trigger: όταν η ατζέντα ξανανοίξει factory lane. ΜΕΤΡΗΜΕΝΟ στα A/B renders (silence_diagnostic, 18/08): franken ghost relief −0.34 dB · vocal-side −0.46 dB — οι πραγματικές διαφορές ήταν υπο-μισού-dB, συνεπείς με το «τίποτα ξεκάθαρο» της ακρόασης: το frankenmerge δεν άξιζε production swap ούτε ως ghost θεραπεία.
+1762:- **[F-066] Shipped assets provenance — ΠΛΗΡΗΣ ΑΠΟΓΡΑΦΗ 2026-08-19 (recon + επαλήθευση όρων στην πηγή).** ΤΕΣΣΕΡΑ trained assets στο binary (include_bytes!), όλα με πηγή MUSDB18-HQ: w_music_v1 (24KB, factory v5) · w_speech_v1 (16KB) · phi1_v3 (238KB, speech-presence classifier, phi1_train.py, commit 76c2a95) · phi2_pcen (238KB, PCEN sensor, df43772). Χωρίς trained δεδομένα: vad_model.rs (hardcoded αναλυτικές σταθερές) · CourierPrime font (OFL-1.1 — εκκρεμεί license notice) · synthetic fixtures (generator scripts). Οροι dataset, επαληθευμένοι στην πηγή 19/08 (Zenodo 1117372/3338373, sigsep — τοπικό LICENSE ΑΠΟΝ στο DATASET dir): «provided for educational purposes only… not… for any commercial purpose without the express permission of the copyright holders»· σύνθεση μικτή (100 Mixing Secrets/DSD100 · 46 MedleyDB CC BY-NC-SA 4.0 · 2 NI · 2 BY-NC-SA 3.0). ΑΠΟΝ provenance: tests/fixtures/bodleasons_mid.wav, real_world_60s.wav — κατά δήλωση Anestis (19/08, χωρίς όρκο): αν είναι ομιλία, προέρχονται από LibriSpeech ή FMA/Freesound — ανεπιβεβαίωτο. Σημείωση εμβέλειας: είναι test fixtures — ΔΕΝ σαλάρουν στο binary ⇒ αφορούν μόνο το public-repo checklist, όχι το launch gate του binary. Trigger: LAUNCH GATE — απόφαση πριν τις 30/09. **ΕΤΥΜΗΓΟΡΙΑ 2026-08-21 (Anestis, sequenced clean-room):** ΟΧΙ retrain τώρα, ΟΧΙ counsel — πρώτα Ο ΚΡΙΤΗΣ. Σειρά με εξαρτήσεις: (1) τελειώνει το verification tooling (schema v0 δομικά + E2E properties suite) → (2) MUSDB v5 metrics ΠΑΓΩΝΟΥΝ ως Oracle baseline (τα σημερινά νούμερα = ο χρυσός κανόνας που ξέρουμε ότι δουλεύει) → (3) εργοστάσιο ανάβει: clean-source retrain (LibriSpeech/VocalSet/FMA, phi1_train.py) → (4) αυτόματη σύγκριση v6-vs-Oracle μέσω του suite. ΔΙΟΡΘΩΣΗ ΑΞΟΝΑ (F-065, δεσμευτικό): το suite κόβει υποψηφίους στα ΜΕΤΡΗΣΙΜΑ σε δευτερόλεπτα, αλλά η ΤΥΦΛΗ ΑΚΡΟΑΣΗ παραμένει η τελική πύλη ταυτότητας templates — μικρότερη, όχι ανύπαρκτη. Launch με καθαρά weights, εντός των 40 ημερών. (Saraga NC = ποτέ training · fixtures σε τυχόν public repo = ίδιο checklist.) ΣΥΜΠΛΗΡΩΜΑ 19/08 — CLEAN-SOURCE ΧΑΡΤΗΣ (όροι διαβασμένοι στην πηγή, quoted+URL στο recon log): SPEECH → LibriSpeech/LibriVox (CC BY 4.0 / public domain — dev-clean ΗΔΗ τοπικά) · SUNG → VocalSet (CC BY 4.0 blanket, 10.1h isolated, Zenodo 1442513) · DRUMS/NEGATIVES → Freesound/FMA με per-item CC0/CC-BY allowlists (τοπικό fma_small_cc_allowlist.json ΗΔΗ υπάρχει) ή ιδίες ηχογραφήσεις — κενό curation, όχι κενό υλικού. ΑΠΟΝ (δεν βρέθηκε αυτούσιος όρος audio): Common Voice audio terms · OpenSinger (404) · MedleyDB audio. NC-verified (ακατάλληλα για εμπορικό retrain): MoisesDB (CC BY-NC-SA blanket) · MTG-Jamendo (NC + Jamendo S.A. authorization). RECON CURATION ΕΓΙΝΕ 2026-08-21 (soundfile.info στο 100% των αρχείων): SPEECH ΠΛΗΡΕΣ — LibriSpeech dev-clean 2.703 flac / 5.39h τοπικά. MUSIC BED ΠΛΗΡΕΣ — FMA allowlist 1.329/1.329 mp3 / 11.07h. SUNG ΑΠΟΝ — VocalSet download (Zenodo 1442513, 10.1h, CC BY). **SUNG ΕΚΛΕΙΣΕ 2026-08-22 (προσγείωση+απογραφή):** md5 πύλες ×2 OK, 7z διάσωση (32-bit zip overflow), cleanup 5.561 AppleDouble/junk (το νυχτερινό «17.9k» ήταν φουσκωμένο από ._*.wav resource forks). Πραγματικά wav: 14.300 σε 4 δομές — ΜΟΝΑΔΙΚΕΣ ΗΧΟΓΡΑΦΗΣΕΙΣ: **3.613 / ~10.8h** (συνεπές με τις δηλωμένες 10.1h Zenodo)· οι όψεις byte-identical επαληθευμένες (5/5 sha256 vs11↔by_singer). 44.1k mono PCM_16. **ΚΑΝΟΝΑΣ BUILDER: vs11/FULL ΜΟΝΟ** — σάρωση ολόκληρου του ραφιού = 4× τεχνητό βάρος ανά ηχογράφηση. MANIFEST.md + zips.sha256 στο ράφι (οι 32.36h του πρώτου manifest ανακλήθηκαν — μετρούσαν τον πλεονασμό ως υλικό). DRUMS/NEGATIVES ΑΠΟΝ — το ΜΟΝΟ curation κενό (~2-5h).
+1763-  **DRUMS ΕΚΛΕΙΣΕ 2026-08-23 (Slakh redux 16k):** το
+1764-  τελευταίο curation κενό του clean-source χάρτη.
+1765-  ΠΗΓΗ: Zenodo 7708270, 48.689.473.348 bytes, md5
+--
+1877-  train split (υπάρχει και 16kHz mono variant στο Zenodo —
+1878-  κουμπώνει με συνταγή v6 αν το NMFD δεν θέλει stereo).
+1879-  Drums patterns = νομικά το ασφαλέστερο slice (ρυθμοί δεν
+1880:  προστατεύονται ως μελωδίες). PLAN B: Freesound αυστηρά
+1881-  CC0-filtered (curation ανά αρχείο). PLAN C: Demucs stem
+1882-  mining στα 437 (η CLAP-λογική το καλύπτει, αλλά pseudo 
+1883-  αληθινά stems). ΑΠΟΡΡΙΦΘΗΚΑΝ με λόγο: Cymatics/Ghosthack
+
+--- acx_check_real_file.rs context ---
+12-//! The WAV is read verbatim — no resampling, no channel conversion —
+13-//! because the external tools must see the identical samples.
+14-//!
+15://! Validated 2026-07-30 on two real narration files (Freesound/voxserv,
+16-//! public domain, mono 16-bit 44.1 kHz), against ffmpeg astats (RMS and
+17-//! peak: match to 0.01 dB) and an independent Python/scipy oracle for the
+18-//! noise floor (tests/tools/acx_nf_oracle.py — match to 0.02 dB, which is
+
+─── 2d (cont). ΑΤΖΕΝΤΑ.md — broader context around clean-source map / next steps ───
+31:  ⇒ CLEAN-SOURCE ΧΑΡΤΗΣ ΠΛΗΡΗΣ (SPEECH+SUNG+BED+DRUMS).
+35:· ΕΚΚΡΕΜΕΙ ΚΑΘΑΡΙΣΜΟΣ: drums-v1-PREMATURE-please-delete/
+108:  denoise· εμείς αρνούμαστε να κρύψουμε με επεξεργασία
+318:  F-046 RESOLVED). ΕΚΚΡΕΜΕΙ ΜΟΝΟ: git stash drop
+327:  re-lock) · ντετερμινιστικό spectral denoise (ACX floor
+
+--- context around line 108 (denoise doctrine) ---
+· ΠΥΛΗ ΕΙΣΟΔΟΥ — ΝΕΟΣ ΣΤΑΘΜΟΣ ΣΤΟ JOURNEY (εύρημα
+  24/08, το σημαντικότερο της έρευνας Audio Lab).
+  Η ίδια η ACX συνιστά: «πέρνα ένα test passage από
+  ΟΛΟΚΛΗΡΗ την αλυσίδα σου ΠΡΙΝ ηχογραφήσεις το
+  βιβλίο» — δηλαδή έλεγχος ΣΤΟΥΝΤΙΟ, όχι παραδοτέου.
+  ΕΧΟΥΜΕ ΗΔΗ ΤΟ ΟΡΓΑΝΟ: input_acx_compliant +
+  input_delivery_* μετρούν το ΩΜΟ input πριν από κάθε
+  επεξεργασία — και σωστά ΧΩΡΙΣ margin (F-077: δεν
+  υπάρχει encoder σε εκείνη τη διαδρομή). Το κρατήσαμε
+  προσεκτικά για άλλο λόγο και ταιριάζει ακριβώς εδώ.
+  ΤΙ ΛΕΕΙ ΤΟ ΠΡΟΪΟΝ ΤΟΤΕ: «noise floor −52, η
+  προδιαγραφή θέλει −60. ΔΕΝ διορθώνεται στο mastering
+  — είναι το δωμάτιό σου.» Κάθε άλλος θα πουλούσε
+  denoise· εμείς αρνούμαστε να κρύψουμε με επεξεργασία
+  πρόβλημα ηχογράφησης = ΔΟΓΜΑ Ι ΣΕ ΜΟΡΦΗ ΠΡΟΪΟΝΤΟΣ.
+  Και γλιτώνει τον narrator από δέκα ώρες δουλειάς που
+  θα απορριφθούν.
+  ΚΑΙ ΣΚΟΤΩΝΕΙ ΤΟΝ ΒΡΟΧΟ ΤΟΥΣ: η ροή τους είναι master
+  → export → UPLOAD → περίμενε → διάβασε → DAW →
+  ξανα-export → ξανα-upload. Εμείς κρίνουμε ΤΟΠΙΚΑ,
+  στο ακριβές pre-encode buffer, ΠΡΙΝ το export, με το
+  margin του encoder μέσα (a7fa857/aa7be78) — χωρίς
+  λογαριασμό, χωρίς upload του ήχου σε server τρίτου.
+  ΤΑ ΟΡΙΑ ΤΟΥΣ, ΜΕΤΡΗΜΕΝΑ ΑΠΟ ΤΗΝ ΕΡΕΥΝΑ: μόνο ΗΠΑ ·
+  απαιτεί λογαριασμό · ανεβάζεις τον ήχο σου · κανένα
+  batch summary για μεγάλα βιβλία.
+
+--- context around line 318-330 (spectral denoise plan) ---
+· Κουμπιά ~11 μέρες: determinism-gates dispatch (Actions
+  reset) · F-070 streaming RMS recon · F-075 PDF masters_dir
+  · F-071 sweep · glue_audition · spatial input_blake3_hex ·
+  identity set_var→όρισμα · output-ACX · Ψ4 μητρώο · 5ms
+  tail flush · folddown lag=0 recon · blue sha conflict
+  (θέλει ΑΚΡΟΑΣΗ owner) · F-072 in-repo · LTASS stash
+  recon — ΕΓΙΝΕ 24/08: το stash είναι ΝΕΚΡΟ (η δουλειά
+  προσγειώθηκε ως 993f7cd μία μέρα μετά, byte-ταυτόσημη·
+  F-046 RESOLVED). ΕΚΚΡΕΜΕΙ ΜΟΝΟ: git stash drop
+  stash@{0} από τον χρήστη (το denylist το μπλοκάρει
+  για agents, σωστά) ΜΕΤΑ την επιβεβαίωση ότι το
+  northstar δείχνει πλέον στο 993f7cd. Το stash@{1}
+  (kepler) ΔΕΝ εξετάστηκε και ΔΕΝ αγγίζεται.
+· DSP primitives από πραγματογνωμοσύνη 22/08 — ΔΥΟ
+  κρατημένα, post-launch, μόνο με μέτρηση μπροστά:
+  oversampling wrapper (δένει με F-048 0.35dB underread +
+  ορφανό OversampledSoftClipper· αλλάζει bytes ⇒ INV-DET
+  re-lock) · ντετερμινιστικό spectral denoise (ACX floor
+  pull· ΠΟΤΕ rnnoise/ML runtime — δόγμα· πύλη = τυφλή
+  ακρόαση για musical noise). Τα υπόλοιπα 5 (linear-phase
+  EQ, transient shaper, tape/tube, upward comp, auto-phase)
+  = κατάλογος είδους, όχι μετρημένη ανάγκη — κανένα πριν
+  το μετρημένο ταβάνι (soft-mask τόπος 2, F-047, F-065).
+· ΣΕΙΡΑ northstar: conductor-σύγχρονος. Παρκαρισμένα:
+  Φ3 Φάση 2 · 6b factory · F-069.
+· F-078 — το heap gate κρίνει διαφορετικά ΤΟΝ ΙΔΙΟ
+
+─── ΤΕΛΙΚΟΣ ΕΛΕΓΧΟΣ ───
+=== git status --short ===
+?? docs/lab-logs/corpus-recon-20260912.txt
+
+=== wc -l + sha256sum του log ===
+1006 docs/lab-logs/corpus-recon-20260912.txt
+1090dc966f0adef7f3e841ed1b63877c3747993eef3e6631f969024108607bea  docs/lab-logs/corpus-recon-20260912.txt
+=== ποια fixtures δειχνουν στο acx/ ===
+./.reports/2026-08-25-ltass-reference.md:208:$ ls BILLGATES_BOOK/*.mp3 | wc -l                                  → 17
+./.reports/2026-08-25-ltass-reference.md:209:$ ls "BILLGATES_BOOK/bill gates - source code (2025) [audiobook]"/*.mp3 | wc -l → 20
+./.reports/2026-08-25-ltass-reference.md:215:Άρα **20 διακριτά** BILLGATES + **8** AUDIOBFLAC = **28 διακριτά αρχεία
+./.reports/2026-08-25-ltass-reference.md:223:### 5α — AUDIOBFLAC (8 αρχεία, flac)
+./.reports/2026-08-25-ltass-reference.md:249:### 5β — BILLGATES «Source Code» (20 διακριτά, mp3)
+./.reports/2026-08-25-ltass-reference.md:296:| AUDIOBFLAC (8) | 5 | 4 | 2 | 1 | 0 |
+./.reports/2026-08-25-ltass-reference.md:297:| BILLGATES (20) | 20 | 8 | 0 | 0 | 15 |
+./.reports/2026-08-25-ltass-reference.md:315:**Ζώνη 5 (2–4 kHz, HighMid) — 15/28, όλα στο BILLGATES, όλα στο −6.00.**
+./.reports/2026-08-25-ltass-reference.md:317:BILLGATES **δεν περνάει**: ο στόχος ζητά **περισσότερο από 6 dB κόψιμο**
+./.reports/2026-08-25-ltass-reference.md:318:στα 2–4 kHz και παίρνει ό,τι χωράει το ταβάνι. Στα 8 AUDIOBFLAC η ζώνη 5
+./.reports/2026-08-25-ltass-reference.md:330:  **και τα 20 BILLGATES** (+4.75 … +6.00) και 3 flac — **24/28**, από τα
+./.reports/2026-08-25-ltass-reference.md:414:   τουλάχιστον μία ζώνη· **20/20** στο BILLGATES. Συγκεντρωμένα σε **δύο**
+./.reports/2026-08-24-spacing-multi.md:91:ΜΕΤΡΗΜΕΝΟ: ο φάκελος `~/Downloads/DATASET/AUDIOBFLAC/` περιέχει **8**
+./.reports/2026-08-24-spacing-multi.md:100:πια** — μετακινήθηκε στο AUDIOBFLAC. Ταυτότητα επιβεβαιωμένη με
+./.reports/2026-08-24-spacing-multi.md:104:**ΕΚΤΟΣ του δηλωμένου εύρους** (δεν είναι στο AUDIOBFLAC), δεν αγγίχτηκε.
+./.reports/2026-08-24-spacing-multi.md:314:   δηλωμένου εύρους (δεν είναι στο AUDIOBFLAC). Δεν μετρήθηκε.
+./.reports/2026-08-24-spacing-multi.md:333:sha256 των εισόδων (`~/Downloads/DATASET/AUDIOBFLAC/`):
+./.reports/2026-08-25-acx-bridge.md:97:Είσοδος: `~/Downloads/DATASET/AUDIOBFLAC/24 - The Wise In The Desert.flac`
+./.reports/2026-08-25-acx-corpus-triage.md:1:# ΜΕΤΡΗΣΗ — απογραφή και διαλογή του corpus `~/Downloads/DATASET/acx/`
+./.reports/2026-08-25-acx-corpus-triage.md:36:  γλώσσες**, και **επικαλύπτονται με τα 8 AUDIOBFLAC** που μετρήθηκαν
+./.reports/2026-08-25-acx-corpus-triage.md:57:| BILLGATES (Source Code) | **1** |
+./.reports/2026-08-25-acx-corpus-triage.md:58:| AUDIOBFLAC | ≈2 (nietzsche 2 γλώσσες + μεμονωμένα) |
+./.reports/2026-08-25-acx-corpus-triage.md:89:Το BILLGATES έδωσε **20/20 head** και **20/20 tail** μέσα στο παράθυρο.
+./.reports/2026-08-25-acx-corpus-triage.md:106:**(β) Αλλά ΚΑΙ η γνήσια αφήγηση διαφωνεί με το BILLGATES.** Το
+./.reports/2026-08-25-acx-corpus-triage.md:111:⇒ **Το BILLGATES δεν είναι αντιπροσωπευτικό· είναι εξαιρετικό.** Το
+./.reports/2026-08-25-acx-corpus-triage.md:155:Στα AUDIOBFLAC ο διαχωρισμός ήταν τέλειος (2/8 με −inf, και ήταν
+./.reports/2026-08-25-acx-source-of-truth.md:59:BILLGATES έχουν head **0.60 s** — κάτω από τη σύσταση — και είναι
+./.reports/2026-08-24-rms-lufs-distance.md:9:**ΥΛΙΚΟ — σημείωση πριν τα νούμερα:** η εντολή ανέφερε "6 AUDIOBFLAC"
+./.reports/2026-08-24-rms-lufs-distance.md:10:(σύνολο 23 μαζί με τα 17 BILLGATES). Στον φάκελο υπάρχουν **8**
+./.reports/2026-08-24-rms-lufs-distance.md:11:αρχεία flac στο `AUDIOBFLAC/` (εκτός του `BILLGATES_BOOK/`
+=== στα lab-logs ===
+docs/lab-logs/corpus-recon-20260912.txt
+=== END ===
+=== ποια κατωφλια/σταθερες ηρθαν απο εκει ===
+lineos/m0/m0-daemon/src/dsp/mod.rs:426:        const LTASS_CFS: [f32; 8] = [50.0, 150.0, 350.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0];
+lineos/m0/m0-daemon/tests/flag_oracle.rs:907:    const LTASS_CFS: [f32; 8] = [50.0, 150.0, 350.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0];
+lineos/m0/m0-daemon/tests/flag_oracle.rs:924:        // 10·log10(|X_on|²/|X_off|²) = 20·log10(|H_LTASS(f)|)
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:33:            { "source": "deesser", "target": "ltass_band_0", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:34:            { "source": "ltass_band_0", "target": "ltass_band_1", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:35:            { "source": "ltass_band_1", "target": "ltass_band_2", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:36:            { "source": "ltass_band_2", "target": "ltass_band_3", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:37:            { "source": "ltass_band_3", "target": "ltass_band_4", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:38:            { "source": "ltass_band_4", "target": "ltass_band_5", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:39:            { "source": "ltass_band_5", "target": "ltass_band_6", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:40:            { "source": "ltass_band_6", "target": "ltass_band_7", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:41:            { "source": "ltass_band_7", "target": "out", "modulation_type": "audio" }
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:74:    println!("Target LTASS Shape: {:?}", profile.spectral_target);
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:25:            { "source": "deesser", "target": "ltass_band_0", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:26:            { "source": "ltass_band_0", "target": "ltass_band_1", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:27:            { "source": "ltass_band_1", "target": "ltass_band_2", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:28:            { "source": "ltass_band_2", "target": "ltass_band_3", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:29:            { "source": "ltass_band_3", "target": "ltass_band_4", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:30:            { "source": "ltass_band_4", "target": "ltass_band_5", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:31:            { "source": "ltass_band_5", "target": "ltass_band_6", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:32:            { "source": "ltass_band_6", "target": "ltass_band_7", "modulation_type": "audio" },
+lineos/m1/sp314-nodes/tests/topology_builder_proof.rs:33:            { "source": "ltass_band_7", "target": "vca_gain", "modulation_type": "audio" },
+=== F-numbers στις 6 αναφορες ===
+F-001
+F-004
+F-005
+F-033
+F-043
+F-045
+F-046
+F-047
+F-048
+F-050
+F-053
+F-070
+F-071
+F-072
+F-073
+F-074
+F-076
+F-077
+F-078
+F-079
+F-080
+F-081
+F-082
+F-083
+F-084
+F-085
+F-086
+F-087
+F-088
+F-089
+F-090
+F-091
+F-092
+F-093
+=== περνανε στο FINDINGS; ===
+F-001
+F-002
+F-003
+F-004
+F-005
+F-006
+F-007
+F-008
+F-009
+F-010
+F-011
+F-012
+F-013
+F-014
+F-015
+F-016
+F-017
+F-018
+F-022
+F-023
+F-024
+F-025
+F-026
+F-027
+F-028
+F-029
+F-030
+F-032
+F-033
+F-034
+F-035
+F-036
+F-037
+F-040
+F-041
+F-042
+F-043
+F-044
+F-045
+F-046
+=== END ===
+=== ποσα F στο FINDINGS ===
+F-079
+F-080
+F-081
+F-082
+F-083
+F-084
+F-085
+F-086
+F-087
+F-088
+F-089
+F-090
+F-091
+F-092
+F-093
+F-094
+F-095
+F-096
+F-097
+F-098
+=== υπαρχουν τα κρισιμα; ===
+418:- **[F-083] Το export έχει ΤΡΙΑ ασύνδετα margins, και το μετρημένο δεν χρησιμοποιείται πουθενά.** Component: `export_mp3_acx`. ΜΕΤΡΗΜΕΝΟ 2026-08-24. Δύο ξεχωριστά **στατικά (uniform gain)** περάσματα: RMS correction πρώτα (στόχος: κοντινότερο σημείο στο [−23,−18], **margin 0.5 hardcoded**), peak trim δεύτερο (**−3.05 dBTP hardcoded, ΟΧΙ από preset**). **Το margin 0.20 του F-077 — πέντε γύροι μέτρησης — ΔΕΝ χρησιμοποιείται εδώ καθόλου.** Τρεις διαφορετικές τιμές σε τρία σημεία, καμία δεν επικοινωνεί με τις άλλες. ΘΕΤΙΚΟ: υπάρχει ΓΝΗΣΙΑ επανα-μέτρηση μετά τα trims — ο κώδικας είναι τίμιος ως προς τη δική του λογική. **⚠ ΠΑΡΑΤΗΡΗΣΗ ΠΟΥ ΔΕΝ ΕΠΑΛΗΘΕΥΤΗΚΕ ΩΣ ΠΑΡΑΓΩΓΗΣ:** σε research harness (νέο binary, όχι μέσω `/export`), τα post-export νούμερα βγήκαν **ταυτόσημα σε τρία εντελώς διαφορετικά αρχεία** — pre-correction RMS −65 dB, noise floor −144, ίδια παντού. Το ίδιο τεστ που αποκάλυψε το F-085. Η προτεινόμενη αιτία ήταν ότι το `pcm_bytes_to_f32` δεν παρσάρει τον RIFF header (68 bytes). **Ο ΜΗΧΑΝΙΣΜΟΣ ΑΜΦΙΣΒΗΤΕΙΤΑΙ ΑΡΙΘΜΗΤΙΚΑ:** 68/4 = 17 ακριβώς ⇒ τα δείγματα παραμένουν ευθυγραμμισμένα στα 4 bytes· L/R swap **δεν αλλάζει RMS**· και 17 σκουπίδια σε εκατομμύρια δείγματα θα έδιναν τεράστιο **peak**, όχι σιωπή. Πιθανότερη υπόθεση: **ασυμφωνία μορφής δείγματος** (i16 γραμμένο, διαβασμένο ως f32 ⇒ denormals ⇒ ακριβώς σιωπή, ταυτόσημη σε κάθε αρχείο). **ΤΟ ΕΡΩΤΗΜΑ ΠΟΥ ΜΠΛΟΚΑΡΕΙ:** το `/export` δέχεται `blob_id`, όχι path. Διαβάζει από blob store ή από αρχείο; Αν από blob store με raw PCM, **το bug είναι στο harness και ΟΧΙ στο προϊόν**. Η επαλήθευση είναι ένα recon: πραγματικός daemon, POST `/master/streaming` → POST `/export` → άκου το mp3. ΜΕΧΡΙ ΤΟΤΕ: η παρατήρηση καταγράφεται, ο ισχυρισμός «ο narrator δεν παίρνει την αφήγησή του» **ΔΕΝ γίνεται δεκτός**. Το σκέλος των τριών margins ισχύει ανεξάρτητα. Trigger: ΠΡΙΝ κάθε αλλαγή στο export path.
+422:  (F-087) το `export_mp3_acx` προσγείωσε πραγματική
+448:  ΔΕΝ πάρθηκε ποτέ** (βλ. F-086, ΦΑΣΗ 2). Μέχρι να
+457:  path· και μαζί με την απόφαση targeting του F-086.
+459:- **[F-084] Το `declared_latency_samples` δηλώνει 240, μετρήθηκε 0 — περιγράφει στάδιο που δεν υπάρχει στη ζωντανή διαδρομή.** Component: `blob_store.rs:581` · `limiter/core.rs:60-62`. ΜΕΤΡΗΜΕΝΟ 2026-08-24 με **impulse test** (δύο ανεξάρτητες μέθοδοι: peak search + cross-correlation). Το πεδίο γεμίζει **αποκλειστικά** από τον limiter (`round(sr × 0.005)` = 240 @48k). **Ο `BrickwallLimiter` δεν τρέχει ΚΑΘΟΛΟΥ στη ζωντανή διαδρομή** — μηδέν αναφορές σε `streaming_pipeline`/`executor`· ζει μόνο στο ορφανό `/master` + `episode_render`. Όλοι οι κόμβοι της ζωντανής αλυσίδας (low-cut · gate · dehum×3 · split-band de-ess · LTASS×8 · gain) είναι **feed-forward, μηδενικού latency** (επιβεβαιωμένο σε πηγαίο). **ΓΙΑΤΙ ΕΙΝΑΙ ΣΟΒΑΡΟ:** το πεδίο υπάρχει ΑΚΡΙΒΩΣ για να επιτρέπει **null test από τρίτον** — «ευθυγράμμισε input/output κατά Ν δείγματα και αφαίρεσε». Λάθος Ν ⇒ το null test αποτυγχάνει ⇒ **η θέση «διάψευσέ με» καταρρέει στην πράξη**, και ο τρίτος θα νομίζει ότι φταίει ο ήχος. **ΚΑΙ ΔΙΠΛΑ ΛΑΘΟΣ:** ο υπολογισμός χρησιμοποιεί `blob.core.sample_rate = 48000`, αλλά το `export_mp3_acx` κάνει resample σε **44.1k ΜΕΤΑ** το certificate, με sinc resampler που εισάγει δικό του, **αμέτρητο** group delay. Ακόμα κι αν το 240 ήταν σωστό, δεν θα περιέγραφε το αρχείο που κρατάει ο παραλήπτης. ΣΥΝΟΔΟ: ο `DspNode` trait **δεν έχει καν μέθοδο latency** — κανένας κόμβος δεν μπορεί να δηλώσει. ΚΑΙ: δεύτερη, **χειροκίνητη** κωδικοποίηση του ίδιου αριθμού (`episode_render.rs:22-23` `LIMITER_FLUSH_FRAMES = 240`, σχόλιο αντί για κλήση) — δύο πηγές αλήθειας για τον ίδιο αριθμό. Trigger: ΠΡΙΝ βγει οποιοδήποτε δημόσιο δείγμα.
+461:- **[F-085] ΕΝΝΕΑ σταθερές ταξιδεύουν ως μετρήσεις μέσα στο υπογεγραμμένο payload.** Component: `assemble_blob()`, `certificate_node.rs:267-452`. ΜΕΤΡΗΜΕΝΟ 2026-08-24 **με τρέξιμο**. `stereo_correlation = 1.0` (`:300`) · `phase_coherence 0.97` · `spectral_centroid 3200.0` · `spectral_flatness 0.12` · `stereo_width 0.5` · `dr 10.0` · `rms_db = lufs + 3.0` κ.ά. **Η ΑΠΟΔΕΙΞΗ:** δύο εντελώς διαφορετικά πραγματικά αρχεία (αγγλικό vs γερμανικό audiobook) μέσα από την πραγματική `execute_streaming_plan()` → **9 στα 9 πεδία ΤΑΥΤΟΣΗΜΑ**, συμπεριλαμβανομένου του `rms_db`. **ΤΑΞΙΔΕΥΟΥΝ:** `StoredQuality` → `BlobVariant::Certified` → `StoredBlobV2` → `CertificateSidecar.payload` (`blob_store.rs:607`, `payload: blob.clone()`) — **αυτό ακριβώς που υπογράφεται Ed25519 και γράφεται στον δίσκο.** ⚠ Το `stereo_correlation`, το `phase_coherence` και το `spectral_centroid` είναι **διαψεύσιμα σε δέκα δευτερόλεπτα** από οποιονδήποτε με ffmpeg. Δύο πιστοποιητικά δίπλα-δίπλα το δείχνουν αμέσως. **ΤΟ ΣΧΗΜΑ ΤΟ ΑΠΑΓΟΡΕΥΕΙ ΗΔΗ:** το §5.2 λέει «ό,τι δεν μετρήθηκε ΛΕΓΕΤΑΙ, δεν σιωπά». Αυτά κάνουν το τρίτο, το χειρότερο: **ούτε μετράνε, ούτε σιωπούν — ΕΦΕΥΡΙΣΚΟΥΝ.** Η διόρθωση **δεν είναι τροποποίηση σχήματος· είναι συμμόρφωση με υπάρχον**: `Option` + απουσία όπου δεν μετριέται. **ΚΑΙ ΤΑ ΠΕΡΙΣΣΟΤΕΡΑ ΜΕΤΡΙΟΥΝΤΑΙ ΗΔΗ ΑΛΛΟΥ** — `MixMetrics` (stereo_correlation, stereo_width), `StemFeatures` (spectral_centroid, spectral_flatness), `crest_db`, `global_phase_correlation`. **Καλωδίωση, όχι νέο DSP.** **ΤΟ `rms_db` ΕΧΕΙ ΔΥΟ ΤΥΧΕΣ:** στο ορφανό offline παίρνει **πραγματική** τιμή (`dsp_pipeline.rs:1424`, `Some(stereo_rms_db_measured)`)· στο ζωντανό περνάει **literal `None`** (`executor.rs:442`) ⇒ πάντα fallback `lufs+3.0`. Δωδέκατο «υπολογίζεται και πετιέται». Το F-070 (21/08) καλύπτει **μόνο** το `rms_db`. Οι άλλες 8: **μηδέν αναφορές στο FINDINGS μέχρι σήμερα.** Trigger: **ΜΠΛΟΚΑΡΕΙ το δημόσιο δείγμα του verify kit.** Δεν βγαίνει certificate προς τρίτον με `phase_coherence: 0.97` σταθερό.
+463:- **[F-086] Στοχεύουμε LUFS, μας κρίνουν σε RMS — και η απόσταση ΔΕΝ είναι σταθερή.** Component: `autotune.rs:70-72` · `AcxCheckAnalyzer`. ΜΕΤΡΗΜΕΝΟ 2026-08-24 σε **25 αρχεία αφήγησης**. Το mastering στοχεύει `target_lufs` ρητά· το streaming certificate έχει **`acx: None`** ⇒ **μηδέν RMS verdict παράγεται στο mastering**· ο έλεγχος συμβαίνει μόνο αργότερα, στο export. Το μετρημένο `rms_db` **δεν διαβάζεται ΠΟΥΘΕΝΑ** στη ζωντανή διαδρομή. **Η ΚΑΤΑΝΟΜΗ (LUFS − RMS):** median **4.504 dB**, spread **2.272 dB**, καμία αρνητική τιμή. Pearson r με `active_frac`: **−0.636** (σύνολο), **−0.765** εντός ενός βιβλίου. **Μέσα σε ομοιογενές σώμα ενός βιβλίου (13 κεφάλαια, active_frac spread 0.031): 0.274 dB.** ⇒ **Η απόσταση ΕΙΝΑΙ η πυκνότητα ομιλίας** (το LUFS κάνει gating, το RMS όχι). Σταθερή μόνο μέσα σε στενά ομοιογενές υλικό, **ΟΧΙ ως γενικός νόμος** ⇒ **το στοχεύειν LUFS ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΓΓΥΗΘΕΙ RMS συμμόρφωση.** **ΤΟ ΜΕΓΕΘΟΣ-ΣΤΟΧΟΣ ΕΙΝΑΙ ΙΔΙΟΤΗΤΑ ΤΟΥ ΠΡΟΟΡΙΣΜΟΥ:** ACX→RMS · streaming/podcast/broadcast→LUFS. Ίδιο μοτίβο με τους κόμβους που ξυπνούν από δεδομένα, ένα επίπεδο πιο βαθιά. Η μηχανή χτίστηκε LUFS-first και το ACX είναι το μόνο entry σε άλλον άξονα — γι' αυτό ήταν άβολο από την αρχή. **ΚΑΙ ΤΟ ΔΟΜΙΚΟ ΠΟΥ ΠΡΟΚΥΠΤΕΙ ΑΠΟ ΤΗΝ ΠΡΟΔΙΑΓΡΑΦΗ:** peak ≤ −3 ΚΑΙ RMS ≥ −23 ⇒ **crest ≤ 20 dB ως ΑΝΑΓΚΑΙΑ συνθήκη** (με τα σημερινά margins: 19.45). Το gain μετακινεί peak και RMS **μαζί** — δεν αλλάζει ποτέ την απόστασή τους. **Η ζωντανή αλυσίδα έχει ΜΟΝΟ gain** (impulse test: μηδέν latency, κανένας limiter, κανένας compressor) ⇒ **υλικό με crest > 20 αποτυγχάνει ΔΟΜΙΚΑ και δεν το λέμε.** **ΤΟ ΕΡΓΑΛΕΙΟ ΥΠΑΡΧΕΙ ΗΔΗ:** ο `Compressor` είναι `DspNode` στο **ίδιο factory** που χτίζει το vocal_graph· και υπάρχει **`LimiterNode` wrapper καταχωρημένος** (`"Limiter"` key) που **καμία topology δεν χρησιμοποιεί ποτέ**. Το «εκτός γραφήματος» ήταν **επιλογή σχεδίασης, όχι δομικός περιορισμός** — δύο γραμμές ο καθένας. ⚠ Ο `MultibandCompressorNode` υπάρχει στο factory και **καμία topology δεν τον χρησιμοποιεί πουθενά** — δέκατο έκτο ορφανό. Trigger: **ΦΑΣΗ 1 του sequencing** — η αλυσίδα γίνεται πλήρης πριν από κάθε άλλο.
+465:- **[F-087] ΚΑΘΕ ACX mp3 ΠΟΥ ΕΞΑΓΕΤΑΙ ΣΗΜΕΡΑ ΕΙΝΑΙ
+503:  αρχεία» του F-083: ο WAV header είναι σχεδόν
+506:  F-083 ΑΙΡΕΤΑΙ: ΠΑΡΑΓΩΓΗΣ. Και η αρχική υπόθεση
+747:- **[F-088] Το audio κάθε blob είναι ΕΦΗΜΕΡΟ — το
+794:  ΑΣΥΜΦΩΝΙΑ** που δηλώθηκε στο F-087: το
+812:  ζωντανή διαδρομή δεν γράφει (F-087, τριπλό
+815:  **ΓΙΑΤΙ ΕΙΝΑΙ ΑΝΕΞΑΡΤΗΤΟ ΤΟΥ F-087:** το F-087
+817:  τι να διαβαστεί**. Η διόρθωση του F-087 (25/08) δεν
+821:  με το F-087, όχι μετά. Και **ΠΡΙΝ** υποσχεθεί το
+859:  F-088 είναι ειδική περίπτωση ενός γενικότερου:
+946:  ⚠ **Η ΔΙΟΡΘΩΣΗ ΤΟΥ F-087 ΔΕΝ ΤΟ ΠΙΑΝΕΙ** — ένα FLAC
+990:- **[F-089] Το spectral centroid μετρούσε στο ΜΙΣΟ
+1075:- **[F-090] Ο χρήστης παίρνει ΑΝΥΠΟΓΡΑΦΟ sidecar. Το
+=== spectral_target: JSON η κωδικας; ===
+lineos/shared/schema/reference-profiles/music-acoustic-v1.json:27:  "spectral_target": {
+lineos/shared/schema/reference-profiles/podcast-v1.json:28:  "spectral_target": {
+lineos/shared/schema/reference-profiles/music-techno-v1.json:27:  "spectral_target": {
+lineos/shared/schema/reference-profiles/music-idm-v1.json:27:  "spectral_target": {
+lineos/m0/m0-daemon/src/bin/measure_corpus.rs:144:    spectral_target: ProfileSpectralTarget,
+lineos/m0/m0-daemon/src/bin/measure_corpus.rs:578:            spectral_target: ProfileSpectralTarget {
+=== END ===

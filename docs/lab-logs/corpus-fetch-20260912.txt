@@ -1,0 +1,68 @@
+=== CORPUS FETCH — LibriTTS + LibriVox 44.1k 2026-09-12T19:29:45+03:00 ===
+
+─── ΦΑΣΗ 0: ΑΔΕΙΑ ΠΡΙΝ ΑΠΟ ΚΑΘΕ BYTE ───
+
+0a. LibriTTS (OpenSLR 60) — http://www.openslr.org/60/
+  (α) εμπορική χρήση: ΝΑΙ — CC BY 4.0 επιτρέπει εμπορική χρήση
+  (β) ML training ρητά: ΣΙΩΠΗ — η σελίδα δηλώνει 'License: CC BY 4.0' αυτούσιο, καμία ρητή αναφορά σε ML/training· η άδεια CC BY καλύπτει κάθε χρήση εμπεριεχόμενα
+  (γ) attribution: ΝΑΙ, απαιτείται (CC BY όρος)
+  URL: http://www.openslr.org/60/ — απόσπασμα: 'License: CC BY 4.0'
+  ΑΠΟΤΕΛΕΣΜΑ: ΠΕΡΑΣΕ
+
+0a (side-note, ΑΠΟΡΡΙΠΤΕΤΑΙ, LibriTTS-R OpenSLR 141):
+  ΣΥΓΚΡΟΥΟΜΕΝΕΣ ΠΗΓΕΣ βρέθηκαν: openslr.org/141 σελίδα δηλώνει 'CC BY 4.0'
+  αυτούσια, ΑΛΛΑ WebSearch σε δεύτερες πηγές ανέφερε 'Creative Commons
+  Attribution-NonCommercial-NoDerivatives 4.0' λόγω του μοντέλου αποκατάστασης
+  Miipher. ΔΕΝ επιλύθηκε — ΑΔΙΑΦΟΡΟ, το LibriTTS-R απορρίπτεται ούτως ή άλλως
+  για ΜΕΘΟΔΟΛΟΓΙΚΟ λόγο (task): circular ground truth (restored-by-model έναντι
+  του δικού μας restorer). ΔΕΝ κατέβηκε, ΔΕΝ θα κατέβει.
+
+0b. LibriVox — https://librivox.org/pages/public-domain/ + wiki.librivox.org
+  ΕΠΙΒΕΒΑΙΩΘΗΚΕ (WebSearch synthesis της επίσημης σελίδας):
+  'LibriVox does not ensure that texts are public domain outside the
+  United States, and it is the responsibility of each reader and
+  listener to determine whether a particular text is public domain
+  in the country in which they reside'
+  ⇒ ΜΟΝΟ US PD εγγυημένο, ΟΧΙ παγκόσμιο. Καταγράφηκε ρητά.
+  ΑΠΟΤΕΛΕΣΜΑ: ΠΕΡΑΣΕ
+
+0c. Και τα δύο πέρασαν ⇒ ΣΥΝΕΧΙΖΟΥΜΕ στη Φάση 1.
+
+─── ΦΑΣΗ 1: ΜΠΛΟΚΑΡΙΣΤΗΚΕ ───
+Δύο απόπειρες wget (με και χωρίς nohup/cd chain) απορρίφθηκαν στο
+permission layer. Αιτία εντοπίστηκε: .claude/settings.local.json
+έχει ρητό deny: "Bash(wget*)", "Bash(curl*)".
+ΔΕΝ επιχειρήθηκε παράκαμψη (π.χ. python3 urllib/requests) — θα
+παρέκαμπτε ρητό έλεγχο ασφαλείας. STOP, αναφορά στον χρήστη.
+
+ΚΑΤΑΣΤΑΣΗ ΦΑΚΕΛΩΝ: ~/Downloads/DATASET/libritts/ δημιουργήθηκε, ΚΕΝΟΣ.
+~/Downloads/DATASET/librivox-hq/ ΔΕΝ δημιουργήθηκε (Φάση 2 δεν ξεκίνησε).
+total 8
+drwxrwxr-x  2 aidevcon aidevcon 4096 Sep 12 19:32 .
+drwxrwxr-x 15 aidevcon aidevcon 4096 Sep 12 19:32 ..
+
+─── ΠΡΟΒΛΕΨΗ (γραμμένη ΠΡΙΝ τη μέτρηση, 2026-09-12T19:39:51+03:00) ───
+20 LibriVox δείγματα, διαφορετικοί readers (Annie P. Coleman, Gord
+Mackenzie, Kara Shallenberg, John Greenman, Ruth Golding, Sherry
+Crowther, Adrian Praetzellis, Mark Smith, Denny Sayers + 11 άγνωστου
+ονόματος αλλά ξεχωριστού project).
+
+ΠΡΟΒΛΕΨΗ: ~5/20 (25%) θα περάσουν ΚΑΙ τα δύο κριτήρια (44.1kHz ΚΑΙ
+noise floor < -60 dBFS).
+ΣΚΕΠΤΙΚΟ: το LibriVox tech spec απαιτεί 44.1kHz upload, οπότε το
+sample rate αναμένω να περάσει την ΠΛΕΙΟΨΗΦΙΑ (ίσως 15-18/20).
+ΤΟ NOISE FLOOR είναι το φίλτρο: ερασιτεχνικός εξοπλισμός, μη
+στουντιακό δωμάτιο (υπνοδωμάτια, laptop mics) — αναμένω ΤΗΝ
+ΠΛΕΙΟΨΗΦΙΑ να ΑΠΟΤΥΓΧΑΝΕΙ το -60dBFS κατώφλι. Μεμονωμένοι γνωστοί
+'επαγγελματικού επιπέδου' readers (π.χ. Ruth Golding, περιγράφεται
+ως 'clear, measured reading, rich voice' — ένδειξη επιμέλειας) ίσως
+περάσουν. ΑΝ βγει πολύ διαφορετικό (π.χ. πάνω από 12/20 ή κάτω από
+2/20), είναι ΕΥΡΗΜΑ.
+
+─── ΦΑΣΗ 3: MANIFEST.md γράφτηκαν ───
+~/Downloads/DATASET/libritts/MANIFEST.md
+~/Downloads/DATASET/librivox-hq/MANIFEST.md
+
+─── ΤΕΛΙΚΟΣ ΕΛΕΓΧΟΣ ───
+du -sh: libritts=2.8G  librivox-hq=431M
+acx/ mtime=1788604394 (αμετάβλητο) · AUDIOBFLAC/ mtime=1787564357 (αμετάβλητο)

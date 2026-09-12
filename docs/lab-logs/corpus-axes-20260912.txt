@@ -1,0 +1,1012 @@
+=== CORPUS AXES RECON 2026-09-12T19:11:10+03:00 ===
+
+─── §1 ΑΞΟΝΑΣ 1: προσθετικός συνεχής (hum, hiss, HVAC, fan) ───
+--- ~/Downloads/DATASET: αναζήτηση hum/hiss/hvac/fan/noise-bed υλικού ---
+/home/aidevcon/Downloads/DATASET/acx/04-paletti-fanta_ghiro_siebenschoen_02.flac
+/home/aidevcon/Downloads/DATASET/acx/03-paletti-fanta_ghiro_siebenschoen_01.flac
+
+--- MUSAN noise subset (αν κατέβηκε ήδη ως μέρος OpenRIR κλπ) ---
+
+--- research/ αναζήτηση ---
+research/superflux/venv/lib/python3.12/site-packages/PIL/XVThumbImagePlugin.py
+research/superflux/venv/lib/python3.12/site-packages/PIL/__pycache__/XVThumbImagePlugin.cpython-312.pyc
+research/musdb-lab/venv/lib/python3.12/site-packages/PIL/XVThumbImagePlugin.py
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/PIL/XVThumbImagePlugin.py
+research/encoder-gap-speech/src/bin/noise_floor_case.rs
+research/encoder-gap-speech/src/bin/dehum_what.rs
+research/musdb-lab/venv/lib/python3.12/site-packages/PIL/__pycache__/XVThumbImagePlugin.cpython-312.pyc
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/PIL/__pycache__/XVThumbImagePlugin.cpython-312.pyc
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stubs/hvac
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/jedi/third_party/django-stubs/django-stubs/contrib/humanize
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stubs/hvac/hvac
+research/erlangen-nmfd/venv/lib/python3.12/site-packages/jedi/third_party/django-stubs/django-stubs/contrib/humanize/templatetags/humanize.pyi
+
+─── §1 ΑΞΟΝΑΣ 2: προσθετικός παροδικός (clicks, pops, mouth, χειρισμός) ───
+/home/aidevcon/Downloads/DATASET/musdb18hq/train/Music Delta - Britpop
+
+(σημείωση: CLAUDE.md/FINDINGS ήδη λέει ότι 'Mouth Clicks, Smacks and Pop Articulations' CC-BY-NC απορρίφθηκε — βλ. corpus-recon 2026-09-12)
+
+─── §1 ΑΞΟΝΑΣ 3: συνελικτικός (reverb, δωμάτιο, μικρόφωνο) ───
+/home/aidevcon/Downloads/DATASET/acx/00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.nfo
+/home/aidevcon/Downloads/DATASET/acx/09-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.m3u
+/home/aidevcon/Downloads/DATASET/acx/07-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/08-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/05-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/11-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/02-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/12-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/03-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/10-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/04-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.jpg
+/home/aidevcon/Downloads/DATASET/acx/01-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/06-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod.flac
+/home/aidevcon/Downloads/DATASET/acx/00-die_geheimen_archive_des_sir_arthur_conan_doyle-8_alles_auf_tod-de-audiobook-cd-flac-2026.sfv
+
+─── §1 ΑΞΟΝΑΣ 4: μη γραμμικός (clipping, codec, quantization) ───
+research/superflux/outputs/clip_speech_matrix.bin
+research/superflux/outputs/clip_speech_params.json
+research/superflux/outputs/clip_speech_envelope.bin
+research/superflux/outputs/clip_podcast_st_params.json
+research/superflux/outputs/clip_podcast_st_matrix.bin
+research/superflux/outputs/clip_podcast_st_envelope.bin
+
+(σημείωση: κανένα από αυτά είναι CORPUS — clipping/codec παράγονται, δεν κατεβαίνουν, βλ. §2)
+
+─── §1 ΑΞΟΝΑΣ 5: φασματική παραμόρφωση (tilt, συντονισμοί, sibilance) ───
+research/encoder-gap-speech/src/bin/ltass_sibilance.rs
+
+─── §1 ΑΞΟΝΑΣ 6: χρονική ασυνέχεια (dropouts, ραφές, take mismatch) ───
+/home/aidevcon/Downloads/DATASET/AUDIOBFLAC/BILLGATES_BOOK/Source Code - 01 - Opening Credits.mp3
+/home/aidevcon/Downloads/DATASET/musdb18hq/train/Skelpolu - Human Mistakes
+/home/aidevcon/Downloads/DATASET/musdb18hq/train/Meaxic - Take A Step
+
+─── §1 (cont) — flight_clips / flight_clips_stereo / .reports fixtures (τοπικά test υλικά) ───
+total 7392
+drwxrwxr-x  2 aidevcon aidevcon    4096 Jul 10 22:21 .
+drwxrwxr-x 34 aidevcon aidevcon   20480 Sep 12 00:36 ..
+-rw-rw-r--  1 aidevcon aidevcon  481488 Jul 10 22:21 ad_sample_2.mp3
+-rw-rw-r--  1 aidevcon aidevcon  242311 Jul 10 22:13 ad_sample.mp3
+-rw-rw-r--  1 aidevcon aidevcon 1728226 Jul 10 20:05 clip_acoustic.wav
+-rw-rw-r--  1 aidevcon aidevcon 1728078 Jul 10 22:21 clip_ad.wav
+-rw-rw-r--  1 aidevcon aidevcon 1728078 Jul 10 20:05 clip_idm.wav
+-rw-rw-r--  1 aidevcon aidevcon 1629006 Jul 10 20:05 clip_speech.wav
+total 49704
+drwxrwxr-x  2 aidevcon aidevcon    4096 Jul 27 17:09 .
+drwxrwxr-x 34 aidevcon aidevcon   20480 Sep 12 00:36 ..
+-rw-rw-r--  1 aidevcon aidevcon 3456226 Jul 10 21:25 clip_acoustic_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 3456078 Jul 10 22:21 clip_ad_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 3456078 Jul 10 21:25 clip_idm_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 3456222 Jul 10 22:20 clip_podcast_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 6912000 Jul 27 17:13 clip_podcast_st.wav.pcm
+-rw-rw-r--  1 aidevcon aidevcon 3257934 Jul 10 21:25 clip_speech_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 6714082 Jul 11 01:30 clip_transition_reverse_sa_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 6713934 Jul 11 01:23 clip_transition_reverse_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 6713934 Jul 11 01:30 clip_transition_sa_st.wav
+-rw-rw-r--  1 aidevcon aidevcon 6713934 Jul 11 00:49 clip_transition_st.wav
+
+--- .reports/ διαγνωστικά αρχεία που ήδη περιέχουν φθορά ---
+.reports/2026-08-24-restoration-chain-what-assets/stage_2_+gate.wav
+.reports/2026-08-24-restoration-chain-what-assets/stage_0_dry.wav
+.reports/2026-08-24-restoration-chain-what-assets/stage_3_+dehum.wav
+.reports/2026-08-24-restoration-chain-what-assets/stage_4_+deess(=voice()).wav
+.reports/2026-08-24-restoration-chain-what-assets/stage_1_+lowcut.wav
+.reports/2026-08-24-restoration-chain-what-assets/audition_20s.wav
+
+--- lineos test fixtures ---
+lineos/m0/m0-daemon/tests/fixtures/lufs_l_only.wav
+lineos/m0/m0-daemon/tests/fixtures/lufs_ls_only.wav
+lineos/m0/m0-daemon/tests/fixtures/test_5dot1_input.wav
+lineos/m0/m0-daemon/tests/fixtures/test_stereo_input.wav
+lineos/m0/m0-daemon/tests/fixtures/test_stereo_dynamic.wav
+lineos/m0/m0-daemon/tests/fixtures/lufs_5dot1_ref.wav
+lineos/m0/m0-daemon/tests/fixtures/lufs_5dot1_ref_loud.wav
+lineos/m1/sp314-dsp/tests/fixtures/am_contra_bass_30s.wav
+lineos/m1/sp314-dsp/tests/fixtures/real_world_60s.wav
+lineos/m1/sp314-dsp/tests/fixtures/white_drone.wav
+lineos/m1/sp314-dsp/tests/fixtures/synthetic_5point1.wav
+lineos/m1/sp314-dsp/tests/fixtures/sine_1khz_3s_mastered.wav
+lineos/m1/sp314-dsp/tests/fixtures/inharmonic_drone.wav
+lineos/m1/sp314-dsp/tests/fixtures/am_contra_30s.wav
+lineos/m1/sp314-dsp/tests/fixtures/sine_1khz_3s.wav
+lineos/m1/sp314-dsp/tests/fixtures/bodleasons_mid.wav
+lineos/m1/sp314-dsp/tests/fixtures/pink_drone.wav
+lineos/m1/sp314-dsp/tests/fixtures/duck_splice/skelpolu_bed.flac
+lineos/m1/sp314-dsp/tests/fixtures/duck_splice/synth_bed.flac
+lineos/m1/sp314-dsp/tests/fixtures/duck_splice/duck_splice_synth_snr-15.flac
+lineos/m1/sp314-dsp/tests/fixtures/duck_splice/speech_segment.flac
+lineos/m1/sp314-dsp/tests/fixtures/duck_splice/duck_splice_real_snr-15.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/mix_3_snr-15.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/mix_2_snr-6.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/music_3_snr-15.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/mix_2_snr-25.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/mix_1_snr-6.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/voice_2.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/music_1_snr-15.flac
+lineos/m1/sp314-dsp/tests/fixtures/audiobook/music_2_snr-15.flac
+
+─── EΥΡΗΜΑ: duck_splice/ και audiobook/ fixtures με SNR στο όνομα ───
+total 13068
+drwxrwxr-x 2 aidevcon aidevcon    4096 Aug  5 01:24 .
+drwxrwxr-x 5 aidevcon aidevcon    4096 Aug 18 13:21 ..
+-rw-rw-r-- 1 aidevcon aidevcon 3002172 Aug  5 01:27 duck_splice_real_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 3322060 Aug  5 01:27 duck_splice_synth_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon    7301 Aug  5 01:27 manifest.json
+-rw-rw-r-- 1 aidevcon aidevcon 2940368 Aug  5 01:27 skelpolu_bed.flac
+-rw-rw-r-- 1 aidevcon aidevcon  825361 Aug  5 01:27 speech_segment.flac
+-rw-rw-r-- 1 aidevcon aidevcon 3268595 Aug  5 01:27 synth_bed.flac
+
+total 43144
+drwxrwxr-x 2 aidevcon aidevcon    4096 Aug  3 04:50 .
+drwxrwxr-x 5 aidevcon aidevcon    4096 Aug 18 13:21 ..
+-rw-rw-r-- 1 aidevcon aidevcon    3887 Aug  3 04:50 manifest.json
+-rw-rw-r-- 1 aidevcon aidevcon 2408890 Aug  3 02:53 mix_1_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2386588 Aug  3 02:53 mix_1_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2475677 Aug  3 02:53 mix_1_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2635055 Aug  3 02:53 mix_2_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2426433 Aug  3 02:53 mix_2_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2957342 Aug  3 02:53 mix_2_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2162184 Aug  3 02:53 mix_3_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2150411 Aug  3 02:53 mix_3_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2196850 Aug  3 02:53 mix_3_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon 1865884 Aug  3 02:53 music_1_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 1617446 Aug  3 02:53 music_1_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2092702 Aug  3 02:53 music_1_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2381117 Aug  3 02:53 music_2_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2066781 Aug  3 02:53 music_2_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2821295 Aug  3 02:53 music_2_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon  893468 Aug  3 02:53 music_3_snr-15.flac
+-rw-rw-r-- 1 aidevcon aidevcon  678866 Aug  3 02:53 music_3_snr-25.flac
+-rw-rw-r-- 1 aidevcon aidevcon 1113970 Aug  3 02:53 music_3_snr-6.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2372656 Aug  3 02:53 voice_1.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2282563 Aug  3 02:53 voice_2.flac
+-rw-rw-r-- 1 aidevcon aidevcon 2135007 Aug  3 02:53 voice_3.flac
+=== duck_splice/manifest.json ===
+{
+  "bed_scan": {
+    "candidates_tried": [
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Buitraker_-_Revo_X",
+        "vad_pct": 99.96666717529297
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Hollow_Ground_-_Ill_Fate",
+        "vad_pct": 94.36666870117188
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "MERC_Music_-_Knockout",
+        "vad_pct": 56.766666412353516
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Moosmusic_-_Big_Dummy_Shake",
+        "vad_pct": 98.80000305175781
+      },
+      {
+        "pass": false,
+        "phase": 0,
+        "stem": "drums+bass",
+        "track": "Timboz_-_Pony",
+        "vad_pct": 85.13333129882812
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Buitraker_-_Revo_X",
+        "vad_pct": 98.80000305175781
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Hollow_Ground_-_Ill_Fate",
+        "vad_pct": 70.73332977294922
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "MERC_Music_-_Knockout",
+        "vad_pct": 43.0
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Moosmusic_-_Big_Dummy_Shake",
+        "vad_pct": 89.46666717529297
+      },
+      {
+        "pass": false,
+        "phase": 1,
+        "stem": "drums",
+        "track": "Timboz_-_Pony",
+        "vad_pct": 76.13333129882812
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Al_James_-_Schoolboy_Facination",
+        "vad_pct": 85.03333282470703
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "AM_Contra_-_Heart_Peripheral",
+        "vad_pct": 99.96666717529297
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Arise_-_Run_Run_Run",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Ben_Carrigan_-_Well_Talk_About_It_All_Tonight",
+        "vad_pct": 99.66666412353516
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Forkupines_-_Semantics",
+        "vad_pct": 81.69999694824219
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Little_Chicagos_Finest_-_My_Own",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Louis_Cressy_Band_-_Good_Time",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Motor_Tapes_-_Shore",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "PR_-_Oh_No",
+        "vad_pct": 83.36666870117188
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Punkdisco_-_Oral_Hygiene",
+        "vad_pct": 43.06666564941406
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Secretariat_-_Borderline",
+        "vad_pct": 86.69999694824219
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Signe_Jakobsen_-_What_Have_You_Done_To_Me",
+        "vad_pct": 90.5
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Skelpolu_-_Resurrection",
+        "vad_pct": 7.666666507720947
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Speak_Softly_-_Like_Horses",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "The_Mountaineering_Club_-_Mallory",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "The_Sunshine_Garcia_Band_-_For_I_Am_The_Moon",
+        "vad_pct": 96.43333435058594
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Tom_McKenzie_-_Directions",
+        "vad_pct": 100.0
+      },
+      {
+        "pass": false,
+        "phase": 2,
+        "stem": "other",
+        "track": "Zeno_-_Signs",
+        "vad_pct": 99.96666717529297
+      }
+    ],
+    "gate_threshold_pct": 5.0,
+    "note": "First measured corpus of micro-VAD music FP rates. PARK[RED]: upgrade required.",
+    "total_candidates": 28
+  },
+  "hashes": {
+    "duck_splice_real_snr-15.flac": "45677cd8f52477bae723ee0709842f570a0aa9a738e3c54c1bda26d767bebe3d",
+    "duck_splice_synth_snr-15.flac": "b3761ccbdddcbe9ab70ad24836c5bacf07be01d6f9c760f79c1b70c32278981e",
+    "skelpolu_bed.flac": "9be0bb3fbade4d27a357a354ff65641fc31c218728b0751b69083d4e3bb65670",
+    "speech_segment.flac": "44c97972c2c78a2e8a545a8fcc519efe2c8e54de729a9d71f7f3df02880c8b81",
+    "synth_bed.flac": "5428da4c0947545197d2824ad3251422ef3992498c6210b54d6c2a91cd82c79b"
+  },
+  "real_fixture": {
+    "bed": {
+      "gain_linear": 0.4339156448841095,
+      "gate_passed": false,
+      "known_contamination": "music false-positive, not speech",
+      "original_lufs": -27.748106002807617,
+      "stem": "other",
+      "target_lufs": -35.0,
+      "track": "Skelpolu_-_Resurrection",
+      "type": "musdb_stem",
+      "vad_pct": 7.666666507720947
+    },
+    "bed_file": "skelpolu_bed.flac",
+    "file": "duck_splice_real_snr-15.flac",
+    "note": "Pre/post VAD-upgrade benchmark. W2.2 reports duck as informational only.",
+    "role": "sensor_witness"
+  },
+  "resampler": "rubato SincFixedIn",
+  "seed": 271828,
+  "snr_db": -15.0,
+  "speech": {
+    "file": "speech_segment.flac",
+    "gain_linear": 1.1107920408248901,
+    "original_lufs": -20.912654876708984,
+    "target_lufs": -20.0,
+    "utterances": [
+      {
+        "id": "422-122949-0013",
+        "mix_end_sample": 960000,
+        "mix_start_sample": 480000,
+        "path": "/home/aidevcon/Downloads/DATASET/speech/LibriSpeech/dev-clean/422/122949/422-122949-0013.flac",
+        "samples_used": 480000,
+        "speech_relative_end_sample": 480000,
+        "speech_relative_start_sample": 0
+      }
+    ]
+  },
+  "speech_end_sample": 960000,
+  "speech_end_sec": 20.0,
+  "speech_minus_bed_lu": 15.0,
+  "speech_n_samples": 480000,
+  "speech_onset_sample": 480000,
+  "speech_onset_sec": 10.0,
+  "synth_fixture": {
+    "bed": {
+      "gain_linear": 0.13726477324962616,
+      "gate_passed": true,
+      "lpf_alpha": 0.9489873051643372,
+      "lpf_fc_hz": 400.0,
+      "original_lufs": -17.751182556152344,
+      "seed": 1271827,
+      "target_lufs": -35.0,
+      "type": "synthetic_lowpass_noise",
+      "vad_pct": 0.0
+    },
+    "bed_file": "synth_bed.flac",
+    "file": "duck_splice_synth_snr-15.flac",
+    "note": "W2.2 pass/fail fixture: duck iff [10s,20s]",
+    "role": "primary_gate"
+  },
+  "target_sr": 48000,
+  "total_duration_sec": 30.0,
+  "total_samples": 1440000,
+  "version": "W2.0-rev2"
+}
+=== audiobook/manifest.json ===
+{
+  "resampler": "rubato SincFixedIn",
+  "hashes": {
+    "mix_1_snr-15.flac": {
+      "hash": "c3ee526e8c697fb185127ff8671d316b3e1d506187f12e8abca37284cc98c6c5",
+      "music_gain_linear": 0.07735428214073181,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -36.224609375,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_1_snr-25.flac": {
+      "hash": "73ef2545167d7f8f7d1509c91084fb3cb6d47c93cfef6f6892844b41db4094fe",
+      "music_gain_linear": 0.024461571127176285,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -46.224609375,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_1_snr-6.flac": {
+      "hash": "4b5e6286d4024bf07f0127a88e82ad0a5f8995de3a6189b1a7c283763c8942af",
+      "music_gain_linear": 0.2180139571428299,
+      "music_original_lufs": -13.99429702758789,
+      "music_target_lufs": -27.224611282348633,
+      "voice_lufs": -21.224611282348633
+    },
+    "mix_2_snr-15.flac": {
+      "hash": "65560d5d8b2d5ae8d9671d8087d965833a85eb6ad769479a6a42bd0cdd615905",
+      "music_gain_linear": 0.08124276250600815,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -35.506080627441406,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_2_snr-25.flac": {
+      "hash": "f06d8e3de601de45248dad7318d9a1dcb1bd8f85d1eeb5d73ece6588005d09fc",
+      "music_gain_linear": 0.025691216811537743,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -45.506080627441406,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_2_snr-6.flac": {
+      "hash": "f3df38fd83a99beebe207f046e3ac0be9a7b90e5ff75312f42de79213125c331",
+      "music_gain_linear": 0.22897326946258545,
+      "music_original_lufs": -13.701774597167969,
+      "music_target_lufs": -26.506078720092773,
+      "voice_lufs": -20.506078720092773
+    },
+    "mix_3_snr-15.flac": {
+      "hash": "7fc59babe4b344363b226cba47f8a80266cff7abff8f61097372a88137c64516",
+      "music_gain_linear": 0.1783839762210846,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -33.022377014160156,
+      "voice_lufs": -18.022375106811523
+    },
+    "mix_3_snr-25.flac": {
+      "hash": "19c3f1b1dda12ec5bc9f1f1fbab66566820425168e1abb9397cd7a8281b76553",
+      "music_gain_linear": 0.05640997365117073,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -43.022377014160156,
+      "voice_lufs": -18.022375106811523
+    },
+    "mix_3_snr-6.flac": {
+      "hash": "6fbd226769ea8310024164329922d8d27235920019aaced6436d236263a01e06",
+      "music_gain_linear": 0.5027544498443604,
+      "music_original_lufs": -18.04949378967285,
+      "music_target_lufs": -24.022375106811523,
+      "voice_lufs": -18.022375106811523
+    },
+    "music_1_snr-15.flac": "cc963de600d18906d9c58e1b4fd81acef8c953ea62c278cca789e93ad0dad0d7",
+    "music_1_snr-25.flac": "8e7557c68f301d3785a2d2139c87d546cd1c61595b4e3b5dc3046b6b578a4468",
+    "music_1_snr-6.flac": "8ce02dd7e86a95ebd900ddfc3900a95cab72ab8ac562907abcc654ddce56498a",
+    "music_2_snr-15.flac": "ee050fe792aa532455931049a2162768d753ef504f3f173f6083822832d6e8cf",
+    "music_2_snr-25.flac": "0f1685855dc808c3f3cbc56499f828e6f0998238a1c9704a288a0c0a86af7adf",
+    "music_2_snr-6.flac": "282c64adab37637a7c56d1726c4dd6ae1574d017f8f0b99bb78422d2072ed91c",
+    "music_3_snr-15.flac": "32ff8f6f782605072b36ebb3f081a7b5327fd13d8be47a3faca3b898e6a3d763",
+    "music_3_snr-25.flac": "9ad73512810a4dbca0dd41ab69e93fb91dc4c2e4ba46dcd177cebb6c1eaee771",
+    "music_3_snr-6.flac": "af6e7336bb3d81514cae4ac8349b7ce7aa7d0e703d62f126f6b35dc1ed8be326",
+    "voice_1.flac": "9560115a66830dc5824333c30c6ece03281f321e0313a3f240030ce0b6655b62",
+    "voice_2.flac": "1c0adc288e71a4daf15da59593fc913b571f34011702715e15b7c54cfdcd7908",
+    "voice_3.flac": "32a730d25df5122f90da2745739de5b9a3908844d6d7c644608b84c76d12a928"
+  },
+  "seed": 314159
+}
+─── §4: grep SNR/mix/augment/degrade σε research/ και lineos/ ───
+research/musdb-lab/phi1_dataset_builder.py
+research/musdb-lab/phi1_train.py
+research/musdb-lab/phi2_train.py
+research/musdb-lab/w6b_podcast_eval.py
+research/encoder-gap-speech/src/bin/who_controls_peak.rs
+research/encoder-gap-speech/src/bin/mp3_acx_mechanism_confirm.rs
+research/encoder-gap-speech/src/bin/storedquality_what.rs
+research/encoder-gap-speech/src/bin/live_export_end_to_end.rs
+research/encoder-gap-speech/src/lib.rs
+research/encoder-gap-speech/src/bin/restoration_chain_what.rs
+research/encoder-gap-speech/src/bin/which_endpoint_diff.rs
+research/encoder-gap-speech/src/bin/quality_oracle.rs
+research/encoder-gap-speech/src/bin/f087_verdict_check.rs
+research/encoder-gap-speech/src/bin/mp3_acx_stage_rms.rs
+research/encoder-gap-speech/src/bin/acx_bridge_e2e.rs
+research/encoder-gap-speech/src/bin/export_button_reality.rs
+research/encoder-gap-speech/src/bin/latency_impulse_test.rs
+research/encoder-gap-speech/src/bin/quality_vs_ffmpeg.rs
+research/ab-player/normalize.py
+lineos/m0/m0-daemon/src/dsp/six_channel_stream.rs
+lineos/m0/m0-daemon/src/dsp/mod.rs
+lineos/m0/m0-daemon/src/blob_store.rs
+lineos/m0/m0-daemon/src/dsp/standardized_stream.rs
+lineos/m0/m0-daemon/src/dsp/autotune.rs
+lineos/m0/m0-daemon/src/domain/nodes/certificate_node.rs
+lineos/m0/m0-daemon/src/domain/dsp_pipeline.rs
+lineos/m0/m0-daemon/src/domain/nodes/dsp_node.rs
+lineos/m0/m0-daemon/src/handlers/master.rs
+lineos/m0/m0-daemon/src/domain/episode_render.rs
+lineos/m0/m0-daemon/src/dsp/stream_core.rs
+lineos/m0/m0-daemon/src/handlers/decode.rs
+lineos/m0/m0-daemon/src/domain/nodes/render_node.rs
+lineos/m0/m0-daemon/src/domain/nodes/decode_node.rs
+lineos/m0/m0-daemon/src/handlers/album.rs
+lineos/m0/m0-daemon/src/agents/conductor.rs
+lineos/m0/m0-daemon/src/bin/measure_corpus.rs
+lineos/m0/m0-daemon/src/bin/test_engine.rs
+lineos/m0/m0-daemon/src/agents/operator.rs
+lineos/m0/m0-daemon/src/handlers/export.rs
+lineos/m0/m0-daemon/tests/streaming_integration.rs
+
+─── §4 (narrow): script που παρήγαγε duck_splice/audiobook fixtures ───
+lineos/m0/m0-daemon/src/domain/nodes/render_node.rs
+lineos/m0/m0-daemon/tests/w2_duck_gate.rs
+lineos/m1/sp314-dsp/src/dsp/control_bus.rs
+lineos/m1/sp314-dsp/src/analysis/vad_model.rs
+lineos/m1/sp314-dsp/src/stft/two_pass.rs
+lineos/m1/sp314-dsp/tests/s2_retrial.rs
+lineos/m1/sp314-dsp/tests/spectral_reconstruction_oracle.rs
+lineos/m1/sp314-dsp/tests/nmfd_fit_cost.rs
+lineos/m1/sp314-dsp/tests/phi1_duck_compare.rs
+lineos/m1/sp314-dsp/tests/nmfd_p3_jury.rs
+lineos/m1/sp314-dsp/tests/nmfd_jury_test.rs
+lineos/m1/sp314-dsp/tests/phi1_vs_dsp_jury.rs
+lineos/m1/sp314-dsp/tests/fixture_factory.rs
+lineos/m1/sp314-dsp/tests/nmfd_production_dragon.rs
+lineos/m1/sp314-dsp/tests/s2_grid.rs
+lineos/m1/sp314-dsp/tests/w_speech_fit.rs
+lineos/m1/sp314-dsp/tests/nmfd_mask_oracle.rs
+research/w-speech/gen_readme.py
+research/erlangen-nmfd/export_golden.py
+research/musdb-lab/phi1_w6b_windowed.py
+research/musdb-lab/phi2_train.py
+research/musdb-lab/phi1_train.py
+research/musdb-lab/phi1_dataset_builder.py
+research/musdb-lab/w6b_podcast_eval.py
+research/musdb-lab/diag_w6b.py
+research/musdb-lab/w7c_arm_eval.py
+research/silero-lab/run_silero.py
+research/musdb-lab/w7b_vad_routed.py
+research/musdb-lab/w7a_vad_sep.py
+
+=== fixture_factory.rs — grep duck_splice/audiobook/seed context ===
+4:        Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+114:        let mut resampler = SincFixedIn::<f32>::new(
+142:    #[ignore = "ΓΕΝΝΗΤΡΙΑ fixtures (γράφει tests/fixtures/audiobook/), όχι φρουρός· ΚΑΙ δεν χτίζεται στο default build — θέλει --features cli. Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
+143:    fn build_fixtures() {
+144:        let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/audiobook");
+147:        let mut rng = Lcg::new(314159);
+162:        manifest.insert("seed".to_string(), serde_json::json!(314159));
+165:            serde_json::json!("rubato SincFixedIn"),
+214:                    "music_target_lufs".to_string(),
+257:    // Seed: 271828 (distinct from build_fixtures seed 314159).
+259:    // Outputs (tests/fixtures/duck_splice/):
+260:    //   duck_splice_synth_snr-15.flac — synth noise bed + speech  [primary gate]
+261:    //   duck_splice_real_snr-15.flac  — Skelpolu stem + speech    [sensor witness]
+267:    #[ignore = "ΓΕΝΝΗΤΡΙΑ του duck_splice fixture (τα παραγόμενα απαριθμούνται στο σχόλιο από πάνω), όχι φρουρός· θέλει --features cli. Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
+268:    fn build_duck_splice_fixture() {
+269:        let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/duck_splice");
+323:                let mut rng1 = Lcg::new(271828);
+327:                    let mut rng2 = Lcg::new(271828);
+356:        // Seed: 271828 + 999999 (isolated from all other Lcg uses).
+385:        let mut ske_rng = Lcg::new(271828);
+423:            let mut utt_rng = Lcg::new(271828 + utt_idx as u64 * 1_000_003);
+466:        let speech_target_lufs = -20.0_f32;
+467:        let speech_gain = 10.0_f32.powf((speech_target_lufs - speech_lufs_raw) / 20.0);
+471:        let bed_target_lufs = speech_target_lufs - 15.0_f32; // -35 LUFS
+474:        let synth_gain = 10.0_f32.powf((bed_target_lufs - synth_lufs_raw) / 20.0);
+479:        let ske_gain = 10.0_f32.powf((bed_target_lufs - ske_lufs_raw) / 20.0);
+509:        let mix_synth_path  = format!("{}/duck_splice_synth_snr-15.flac", base_out);
+510:        let mix_real_path   = format!("{}/duck_splice_real_snr-15.flac",  base_out);
+530:            "seed": 271828_u64,
+531:            "resampler": "rubato SincFixedIn",
+540:            "snr_db": -15.0_f32,
+546:                "file": "duck_splice_synth_snr-15.flac",
+556:                    "target_lufs": bed_target_lufs,
+564:                "file": "duck_splice_real_snr-15.flac",
+574:                    "target_lufs": bed_target_lufs,
+582:                "target_lufs": speech_target_lufs,
+595:                "duck_splice_synth_snr-15.flac": &mix_synth_sha,
+596:                "duck_splice_real_snr-15.flac":  &mix_real_sha,
+611:            speech_lufs_raw, speech_target_lufs, speech_gain
+
+─── §2 ΑΞΟΝΑΣ 1: hum generator ───
+lineos/m0/m0-daemon/tests/sparse_scout_integration.rs:28:    // 500Hz sine ensures a 10ms window contains exactly 5 full cycles (at 48kHz).
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:127:    fn attenuates_hum_frequency() {
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:133:        // Generate 50Hz sine
+lineos/m1/sp314-nodes/tests/vocal_graph_ltass_proof.rs:95:    // Generate a 750Hz sine wave (Band 3 center frequency)
+lineos/m1/sp314-dsp/src/analysis/spectral.rs:292:        // 250Hz sine should have high energy
+lineos/m1/sp314-dsp/src/analysis/spectral.rs:303:            "250Hz sine energy should be \
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:13:    notch_50: Biquad,
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:53:            notch_50: Biquad::new(FilterType::Notch, 50.0, 20.0, sample_rate),
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:104:                let (l1, r1) = self.notch_50.process_stereo(l, r);
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:147:        self.notch_50.reset();
+lineos/m1/sp314-dsp/tests/restoration_contract.rs:12:fn dehum_removes_50hz_sine() {
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:218:fn forensic_dehum() {
+lineos/m1/sp314-dsp/tests/stress/generators.rs:144:/// kick: fast decaying 50Hz sine.
+lineos/m1/sp314-dsp/tests/stress/generators.rs:145:/// bass: sustained 50Hz sine.
+research/encoder-gap-speech/src/bin/dehum_what.rs:184:fn new_poxvoice_dehum(sr: u32) -> DeHumNode {
+
+=== dehum_what.rs (πιθανή γεννήτρια hum για test) ===
+25:const SEARCH_HI_HZ: f64 = 250.0;
+112:const ZONE_EDGES_HZ: [f64; 9] = [0.0, 40.0, 70.0, 130.0, 250.0, 500.0, 2000.0, 6000.0, f64::INFINITY];
+184:fn new_poxvoice_dehum(sr: u32) -> DeHumNode {
+187:    n.set_parameter("fundamental_hz", 50.0);
+216:        let s = amp50 * (2.0 * std::f64::consts::PI * 50.0 * t).sin()
+224:    let in50 = tone_amplitude(&l0[skip..], 50.0, sr);
+232:    let out50 = tone_amplitude(&l[skip..], 50.0, sr);
+247:fn main() {
+
+─── §2 ΑΞΟΝΑΣ 2: click/pop generator ───
+lineos/m0/m0-daemon/src/realtime_bridge.rs:58:    pub fn pop(&self) -> Option<RealtimeFrame> {
+lineos/m0/m0-daemon/src/realtime_bridge.rs:82:    fn push_pop_roundtrip() {
+lineos/m0/m0-daemon/src/realtime_bridge.rs:133:    fn pop_resets_timer() {
+lineos/m0/m0-daemon/src/dsp/beat_detector.rs:421:    fn generate_click_track(sample_rate: u32, bpm: f32, duration_secs: f32) -> Vec<f32> {
+lineos/m1/sp314-dsp/tests/crossfade_oracle.rs:59:fn test_crossfade_click() {
+lineos/m1/sp314-dsp/tests/crossfade_oracle.rs:154:fn test_equal_gain_click() {
+lineos/m1/sp314-dsp/src/analysis/scout.rs:95:    fn test_periodic_click_train() {
+lineos/m1/sp314-dsp/src/analysis/scout.rs:128:    fn test_irregular_click_train() {
+lineos/m0/m0-daemon/tests/e2e_acx_certificate.rs:90:fn acx_preset_populates_delivery_check_fields() {
+lineos/m1/sp314-dsp/src/cut_heal/mod.rs:193:    fn crossfade_no_click_at_boundary() {
+lineos/m1/sp314-dsp/src/limiter/delay.rs:19:    pub fn push_and_pop(&mut self, x: f32) -> f32 {
+
+─── §2 ΑΞΟΝΑΣ 3: RIR convolution / reverb generator ───
+lineos/m1/sp314-nodes/src/graph.rs
+lineos/m1/sp314-nodes/src/nodes/reverb.rs
+lineos/m0/m0-daemon/tests/e2e_mastering_quality.rs
+lineos/m0/m0-daemon/tests/e2e_reverb_vacuum.rs
+lineos/m1/sp314-dsp/tests/stress/generators.rs
+lineos/m1/sp314-dsp/tests/forensic_renders.rs
+--- ReverbNode path ---
+lineos/m0/m0-daemon/tests/e2e_reverb_vacuum.rs
+lineos/m1/sp314-nodes/src/nodes/reverb.rs
+
+─── §2 ΑΞΟΝΑΣ 4: clipper, LAME encode-decode, quantizer ───
+lineos/m1/sp314-dsp/src/limiter/clipper.rs
+lineos/m1/sp314-dsp/src/limiter/mod.rs
+lineos/m1/sp314-dsp/src/analysis/stem_escalation.rs
+lineos/m1/sp314-dsp/src/verification/mod.rs
+lineos/m1/sp314-dsp/src/analysis/clipping.rs
+lineos/m1/sp314-dsp/src/pipeline/gain.rs
+lineos/m1/sp314-dsp/src/analysis/scout_scanner.rs
+lineos/m1/sp314-dsp/src/jini/mod.rs
+lineos/m1/sp314-dsp/tests/w18_scout_scores.rs
+lineos/m1/sp314-dsp/tests/clipper_contract.rs
+lineos/m1/sp314-dsp/src/harmonic/mod.rs
+lineos/m1/sp314-dsp/tests/pass1_integration.rs
+lineos/m1/sp314-dsp/src/pipeline/autotune.rs
+lineos/m1/sp314-dsp/tests/pipeline_primitives_contract.rs
+--- LAME encode wrapper ---
+--- resampler (rubato) already confirmed in fixture_factory.rs ---
+
+─── §2 ΑΞΟΝΑΣ 5: spectral tilt / resonance / sibilance generator ───
+lineos/m0/m0-daemon/src/dsp/mod.rs:664:                low_shelf_freq_hz: 100.0,
+lineos/m0/m0-daemon/src/dsp/mod.rs:666:                high_shelf_freq_hz: 10_000.0,
+lineos/m0/m0-daemon/tests/flag_oracle.rs:788:            low_shelf_freq_hz: 100.0,
+lineos/m0/m0-daemon/tests/flag_oracle.rs:790:            high_shelf_freq_hz: 10_000.0,
+lineos/m0/m0-daemon/tests/e2e_qualitative_tests.rs:100:pub fn assert_spectral_tilt_bounds(
+lineos/m0/m0-daemon/tests/e2e_qualitative_tests.rs:151:    fn test_spectral_tilt_no_harshness_with_zero_processing() {
+lineos/m1/sp314-dsp/tests/recon_butter_q_response.rs:47:fn pinned_current_hp_is_resonant_and_corrected_hp_is_flat() {
+lineos/m1/sp314-dsp/tests/recon_butter_q_response.rs:107:fn pinned_current_lp_is_resonant_too() {
+
+─── §2 ΑΞΟΝΑΣ 6: dropout / splice / take-mismatch generator ───
+lineos/m0/m0-daemon/tests/e2e_tier1_abort.rs
+lineos/m1/sp314-dsp/src/cut_heal/mod.rs
+lineos/m1/sp314-dsp/tests/fixture_factory.rs
+
+=== reverb.rs (algorithmic ή convolution;) ===
+use crate::node::DspNode;
+
+struct Lbcf {
+    buffer: Vec<f32>,
+    idx: usize,
+    filter_store: f32,
+}
+
+impl Lbcf {
+    fn new(len: usize) -> Self {
+        Self {
+            buffer: vec![0.0; len],
+            idx: 0,
+            filter_store: 0.0,
+        }
+    }
+
+    fn process(&mut self, input: f32, feedback: f32, damping: f32) -> f32 {
+        let out = self.buffer[self.idx];
+        self.filter_store = out * (1.0 - damping) + self.filter_store * damping;
+        if self.filter_store.abs() < 1e-9 {
+            self.filter_store = 0.0;
+        } // denormal prevent
+        self.buffer[self.idx] = input + self.filter_store * feedback;
+        self.idx = (self.idx + 1) % self.buffer.len();
+        // Return input + out to avoid 30ms dead silence at start
+        input + out
+    }
+}
+
+struct Allpass {
+    buffer: Vec<f32>,
+    idx: usize,
+}
+
+impl Allpass {
+    fn new(len: usize) -> Self {
+        Self {
+            buffer: vec![0.0; len],
+            idx: 0,
+
+=== clipper.rs ===
+// allow: polyphase up/down FIR with circular indexing and
+// reversed-phase alignment (3-p); indices are the filter math.
+#![allow(clippy::needless_range_loop)]
+
+const TAPS: usize = 16;
+
+const POLYPHASE_UP: [[f64; TAPS]; 4] = [
+    [
+        -1.7425427174407935e-06,
+        0.00011046553246435567,
+        -0.000941059720917635,
+        0.0043679118522559806,
+        -0.014474504103225153,
+        0.038948457640802604,
+        -0.09574957759528517,
+        0.2844251695308281,
+        0.8949722466459078,
+        -0.15503552492948255,
+        0.061170277669582385,
+        -0.024209180253285462,
+        0.008216810773212088,
+        -0.0021377457248467195,
+        0.0003592009444519958,
+        -2.1705869358414087e-05,
+    ],
+    [
+        -8.866036690746866e-06,
+        0.0002916564199290538,
+        -0.002036367615763512,
+        0.008550367479972973,
+        -0.02662391480997065,
+        0.06916203100308367,
+        -0.17096592427329604,
+        0.621632950152724,
+        0.621632950152724,
+        -0.17096592427329604,
+        0.06916203100308367,
+        -0.02662391480997066,
+        0.008550367479972976,
+        -0.0020363676157635156,
+
+=== cut_heal/mod.rs (dropout generator ή repair;) ===
+pub mod crossfade;
+
+pub struct SilenceCut;
+pub struct BreathCut;
+pub struct CrossfadeHeal;
+
+impl SilenceCut {
+    /// Detects regions where RMS < -60 dBFS for > 200ms (9600 samples at 48kHz)
+    /// Returns: Vec<(start_index, end_index)>
+    pub fn detect(audio: &[f32], sample_rate: u32) -> Vec<(usize, usize)> {
+        let mut regions = Vec::new();
+        let threshold_amp = libm::powf(10.0f32, -60.0 / 20.0);
+        let min_samples = (sample_rate as f32 * 0.200) as usize; // 200ms
+
+        let block_size = 512;
+        let num_blocks = audio.len() / block_size;
+
+        let mut in_silence = false;
+        let mut silence_start = 0;
+
+        for i in 0..num_blocks {
+            let start = i * block_size;
+            let end = (i + 1) * block_size;
+            let block = &audio[start..end];
+            let mut sum_sq = 0.0;
+            for &sample in block {
+                sum_sq += sample * sample;
+            }
+            let rms = libm::sqrtf(sum_sq / block_size as f32);
+
+            if rms < threshold_amp {
+                if !in_silence {
+                    in_silence = true;
+                    silence_start = start;
+                }
+            } else {
+                if in_silence {
+                    in_silence = false;
+                    let len = start - silence_start;
+                    if len >= min_samples {
+                        regions.push((silence_start, start));
+                    }
+                }
+            }
+        }
+
+        // Handle trailing silence
+        if in_silence {
+            let end = num_blocks * block_size;
+            let len = end - silence_start;
+
+=== clipper.rs — grep πραγματική clip function ===
+182:    pub fn new_with_ceiling(enabled: bool, ceiling_linear: f32) -> Self {
+195:    pub fn new(enabled: bool) -> Self {
+199:    pub fn reset(&mut self) {
+208:    pub fn process(&mut self, left: f32, right: f32) -> (f32, f32) {
+
+=== LAME encode-decode roundtrip (codec degradation) ===
+lineos/m0/m0-daemon/src/handlers/export.rs
+lineos/m1/lame-sys/src/lib.rs
+--- quality_vs_ffmpeg.rs (candidate) ---
+4://! αντιγράφει το ΙΔΙΟ master wav ώστε να το μετρήσει το ffmpeg. Η
+5://! σύγκριση είναι cert-vs-ffmpeg ΣΤΟ ΙΔΙΟ ΑΡΧΕΙΟ — όχι με τον εαυτό μας.
+12:fn main() {
+13:    let input = std::env::args().nth(1).expect("usage: quality_vs_ffmpeg <audio>");
+
+=== BiquadFilter (peaking/shelf) — γενικό εργαλείο για axis 5 (tilt/resonance) ===
+lineos/m1/sp314-nodes/src/nodes/biquad.rs
+lineos/m1/sp314-dsp/src/restoration/biquad.rs
+lineos/m1/sp314-dsp/src/masking_eq/biquad.rs
+lineos/m1/sp314-dsp/src/dsp/biquad.rs
+
+─── §3: LibriSpeech dev-clean noise floor — μετρήθηκε ποτέ; ───
+FINDINGS.md:31:  (1) 60 αρχεία LibriSpeech dev-clean μέσα από το ΔΙΚΟ
+FINDINGS.md:165:  **ΚΑΙ ΤΟ ΣΟΒΑΡΟΤΕΡΟ: το LibriSpeech dev-clean είναι
+FINDINGS.md:1762:- **[F-066] Shipped assets provenance — ΠΛΗΡΗΣ ΑΠΟΓΡΑΦΗ 2026-08-19 (recon + επαλήθευση όρων στην πηγή).** ΤΕΣΣΕΡΑ trained assets στο binary (include_bytes!), όλα με πηγή MUSDB18-HQ: w_music_v1 (24KB, factory v5) · w_speech_v1 (16KB) · phi1_v3 (238KB, speech-presence classifier, phi1_train.py, commit 76c2a95) · phi2_pcen (238KB, PCEN sensor, df43772). Χωρίς trained δεδομένα: vad_model.rs (hardcoded αναλυτικές σταθερές) · CourierPrime font (OFL-1.1 — εκκρεμεί license notice) · synthetic fixtures (generator scripts). Οροι dataset, επαληθευμένοι στην πηγή 19/08 (Zenodo 1117372/3338373, sigsep — τοπικό LICENSE ΑΠΟΝ στο DATASET dir): «provided for educational purposes only… not… for any commercial purpose without the express permission of the copyright holders»· σύνθεση μικτή (100 Mixing Secrets/DSD100 · 46 MedleyDB CC BY-NC-SA 4.0 · 2 NI · 2 BY-NC-SA 3.0). ΑΠΟΝ provenance: tests/fixtures/bodleasons_mid.wav, real_world_60s.wav — κατά δήλωση Anestis (19/08, χωρίς όρκο): αν είναι ομιλία, προέρχονται από LibriSpeech ή FMA/Freesound — ανεπιβεβαίωτο. Σημείωση εμβέλειας: είναι test fixtures — ΔΕΝ σαλάρουν στο binary ⇒ αφορούν μόνο το public-repo checklist, όχι το launch gate του binary. Trigger: LAUNCH GATE — απόφαση πριν τις 30/09. **ΕΤΥΜΗΓΟΡΙΑ 2026-08-21 (Anestis, sequenced clean-room):** ΟΧΙ retrain τώρα, ΟΧΙ counsel — πρώτα Ο ΚΡΙΤΗΣ. Σειρά με εξαρτήσεις: (1) τελειώνει το verification tooling (schema v0 δομικά + E2E properties suite) → (2) MUSDB v5 metrics ΠΑΓΩΝΟΥΝ ως Oracle baseline (τα σημερινά νούμερα = ο χρυσός κανόνας που ξέρουμε ότι δουλεύει) → (3) εργοστάσιο ανάβει: clean-source retrain (LibriSpeech/VocalSet/FMA, phi1_train.py) → (4) αυτόματη σύγκριση v6-vs-Oracle μέσω του suite. ΔΙΟΡΘΩΣΗ ΑΞΟΝΑ (F-065, δεσμευτικό): το suite κόβει υποψηφίους στα ΜΕΤΡΗΣΙΜΑ σε δευτερόλεπτα, αλλά η ΤΥΦΛΗ ΑΚΡΟΑΣΗ παραμένει η τελική πύλη ταυτότητας templates — μικρότερη, όχι ανύπαρκτη. Launch με καθαρά weights, εντός των 40 ημερών. (Saraga NC = ποτέ training · fixtures σε τυχόν public repo = ίδιο checklist.) ΣΥΜΠΛΗΡΩΜΑ 19/08 — CLEAN-SOURCE ΧΑΡΤΗΣ (όροι διαβασμένοι στην πηγή, quoted+URL στο recon log): SPEECH → LibriSpeech/LibriVox (CC BY 4.0 / public domain — dev-clean ΗΔΗ τοπικά) · SUNG → VocalSet (CC BY 4.0 blanket, 10.1h isolated, Zenodo 1442513) · DRUMS/NEGATIVES → Freesound/FMA με per-item CC0/CC-BY allowlists (τοπικό fma_small_cc_allowlist.json ΗΔΗ υπάρχει) ή ιδίες ηχογραφήσεις — κενό curation, όχι κενό υλικού. ΑΠΟΝ (δεν βρέθηκε αυτούσιος όρος audio): Common Voice audio terms · OpenSinger (404) · MedleyDB audio. NC-verified (ακατάλληλα για εμπορικό retrain): MoisesDB (CC BY-NC-SA blanket) · MTG-Jamendo (NC + Jamendo S.A. authorization). RECON CURATION ΕΓΙΝΕ 2026-08-21 (soundfile.info στο 100% των αρχείων): SPEECH ΠΛΗΡΕΣ — LibriSpeech dev-clean 2.703 flac / 5.39h τοπικά. MUSIC BED ΠΛΗΡΕΣ — FMA allowlist 1.329/1.329 mp3 / 11.07h. SUNG ΑΠΟΝ — VocalSet download (Zenodo 1442513, 10.1h, CC BY). **SUNG ΕΚΛΕΙΣΕ 2026-08-22 (προσγείωση+απογραφή):** md5 πύλες ×2 OK, 7z διάσωση (32-bit zip overflow), cleanup 5.561 AppleDouble/junk (το νυχτερινό «17.9k» ήταν φουσκωμένο από ._*.wav resource forks). Πραγματικά wav: 14.300 σε 4 δομές — ΜΟΝΑΔΙΚΕΣ ΗΧΟΓΡΑΦΗΣΕΙΣ: **3.613 / ~10.8h** (συνεπές με τις δηλωμένες 10.1h Zenodo)· οι όψεις byte-identical επαληθευμένες (5/5 sha256 vs11↔by_singer). 44.1k mono PCM_16. **ΚΑΝΟΝΑΣ BUILDER: vs11/FULL ΜΟΝΟ** — σάρωση ολόκληρου του ραφιού = 4× τεχνητό βάρος ανά ηχογράφηση. MANIFEST.md + zips.sha256 στο ράφι (οι 32.36h του πρώτου manifest ανακλήθηκαν — μετρούσαν τον πλεονασμό ως υλικό). DRUMS/NEGATIVES ΑΠΟΝ — το ΜΟΝΟ curation κενό (~2-5h).
+FINDINGS.md:1820:  ⇒ CLEAN-SOURCE ΧΑΡΤΗΣ ΠΛΗΡΗΣ: SPEECH ✓ (LibriSpeech
+
+.reports/2026-08-25-quality-wiring.md
+.reports/2026-08-25-spectral-wiring.md
+.reports/2026-08-23-gap-mechanism.md
+.reports/2026-08-25-latency-honest.md
+.reports/2026-08-25-clips-wiring.md
+.reports/2026-08-23-encoder-gap-speech.md
+.reports/2026-08-23-noise-floor-gap.md
+.reports/2026-08-24-export-reads-what.md
+
+--- noise_floor_case.rs — τι μετράει; ---
+//! F-077/F-079 — single-file noise floor Δ measurement on REAL narration
+//! with genuine room-tone pauses ("24 - The Wise In The Desert.flac",
+//! user-supplied, qualified in .reports/2026-08-23-noise-floor-gap.md
+//! addendum: 44.1kHz stereo, 154.88s, noise_floor -81.975dB vs RMS
+//! -14.182dB — 67.8dB gap, confirmed non-digital-silence).
+//!
+//! ΜΕΤΡΗΣΗ, όχι gate. ΙΔΙΟ deliver path (export_mp3_acx) με όλους τους
+//! προηγούμενους γύρους. Ένα αρχείο — ΔΗΛΩΜΕΝΟ ρητά ως ΠΡΩΤΗ ΜΕΤΡΗΣΗ,
+//! όχι κατανομή, όχι margin.
+//!
+//! ΟΡΓΑΝΟ: για RMS/peak έχουμε εξωτερικό ένορκο (ffmpeg astats,
+//! cross-check <0.05dB απαιτούμενο). Για noise floor ΔΕΝ υπάρχει
+//! εξωτερικό ισοδύναμο (το astats δεν έχει windowed/HP-filtered
+//! minimum) — άρα ΙΔΙΟ όργανο (ο δικός μας AcxCheckAnalyzer) και στις
+//! δύο πλευρές. Αυτό είναι το σωστό όταν μετράς ΧΑΣΜΑ, όχι απόλυτη τιμή.
+//!
+//! ΠΡΟΒΛΕΨΗ (γραμμένη πριν τρέξει):
+//!   RMS Δ ≈ -0.27 (όπως όλοι οι προηγούμενοι γύροι)
+//!   peak Δ αρνητικό, |Δ| < 0.6
+//!   NOISE FLOOR Δ: ΘΕΤΙΚΟ — ο κβαντιστής προσθέτει θόρυβο στις
+//!     παύσεις εκεί που υπήρχε room tone. ΑΝΤΙΘΕΤΗ φορά από τα άλλα
+//!     δύο, επικίνδυνη για το ACX (απαιτεί ≤ -60).
+
+use encoder_gap_speech::{ffmpeg_astats, make_blob, rebuild_pre_encode_mono};
+use m0d::handlers::export::export_mp3_acx;
+use sp314_dsp::analysis::acx_check::AcxCheckAnalyzer;
+use std::path::PathBuf;
+
+fn main() {
+    let input = "/home/aidevcon/Downloads/DATASET/24 - The Wise In The Desert.flac";
+
+=== FINDINGS.md γύρω από γραμμή 31 ===
+
+Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 paths updated. NOTE: τα 21 εναπομείναντα ACTIVE επαληθεύτηκαν ΜΟΝΟ ως προς ύπαρξη component, ΟΧΙ ως προς συμπεριφορά — per-entry επαλήθευση όταν πυροδοτηθεί ο trigger τους.
+
+
+## CANDIDATES — ΒΑΦΤΙΣΤΗΚΑΝ 2026-08-20: CAND-A..H → F-062..F-069 (ίδια σειρά· παλιές αναφορές CAND-X σε chat/σημειώσεις αποκωδικοποιούνται από εδώ)
+
+- **[F-077] Το cert λέει το pre-encode PCM, ο αγοραστής μετράει το decoded mp3 — χάσμα ~0.27 dB ΜΕΤΡΗΜΕΝΟ.** Component: output_acx_* (deliver.rs/export.rs) + ACX όψη §5.4. ΜΕΤΡΗΜΕΝΟ 2026-08-23 (εξωτερικός ένορκος, tests/external_acx_ffmpeg_agreement.rs, 192k CBR synthetic fixture): ffmpeg astats στο ΠΑΡΑΔΟΘΕΝ mp3 έδωσε RMS −22.773 vs cert −22.500 (Δ −0.273) και sample peak −16.741 vs cert −16.480 (Δ −0.261). Τα output_acx_* μετρούνται στο pre-encode buffer — ο τρίτος μετράει το decoded. ΣΥΝΕΠΕΙΑ ΜΕ ΔΟΝΤΙΑ: master που περνάει στο ΧΕΙΛΟΣ του ACX παραθύρου (π.χ. RMS −22.9) μπορεί να διαβαστεί −23.17 = platform FAIL με cert PASS. Διπλή θεραπεία προς κρίση: (α) δηλωμένο safety margin ≥ του χάσματος στα άκρα του targeting (τα δικά μας fixtures προσγειώνονται −18.50/−22.50 = ΜΕΣΑ στη ζώνη κινδύνου)· (β) γραμμή στο σχήμα §5.4/§5.6 ότι τα output_acx_* περιγράφουν το pre-encode master, με το μετρημένο platform-side Δ. ΠΑΡΑΠΡΟΪΟΝ (δικό μου λάθος, καταγραφή): το αρχικό κάτω όριο peak −0.1 dB ήταν ΘΕΩΡΙΑ («o decoder μόνο ανεβάζει peaks») — η μέτρηση το ΔΙΕΨΕΥΣΕ: synthetic step edges στρογγυλεύονται ΚΑΤΩ στο MDCT. Κατώφλια ξανακλειδώθηκαν ΑΠΟ τη μέτρηση (RMS 0.5 · peak [−0.5,+1.5]), με το νεκρό δόγμα γραμμένο στα σχόλια. ΟΡΙΟ ΟΡΓΑΝΟΥ ΔΗΛΩΜΕΝΟ: το noise floor ΔΕΝ ελέγχεται εξωτερικά (το astats δεν έχει αντίστοιχο windowed/HP-φιλτραρισμένο minimum). ΚΑΙ: το χάσμα μετρήθηκε σε synthetic fixture — αληθινή αφήγηση αμέτρητη. Trigger: πριν το launch — κάθε ισχυρισμός ACX compliance προς τρίτον.
+
+  **ΕΤΥΜΗΓΟΡΙΑ 2026-08-23 — ΠΕΝΤΕ ΓΥΡΟΙ, Ο ΜΗΧΑΝΙΣΜΟΣ
+  ΑΠΟΜΟΝΩΘΗΚΕ, ΤΟ MARGIN ΚΛΕΙΔΩΝΕΙ.** Κάθε γύρος
+  σκότωσε μία υπόθεση με μέτρηση:
+  (1) 60 αρχεία LibriSpeech dev-clean μέσα από το ΔΙΚΟ
+      ΜΑΣ deliver path, seed 20260823, διάρκειες
+      5.04-23.76s: RMS Δ median −0.269 (p5 −0.278, p95
+      −0.263, min −0.280, max +0.027)· sample peak Δ
+      median −0.265 (min −0.543, max +0.037). 59/60
+      αρνητικά, 1 θετικό. Συσχέτιση με διάρκεια |r|
+      < 0.13 ⇒ ΔΕΝ είναι artifact του encoder padding.
+      Το ζεύγος 1988-147956-0020/0028 (ίδιος ομιλητής,
+      ίδιο κεφάλαιο, pre-encode peak ταυτόσημο στα
+      0.03 dB) απέκλινε ΜΙΣΟ dB προς ΑΝΤΙΘΕΤΕΣ φορές
+
+=== FINDINGS.md γύρω από γραμμή 165 ===
+  ανάγνωση και είναι αυτή που επιστρέφει το παράθυρο.
+  ΤΟ MARGIN ΕΙΝΑΙ ΔΙΠΛΟ ΒΗΜΑ: (α) το VERDICT κρίνεται
+  με προσαρμοσμένα κατώφλια — ΜΠΛΟΚΑΡΕΙ, γιατί cert που
+  λέει PASS και απορρίπτεται είναι χειρότερο από κανένα
+  cert· (β) το TARGETING στοχεύει μέσα στη ζώνη
+  ασφαλείας — ακολουθεί, αλλιώς τα renders βγαίνουν FAIL
+  αντί να προσγειώνονται. Κόστος: το ACX RMS παράθυρο
+  πέφτει 5.0 → 4.3 dB χρήσιμο. Άφθονο για ομιλία.
+  ΟΡΙΑ ΤΟΥ ΔΕΙΓΜΑΤΟΣ, ΔΗΛΩΜΕΝΑ: σύντομα utterances
+  (median 8.4s), single-speaker mono, 192k CBR ΜΟΝΟ.
+  **ΚΑΙ ΤΟ ΣΟΒΑΡΟΤΕΡΟ: το LibriSpeech dev-clean είναι
+  16 kHz** — Nyquist στα 8 kHz. Το ACX παραδοτέο είναι
+  44.1 kHz με sibilants (s/t/sh) να ζουν στα 5-10 kHz.
+  Το F-079 μέτρησε το peak χάσμα ΤΕΤΡΑΠΛΑΣΙΟ στα 8 kHz
+  (0.105 → 0.427) — δηλαδή το δείγμα ΔΕΝ ΕΙΧΕ ΕΝΕΡΓΕΙΑ
+  ΕΚΕΙ ΟΠΟΥ ΤΟ ΧΑΣΜΑ ΕΙΝΑΙ ΧΕΙΡΟΤΕΡΟ. Δεν ακυρώνει τη
+  μέτρηση (το RMS/LUFS σκέλος είναι ομοιόμορφο και
+  επιβεβαιωμένο σε ημίτονα ΚΑΙ ομιλία), αλλά είναι ο
+  ισχυρότερος λόγος για δεύτερη μέτρηση σε πραγματική
+  αφήγηση 44.1 kHz πριν τα margins θεωρηθούν σταθερά.
+  **ΚΑΙ ΤΟ ΕΡΩΤΗΜΑ ΠΟΥ ΔΕΝ ΑΠΑΝΤΗΘΗΚΕ: LAME ή MP3;**
+
+=== ρητή αναζήτηση: 'noise floor' ΚΑΙ 'LibriSpeech' στο ίδιο context ===
+(κενό = καμία ταυτόχρονη αναφορά)
+
+.reports/2026-08-25-clips-wiring.md
+.reports/2026-08-23-encoder-gap-speech.md
+.reports/2026-08-23-noise-floor-gap.md
+.reports/2026-08-25-quality-wiring.md
+.reports/2026-08-25-spectral-wiring.md
+.reports/2026-08-23-gap-mechanism.md
+.reports/2026-08-25-latency-honest.md
+.reports/2026-08-24-export-reads-what.md
+
+=== .reports/2026-08-23-noise-floor-gap.md — αφορά LibriSpeech; ===
+42:| LibriSpeech dev-clean (2703 αρχεία) | **16000** | 1 | 1.5–24s | ΝΑΙ | — | — | — | ΝΑΙ, αλλά sr αποκλείει |
+101:  (LibriSpeech dev-clean, 2703 αρχεία) είναι 16kHz — αποκλείεται
+115:2. **Ραφτεί/ζητηθεί νέο υλικό**: LibriSpeech ΔΕΝ έχει 44.1kHz+ εκδοχή
+116:   τοπικά· θα χρειαστεί είτε upsampling ενός LibriSpeech chapter (ΔΕΝ
+
+─── §5 margin: κάτι στο περιθώριο ───
+cut_heal/mod.rs (SilenceCut/BreathCut/CrossfadeHeal) υπάρχει ΜΟΝΟ ως ανιχνευτής/επιδιορθωτής γεφύρωσης σιωπής — ΚΑΝΕΝΑΣ γεννήτορας τεχνητών dropouts/ραφών δεν βρέθηκε πουθενά. Το εργαλείο υπάρχει για να ΘΕΡΑΠΕΥΣΕΙ τον άξονα 6, όχι να τον παράγει για test.
+
+─── ΤΕΛΙΚΟΣ ΕΛΕΓΧΟΣ ───
+?? docs/lab-logs/corpus-axes-20260912.txt
+?? docs/lab-logs/corpus-recon-20260912.txt
+
+─────────────────────────────────────────────
+ΣΗΜΕΙΩΣΗ ΧΡΗΣΤΗ 2026-09-12 — ΓΙΑ ΤΟΝ ΕΠΟΜΕΝΟ
+Οι διαδρομές DATASET/acx/ και DATASET/AUDIOBFLAC/
+που εμφανίζονται παραπάνω είναι ΑΠΟΓΡΑΦΗ ΔΙΣΚΟΥ,
+ΟΧΙ υποψήφιες πηγές corpus.
+Scene-release rips εμπορικών audiobooks, χωρίς άδεια
+— βλ. corpus-recon-20260912.txt, ενότητα
+`⚠ FLAG: acx/ and AUDIOBFLAC/ appear to be
+scene-release audiobook rips`.
+Ο πίνακας των 6 αξόνων δίνει ΑΠΟΝ σε όλους — κανένα
+από αυτά τα αρχεία δεν προτάθηκε ως υλικό.
+
+ΑΠΟΦΑΣΗ ΙΔΙΟΚΤΗΤΗ, ΕΚΤΕΛΕΣΤΗΚΕ 2026-09-12:
+μετακινήθηκαν σε ~/Music/INFECTED_CORPUS/.
+ΟΙ ΔΙΑΔΡΟΜΕΣ ΠΑΡΑΠΑΝΩ ΕΙΝΑΙ ΠΛΕΟΝ ΙΣΤΟΡΙΚΕΣ.
+─────────────────────────────────────────────
