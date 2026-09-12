@@ -60,6 +60,10 @@ fn streaming_pipeline_ducking_e2e() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -106,6 +110,10 @@ fn streaming_pipeline_ducking_e2e() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -233,6 +241,10 @@ fn test_streaming_pipeline_jit_orchestration() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -359,6 +371,10 @@ fn test_streaming_pipeline_jit_fallback() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -425,6 +441,10 @@ fn test_vocal_graph_e2e_ltass_proof() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -470,6 +490,10 @@ fn test_vocal_graph_e2e_ltass_proof() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -697,6 +721,10 @@ fn pre_gain_is_linear_below_the_ceiling() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -737,6 +765,10 @@ fn pre_gain_is_linear_below_the_ceiling() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -906,6 +938,10 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             quietest_active_window_dbfs: None,
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -987,6 +1023,10 @@ fn test_restoration_speech_gated() {
             quietest_active_window_dbfs: None,    // Exercises the -45 default gate
             // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Από τον ίδιο κατάλογο. PODCAST.max_noise_floor_db είναι None —
+            // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
+            // του preset, όχι placeholder.
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON

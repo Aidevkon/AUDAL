@@ -65,6 +65,17 @@ pub struct StreamingConfig<'a> {
     /// spotify/youtube/broadcast/podcast, −3.0 για acx). Ο limiter στοχεύει
     /// `ceiling_db − TRUE_PEAK_HEADROOM_DB` (0.35, F-048).
     pub max_true_peak_db: f32,
+    /// Το όριο πατώματος του προορισμού. Option γιατί
+    /// μόνο το acx το δηλώνει (presets.rs, SOURCE
+    /// help.acx.com) — None σημαίνει «ο προορισμός δεν
+    /// έχει απαίτηση», όχι «άγνωστο».
+    /// ΔΕΝ ΔΙΑΒΑΖΕΤΑΙ ΑΚΟΜΑ: η συνθήκη που θα το
+    /// χρησιμοποιήσει χρειάζεται και το interior
+    /// ελάχιστο (acx_check::interior_noise_floor_db,
+    /// ce6aafb), που δεν υπολογίζεται στη διαδρομή
+    /// αυτή. Καλωδίωση πρώτα, ενεργοποίηση μετά — ίδιο
+    /// σχήμα με το intent_dynamics.
+    pub max_noise_floor_db: Option<f32>,
     /// Intent «dynamics» [0.0, 1.0] — Smooth…Punchy. None = default 0.5.
     /// Τροφοδοτεί ΜΟΝΟ τον τύπο του blend_release_ms του limiter.
     pub intent_dynamics: Option<f32>,

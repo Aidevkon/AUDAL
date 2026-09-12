@@ -259,6 +259,13 @@ pub fn execute_streaming_plan(
     let target_lufs = plan
         .target_lufs_override
         .unwrap_or(delivery_target.target_lufs);
+    // Το όριο πατώματος ΔΕΝ ζει στο LoudnessTarget (config.rs:9-14 — τέσσερα
+    // πεδία, κανένα δικό του). Ζει στο DeliverySpec, και η μόνη διαδρομή προς
+    // τα εκεί είναι το μητρώο. Ίδιο ιδίωμα με το `wants_acx`
+    // (dsp_pipeline.rs:624). None και για άγνωστο preset και για preset χωρίς
+    // απαίτηση — και οι δύο σημαίνουν «κανένα όριο εδώ».
+    let delivery_max_noise_floor_db = lineos_types::presets::lookup(&plan.preset_id)
+        .and_then(|e| e.delivery.max_noise_floor_db);
     let (metrics, p0_decoder) = crate::dsp::input_lufs::pass0_decode_to_dump(path, &raw_tap_path)
         .map_err(ExecutorError::DspFailed)?;
     let input_lufs = metrics.integrated_lufs;
@@ -369,6 +376,7 @@ pub fn execute_streaming_plan(
                 expected_output_frames: p0_decoder.expected_output_frames(),
                 quietest_active_window_dbfs: trunk_report.quietest_active_window_dbfs,
                 max_true_peak_db: delivery_target.max_true_peak_db,
+                max_noise_floor_db: delivery_max_noise_floor_db,
                 intent_dynamics: plan.intent_dynamics,
                 restoration_enabled: true,
             },
