@@ -1082,3 +1082,129 @@ fn test_restoration_speech_gated() {
 
     std::fs::remove_file(output_path).ok();
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Η ΣΥΖΕΥΞΗ segmentation + analyzer
+// ─────────────────────────────────────────────────────────────────────────────
+// Ζουν εδώ γιατί ο μόνος καταναλωτής της νέας εισόδου είναι η streaming
+// διαδρομή (executor.rs). Δεν αγγίζουν το streaming_pipeline.
+
+fn trunk_fixture(path: &str, secs: f32) {
+    let sr = 48_000u32;
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(path, spec).unwrap();
+    let n = (sr as f32 * secs) as usize;
+    for i in 0..n {
+        // Ημίτονο + ντετερμινιστικός θόρυβος — αρκετό υλικό ώστε ο scout να
+        // βγάλει όρια και ο analyzer να έχει τι να μετρήσει.
+        let noise = ((i * 11) % 100) as f32 / 100.0 * 0.02 - 0.01;
+        let v = 0.4 * (i as f32 * 0.05).sin() + noise;
+        w.write_sample(v).unwrap();
+        w.write_sample(v).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+fn trunk_dump(tag: &str, secs: f32) -> String {
+    let wav = format!("/tmp/test_trunk_{tag}.wav");
+    let raw = format!("/tmp/test_trunk_{tag}.raw");
+    trunk_fixture(&wav, secs);
+    m0d::dsp::input_lufs::pass0_decode_to_dump(std::path::Path::new(&wav), &raw)
+        .expect("pass0 decode");
+    let _ = std::fs::remove_file(&wav);
+    raw
+}
+
+#[test]
+fn trunk_pass_with_acx_exposes_both_segmentation_and_analyzer() {
+    // ΤΟ ΕΥΡΗΜΑ (12/09): segmentation και analyzer αλληλοαποκλείονταν
+    // στη δημόσια επιφάνεια — καμία είσοδος δεν εξέθετε τον συνδυασμό,
+    // ενώ ο μηχανισμός τον δέχεται. Αυτό το τεστ κλειδώνει ότι η νέα
+    // είσοδος τα εκθέτει ΚΑΙ ΤΑ ΔΥΟ. Αν κάποιος ξανακλείσει τον
+    // συνδυασμό, σπάει εδώ — αλλιώς η σύζευξη επιστρέφει σιωπηλά.
+    let raw = trunk_dump("acx_both", 20.0);
+
+    // Το edge έρχεται από τον κατάλογο, όχι literal.
+    let edge_s = lineos_types::presets::ACX
+        .room_tone_max_s
+        .expect("ACX ορίζει room_tone_max_s");
+
+    let report = sp314_orchestrator::trunk_pass::run_trunk_pass_with_acx(
+        std::path::Path::new(&raw),
+        false,
+        edge_s,
+    )
+    .expect("trunk pass with acx");
+
+    // (α) Το segmentation έτρεξε — το TrunkReport ΤΟ ΕΚΘΕΤΕΙ ρητά, δεν
+    //     χρειάζεται Deref.
+    assert!(
+        !report.boundaries.is_empty(),
+        "segmentation δεν έτρεξε: μηδέν boundaries"
+    );
+
+    // (β) Ο analyzer έτρεξε — μέσω Deref στο TrunkMetrics.acx.
+    assert!(
+        report.acx.is_some(),
+        "ο analyzer δεν έτρεξε: acx = None"
+    );
+
+    // (γ) Και το interior βγήκε ΠΡΙΝ το finish() — αυτό είναι το μόνο
+    //     σημείο όπου αποδεικνύεται ότι η σειρά τηρήθηκε.
+    assert!(
+        report.acx_interior_noise_floor.is_some(),
+        "interior δεν υπολογίστηκε — το finish() κατανάλωσε τον analyzer πρώτο;"
+    );
+
+    let _ = std::fs::remove_file(&raw);
+}
+
+#[test]
+fn trunk_pass_without_acx_has_no_interior() {
+    // Η υπάρχουσα είσοδος δεν αλλάζει συμπεριφορά.
+    let raw = trunk_dump("acx_none", 20.0);
+
+    let report =
+        sp314_orchestrator::trunk_pass::run_trunk_pass(std::path::Path::new(&raw), false)
+            .expect("trunk pass");
+
+    assert!(
+        !report.boundaries.is_empty(),
+        "segmentation πρέπει να τρέχει και χωρίς analyzer"
+    );
+    assert!(report.acx.is_none(), "ο analyzer δεν ζητήθηκε — acx πρέπει None");
+    assert!(
+        report.acx_interior_noise_floor.is_none(),
+        "χωρίς analyzer δεν υπάρχει interior"
+    );
+
+    let _ = std::fs::remove_file(&raw);
+}
+
+#[test]
+fn every_preset_that_demands_a_floor_also_declares_its_edge() {
+    // Ο κλάδος του executor σκάει αν ένα preset ζητά πάτωμα χωρίς να δηλώνει
+    // πόσο room tone επιτρέπει. Αυτό το τεστ κλειδώνει την προϋπόθεση στην
+    // πηγή της — στο μητρώο — ώστε η ασυνέπεια να πιάνεται εδώ και όχι σε
+    // render.
+    //
+    // ⚠ ΤΙ ΔΕΝ ΑΠΟΔΕΙΚΝΥΕΙ: ότι ο executor διακλαδώνεται σωστά. Το DspOutput
+    //   (operator.rs:174-184) ΔΕΝ φέρει το trunk_report, άρα ο κλάδος δεν
+    //   είναι παρατηρήσιμος από τεστ σήμερα. «Τρέχει για acx, δεν τρέχει για
+    //   podcast» θέλει πραγματικό render — δηλωμένο κενό, όχι κάλυψη.
+    for entry in lineos_types::presets::CATALOGUE {
+        if entry.delivery.max_noise_floor_db.is_some() {
+            assert!(
+                entry.delivery.room_tone_max_s.is_some(),
+                "preset {} δηλώνει max_noise_floor_db αλλά όχι room_tone_max_s \
+                 — ο κλάδος του executor θα σκάσει σε αυτό",
+                entry.id
+            );
+        }
+    }
+}

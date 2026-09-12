@@ -85,6 +85,19 @@ pub struct TrunkMetrics {
 pub struct TrunkReport {
     pub boundaries: Vec<SegmentBoundary>,
     pub metrics: TrunkMetrics,
+    /// (floor_db, start_frame) του interior ελαχίστου. None αν:
+    ///   · ο analyzer δεν έτρεξε (with_acx = false)
+    ///   · δεν δόθηκε edge_sec
+    ///   · το αρχείο είναι πολύ κοντό για interior
+    ///     (το ίδιο MIN_SUB_BLOCKS του analyzer, όχι νέο όριο)
+    /// None σημαίνει «δεν μετρήθηκε» — ίδια σημασιολογία με το
+    /// max_noise_floor_db, ΜΗΔΕΝ default.
+    ///
+    /// Ίδιο μοτίβο με το `acx_noise_floor_proxy_db` (:693 → :816): μετριέται
+    /// στο ίδιο ενιαίο πέρασμα και ταξιδεύει μαζί με τα υπόλοιπα. ΔΙΑΦΟΡΑ:
+    /// εκείνο πετιέται στο `to_pre_analysis`· αυτό ζει στο TrunkReport, που
+    /// ΔΕΝ σειριοποιείται και δεν φτάνει σε cert.
+    pub acx_interior_noise_floor: Option<(f32, usize)>,
 }
 
 impl std::ops::Deref for TrunkReport {
@@ -363,7 +376,7 @@ impl StreamingZcrMeter {
 /// The dump was written by pass0_decode_to_dump through StandardizedDecoder,
 /// which guarantees 48k/2ch by construction [standardized_decoder.rs:70].
 pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
-    run_trunk_internal(dump_path, false, false, false).map(|r| r.metrics)
+    run_trunk_internal(dump_path, false, false, false, None).map(|r| r.metrics)
 }
 
 /// Same single pass, plus the ACX delivery check (sample peak, DC-removed
@@ -371,11 +384,32 @@ pub fn run_trunk_metrics(dump_path: &Path) -> Result<TrunkMetrics, String> {
 /// Costs one extra HP cascade + window min per mono sample; callers that
 /// aren't delivering to ACX use run_trunk_metrics and pay nothing.
 pub fn run_trunk_metrics_with_acx(dump_path: &Path) -> Result<TrunkMetrics, String> {
-    run_trunk_internal(dump_path, false, true, false).map(|r| r.metrics)
+    run_trunk_internal(dump_path, false, true, false, None).map(|r| r.metrics)
+}
+
+/// Ίδιο με το run_trunk_pass, αλλά με τον AcxCheckAnalyzer ενεργό.
+///
+/// Ο συνδυασμός segmentation + analyzer ΔΕΝ εκτίθεται από καμία άλλη
+/// δημόσια είσοδο (μετρήθηκε 2026-09-12). Η streaming χρειάζεται
+/// boundaries — άρα run_trunk_pass — αλλά χρειάζεται και το interior
+/// ελάχιστο, που μόνο ο analyzer το δίνει. Απουσία εισόδου, όχι
+/// απόφαση κόστους.
+///
+/// Το edge_sec έρχεται ως ΟΡΙΣΜΑ: η πολιτική ζει στον orchestrator,
+/// ποτέ στον πυρήνα DSP — ίδιο δόγμα με το −45 fallback του gate.
+///
+/// ΚΟΣΤΟΣ, δηλωμένο: one extra HP cascade + window min per mono sample
+/// (trunk_pass.rs, σχόλιο του with_acx).
+pub fn run_trunk_pass_with_acx(
+    dump_path: &Path,
+    enable_vad: bool,
+    edge_sec: f32,
+) -> Result<TrunkReport, String> {
+    run_trunk_internal(dump_path, true, true, enable_vad, Some(edge_sec))
 }
 
 pub fn run_trunk_pass(dump_path: &Path, enable_vad: bool) -> Result<TrunkReport, String> {
-    run_trunk_internal(dump_path, true, false, enable_vad)
+    run_trunk_internal(dump_path, true, false, enable_vad, None)
 }
 
 fn run_trunk_internal(
@@ -383,6 +417,8 @@ fn run_trunk_internal(
     do_segmentation: bool,
     with_acx: bool,
     enable_vad: bool,
+    // None ⇒ ο analyzer δεν υπολογίζει interior· δεν έχει νόημα χωρίς edge.
+    edge_sec: Option<f32>,
 ) -> Result<TrunkReport, String> {
     // 2 channels: trunk dump is stereo f32 LE interleaved from StandardizedDecoder.
     let mut source = sp314_dsp::stft::raw_pcm_source::RawPcmFileSource::new(dump_path, 2)?;
@@ -691,6 +727,13 @@ fn run_trunk_internal(
         dyn_result.dyn_range_db,
     );
     let acx_noise_floor_proxy_db = dyn_result.p5_block_rms_db;
+    // ⚠ Η ΣΕΙΡΑ ΕΙΝΑΙ ΥΠΟΧΡΕΩΤΙΚΗ: το finish() ΚΑΤΑΝΑΛΩΝΕΙ τον analyzer, ενώ
+    // το interior_noise_floor_db θέλει &self. Μετά τη γραμμή του finish() το
+    // interior ΔΕΝ ανακτάται κατάντη — το AcxCheckReport δεν το φέρει, και
+    // δεν μπορεί να το αποκτήσει (σχήμα παγωμένο 2026-08-23).
+    let acx_interior = acx_analyzer
+        .as_ref()
+        .and_then(|a| edge_sec.and_then(|e| a.interior_noise_floor_db(e)));
     let acx = acx_analyzer.map(|a| a.finish());
     let lra = lra_meter.finish();
 
@@ -810,6 +853,7 @@ fn run_trunk_internal(
 
     Ok(TrunkReport {
         boundaries,
+        acx_interior_noise_floor: acx_interior,
         metrics: TrunkMetrics {
             integrated_lufs,
             rms_db,

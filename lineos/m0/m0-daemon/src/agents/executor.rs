@@ -289,10 +289,35 @@ pub fn execute_streaming_plan(
         None => 1.0,
     };
 
-    let trunk_report = sp314_orchestrator::trunk_pass::run_trunk_pass(
-        std::path::Path::new(&raw_tap_path),
-        false,
-    )
+    // Ο analyzer τρέχει ΜΟΝΟ όταν ο προορισμός δηλώνει όριο πατώματος. Κόστος
+    // για όποιον δεν το δηλώνει: μηδέν — ίδιο δόγμα με το `wants_acx` του
+    // episode μονοπατιού (dsp_pipeline.rs:624).
+    let delivery_edge_sec = lineos_types::presets::lookup(&plan.preset_id)
+        .and_then(|e| e.delivery.room_tone_max_s);
+
+    let trunk_report = if delivery_max_noise_floor_db.is_some() {
+        // ΚΑΝΕΝΑ unwrap_or: αν ο προορισμός ζητά πάτωμα αλλά δεν λέει πόσο
+        // room tone επιτρέπει, το DeliverySpec είναι ασυνεπές και το λέμε.
+        // Δεν συμβαίνει σήμερα (μόνο το acx δηλώνει όριο, και δηλώνει και τα
+        // δύο) — ο κλάδος υπάρχει για να μη γεννηθεί σιωπηλά αύριο.
+        let edge_sec = delivery_edge_sec.ok_or_else(|| {
+            ExecutorError::DspFailed(format!(
+                "preset {} δηλώνει max_noise_floor_db αλλά όχι \
+                 room_tone_max_s — ασυνεπές DeliverySpec",
+                plan.preset_id
+            ))
+        })?;
+        sp314_orchestrator::trunk_pass::run_trunk_pass_with_acx(
+            std::path::Path::new(&raw_tap_path),
+            false,
+            edge_sec,
+        )
+    } else {
+        sp314_orchestrator::trunk_pass::run_trunk_pass(
+            std::path::Path::new(&raw_tap_path),
+            false,
+        )
+    }
     .map_err(|e| ExecutorError::DspFailed(format!("trunk pass failed: {e}")))?;
     let boundaries = trunk_report.boundaries.clone();
     profiler.mark_stage_with_hash("Trunk Pass", String::new());
