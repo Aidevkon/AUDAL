@@ -90,7 +90,10 @@ fn balanced_input_yields_near_zero_gains() {
 /// by G_MAX (resolver) and CFW (firewall).
 #[test]
 fn clamp_gains_bounded_by_g_max_and_firewall() {
-    const G_MAX_DB: f32 = 6.0;
+    // ΤΟ ΟΡΙΟ ΔΙΑΒΑΖΕΤΑΙ ΑΠΟ ΤΟ PROFILE. Ήταν αντίγραφο
+    // (`const G_MAX_DB: f32 = 6.0;`) — δεύτερο σημείο με την ίδια τιμή,
+    // που αποκλίνει σιωπηλά αν το JSON αλλάξει (audit 2026-09-12).
+    let g_max_db = aether_bridge::reference_resolver::ReferenceProfile::load_podcast_v1().g_max_db;
     const CFW_MAX_DB: f32 = 12.0;
 
     // Extreme: +30 dB dumped on the low end.
@@ -99,6 +102,7 @@ fn clamp_gains_bounded_by_g_max_and_firewall() {
     let (dsp_config, _, _) = build_dsp_config(&podcast_req(), &stem_features(), Some(&pa))
         .expect("build_dsp_config failed");
 
+    let mut reached_clamp = false;
     for band in dsp_config
         .eq
         .zone_bands
@@ -106,11 +110,11 @@ fn clamp_gains_bounded_by_g_max_and_firewall() {
         .filter(|b| b.source == EqSource::Reference)
     {
         assert!(
-            band.gain_db.abs() <= G_MAX_DB + 1e-3,
+            band.gain_db.abs() <= g_max_db + 1e-3,
             "Band {:.0} Hz: |{:.3}| dB > G_MAX={}.",
             band.center_hz,
             band.gain_db,
-            G_MAX_DB
+            g_max_db
         );
         assert!(
             band.gain_db.abs() <= CFW_MAX_DB,
@@ -119,7 +123,19 @@ fn clamp_gains_bounded_by_g_max_and_firewall() {
             band.gain_db,
             CFW_MAX_DB
         );
+        if (band.gain_db.abs() - g_max_db).abs() <= 1e-3 {
+            reached_clamp = true;
+        }
     }
+
+    // ΔΙΠΛΕΥΡΟ: το προηγούμενο έλεγχε μόνο ότι το όριο δεν ξεπεράστηκε,
+    // οπότε ένα ΜΙΚΡΟΤΕΡΟ g_max περνούσε σιωπηλά. Το ερέθισμα (+30 dB)
+    // είναι πολύ πέρα από κάθε ψαλίδι, άρα κάποια μπάντα ΠΡΕΠΕΙ να
+    // κάθεται ακριβώς πάνω του — αλλιώς το ψαλίδι δεν εφαρμόστηκε.
+    assert!(
+        reached_clamp,
+        "καμία μπάντα δεν έφτασε το g_max={g_max_db} — το ψαλίδι δεν εφαρμόστηκε"
+    );
 }
 
 /// TEST #3 — Muddy input → CUT the low end.

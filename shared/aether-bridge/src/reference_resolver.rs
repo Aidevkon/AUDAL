@@ -265,7 +265,35 @@ mod tests {
         assert_eq!(p.sbr_hi, SBR_HI);
 
         assert_eq!(p.normalization_band_count, 6);
-        assert!((p.g_max_db - 6.0).abs() < 1e-6);
+
+        // ΤΟ ΨΑΛΙΔΙ ΩΣ ΣΥΜΠΕΡΙΦΟΡΑ: μια απόκλιση πολύ μεγαλύτερη από
+        // κάθε επιτεύξιμη πρέπει να βγει ΑΚΡΙΒΩΣ στο όριο του profile —
+        // διαβασμένο από το JSON, όχι γραμμένο εδώ. Έτσι το test
+        // επιβιώνει σε αλλαγή τιμής και πέφτει σε αλλαγή λογικής.
+        {
+            let mut signal = p.spectral_target;
+            signal[0] += 40.0; // θέλει κόψιμο, πολύ πέρα από το ψαλίδι
+            signal[1] -= 40.0; // θέλει ανέβασμα, το ίδιο
+            let g = ReferenceResolver::compute_gains(
+                &signal,
+                &p.spectral_target,
+                p.g_max_db,
+                &p.dead_zone_db,
+            );
+            assert_eq!(g[0], -p.g_max_db, "κόψιμο πρέπει να ψαλιδιστεί στο -g_max");
+            assert_eq!(g[1], p.g_max_db, "ανέβασμα πρέπει να ψαλιδιστεί στο +g_max");
+        }
+
+        // ΚΑΙ Η ΤΙΜΗ, ΜΕ ΜΗΝΥΜΑ. Μένει κλειδωμένη — αλλά η αλλαγή της
+        // γίνεται σκόπιμη αντί για σιωπηλή.
+        assert_eq!(
+            p.g_max_db, 6.0,
+            "το g_max άλλαξε — placeholder (dd1122b, 2026-07-02), \
+             trigger: corpus αφήγησης >=3 ΔΙΑΚΡΙΤΕΣ παραγωγές. \
+             Ενημέρωσε το podcast-v1.json:9 και τη spec \
+             (reference-driven-sonic-vision-podcast-v1_1.md:421, που το \
+             δηλώνει 'tuned craft' ενώ το JSON το δηλώνει placeholder)."
+        );
         // A dead zone at or above this exceeds any achievable |target - signal|,
         // so compute_gains always takes the zero branch. g_max_db plays no part:
         // it lives only in the else-branch, which a disabled band never reaches.
