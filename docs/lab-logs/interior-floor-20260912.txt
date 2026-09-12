@@ -1,0 +1,33 @@
+=== RECON+MEASURE: interior ελάχιστο ΑΠΟ ΚΩΔΙΚΑ, 20 LibriVox, 2026-09-12T23:10:43+03:00 ===
+ΠΡΟΒΛΕΨΗ (γραμμένη πριν το τρέξιμο): 4/20 interior κάτω από -60
+
+edge_s = 5 (presets.rs room_tone_max_s) · limit = -60 dB (max_noise_floor_db)
+
+αρχείο                                      abs_min      @sec   interior      @sec  ΚΑΤΑΣΤΑΣΗ
+adventureholmes_01_doyle.mp3                 -65.56      31.3     -65.56      31.3  SLEEPING   (3907s)
+adventuresholmes_01_doyle.mp3                -97.77     546.4     -97.77     546.4  SLEEPING   (1671s)
+adventurespinocchio_01_collodi.mp3           -52.50       0.0     -51.86      20.1  WAKING   (302s)
+anne_of_green_gables_01_montgomery.mp3       -90.03     873.5     -46.75     722.2  WAKING   (878s)
+count_of_monte_cristo_001_dumas.mp3          -76.65    1178.7     -53.81      23.4  WAKING   (1179s)
+dracula_01_stoker.mp3                        -56.16      95.4     -56.16      95.4  WAKING   (2218s)
+emma_01_01_austen.mp3                        -60.01      16.3     -60.01      16.3  SLEEPING   (1297s)
+huckfinn_01_twain_apc.mp3                    -57.26     531.6     -57.20      98.9  WAKING   (532s)
+janeeyre_01_bronte.mp3                      -144.00     798.7     -58.84     282.9  WAKING   (800s)
+mobydick_000_melville.mp3                    -74.23    1752.6     -74.19    1745.4  SLEEPING   (1753s)
+odyssey_01_homer_butler.mp3                  -64.82      22.6     -64.82      22.6  SLEEPING   (1386s)
+peterpan_01_barrie.mp3                      -144.00    1069.6     -59.57     472.0  WAKING   (1071s)
+prideandprejudice_10-11_austen.mp3           -61.35    1562.5     -60.84    1321.1  SLEEPING   (1563s)
+returnofholmes_01_doyle.mp3                  -97.86    1551.8     -65.37     190.9  SLEEPING   (1556s)
+robinson_crusoe_01_defoe.mp3                -144.00    2346.2     -70.72     763.8  SLEEPING   (2348s)
+secretgarden_01_burnett.mp3                  -58.36      32.1     -58.36      32.1  WAKING   (808s)
+swiss_family_robinson_01_wyss.mp3            -87.51    1123.6     -68.50     160.2  SLEEPING   (1127s)
+tale_of_two_cities_01_dickens.mp3            -58.63      34.2     -58.63      34.2  WAKING   (410s)
+treasure_island_01-02_stevenson.mp3          -60.99    1804.1     -60.18     939.7  SLEEPING   (1805s)
+uncletom_01_stowe.mp3                        -62.61       0.0     -61.33     152.0  SLEEPING   (1536s)
+
+=== ΣΥΝΟΨΗ ===
+ΑΠΟΛΥΤΟ ελάχιστο  < -60 dB : 15/20
+INTERIOR ελάχιστο < -60 dB : 11/20   ← SLEEPING
+                  >= -60 dB : 9/20   ← WAKING
+                  ΑΠΟΝ            : 0/20   ← ABSENT
+DONE

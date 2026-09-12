@@ -258,6 +258,60 @@ impl AcxCheckAnalyzer {
         }
     }
 
+    /// Το ελάχιστο κυλιόμενο παράθυρο 500 ms **ΕΚΤΟΣ** των άκρων, και η θέση
+    /// του σε δείγματα. `None` όταν δεν απομένουν αρκετά παράθυρα.
+    ///
+    /// ΓΙΑΤΙ ΥΠΑΡΧΕΙ: το `finish()` δίνει το ΑΠΟΛΥΤΟ ελάχιστο σε όλο το
+    /// αρχείο — η σωστή απάντηση για τον έλεγχο συμμόρφωσης του οίκου, γιατί
+    /// αυτό ακριβώς μετράει το plugin του. Είναι όμως η λάθος απάντηση για
+    /// «πόσο θορυβώδες είναι το δωμάτιο»: στα άκρα ζει το padding, και
+    /// padding δεν είναι δωμάτιο.
+    ///
+    /// ⚠ ΤΟ `edge_sec` ΔΕΝ ΟΡΙΖΕΤΑΙ ΕΔΩ, ΚΑΙ ΕΠΙΤΗΔΕΣ: το sp314-dsp δεν
+    /// εξαρτάται από το lineos-types, άρα η προδιαγραφή του προορισμού δεν
+    /// φτάνει ως εδώ. Ο καλών δίνει τον αριθμό ΚΑΙ την προέλευσή του — έτσι
+    /// αυτό το αρχείο δεν αποκτά κατώφλι χωρίς πηγή.
+    ///
+    /// ⚠ ΔΗΛΩΜΕΝΟ ΚΟΣΤΟΣ: ο αποκλεισμός είναι ΣΤΑΘΕΡΟΣ. Αν ο καλών δώσει το
+    /// ΑΝΩ ΦΡΑΓΜΑ του επιτρεπτού padding (π.χ. τα 5 s του ACX) και το αρχείο
+    /// έχει μόλις 1 s padding, τότε 4 s ΠΡΑΓΜΑΤΙΚΟΥ περιεχομένου σε κάθε άκρο
+    /// δεν μετριούνται. Συντηρητικό προς τη μία κατεύθυνση, όχι ουδέτερο.
+    ///
+    /// ΤΟ ΟΡΙΟ ΤΟΥ «ΔΕΝ ΜΕΤΡΙΕΤΑΙ» ΔΕΝ ΕΙΝΑΙ ΝΕΟ: είναι το ίδιο
+    /// `MIN_SUB_BLOCKS` που το `finish()` χρησιμοποιεί για ολόκληρο το
+    /// αρχείο, δηλαδή ο ορισμός του plugin για «selection too short».
+    pub fn interior_noise_floor_db(&self, edge_sec: f32) -> Option<(f32, usize)> {
+        let edge_blocks =
+            (edge_sec * 1000.0 / SUB_BLOCK_MS as f32).ceil().max(0.0) as usize;
+        let n = self.sub_mean_sqs.len();
+        // Δύο άκρα — δομικός παράγοντας, όχι κατώφλι. Ονομασμένος ώστε να μην
+        // διαβάζεται ως αριθμητική σύγκριση από το threshold-lint.
+        let both_edges = edge_blocks.saturating_mul(2);
+        if n < both_edges {
+            return None;
+        }
+        let interior = &self.sub_mean_sqs[edge_blocks..n - edge_blocks];
+        if interior.len() < MIN_SUB_BLOCKS {
+            return None;
+        }
+
+        // ΙΔΙΟΣ βρόχος με το finish() — 5 διαδοχικά sub-blocks, μέσος όρος
+        // των mean squares. Δεν ξαναγράφεται ο ορισμός, μετακινείται το εύρος.
+        let mut min_window = f32::MAX;
+        let mut min_idx = 0;
+        for (i, w) in interior.windows(WINDOW_SUB_BLOCKS).enumerate() {
+            let sum = w.iter().sum::<f32>() / WINDOW_SUB_BLOCKS as f32;
+            if sum < min_window {
+                min_window = sum;
+                min_idx = i;
+            }
+        }
+        Some((
+            to_db(libm::sqrtf(min_window)),
+            (edge_blocks + min_idx) * self.sub_block_size,
+        ))
+    }
+
     pub fn finish(self) -> AcxCheckReport {
         if self.count == 0 {
             return AcxCheckReport {

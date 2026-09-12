@@ -95,7 +95,29 @@ fn main() {
         .collect();
     files.sort();
 
-    println!("{:<45} {:>6} {:>3} {:>14} {}", "αρχείο", "sr", "ch", "noise_floor_db", "ΠΕΡΝΑΕΙ (<-60)");
+    // ΤΑ ΔΥΟ ΝΟΥΜΕΡΑ ΕΡΧΟΝΤΑΙ ΑΠΟ ΤΗΝ ΠΡΟΔΙΑΓΡΑΦΗ, ΟΧΙ ΑΠΟ ΕΔΩ.
+    // Και τα δύο φέρουν SOURCE + RETRIEVED στο presets.rs (:95-99, :85).
+    //
+    // edge_s = room_tone_max_s: ο οίκος λέει «room tone spacing must not
+    // exceed 5 seconds» — ΑΝΩ ΦΡΑΓΜΑ του τι ΕΠΙΤΡΕΠΕΤΑΙ να είναι padding.
+    // ⚠ Η χρήση του ως ΣΤΑΘΕΡΟΣ ΑΠΟΚΛΕΙΣΜΟΣ είναι ΕΠΙΛΟΓΗ, συντηρητική:
+    //   σε αρχείο με 1 s padding, 4 s πραγματικού περιεχομένου σε κάθε άκρο
+    //   δεν μετριούνται. Το κόστος είναι δηλωμένο, όχι μηδενικό.
+    // limit = max_noise_floor_db: «noise floor no higher than -60dB RMS».
+    //   ΚΑΝΕΙ ΚΑΙ ΤΙΣ ΔΥΟ ΔΟΥΛΕΙΕΣ — κρίση συμμόρφωσης ΚΑΙ διαχωρισμός
+    //   SLEEPING/WAKING. Μηδέν νέο κατώφλι.
+    let edge_s = lineos_types::presets::ACX
+        .room_tone_max_s
+        .expect("ACX ορίζει room_tone_max_s");
+    let limit_db = lineos_types::presets::ACX
+        .max_noise_floor_db
+        .expect("ACX ορίζει max_noise_floor_db");
+    println!("edge_s = {edge_s} (presets.rs room_tone_max_s) · limit = {limit_db} dB (max_noise_floor_db)\n");
+
+    println!(
+        "{:<40} {:>10} {:>9} {:>10} {:>9}  {}",
+        "αρχείο", "abs_min", "@sec", "interior", "@sec", "ΚΑΤΑΣΤΑΣΗ"
+    );
     let mut results = Vec::new();
     for f in &files {
         let (sr, ch) = ffprobe_sr_ch(f);
@@ -105,32 +127,65 @@ fn main() {
         for chunk in mono.chunks(4096) {
             acx.feed_chunk(chunk);
         }
+        // ΠΡΙΝ το finish() — το interior_noise_floor_db παίρνει &self,
+        // το finish() καταναλώνει.
+        let interior = acx.interior_noise_floor_db(edge_s);
         let report = acx.finish();
 
         let name = Path::new(f).file_name().unwrap().to_string_lossy();
-        match report.noise_floor_db {
-            Some(nf) => {
-                let pass = nf < -60.0;
-                let window_sec = report
-                    .quietest_window_start_frame
-                    .map(|f| f as f64 / sr as f64)
-                    .unwrap_or(f64::NAN);
-                let total_sec = mono.len() as f64 / sr as f64;
-                println!(
-                    "{:<45} {:>6} {:>3} {:>14.2} {}  quietest_window_at={:.1}s/{:.1}s",
-                    name, sr, ch, nf, if pass { "ΝΑΙ" } else { "ΟΧΙ" }, window_sec, total_sec
-                );
-                results.push((name.into_owned(), Some(nf), pass));
-            }
-            None => {
-                println!("{:<45} {:>6} {:>3} {:>14} {}", name, sr, ch, "None", "ΑΠΟΝ (<1s)");
-                results.push((name.into_owned(), None, false));
-            }
-        }
+        let total_sec = mono.len() as f64 / sr as f64;
+
+        let abs_txt = match report.noise_floor_db {
+            Some(nf) => format!("{nf:10.2}"),
+            None => format!("{:>10}", "None"),
+        };
+        let abs_at = report
+            .quietest_window_start_frame
+            .map(|fr| format!("{:9.1}", fr as f64 / sr as f64))
+            .unwrap_or_else(|| format!("{:>9}", "-"));
+
+        // Ο ΚΑΝΟΝΑΣ, ΑΠΟ ΚΩΔΙΚΑ:
+        //   δεν υπάρχει interior            ⇒ ABSENT
+        //   interior κάτω από το όριο       ⇒ SLEEPING (ο gate δεν έχει δουλειά)
+        //   interior πάνω από το όριο       ⇒ WAKING
+        let (int_txt, int_at, state) = match interior {
+            None => (
+                format!("{:>10}", "None"),
+                format!("{:>9}", "-"),
+                "ABSENT",
+            ),
+            Some((db, fr)) => (
+                format!("{db:10.2}"),
+                format!("{:9.1}", fr as f64 / sr as f64),
+                if db < limit_db { "SLEEPING" } else { "WAKING" },
+            ),
+        };
+
+        println!(
+            "{:<40} {} {} {} {}  {}   ({:.0}s)",
+            name, abs_txt, abs_at, int_txt, int_at, state, total_sec
+        );
+        results.push((
+            name.into_owned(),
+            report.noise_floor_db,
+            interior.map(|(db, _)| db),
+            state,
+        ));
     }
 
-    let pass_count = results.iter().filter(|(_, _, p)| *p).count();
-    println!("\n=== ΣΥΝΟΨΗ AcxCheckAnalyzer ===");
-    println!("< -60dBFS: {pass_count}/{}", results.len());
+    let n = results.len();
+    let sleeping = results.iter().filter(|r| r.3 == "SLEEPING").count();
+    let waking = results.iter().filter(|r| r.3 == "WAKING").count();
+    let absent = results.iter().filter(|r| r.3 == "ABSENT").count();
+    let abs_pass = results
+        .iter()
+        .filter(|r| r.1.map(|v| v < limit_db).unwrap_or(false))
+        .count();
+
+    println!("\n=== ΣΥΝΟΨΗ ===");
+    println!("ΑΠΟΛΥΤΟ ελάχιστο  < {limit_db} dB : {abs_pass}/{n}");
+    println!("INTERIOR ελάχιστο < {limit_db} dB : {sleeping}/{n}   ← SLEEPING");
+    println!("                  >= {limit_db} dB : {waking}/{n}   ← WAKING");
+    println!("                  ΑΠΟΝ            : {absent}/{n}   ← ABSENT");
     println!("DONE");
 }
