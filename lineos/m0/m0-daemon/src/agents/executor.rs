@@ -253,9 +253,12 @@ pub fn execute_streaming_plan(
     let mut profiler = crate::handlers::timeline::TimelineProfiler::new();
     let path = std::path::Path::new(&audio_path);
 
-    let target_lufs = plan.target_lufs_override.unwrap_or_else(|| {
-        lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id).target_lufs
-    });
+    // ΕΝΑ object, δύο πεδία: το target_lufs δέχεται override από το plan,
+    // το ταβάνι ΟΧΙ — έρχεται πάντα από το spec του preset.
+    let delivery_target = lineos_types::config::LoudnessTarget::from_preset(&plan.preset_id);
+    let target_lufs = plan
+        .target_lufs_override
+        .unwrap_or(delivery_target.target_lufs);
     let (metrics, p0_decoder) = crate::dsp::input_lufs::pass0_decode_to_dump(path, &raw_tap_path)
         .map_err(ExecutorError::DspFailed)?;
     let input_lufs = metrics.integrated_lufs;
@@ -365,6 +368,8 @@ pub fn execute_streaming_plan(
                 pre_gain_linear,
                 expected_output_frames: p0_decoder.expected_output_frames(),
                 quietest_active_window_dbfs: trunk_report.quietest_active_window_dbfs,
+                max_true_peak_db: delivery_target.max_true_peak_db,
+                intent_dynamics: plan.intent_dynamics,
                 restoration_enabled: true,
             },
             sp314_orchestrator::streaming_pipeline::TimelinePlan {

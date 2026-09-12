@@ -59,6 +59,15 @@ pub struct StreamingConfig<'a> {
     /// the DSP core.
     /// ΗΤΑΝ `noise_floor_dbfs` — ΔΕΝ είναι πάτωμα θορύβου [F-097].
     pub quietest_active_window_dbfs: Option<f32>,
+    /// Ταβάνι true peak, dBTP — ΑΠΟ ΤΟ SPEC ΤΟΥ PRESET
+    /// (`DeliverySpec::max_true_peak_db`, lineos-types). ΔΕΝ έχει default
+    /// εδώ και ΔΕΝ είναι Option: κάθε preset φέρνει το δικό του (−1.0 για
+    /// spotify/youtube/broadcast/podcast, −3.0 για acx). Ο limiter στοχεύει
+    /// `ceiling_db − TRUE_PEAK_HEADROOM_DB` (0.35, F-048).
+    pub max_true_peak_db: f32,
+    /// Intent «dynamics» [0.0, 1.0] — Smooth…Punchy. None = default 0.5.
+    /// Τροφοδοτεί ΜΟΝΟ τον τύπο του blend_release_ms του limiter.
+    pub intent_dynamics: Option<f32>,
     /// Bypass flag for A/B testing (Y4-c TODO: plumb to UI)
     pub restoration_enabled: bool,
 }
@@ -252,6 +261,36 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut acc_left: Vec<f32> = Vec::with_capacity(block_size * 2);
     let mut acc_right: Vec<f32> = Vec::with_capacity(block_size * 2);
 
+    // ── ΤΟ ΤΑΒΑΝΙ ΤΗΣ ΖΩΝΤΑΝΗΣ ΔΙΑΔΡΟΜΗΣ ────────────────────────────────
+    // Ο render του κουμπιού δεν είχε κανένα ταβάνι· το μόνο που στεκόταν
+    // ανάμεσα στην έξοδο και σε clipping ήταν το ΥΠΟ ΣΥΝΘΗΚΗ στατικό trim
+    // του export (`if tp_db > -3.0`). Ο κόμβος και η ρύθμισή του
+    // μεταφέρονται από τη Music διαδρομή (dsp/mod.rs) — δεν γράφονται εδώ.
+    //
+    // Control plane υπολογίζει, ο DSP διαβάζει —
+    // ίδιος τύπος με dsp_node.rs, ΜΙΑ πηγή.
+    // 0.0 Smooth → 200ms · 0.5 default → 105ms ·
+    // 1.0 Punchy → 10ms
+    // ΗΤΑΝ 95.0 δανεισμένο από episode_render:196,
+    // που είναι αντίγραφο σχολίου διορθωμένου στις
+    // 2026-08-25 (dsp_node.rs:80). Το 95 δεν
+    // προκύπτει από κανέναν τύπο.
+    let d = config.intent_dynamics.unwrap_or(0.5).clamp(0.0, 1.0);
+    let blend_release_ms = 200.0 - (d * 190.0);
+
+    let limiter_config = sp314_dsp::limiter::core::LimiterConfig {
+        release_ms: 15.0,
+        blend_release_ms,
+        ceiling_db: config.max_true_peak_db,
+        midside_eq_enabled: false,
+        true_peak_enabled: true,
+    };
+    let mut limiter = sp314_dsp::limiter::core::BrickwallLimiter::new(limiter_config, sample_rate);
+    // Το lookahead ΠΑΡΑΓΕΤΑΙ, δεν καρφώνεται: ίδια συνάρτηση που χτίζει τον
+    // δακτύλιο του limiter (5 ms· 240 δείγματα στα 48 kHz).
+    let limiter_flush_frames =
+        sp314_dsp::limiter::core::lookahead_samples(sample_rate) as usize;
+
     let mut total_frames_processed: usize = 0;
     let mut last_type: Option<SegmentType> = None;
     let mut last_idx: Option<usize> = None;
@@ -405,6 +444,11 @@ pub fn run_streaming_pipeline_with_timeline(
                 graph.process_block(&mut bl, &mut br);
             }
 
+            // ΜΕΤΑ ΤΗ ΣΥΓΧΩΝΕΥΣΗ, ΠΡΙΝ ΤΟ CAP: εδώ το bl/br είναι η ΤΕΛΙΚΗ
+            // έξοδος και για τους δύο κλάδους (fallback graph και dual graph).
+            // Μόνο τα έγκυρα δείγματα — η ουρά του μπλοκ είναι zero padding.
+            limiter.process_block(&mut bl[..valid_frames], &mut br[..valid_frames]);
+
             let frames_to_write = if let Some(cap) = config.expected_output_frames {
                 let remaining = (cap as usize).saturating_sub(total_frames_processed);
                 valid_frames.min(remaining)
@@ -419,6 +463,36 @@ pub fn run_streaming_pipeline_with_timeline(
         Ok(())
     })
     .map_err(|e| format!("{:?}", e))?;
+
+    // ── LOOKAHEAD FLUSH — ΤΟ ΜΗΚΟΣ ΤΟΥ ΑΡΧΕΙΟΥ ΔΕΝ ΑΛΛΑΖΕΙ ──────────────
+    // Ο limiter καθυστερεί κατά `limiter_flush_frames`, άρα τόσα δείγματα
+    // μένουν στον δακτύλιο όταν τελειώσει η είσοδος. Ίδιο μοτίβο με το
+    // episode render (LIMITER_FLUSH_FRAMES): σπρώχνουμε σιωπή για να τα
+    // βγάλει, ΑΛΛΑ γράφουμε ΜΟΝΟ μέχρι το ίδιο cap που ίσχυε και πριν.
+    //
+    // ⚠ ΔΗΛΩΜΕΝΗ ΣΥΝΕΠΕΙΑ, ΙΔΙΑ ΜΕ ΤΗΝ EPISODE ΔΙΑΔΡΟΜΗ: η έξοδος είναι
+    //   μετατοπισμένη κατά το lookahead (5 ms) και τα τελευταία τόσα
+    //   δείγματα εισόδου δεν φτάνουν στο αρχείο. Το ΠΛΗΘΟΣ των frames
+    //   μένει ΑΚΡΙΒΩΣ ίδιο — αυτό είναι που πιστοποιεί το cert (spacing σε
+    //   δευτερόλεπτα).
+    if limiter_flush_frames > 0 {
+        let mut flush_l = vec![0.0_f32; limiter_flush_frames];
+        let mut flush_r = vec![0.0_f32; limiter_flush_frames];
+        limiter.process_block(&mut flush_l, &mut flush_r);
+
+        let flush_to_write = match config.expected_output_frames {
+            Some(cap) => (cap as usize)
+                .saturating_sub(total_frames_processed)
+                .min(limiter_flush_frames),
+            // Χωρίς cap δεν υπάρχει «αναμενόμενο μήκος» να συμπληρωθεί, και
+            // γράψιμο της ουράς θα ΜΕΓΑΛΩΝΕ το αρχείο. Δεν γράφεται.
+            None => 0,
+        };
+        if flush_to_write > 0 {
+            writer.write_chunk(&flush_l[..flush_to_write], &flush_r[..flush_to_write])?;
+            total_frames_processed += flush_to_write;
+        }
+    }
 
     writer.finalize()?;
     Ok(total_frames_processed)

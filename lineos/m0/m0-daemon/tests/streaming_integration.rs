@@ -58,6 +58,10 @@ fn streaming_pipeline_ducking_e2e() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -100,6 +104,10 @@ fn streaming_pipeline_ducking_e2e() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -223,6 +231,10 @@ fn test_streaming_pipeline_jit_orchestration() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -243,10 +255,17 @@ fn test_streaming_pipeline_jit_orchestration() {
     let stream_left: Vec<f32> = stream_interleaved.iter().step_by(2).copied().collect();
     let input_left: Vec<f32> = input_interleaved.iter().step_by(2).copied().collect();
 
-    // 0.0-1.0s: Single graph (Speech -> gain 1.0). Should be bit-perfect to input.
+    // ΤΟ LOOKAHEAD ΤΟΥ LIMITER — ΠΑΡΑΓΟΜΕΝΟ, ΟΧΙ 240 ΚΑΡΦΩΤΟ.
+    // Ο limiter της ζωντανής διαδρομής καθυστερεί κατά το lookahead του
+    // ΑΚΟΜΑ ΚΑΙ ΟΤΑΝ ΔΕΝ ΜΕΙΩΝΕΙ ΤΙΠΟΤΑ — ο δακτύλιος τρέχει πάντα.
+    // Το τεστ ΔΕΝ χαλάρωσε: η ανοχή μένει 1e-10· ευθυγραμμίζεται η σύγκριση.
+    let la = sp314_dsp::limiter::core::lookahead_samples(48_000) as usize;
+
+    // 0.0-1.0s: Single graph (Speech -> gain 1.0). Should be bit-perfect to input,
+    // ευθυγραμμισμένο με το lookahead.
     let mut mse_single = 0.0;
     for i in 24000..48000 {
-        let diff = stream_left[i] - input_left[i];
+        let diff = stream_left[i + la] - input_left[i];
         mse_single += diff * diff;
     }
     mse_single /= 24000.0;
@@ -255,7 +274,7 @@ fn test_streaming_pipeline_jit_orchestration() {
     let mut mse_dual = 0.0;
     for i in 72000..96000 {
         // 1.5s to 2.0s
-        let diff = stream_left[i] - input_left[i];
+        let diff = stream_left[i + la] - input_left[i];
         mse_dual += diff * diff;
     }
     mse_dual /= 24000.0;
@@ -338,6 +357,10 @@ fn test_streaming_pipeline_jit_fallback() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -400,6 +423,10 @@ fn test_vocal_graph_e2e_ltass_proof() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -441,6 +468,10 @@ fn test_vocal_graph_e2e_ltass_proof() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -603,8 +634,13 @@ fn standardized_decoder_resamples_and_hashes() {
     let _ = std::fs::remove_file(wav_path);
 }
 
+// ΜΕΤΟΝΟΜΑΣΙΑ 2026-09-12: ΗΤΑΝ
+// `pre_gain_applies_identically_to_fallback_and_dual_graph_paths`.
+// Το όνομα ήταν ΨΕΥΔΕΣ: το ίδιο το σώμα γράφει «No boundaries -> guaranteed
+// to use fallback path exclusively», άρα ο dual κλάδος ΔΕΝ τρέχει ποτέ εδώ.
+// Το τεστ συγκρίνει δύο pre_gain στον ΙΔΙΟ (fallback) κλάδο.
 #[test]
-fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
+fn pre_gain_is_linear_below_the_ceiling() {
     let topology = dummy_ducking_topology();
 
     let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
@@ -623,7 +659,27 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
     let (_, flagged_indices) =
         m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
 
-    // Run 1: Unity (1.0)
+    // ΗΤΑΝ 1.0/2.0. Μετρήθηκε 11/09 με εξωτερικό
+    // εργαλείο: η είσοδος έχει true peak −1.1 dBTP,
+    // πάνω από τον στόχο του limiter (−1.35 = ταβάνι
+    // −1.0 μείον το headroom του εκτιμητή, F-048).
+    // Ο limiter ενεργούσε ΚΑΙ ΣΤΑ ΔΥΟ σκέλη, οπότε η
+    // κορυφή δεν ανήκε πια στο pre_gain και ο λόγος
+    // έβγαινε 1.005 αντί 2.
+    // Η γραμμικότητα μετριέται στη γραμμική περιοχή.
+    // Το άνω όριο προκύπτει από τη μετρημένη κορυφή
+    // εισόδου και τις δύο σταθερές, δεν διαλέγεται:
+    //   2 × pre_gain × 10^(−1.1/20) < 10^(−1.35/20)
+    //   ⇒ pre_gain < 0.4858
+    // Το 0.25 αφήνει ~6 dB περιθώριο.
+    // Η ανοχή ΔΕΝ χαλάρωσε.
+    //
+    // ΕΠΑΛΗΘΕΥΤΗΚΕ ότι ο υπολογισμός στέκει: τα δύο τρεξίματα διαφέρουν ΜΟΝΟ
+    // στο `pre_gain_linear`· η τοπολογία είναι in → duck_gain(Gain 1.0) → out
+    // και με `boundaries = vec![]` ο κλάδος τμημάτων δεν τρέχει ποτέ, άρα το
+    // duck_gain μένει 1.0 και στα δύο· καμία άλλη ενίσχυση στη διαδρομή.
+    //
+    // Run 1: base (0.25)
     run_streaming_pipeline_with_timeline(
         FileDecoder {
             path: input_path.to_string(),
@@ -636,9 +692,13 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 1.0,
-            pre_gain_linear: 1.0,
+            pre_gain_linear: 0.25,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -650,7 +710,7 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
     )
     .unwrap();
 
-    // Run 2: Boost (2.0)
+    // Run 2: ×2 (0.5) — ίδιο σήμα, διπλάσιο pre_gain, ακόμη κάτω από το ταβάνι.
     let (tx_job2, rx_job2) = std::sync::mpsc::channel();
     let (tx_res2, rx_res2) = std::sync::mpsc::channel();
     let shadow_reader2 =
@@ -672,9 +732,13 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 1.0,
-            pre_gain_linear: 2.0,
+            pre_gain_linear: 0.5,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -700,11 +764,13 @@ fn pre_gain_applies_identically_to_fallback_and_dual_graph_paths() {
         .map(|&x| x.abs())
         .fold(0.0f32, f32::max);
 
-    println!("Max Unity: {:.6}, Max Boost: {:.6}", max_unity, max_boost);
+    // Τα ονόματα `unity`/`boost` κρατήθηκαν ως τοπικά, αλλά το ζεύγος δεν
+    // είναι πια 1.0/2.0 — η ετικέτα λέει τι μετρήθηκε.
+    println!("Max base(0.25): {:.6}, Max x2(0.5): {:.6}", max_unity, max_boost);
     assert!(max_unity > 0.01, "Input needs some amplitude");
     assert!(
         (max_boost - max_unity * 2.0).abs() < 1e-4,
-        "Boost output should be exactly 2x unity output"
+        "Doubling pre_gain below the ceiling must double the output exactly"
     );
 
     std::fs::remove_file(output_path_unity).ok();
@@ -838,6 +904,10 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             pre_gain_linear: 1.0,
             expected_output_frames: expected,
             quietest_active_window_dbfs: None,
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: false,
         },
         TimelinePlan {
@@ -915,6 +985,10 @@ fn test_restoration_speech_gated() {
             pre_gain_linear: 1.0,
             expected_output_frames: None,
             quietest_active_window_dbfs: None,    // Exercises the -45 default gate
+            // Ταβάνι από τον κατάλογο, ΟΧΙ literal.
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            // Default intent — ο τύπος δίνει 105 ms.
+            intent_dynamics: None,
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
         },
         TimelinePlan {
@@ -933,18 +1007,23 @@ fn test_restoration_speech_gated() {
     let stream_left: Vec<f32> = stream_interleaved.iter().step_by(2).copied().collect();
     let input_left: Vec<f32> = input_interleaved.iter().step_by(2).copied().collect();
 
+    // ΤΟ LOOKAHEAD ΤΟΥ LIMITER — ΠΑΡΑΓΟΜΕΝΟ, ΟΧΙ 240 ΚΑΡΦΩΤΟ.
+    // Ο κόμβος καθυστερεί κατά το lookahead του ΑΚΟΜΑ ΚΑΙ ΧΩΡΙΣ μείωση.
+    // Η ανοχή μένει 1e-10 — ευθυγραμμίζεται μόνο η σύγκριση.
+    let la = sp314_dsp::limiter::core::lookahead_samples(48_000) as usize;
+
     // (α) Music regions (0.0-1.0s and 2.0-3.0s):
     // Fallback-graph output == input * gain. The RestorationChain never runs.
     let mut mse_music1 = 0.0;
     for i in 24000..48000 {
-        let diff = stream_left[i] - (input_left[i] * 0.501);
+        let diff = stream_left[i + la] - (input_left[i] * 0.501);
         mse_music1 += diff * diff;
     }
     assert!(mse_music1 / 24000.0 < 1e-10, "Music region 1 altered!");
 
     let mut mse_music2 = 0.0;
     for i in 120000..144000 {
-        let diff = stream_left[i] - (input_left[i] * 0.501);
+        let diff = stream_left[i + la] - (input_left[i] * 0.501);
         mse_music2 += diff * diff;
     }
     assert!(mse_music2 / 24000.0 < 1e-10, "Music region 2 altered!");
@@ -953,7 +1032,7 @@ fn test_restoration_speech_gated() {
     // Dual graph engages. Assert the region differs from raw mix (chain ran).
     let mut mse_speech = 0.0;
     for i in 48000..96000 {
-        let diff = stream_left[i] - input_left[i];
+        let diff = stream_left[i + la] - input_left[i];
         mse_speech += diff * diff;
     }
     assert!(
