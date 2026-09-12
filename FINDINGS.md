@@ -313,7 +313,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   ετικέτα του. Και δύο κόμβοι είναι νεκροί στα δύο
   άκρα του ίδιου προβλήματος.** Component:
   conditions.rs:28 · router.rs:14-16 ·
-  pipelineforge_contract.rs:71-72 · dsp/mod.rs:480-501 ·
+  pipelineforge_contract.rs:71-72 · dsp/mod.rs:518-539 ·
   dehum.rs. ΜΕΤΡΗΜΕΝΟ 2026-08-24.
   ΤΟ ΕΥΡΗΜΑ: το `MainsHumDetected` υπάρχει ως enum
   variant (μόνο σχόλιο) και ως καταναλωτής στο router
@@ -1369,7 +1369,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 - **[F-093] Εξήντα τέσσερις συντελεστές σε
   production, από εργαλείο που ΔΕΝ ΥΠΗΡΞΕ ΠΟΤΕ ΣΤΟ
   REPO.** Component: `dsp/mod.rs` `A_INV` ·
-  `dsp/mod.rs:585` `EXPECTED` · `flag_oracle.rs:876`
+  `dsp/mod.rs:623` `EXPECTED` · `flag_oracle.rs:876`
   `EXPECTED_DB`. ΜΕΤΡΗΜΕΝΟ 2026-08-25.
   Το σχόλιο (993f7cd, 28/07) λέει αυτούσια:
   «Regenerating this requires rerunning
@@ -1473,7 +1473,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   επικάλυψη, η άλλη —αυτή του χρήστη— όχι.**
   Component: `flavor.rs:90-97` ·
   `streaming_pipeline.rs:117-156,227` ·
-  `dsp/mod.rs:452-470`. ΜΕΤΡΗΜΕΝΟ 2026-09-06.
+  `dsp/mod.rs:452-508`. ΜΕΤΡΗΜΕΝΟ 2026-09-06.
 
   ```
   flavor.rs (LtassCorrection)   q: 1.0
@@ -1506,7 +1506,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   λύνει και τα δύο.**
 
   Ο ΛΥΤΗΣ ΥΠΑΡΧΕΙ ΚΑΙ ΕΙΝΑΙ ΣΤΗ ΛΑΘΟΣ ΔΙΑΔΡΟΜΗ:
-  `dsp/mod.rs:452` A_INV 8×8 · `:470`
+  `dsp/mod.rs:452` A_INV 8×8 · `:508`
   πολλαπλασιασμός ⇒ Μόνο στη Music διαδρομή
   (/master). `streaming_pipeline.rs:227` γράφει τα
   gains ΑΠΕΥΘΕΙΑΣ, χωρίς αντιστάθμιση.

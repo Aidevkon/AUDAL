@@ -462,9 +462,47 @@ impl DspAdapter {
 
             // The resolver already clamps its output to the profile's
             // g_max_db, but compensation can push a band past it. Clamp
-            // again after solving. podcast-v1 uses 6.0; the music profiles
-            // use 2.5 and would need this value passed in rather than
-            // hardcoded when reference correction reaches the music path.
+            // again after solving.
+            //
+            // ⚠ ΑΝΤΙΓΡΑΦΟ, ΟΧΙ ΠΗΓΗ. Το 6.0 είναι η τιμή του
+            // podcast-v1.json:8, γραμμένη ξανά εδώ. Σήμερα δίνει τη σωστή
+            // απάντηση ΓΙΑ ΛΑΘΟΣ ΛΟΓΟ: η μόνη διαδρομή που φτάνει σε αυτό
+            // το μπλοκ είναι το Episode, και το Episode ΕΙΝΑΙ podcast-v1.
+            //
+            // ΜΕΤΡΗΜΕΝΟ 2026-09-12: το κλαδί Music του
+            // aether-bridge/src/lib.rs:147-149 είναι ΚΕΝΟ —
+            // «Unclassified music skips reference correction» — οπότε το
+            // target_profile_id μένει None και κανένα ZoneBand με
+            // EqSource::Reference δεν παράγεται. Ο μόνος ProfileId που
+            // κατασκευάζεται σε παραγωγή είναι ο PodcastV1 (lib.rs:146,
+            // streaming_pipeline.rs:234)· τα MusicAcoustic/MusicTechno
+            // υπάρχουν στο load() και κανείς δεν τα ζητά. Άρα το 2.5 των
+            // τριών music profiles ΔΕΝ φτάνει ποτέ εδώ.
+            // ⇒ ΑΝΕΝΕΡΓΟ ΑΝΤΙΓΡΑΦΟ, ΟΧΙ ΛΑΘΟΣ ΤΙΜΗ.
+            //
+            // ⚠ ΤΙ ΘΑ ΚΟΣΤΙΣΕΙ ΟΤΑΝ ΦΤΑΣΕΙ. Το προηγούμενο σχόλιο εδώ
+            // έλεγε «would need this value passed in rather than
+            // hardcoded», που υποτιμά το κόστος. Η
+            // apply_topology_overrides(topology, config) παίρνει δύο
+            // ορίσματα, και το DspConfig ΔΕΝ φέρει profile: eq · dynamics
+            // · sat · stereo · ambience · persona_id · chaos_seed ·
+            // instrument_deltas. Ούτε το DspEqConfig (low_shelf_* ·
+            // high_shelf_* · zone_bands) ούτε το ZoneBand (center_hz ·
+            // gain_db · q · source). Νέο πεδίο σημαίνει αλλαγή του
+            // DspConfig — και το DspConfig σειριοποιείται ΟΛΟΚΛΗΡΟ στο
+            // ΥΠΟΓΕΓΡΑΜΜΕΝΟ certificate (certificate_node.rs:94 →
+            // aether_config, :404). Δηλαδή αλλαγή σχήματος, με alias και
+            // συμβατότητα παλιών sidecars, όχι «pass it in».
+            //
+            // ΚΑΙ ΤΑ ΥΠΟΛΟΙΠΑ ΑΝΤΙΓΡΑΦΑ, γιατί αφορούν το trigger του
+            // ίδιου του placeholder: πέντε σημεία γράφουν 6.0 —
+            // podcast-v1.json:8 (η πηγή), αυτό, reference_resolver.rs
+            // (assert τιμής), και ΔΥΟ research bins,
+            // encoder-gap-speech/src/bin/ltass_corpus.rs:10 και
+            // ltass_lowcut_conflict.rs:120. Τα δύο τελευταία είναι
+            // ΑΚΡΙΒΩΣ τα εργαλεία που θα μετρούσαν το corpus αφήγησης που
+            // ξεκλειδώνει το g_max (podcast-v1.json:9) — και θα έδιναν
+            // λάθος αποτέλεσμα αν το JSON άλλαζε πρώτο.
             const G_MAX_DB: f32 = 6.0;
 
             for (i, row) in A_INV.iter().enumerate() {
