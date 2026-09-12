@@ -291,8 +291,8 @@ mod tests {
             "το g_max άλλαξε — placeholder (dd1122b, 2026-07-02), \
              trigger: corpus αφήγησης >=3 ΔΙΑΚΡΙΤΕΣ παραγωγές. \
              Ενημέρωσε το podcast-v1.json:9 και τη spec \
-             (reference-driven-sonic-vision-podcast-v1_1.md:421, που το \
-             δηλώνει 'tuned craft' ενώ το JSON το δηλώνει placeholder)."
+             (reference-driven-sonic-vision-podcast-v1_1.md §10.8, που \
+             περιγράφει την προέλευσή του)."
         );
         // A dead zone at or above this exceeds any achievable |target - signal|,
         // so compute_gains always takes the zero branch. g_max_db plays no part:

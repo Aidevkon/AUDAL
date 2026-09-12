@@ -414,17 +414,57 @@ The targets and their sources: LTASS shape (Byrne
 1994, podcast-v1.json), the hard constraints
 (BS.1770-5 / EBU R128 / Apple art.893), the SBR
 definition (§3.2), and the matching-EQ structure
-(§3.4). Anyone can verify the *targets* are
-legitimate and the *method* is sound.
+(§3.4). **The per-band correction curve belongs here
+too** — `spectral_target` carries `_source` and
+`_flag` per band (BYRNE_DIRECT or
+SUPPLEMENTARY_SOURCE_DERIVED), and `dead_zone_db`
+carries its own rationale, including the listening
+verdict that disabled bands 6-7. It was listed as
+Tier 2 until 2026-09-12, while the sentence above
+already claimed it. Anyone can verify the *targets*
+are legitimate and the *method* is sound.
 
 **Tier 2 — Proprietary craft ("in dark, not
-hidden").** The exact `G_MAX_DB` (6.0), the per-band
-correction curve, the SPEECH_BANDS mean definition,
-and the pass ordering are the tuned craft. They live
-as ordinary constants in this private commercial
-repo — deterministic, Oracle-TDD-tested, internally
-documented. Not obfuscated (we know exactly what
-they are); simply not published.
+hidden").** The pass ordering (`router.rs`) is the
+tuned craft. It lives as ordinary code in this
+private commercial repo — deterministic,
+Oracle-TDD-tested, internally documented. Not
+obfuscated (we know exactly what it is); simply not
+published.
+
+**`G_MAX_DB` (6.0) is not craft — it is a
+placeholder.** It was born as `const G_MAX_DB: f32 =
+6.0;` with the word "placeholder" in its own comment
+(dd1122b, 2026-07-02) and moved into podcast-v1.json
+verbatim (ba29395, 2026-07-08, "Not one existing
+numeric value changed"). The tuning that would
+refine it never happened. What places it: the three
+music profiles carry `g_max_db: 2.5` measured from
+`corpus.source: genre-corpus`; speech — the only
+profile that reaches audio — carries 6.0 from a
+paper. It unlocks on a narration corpus from **>=3
+DISTINCT productions** (different narrator, room,
+house); twenty chapters of one book is one condition
+times twenty. `reference_resolver.rs` asserts the
+value with that reasoning attached, so a change is
+deliberate rather than silent.
+
+**`SPEECH_BANDS` no longer exists.** The constant was
+deleted in ba29395 (2026-07-08) and replaced by
+`normalization_band_count: 6` in podcast-v1.json,
+which is public and carries its own rationale (Byrne
+stops at 2.5 kHz, so bands 6-7 are synthetic tilt).
+It stayed on this list for two months after it was
+gone.
+
+**This list had never been checked against the
+tree.** Three of its four entries did not hold when
+it was first audited (2026-09-12): one was a
+placeholder, one had been deleted, one was already
+public. A list that names constants in a repo that
+moves will rot, and nothing fails when it does —
+re-verify it whenever a constant moves, and treat
+its age as a reason for suspicion.
 
 **Provenance in the certificate.** Every EQ move now
 carries an `EqSource` tag (`Semantic` | `Reference`)
