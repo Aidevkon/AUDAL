@@ -1,0 +1,149 @@
+=== ΑΚΡΟΑΣΗ [4]: η λωρίδα «σίγουρα φωνή» σε πραγματικό υλικό ===
+
+⚠ Η ΣΗΜΑΙΑ ΔΕΝ ΓΥΡΙΖΕΙ ΑΠΟ ΕΞΩ
+  Το `StreamingPlan` (operator.rs:229-241) ΔΕΝ φέρει restoration toggle, και ο
+  executor την καρφώνει `true` (executor.rs:410).
+  ⇒ ΔΕΝ περνάει από το execute_streaming_plan. Το harness καλεί ΤΗΝ ΙΔΙΑ
+    ζωντανή `run_streaming_pipeline_with_timeline`, δύο φορές, με ΜΟΝΗ διαφορά
+    τη σημαία, και με boundaries από τον ΠΡΑΓΜΑΤΙΚΟ Scout (run_trunk_pass).
+    Ό,τι διαφέρει ανάμεσα στα δύο αρχεία είναι η λωρίδα και τίποτε άλλο.
+
+ΥΛΙΚΟ (δημόσιας άδειας, interior ήδη μετρημένο 12/09)
+  anne_of_green_gables_01_montgomery.mp3   
+    sha256 45bae07c42fa6429d5fcf534c6df3d60a9acf9328589229ad4e8f36c96b474e9
+    878.140188s · interior/κατάσταση: -46.75 WAKING
+  secretgarden_01_burnett.mp3              
+    sha256 eaad22ef624a605b6c7610cbb801e91129008df3dd2ec54310f0a0ba6d6b5dec
+    808.542041s · interior/κατάσταση: -58.36 WAKING
+  dracula_01_stoker.mp3                    
+    sha256 26ae89daf2da8f23239cf6c80c82cc19b7364bb5ce988071f646cee4ce8a1f54
+    2218.004898s · interior/κατάσταση: -56.16 WAKING
+  swiss_family_robinson_01_wyss.mp3        
+    sha256 bb80f9df97304aa8ca088372605b77c5c5710f178f11c51aa2dcede4b9adf7ec
+    1127.079184s · interior/κατάσταση: -68.50 SLEEPING
+  mobydick_000_melville.mp3                
+    sha256 f333b218a297f3fdbbd7226ad4b8f9ea4075f48fd550b7ed5832f07374369b6d
+    1753.477375s · interior/κατάσταση: -74.19 SLEEPING
+
+ΠΡΟΒΛΕΨΗ — ΓΡΑΜΜΕΝΗ ΠΡΙΝ ΤΟ ΤΡΕΞΙΜΟ
+  WAKING    Δ interior ΑΡΝΗΤΙΚΟ (το πάτωμα κατεβαίνει)
+            Δ LUFS ~0 (ο expander δεν αγγίζει ομιλία)
+            Δ crest ΘΕΤΙΚΟ ή ~0
+  SLEEPING  ΟΛΑ ΤΑ Δ ΑΚΡΙΒΩΣ 0 — ο κόμβος δεν έτρεξε
+  ⚠ ΑΝ ΤΟ SLEEPING ΔΕΝ ΔΩΣΕΙ ΑΚΡΙΒΩΣ ΜΗΔΕΝ: ΣΤΑΜΑΤΑ.
+
+────────────────────────────────────────────────────────────────
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+anne_of_green_gables_01_montgomery
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 4 · flagged: 0
+   [  0]    0.0–619.0  s Speech  leaning 0.840 conf 0.616  →ΛΩΡΙΔΑ
+   [  1]  619.0–620.0  s Music  leaning 0.154 conf 0.552  —
+   [  2]  620.0–871.0  s Speech  leaning 0.860 conf 0.664  →ΛΩΡΙΔΑ
+   [  3]  871.0–873.0  s Music  leaning 0.167 conf 0.595  —
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 2
+  interior πηγής: Some(-46.763252) ⇒ expander ΤΡΕΧΕΙ
+
+########## SLEEPING ##########
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+swiss_family_robinson_01_wyss
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 0
+   [  0]    0.0–16.0   s Speech  leaning 0.937 conf 0.820  →ΛΩΡΙΔΑ
+   [  1]   16.0–20.0   s Music  leaning 0.140 conf 0.574  —
+   [  2]   20.0–26.0   s Speech  leaning 1.000 conf 0.904  →ΛΩΡΙΔΑ
+   [  3]   26.0–31.0   s Music  leaning 0.034 conf 0.766  —
+   [  4]   31.0–153.0  s Speech  leaning 0.983 conf 0.903  →ΛΩΡΙΔΑ
+   [  5]  153.0–157.0  s Music  leaning 0.000 conf 0.787  —
+   [  6]  157.0–1117.0 s Speech  leaning 0.969 conf 0.860  →ΛΩΡΙΔΑ
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  interior πηγής: Some(-68.54918) ⇒ expander ΔΕΝ τρέχει
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -74.023     -74.023      0.0000
+  absolute dBFS              -93.716     -93.716      0.0000
+    θέση απόλυτου s           1126.6      1126.6
+  LUFS                       -20.515     -20.515      0.0000
+  true peak dBTP              -3.124      -3.124      0.0000
+  LRA LU                       6.929       6.929      0.0000
+  crest dB                    21.352      21.352      0.0000
+  dyn range dB                46.409      46.409      0.0000
+  frames                    54101610    54101610   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -29.34  -20.34  -16.97  -17.84  -23.96  -25.83  -28.14  -41.67
+  ON    -29.34  -20.34  -16.97  -17.84  -23.96  -25.83  -28.14  -41.67
+  Δ      0.000   0.000   0.000   0.000   0.000   0.000   0.000   0.000
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     49  ON     49  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF     56  ON     56  Δ     +0
+  [   -70,  -60)  OFF   1384  ON   1384  Δ     +0
+  [   -60,  -50)  OFF    850  ON    850  Δ     +0
+  [   -50,  -40)  OFF    525  ON    525  Δ     +0
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 0/11272
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 0
+
+  OFF: /tmp/expander-audition/swiss_family_robinson_01_wyss__OFF.wav
+  ON : /tmp/expander-audition/swiss_family_robinson_01_wyss__ON.wav
+
+
+########## WAKING ##########
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+anne_of_green_gables_01_montgomery
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 4 · flagged: 0
+   [  0]    0.0–619.0  s Speech  leaning 0.840 conf 0.616  →ΛΩΡΙΔΑ
+   [  1]  619.0–620.0  s Music  leaning 0.154 conf 0.552  —
+   [  2]  620.0–871.0  s Speech  leaning 0.860 conf 0.664  →ΛΩΡΙΔΑ
+   [  3]  871.0–873.0  s Music  leaning 0.167 conf 0.595  —
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 2
+  interior πηγής: Some(-46.763252) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -52.049     -52.049      0.0000
+  absolute dBFS              -96.077     -96.069      0.0082
+    θέση απόλυτου s            873.4       873.4
+  LUFS                       -26.102     -26.102     -0.0000
+  true peak dBTP              -3.293      -3.293      0.0000
+  LRA LU                       6.132       6.132      0.0000
+  crest dB                    27.417      27.417     -0.0000
+  dyn range dB                21.976      21.976      0.0000
+  frames                    42151321    42151321   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -38.39  -34.50  -25.35  -22.36  -26.57  -26.77  -31.09  -38.67
+  ON    -38.39  -34.50  -25.35  -22.36  -26.57  -26.77  -31.09  -38.67
+  Δ     -0.000  -0.000  -0.000  -0.000  -0.000  -0.000  -0.000  -0.000
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     50  ON     50  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF      1  ON      1  Δ     +0
+  [   -60,  -50)  OFF     16  ON     16  Δ     +0
+  [   -50,  -40)  OFF   2124  ON   2124  Δ     +0
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 6191/8782
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+        0.0s   Δ    0.03 dB   (OFF -47.4 → ON -47.4)
+        1.5s   Δ    0.00 dB   (OFF -36.6 → ON -36.6)
+        2.2s   Δ    0.00 dB   (OFF -34.4 → ON -34.4)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 4639
+
+  OFF: /tmp/expander-audition/anne_of_green_gables_01_montgomery__OFF.wav
+  ON : /tmp/expander-audition/anne_of_green_gables_01_montgomery__ON.wav
+

@@ -128,6 +128,7 @@ pub fn make_blob(id: &str, pcm_path: PathBuf, num_frames: usize) -> StoredBlobV2
             aether_persona: None,
             aether_config: None,
             qr_base64: None,
+            corrections: Vec::new(),
         },
     }
 }
