@@ -1,0 +1,245 @@
+=== RECON: Ο ΑΝΙΧΝΕΥΤΗΣ ΒΟΜΒΟΥ — ΤΙ ΥΠΑΡΧΕΙ, ΤΙ ΛΕΙΠΕΙ ===
+2026-09-14 · read-only · ΜΗΔΕΝ αλλαγή σε παραγωγή
+
+── (1) grep ΣΕ ΟΛΟ ΤΟ ΔΕΝΤΡΟ: hum · mains · line_freq · notch ──
+lineos/m1/sp314-dsp/src/bin/scratch_bq.rs:4:    let mut bq = Biquad::new(FilterType::Notch, 50.0, 20.0, 48000.0);
+lineos/m1/sp314-dsp/src/restoration/biquad.rs:12:    Notch,
+lineos/m1/sp314-dsp/src/restoration/biquad.rs:35:            FilterType::Notch => (
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:102:            // 3. De-Hum (static notch cascade)
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:104:                let (l1, r1) = self.notch_50.process_stereo(l, r);
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:105:                let (l2, r2) = self.notch_100.process_stereo(l1, r1);
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:106:                let (l3, r3) = self.notch_150.process_stereo(l2, r2);
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:12:    // De-Hum: 50Hz, 100Hz, 150Hz notches
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:13:    notch_50: Biquad,
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:147:        self.notch_50.reset();
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:148:        self.notch_100.reset();
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:149:        self.notch_150.reset();
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:14:    notch_100: Biquad,
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:15:    notch_150: Biquad,
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:2:// De-Hum + Split-Band De-Ess chain.
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:52:            // High Q (20.0) — strictly targets hum without affecting bass
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:53:            notch_50: Biquad::new(FilterType::Notch, 50.0, 20.0, sample_rate),
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:54:            notch_100: Biquad::new(FilterType::Notch, 100.0, 20.0, sample_rate),
+lineos/m1/sp314-dsp/src/restoration/cleaner.rs:55:            notch_150: Biquad::new(FilterType::Notch, 150.0, 20.0, sample_rate),
+lineos/m1/sp314-dsp/src/restoration/mod.rs:13:    /// 50/100/150Hz notch cascade (mains hum removal)
+lineos/m1/sp314-dsp/src/restoration/mod.rs:32:    /// For music mastering — no gate, no hum (assume clean source)
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:223:        let hum = (t * 50.0 * 2.0 * PI).sin() * 0.15
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:229:        sig_l[i] = hum + bass + mid;
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:230:        sig_r[i] = hum + bass + mid;
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:268:        let hum = (t * 50.0 * 2.0 * PI).sin() * 0.1;
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:271:        sig_l[i] = voice_noise + bed + sibilant + hum + base_silence;
+lineos/m1/sp314-dsp/tests/forensic_renders.rs:272:        sig_r[i] = voice_noise + bed + sibilant + hum + base_silence;
+lineos/m1/sp314-nodes/src/nodes/biquad.rs:84:            // Notch
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:10:    notches: Vec<Biquad>,
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:20:            notches: Vec::new(),
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:22:        node.build_notches();
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:26:    fn build_notches(&mut self) {
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:27:        self.notches.clear();
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:33:                self.notches.push(Biquad::new(
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:34:                    FilterType::Notch,
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:51:        if !self.enabled || self.notches.is_empty() {
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:59:            for notch in &mut self.notches {
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:60:                let (nl, nr) = notch.process_stereo(l, r);
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:79:                    self.build_notches();
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:85:                    self.build_notches();
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:98:        for notch in &mut self.notches {
+lineos/m1/sp314-nodes/src/nodes/dehum.rs:99:            notch.reset();
+lineos/m1/sp314-orchestrator/src/streaming_pipeline.rs:327:        // ρωτήσει αν υπάρχει hum — και μετρήθηκε να τρώει ανδρική θεμελιώδη.
+pipelines/pipelineforge/src/conditions.rs:28:    MainsHumDetected, // 50/60Hz mains hum
+pipelines/pipelineforge/src/flavor.rs:150:                    { "node_id": "notch_50", "node_type": "BiquadFilter", "parameters": { "filter_type": 2.0, "freq_hz": 50.0, "q": 20.0 } },
+pipelines/pipelineforge/src/flavor.rs:151:                    { "node_id": "notch_100", "node_type": "BiquadFilter", "parameters": { "filter_type": 2.0, "freq_hz": 100.0, "q": 20.0 } },
+pipelines/pipelineforge/src/flavor.rs:152:                    { "node_id": "notch_150", "node_type": "BiquadFilter", "parameters": { "filter_type": 2.0, "freq_hz": 150.0, "q": 20.0 } },
+pipelines/pipelineforge/src/flavor.rs:156:                    { "source": "Input", "target": "notch_50", "modulation_type": "audio" },
+pipelines/pipelineforge/src/flavor.rs:157:                    { "source": "notch_50", "target": "notch_100", "modulation_type": "audio" },
+pipelines/pipelineforge/src/flavor.rs:158:                    { "source": "notch_100", "target": "notch_150", "modulation_type": "audio" },
+pipelines/pipelineforge/src/flavor.rs:159:                    { "source": "notch_150", "target": "Output", "modulation_type": "audio" }
+pipelines/pipelineforge/src/router.rs:14:        if conditions.has(&EngineerCondition::MainsHumDetected) {
+pipelines/pipelineforge/tests/pipelineforge_contract.rs:72:        .push(EngineerCondition::MainsHumDetected);
+research/encoder-gap-speech/src/bin/dehum_what.rs:1://! ΜΕΤΡΗΣΗ 2026-08-24 — ο DeHum αφαιρεί hum ή φωνή;
+research/encoder-gap-speech/src/bin/dehum_what.rs:21:// Ζώνη όπου ο DeHum μπορεί να δράσει (50/100/150Hz notches) — για την
+research/encoder-gap-speech/src/bin/dehum_what.rs:6://! τον de-esser στα defaults του — ύποπτο για ένα «χειρουργικό» notch.
+research/encoder-gap-speech/src/bin/dehum_what.rs:9://! με γνωστή απάντηση (50Hz hum + 200Hz "φωνή").
+
+── ΠΟΙΟΣ ΘΕΤΕΙ MainsHumDetected ──
+pipelines/pipelineforge/src/conditions.rs:28:    MainsHumDetected, // 50/60Hz mains hum
+pipelines/pipelineforge/tests/pipelineforge_contract.rs:72:        .push(EngineerCondition::MainsHumDetected);
+pipelines/pipelineforge/src/router.rs:14:        if conditions.has(&EngineerCondition::MainsHumDetected) {
+
+── intent_to_conditions, ΑΥΤΟΥΣΙΟ (dsp/mod.rs:518) ──
+    fn intent_to_conditions(
+        intent: &MasteringIntent,
+        left: &[f32],
+        right: &[f32],
+        sample_rate: u32,
+    ) -> ConditionSet {
+        let mut conditions = vec![];
+
+        // Basic loudness conditions
+        let approx_lufs = Self::estimate_lufs(left, right);
+        if approx_lufs > intent.target.target_lufs + 2.0 {
+            conditions.push(EngineerCondition::LufsTooLoud);
+        } else if approx_lufs < intent.target.target_lufs - 6.0 {
+            conditions.push(EngineerCondition::LufsTooQuiet);
+        }
+
+        ConditionSet {
+            conditions,
+            sample_rate,
+            target_lufs: intent.target.target_lufs,
+        }
+    }
+
+── DeHumNode, ΑΥΤΟΥΣΙΟ (sp314-nodes/src/nodes/dehum.rs) ──
+use crate::node::DspNode;
+use sp314_dsp::restoration::biquad::{Biquad, FilterType};
+
+pub struct DeHumNode {
+    sample_rate: u32,
+    enabled: bool,
+    fundamental_hz: f32,
+    harmonics: f32, // using f32 for parameter matching, cast to usize internally
+
+    notches: Vec<Biquad>,
+}
+
+impl DeHumNode {
+    pub fn new(sample_rate: u32) -> Self {
+        let mut node = Self {
+            sample_rate,
+            enabled: true,
+            fundamental_hz: 50.0,
+            harmonics: 3.0,
+            notches: Vec::new(),
+        };
+        node.build_notches();
+        node
+    }
+
+    fn build_notches(&mut self) {
+        self.notches.clear();
+        let num_harmonics = (self.harmonics as usize).clamp(1, 10);
+        for i in 1..=num_harmonics {
+            let freq = self.fundamental_hz * i as f32;
+            if freq < self.sample_rate as f32 / 2.0 {
+                // Q = 20.0 from cleaner.rs
+                self.notches.push(Biquad::new(
+                    FilterType::Notch,
+                    freq,
+                    20.0,
+                    self.sample_rate as f32,
+                ));
+            }
+        }
+    }
+}
+
+const PARAMS: &[&str] = &["enabled", "fundamental_hz", "harmonics"];
+
+    }
+
+    fn set_parameter(&mut self, name: &str, value: f32) -> bool {
+        if !self.has_parameter(name) {
+            return false;
+        }
+        match name {
+            "enabled" => self.enabled = value > 0.5,
+            "fundamental_hz" => {
+                if (value - self.fundamental_hz).abs() > 0.1 {
+                    self.fundamental_hz = value;
+                    self.build_notches();
+                }
+            }
+            "harmonics" => {
+                if (value - self.harmonics).abs() > 0.1 {
+                    self.harmonics = value;
+                    self.build_notches();
+                }
+            }
+            _ => return false,
+        }
+        true
+
+── (5) ΣΑΡΩΣΗ ΤΩΝ ΕΝΝΙΑ, hum_spectrum, παράθυρο 60–600 s ──
+########## anne_of_green_gables_01_montgomery
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  anne_of_green_gables_01_montgomery παύση 573.40–575.10 s (1.70 s) · τμήματα Welch 8 · τομή Some(-37.5)
+  anne_of_green_gables_01_montgomery κορυφή κάδος 58.59 Hz · ΠΑΡΕΜΒΟΛΗ 59.99 Hz  (απόσταση: 50 +9.99 · 60 -0.01)
+      58.59      -7.8       15.88   50x1   +8.6 Hz | 60x1   -1.4 Hz  <-60
+     307.62     -25.2        8.34   50x6   +7.6 Hz | 60x5   +7.6 Hz  <-60
+     269.53     -29.2        6.17   50x5  +19.5 Hz | 60x4  +29.5 Hz  <-50
+      90.82     -31.5        5.75   50x2   -9.2 Hz | 60x2  -29.2 Hz  <-50
+      70.31     -18.1        5.63   50x1  +20.3 Hz | 60x1  +10.3 Hz  <-60
+########## adventurespinocchio_01_collodi
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  adventurespinocchio_01_collodi     παύση 131.60–133.20 s (1.60 s) · τμήματα Welch 8 · τομή Some(-37.5)
+  adventurespinocchio_01_collodi     κορυφή κάδος 58.59 Hz · ΠΑΡΕΜΒΟΛΗ 60.01 Hz  (απόσταση: 50 +10.01 · 60 +0.01)
+     120.12     -19.1       24.16   50x2  +20.1 Hz | 60x2   +0.1 Hz  <-60
+      58.59     -13.5       21.21   50x1   +8.6 Hz | 60x1   -1.4 Hz  <-60
+     240.23     -28.5       17.37   50x5   -9.8 Hz | 60x4   +0.2 Hz  <-60
+     181.64     -30.8       12.13   50x4  -18.4 Hz | 60x3   +1.6 Hz  <-60
+     360.35     -36.4       11.66   50x7  +10.4 Hz | 60x6   +0.4 Hz  <-60
+########## count_of_monte_cristo_001_dumas
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  count_of_monte_cristo_001_dumas    παύση 518.30–522.10 s (3.80 s) · τμήματα Welch 21 · τομή Some(-37.5)
+  count_of_monte_cristo_001_dumas    κορυφή κάδος 58.59 Hz · ΠΑΡΕΜΒΟΛΗ 60.03 Hz  (απόσταση: 50 +10.03 · 60 +0.03)
+      58.59      -9.3       19.33   50x1   +8.6 Hz | 60x1   -1.4 Hz  <-60
+     178.71     -41.6        5.77   50x4  -21.3 Hz | 60x3   -1.3 Hz  <-60
+     298.83     -44.5        5.58   50x6   -1.2 Hz | 60x5   -1.2 Hz  <-60
+     246.09     -45.6        2.86   50x5   -3.9 Hz | 60x4   +6.1 Hz  <-50
+      84.96     -36.5        2.63   50x2  -15.0 Hz | 60x1  +25.0 Hz  <-50
+########## dracula_01_stoker
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  dracula_01_stoker                  παύση 255.70–258.10 s (2.40 s) · τμήματα Welch 13 · τομή Some(-39.5)
+  dracula_01_stoker                  κορυφή κάδος 61.52 Hz · ΠΑΡΕΜΒΟΛΗ 60.79 Hz  (απόσταση: 50 +10.79 · 60 +0.79)
+      26.37     -23.1       19.77   50x1  -23.6 Hz | 60x1  -33.6 Hz  <-50
+      61.52     -34.3       10.64   50x1  +11.5 Hz | 60x1   +1.5 Hz  <-60
+     269.53     -30.9        9.28   50x5  +19.5 Hz | 60x4  +29.5 Hz  <-50
+     298.83     -32.5        6.48   50x6   -1.2 Hz | 60x5   -1.2 Hz  <-60
+     120.12     -37.5        6.48   50x2  +20.1 Hz | 60x2   +0.1 Hz  <-60
+########## huckfinn_01_twain_apc
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  huckfinn_01_twain_apc              παύση 97.60–100.10 s (2.50 s) · τμήματα Welch 13 · τομή Some(-35.5)
+  huckfinn_01_twain_apc              κορυφή κάδος 58.59 Hz · ΠΑΡΕΜΒΟΛΗ 59.84 Hz  (απόσταση: 50 +9.84 · 60 -0.16)
+      58.59     -26.0       10.87   50x1   +8.6 Hz | 60x1   -1.4 Hz  <-60
+      26.37     -32.7        4.48   50x1  -23.6 Hz | 60x1  -33.6 Hz  <-50
+     213.87     -37.9        3.79   50x4  +13.9 Hz | 60x4  -26.1 Hz  <-50
+     178.71     -38.0        3.45   50x4  -21.3 Hz | 60x3   -1.3 Hz  <-60
+     152.34     -37.4        3.34   50x3   +2.3 Hz | 60x3  -27.7 Hz  <-50
+########## secretgarden_01_burnett
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  secretgarden_01_burnett            παύση 150.70–153.20 s (2.50 s) · τμήματα Welch 13 · τομή Some(-40.5)
+  secretgarden_01_burnett            κορυφή κάδος 73.24 Hz · ΠΑΡΕΜΒΟΛΗ 72.68 Hz  (απόσταση: 50 +22.68 · 60 +12.68)
+      26.37     -21.2       20.96   50x1  -23.6 Hz | 60x1  -33.6 Hz  <-50
+     301.76     -35.3        9.87   50x6   +1.8 Hz | 60x5   +1.8 Hz  <-60
+     333.98     -35.5        8.96   50x7  -16.0 Hz | 60x6  -26.0 Hz  <-50
+     375.00     -36.6        5.69   50x8  -25.0 Hz | 60x6  +15.0 Hz  <-60
+     120.12     -39.2        4.22   50x2  +20.1 Hz | 60x2   +0.1 Hz  <-60
+########## tale_of_two_cities_01_dickens
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  tale_of_two_cities_01_dickens      παύση 407.50–409.80 s (2.30 s) · τμήματα Welch 12 · τομή Some(-40.5)
+  tale_of_two_cities_01_dickens      κορυφή κάδος 55.66 Hz · ΠΑΡΕΜΒΟΛΗ 55.23 Hz  (απόσταση: 50 +5.23 · 60 -4.77)
+     131.84     -37.7        3.86   50x3  -18.2 Hz | 60x2  +11.8 Hz  <-60
+     377.93     -43.9        3.64   50x8  -22.1 Hz | 60x6  +17.9 Hz  <-60
+     360.35     -43.7        3.61   50x7  +10.4 Hz | 60x6   +0.4 Hz  <-60
+      20.51     -24.3        3.49   50x1  -29.5 Hz | 60x1  -39.5 Hz  <-50
+     166.99     -40.0        2.81   50x3  +17.0 Hz | 60x3  -13.0 Hz  <-60
+########## peterpan_01_barrie
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  peterpan_01_barrie                 παύση 471.90–474.20 s (2.30 s) · τμήματα Welch 12 · τομή Some(-41.5)
+  peterpan_01_barrie                 κορυφή κάδος 61.52 Hz · ΠΑΡΕΜΒΟΛΗ 61.42 Hz  (απόσταση: 50 +11.42 · 60 +1.42)
+      90.82     -28.0       14.98   50x2   -9.2 Hz | 60x2  -29.2 Hz  <-50
+     164.06     -39.1        4.46   50x3  +14.1 Hz | 60x3  -15.9 Hz  <-50
+     369.14     -42.2        3.96   50x7  +19.1 Hz | 60x6   +9.1 Hz  <-60
+     131.84     -39.7        3.79   50x3  -18.2 Hz | 60x2  +11.8 Hz  <-60
+      32.23     -43.0        3.52   50x1  -17.8 Hz | 60x1  -27.8 Hz  <-50
+########## janeeyre_01_bronte (ΧΩΡΙΣ τομή — ρητό παράθυρο -38.5)
+παράθυρο: ΜΟΝΟ παύση (κάθε 100 ms κάτω από την τομή Otsu του αρχείου)
+  janeeyre_01_bronte                 παύση 397.60–399.30 s (1.70 s) · τμήματα Welch 8 · τομή None
+  janeeyre_01_bronte                 κορυφή κάδος 55.66 Hz · ΠΑΡΕΜΒΟΛΗ 55.67 Hz  (απόσταση: 50 +5.67 · 60 -4.33)
+      20.51     -14.7       17.90   50x1  -29.5 Hz | 60x1  -39.5 Hz  <-50
+     146.48     -20.5        9.51   50x3   -3.5 Hz | 60x2  +26.5 Hz  <-50
+     292.97     -23.0        7.91   50x6   -7.0 Hz | 60x5   -7.0 Hz  <-60
+     187.50     -24.1        5.71   50x4  -12.5 Hz | 60x3   +7.5 Hz  <-60
+      55.66     -28.9        4.37   50x1   +5.7 Hz | 60x1   -4.3 Hz  <-60
+
+[exited with code 0]
