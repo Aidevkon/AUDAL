@@ -71,6 +71,7 @@ fn make_blob(pcm_path: PathBuf, preset_id: &str) -> StoredBlobV2 {
             aether_persona: None,
             aether_config: None,
             qr_base64: None,
+            corrections: Vec::new(),
         },
     }
 }

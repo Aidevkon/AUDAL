@@ -435,11 +435,11 @@ codebase δεν είναι σύμπτωση — είναι ο τρόπος πο�
 Ο κώδικας απάντησε με τον compiler, πριν το κείμενο
 προλάβει να σχεδιάσει την απάντηση.
 
-  blob_store.rs:1438 `Uncertified { reason: UncertifiedReason },`
+  blob_store.rs:1493 `Uncertified { reason: UncertifiedReason },`
 
 Ένα χρέος που είναι ΤΥΠΟΣ έχει τέσσερα πράγματα που ένα
 χρέος σε παράγραφο δεν έχει:
-  ΟΝΟΜΑ            blob_store.rs:1449 `SpatialPathHasNoTelemetry,`
+  ΟΝΟΜΑ            blob_store.rs:1504 `SpatialPathHasNoTelemetry,`
   ΔΗΜΟΣΙΑ ΠΡΟΒΟΛΗ  γενική προς έξω («no_measurements»),
                    ειδική προς μέσα — το εσωτερικό όνομα
                    είναι ομολογία ελαττώματος με όνομα
@@ -905,8 +905,8 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
       spatial_folddown_agrees_with_stereo.rs:115 `fn spatial_folddown_agrees_with_stereo() {`
       streaming_integration.rs:25 `fn streaming_pipeline_ducking_e2e() {`
       w17_flacenc_bloat.rs:26 `fn w17_flacenc_bloat_repro() {`
-      export_mp3_acx.rs:131 `fn test_export_mp3_acx_ffprobe() {`
-      export_flac_real.rs:126 `fn test_export_flac_ffprobe() {`
+      export_mp3_acx.rs:132 `fn test_export_mp3_acx_ffprobe() {`
+      export_flac_real.rs:127 `fn test_export_flac_ffprobe() {`
 
     ΕΠΑΛΗΘΕΥΣΗ ΤΟΥ ΑΡΙΘΜΟΥ (δεν χωράει ως άγκιστρο):
       grep -rn '#\[ignore\]' --include="*.rs" \
@@ -1121,8 +1121,8 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
 
       Ο ΠΑΛΙΟΣ ΤΥΠΟΣ ΔΕΝ ΥΠΑΡΧΕΙ. grep `struct StoredBlob`
       (χωρίς V2) = ΜΗΔΕΝ. Το C-union χωρίστηκε:
-        blob_store.rs:1382 `pub struct StoredBlobCore {`
-        blob_store.rs:1438 `Uncertified { reason: UncertifiedReason },`
+        blob_store.rs:1383 `pub struct StoredBlobCore {`
+        blob_store.rs:1493 `Uncertified { reason: UncertifiedReason },`
       Ό,τι είναι ΠΑΝΤΑ παρόν ζει στον Core· ό,τι εξαρτάται
       από το αν μετρήθηκε, στο variant. Τα κενά πεδία δεν
       μπορούν πια να υπάρξουν — δεν είναι εκπρόσωπος του

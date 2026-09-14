@@ -767,6 +767,9 @@ fn run_dsp_internal(
             output_sha256: render_res.output_sha256.clone(),
             dead_air,
             acx: trunk_metrics.acx,
+            // Το episode μονοπάτι καλεί run_trunk_metrics_with_acx, που περνάει
+            // edge_sec = None ⇒ δεν υπάρχει interior ανάλυση να καταγραφεί.
+            corrections: Vec::new(),
         };
 
         // F-085: οι τρεις μετρήσεις του παραδοτέου, από το raw master

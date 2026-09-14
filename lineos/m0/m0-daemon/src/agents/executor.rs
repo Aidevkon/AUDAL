@@ -450,11 +450,67 @@ pub fn execute_streaming_plan(
     let (fingerprints, spatial_metadata) =
         crate::domain::content_type::ContentType::bypassed_render();
     profiler.mark_stage_with_hash("Certificate Assembly", String::new());
+    // ── ΤΟ ΜΠΛΟΚ corrections ────────────────────────────────────────────
+    // Χτίζεται ΕΔΩ γιατί εδώ ζει η γνώση του προορισμού. Ο κόμβος
+    // πιστοποίησης συναρμολογεί, δεν αποφασίζει.
+    //
+    // ΤΟ ΣΤΑΔΙΟ ΠΟΥ ΓΡΑΦΕΤΑΙ ΕΙΝΑΙ ΑΥΤΟ ΠΟΥ ΤΡΕΧΕΙ: η ανάλυση. Ο κόμβος
+    // διόρθωσης είναι γραμμένος αλλά ασύνδετος — ένα «applied» σε
+    // υπογεγραμμένο έγγραφο θα ισχυριζόταν ενέργεια που δεν έγινε.
+    //
+    // ΚΕΝΟ όταν ο προορισμός δεν δηλώνει όριο: ο analyzer δεν έτρεξε
+    // καθόλου, άρα δεν υπάρχει ανάλυση. Κενό ΔΕΝ είναι `absent`.
+    let corrections: Vec<crate::blob_store::CorrectionRecord> =
+        match (delivery_max_noise_floor_db, delivery_edge_sec) {
+            (Some(limit_db), Some(edge_sec)) => {
+                let mut measurements = Vec::new();
+                let (state, reason) = match trunk_report.acx_interior_noise_floor {
+                    Some((floor_db, _start_frame)) => {
+                        measurements.push(crate::blob_store::NamedValue {
+                            name: "input_interior_floor_db".into(),
+                            value: floor_db,
+                            unit: "dBFS".into(),
+                        });
+                        measurements.push(crate::blob_store::NamedValue {
+                            name: "limit_db".into(),
+                            value: limit_db,
+                            unit: "dBFS".into(),
+                        });
+                        // ΣΥΜΒΑΣΗ ΠΡΟΣΗΜΟΥ: θετικό = το πάτωμα είναι ΚΑΤΩ από
+                        // το όριο, καθαρό. Γραμμένη στο certificate-schema-v0.
+                        measurements.push(crate::blob_store::NamedValue {
+                            name: "margin_db".into(),
+                            value: limit_db - floor_db,
+                            unit: "dB".into(),
+                        });
+                        ("measured", String::new())
+                    }
+                    None => (
+                        "absent",
+                        "insufficient interior windows after edge exclusion".to_string(),
+                    ),
+                };
+                measurements.push(crate::blob_store::NamedValue {
+                    name: "edge_sec".into(),
+                    value: edge_sec,
+                    unit: "s".into(),
+                });
+                vec![crate::blob_store::CorrectionRecord {
+                    stage: "interior_noise_analysis".into(),
+                    state: state.into(),
+                    reason,
+                    measurements,
+                }]
+            }
+            _ => Vec::new(),
+        };
+
     let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
         pcm_blake3: measured.pcm_blake3.clone(),
         output_sha256: measured.output_sha256.clone(),
         dead_air,
         acx: None,
+        corrections,
     };
     let cert_out = crate::domain::nodes::certificate_node::run_streaming(
         &blob_id,

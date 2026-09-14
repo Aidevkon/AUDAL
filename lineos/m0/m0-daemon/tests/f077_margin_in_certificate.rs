@@ -96,6 +96,7 @@ fn make_certified_blob(id: &str, pcm_path: PathBuf) -> StoredBlobV2 {
             aether_persona: None,
             aether_config: None,
             qr_base64: None,
+            corrections: Vec::new(),
         },
     }
 }

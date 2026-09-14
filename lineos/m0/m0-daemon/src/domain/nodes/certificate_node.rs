@@ -171,6 +171,7 @@ pub fn run(
         Some(telemetry_momentary),
         crate::dsp::signal_health::DeadAirSummary::default(),
         None, // ACX check never runs on the Music path
+        Vec::new(), // ούτε ανάλυση πατώματος — κενό, όχι absent
         folddown_gain_db,
         stereo_rms_measured,
         stereo_correlation_measured,
@@ -195,6 +196,10 @@ pub struct StreamingCertData {
     /// ACX delivery check from the trunk pass — Some only when the preset's
     /// DeliverySpec carries a noise-floor limit. None = not measured.
     pub acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
+    /// Τι αποφάσισε ή τι μέτρησε η μηχανή. Χτίζεται στον ΚΑΛΟΥΝΤΑ, γιατί εκεί
+    /// ζει η γνώση του προορισμού (όριο, edge) — ο κόμβος πιστοποίησης
+    /// συναρμολογεί, δεν αποφασίζει. Κενό όταν δεν υπήρξε ανάλυση.
+    pub corrections: Vec<crate::blob_store::CorrectionRecord>,
 }
 
 /// Certificate node for the Episode streaming
@@ -306,6 +311,7 @@ pub fn run_streaming(
         None,
         cert_data.dead_air,
         cert_data.acx,
+        cert_data.corrections,
         folddown_gain_db,
         // F-070 ΚΛΕΙΝΕΙ ΚΑΙ ΓΙΑ ΤΟ STREAMING (F-085 wiring, 25/08):
         // το RMS του παραδοτέου μετριέται πλέον στο ίδιο πέρασμα με
@@ -356,6 +362,7 @@ fn assemble_blob(
     telemetry_momentary: Option<f32>,
     dead_air: crate::dsp::signal_health::DeadAirSummary,
     acx: Option<sp314_dsp::analysis::acx_check::AcxCheckReport>,
+    corrections: Vec<crate::blob_store::CorrectionRecord>,
     folddown_gain_db: Option<f32>,
     stereo_rms_measured: Option<f32>,
     // F-085: μετρήσεις ΤΟΥ ΠΑΡΑΔΟΤΕΟΥ (post-master), όχι της εισόδου.
@@ -402,6 +409,7 @@ fn assemble_blob(
             aether_cert: Some(cert_json),
             aether_persona: Some(persona_config.id.clone()),
             aether_config: Some(config_json),
+            corrections,
             loudness: crate::blob_store::StoredLoudness {
                 integrated_lufs: lufs,
                 short_term_lufs: telemetry_short_term,

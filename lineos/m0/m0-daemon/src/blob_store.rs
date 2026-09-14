@@ -1158,6 +1158,7 @@ mod tests {
                 aether_persona: None,
                 aether_config: None,
                 qr_base64: None,
+                corrections: Vec::new(),
             },
         }
     }
@@ -1417,6 +1418,45 @@ pub struct StoredBlobCore {
     pub num_frames: usize,
 }
 
+/// Ονομασμένο μέγεθος με τιμή και μονάδα. ΟΧΙ ελεύθερο map, ΟΧΙ πρόζα.
+///
+/// ΓΙΑΤΙ ΟΧΙ MAP: το threshold-lint σαρώνει `.rs` και ΟΧΙ JSON (μετρήθηκε
+/// 2026-09-12) — γι' αυτό ένα placeholder έμεινε δύο μήνες αόρατο. Ελεύθερα
+/// κλειδιά σε ΥΠΟΓΕΓΡΑΜΜΕΝΟ έγγραφο είναι το ίδιο κενό, επί δώδεκα στάδια.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NamedValue {
+    pub name: String,
+    pub value: f32,
+    /// "dB" | "dBFS" | "s" | "Hz" | "count"
+    pub unit: String,
+}
+
+/// Τι αποφάσισε η μηχανή, ανά διορθωτικό στάδιο.
+///
+/// ΞΕΧΩΡΙΣΤΟ ΑΠΟ ΤΟ DeliveryCheck: εκείνο κρίνει το ΑΡΧΕΙΟ έναντι
+/// προδιαγραφής (pass/fail/advisory). Αυτό καταγράφει τι έκανε ο
+/// ΚΟΜΒΟΣ και γιατί. Ένα στάδιο μπορεί να είναι `skipped` ενώ το
+/// αρχείο περνά — δεν είναι αντίφαση, είναι άλλο ερώτημα.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CorrectionRecord {
+    /// Κλειστό σύνολο. Ίδιο μοτίβο με το DeliveryCheck.verdict:
+    /// String για συμβατότητα, αλλά οι τιμές απαριθμούνται εδώ.
+    /// Σήμερα παρατηρείται ΜΙΑ: "interior_noise_analysis".
+    pub stage: String,
+    /// "applied" | "skipped" | "measured" | "absent"
+    ///   applied  — ο κόμβος εκτελέστηκε και ενήργησε
+    ///   skipped  — ο κόμβος εκτελέστηκε, δεν χρειάστηκε
+    ///   measured — η ανάλυση παρήγαγε μέτρηση (δεν ενεργεί)
+    ///   absent   — η μέτρηση δεν ήταν δυνατή
+    /// ΤΟ ΛΕΞΙΛΟΓΙΟ ΟΡΙΖΕΤΑΙ ΟΛΟΚΛΗΡΟ, ΠΑΡΑΤΗΡΕΙΤΑΙ ΜΕΡΙΚΩΣ: τα δύο πρώτα
+    /// περιμένουν στάδιο που εκτελείται.
+    pub state: String,
+    /// Κλειστό σύνολο ΑΝΑ stage. ΧΩΡΙΣ αριθμούς μέσα του — οι αριθμοί είναι
+    /// μετρήσεις και ζουν στο `measurements`. Κενό όπου η μέτρηση μιλάει μόνη.
+    pub reason: String,
+    pub measurements: Vec<NamedValue>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BlobVariant {
     /// Μετρήθηκε. Έχει απόδειξη.
@@ -1432,6 +1472,21 @@ pub enum BlobVariant {
         aether_persona: Option<String>,
         aether_config: Option<String>,
         qr_base64: Option<String>,
+        /// ΠΕΜΠΤΟ ΜΠΛΟΚ. Τα τέσσερα υπάρχοντα (loudness/quality/provenance/
+        /// spatial) περιγράφουν ΤΟ ΣΗΜΑ· αυτό περιγράφει ΤΙ ΕΚΑΝΕ Ή ΤΙ ΜΕΤΡΗΣΕ
+        /// Η ΜΗΧΑΝΗ. Δύο ερωτήματα, δύο μπλοκ: το `delivery_checks` ρωτά
+        /// «συμμορφώνεται το αρχείο;», αυτό ρωτά «τι έκανε η μηχανή;».
+        ///
+        /// ΚΕΝΟ όταν ο προορισμός δεν δηλώνει όριο πατώματος: ο analyzer δεν
+        /// τρέχει καθόλου, άρα δεν υπάρχει ανάλυση να καταγραφεί. Κενό ΔΕΝ
+        /// είναι `absent` — το `absent` σημαίνει «έτρεξε και δεν βρήκε
+        /// interior».
+        ///
+        /// ΠΟΛΛΑΠΛΕΣ ΕΓΓΡΑΦΕΣ ΑΝΑ ΑΡΧΕΙΟ ΕΙΝΑΙ ΤΟ DESIGN: όταν ένας κόμβος
+        /// διόρθωσης συνδεθεί, η ανάλυση και η ενέργεια θα είναι δύο
+        /// ξεχωριστές εγγραφές.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        corrections: Vec<crate::blob_store::CorrectionRecord>,
     },
     /// ΔΕΝ μετρήθηκε. ΧΡΕΟΣ με όνομα.
     /// ΔΕΝ παραδίδεται σε χρήστη χωρίς ρητή μετατροπή.

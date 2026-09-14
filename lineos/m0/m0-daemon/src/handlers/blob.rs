@@ -323,6 +323,7 @@ mod tests {
                 aether_persona: None,
                 aether_config: None,
                 qr_base64: None,
+                corrections: Vec::new(),
             },
         };
 
