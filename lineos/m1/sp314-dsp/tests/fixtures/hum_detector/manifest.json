@@ -2,10 +2,14 @@
   "carrier_residual_db": {
     "50hz_welch48k": -0.09,
     "60hz_welch48k": 0.98,
+    "70hz_welch48k": 2.52,
     "50hz_decim1k": 0.34,
     "60hz_decim1k": 5.18,
+    "70hz_decim1k": 9.094,
     "measured_welch48k": "2026-09-15, hum_spectrum, pause 145.6-148.8s",
-    "measured_decim1k": "2026-09-14, hum_detector_methods (commit 73db55d), hum_none fixture, same pause window as welch48k"
+    "measured_decim1k": "2026-09-14, hum_detector_methods (commit 73db55d), hum_none fixture, same pause window as welch48k",
+    "measured_70hz_welch48k": "hum_spectrum, πλήρης ζώνη 40-75Hz (interpolated peak 70.16 Hz) — δεν αποθηκεύτηκε σε lab-log, μόνο στη συνομιλία",
+    "measured_70hz_decim1k": "2026-09-14, mains_hum_detector test (commit 5284931), hum_none fixture, βρέθηκε από τον ίδιο τον ανιχνευτή στη ζώνη 40-75Hz"
   },
   "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
   "seed": 314159,
@@ -18,7 +22,8 @@
     "prominence_definition_decim1k": "peak minus median of +/-25 Hz excluding +/-4 Hz, 2x cascaded butter_lp2_prewarped @450Hz then decimate x48 to 1kHz then a single FFT N=4096 zero-padded (no averaging), measured INSIDE the same pause window as welch48k",
     "waveform": "pure sine, fundamental only — the 60->120 Hz decay of real mains measured 3.2..33.2 dB across n=4 files; unstable, so no ratio was invented. A detector that relies on harmonics is NOT exercised here.",
     "instrument_dependence": "Η προεξοχή εξαρτάται από το όργανο. Το ίδιο δοκίμιο διαβάζεται 5.12 dB με Welch N=16384 στα 48 kHz και 16.08 dB με αποδεκατισμό ×48 και ένα FFT — 11 dB διαφορά, μετρημένη 2026-09-14. ΚΑΘΕ ΣΥΓΚΡΙΣΗ ΜΕ ΑΥΤΑ ΤΑ ΝΟΥΜΕΡΑ ΔΗΛΩΝΕΙ ΜΕ ΠΟΙΟ ΟΡΓΑΝΟ ΕΓΙΝΕ.",
-    "negative_fixture_not_silent": "Στο λεπτό πλέγμα το αρνητικό δοκίμιο ΔΕΝ είναι σιωπηλό: δείχνει 5.18 dB στα 60 Hz χωρίς τίποτα εγχυμένο, γιατί ο φορέας έχει δικό του υπόλειμμα δικτύου που το χοντρό πλέγμα αραιώνει. Ένας ανιχνευτής με κατώφλι κάτω από αυτό θα δώσει ψευδώς θετικό εδώ — και το δοκίμιο δεν μπορεί να τον πιάσει."
+    "negative_fixture_not_silent": "Στο λεπτό πλέγμα το αρνητικό δοκίμιο ΔΕΝ είναι σιωπηλό — και το χειρότερο σενάριο δεν είναι καν στα 60 Hz: ο ανιχνευτής (ζώνη 40-75 Hz) βρίσκει την ισχυρότερη γραμμή του φορέα στα ~70 Hz, 9.09 dB, χωρίς τίποτα εγχυμένο. Στα 60 Hz δείχνει 5.18 dB — υπολειμματικό δίκτυο, μετρημένο ξεχωριστά. Ένας ανιχνευτής με κατώφλι κάτω από τα 9.09 dB θα δώσει ψευδώς θετικό εδώ, και το δοκίμιο δεν μπορεί να τον πιάσει.",
+    "measured_at_points_not_zone": "Οι τιμές του φορέα μετρήθηκαν αρχικά ΜΟΝΟ στα 50 και στα 60 Hz. Ο ανιχνευτής ψάχνει ΟΛΗ τη ζώνη 40-75 και βρήκε ισχυρότερη γραμμή στα 70 — μετρήθηκε 2026-09-14, αφού το τεστ κοκκίνισε. ΕΝΑ ΔΟΚΙΜΙΟ ΠΟΥ ΜΕΤΡΗΘΗΚΕ ΣΕ ΣΗΜΕΙΑ ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΚΡΙΝΕΙ ΟΡΓΑΝΟ ΠΟΥ ΨΑΧΝΕΙ ΖΩΝΗ."
   },
   "fixtures": [
     {
@@ -120,6 +125,8 @@
       "measured_prominence_at_50hz_db_decim1k": 0.34,
       "measured_prominence_at_60hz_db_welch48k": 0.9774284362792969,
       "measured_prominence_at_60hz_db_decim1k": 5.18,
+      "measured_prominence_at_70hz_db_welch48k": 2.52,
+      "measured_prominence_at_70hz_db_decim1k": 9.094,
       "positive": false,
       "requested_prominence_db": null,
       "sha256": "3f7042306dd5297dca0a1c9bf2707a72f06c2c7b4b97013c7092a949739a81d3",
