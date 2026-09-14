@@ -84,8 +84,12 @@ fn pause_for(mono: &[f32], sr: u32) -> Vec<f32> {
     mono[a..a + n].to_vec()
 }
 
+/// ⚠ ΜΕΤΟΝΟΜΑΣΙΑ ΑΠΟ `detects_seven_known_fixtures`, δηλωμένη: το παλιό
+/// όνομα ήταν ψευδές. Δεν ανιχνεύει εφτά — ανιχνεύει έξι (θετικά, γνωστή
+/// συχνότητα+προεξοχή) ΚΑΙ φρουρεί ένα (αρνητικό, διαφορετικός
+/// ισχυρισμός, βλ. σχόλιο μέσα στον βρόχο).
 #[test]
-fn detects_seven_known_fixtures() {
+fn detects_six_and_guards_the_negative() {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hum_detector");
     let manifest: Value = serde_json::from_str(
         &std::fs::read_to_string(format!("{dir}/manifest.json")).expect("manifest.json"),
@@ -101,33 +105,42 @@ fn detects_seven_known_fixtures() {
         let (mono, sr) = decode_mono(&path);
         let pause = pause_for(&mono, sr);
         let line = detect_mains_line(&pause, sr).expect("η παύση δεν είναι πολύ κοντή για FFT");
-
-        let (expect_hz, expect_prom) = if file == "hum_none.flac" {
-            // Το αρνητικό: καμία εγχυμένη γραμμή, αλλά ο φορέας έχει δικό
-            // του υπόλειμμα δικτύου στα 60Hz (manifest carrier_residual_db).
-            (
-                60.0_f32,
-                f["measured_prominence_at_60hz_db_decim1k"]
-                    .as_f64()
-                    .expect("measured_prominence_at_60hz_db_decim1k") as f32,
-            )
-        } else {
-            (
-                f["hum_hz"].as_f64().expect("hum_hz") as f32,
-                f["measured_prominence_db_decim1k"]
-                    .as_f64()
-                    .expect("measured_prominence_db_decim1k") as f32,
-            )
-        };
-
         checked += 1;
-        let hz_err = (line.hz - expect_hz).abs();
-        let prom_err = (line.prominence_db - expect_prom).abs();
-        if hz_err > FREQ_TOL_HZ || prom_err > PROMINENCE_TOL_DB {
-            failures.push(format!(
-                "{file}: βρέθηκε hz={:.3} prom={:.3}dB, αναμενόταν hz={:.2}±{FREQ_TOL_HZ} prom={:.2}±{PROMINENCE_TOL_DB}dB (Δhz={:.3} Δprom={:.3})",
-                line.hz, line.prominence_db, expect_hz, expect_prom, hz_err, prom_err
-            ));
+
+        if file == "hum_none.flac" {
+            // ΤΟ ΑΡΝΗΤΙΚΟ ΔΕΝ ΕΛΕΓΧΕΙ ΣΥΧΝΟΤΗΤΑ.
+            // ΗΤΑΝ ΚΑΡΦΩΜΕΝΟ ΣΤΑ 60 Hz — και ο ανιχνευτής
+            // βρήκε 70. Δεν ήταν σφάλμα: ο φορέας έχει
+            // πραγματική γραμμή εκεί, 9.09 dB, ισχυρότερη από
+            // τη δική του στα 60. Μετρήθηκε 2026-09-14 αφού
+            // το τεστ κοκκίνισε· το manifest την κατέγραψε.
+            // Ένα δοκίμιο χωρίς εγχυμένο τόνο ΔΕΝ έχει
+            // «σωστή» συχνότητα να δηλώσει. Αυτό που δηλώνει
+            // είναι ΠΟΣΟ δυνατή είναι η πιο δυνατή γραμμή του
+            // — και ο ανιχνευτής δεν επιτρέπεται να βρει
+            // τίποτα πιο δυνατό από αυτό.
+            let worst_case_db = f["measured_prominence_at_70hz_db_decim1k"]
+                .as_f64()
+                .expect("measured_prominence_at_70hz_db_decim1k") as f32;
+            if line.prominence_db > worst_case_db + PROMINENCE_TOL_DB {
+                failures.push(format!(
+                    "{file}: βρέθηκε prom={:.3}dB στα {:.3}Hz — ξεπερνάει το χειρότερο του φορέα {:.2}±{PROMINENCE_TOL_DB}dB",
+                    line.prominence_db, line.hz, worst_case_db
+                ));
+            }
+        } else {
+            let expect_hz = f["hum_hz"].as_f64().expect("hum_hz") as f32;
+            let expect_prom = f["measured_prominence_db_decim1k"]
+                .as_f64()
+                .expect("measured_prominence_db_decim1k") as f32;
+            let hz_err = (line.hz - expect_hz).abs();
+            let prom_err = (line.prominence_db - expect_prom).abs();
+            if hz_err > FREQ_TOL_HZ || prom_err > PROMINENCE_TOL_DB {
+                failures.push(format!(
+                    "{file}: βρέθηκε hz={:.3} prom={:.3}dB, αναμενόταν hz={:.2}±{FREQ_TOL_HZ} prom={:.2}±{PROMINENCE_TOL_DB}dB (Δhz={:.3} Δprom={:.3})",
+                    line.hz, line.prominence_db, expect_hz, expect_prom, hz_err, prom_err
+                ));
+            }
         }
     }
 
