@@ -55,49 +55,13 @@ fn dump_mono(path: &str, tag: &str) -> (Vec<f32>, Option<f32>) {
     (mono, split)
 }
 
-fn rms_db(x: &[f32]) -> f32 {
-    let e = x.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>() / x.len() as f64;
-    if e < 1e-20 {
-        -200.0
-    } else {
-        (10.0 * e.log10()) as f32
-    }
-}
-
-/// Ο μεγαλύτερος συνεχόμενος χώρος μέσα στο [from,to] όπου ΚΑΘΕ παράθυρο
-/// 100 ms είναι κάτω από το κατώφλι. Επιστρέφει (start_sample, len_samples).
-fn longest_pause(mono: &[f32], from_s: f32, to_s: f32, thr_db: f32) -> Option<(usize, usize)> {
-    let w = 4_800usize;
-    let a = (from_s * SR) as usize;
-    let b = ((to_s * SR) as usize).min(mono.len());
-    if b <= a + w {
-        return None;
-    }
-    let (mut best, mut cur_start, mut cur_len) = ((0usize, 0usize), a, 0usize);
-    let mut i = a;
-    while i + w <= b {
-        if rms_db(&mono[i..i + w]) < thr_db {
-            if cur_len == 0 {
-                cur_start = i;
-            }
-            cur_len += w;
-        } else {
-            if cur_len > best.1 {
-                best = (cur_start, cur_len);
-            }
-            cur_len = 0;
-        }
-        i += w;
-    }
-    if cur_len > best.1 {
-        best = (cur_start, cur_len);
-    }
-    if best.1 == 0 {
-        None
-    } else {
-        Some(best)
-    }
-}
+/// ⚠ ΠΡΩΗΝ ΑΝΤΙΓΡΑΦΟ, ΤΩΡΑ ΜΙΑ ΠΗΓΗ (§0.2 του detector task): αυτό ζούσε
+/// εδώ ΚΑΙ σε sp314-dsp/tests/fixture_factory.rs (WS1). Και τα δύο τώρα
+/// καλούν `sp314_dsp::analysis::mains_hum::longest_run_below` (δημόσιο,
+/// αυτό το αρχείο ήδη εξαρτάται από το sp314-dsp). Το threshold εδώ
+/// ΣΥΝΕΧΙΖΕΙ να έρχεται απ' έξω (trunk_pass's Otsu, μέσω
+/// run_trunk_pass_with_acx) — αυτό το αρχείο δεν υπολόγιζε ποτέ δικό του
+/// Otsu, μόνο το longest-run-below-threshold μέρος ήταν διπλό.
 
 /// Welch PSD σε dB. Hann, 50% επικάλυψη, μέσος όρος ισχύος.
 fn welch(x: &[f32]) -> (Vec<f32>, usize) {
@@ -193,7 +157,8 @@ fn analyse(path: &str, from_s: f32, to_s: f32) -> Spec {
         None => split.expect("το αρχείο δεν έδωσε τομή Otsu — δεν υπάρχει κριτήριο παύσης"),
     };
     let (start, len) =
-        longest_pause(&mono, from_s, to_s, thr).expect("καμία παύση κάτω από την τομή στο εύρος");
+        sp314_dsp::analysis::mains_hum::longest_run_below(&mono, SR as u32, thr, Some((from_s, to_s)))
+            .expect("καμία παύση κάτω από την τομή στο εύρος");
     let seg = &mono[start..start + len];
     let (psd, segs) = welch(seg);
 

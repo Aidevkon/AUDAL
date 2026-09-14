@@ -6,6 +6,7 @@ pub mod analyzer;
 pub mod clipping;
 pub mod dynamics;
 pub mod features;
+pub mod mains_hum;
 pub mod mel_128;
 pub mod onset_flux;
 pub mod pre_analysis;

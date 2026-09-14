@@ -262,100 +262,17 @@ mod tests {
     ///   DOI 10.1109/TSMC.1979.4310076
     /// RETRIEVED: 2026-09-14 (Semantic Scholar Graph API, εγγραφή DOI)
     ///
-    /// ⚠ ΑΝΤΙΓΡΑΦΟ — ΔΗΛΩΜΕΝΟ. Ο ΙΔΙΟΣ αλγόριθμος ζει στο trunk_pass.rs
-    /// (sp314-orchestrator, ιδιωτικός) και στο hum_spectrum.rs (WS2). ΤΟ
-    /// sp314-dsp ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΞΑΡΤΗΘΕΙ ΑΠΟ ΚΑΝΕΝΑ ΑΠΟ ΤΑ ΔΥΟ: ο
-    /// orchestrator εξαρτάται ΑΠΟ ΑΥΤΟ (κύκλος), και το WS2 είναι ΑΛΛΟ
-    /// workspace. Δεν υπάρχει τρόπος επαναχρησιμοποίησης χωρίς νέο crate.
-    fn otsu_split_bin(hist: &[u32]) -> Option<usize> {
-        let total: f64 = hist.iter().map(|&c| c as f64).sum();
-        if total == 0.0 {
-            return None;
-        }
-        let sum_all: f64 = hist.iter().enumerate().map(|(i, &c)| i as f64 * c as f64).sum();
-        let (mut w0, mut sum0) = (0.0_f64, 0.0_f64);
-        let (mut best_var, mut best_t) = (-1.0_f64, 0usize);
-        for t in 0..hist.len() {
-            w0 += hist[t] as f64;
-            if w0 == 0.0 {
-                continue;
-            }
-            let w1 = total - w0;
-            if w1 == 0.0 {
-                break;
-            }
-            sum0 += t as f64 * hist[t] as f64;
-            let m0 = sum0 / w0;
-            let m1 = (sum_all - sum0) / w1;
-            let var = w0 * w1 * (m0 - m1) * (m0 - m1);
-            if var > best_var {
-                best_var = var;
-                best_t = t;
-            }
-        }
-        if best_var < 0.0 {
-            None
-        } else {
-            Some(best_t)
-        }
-    }
-
-    /// Η ΠΑΥΣΗ — ΤΟ ΙΔΙΟ ΚΡΙΤΗΡΙΟ ΜΕ ΤΟΝ ΑΝΙΧΝΕΥΤΗ.
-    ///
-    /// ⚠ ΑΝΤΙΓΡΑΦΟ ΤΟΥ `longest_pause` ΤΟΥ hum_spectrum.rs (WS2), ΓΙΑ ΤΟΝ
-    /// ΙΔΙΟ ΛΟΓΟ: άλλο workspace, μηδέν διαδρομή εξάρτησης. ΚΑΘΕ ΑΛΛΑΓΗ
-    /// ΕΔΩ ΠΡΕΠΕΙ ΝΑ ΓΙΝΕΙ ΚΑΙ ΕΚΕΙ — αλλιώς η «ζητούμενη» και η
-    /// «μετρημένη» προεξοχή σταματούν να μετράνε το ίδιο πράγμα, που είναι
-    /// ΑΚΡΙΒΩΣ το σφάλμα που έβγαλε +32 dB απόκλιση στην πρώτη δοκιμή.
-    ///
-    /// Παράθυρα 100 ms, κατώφλι = η τομή Otsu του ΙΔΙΟΥ του σήματος, κάδοι
-    /// 1 dB από −100 ως 0. Επιστρέφει (start_sample, len_samples).
-    fn longest_pause(x: &[f32], sr: u32) -> Option<(usize, usize)> {
-        let w = (sr as f32 * 0.100) as usize;
-        let rms_db = |c: &[f32]| -> f32 {
-            let e = c.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>() / c.len() as f64;
-            if e < 1e-20 {
-                -200.0
-            } else {
-                (10.0 * e.log10()) as f32
-            }
-        };
-        let windows: Vec<f32> = x.chunks(w).filter(|c| c.len() == w).map(rms_db).collect();
-        if windows.is_empty() {
-            return None;
-        }
-        let mut hist = [0u32; 100];
-        for &v in &windows {
-            let b = (v + 100.0).floor();
-            if b >= 0.0 && (b as usize) < 100 {
-                hist[b as usize] += 1;
-            }
-        }
-        let thr = -100.0 + otsu_split_bin(&hist)? as f32 + 0.5;
-
-        let (mut best, mut cur_start, mut cur_len) = ((0usize, 0usize), 0usize, 0usize);
-        for (i, &v) in windows.iter().enumerate() {
-            if v < thr {
-                if cur_len == 0 {
-                    cur_start = i * w;
-                }
-                cur_len += w;
-            } else {
-                if cur_len > best.1 {
-                    best = (cur_start, cur_len);
-                }
-                cur_len = 0;
-            }
-        }
-        if cur_len > best.1 {
-            best = (cur_start, cur_len);
-        }
-        if best.1 == 0 {
-            None
-        } else {
-            Some(best)
-        }
-    }
+    /// ⚠ ΠΡΩΗΝ ΑΝΤΙΓΡΑΦΟ, ΤΩΡΑ ΜΙΑ ΠΗΓΗ (§0.2 του detector task): αυτό το
+    /// otsu_split_bin+longest_pause ζούσε εδώ ΚΑΙ σε
+    /// research/encoder-gap-speech/src/bin/hum_spectrum.rs (WS2) —
+    /// γνήσιο διπλότυπο, όχι απλά ομώνυμο. Και τα δύο τώρα καλούν
+    /// `sp314_dsp::analysis::mains_hum::{otsu_pause_threshold_db,
+    /// longest_run_below}` (δημόσιο, ίδιο crate — δεν χρειαζόταν πια νέο
+    /// crate, ΜΟΝΟ να γίνει δημόσιο). Το Otsu του trunk_pass.rs
+    /// (sp314-orchestrator, ιδιωτικός) ΔΕΝ ενοποιείται εδώ — streaming
+    /// histogram-only σχήμα, καμία θέση παραθύρου δεν κρατιέται (§0.1),
+    /// άρα δεν είναι το ίδιο σχήμα δεδομένων παρά το ίδιο όνομα
+    /// αλγορίθμου.
 
     /// Η ΣΤΑΘΜΗ ΒΓΑΙΝΕΙ ΑΠΟ ΤΗΝ ΠΡΟΕΞΟΧΗ, ΟΧΙ ΑΠΟ ΑΠΟΛΥΤΟ dBFS.
     ///
@@ -377,7 +294,10 @@ mod tests {
         let bin_hz = sr as f32 / 16_384.0;
         let k = (f_hz / bin_hz).round() as usize;
 
-        let (a, n) = longest_pause(carrier, sr).expect("ο φορέας δεν έχει παύση");
+        let thr = sp314_dsp::analysis::mains_hum::otsu_pause_threshold_db(carrier, sr)
+            .expect("ο φορέας δεν έχει τομή Otsu");
+        let (a, n) = sp314_dsp::analysis::mains_hum::longest_run_below(carrier, sr, thr, None)
+            .expect("ο φορέας δεν έχει παύση");
         let pause = &carrier[a..a + n];
         let psd_pause = welch_psd_db(pause);
         let floor_db = local_floor_db(&psd_pause, k, sr);
@@ -397,7 +317,10 @@ mod tests {
     fn measured_prominence(mix: &[f32], sr: u32, f_hz: f32) -> f32 {
         let bin_hz = sr as f32 / 16_384.0;
         let k = (f_hz / bin_hz).round() as usize;
-        let (a, n) = longest_pause(mix, sr).expect("το μίγμα δεν έχει παύση");
+        let thr = sp314_dsp::analysis::mains_hum::otsu_pause_threshold_db(mix, sr)
+            .expect("το μίγμα δεν έχει τομή Otsu");
+        let (a, n) = sp314_dsp::analysis::mains_hum::longest_run_below(mix, sr, thr, None)
+            .expect("το μίγμα δεν έχει παύση");
         let psd = welch_psd_db(&mix[a..a + n]);
         psd[k] - local_floor_db(&psd, k, sr)
     }
