@@ -107,6 +107,19 @@ pub struct TrunkReport {
     /// Μετριέται στο ΙΔΙΟ πέρασμα με όλα τα υπόλοιπα (ιστόγραμμα στον βρόχο
     /// του mono), όχι σε δεύτερο.
     pub quiet_window_split_dbfs: Option<f32>,
+    /// Η πιο προεξέχουσα γραμμή 40-75Hz μέσα στη μεγαλύτερη παύση
+    /// (sp314_dsp::analysis::mains_hum::detect_mains_line — ΤΟ ΟΡΓΑΝΟ,
+    /// μηδέν κατώφλι απόφασης μέσα του).
+    ///
+    /// None σημαίνει «δεν μετρήθηκε» — ΟΧΙ «δεν υπάρχει βόμβος». Συμβαίνει
+    /// όταν: δεν βρέθηκε τομή Otsu (κατανομή όχι διμερής, ίδια συνθήκη με
+    /// το `quiet_window_split_dbfs = None`) · ή δεν βρέθηκε καμία παύση
+    /// κάτω από την τομή. ΜΗΔΕΝ default, ΜΗΔΕΝ fallback.
+    ///
+    /// Η ΠΡΟΕΞΟΧΗ ΔΕΝ ΕΙΝΑΙ ΣΥΓΚΡΙΣΙΜΗ με μετρήσεις Welch48k αλλού στο
+    /// δέντρο — δικό της όργανο, δικά της νούμερα (βλ.
+    /// analysis::mains_hum's module doc).
+    pub mains_line: Option<sp314_dsp::analysis::mains_hum::MainsLine>,
 }
 
 impl std::ops::Deref for TrunkReport {
@@ -537,6 +550,16 @@ fn run_trunk_internal(
     let mut qw_hist = [0u32; QW_NBINS];
     let mut qw_sum_sq: f32 = 0.0;
     let mut qw_count: usize = 0;
+    // Η ΠΕΡΙΒΑΛΛΟΥΣΑ, ΙΔΙΟΣ ΒΡΟΧΟΣ ΜΕ ΤΟ ΙΣΤΟΓΡΑΜΜΑ (detector task §Α):
+    // RMS ΓΡΑΜΜΙΚΟ (όχι dB) ανά παράθυρο 100 ms, ΜΙΑ τιμή ανά qw_hist bump —
+    // το ιστόγραμμα ΔΕΝ αντικαθίσταται, η τομή Otsu βγαίνει ακόμα από αυτό.
+    // ~24k στοιχεία σε αρχείο 40 λεπτών ≈ 96KB — δίπλα στα ~2.93MB των
+    // hist_left/right/mono παρακάτω. Γιατί RMS γραμμικό κι όχι dB: επιτρέπει
+    // να περάσει αυτούσια σε longest_run_below (mains_hum.rs, 5284931) με
+    // sample_rate=10 (10 παράθυρα/δευτ.) — η ίδια συνάρτηση ξαναϋπολογίζει
+    // 10*log10(v²) εσωτερικά, που ισούται με το db εδώ ΜΟΝΟ αν το v είναι
+    // RMS amplitude, όχι ήδη-σε-dB τιμή. ΜΗΔΕΝ τέταρτο αντίγραφο.
+    let mut qw_env: Vec<f32> = Vec::new();
 
     // === 8-band spectral profile ===
     // Mirrors spectral_profile_8band [pre_analysis.rs:469-499]:
@@ -732,6 +755,7 @@ fn run_trunk_internal(
                         qw_hist[bin as usize] += 1;
                     }
                 }
+                qw_env.push(e.max(0.0).sqrt() as f32);
                 qw_sum_sq = 0.0;
                 qw_count = 0;
             }
@@ -974,10 +998,26 @@ fn run_trunk_internal(
         }
     }
 
+    // === Ο ανιχνευτής βόμβου δικτύου (detector task §Β) ===
+    // Η παύση βρίσκεται ΜΙΑ φορά, εδώ στο τέλος — το ΙΔΙΟ ιστόγραμμα
+    // qw_hist δίνει την τομή Otsu (ήδη υπολογιζόταν, για το
+    // quiet_window_split_dbfs), η περιβάλλουσα qw_env (§Α, πάνω) δίνει τη
+    // ΘΕΣΗ. ΕΝΑ seek (read_window παρακάτω) — ΟΧΙ δεύτερο decode του dump.
+    let quiet_split = quiet_window_split_db(&qw_hist);
+    let mains_line = quiet_split.and_then(|thr| {
+        let (start_w, len_w) =
+            sp314_dsp::analysis::mains_hum::longest_run_below(&qw_env, 10, thr, None)?;
+        let start_frame = start_w * QW_WINDOW;
+        let len_frames = len_w * QW_WINDOW;
+        let pause = source.read_window(start_frame, len_frames);
+        sp314_dsp::analysis::mains_hum::detect_mains_line(&pause, SAMPLE_RATE)
+    });
+
     Ok(TrunkReport {
         boundaries,
         acx_interior_noise_floor: acx_interior,
-        quiet_window_split_dbfs: quiet_window_split_db(&qw_hist),
+        quiet_window_split_dbfs: quiet_split,
+        mains_line,
         metrics: TrunkMetrics {
             integrated_lufs,
             rms_db,
