@@ -1,0 +1,110 @@
+{
+  "carrier_residual_db": {
+    "50hz": -0.09,
+    "60hz": 0.98,
+    "measured": "2026-09-15, hum_spectrum, pause 145.6-148.8s"
+  },
+  "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+  "seed": 314159,
+  "harmonics": 1,
+  "sample_rate": 48000,
+  "carrier_duration_sec": 30.0,
+  "limits": {
+    "carrier": "mobydick_000_melville — residual -0.09 dB at 50 Hz and +0.98 dB at 60 Hz above the local median; largest prominence anywhere in 20-400 Hz is 3.24 dB at 216.8 Hz",
+    "prominence_definition": "peak minus median of +/-25 Hz excluding +/-4 Hz, Welch N=16384 Hann 50%, measured INSIDE the longest pause (100 ms windows below the file's own Otsu split)",
+    "waveform": "pure sine, fundamental only — the 60->120 Hz decay of real mains measured 3.2..33.2 dB across n=4 files; unstable, so no ratio was invented. A detector that relies on harmonics is NOT exercised here."
+  },
+  "fixtures": [
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_50hz_p04.flac",
+      "harmonics": 1,
+      "hum_hz": 50.0,
+      "measured_prominence_at_other_hz_db": 0.171417236328125,
+      "measured_prominence_db": 5.116237640380859,
+      "other_hz": 60.0,
+      "positive": true,
+      "requested_prominence_db": 4.0,
+      "sha256": "6ddd068ec8da2c147c48aeed85ee7ee1bbb1ab7b0e4169a352bd4b6cf1b96f32",
+      "tone_amplitude_dbfs": -89.70697021484375
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_50hz_p12.flac",
+      "harmonics": 1,
+      "hum_hz": 50.0,
+      "measured_prominence_at_other_hz_db": 0.17932891845703125,
+      "measured_prominence_db": 12.100898742675781,
+      "other_hz": 60.0,
+      "positive": true,
+      "requested_prominence_db": 12.0,
+      "sha256": "2f313f6f7c968395b6f2632e00f36822c7ec090897b1fa96272a906922bcde82",
+      "tone_amplitude_dbfs": -81.70697021484375
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_50hz_p21.flac",
+      "harmonics": 1,
+      "hum_hz": 50.0,
+      "measured_prominence_at_other_hz_db": 0.20499420166015625,
+      "measured_prominence_db": 20.979393005371094,
+      "other_hz": 60.0,
+      "positive": true,
+      "requested_prominence_db": 21.0,
+      "sha256": "e6aac4fe40c0aa33fcf549c1f770fff95fcb99b97a1d9dc3745a266d85848d4a",
+      "tone_amplitude_dbfs": -72.70697021484375
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_60hz_p04.flac",
+      "harmonics": 1,
+      "hum_hz": 60.0,
+      "measured_prominence_at_other_hz_db": -0.3893394470214844,
+      "measured_prominence_db": 4.113533020019531,
+      "other_hz": 50.0,
+      "positive": true,
+      "requested_prominence_db": 4.0,
+      "sha256": "14202d921b918022994edc5065cebe75d07ab94d70bc4264a47de6602c7f0e65",
+      "tone_amplitude_dbfs": -87.90223693847656
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_60hz_p12.flac",
+      "harmonics": 1,
+      "hum_hz": 60.0,
+      "measured_prominence_at_other_hz_db": -0.9573440551757812,
+      "measured_prominence_db": 11.36395263671875,
+      "other_hz": 50.0,
+      "positive": true,
+      "requested_prominence_db": 12.0,
+      "sha256": "95cf61b8115be0a930f4615fb8a2efea71450f7a79a47bea4ba81901a6b9da4d",
+      "tone_amplitude_dbfs": -79.9022445678711
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_60hz_p21.flac",
+      "harmonics": 1,
+      "hum_hz": 60.0,
+      "measured_prominence_at_other_hz_db": -1.0000076293945312,
+      "measured_prominence_db": 20.57592010498047,
+      "other_hz": 50.0,
+      "positive": true,
+      "requested_prominence_db": 21.0,
+      "sha256": "41169872007c51eceaf0d42d60a764786386e94cfff1a838036f2f816223db40",
+      "tone_amplitude_dbfs": -70.9022445678711
+    },
+    {
+      "carrier": "/tmp/fixture-factory/mobydick_000_melville.mp3",
+      "file": "hum_none.flac",
+      "harmonics": 0,
+      "hum_hz": null,
+      "measured_prominence_at_50hz_db": -0.08502578735351562,
+      "measured_prominence_at_60hz_db": 0.9774284362792969,
+      "positive": false,
+      "requested_prominence_db": null,
+      "sha256": "3f7042306dd5297dca0a1c9bf2707a72f06c2c7b4b97013c7092a949739a81d3",
+      "tone_amplitude_dbfs": null
+    }
+  ],
+  "carrier_start_sec": 135.0
+}

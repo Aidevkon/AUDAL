@@ -138,6 +138,357 @@ mod tests {
         100.0 * speech_frames as f32 / feats.len().max(1) as f32
     }
 
+
+    // ══ ΓΕΝΝΗΤΡΙΑ ΔΟΚΙΜΙΩΝ ΜΕ ΓΝΩΣΤΟ ΒΟΜΒΟ ════════════════════════════════
+    // ΜΟΝΟ ΥΛΙΚΟ. ΜΗΔΕΝ ΑΝΙΧΝΕΥΤΗΣ — ο ανιχνευτής είναι επόμενο βήμα και
+    // αυτά τα δοκίμια υπάρχουν για να τον κρίνουν, όχι να τον ορίσουν.
+    //
+    // ΓΙΑΤΙ ΥΠΑΡΧΟΥΝ: μετρήθηκε 2026-09-14 ότι και τα είκοσι αρχεία του
+    // LibriVox corpus δείχνουν 60 Hz ή τίποτα — ΚΑΝΕΝΑ στα 50 με προεξοχή
+    // πάνω από 3.6 dB. Ανιχνευτής που πρέπει να ΔΙΑΛΕΓΕΙ ανάμεσα σε 50 και
+    // 60 δεν μπορεί να δοκιμαστεί σε δείγμα που έχει μόνο τη μία απάντηση.
+
+    /// Ημίτονο δικτύου: θεμελιώδης + προαιρετικές αρμονικές με φθίνουσα στάθμη.
+    ///
+    /// ⚠ ΤΟ ΠΡΑΓΜΑΤΙΚΟ ΔΙΚΤΥΟ ΔΕΝ ΕΙΝΑΙ ΚΑΘΑΡΟ ΗΜΙΤΟΝΟ, ΚΑΙ ΤΟ F-082 ΤΟ
+    /// ΔΗΛΩΝΕΙ ΩΣ ΟΡΙΟ ΤΟΥ ΙΔΙΟΥ ΤΟΥ ΕΥΡΗΜΑΤΟΣ. Η παράμετρος `harmonics`
+    /// υπάρχει, ΑΛΛΑ τα δοκίμια παράγονται με harmonics = 1.
+    ///
+    /// ΓΙΑΤΙ: το `harmonic_decay_db` έπρεπε να μετρηθεί από τα πραγματικά.
+    /// ΜΕΤΡΗΘΗΚΕ 2026-09-14 — η πτώση 60→120 Hz στα αρχεία που την έδειξαν:
+    ///   anne +33.2 · monte_cristo +25.3 · pinocchio +5.6 · dracula +3.2 dB
+    /// Εύρος 30.0 dB σε n=4. ΔΕΝ ΥΠΑΡΧΕΙ ΣΤΑΘΕΡΟΣ ΛΟΓΟΣ — οπότε δεν
+    /// εφευρίσκεται ένας. Μόνο θεμελιώδης, ΔΗΛΩΜΕΝΑ.
+    fn mains_hum(
+        sr: u32,
+        dur_sec: f32,
+        fundamental_hz: f32,
+        harmonics: usize,
+        harmonic_decay_db: f32,
+        amplitude: f32,
+    ) -> Vec<f32> {
+        let n = (dur_sec * sr as f32) as usize;
+        let mut out = vec![0.0_f32; n];
+        for h in 1..=harmonics.max(1) {
+            let f = fundamental_hz * h as f32;
+            if f >= sr as f32 / 2.0 {
+                break;
+            }
+            let a = amplitude * 10.0_f32.powf(-harmonic_decay_db * (h - 1) as f32 / 20.0);
+            for (i, s) in out.iter_mut().enumerate() {
+                let t = i as f32 / sr as f32;
+                *s += a * (2.0 * std::f32::consts::PI * f * t).sin();
+            }
+        }
+        out
+    }
+
+    /// Welch PSD σε dB — ΙΔΙΕΣ παράμετροι με το όργανο που θα επαληθεύσει
+    /// (research/encoder-gap-speech/src/bin/hum_spectrum.rs): N=16384, Hann,
+    /// 50% επικάλυψη. Αν αποκλίνουν, η «ζητούμενη προεξοχή» και η «μετρημένη»
+    /// θα μετρούσαν διαφορετικά πράγματα και η σύγκριση δεν θα σήμαινε τίποτα.
+    fn welch_psd_db(x: &[f32]) -> Vec<f32> {
+        use rustfft::{num_complex::Complex, FftPlanner};
+        const NFFT: usize = 16_384;
+        let hop = NFFT / 2;
+        let win: Vec<f32> = (0..NFFT)
+            .map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / NFFT as f32).cos())
+            .collect();
+        let wpow: f64 = win.iter().map(|&v| (v as f64) * (v as f64)).sum();
+        let mut acc = vec![0.0_f64; NFFT / 2 + 1];
+        let mut segs = 0usize;
+        let mut off = 0usize;
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(NFFT);
+        while off + NFFT <= x.len() {
+            let mut buf: Vec<Complex<f32>> = (0..NFFT)
+                .map(|i| Complex::new(x[off + i] * win[i], 0.0))
+                .collect();
+            fft.process(&mut buf);
+            for (k, a) in acc.iter_mut().enumerate() {
+                let p = (buf[k].re as f64).powi(2) + (buf[k].im as f64).powi(2);
+                let scale = if k == 0 || k == NFFT / 2 { 1.0 } else { 2.0 };
+                *a += scale * p / wpow;
+            }
+            segs += 1;
+            off += hop;
+        }
+        assert!(segs > 0, "σήμα πιο κοντό από ένα τμήμα Welch");
+        acc.iter()
+            .map(|&v| {
+                let m = v / segs as f64;
+                if m < 1e-30 {
+                    -300.0
+                } else {
+                    (10.0 * m.log10()) as f32
+                }
+            })
+            .collect()
+    }
+
+    /// Τοπικό πάτωμα: διάμεσος σε ±25 Hz, ΕΞΑΙΡΩΝΤΑΣ ±4 Hz γύρω από τον κάδο.
+    /// ΙΔΙΟΣ ορισμός με το όργανο επαλήθευσης — και ΙΔΙΟΣ με το «λόγος
+    /// κορυφής προς γείτονες» που όρισε το κατώφλι +8 dB του F-082.
+    fn local_floor_db(psd: &[f32], k: usize, sr: u32) -> f32 {
+        let bin_hz = sr as f32 / 16_384.0;
+        let span = (25.0 / bin_hz) as usize;
+        let skip = (4.0 / bin_hz) as usize;
+        let lo = k.saturating_sub(span);
+        let hi = (k + span).min(psd.len() - 1);
+        let mut v: Vec<f32> = (lo..=hi)
+            .filter(|&i| i < k.saturating_sub(skip) || i > k + skip)
+            .map(|i| psd[i])
+            .collect();
+        assert!(!v.is_empty(), "κενή γειτονιά στον κάδο {k}");
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        v[v.len() / 2]
+    }
+
+    /// Η ΣΤΑΘΜΗ ΒΓΑΙΝΕΙ ΑΠΟ ΤΗΝ ΠΡΟΕΞΟΧΗ, ΟΧΙ ΑΠΟ ΑΠΟΛΥΤΟ dBFS.
+    ///
+    /// ΔΥΟ ΔΡΟΜΟΙ ΥΠΗΡΧΑΝ: απόλυτη στάθμη ημιτόνου σε dBFS, ή προεξοχή πάνω
+    /// από το πάτωμα του φορέα. ΔΙΑΛΕΧΤΗΚΕ Ο ΔΕΥΤΕΡΟΣ, γιατί είναι ΑΚΡΙΒΩΣ
+    /// το μέγεθος που μετράει ο ανιχνευτής (F-082: λόγος κορυφής προς
+    /// γείτονες). Ένα απόλυτο dBFS θα έδινε άλλη προεξοχή σε κάθε φορέα.
+    ///
+    /// Η PSD είναι τετραγωνική στο πλάτος, άρα το κέρδος βγαίνει σε ΕΝΑ βήμα:
+    ///   ζητούμενη κορυφή = πάτωμα_φορέα + προεξοχή
+    ///   κέρδος_dB        = ζητούμενη κορυφή − κορυφή_ημιτόνου_στο_πλάτος_1
+    /// Otsu σε 1-D ιστόγραμμα: η τομή που μεγιστοποιεί τη διακύμανση ΑΝΑΜΕΣΑ
+    /// στις δύο κλάσεις.
+    ///
+    /// SOURCE: N. Otsu, "A Threshold Selection Method from Gray-Level Histograms",
+    ///   IEEE Transactions on Systems, Man and Cybernetics, vol. 9, pp. 62-66, 1979,
+    ///   DOI 10.1109/TSMC.1979.4310076
+    /// RETRIEVED: 2026-09-14 (Semantic Scholar Graph API, εγγραφή DOI)
+    ///
+    /// ⚠ ΑΝΤΙΓΡΑΦΟ — ΔΗΛΩΜΕΝΟ. Ο ΙΔΙΟΣ αλγόριθμος ζει στο trunk_pass.rs
+    /// (sp314-orchestrator, ιδιωτικός) και στο hum_spectrum.rs (WS2). ΤΟ
+    /// sp314-dsp ΔΕΝ ΜΠΟΡΕΙ ΝΑ ΕΞΑΡΤΗΘΕΙ ΑΠΟ ΚΑΝΕΝΑ ΑΠΟ ΤΑ ΔΥΟ: ο
+    /// orchestrator εξαρτάται ΑΠΟ ΑΥΤΟ (κύκλος), και το WS2 είναι ΑΛΛΟ
+    /// workspace. Δεν υπάρχει τρόπος επαναχρησιμοποίησης χωρίς νέο crate.
+    fn otsu_split_bin(hist: &[u32]) -> Option<usize> {
+        let total: f64 = hist.iter().map(|&c| c as f64).sum();
+        if total == 0.0 {
+            return None;
+        }
+        let sum_all: f64 = hist.iter().enumerate().map(|(i, &c)| i as f64 * c as f64).sum();
+        let (mut w0, mut sum0) = (0.0_f64, 0.0_f64);
+        let (mut best_var, mut best_t) = (-1.0_f64, 0usize);
+        for t in 0..hist.len() {
+            w0 += hist[t] as f64;
+            if w0 == 0.0 {
+                continue;
+            }
+            let w1 = total - w0;
+            if w1 == 0.0 {
+                break;
+            }
+            sum0 += t as f64 * hist[t] as f64;
+            let m0 = sum0 / w0;
+            let m1 = (sum_all - sum0) / w1;
+            let var = w0 * w1 * (m0 - m1) * (m0 - m1);
+            if var > best_var {
+                best_var = var;
+                best_t = t;
+            }
+        }
+        if best_var < 0.0 {
+            None
+        } else {
+            Some(best_t)
+        }
+    }
+
+    /// Η ΠΑΥΣΗ — ΤΟ ΙΔΙΟ ΚΡΙΤΗΡΙΟ ΜΕ ΤΟΝ ΑΝΙΧΝΕΥΤΗ.
+    ///
+    /// ⚠ ΑΝΤΙΓΡΑΦΟ ΤΟΥ `longest_pause` ΤΟΥ hum_spectrum.rs (WS2), ΓΙΑ ΤΟΝ
+    /// ΙΔΙΟ ΛΟΓΟ: άλλο workspace, μηδέν διαδρομή εξάρτησης. ΚΑΘΕ ΑΛΛΑΓΗ
+    /// ΕΔΩ ΠΡΕΠΕΙ ΝΑ ΓΙΝΕΙ ΚΑΙ ΕΚΕΙ — αλλιώς η «ζητούμενη» και η
+    /// «μετρημένη» προεξοχή σταματούν να μετράνε το ίδιο πράγμα, που είναι
+    /// ΑΚΡΙΒΩΣ το σφάλμα που έβγαλε +32 dB απόκλιση στην πρώτη δοκιμή.
+    ///
+    /// Παράθυρα 100 ms, κατώφλι = η τομή Otsu του ΙΔΙΟΥ του σήματος, κάδοι
+    /// 1 dB από −100 ως 0. Επιστρέφει (start_sample, len_samples).
+    fn longest_pause(x: &[f32], sr: u32) -> Option<(usize, usize)> {
+        let w = (sr as f32 * 0.100) as usize;
+        let rms_db = |c: &[f32]| -> f32 {
+            let e = c.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>() / c.len() as f64;
+            if e < 1e-20 {
+                -200.0
+            } else {
+                (10.0 * e.log10()) as f32
+            }
+        };
+        let windows: Vec<f32> = x.chunks(w).filter(|c| c.len() == w).map(rms_db).collect();
+        if windows.is_empty() {
+            return None;
+        }
+        let mut hist = [0u32; 100];
+        for &v in &windows {
+            let b = (v + 100.0).floor();
+            if b >= 0.0 && (b as usize) < 100 {
+                hist[b as usize] += 1;
+            }
+        }
+        let thr = -100.0 + otsu_split_bin(&hist)? as f32 + 0.5;
+
+        let (mut best, mut cur_start, mut cur_len) = ((0usize, 0usize), 0usize, 0usize);
+        for (i, &v) in windows.iter().enumerate() {
+            if v < thr {
+                if cur_len == 0 {
+                    cur_start = i * w;
+                }
+                cur_len += w;
+            } else {
+                if cur_len > best.1 {
+                    best = (cur_start, cur_len);
+                }
+                cur_len = 0;
+            }
+        }
+        if cur_len > best.1 {
+            best = (cur_start, cur_len);
+        }
+        if best.1 == 0 {
+            None
+        } else {
+            Some(best)
+        }
+    }
+
+    /// Η ΣΤΑΘΜΗ ΒΓΑΙΝΕΙ ΑΠΟ ΤΗΝ ΠΡΟΕΞΟΧΗ, ΟΧΙ ΑΠΟ ΑΠΟΛΥΤΟ dBFS.
+    ///
+    /// ΔΥΟ ΔΡΟΜΟΙ ΥΠΗΡΧΑΝ: απόλυτη στάθμη ημιτόνου σε dBFS, ή προεξοχή πάνω
+    /// από το πάτωμα του φορέα. ΔΙΑΛΕΧΤΗΚΕ Ο ΔΕΥΤΕΡΟΣ, γιατί είναι ΑΚΡΙΒΩΣ
+    /// το μέγεθος που μετράει ο ανιχνευτής (F-082: λόγος κορυφής προς
+    /// γείτονες). Ένα απόλυτο dBFS θα έδινε άλλη προεξοχή σε κάθε φορέα.
+    ///
+    /// ⚠ ΤΟ ΤΕΚΜΗΡΙΟ ΓΕΝΝΙΕΤΑΙ ΣΤΗ ΘΕΣΗ ΤΟΥ [§5.5]. Η ΠΡΩΤΗ ΕΚΔΟΧΗ ΜΕΤΡΟΥΣΕ
+    /// ΤΟ ΠΑΤΩΜΑ ΣΕ ΟΛΟΚΛΗΡΟ ΤΟ ΑΠΟΣΠΑΣΜΑ ΤΩΝ 30 s — που περιέχει ομιλία —
+    /// ενώ ο ανιχνευτής μετράει ΜΟΝΟ ΜΕΣΑ ΣΤΗΝ ΠΑΥΣΗ. ΜΕΤΡΗΘΗΚΕ: απόκλιση
+    /// 27.01 έως 33.19 dB σε 6/6 δοκίμια, σχεδόν σταθερή — μετατόπιση
+    /// αναφοράς, όχι θόρυβος. Η αναφορά μετριέται τώρα ΣΤΗΝ ΠΑΥΣΗ.
+    ///
+    /// Η PSD είναι τετραγωνική στο πλάτος, άρα το κέρδος βγαίνει σε ΕΝΑ βήμα:
+    ///   ζητούμενη κορυφή = πάτωμα_παύσης + προεξοχή
+    ///   κέρδος_dB        = ζητούμενη κορυφή − κορυφή_ημιτόνου_στο_πλάτος_1
+    fn amplitude_for_prominence(carrier: &[f32], sr: u32, f_hz: f32, prominence_db: f32) -> f32 {
+        let bin_hz = sr as f32 / 16_384.0;
+        let k = (f_hz / bin_hz).round() as usize;
+
+        let (a, n) = longest_pause(carrier, sr).expect("ο φορέας δεν έχει παύση");
+        let pause = &carrier[a..a + n];
+        let psd_pause = welch_psd_db(pause);
+        let floor_db = local_floor_db(&psd_pause, k, sr);
+
+        // Το ημίτονο αναφοράς έχει ΤΟ ΙΔΙΟ ΜΗΚΟΣ με την παύση — αλλιώς ο
+        // αριθμός των τμημάτων Welch διαφέρει και μαζί του η κανονικοποίηση.
+        let unit = mains_hum(sr, n as f32 / sr as f32, f_hz, 1, 0.0, 1.0);
+        let psd_unit = welch_psd_db(&unit);
+
+        let gain_db = (floor_db + prominence_db) - psd_unit[k];
+        10.0_f32.powf(gain_db / 20.0)
+    }
+
+    /// Η ΠΡΟΕΞΟΧΗ ΟΠΩΣ ΘΑ ΤΗ ΔΙΑΒΑΣΕΙ Ο ΑΝΙΧΝΕΥΤΗΣ — μετρημένη στο ΤΕΛΙΚΟ
+    /// μίγμα, μέσα στην παύση, με τον ΙΔΙΟ ορισμό τοπικού μέσου.
+    /// ΑΥΤΟ γράφεται στο manifest, ΟΧΙ το ζητούμενο.
+    fn measured_prominence(mix: &[f32], sr: u32, f_hz: f32) -> f32 {
+        let bin_hz = sr as f32 / 16_384.0;
+        let k = (f_hz / bin_hz).round() as usize;
+        let (a, n) = longest_pause(mix, sr).expect("το μίγμα δεν έχει παύση");
+        let psd = welch_psd_db(&mix[a..a + n]);
+        psd[k] - local_floor_db(&psd, k, sr)
+    }
+
+    /// Ντετερμινιστικό απόσπασμα από ΡΗΤΗ χρονική θέση.
+    ///
+    /// ΓΙΑΤΙ ΞΕΧΩΡΙΣΤΗ ΑΠΟ ΤΗΝ `get_audio_excerpt`: εκείνη διαλέγει τη θέση
+    /// με τον Lcg. Αλλάζοντάς την θα άλλαζαν τα hashes των ΥΠΑΡΧΟΝΤΩΝ
+    /// δοκιμίων, που είναι πύλη ντετερμινισμού. Εδώ η θέση είναι ΕΠΙΛΟΓΗ —
+    /// το παράθυρο πρέπει να περιέχει παύση, αλλιώς δεν υπάρχει πού να
+    /// κοιτάξει ο ανιχνευτής.
+    fn decode_mono_at(path: &str, target_sr: u32, start_sec: f32, dur_sec: f32) -> (Vec<f32>, u32) {
+        let file = Box::new(File::open(path).unwrap());
+        let mss = MediaSourceStream::new(file, Default::default());
+        let probed = symphonia::default::get_probe()
+            .format(
+                &Hint::new(),
+                mss,
+                &FormatOptions::default(),
+                &MetadataOptions::default(),
+            )
+            .unwrap();
+        let mut format = probed.format;
+        let track = format
+            .tracks()
+            .iter()
+            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+            .unwrap();
+        let track_id = track.id;
+        let sr = track.codec_params.sample_rate.unwrap();
+        let mut decoder = symphonia::default::get_codecs()
+            .make(&track.codec_params, &DecoderOptions::default())
+            .unwrap();
+
+        let mut mono = Vec::new();
+        loop {
+            let packet = match format.next_packet() {
+                Ok(p) => p,
+                Err(_) => break,
+            };
+            if packet.track_id() != track_id {
+                continue;
+            }
+            match decoder.decode(&packet) {
+                Ok(decoded) => {
+                    let channels = decoded.spec().channels.count();
+                    let mut sb = SampleBuffer::<f32>::new(decoded.capacity() as u64, *decoded.spec());
+                    sb.copy_interleaved_ref(decoded.clone());
+                    let s = sb.samples();
+                    for i in (0..s.len()).step_by(channels) {
+                        let mut sum = 0.0;
+                        for c in 0..channels {
+                            sum += s[i + c];
+                        }
+                        mono.push(sum / channels as f32);
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        let a = (start_sec * sr as f32) as usize;
+        let b = ((start_sec + dur_sec) * sr as f32) as usize;
+        assert!(b <= mono.len(), "το απόσπασμα ξεπερνά το αρχείο");
+        let excerpt = mono[a..b].to_vec();
+        if sr == target_sr {
+            return (excerpt, sr);
+        }
+        // ⚠ ΤΟ ΠΛΕΓΜΑ ΚΑΔΩΝ ΠΡΕΠΕΙ ΝΑ ΤΑΥΤΙΖΕΤΑΙ ΜΕ ΤΟΝ ΑΝΙΧΝΕΥΤΗ. Εκείνος
+        // δουλεύει πάντα στα 48 kHz (το dump της αλυσίδας). Στα 44.1 kHz ο
+        // κάδος είναι 2.69 Hz αντί 2.93 — ο τόνος θα έπεφτε αλλού μέσα στον
+        // κάδο και η απώλεια κλιμάκωσης του Hann θα διέφερε ως ~1.4 dB.
+        // ΙΔΙΕΣ παράμετροι rubato με την `get_audio_excerpt`.
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let mut resampler = SincFixedIn::<f32>::new(
+            target_sr as f64 / sr as f64,
+            2.0,
+            params,
+            excerpt.len(),
+            1,
+        )
+        .unwrap();
+        let waves_out = resampler.process(&vec![excerpt], None).unwrap();
+        (waves_out[0].clone(), target_sr)
+    }
+
     #[test]
     #[ignore = "ΓΕΝΝΗΤΡΙΑ fixtures (γράφει tests/fixtures/audiobook/), όχι φρουρός· ΚΑΙ δεν χτίζεται στο default build — θέλει --features cli. Δηλωμένη ΕΞΑΙΡΕΣΗ στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
     fn build_fixtures() {
@@ -619,5 +970,143 @@ mod tests {
         println!("DUCK_SPLICE|speech_sha={}",    speech_sha);
         println!("DUCK_SPLICE|manifest written to {}/manifest.json", base_out);
     }
-}
 
+    // ── ΤΑ ΔΟΚΙΜΙΑ ────────────────────────────────────────────────────────
+    //
+    // ΦΟΡΕΑΣ: mobydick_000_melville, 135–165 s. ΔΙΑΛΕΧΤΗΚΕ ΜΕ ΜΕΤΡΗΣΗ, ΟΧΙ
+    // ΜΕ ΤΟ ΜΑΤΙ: σαρώθηκαν και τα 20 αρχεία του corpus (9 WAKING 14/09,
+    // 11 SLEEPING 15/09) με το hum_spectrum. ΥΠΟΛΕΙΜΜΑ ΤΟΥ ΦΟΡΕΑ, μετρημένο
+    // σε παύση 3.20 s: στα 50 Hz −0.09 dB πάνω από το τοπικό πάτωμα, στα
+    // 60 Hz +0.98 dB. ΚΑΜΙΑ ΓΡΑΜΜΗ — η μεγαλύτερη προεξοχή σε ΟΛΟ το
+    // 20–400 Hz είναι 3.24 dB, στα 216.80 Hz.
+    // Το παράθυρο 135–165 s περιέχει την παύση 145.6–148.8 s.
+    //
+    // ΟΙ ΤΡΕΙΣ ΠΡΟΕΞΟΧΕΣ, ΚΑΙ ΓΙΑΤΙ ΑΥΤΕΣ:
+    //   ΜΕΤΡΗΜΕΝΟ ΕΥΡΟΣ ΤΩΝ ΠΡΑΓΜΑΤΙΚΩΝ (20 αρχεία): 2.5 έως 22.4 dB.
+    //   Το κατώφλι ανίχνευσης του F-082 είναι +8 dB.
+    //    4 dB — ΚΑΤΩ από το κατώφλι. Ανιχνευτής πρέπει να πει ΟΧΙ.
+    //           Μέσα στο πραγματικό εύρος: prideandprejudice 5.58,
+    //           adventuresholmes < 3.57.
+    //   12 dB — ΠΑΝΩ από το κατώφλι, με περιθώριο. Πρέπει να πει ΝΑΙ.
+    //           robinson_crusoe 14.39, monte_cristo 15.15.
+    //   21 dB — Η ΚΟΡΥΦΗ του πραγματικού εύρους: pinocchio 21.21,
+    //           odyssey 22.36.
+    //   ⚠ ΚΑΜΙΑ ΑΚΡΙΒΩΣ ΣΤΟ +8. Δοκίμιο πάνω στο κατώφλι κάνει τον έλεγχο
+    //     ρίψη νομίσματος και το τεστ ασταθές. Το κατώφλι ΦΡΑΣΣΕΤΑΙ
+    //     ΕΚΑΤΕΡΩΘΕΝ, δεν πατιέται.
+    //
+    // ΤΟ ΑΡΝΗΤΙΚΟ ΕΙΝΑΙ ΥΠΟΧΡΕΩΤΙΚΟ: φορέας σκέτος, τίποτα προστιθέμενο.
+    // Ανιχνευτής που λέει πάντα ναι δεν είναι ανιχνευτής.
+    //
+    // ΕΞΟΔΟΣ (tests/fixtures/hum_detector/):
+    //   hum_50hz_p04.flac · hum_50hz_p12.flac · hum_50hz_p21.flac
+    //   hum_60hz_p04.flac · hum_60hz_p12.flac · hum_60hz_p21.flac
+    //   hum_none.flac                                    [ΑΡΝΗΤΙΚΟ]
+    //   manifest.json — ground truth ανά δοκίμιο
+    #[test]
+    #[ignore = "ΓΕΝΝΗΤΡΙΑ fixtures (γράφει tests/fixtures/hum_detector/), όχι φρουρός· ΚΑΙ δεν χτίζεται στο default build — θέλει --features cli. Καλύπτεται από την ΥΠΑΡΧΟΥΣΑ εξαίρεση 'fixture_factory' στο scripts/run-ignored.sh. Το ξυπνά: cargo test -p sp314-dsp --features cli --test fixture_factory -- --ignored"]
+    fn build_hum_detector_fixtures() {
+        let base_out = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hum_detector");
+        std::fs::create_dir_all(base_out).unwrap();
+
+        const CARRIER: &str = "/tmp/fixture-factory/mobydick_000_melville.mp3";
+        const START_SEC: f32 = 135.0;
+        const DUR_SEC: f32 = 30.0;
+        const HARMONICS: usize = 1;
+        const HARMONIC_DECAY_DB: f32 = 0.0; // αδρανές με harmonics = 1
+
+        const TARGET_SR: u32 = 48_000;
+        let (carrier, sr) = decode_mono_at(CARRIER, TARGET_SR, START_SEC, DUR_SEC);
+        println!("φορέας: {CARRIER} @ {START_SEC}s +{DUR_SEC}s · {sr} Hz · {} δείγματα", carrier.len());
+
+        let mut manifest: HashMap<String, serde_json::Value> = HashMap::new();
+        manifest.insert("carrier".into(), serde_json::json!(CARRIER));
+        manifest.insert("carrier_start_sec".into(), serde_json::json!(START_SEC));
+        manifest.insert("carrier_duration_sec".into(), serde_json::json!(DUR_SEC));
+        manifest.insert("sample_rate".into(), serde_json::json!(sr));
+        manifest.insert("seed".into(), serde_json::json!(314159));
+        manifest.insert(
+            "carrier_residual_db".into(),
+            serde_json::json!({ "50hz": -0.09, "60hz": 0.98, "measured": "2026-09-15, hum_spectrum, pause 145.6-148.8s" }),
+        );
+        manifest.insert("harmonics".into(), serde_json::json!(HARMONICS));
+        manifest.insert(
+            "limits".into(),
+            serde_json::json!({
+                "waveform": "pure sine, fundamental only — the 60->120 Hz decay of real mains measured 3.2..33.2 dB across n=4 files; unstable, so no ratio was invented. A detector that relies on harmonics is NOT exercised here.",
+                "carrier": "mobydick_000_melville — residual -0.09 dB at 50 Hz and +0.98 dB at 60 Hz above the local median; largest prominence anywhere in 20-400 Hz is 3.24 dB at 216.8 Hz",
+                "prominence_definition": "peak minus median of +/-25 Hz excluding +/-4 Hz, Welch N=16384 Hann 50%, measured INSIDE the longest pause (100 ms windows below the file's own Otsu split)"
+            }),
+        );
+
+        let mut entries: Vec<serde_json::Value> = Vec::new();
+
+        for &f_hz in &[50.0_f32, 60.0_f32] {
+            for &prom in &[4.0_f32, 12.0_f32, 21.0_f32] {
+                let amp = amplitude_for_prominence(&carrier, sr, f_hz, prom);
+                let hum = mains_hum(sr, DUR_SEC, f_hz, HARMONICS, HARMONIC_DECAY_DB, amp);
+                let mix: Vec<f32> = carrier
+                    .iter()
+                    .zip(hum.iter())
+                    .map(|(c, h)| c + h)
+                    .collect();
+
+                let name = format!("hum_{}hz_p{:02}.flac", f_hz as i32, prom as i32);
+                let path = format!("{base_out}/{name}");
+                FlacWriter::write(&path, &mix, &mix, sr).unwrap();
+
+                // ΤΟ MANIFEST ΓΡΑΦΕΤΑΙ ΑΠΟ ΤΟ ΜΕΤΡΗΜΕΝΟ, ΟΧΙ ΑΠΟ ΤΟ
+                // ΖΗΤΟΥΜΕΝΟ. Το ζητούμενο μπαίνει δίπλα, για να φαίνεται
+                // η απόκλιση αντί να κρύβεται.
+                let meas = measured_prominence(&mix, sr, f_hz);
+                let other_hz = if f_hz == 50.0 { 60.0 } else { 50.0 };
+                let meas_other = measured_prominence(&mix, sr, other_hz);
+                let amp_dbfs = 20.0 * amp.log10();
+                println!(
+                    "  {name}: ζητ {prom:.1} → ΜΕΤΡ {meas:.2} dB (Δ {:+.2}) · στα {other_hz:.0} Hz: {meas_other:+.2} dB · πλάτος {amp_dbfs:.2} dBFS",
+                    meas - prom
+                );
+                entries.push(serde_json::json!({
+                    "file": name,
+                    "sha256": hash_file(&path),
+                    "hum_hz": f_hz,
+                    "measured_prominence_db": meas,
+                    "requested_prominence_db": prom,
+                    "measured_prominence_at_other_hz_db": meas_other,
+                    "other_hz": other_hz,
+                    "tone_amplitude_dbfs": amp_dbfs,
+                    "harmonics": HARMONICS,
+                    "carrier": CARRIER,
+                    "positive": true,
+                }));
+            }
+        }
+
+        // ΤΟ ΑΡΝΗΤΙΚΟ — ο φορέας ΑΥΤΟΥΣΙΟΣ, μηδέν προστιθέμενο.
+        let none_path = format!("{base_out}/hum_none.flac");
+        FlacWriter::write(&none_path, &carrier, &carrier, sr).unwrap();
+        let none_50 = measured_prominence(&carrier, sr, 50.0);
+        let none_60 = measured_prominence(&carrier, sr, 60.0);
+        println!("  hum_none.flac: στα 50 Hz {none_50:+.2} dB · στα 60 Hz {none_60:+.2} dB");
+        entries.push(serde_json::json!({
+            "file": "hum_none.flac",
+            "sha256": hash_file(&none_path),
+            "hum_hz": serde_json::Value::Null,
+            "requested_prominence_db": serde_json::Value::Null,
+            "measured_prominence_at_50hz_db": none_50,
+            "measured_prominence_at_60hz_db": none_60,
+            "tone_amplitude_dbfs": serde_json::Value::Null,
+            "harmonics": 0,
+            "carrier": CARRIER,
+            "positive": false,
+        }));
+
+        manifest.insert("fixtures".into(), serde_json::Value::Array(entries));
+        let manifest_path = format!("{base_out}/manifest.json");
+        let mut manifest_file = File::create(&manifest_path).unwrap();
+        manifest_file
+            .write_all(serde_json::to_string_pretty(&manifest).unwrap().as_bytes())
+            .unwrap();
+        println!("manifest: {manifest_path}");
+    }
+}
