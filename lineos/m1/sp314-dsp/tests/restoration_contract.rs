@@ -7,32 +7,37 @@
 
 use approx::assert_abs_diff_eq;
 use sp314_dsp::restoration::RestorationChain;
+use sp314_dsp::restoration::RestorationConfig;
 
+/// ΤΟ ΟΡΓΑΝΟ ΔΟΥΛΕΥΕΙ — ΜΕ ΤΟ dehum ΡΗΤΑ ΑΝΟΙΧΤΟ.
+///
+/// ΠΡΟΕΛΕΥΣΗ: το τεστ ΗΤΑΝ `dehum_removes_50hz_sine` και έτρεχε με
+/// `RestorationConfig::voice()`. Στις 2026-09-14 το `voice()` έκλεισε το
+/// `hum_enabled` (F-082 + εννέα αρχεία αφήγησης: η κορυφή βόμβου στα
+/// 59.8-60.8 Hz σε έξι, σε κανένα στα 50). Το τεστ κοκκίνισε ΣΩΣΤΑ: το
+/// συμβόλαιο που εξέφραζε έπαψε να ισχύει.
+///
+/// ΔΕΝ ΧΑΛΑΡΩΣΕ — ΞΑΝΑΓΡΑΦΤΗΚΕ ΣΕ ΔΥΟ. Εδώ το πρώτο σκέλος: το cascade
+/// ΔΕΝ χάλασε, ΚΛΕΙΣΤΗΚΕ. Το κατώφλι 1% είναι ΤΟ ΙΔΙΟ που ίσχυε πριν —
+/// καμία αλλαγή ανοχής.
+///
+/// ΓΙΑΤΙ ΜΟΝΟΣ ΤΟΥ Ο ΚΟΜΒΟΣ (lowcut/deess/gate κλειστά): ο lowcut στα 80 Hz
+/// εξασθενεί ΚΑΙ ΑΥΤΟΣ τα 50 Hz. Με τα δύο μαζί, το τεστ δεν θα μπορούσε να
+/// πει ΠΟΙΟΣ έκοψε.
+///
+/// ⇒ ΟΤΑΝ ΕΡΘΕΙ Ο ΑΝΙΧΝΕΥΤΗΣ ΠΟΥ ΞΑΝΑΝΟΙΓΕΙ ΤΟΝ ΚΟΜΒΟ, ΑΥΤΟ ΤΟ ΤΕΣΤ ΕΙΝΑΙ
+///   Η ΑΠΟΔΕΙΞΗ ΟΤΙ ΔΟΥΛΕΥΕΙ ΑΚΟΜΑ.
 #[test]
-fn dehum_removes_50hz_sine() {
-    let mut chain = RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32, -45.0_f32);
+fn dehum_removes_50hz_sine_when_explicitly_enabled() {
+    let hum_only = RestorationConfig {
+        lowcut_enabled: false,
+        hum_enabled: true,
+        deess_enabled: false,
+        gate_enabled: false,
+    };
     let len = 96000;
-    let mut left = vec![0.0_f32; len];
-    let mut right = vec![0.0_f32; len];
 
-    for i in 0..len {
-        let t = i as f32 / 48000.0;
-        let s_50 = (2.0 * std::f32::consts::PI * 50.0 * t).sin();
-        let s_1k = (2.0 * std::f32::consts::PI * 1000.0 * t).sin();
-
-        left[i] = s_50 + s_1k;
-        right[i] = left[i];
-    }
-
-    // Process the mixed signal
-    chain.process(&mut left, &mut right);
-
-    // To cleanly separate 50Hz and 1kHz in the output without a complex FFT,
-    // we can just run pure 50Hz and pure 1kHz through the chain separately
-    // to measure the energy reduction, since the chain is mostly linear.
-    // Wait, the De-Esser is nonlinear, but it won't react to -12 dBFS low frequencies.
-    let mut chain_50 =
-        RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32, -45.0_f32);
+    let mut chain_50 = RestorationChain::new(48000.0, hum_only.clone(), -6.0_f32, -45.0_f32);
     let mut left_50 = vec![0.0_f32; len];
     let mut right_50 = vec![0.0_f32; len];
     for i in 0..len {
@@ -60,8 +65,7 @@ fn dehum_removes_50hz_sine() {
         "50Hz energy not reduced below 1%"
     );
 
-    let mut chain_1k =
-        RestorationChain::new(48000.0, RestorationConfig::voice(), -6.0_f32, -45.0_f32);
+    let mut chain_1k = RestorationChain::new(48000.0, hum_only, -6.0_f32, -45.0_f32);
     let mut left_1k = vec![0.0_f32; len];
     let mut right_1k = vec![0.0_f32; len];
     for i in 0..len {
@@ -86,6 +90,57 @@ fn dehum_removes_50hz_sine() {
     assert!(
         output_energy_1k > ref_energy_1k * 0.99,
         "1kHz energy reduced too much"
+    );
+}
+
+/// ΤΟ ΝΕΟ ΣΥΜΒΟΛΑΙΟ: ΤΟ `voice()` ΔΕΝ ΒΑΖΕΙ ΤΟ NOTCH ΣΤΑ 50 Hz.
+///
+/// ΤΟ ΟΝΟΜΑ ΛΕΕΙ ΤΙ ΦΡΟΥΡΕΙ, ΟΧΙ ΤΙ ΤΡΕΧΕΙ: αν κάποιος ξανανοίξει το
+/// `hum_enabled` στο `voice()` ΣΙΩΠΗΛΑ, αυτό κοκκινίζει. Χωρίς αυτό, τίποτα
+/// σε όλο το δέντρο δεν το πιάνει — το προηγούμενο τεστ φρουρούσε το ΑΝΤΙΘΕΤΟ.
+///
+/// ⚠ Η ΣΥΓΚΡΙΣΗ ΕΙΝΑΙ ΖΕΥΓΟΣ, ΟΧΙ ΑΠΟΛΥΤΟ ΝΟΥΜΕΡΟ. Ο `voice()` έχει ΚΑΙ τον
+/// lowcut στα 80 Hz ανοιχτό, που εξασθενεί ΚΑΙ ΑΥΤΟΣ τα 50 Hz. Ένα όριο
+/// «μένει το Χ% της ενέργειας» θα μετρούσε τον lowcut, όχι το dehum. Τα δύο
+/// σκέλη διαφέρουν ΣΕ ΕΝΑ BIT — το `hum_enabled` — άρα ό,τι τα χωρίζει είναι
+/// το cascade και μόνο αυτό.
+///
+/// ΤΟ ΟΡΙΟ ΕΙΝΑΙ ΠΑΡΑΓΩΓΟ, ΟΧΙ ΚΟΥΡΔΙΣΜΕΝΟ: το F-082 μέτρησε (24/08, oracle
+/// με γνωστή απάντηση) ότι το cascade δίνει −27.76 dB στα 50 Hz, δηλαδή λόγος
+/// ισχύος ~600x. Το 10x (10 dB) κάθεται δύο τάξεις μεγέθους κάτω από αυτό.
+#[test]
+fn voice_preset_does_not_notch_50hz() {
+    let len = 96000;
+    let mut hum_on = RestorationConfig::voice();
+    hum_on.hum_enabled = true; // ΤΟ ΜΟΝΟ ΠΟΥ ΑΛΛΑΖΕΙ
+
+    let energy_at_50 = |cfg: RestorationConfig| -> f64 {
+        let mut chain = RestorationChain::new(48000.0, cfg, -6.0_f32, -45.0_f32);
+        let mut left = vec![0.0_f32; len];
+        let mut right = vec![0.0_f32; len];
+        for i in 0..len {
+            let t = i as f32 / 48000.0;
+            left[i] = (2.0 * std::f32::consts::PI * 50.0 * t).sin();
+            right[i] = left[i];
+        }
+        chain.process(&mut left, &mut right);
+        let mut e = 0.0_f64;
+        for i in 48000..len {
+            // Skip transient — ίδιο παράθυρο με το πρώτο σκέλος
+            e += (left[i] as f64) * (left[i] as f64);
+        }
+        e
+    };
+
+    let e_voice = energy_at_50(RestorationConfig::voice());
+    let e_hum_on = energy_at_50(hum_on);
+    println!("[DEHUM-OFF] 50Hz energy: voice()={e_voice:.6e}  hum_on={e_hum_on:.6e}  λόγος={:.1}x", e_voice / e_hum_on);
+
+    assert!(
+        e_voice > e_hum_on * 10.0,
+        "το voice() φαίνεται να έχει το dehum ΑΝΟΙΧΤΟ: voice()={e_voice:.3e} \
+         vs hum_on={e_hum_on:.3e} (λόγος {:.2}x, απαιτείται >10x)",
+        e_voice / e_hum_on
     );
 }
 
@@ -141,7 +196,6 @@ fn deess_reduces_high_frequency_bursts() {
 }
 
 use sp314_dsp::restoration::gate::NoiseGate;
-use sp314_dsp::restoration::RestorationConfig;
 
 // ΗΤΑΝ noise_gate_closes_on_silence με
 // epsilon 1e-8 — δηλαδή απαιτούσε ψηφιακό μηδέν.

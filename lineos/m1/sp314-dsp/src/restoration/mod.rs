@@ -19,11 +19,26 @@ pub struct RestorationConfig {
 }
 
 impl RestorationConfig {
-    /// For voice/podcast — all stages active
+    /// For voice/podcast — lowcut, de-ess and gate active; hum OFF (see below)
     pub fn voice() -> Self {
         Self {
             lowcut_enabled: true,
-            hum_enabled: true,
+            // ΚΛΕΙΣΤΟ, ΟΧΙ ΑΦΑΙΡΕΜΕΝΟ. Το στατικό cascade
+            // κόβει 50/100/150 με Q=20 (πλάτος 2.5 Hz).
+            // ΜΕΤΡΗΘΗΚΕ 2026-09-14 σε εννέα αρχεία αφήγησης:
+            // η κορυφή βόμβου είναι στα 59.8-60.8 Hz σε έξι,
+            // σε κανένα στα 50 — οκτώ πλάτη μακριά.
+            // ΚΑΙ ΤΟ F-082 (24/08) μέτρησε τι αφαιρούσε όταν
+            // δεν υπήρχε hum στα 50: ενέργεια 70-250 Hz με
+            // κέντρο βάρους 126-136 Hz, δηλαδή ανδρική
+            // θεμελιώδη.
+            // ⇒ ΔΕΝ ΠΙΑΝΕΙ ΑΥΤΟ ΠΟΥ ΥΠΑΡΧΕΙ ΚΑΙ ΠΙΑΝΕΙ ΑΥΤΟ
+            //   ΠΟΥ ΔΕΝ ΕΠΡΕΠΕ.
+            // ΑΝΤΙΚΑΘΙΣΤΑΤΑΙ ΟΤΑΝ ΥΠΑΡΞΕΙ ΑΝΙΧΝΕΥΤΗΣ ΠΟΥ
+            // ΔΙΑΛΕΓΕΙ ΣΥΧΝΟΤΗΤΑ (R5b #4). Ο DeHumNode
+            // (sp314-nodes) δέχεται ΗΔΗ fundamental_hz ως
+            // παράμετρο — κανείς δεν του τη δίνει.
+            hum_enabled: false,
             deess_enabled: true,
             gate_enabled: true,
         }
