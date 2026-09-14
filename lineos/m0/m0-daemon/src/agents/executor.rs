@@ -406,6 +406,9 @@ pub fn execute_streaming_plan(
                 input_interior_floor_db: trunk_report
                     .acx_interior_noise_floor
                     .map(|(db, _frame)| db),
+                // Το κατώφλι του expander: η τομή της κατανομής του ίδιου του
+                // αρχείου, από το ΙΔΙΟ trunk pass. None = μη διμερής.
+                quiet_window_split_dbfs: trunk_report.quiet_window_split_dbfs,
                 intent_dynamics: plan.intent_dynamics,
                 restoration_enabled: true,
             },
@@ -516,11 +519,16 @@ pub fn execute_streaming_plan(
                 let engaged = sp314_orchestrator::streaming_pipeline::expander_threshold_db(
                     delivery_max_noise_floor_db,
                     interior_db,
+                    trunk_report.quiet_window_split_dbfs,
                 );
                 let (ex_state, ex_reason) = match engaged {
                     Some(_) => (
                         "applied",
                         "interior floor exceeds the destination limit",
+                    ),
+                    None if trunk_report.quiet_window_split_dbfs.is_none() => (
+                        "skipped",
+                        "the level distribution shows no room separate from the voice",
                     ),
                     None => (
                         "skipped",
@@ -537,11 +545,29 @@ pub fn execute_streaming_plan(
                     // αντίγραφο κατωφλιού μέσα σε ΥΠΟΓΕΓΡΑΜΜΕΝΟ έγγραφο — το
                     // ακριβές σχήμα που το ίδιο το schema entry απαγορεύει.
                     // Μπαίνουν όταν ο κόμβος τα εκθέσει· δηλωμένο κενό.
-                    measurements: vec![crate::blob_store::NamedValue {
-                        name: "threshold_db".into(),
-                        value: engaged.unwrap_or(limit_db),
-                        unit: "dBFS".into(),
-                    }],
+                    //
+                    // ΤΟ `threshold_db` ΓΡΑΦΕΤΑΙ ΜΟΝΟ ΟΤΑΝ ΥΠΑΡΧΕΙ. Όταν ο
+                    // κόμβος δεν τρέχει δεν υπάρχει κατώφλι να αναφερθεί, και
+                    // ένα νούμερο-συμπλήρωμα σε υπογεγραμμένο έγγραφο θα ήταν
+                    // ψέμα. «Κενό ≠ απόν» — το schema entry το ορίζει.
+                    measurements: {
+                        let mut m = Vec::new();
+                        if let Some(t) = engaged {
+                            m.push(crate::blob_store::NamedValue {
+                                name: "threshold_db".into(),
+                                value: t,
+                                unit: "dBFS".into(),
+                            });
+                        }
+                        if let Some(f) = interior_db {
+                            m.push(crate::blob_store::NamedValue {
+                                name: "interior_floor_db".into(),
+                                value: f,
+                                unit: "dBFS".into(),
+                            });
+                        }
+                        m
+                    },
                 });
                 records
             }

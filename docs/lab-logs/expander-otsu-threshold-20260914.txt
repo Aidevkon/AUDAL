@@ -1,0 +1,746 @@
+=== ΤΟ ΚΑΤΩΦΛΙ ΑΠΟ ΤΗΝ ΚΑΤΑΝΟΜΗ ΤΟΥ ΙΔΙΟΥ ΤΟΥ ΣΗΜΑΤΟΣ ===
+2026-09-14 · HEAD 15a6987 + αδέσμευτο diff (7 αρχεία)
+όργανο: research/encoder-gap-speech/src/bin/expander_audition.rs (ΜΗΔΕΝ μοχλός)
+κατώφλι: TrunkReport::quiet_window_split_dbfs, ΑΠΟ ΤΗΝ ΠΑΡΑΓΩΓΗ
+
+── ΠΡΟΒΛΕΨΗ, ΓΡΑΜΜΕΝΗ ΠΡΙΝ ΤΟ ΤΡΕΞΙΜΟ ──
+ΤΥΠΟΣ (αυτούσιος, gate.rs):  gain = max(floor_lin, (level/threshold)^(RATIO-1))
+σε dB:  μείωση = (RATIO-1) x (κατώφλι_dB - στάθμη_dB) = 0.5 x Δ, με ταβάνι EXPANDER_FLOOR_DB = 12 dB
+
+αρχείο                                 otsu  interior       Δ   μείωση  ON floor  <-60?
+anne_of_green_gables_01_montgomery    -37.5    -46.76    9.26     4.63    -51.39    ΟΧΙ
+adventurespinocchio_01_collodi        -37.5    -51.88   14.38     7.19    -59.07    ΟΧΙ
+count_of_monte_cristo_001_dumas       -37.5    -53.85   16.35     8.18    -62.03    ΝΑΙ
+dracula_01_stoker                     -39.5    -56.38   16.88     8.44    -64.82    ΝΑΙ
+huckfinn_01_twain_apc                 -35.5    -57.22   21.72    10.86    -68.08    ΝΑΙ
+secretgarden_01_burnett               -40.5    -58.32   17.82     8.91    -67.23    ΝΑΙ
+tale_of_two_cities_01_dickens         -40.5    -58.70   18.20     9.10    -67.80    ΝΑΙ
+janeeyre_01_bronte                    -38.5    -59.01   20.51ΟΧΙ ΔΙΜΕΡΕΣ    -59.01    ΟΧΙ
+peterpan_01_barrie                    -41.5    -59.58   18.08     9.04    -68.62    ΝΑΙ
+
+ΦΤΑΝΟΥΝ ΤΟ -60: 6/9
+ΜΕΓΙΣΤΗ ΜΕΙΩΣΗ: 10.86 dB < 12  =>  το EXPANDER_FLOOR_DB ΔΕΝ δεσμεύει πουθενά
+
+── ΠΡΟΒΛΕΨΗ ↔ ΜΕΤΡΗΜΕΝΟ, ΑΝΑ ΑΡΧΕΙΟ ──
+αρχείο                                 τομή      OFF       ON     Δint   προβλ   απόκλ  <-60    ΔLUFS
+anne_of_green_gables_01_montgomery    -37.5  -52.049  -52.049  -0.0004    4.63    4.63   ΟΧΙ  -0.0000
+adventurespinocchio_01_collodi        -37.5  -51.885  -56.438  -4.5523    7.19    2.64   ΟΧΙ  -0.0012
+count_of_monte_cristo_001_dumas       -37.5  -53.878  -59.944  -6.0661    8.18    2.11   ΟΧΙ   0.0008
+dracula_01_stoker                     -39.5  -61.758  -61.758   0.0004    8.44    8.44   ΝΑΙ  -0.0027
+huckfinn_01_twain_apc                 -35.5  -63.159  -64.777  -1.6185   10.86    9.24   ΝΑΙ   0.0006
+secretgarden_01_burnett               -40.5  -64.304  -64.304  -0.0004    8.91    8.91   ΝΑΙ  -0.0027
+tale_of_two_cities_01_dickens         -40.5  -58.676  -64.602  -5.9254    9.10    3.17   ΝΑΙ  -0.0002
+janeeyre_01_bronte                        —  -63.449  -63.449   0.0000       —       —   ΝΑΙ   0.0000
+peterpan_01_barrie                    -41.5  -63.505  -65.564  -2.0587    9.04    6.98   ΝΑΙ   0.0003
+swiss_family_robinson_01_wyss         -43.5  -74.023  -74.023   0.0000       —       —   ΝΑΙ   0.0000
+
+ΦΤΑΝΟΥΝ ΤΟ -60 (rendered ON): 6 /9
+SLEEPING φρουρός swiss: Δ interior = 0.0000  => ΑΚΡΙΒΩΣ ΜΗΔΕΝ
+
+── ΠΑΡΑΘΥΡΑ 100 ms ΠΟΥ ΔΙΑΦΕΡΟΥΝ ──
+αρχείο                                παράθυρα με διαφορά  ΠΑΝΩ -40  ΚΑΤΩ -40  μεγ.Δ dB
+anne_of_green_gables_01_montgomery              8701/8782      6583      2118      2.96
+adventurespinocchio_01_collodi                  2970/3022      2291       679      4.94
+count_of_monte_cristo_001_dumas               11593/11796      7965      3628      6.36
+dracula_01_stoker                             20242/22181     13954      6288      5.65
+huckfinn_01_twain_apc                           5206/5323      4164      1042      7.78
+secretgarden_01_burnett                         6291/8086      4228      2063      6.01
+tale_of_two_cities_01_dickens                   4041/4099      3204       837      6.58
+janeeyre_01_bronte                                 0/8001         0         0      0.00
+peterpan_01_barrie                            10572/10709      7287      3285      6.30
+swiss_family_robinson_01_wyss                     0/11272         0         0      0.00
+
+── ΠΡΩΤΟΓΕΝΗΣ ΕΞΟΔΟΣ ──
+=== ΤΟ ΚΑΤΩΦΛΙ ΑΠΟ ΤΗΝ ΚΑΤΑΝΟΜΗ ΤΟΥ ΙΔΙΟΥ ΤΟΥ ΣΗΜΑΤΟΣ — ΒΗΜΑ 3 ===
+2026-09-14 · HEAD 15a6987
+
+ΤΥΠΟΣ (αυτούσιος, gate.rs):  gain = max(floor_lin, (level/threshold)^(RATIO-1))
+σε dB:  μείωση = (RATIO-1) x (κατώφλι_dB - στάθμη_dB) = 0.5 x Δ, με ταβάνι EXPANDER_FLOOR_DB = 12 dB
+
+αρχείο                                 otsu  interior       Δ   μείωση  ON floor  <-60?
+anne_of_green_gables_01_montgomery    -37.5    -46.76    9.26     4.63    -51.39    ΟΧΙ
+adventurespinocchio_01_collodi        -37.5    -51.88   14.38     7.19    -59.07    ΟΧΙ
+count_of_monte_cristo_001_dumas       -37.5    -53.85   16.35     8.18    -62.03    ΝΑΙ
+dracula_01_stoker                     -39.5    -56.38   16.88     8.44    -64.82    ΝΑΙ
+huckfinn_01_twain_apc                 -35.5    -57.22   21.72    10.86    -68.08    ΝΑΙ
+secretgarden_01_burnett               -40.5    -58.32   17.82     8.91    -67.23    ΝΑΙ
+tale_of_two_cities_01_dickens         -40.5    -58.70   18.20     9.10    -67.80    ΝΑΙ
+janeeyre_01_bronte                    -38.5    -59.01   20.51ΟΧΙ ΔΙΜΕΡΕΣ    -59.01    ΟΧΙ
+peterpan_01_barrie                    -41.5    -59.58   18.08     9.04    -68.62    ΝΑΙ
+
+ΦΤΑΝΟΥΝ ΤΟ -60: 6/9
+ΜΕΓΙΣΤΗ ΜΕΙΩΣΗ: 10.86 dB < 12  =>  το EXPANDER_FLOOR_DB ΔΕΝ δεσμεύει πουθενά
+
+---- ΣΑΡΩΣΗ ΑΓΚΥΡΩΝ (σεντινέλα 0, χωρίς render) ----
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+anne_of_green_gables_01_montgomery
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 4 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 2
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 9.26 dB · ΠΡΟΒΛΕΨΗ μείωσης 4.63 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-46.763252) · άνω(quietest speech) Some(-55.742146)
+     απόσταση -8.98 dB · μέσο -51.253 dBFS
+  interior πηγής: Some(-46.763252) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+adventurespinocchio_01_collodi
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 1 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 1
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 14.38 dB · ΠΡΟΒΛΕΨΗ μείωσης 7.19 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-51.881332) · άνω(quietest speech) Some(-51.591408)
+     απόσταση 0.29 dB · μέσο -51.736 dBFS
+  interior πηγής: Some(-51.881332) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+count_of_monte_cristo_001_dumas
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 14 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 7
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 16.35 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.17 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-53.84508) · άνω(quietest speech) Some(-53.117416)
+     απόσταση 0.73 dB · μέσο -53.481 dBFS
+  interior πηγής: Some(-53.84508) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+dracula_01_stoker
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 114 · flagged: 21
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 53
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-39.5)
+     τομή πάνω από interior: 16.88 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.44 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-56.38221) · άνω(quietest speech) Some(-55.795532)
+     απόσταση 0.59 dB · μέσο -56.089 dBFS
+  interior πηγής: Some(-56.38221) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+huckfinn_01_twain_apc
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 6 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 3
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-35.5)
+     τομή πάνω από interior: 21.72 dB · ΠΡΟΒΛΕΨΗ μείωσης 10.86 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-57.22122) · άνω(quietest speech) Some(-56.92269)
+     απόσταση 0.30 dB · μέσο -57.072 dBFS
+  interior πηγής: Some(-57.22122) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+secretgarden_01_burnett
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 75 · flagged: 17
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 33
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-40.5)
+     τομή πάνω από interior: 17.82 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.91 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-58.320274) · άνω(quietest speech) Some(-57.994007)
+     απόσταση 0.33 dB · μέσο -58.157 dBFS
+  interior πηγής: Some(-58.320274) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+tale_of_two_cities_01_dickens
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 1 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 1
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-40.5)
+     τομή πάνω από interior: 18.20 dB · ΠΡΟΒΛΕΨΗ μείωσης 9.10 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-58.699333) · άνω(quietest speech) Some(-57.651794)
+     απόσταση 1.05 dB · μέσο -58.176 dBFS
+  interior πηγής: Some(-58.699333) ⇒ expander ΤΡΕΧΕΙ
+
+═══════════════════════════════════════════════════════════
+janeeyre_01_bronte
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 1
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): None
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-59.00695) · άνω(quietest speech) Some(-55.06939)
+     απόσταση 3.94 dB · μέσο -57.038 dBFS
+  interior πηγής: Some(-59.00695) ⇒ expander ΔΕΝ τρέχει
+
+═══════════════════════════════════════════════════════════
+peterpan_01_barrie
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-41.5)
+     τομή πάνω από interior: 18.08 dB · ΠΡΟΒΛΕΨΗ μείωσης 9.04 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-59.577454) · άνω(quietest speech) Some(-59.434055)
+     απόσταση 0.14 dB · μέσο -59.506 dBFS
+  interior πηγής: Some(-59.577454) ⇒ expander ΤΡΕΧΕΙ
+
+---- ΒΗΜΑ 3: RENDERS, ΣΕΙΡΙΑΚΑ ----
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+anne_of_green_gables_01_montgomery
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 4 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 2
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 9.26 dB · ΠΡΟΒΛΕΨΗ μείωσης 4.63 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-46.763252) · άνω(quietest speech) Some(-55.742146)
+     απόσταση -8.98 dB · μέσο -51.253 dBFS
+  interior πηγής: Some(-46.763252) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -52.049     -52.049     -0.0004
+  absolute dBFS              -96.077     -96.071      0.0063
+    θέση απόλυτου s            873.4       873.4
+  LUFS                       -26.102     -26.102     -0.0000
+  true peak dBTP              -3.293      -3.293     -0.0000
+  LRA LU                       6.132       6.139      0.0069
+  crest dB                    27.417      27.418      0.0009
+  dyn range dB                21.976      24.223      2.2473
+  frames                    42151321    42151321   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -38.39  -34.50  -25.35  -22.36  -26.57  -26.77  -31.09  -38.67
+  ON    -38.58  -34.51  -25.35  -22.36  -26.57  -26.77  -31.09  -38.67
+  Δ     -0.193  -0.008  -0.000  -0.000  -0.001  -0.002  -0.002  -0.001
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     50  ON     50  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF      1  ON      1  Δ     +0
+  [   -60,  -50)  OFF     16  ON     17  Δ     +1
+  [   -50,  -40)  OFF   2124  ON   2127  Δ     +3
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 8701/8782
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+      722.6s   Δ    2.96 dB   (OFF -47.1 → ON -50.1)
+      359.5s   Δ    2.84 dB   (OFF -47.1 → ON -49.9)
+      512.2s   Δ    2.84 dB   (OFF -46.9 → ON -49.7)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 6583
+
+  OFF: /tmp/expander-audition/anne_of_green_gables_01_montgomery__otsu__OFF.wav
+  ON : /tmp/expander-audition/anne_of_green_gables_01_montgomery__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+adventurespinocchio_01_collodi
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 1 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 1
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 14.38 dB · ΠΡΟΒΛΕΨΗ μείωσης 7.19 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-51.881332) · άνω(quietest speech) Some(-51.591408)
+     απόσταση 0.29 dB · μέσο -51.736 dBFS
+  interior πηγής: Some(-51.881332) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -51.885     -56.438     -4.5523
+  absolute dBFS              -52.560     -57.034     -4.4739
+    θέση απόλυτου s              0.0         0.0
+  LUFS                       -22.022     -22.024     -0.0012
+  true peak dBTP              -3.220      -3.220     -0.0000
+  LRA LU                       4.829       4.830      0.0012
+  crest dB                    23.153      23.154      0.0008
+  dyn range dB                29.800      33.548      3.7475
+  frames                    14501371    14501371   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -38.96  -24.08  -19.66  -19.95  -25.90  -27.10  -24.74  -30.01
+  ON    -39.07  -24.08  -19.66  -19.95  -25.90  -27.10  -24.74  -30.01
+  Δ     -0.112  -0.002  -0.000  -0.000  -0.003  -0.006  -0.002  -0.000
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      1  ON      1  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF      0  ON      0  Δ     +0
+  [   -60,  -50)  OFF    327  ON    441  Δ   +114
+  [   -50,  -40)  OFF    384  ON    273  Δ   -111
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 2970/3022
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+        0.2s   Δ    4.94 dB   (OFF -52.6 → ON -57.6)
+      109.2s   Δ    4.68 dB   (OFF -52.1 → ON -56.8)
+        0.1s   Δ    4.67 dB   (OFF -52.0 → ON -56.7)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 2291
+
+  OFF: /tmp/expander-audition/adventurespinocchio_01_collodi__otsu__OFF.wav
+  ON : /tmp/expander-audition/adventurespinocchio_01_collodi__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+count_of_monte_cristo_001_dumas
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 14 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 7
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-37.5)
+     τομή πάνω από interior: 16.35 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.17 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-53.84508) · άνω(quietest speech) Some(-53.117416)
+     απόσταση 0.73 dB · μέσο -53.481 dBFS
+  interior πηγής: Some(-53.84508) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -53.878     -59.944     -6.0661
+  absolute dBFS              -82.854     -82.854      0.0000
+    θέση απόλυτου s           1179.0      1179.0
+  LUFS                       -22.580     -22.579      0.0008
+  true peak dBTP              -3.149      -3.149      0.0000
+  LRA LU                       6.839       6.848      0.0091
+  crest dB                    23.845      23.845      0.0003
+  dyn range dB                31.441      35.111      3.6703
+  frames                    56616053    56616053   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -32.37  -25.45  -20.41  -19.10  -22.97  -27.51  -32.61  -39.35
+  ON    -32.44  -25.46  -20.41  -19.10  -22.97  -27.51  -32.61  -39.35
+  Δ     -0.068  -0.001  -0.000  -0.000  -0.001  -0.001  -0.002  -0.002
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      1  ON      1  Δ     +0
+  [   -90,  -80)  OFF     20  ON     20  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF      0  ON      3  Δ     +3
+  [   -60,  -50)  OFF    932  ON   2019  Δ  +1087
+  [   -50,  -40)  OFF   2825  ON   1738  Δ  -1087
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 11593/11796
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+       99.4s   Δ    6.36 dB   (OFF -53.7 → ON -60.1)
+       99.7s   Δ    6.29 dB   (OFF -53.7 → ON -60.0)
+       23.6s   Δ    6.27 dB   (OFF -54.0 → ON -60.3)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 7965
+
+  OFF: /tmp/expander-audition/count_of_monte_cristo_001_dumas__otsu__OFF.wav
+  ON : /tmp/expander-audition/count_of_monte_cristo_001_dumas__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+dracula_01_stoker
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 114 · flagged: 21
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 53
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-39.5)
+     τομή πάνω από interior: 16.88 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.44 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-56.38221) · άνω(quietest speech) Some(-55.795532)
+     απόσταση 0.59 dB · μέσο -56.089 dBFS
+  interior πηγής: Some(-56.38221) ⇒ expander ΤΡΕΧΕΙ
+using local frames 895..1919 of segment 11 (voice.len=48000, drums.len=48000)
+using local frames 896..1920 of segment 19 (voice.len=336000, drums.len=336000)
+using local frames 767..1791 of segment 35 (voice.len=96000, drums.len=96000)
+using local frames 638..1662 of segment 40 (voice.len=1104000, drums.len=1104000)
+using local frames 512..1536 of segment 41 (voice.len=192000, drums.len=192000)
+using local frames 896..1920 of segment 47 (voice.len=144000, drums.len=144000)
+using local frames 383..1407 of segment 50 (voice.len=864000, drums.len=864000)
+using local frames 512..1536 of segment 56 (voice.len=1200000, drums.len=1200000)
+using local frames 767..1791 of segment 59 (voice.len=240000, drums.len=240000)
+using local frames 767..1791 of segment 61 (voice.len=144000, drums.len=144000)
+using local frames 257..1281 of segment 67 (voice.len=288000, drums.len=288000)
+using local frames 767..1791 of segment 69 (voice.len=144000, drums.len=144000)
+using local frames 509..1533 of segment 79 (voice.len=96000, drums.len=96000)
+using local frames 0..1024 of segment 81 (voice.len=192000, drums.len=192000)
+using local frames 767..1791 of segment 85 (voice.len=288000, drums.len=288000)
+NMF worker: seek failed for segment 99: Symphonia("end of stream")
+NMF worker: seek failed for segment 107: Symphonia("end of stream")
+NMF worker: seek failed for segment 109: Symphonia("end of stream")
+using local frames 257..1281 of segment 89 (voice.len=288000, drums.len=288000)
+using local frames 0..1024 of segment 90 (voice.len=336000, drums.len=336000)
+using local frames 896..1920 of segment 91 (voice.len=336000, drums.len=336000)
+segment 99 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+segment 107 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+segment 109 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+using local frames 895..1919 of segment 11 (voice.len=48000, drums.len=48000)
+using local frames 896..1920 of segment 19 (voice.len=336000, drums.len=336000)
+using local frames 767..1791 of segment 35 (voice.len=96000, drums.len=96000)
+using local frames 638..1662 of segment 40 (voice.len=1104000, drums.len=1104000)
+using local frames 512..1536 of segment 41 (voice.len=192000, drums.len=192000)
+using local frames 896..1920 of segment 47 (voice.len=144000, drums.len=144000)
+using local frames 383..1407 of segment 50 (voice.len=864000, drums.len=864000)
+using local frames 512..1536 of segment 56 (voice.len=1200000, drums.len=1200000)
+using local frames 767..1791 of segment 59 (voice.len=240000, drums.len=240000)
+using local frames 767..1791 of segment 61 (voice.len=144000, drums.len=144000)
+using local frames 257..1281 of segment 67 (voice.len=288000, drums.len=288000)
+using local frames 767..1791 of segment 69 (voice.len=144000, drums.len=144000)
+using local frames 509..1533 of segment 79 (voice.len=96000, drums.len=96000)
+using local frames 0..1024 of segment 81 (voice.len=192000, drums.len=192000)
+NMF worker: seek failed for segment 99: Symphonia("end of stream")
+NMF worker: seek failed for segment 107: Symphonia("end of stream")
+NMF worker: seek failed for segment 109: Symphonia("end of stream")
+using local frames 767..1791 of segment 85 (voice.len=288000, drums.len=288000)
+using local frames 257..1281 of segment 89 (voice.len=288000, drums.len=288000)
+using local frames 0..1024 of segment 90 (voice.len=336000, drums.len=336000)
+using local frames 896..1920 of segment 91 (voice.len=336000, drums.len=336000)
+segment 99 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+segment 107 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+segment 109 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -61.758     -61.758      0.0004
+  absolute dBFS              -61.758     -61.758      0.0004
+    θέση απόλυτου s             59.3        59.3
+  LUFS                       -20.857     -20.860     -0.0027
+  true peak dBTP              -5.832      -5.832     -0.0000
+  LRA LU                       6.441       6.441     -0.0000
+  crest dB                    19.495      19.496      0.0017
+  dyn range dB                36.856      41.207      4.3519
+  frames                   106465766   106465766   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -51.90  -31.73  -18.78  -14.51  -22.81  -29.09  -37.85  -48.47
+  ON    -52.46  -31.75  -18.78  -14.51  -22.81  -29.11  -37.89  -48.52
+  Δ     -0.558  -0.011  -0.002  -0.001  -0.005  -0.020  -0.044  -0.052
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      1  ON      1  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF    157  ON    545  Δ   +388
+  [   -60,  -50)  OFF   5228  ON   4871  Δ   -357
+  [   -50,  -40)  OFF   1617  ON   1594  Δ    -23
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 20242/22181
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+     1495.9s   Δ    5.65 dB   (OFF -56.7 → ON -62.3)
+     1201.0s   Δ    5.59 dB   (OFF -56.5 → ON -62.1)
+       19.9s   Δ    5.58 dB   (OFF -56.9 → ON -62.5)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 13954
+
+  OFF: /tmp/expander-audition/dracula_01_stoker__otsu__OFF.wav
+  ON : /tmp/expander-audition/dracula_01_stoker__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+huckfinn_01_twain_apc
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 6 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 3
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-35.5)
+     τομή πάνω από interior: 21.72 dB · ΠΡΟΒΛΕΨΗ μείωσης 10.86 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-57.22122) · άνω(quietest speech) Some(-56.92269)
+     απόσταση 0.30 dB · μέσο -57.072 dBFS
+  interior πηγής: Some(-57.22122) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -63.159     -64.777     -1.6185
+  absolute dBFS              -63.159     -64.777     -1.6185
+    θέση απόλυτου s             53.5        98.9
+  LUFS                       -14.725     -14.725      0.0006
+  true peak dBTP              -3.099      -3.099     -0.0000
+  LRA LU                       5.127       5.129      0.0012
+  crest dB                    16.606      16.606      0.0000
+  dyn range dB                41.422      46.350      4.9276
+  frames                    25548868    25548868   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -48.99  -21.23  -14.01  -12.77  -15.78  -13.96  -20.16  -30.71
+  ON    -49.16  -21.23  -14.01  -12.77  -15.78  -13.96  -20.16  -30.71
+  Δ     -0.179  -0.000  -0.000  -0.000  -0.000  -0.001  -0.001  -0.001
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      0  ON      0  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF     11  ON    299  Δ   +288
+  [   -60,  -50)  OFF    704  ON    483  Δ   -221
+  [   -50,  -40)  OFF    383  ON    316  Δ    -67
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 5206/5323
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+      235.2s   Δ    7.78 dB   (OFF -57.6 → ON -65.4)
+       99.0s   Δ    7.75 dB   (OFF -57.1 → ON -64.9)
+       13.8s   Δ    7.73 dB   (OFF -57.3 → ON -65.0)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 4164
+
+  OFF: /tmp/expander-audition/huckfinn_01_twain_apc__otsu__OFF.wav
+  ON : /tmp/expander-audition/huckfinn_01_twain_apc__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+secretgarden_01_burnett
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 75 · flagged: 17
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 33
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-40.5)
+     τομή πάνω από interior: 17.82 dB · ΠΡΟΒΛΕΨΗ μείωσης 8.91 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-58.320274) · άνω(quietest speech) Some(-57.994007)
+     απόσταση 0.33 dB · μέσο -58.157 dBFS
+  interior πηγής: Some(-58.320274) ⇒ expander ΤΡΕΧΕΙ
+using local frames 895..1919 of segment 5 (voice.len=576000, drums.len=576000)
+using local frames 511..1535 of segment 7 (voice.len=240000, drums.len=240000)
+using local frames 0..1024 of segment 13 (voice.len=192000, drums.len=192000)
+using local frames 895..1919 of segment 17 (voice.len=192000, drums.len=192000)
+using local frames 383..1407 of segment 18 (voice.len=720000, drums.len=720000)
+using local frames 256..1280 of segment 22 (voice.len=96000, drums.len=96000)
+using local frames 128..1152 of segment 27 (voice.len=144000, drums.len=144000)
+using local frames 768..1792 of segment 29 (voice.len=240000, drums.len=240000)
+using local frames 640..1664 of segment 34 (voice.len=240000, drums.len=240000)
+using local frames 512..1536 of segment 36 (voice.len=336000, drums.len=336000)
+using local frames 383..1407 of segment 37 (voice.len=192000, drums.len=192000)
+using local frames 896..1920 of segment 38 (voice.len=432000, drums.len=432000)
+using local frames 0..1024 of segment 39 (voice.len=192000, drums.len=192000)
+using local frames 256..1280 of segment 47 (voice.len=96000, drums.len=96000)
+using local frames 512..1536 of segment 49 (voice.len=240000, drums.len=240000)
+NMF worker: seek failed for segment 71: Symphonia("end of stream")
+using local frames 896..1920 of segment 67 (voice.len=384000, drums.len=384000)
+segment 71 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+using local frames 895..1919 of segment 5 (voice.len=576000, drums.len=576000)
+using local frames 511..1535 of segment 7 (voice.len=240000, drums.len=240000)
+using local frames 0..1024 of segment 13 (voice.len=192000, drums.len=192000)
+using local frames 895..1919 of segment 17 (voice.len=192000, drums.len=192000)
+using local frames 383..1407 of segment 18 (voice.len=720000, drums.len=720000)
+using local frames 256..1280 of segment 22 (voice.len=96000, drums.len=96000)
+using local frames 128..1152 of segment 27 (voice.len=144000, drums.len=144000)
+using local frames 768..1792 of segment 29 (voice.len=240000, drums.len=240000)
+using local frames 640..1664 of segment 34 (voice.len=240000, drums.len=240000)
+using local frames 512..1536 of segment 36 (voice.len=336000, drums.len=336000)
+using local frames 383..1407 of segment 37 (voice.len=192000, drums.len=192000)
+using local frames 896..1920 of segment 38 (voice.len=432000, drums.len=432000)
+using local frames 0..1024 of segment 39 (voice.len=192000, drums.len=192000)
+using local frames 256..1280 of segment 47 (voice.len=96000, drums.len=96000)
+using local frames 512..1536 of segment 49 (voice.len=240000, drums.len=240000)
+NMF worker: seek failed for segment 71: Symphonia("end of stream")
+using local frames 896..1920 of segment 67 (voice.len=384000, drums.len=384000)
+segment 71 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -64.304     -64.304     -0.0004
+  absolute dBFS              -64.304     -64.304     -0.0004
+    θέση απόλυτου s             32.2        32.2
+  LUFS                       -20.662     -20.665     -0.0027
+  true peak dBTP              -3.939      -3.939     -0.0000
+  LRA LU                       7.321       7.327      0.0062
+  crest dB                    20.973      20.976      0.0025
+  dyn range dB                39.684      44.872      5.1876
+  frames                    38810992    38810992   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -51.72  -31.17  -18.91  -14.59  -22.33  -28.30  -33.50  -43.98
+  ON    -52.33  -31.18  -18.91  -14.59  -22.33  -28.33  -33.58  -44.07
+  Δ     -0.612  -0.008  -0.001  -0.001  -0.004  -0.029  -0.081  -0.093
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      0  ON      0  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF    220  ON   1370  Δ  +1150
+  [   -60,  -50)  OFF   1902  ON    757  Δ  -1145
+  [   -50,  -40)  OFF    459  ON    456  Δ     -3
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 6291/8086
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+       14.3s   Δ    6.01 dB   (OFF -58.2 → ON -64.2)
+      476.3s   Δ    5.98 dB   (OFF -58.6 → ON -64.6)
+      593.5s   Δ    5.95 dB   (OFF -58.0 → ON -63.9)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 4228
+
+  OFF: /tmp/expander-audition/secretgarden_01_burnett__otsu__OFF.wav
+  ON : /tmp/expander-audition/secretgarden_01_burnett__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+tale_of_two_cities_01_dickens
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 1 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 1
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-40.5)
+     τομή πάνω από interior: 18.20 dB · ΠΡΟΒΛΕΨΗ μείωσης 9.10 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-58.699333) · άνω(quietest speech) Some(-57.651794)
+     απόσταση 1.05 dB · μέσο -58.176 dBFS
+  interior πηγής: Some(-58.699333) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -58.676     -64.602     -5.9254
+  absolute dBFS              -58.676     -64.602     -5.9254
+    θέση απόλυτου s             34.2        34.2
+  LUFS                       -21.974     -21.974     -0.0002
+  true peak dBTP              -4.328      -4.328     -0.0000
+  LRA LU                       4.671       4.672      0.0014
+  crest dB                    22.315      22.315      0.0001
+  dyn range dB                36.022      40.804      4.7816
+  frames                    19671805    19671805   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -36.63  -23.63  -21.08  -22.32  -24.52  -22.58  -23.94  -38.18
+  ON    -36.65  -23.63  -21.08  -22.32  -24.52  -22.58  -23.94  -38.18
+  Δ     -0.020  -0.000  -0.000  -0.000  -0.000  -0.000  -0.000  -0.001
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF      1  ON      1  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF      1  ON    380  Δ   +379
+  [   -60,  -50)  OFF    680  ON    318  Δ   -362
+  [   -50,  -40)  OFF    198  ON    181  Δ    -17
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 4041/4099
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+        1.6s   Δ    6.58 dB   (OFF -59.6 → ON -66.2)
+       82.9s   Δ    6.53 dB   (OFF -59.4 → ON -65.9)
+       34.6s   Δ    6.51 dB   (OFF -59.7 → ON -66.2)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 3204
+
+  OFF: /tmp/expander-audition/tale_of_two_cities_01_dickens__otsu__OFF.wav
+  ON : /tmp/expander-audition/tale_of_two_cities_01_dickens__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+janeeyre_01_bronte
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 1
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): None
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-59.00695) · άνω(quietest speech) Some(-55.06939)
+     απόσταση 3.94 dB · μέσο -57.038 dBFS
+  interior πηγής: Some(-59.00695) ⇒ expander ΔΕΝ τρέχει
+NMF worker: seek failed for segment 5: Symphonia("end of stream")
+segment 5 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+NMF worker: seek failed for segment 5: Symphonia("end of stream")
+segment 5 stems unavailable (worker error or timeout) — proceeding WITHOUT stem separation for this segment
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -63.449     -63.449      0.0000
+  absolute dBFS             -144.000    -144.000      0.0000
+    θέση απόλυτου s            799.2       799.2
+  LUFS                       -23.596     -23.596      0.0000
+  true peak dBTP              -3.116      -3.116      0.0000
+  LRA LU                       8.746       8.746      0.0000
+  crest dB                    24.687      24.687      0.0000
+  dyn range dB                32.892      32.892      0.0000
+  frames                    38404178    38404178   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -39.67  -26.50  -20.98  -19.64  -25.06  -27.14  -32.11  -42.07
+  ON    -39.67  -26.50  -20.98  -19.64  -25.06  -27.14  -32.11  -42.07
+  Δ      0.000   0.000   0.000   0.000   0.000   0.000   0.000   0.000
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     40  ON     40  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      1  ON      1  Δ     +0
+  [   -70,  -60)  OFF     78  ON     78  Δ     +0
+  [   -60,  -50)  OFF    697  ON    697  Δ     +0
+  [   -50,  -40)  OFF   1275  ON   1275  Δ     +0
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 0/8001
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 0
+
+  OFF: /tmp/expander-audition/janeeyre_01_bronte__otsu__OFF.wav
+  ON : /tmp/expander-audition/janeeyre_01_bronte__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+peterpan_01_barrie
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-41.5)
+     τομή πάνω από interior: 18.08 dB · ΠΡΟΒΛΕΨΗ μείωσης 9.04 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-59.577454) · άνω(quietest speech) Some(-59.434055)
+     απόσταση 0.14 dB · μέσο -59.506 dBFS
+  interior πηγής: Some(-59.577454) ⇒ expander ΤΡΕΧΕΙ
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -63.505     -65.564     -2.0587
+  absolute dBFS             -144.000    -144.000      0.0000
+    θέση απόλυτου s           1070.2      1069.4
+  LUFS                       -20.402     -20.402      0.0003
+  true peak dBTP              -5.031      -5.031     -0.0000
+  LRA LU                       8.208       8.210      0.0019
+  crest dB                    19.892      19.892      0.0004
+  dyn range dB                40.759      46.226      5.4673
+  frames                    51399922    51399922   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -41.28  -24.61  -17.40  -16.29  -21.85  -26.00  -28.54  -38.50
+  ON    -41.29  -24.61  -17.40  -16.29  -21.85  -26.01  -28.54  -38.50
+  Δ     -0.010  -0.001  -0.000  -0.000  -0.001  -0.003  -0.002  -0.002
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     41  ON     41  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF      0  ON      0  Δ     +0
+  [   -70,  -60)  OFF     50  ON   1908  Δ  +1858
+  [   -60,  -50)  OFF   2729  ON    880  Δ  -1849
+  [   -50,  -40)  OFF    555  ON    548  Δ     -7
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 10572/10709
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+       24.2s   Δ    6.30 dB   (OFF -60.0 → ON -66.3)
+      374.3s   Δ    6.24 dB   (OFF -60.1 → ON -66.4)
+       49.3s   Δ    6.20 dB   (OFF -60.1 → ON -66.3)
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 7287
+
+  OFF: /tmp/expander-audition/peterpan_01_barrie__otsu__OFF.wav
+  ON : /tmp/expander-audition/peterpan_01_barrie__otsu__ON.wav
+
+limit -60 dBFS · edge 5 s (presets.rs) · έξοδος /tmp/expander-audition
+
+═══════════════════════════════════════════════════════════
+swiss_family_robinson_01_wyss
+ΒΗΜΑ 0 — Ο SCOUT
+  τμήματα: 8 · flagged: 0
+  τμήματα που πάνε στη ΛΩΡΙΔΑ: 4
+  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): Some(-43.5)
+     τομή πάνω από interior: 25.05 dB · ΠΡΟΒΛΕΨΗ μείωσης 12.00 dB
+  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) Some(-68.54918) · άνω(quietest speech) Some(-59.79046)
+     απόσταση 8.76 dB · μέσο -64.170 dBFS
+  interior πηγής: Some(-68.54918) ⇒ expander ΔΕΝ τρέχει
+
+ΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ
+                                 OFF          ON           Δ
+  interior dBFS              -74.023     -74.023      0.0000
+  absolute dBFS              -93.716     -93.716      0.0000
+    θέση απόλυτου s           1126.6      1126.6
+  LUFS                       -20.515     -20.515      0.0000
+  true peak dBTP              -3.124      -3.124      0.0000
+  LRA LU                       6.929       6.929      0.0000
+  crest dB                    21.352      21.352      0.0000
+  dyn range dB                46.409      46.409      0.0000
+  frames                    54101610    54101610   ΤΑΥΤΟΣΗΜΗ
+
+ΒΗΜΑ 3.1 — ΦΑΣΜΑ 8 ΜΠΑΝΤΩΝ (dB)
+  OFF   -29.34  -20.34  -16.97  -17.84  -23.96  -25.83  -28.14  -41.67
+  ON    -29.34  -20.34  -16.97  -17.84  -23.96  -25.83  -28.14  -41.67
+  Δ      0.000   0.000   0.000   0.000   0.000   0.000   0.000   0.000
+
+ΒΗΜΑ 3.2 — ΚΑΤΑΝΟΜΗ ΗΣΥΧΩΝ ΠΑΡΑΘΥΡΩΝ (< −40 dBFS), 100 ms
+  [  -200,  -90)  OFF     49  ON     49  Δ     +0
+  [   -90,  -80)  OFF      0  ON      0  Δ     +0
+  [   -80,  -70)  OFF     56  ON     56  Δ     +0
+  [   -70,  -60)  OFF   1384  ON   1384  Δ     +0
+  [   -60,  -50)  OFF    850  ON    850  Δ     +0
+  [   -50,  -40)  OFF    525  ON    525  Δ     +0
+
+ΒΗΜΑ 3.3 — |ON − OFF| ΣΤΟΝ ΧΡΟΝΟ
+  παράθυρα με διαφορά: 0/11272
+  ΟΙ ΤΡΕΙΣ ΜΕΓΑΛΥΤΕΡΕΣ — ΕΚΕΙ ΝΑ ΑΚΟΥΣΕΙ ΠΡΩΤΑ:
+  από αυτά, σε παράθυρα ΠΑΝΩ από −40 dBFS: 0
+
+  OFF: /tmp/expander-audition/swiss_family_robinson_01_wyss__otsu__OFF.wav
+  ON : /tmp/expander-audition/swiss_family_robinson_01_wyss__otsu__ON.wav
+

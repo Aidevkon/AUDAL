@@ -98,6 +98,15 @@ pub struct TrunkReport {
     /// εκείνο πετιέται στο `to_pre_analysis`· αυτό ζει στο TrunkReport, που
     /// ΔΕΝ σειριοποιείται και δεν φτάνει σε cert.
     pub acx_interior_noise_floor: Option<(f32, usize)>,
+    /// Η τομή Otsu της κατανομής RMS/100 ms ΤΟΥ ΙΔΙΟΥ ΤΟΥ ΑΡΧΕΙΟΥ, σε dBFS.
+    ///
+    /// None σημαίνει «η κατανομή δεν είναι διμερής» — δεν υπάρχει δωμάτιο
+    /// ξεχωριστό από τη φωνή, άρα δεν υπάρχει σημείο να μπει κατώφλι. ΜΗΔΕΝ
+    /// default, ΜΗΔΕΝ fallback: ο expander απλώς δεν τρέχει.
+    ///
+    /// Μετριέται στο ΙΔΙΟ πέρασμα με όλα τα υπόλοιπα (ιστόγραμμα στον βρόχο
+    /// του mono), όχι σε δεύτερο.
+    pub quiet_window_split_dbfs: Option<f32>,
 }
 
 impl std::ops::Deref for TrunkReport {
@@ -154,6 +163,94 @@ const CHUNK_FRAMES: usize = 4096;
 // Mirror signal_health.rs:92 — windows below this are dead air.
 const DEAD_AIR_GATE_DBFS: f32 = -60.0;
 const NOISE_FLOOR_WINDOW: usize = 48_000; // 1s at 48kHz
+
+// ── Κατανομή ήσυχων παραθύρων ────────────────────────────────────────────────
+// Ιστόγραμμα RMS ανά 100 ms, κάδοι του 1 dB. Ίδιο παράθυρο και ίδιοι κάδοι με
+// το harness που μέτρησε τη διμερή κατανομή στις 14/09 — ό,τι αλλάξει εδώ
+// παύει να είναι συγκρίσιμο με εκείνη τη μέτρηση.
+// MEASURED: n=9 2026-09-14 — 8/9 αφηγήσεις διμερείς, λόγος κοιλάδας 0.058–0.324.
+const QW_WINDOW: usize = 4_800; // 100 ms at 48kHz
+const QW_LO_DB: i32 = -100;
+const QW_HI_DB: i32 = 0;
+const QW_NBINS: usize = (QW_HI_DB - QW_LO_DB) as usize;
+
+/// Otsu: η τομή που μεγιστοποιεί τη διακύμανση ΑΝΑΜΕΣΑ στις δύο κλάσεις ενός
+/// 1-D ιστογράμματος. Επιστρέφει τον δείκτη κάδου της τομής.
+///
+/// SOURCE: N. Otsu, "A Threshold Selection Method from Gray-Level Histograms",
+///   IEEE Transactions on Systems, Man and Cybernetics, vol. 9, pp. 62-66, 1979,
+///   DOI 10.1109/TSMC.1979.4310076
+/// RETRIEVED: 2026-09-14 (Semantic Scholar Graph API, εγγραφή DOI)
+///
+/// ⚠ ΟΡΙΑ ΤΟΥ ΑΛΓΟΡΙΘΜΟΥ — ΔΙΑΒΑΣΕ ΠΡΙΝ ΤΟΝ ΕΜΠΙΣΤΕΥΤΕΙΣ:
+/// ΥΠΟΘΕΤΕΙ δύο πληθυσμούς. ΔΕΝ μπορεί να ανιχνεύσει ότι υπάρχει ένας. Σε
+/// μονοκόρυφη κατανομή επιστρέφει πάντα μια τομή — έγκυρη αριθμητικά, χωρίς
+/// νόημα φυσικά. Ο ΕΛΕΓΧΟΣ ΔΙΜΕΡΕΙΑΣ ΕΙΝΑΙ ΕΥΘΥΝΗ ΤΟΥ ΚΑΛΟΥΝΤΟΣ.
+/// Μετρημένο παράδειγμα: janeeyre_01_bronte ανεβαίνει μονότονα από -67 ως -40
+/// dB· ο Otsu έδωσε -38.5 και ο λόγος κοιλάδας βγήκε 1.0000 [14/09].
+fn otsu_split_bin(hist: &[u32; QW_NBINS]) -> Option<usize> {
+    let total: f64 = hist.iter().map(|&c| c as f64).sum();
+    if total == 0.0 {
+        return None;
+    }
+    let sum_all: f64 = hist.iter().enumerate().map(|(i, &c)| i as f64 * c as f64).sum();
+    let (mut w0, mut sum0) = (0.0_f64, 0.0_f64);
+    let (mut best_var, mut best_t) = (-1.0_f64, 0usize);
+    for t in 0..QW_NBINS {
+        w0 += hist[t] as f64;
+        if w0 == 0.0 {
+            continue;
+        }
+        let w1 = total - w0;
+        if w1 == 0.0 {
+            break;
+        }
+        sum0 += t as f64 * hist[t] as f64;
+        let m0 = sum0 / w0;
+        let m1 = (sum_all - sum0) / w1;
+        let var = w0 * w1 * (m0 - m1) * (m0 - m1);
+        if var > best_var {
+            best_var = var;
+            best_t = t;
+        }
+    }
+    if best_var < 0.0 {
+        None
+    } else {
+        Some(best_t)
+    }
+}
+
+/// Ο ΚΑΛΩΝ: τρέχει τον Otsu ΚΑΙ ελέγχει ότι η κατανομή δικαιολογεί το
+/// αποτέλεσμά του. Επιστρέφει το dBFS της τομής ΜΟΝΟ αν υπάρχουν δύο κορυφές
+/// εκατέρωθεν και κοιλάδα ανάμεσά τους.
+///
+/// ΤΟ ΚΡΙΤΗΡΙΟ ΕΙΝΑΙ ΤΟΠΟΛΟΓΙΚΟ, ΟΧΙ ΜΕΓΕΘΟΥΣ: αρκεί να υπάρχει κορυφή κάτω
+/// από την τομή, κορυφή πάνω, και ένας κάδος ανάμεσα γνησίως χαμηλότερος και
+/// από τις δύο. ΚΑΝΕΝΑ κατώφλι στον λόγο κοιλάδας — ο λόγος μετρήθηκε
+/// (0.058–0.324 στα οκτώ, 1.0000 στο ένα) αλλά ΔΕΝ κρίνει εδώ.
+///
+/// None σημαίνει «η κατανομή δεν λέει πού είναι το δωμάτιο». ΜΗΔΕΝ fallback:
+/// ο καλών δεν βάζει άλλο νούμερο στη θέση του.
+fn quiet_window_split_db(hist: &[u32; QW_NBINS]) -> Option<f32> {
+    let t = otsu_split_bin(hist)?;
+    if t == 0 || t >= QW_NBINS {
+        return None;
+    }
+    // Κορυφή = ο πιο γεμάτος κάδος σε κάθε πλευρά της τομής.
+    let lo = (0..t).max_by_key(|&i| hist[i])?;
+    let hi = (t..QW_NBINS).max_by_key(|&i| hist[i])?;
+    if hist[lo] == 0 || hist[hi] == 0 || lo >= hi {
+        return None;
+    }
+    // Κοιλάδα = ο πιο άδειος κάδος ΑΝΑΜΕΣΑ στις δύο κορυφές. Πρέπει να είναι
+    // γνησίως χαμηλότερος και από τις δύο, αλλιώς δεν υπάρχει διαχωρισμός.
+    let valley = (lo..=hi).map(|i| hist[i]).min()?;
+    if valley >= hist[lo] || valley >= hist[hi] {
+        return None;
+    }
+    Some(QW_LO_DB as f32 + t as f32 + 0.5)
+}
 
 // ── Transient density constants ──────────────────────────────────────────────
 // Mirror compute_transient_density [pre_analysis.rs:548-550] exactly:
@@ -434,6 +531,12 @@ fn run_trunk_internal(
     let mut nf_sum_sq: f32 = 0.0;
     let mut nf_count: usize = 0;
     let mut min_nondead_dbfs: Option<f32> = None;
+    // Ιστόγραμμα RMS/100 ms — ΤΡΕΦΕΤΑΙ ΣΤΟΝ ΙΔΙΟ ΒΡΟΧΟ. Κανένα δεύτερο πέρασμα
+    // πάνω στο dump: ο expander παίρνει το κατώφλι του από τη μέτρηση που
+    // γίνεται ούτως ή άλλως.
+    let mut qw_hist = [0u32; QW_NBINS];
+    let mut qw_sum_sq: f32 = 0.0;
+    let mut qw_count: usize = 0;
 
     // === 8-band spectral profile ===
     // Mirrors spectral_profile_8band [pre_analysis.rs:469-499]:
@@ -611,6 +714,26 @@ fn run_trunk_internal(
                         vad_current_run = 0;
                     }
                 }
+            }
+        }
+
+        // --- Κατανομή ήσυχων παραθύρων: 100 ms RMS -> κάδοι του 1 dB ---
+        // ΙΔΙΟΣ τύπος με το harness της 14/09: RMS πάνω σε mono downmix,
+        // παράθυρα 100 ms, μερικό τελευταίο παράθυρο ΠΕΤΙΕΤΑΙ.
+        for &s in m.iter() {
+            qw_sum_sq += s * s;
+            qw_count += 1;
+            if qw_count == QW_WINDOW {
+                let e = (qw_sum_sq / QW_WINDOW as f32) as f64;
+                if e > 0.0 {
+                    let db = 10.0 * e.log10();
+                    let bin = (db - QW_LO_DB as f64).floor();
+                    if bin >= 0.0 && (bin as usize) < QW_NBINS {
+                        qw_hist[bin as usize] += 1;
+                    }
+                }
+                qw_sum_sq = 0.0;
+                qw_count = 0;
             }
         }
 
@@ -854,6 +977,7 @@ fn run_trunk_internal(
     Ok(TrunkReport {
         boundaries,
         acx_interior_noise_floor: acx_interior,
+        quiet_window_split_dbfs: quiet_window_split_db(&qw_hist),
         metrics: TrunkMetrics {
             integrated_lufs,
             rms_db,

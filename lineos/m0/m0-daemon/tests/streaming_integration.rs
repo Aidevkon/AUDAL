@@ -67,6 +67,7 @@ fn streaming_pipeline_ducking_e2e() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -120,6 +121,7 @@ fn streaming_pipeline_ducking_e2e() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -254,6 +256,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -387,6 +390,7 @@ fn test_streaming_pipeline_jit_fallback() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -460,6 +464,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -512,6 +517,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -746,6 +752,7 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -793,6 +800,7 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -969,6 +977,7 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -1057,6 +1066,7 @@ fn test_restoration_speech_gated() {
             // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
@@ -1264,9 +1274,13 @@ fn every_preset_that_demands_a_floor_also_declares_its_edge() {
 ///   περιεχόμενο κάτω από το κατώφλι. Ίδιο ιδίωμα με το flag_oracle (×0.01).
 ///   Ο φορέας είναι φορέας· η συνθήκη είναι σύγκριση δύο αριθμών.
 #[cfg(test)]
-fn quiet_region_fixture() -> String {
+/// ⚠ ΤΟ `tag` ΕΙΝΑΙ ΥΠΟΧΡΕΩΤΙΚΟ: δύο τεστ καλούν αυτό το fixture και ο
+/// cargo τα τρέχει ΠΑΡΑΛΛΗΛΑ. Με ένα σταθερό όνομα στο /tmp το ένα έσβηνε
+/// το carrier του άλλου στη μέση του render — «missing data chunk», που
+/// διαβάζεται ως σφάλμα αποκωδικοποίησης και δεν είναι.
+fn quiet_region_fixture(tag: &str) -> String {
     let src = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
-    let dst = "/tmp/test_expander_quiet_carrier.wav".to_string();
+    let dst = format!("/tmp/test_expander_quiet_carrier_{tag}.wav");
     let (samples, sr, ch) = m0d::handlers::decode::decode_raw_interleaved(src).unwrap();
     assert_eq!(ch, 2);
     let mut v = samples;
@@ -1294,6 +1308,7 @@ fn run_with_floor(
     input_path: &str,
     limit_db: Option<f32>,
     floor_db: Option<f32>,
+    split_db: Option<f32>,
 ) -> Vec<f32> {
     use lineos_corpus::scout::{SegmentBoundary, SegmentType};
     let topology = dummy_ducking_topology();
@@ -1332,6 +1347,7 @@ fn run_with_floor(
             max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
             max_noise_floor_db: limit_db,
             input_interior_floor_db: floor_db,
+            quiet_window_split_dbfs: split_db,
             intent_dynamics: None,
             restoration_enabled: true, // η αλυσίδα τρέχει· η ΣΥΝΘΗΚΗ κρίνει τον gate
         },
@@ -1345,22 +1361,41 @@ fn run_with_floor(
     samples
 }
 
+/// ΤΟ ΣΥΜΒΟΛΑΙΟ ΕΙΝΑΙ ΤΕΤΡΑΜΕΡΕΣ, ΚΑΙ ΤΟ ΚΑΤΩΦΛΙ ΕΡΧΕΤΑΙ ΑΠΟ ΤΗΝ ΚΑΤΑΝΟΜΗ.
+///
+/// Το τεστ ΔΕΝ χαλάρωσε ανοχή: πρόσθεσε το τέταρτο σκέλος (Β) και έπαψε να
+/// δέχεται ότι το όριο του προορισμού είναι το κατώφλι (Δ). Το όριο κρίνει ΑΝ,
+/// η κατανομή κρίνει ΠΟΥ.
+///
+/// Το carrier έχει το δεύτερο δευτερόλεπτο εξασθενημένο ×0.001 — η «ήσυχη
+/// περιοχή» που ο κόμβος πρέπει να πιάσει.
 #[test]
-fn expander_runs_only_when_the_floor_exceeds_the_destination_limit() {
+fn expander_runs_only_when_the_floor_exceeds_the_limit_and_the_distribution_is_bimodal() {
     let limit = lineos_types::presets::ACX
         .max_noise_floor_db
         .expect("ACX ορίζει max_noise_floor_db");
+    // Τομή «από την κατανομή». Στα εννέα μετρημένα αρχεία ο Otsu έπεσε
+    // −35.5..−41.5 dBFS [14/09]· −40 είναι μέσα σε αυτό το εύρος.
+    let split = -40.0_f32;
 
+    let carrier = quiet_region_fixture("condition");
     // R — κανένα όριο: ο κόμβος δεν έχει κριτήριο, μένει ανενεργός.
-    let carrier = quiet_region_fixture();
-    let r = run_with_floor("ref", &carrier, None, None);
+    let r = run_with_floor("ref", &carrier, None, None, None);
     // Α — πάτωμα ΚΑΤΩ από το όριο (−68.50 < −60): καθαρό, δεν χρειάζεται.
-    let a = run_with_floor("sleeping", &carrier, Some(limit), Some(-68.50));
-    // Β — πάτωμα ΠΑΝΩ από το όριο (−46.75 > −60): χρειάζεται δουλειά.
-    let b = run_with_floor("waking", &carrier, Some(limit), Some(-46.75));
+    let a = run_with_floor("sleeping", &carrier, Some(limit), Some(-68.50), Some(split));
+    // Β — πάτωμα ΠΑΝΩ από το όριο, ΑΛΛΑ η κατανομή δεν είναι διμερής.
+    //     Μετρημένο σε πραγματικό υλικό: janeeyre_01_bronte, μονότονη άνοδος
+    //     −67→−40, καμία κορυφή κάτω από −40 [14/09].
+    let b = run_with_floor("monomodal", &carrier, Some(limit), Some(-46.75), None);
+    // Γ — και τα τέσσερα σκέλη: ο κόμβος τρέχει, με κατώφλι ΤΗΝ ΤΟΜΗ.
+    let c = run_with_floor("waking", &carrier, Some(limit), Some(-46.75), Some(split));
+    // Δ — ίδια συνθήκη, ΑΛΛΗ τομή. Αν το κατώφλι ερχόταν από το όριο, το Δ θα
+    //     ήταν ταυτόσημο με το Γ.
+    let d = run_with_floor("other_split", &carrier, Some(limit), Some(-46.75), Some(-55.0));
 
-    assert_eq!(r.len(), a.len(), "ίδιο μήκος");
-    assert_eq!(r.len(), b.len(), "ίδιο μήκος");
+    for (tag, v) in [("Α", &a), ("Β", &b), ("Γ", &c), ("Δ", &d)] {
+        assert_eq!(r.len(), v.len(), "ίδιο μήκος ({tag})");
+    }
 
     let mse = |x: &[f32], y: &[f32]| -> f64 {
         x.iter().zip(y).map(|(p, q)| (*p as f64 - *q as f64).powi(2)).sum::<f64>()
@@ -1369,20 +1404,37 @@ fn expander_runs_only_when_the_floor_exceeds_the_destination_limit() {
 
     let d_ra = mse(&r, &a);
     let d_rb = mse(&r, &b);
-    println!("[EXPANDER-COND] mse(R,A)={d_ra:.3e}  mse(R,B)={d_rb:.3e}");
+    let d_rc = mse(&r, &c);
+    let d_cd = mse(&c, &d);
+    println!(
+        "[EXPANDER-COND] mse(R,Α)={d_ra:.3e}  mse(R,Β)={d_rb:.3e}  \
+         mse(R,Γ)={d_rc:.3e}  mse(Γ,Δ)={d_cd:.3e}"
+    );
     let _ = std::fs::remove_file(&carrier);
 
-    // Α: η συνθήκη αποτυγχάνει στο τρίτο σκέλος ⇒ ο κόμβος ΔΕΝ τρέχει ⇒
-    // η έξοδος είναι ΤΑΥΤΟΣΗΜΗ με το R, bit για bit.
+    // Α: αποτυγχάνει στο τρίτο σκέλος ⇒ ταυτόσημη έξοδος, bit για bit.
     assert_eq!(
         d_ra, 0.0,
         "πάτωμα κάτω από το όριο ⇒ ο expander ΔΕΝ τρέχει ⇒ ταυτόσημη έξοδος"
     );
 
-    // Β: η συνθήκη ισχύει ⇒ ο κόμβος τρέχει ⇒ η έξοδος ΔΙΑΦΕΡΕΙ, μετρήσιμα.
+    // Β: αποτυγχάνει στο ΤΕΤΑΡΤΟ σκέλος ⇒ ΜΗΔΕΝ FALLBACK ⇒ ταυτόσημη έξοδος.
+    assert_eq!(
+        d_rb, 0.0,
+        "μη διμερής κατανομή ⇒ ο expander ΔΕΝ τρέχει, δεν μαντεύει άλλο κατώφλι"
+    );
+
+    // Γ: και τα τέσσερα ⇒ ο κόμβος τρέχει ⇒ η έξοδος ΔΙΑΦΕΡΕΙ, μετρήσιμα.
     assert!(
-        d_rb > 0.0,
-        "πάτωμα πάνω από το όριο ⇒ ο expander τρέχει ⇒ η έξοδος πρέπει να διαφέρει· mse={d_rb:.3e}"
+        d_rc > 0.0,
+        "τετραμερής συνθήκη ⇒ ο expander τρέχει ⇒ η έξοδος πρέπει να διαφέρει· mse={d_rc:.3e}"
+    );
+
+    // Δ: ΤΟ ΚΑΤΩΦΛΙ ΕΙΝΑΙ Η ΤΟΜΗ. Δύο διαφορετικές τομές, δύο διαφορετικές
+    // έξοδοι — αλλιώς το νούμερο δεν ταξιδεύει ως κατώφλι.
+    assert!(
+        d_cd > 0.0,
+        "άλλη τομή ⇒ άλλο κατώφλι ⇒ άλλη έξοδος· mse={d_cd:.3e}"
     );
 }
 
@@ -1404,7 +1456,7 @@ fn high_confidence_speech_reaches_the_expander_without_stems() {
 
     let run = |tag: &str, restoration: bool, floor: Option<f32>| -> Vec<f32> {
         let topology = dummy_ducking_topology();
-        let carrier = quiet_region_fixture();
+        let carrier = quiet_region_fixture("lane");
         let output_path = format!("/tmp/test_highconf_lane_{tag}.wav");
         let boundaries = vec![SegmentBoundary {
             start_sec: 0.0,
@@ -1439,6 +1491,9 @@ fn high_confidence_speech_reaches_the_expander_without_stems() {
                 max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
                 max_noise_floor_db: Some(limit),
                 input_interior_floor_db: floor,
+                // Η λωρίδα δοκιμάζεται με διμερή κατανομή — αλλιώς η τετραμερής
+                // συνθήκη θα την έκοβε πριν φτάσει στον κόμβο.
+                quiet_window_split_dbfs: Some(-40.0),
                 intent_dynamics: None,
                 restoration_enabled: restoration,
             },

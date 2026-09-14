@@ -95,7 +95,8 @@ fn rms_100ms(x: &[f32], sr: u32) -> Vec<f32> {
         .collect()
 }
 
-fn render(input: &str, tag: &str, restoration: bool, limit: Option<f32>, floor: Option<f32>)
+fn render(input: &str, tag: &str, restoration: bool, limit: Option<f32>, floor: Option<f32>,
+    split: Option<f32>)
     -> String
 {
     let out = format!("{OUT_DIR}/{tag}.wav");
@@ -141,6 +142,7 @@ fn render(input: &str, tag: &str, restoration: bool, limit: Option<f32>, floor: 
             max_true_peak_db: lineos_types::presets::ACX.max_true_peak_db,
             max_noise_floor_db: limit,
             input_interior_floor_db: floor,
+            quiet_window_split_dbfs: split,
             intent_dynamics: None,
             restoration_enabled: restoration,
         },
@@ -154,8 +156,17 @@ fn render(input: &str, tag: &str, restoration: bool, limit: Option<f32>, floor: 
 
 fn main() {
     std::fs::create_dir_all(OUT_DIR).expect("mkdir");
-    let files: Vec<String> = std::env::args().skip(1).collect();
-    assert!(!files.is_empty(), "usage: expander_audition <audio>...");
+    // ΠΡΟΑΙΡΕΤΙΚΟ ΔΕΥΤΕΡΟ ΟΡΙΣΜΑ: κατώφλι-υποψήφιος σε dBFS.
+    //
+    // ⚠ ΠΩΣ ΕΠΙΒΑΛΛΕΤΑΙ ΧΩΡΙΣ ΝΑ ΑΓΓΙΧΤΕΙ ΠΑΡΑΓΩΓΗ: η `expander_threshold_db`
+    // επιστρέφει ΤΟ ΟΡΙΟ όταν το πάτωμα είναι πάνω του. Δίνοντας
+    // max_noise_floor_db = <υποψήφιος> και input_interior_floor_db =
+    // <υποψήφιος>+1, η ΙΔΙΑ συνάρτηση επιστρέφει ακριβώς τον υποψήφιο.
+    // Η συνάρτηση χρησιμοποιείται ως ΜΟΧΛΟΣ· τίποτα δεν άλλαξε στον κώδικα.
+    let mut files: Vec<String> = std::env::args().skip(1).collect();
+    let candidate: Option<f32> = files.last().and_then(|s| s.parse::<f32>().ok());
+    if candidate.is_some() { files.pop(); }
+    assert!(!files.is_empty(), "usage: expander_audition <audio>... [threshold_db]");
 
     let limit = lineos_types::presets::ACX.max_noise_floor_db.unwrap();
     let edge = lineos_types::presets::ACX.room_tone_max_s.unwrap();
@@ -190,9 +201,20 @@ fn main() {
             }
         }
         println!("  τμήματα που πάνε στη ΛΩΡΙΔΑ: {speech_unflagged}");
+        let src_quietest = rep.quietest_active_window_dbfs;
+        let src_split = rep.quiet_window_split_dbfs;
+        println!("  ΤΟΜΗ ΚΑΤΑΝΟΜΗΣ (Otsu, από το trunk pass): {src_split:?}");
+        if let (Some(t), Some(f)) = (src_split, src_interior) {
+            println!("     τομή πάνω από interior: {:.2} dB · ΠΡΟΒΛΕΨΗ μείωσης {:.2} dB",
+                t - f, ((t - f) * 0.5).min(12.0));
+        }
+        println!("  ΤΑ ΔΥΟ ΦΡΑΓΜΑΤΑ: κάτω(interior) {src_interior:?} · άνω(quietest speech) {src_quietest:?}");
+        if let (Some(lo), Some(hi)) = (src_interior, src_quietest) {
+            println!("     απόσταση {:.2} dB · μέσο {:.3} dBFS", hi - lo, (hi + lo) / 2.0);
+        }
         println!("  interior πηγής: {src_interior:?} ⇒ expander {}",
             if sp314_orchestrator::streaming_pipeline::expander_threshold_db(
-                Some(limit), src_interior).is_some() { "ΤΡΕΧΕΙ" } else { "ΔΕΝ τρέχει" });
+                Some(limit), src_interior, src_split).is_some() { "ΤΡΕΧΕΙ" } else { "ΔΕΝ τρέχει" });
         let _ = std::fs::remove_file(&src_dump);
 
         if speech_unflagged == 0 {
@@ -201,12 +223,23 @@ fn main() {
         }
 
         // ── ΒΗΜΑ 1: τα δύο renders ──
-        let off = render(path, &format!("{stem}__OFF"), false, Some(limit), src_interior);
-        let on  = render(path, &format!("{stem}__ON"),  true,  Some(limit), src_interior);
+        // ΣΕΝΤΙΝΕΛΑ 0 = ΜΟΝΟ ΤΑ ΦΡΑΓΜΑΤΑ, χωρίς render. Η σάρωση των εννιά
+        // WAKING χρειάζεται μόνο το trunk pass· τα renders θα ήταν ώρες.
+        if candidate == Some(0.0) {
+            println!();
+            continue;
+        }
+
+        // ΜΗΔΕΝ ΜΟΧΛΟΣ. Το κατώφλι έρχεται από την ΠΑΡΑΓΩΓΗ: την τομή που
+        // υπολόγισε το ίδιο trunk pass πάνω στην κατανομή του αρχείου.
+        let (pass_limit, pass_floor) = (Some(limit), src_interior);
+        let tag = "otsu";
+        let off = render(path, &format!("{stem}__{tag}__OFF"), false, pass_limit, pass_floor, src_split);
+        let on  = render(path, &format!("{stem}__{tag}__ON"),  true,  pass_limit, pass_floor, src_split);
 
         // ── ΒΗΜΑ 2: ο πίνακας ──
-        let (mo, mono_off) = measure(&off, &format!("{stem}_off"));
-        let (mn, mono_on)  = measure(&on,  &format!("{stem}_on"));
+        let (mo, mono_off) = measure(&off, &format!("{stem}_{tag}_off"));
+        let (mn, mono_on)  = measure(&on,  &format!("{stem}_{tag}_on"));
         let d = |a: f32, b: f32| b - a;
         println!("\nΒΗΜΑ 2 — Ο ΠΙΝΑΚΑΣ");
         println!("  {:<22}{:>12}{:>12}{:>12}", "", "OFF", "ON", "Δ");
