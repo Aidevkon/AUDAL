@@ -64,6 +64,9 @@ fn streaming_pipeline_ducking_e2e() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -114,6 +117,9 @@ fn streaming_pipeline_ducking_e2e() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -245,6 +251,9 @@ fn test_streaming_pipeline_jit_orchestration() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -375,6 +384,9 @@ fn test_streaming_pipeline_jit_fallback() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -445,6 +457,9 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -494,6 +509,9 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -725,6 +743,9 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -769,6 +790,9 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -942,6 +966,9 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -1027,6 +1054,9 @@ fn test_restoration_speech_gated() {
             // ο προορισμός δεν έχει απαίτηση πατώματος, και αυτό είναι η αλήθεια
             // του preset, όχι placeholder.
             max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            // Δεν μετρήθηκε σε αυτά τα δοκίμια ⇒ ο expander δεν τρέχει,
+            // ακριβώς όπως και πριν από αυτό το βήμα.
+            input_interior_floor_db: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
@@ -1207,4 +1237,151 @@ fn every_preset_that_demands_a_floor_also_declares_its_edge() {
             );
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXERCISE-PROOF: η συνθήκη του expander
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠ ΤΙ ΑΠΟΔΕΙΚΝΥΕΙ ΚΑΙ ΤΙ ΟΧΙ: καλεί τη ζωντανή `run_streaming_pipeline_with_timeline`
+// με ΣΥΝΘΕΤΙΚΑ boundaries που περνούν την πόρτα (ίδιο ιδίωμα με το
+// `test_restoration_speech_gated`). Αποδεικνύει ότι **η συνθήκη είναι σωστή**.
+// ΔΕΝ αποδεικνύει ότι φτάνει στην παραγωγή σε καθαρή αφήγηση — εκεί το
+// `flagged_hybrid_indices` είναι ΚΕΝΟ (μετρήθηκε 4/4, 11/09) και ο κόμβος δεν
+// τρέχει καθόλου.
+//
+// ΤΑ ΔΥΟ ΠΑΤΩΜΑΤΑ ΕΙΝΑΙ ΜΕΤΡΗΜΕΝΑ, από docs/lab-logs/interior-floor-20260912.txt:
+//   SLEEPING  swiss_family_robinson_01_wyss.mp3      interior −68.50  (κάτω από −60)
+//   WAKING    anne_of_green_gables_01_montgomery.mp3 interior −46.75  (πάνω από −60)
+// Το ηχητικό υλικό είναι ο ΦΟΡΕΑΣ· η συνθήκη είναι σύγκριση δύο αριθμών, και οι
+// δύο αριθμοί είναι πραγματικοί.
+
+/// ΤΟ ΥΛΙΚΟ: ο φορέας `real_world_60s.wav` κάθεται στα −5…−12 dBFS στη ζώνη
+/// ομιλίας — ΜΕΤΡΗΘΗΚΕ 2026-09-13: μόνο 86 δείγματα στα 48000 πέφτουν κάτω από
+/// −60 dBFS, και ο ανιχνευτής envelope (1 ms attack / 100 ms release) δεν τα
+/// βλέπει. Με κατώφλι το όριο του προορισμού (−60), ο expander δεν θα είχε ΤΙ
+/// να πιάσει, και το σκέλος Β δεν θα διέκρινε τίποτα.
+/// ⇒ Η ζώνη 1→2 s κλιμακώνεται ×0.001 (−60 dB) ώστε να υπάρχει πραγματικό
+///   περιεχόμενο κάτω από το κατώφλι. Ίδιο ιδίωμα με το flag_oracle (×0.01).
+///   Ο φορέας είναι φορέας· η συνθήκη είναι σύγκριση δύο αριθμών.
+#[cfg(test)]
+fn quiet_region_fixture() -> String {
+    let src = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+    let dst = "/tmp/test_expander_quiet_carrier.wav".to_string();
+    let (samples, sr, ch) = m0d::handlers::decode::decode_raw_interleaved(src).unwrap();
+    assert_eq!(ch, 2);
+    let mut v = samples;
+    for i in (sr as usize)..(2 * sr as usize) {
+        v[i * 2] *= 0.001;
+        v[i * 2 + 1] *= 0.001;
+    }
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(&dst, spec).unwrap();
+    for s in &v {
+        w.write_sample(*s).unwrap();
+    }
+    w.finalize().unwrap();
+    dst
+}
+
+#[cfg(test)]
+fn run_with_floor(
+    tag: &str,
+    input_path: &str,
+    limit_db: Option<f32>,
+    floor_db: Option<f32>,
+) -> Vec<f32> {
+    use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+    let topology = dummy_ducking_topology();
+    let output_path = format!("/tmp/test_expander_condition_{tag}.wav");
+
+    let boundaries = vec![
+        SegmentBoundary { start_sec: 0.0, end_sec: 1.0, segment_type: SegmentType::Music,
+            avg_leaning: 0.1, avg_confidence: 0.8 },
+        SegmentBoundary { start_sec: 1.0, end_sec: 2.0, segment_type: SegmentType::Speech,
+            avg_leaning: 0.5, avg_confidence: 0.2 }, // Hybrid ⇒ η πόρτα ανοίγει
+        SegmentBoundary { start_sec: 2.0, end_sec: 3.0, segment_type: SegmentType::Music,
+            avg_leaning: 0.1, avg_confidence: 0.8 },
+    ];
+
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    let shadow_reader =
+        m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path)).unwrap();
+    let _worker = m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
+    let (_, flagged_indices) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
+    run_streaming_pipeline_with_timeline(
+        FileDecoder { path: input_path.to_string() },
+        &output_path,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: 48000,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+            pre_gain_linear: 1.0,
+            expected_output_frames: None,
+            quietest_active_window_dbfs: None,
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            max_noise_floor_db: limit_db,
+            input_interior_floor_db: floor_db,
+            intent_dynamics: None,
+            restoration_enabled: true, // η αλυσίδα τρέχει· η ΣΥΝΘΗΚΗ κρίνει τον gate
+        },
+        TimelinePlan { boundaries, flagged_indices, pre_analysis: None },
+        rx_res,
+    )
+    .unwrap();
+
+    let (samples, _, _) = m0d::handlers::decode::decode_raw_interleaved(&output_path).unwrap();
+    let _ = std::fs::remove_file(&output_path);
+    samples
+}
+
+#[test]
+fn expander_runs_only_when_the_floor_exceeds_the_destination_limit() {
+    let limit = lineos_types::presets::ACX
+        .max_noise_floor_db
+        .expect("ACX ορίζει max_noise_floor_db");
+
+    // R — κανένα όριο: ο κόμβος δεν έχει κριτήριο, μένει ανενεργός.
+    let carrier = quiet_region_fixture();
+    let r = run_with_floor("ref", &carrier, None, None);
+    // Α — πάτωμα ΚΑΤΩ από το όριο (−68.50 < −60): καθαρό, δεν χρειάζεται.
+    let a = run_with_floor("sleeping", &carrier, Some(limit), Some(-68.50));
+    // Β — πάτωμα ΠΑΝΩ από το όριο (−46.75 > −60): χρειάζεται δουλειά.
+    let b = run_with_floor("waking", &carrier, Some(limit), Some(-46.75));
+
+    assert_eq!(r.len(), a.len(), "ίδιο μήκος");
+    assert_eq!(r.len(), b.len(), "ίδιο μήκος");
+
+    let mse = |x: &[f32], y: &[f32]| -> f64 {
+        x.iter().zip(y).map(|(p, q)| (*p as f64 - *q as f64).powi(2)).sum::<f64>()
+            / x.len() as f64
+    };
+
+    let d_ra = mse(&r, &a);
+    let d_rb = mse(&r, &b);
+    println!("[EXPANDER-COND] mse(R,A)={d_ra:.3e}  mse(R,B)={d_rb:.3e}");
+    let _ = std::fs::remove_file(&carrier);
+
+    // Α: η συνθήκη αποτυγχάνει στο τρίτο σκέλος ⇒ ο κόμβος ΔΕΝ τρέχει ⇒
+    // η έξοδος είναι ΤΑΥΤΟΣΗΜΗ με το R, bit για bit.
+    assert_eq!(
+        d_ra, 0.0,
+        "πάτωμα κάτω από το όριο ⇒ ο expander ΔΕΝ τρέχει ⇒ ταυτόσημη έξοδος"
+    );
+
+    // Β: η συνθήκη ισχύει ⇒ ο κόμβος τρέχει ⇒ η έξοδος ΔΙΑΦΕΡΕΙ, μετρήσιμα.
+    assert!(
+        d_rb > 0.0,
+        "πάτωμα πάνω από το όριο ⇒ ο expander τρέχει ⇒ η έξοδος πρέπει να διαφέρει· mse={d_rb:.3e}"
+    );
 }

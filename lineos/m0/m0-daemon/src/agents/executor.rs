@@ -402,6 +402,10 @@ pub fn execute_streaming_plan(
                 quietest_active_window_dbfs: trunk_report.quietest_active_window_dbfs,
                 max_true_peak_db: delivery_target.max_true_peak_db,
                 max_noise_floor_db: delivery_max_noise_floor_db,
+                // Μόνο η τιμή· το frame δεν χρειάζεται στη διαδρομή του κόμβου.
+                input_interior_floor_db: trunk_report
+                    .acx_interior_noise_floor
+                    .map(|(db, _frame)| db),
                 intent_dynamics: plan.intent_dynamics,
                 restoration_enabled: true,
             },
@@ -495,12 +499,51 @@ pub fn execute_streaming_plan(
                     value: edge_sec,
                     unit: "s".into(),
                 });
-                vec![crate::blob_store::CorrectionRecord {
+                let mut records = vec![crate::blob_store::CorrectionRecord {
                     stage: "interior_noise_analysis".into(),
                     state: state.into(),
                     reason,
                     measurements,
-                }]
+                }];
+
+                // ΔΕΥΤΕΡΗ ΕΓΓΡΑΦΗ: τι ΕΚΑΝΕ ο κόμβος, ξεχωριστά από τι
+                // μετρήθηκε. Η συνθήκη έρχεται από ΤΗ ΜΙΑ πηγή
+                // (streaming_pipeline::expander_threshold_db) — όχι αντίγραφο.
+                // Το `skipped` είναι ΑΛΗΘΕΣ τώρα: ο κόμβος υπάρχει στην
+                // αλυσίδα και η συνθήκη τον αφήνει ανενεργό. Κατάσταση, όχι
+                // εκτίμηση.
+                let interior_db = trunk_report.acx_interior_noise_floor.map(|(db, _)| db);
+                let engaged = sp314_orchestrator::streaming_pipeline::expander_threshold_db(
+                    delivery_max_noise_floor_db,
+                    interior_db,
+                );
+                let (ex_state, ex_reason) = match engaged {
+                    Some(_) => (
+                        "applied",
+                        "interior floor exceeds the destination limit",
+                    ),
+                    None => (
+                        "skipped",
+                        "interior floor clears the destination limit",
+                    ),
+                };
+                records.push(crate::blob_store::CorrectionRecord {
+                    stage: "noise_expander".into(),
+                    state: ex_state.into(),
+                    reason: ex_reason.into(),
+                    // ⚠ ΜΟΝΟ ΤΟ threshold_db. Τα `floor_db` (−12) και `ratio`
+                    // (1.5) του expander είναι ΙΔΙΩΤΙΚΕΣ σταθερές του gate.rs
+                    // χωρίς accessor. Γραμμένα εδώ ως literals θα ήταν ΔΕΥΤΕΡΟ
+                    // αντίγραφο κατωφλιού μέσα σε ΥΠΟΓΕΓΡΑΜΜΕΝΟ έγγραφο — το
+                    // ακριβές σχήμα που το ίδιο το schema entry απαγορεύει.
+                    // Μπαίνουν όταν ο κόμβος τα εκθέσει· δηλωμένο κενό.
+                    measurements: vec![crate::blob_store::NamedValue {
+                        name: "threshold_db".into(),
+                        value: engaged.unwrap_or(limit_db),
+                        unit: "dBFS".into(),
+                    }],
+                });
+                records
             }
             _ => Vec::new(),
         };

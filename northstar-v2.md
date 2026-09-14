@@ -1016,7 +1016,7 @@ W17 bloat νεκρός μετρημένα (ratio 0.30). INV-DET-1 golden: 99791c
          ενώ το blake3 χασάρει LE:
          wav_to_raw.rs:148 `blake3.update(&left_buf[i].to_le_bytes());`
          ΕΝΕΡΓΗ διαδρομή:
-         executor.rs:423 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
+         executor.rs:427 `crate::dsp::wav_to_raw::wav_to_raw_measured(&output_path, &mastered_raw_path)`
          Σε LE μηχάνημα ταυτίζονται. Σε BE ΟΧΙ: η σχέση
          hash↔αρχείο σπάει ΣΙΩΠΗΛΑ, κανένα test δεν το
          πιάνει γιατί κανένα CI δεν τρέχει εκεί.

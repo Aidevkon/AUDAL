@@ -69,18 +69,39 @@ pub struct StreamingConfig<'a> {
     /// μόνο το acx το δηλώνει (presets.rs, SOURCE
     /// help.acx.com) — None σημαίνει «ο προορισμός δεν
     /// έχει απαίτηση», όχι «άγνωστο».
-    /// ΔΕΝ ΔΙΑΒΑΖΕΤΑΙ ΑΚΟΜΑ: η συνθήκη που θα το
-    /// χρησιμοποιήσει χρειάζεται και το interior
-    /// ελάχιστο (acx_check::interior_noise_floor_db,
-    /// ce6aafb), που δεν υπολογίζεται στη διαδρομή
-    /// αυτή. Καλωδίωση πρώτα, ενεργοποίηση μετά — ίδιο
-    /// σχήμα με το intent_dynamics.
+    /// ΔΙΑΒΑΖΕΤΑΙ: μαζί με το `input_interior_floor_db` αποφασίζει αν ο
+    /// expander τρέχει, και ΕΙΝΑΙ το κατώφλι του.
     pub max_noise_floor_db: Option<f32>,
+    /// Το interior πάτωμα της εισόδου, μετρημένο από τον
+    /// AcxCheckAnalyzer με τα άκρα αποκλεισμένα.
+    /// None όταν ο analyzer δεν έτρεξε (ο προορισμός δεν δηλώνει όριο)
+    /// ή όταν δεν έμειναν αρκετά παράθυρα μετά τον αποκλεισμό.
+    /// ΜΗΔΕΝ default: None σημαίνει «δεν μετρήθηκε».
+    pub input_interior_floor_db: Option<f32>,
     /// Intent «dynamics» [0.0, 1.0] — Smooth…Punchy. None = default 0.5.
     /// Τροφοδοτεί ΜΟΝΟ τον τύπο του blend_release_ms του limiter.
     pub intent_dynamics: Option<f32>,
     /// Bypass flag for A/B testing (Y4-c TODO: plumb to UI)
     pub restoration_enabled: bool,
+}
+
+/// Η ΜΙΑ ΠΗΓΗ ΤΗΣ ΣΥΝΘΗΚΗΣ: `Some(threshold_db)` όταν ο expander τρέχει,
+/// `None` όταν μένει ανενεργός.
+///
+/// Τρέχει ΜΟΝΟ αν και τα τρία: ο προορισμός δηλώνει όριο · το interior πάτωμα
+/// μετρήθηκε · το πάτωμα είναι ΠΑΝΩ από το όριο. Το κατώφλι είναι **το όριο**.
+///
+/// ΓΙΑΤΙ ΔΗΜΟΣΙΑ: ο καλών χρειάζεται την ΙΔΙΑ απόφαση για να γράψει τι έκανε η
+/// μηχανή στο πιστοποιητικό. Δύο αντίγραφα της συνθήκης θα απέκλιναν — μία
+/// συνάρτηση, μία αλήθεια.
+pub fn expander_threshold_db(
+    max_noise_floor_db: Option<f32>,
+    input_interior_floor_db: Option<f32>,
+) -> Option<f32> {
+    match (max_noise_floor_db, input_interior_floor_db) {
+        (Some(limit_db), Some(floor_db)) if floor_db > limit_db => Some(limit_db),
+        _ => None,
+    }
 }
 
 /// Multiply left/right buffers by a linear gain, in place.
@@ -228,13 +249,36 @@ pub fn run_streaming_pipeline_with_timeline(
     let mut music_graph = DspGraph::from_topology(&music_topology, block_size, sample_rate)
         .map_err(|e| format!("{:?}", e))?;
 
-    // The -45 default policy lives HERE, in the orchestrator, never in the DSP core.
+    // Η ΠΟΛΙΤΙΚΗ ΖΕΙ ΕΔΩ, στον orchestrator, ποτέ στον πυρήνα DSP.
     // ΟΡΙΟ ΜΕΤΟΝΟΜΑΣΙΑΣ [F-097]: το `gate_threshold_db` είναι ΣΩΣΤΟ όνομα —
     // από εδώ και κάτω η τιμή είναι κατώφλι πύλης, όχι μέτρηση.
-    let gate_threshold_db = config.quietest_active_window_dbfs.unwrap_or(-45.0);
+    //
+    // Το κατώφλι είναι το όριο του προορισμού, όχι το μετρημένο
+    // πάτωμα: «μείωσε ό,τι είναι κάτω από αυτό που ο προορισμός
+    // δέχεται». Ένα κατώφλι στο ίδιο το πάτωμα δεν θα έπιανε ποτέ —
+    // το σήμα είναι εξ ορισμού ίσο ή πάνω από αυτό. Και ένα κατώφλι
+    // «πάτωμα + περιθώριο» θα απαιτούσε τρίτη σταθερά από πρότυπο.
+    // ΗΤΑΝ quietest_active_window_dbfs, που είναι η πιο ήσυχη ΟΜΙΛΙΑ
+    // και όχι το πάτωμα (F-096): 43 dB διαφορά στο ίδιο αρχείο, και
+    // ακούστηκε να τρώει φωνή.
+    //
+    // ΤΡΕΧΕΙ ΜΟΝΟ ΑΝ ΚΑΙ ΤΑ ΤΡΙΑ: ο προορισμός δηλώνει όριο · το interior
+    // πάτωμα μετρήθηκε · το πάτωμα είναι ΠΑΝΩ από το όριο. Το −45 fallback
+    // ΕΦΥΓΕ: αν λείπει οποιοδήποτε, ο κόμβος μένει ανενεργός — δεν μαντεύει.
+    let (gate_enabled, gate_threshold_db) =
+        match expander_threshold_db(config.max_noise_floor_db, config.input_interior_floor_db) {
+            Some(limit_db) => (true, limit_db),
+            // NEG_INFINITY και όχι αριθμός: το threshold_linear γίνεται 0, άρα
+            // κάθε στάθμη είναι «πάνω από το κατώφλι» και ο κόμβος είναι
+            // διαφανής ΑΚΟΜΑ ΚΑΙ αν κάποιος ανάψει τη σημαία αλλού. Ασφαλής
+            // κατεύθυνση, όχι μαντεψιά.
+            None => (false, f32::NEG_INFINITY),
+        };
+    let mut restoration_config = sp314_dsp::restoration::RestorationConfig::voice();
+    restoration_config.gate_enabled = gate_enabled;
     let mut rest_chain = sp314_dsp::restoration::RestorationChain::new(
         sample_rate as f32,
-        sp314_dsp::restoration::RestorationConfig::voice(),
+        restoration_config,
         0.0,
         gate_threshold_db,
     ); // 0.0 pad because streaming does not pre-pad
