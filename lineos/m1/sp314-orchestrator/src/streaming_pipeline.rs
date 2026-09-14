@@ -283,6 +283,40 @@ pub fn run_streaming_pipeline_with_timeline(
         gate_threshold_db,
     ); // 0.0 pad because streaming does not pre-pad
 
+    // ── Η ΛΩΡΙΔΑ «ΣΙΓΟΥΡΑ ΦΩΝΗ» ─────────────────────────────────────────
+    // Το σχέδιο την είχε ονομάσει «HIGH-CONF SPEECH → BYPASS NMF»
+    // (VISION_EVOLUTION, 02/08) — bypass των stems, ΟΧΙ των διορθώσεων. Η
+    // αλυσίδα έμεινε μέσα στον κλάδο των stems επειδή εκεί χτίστηκε.
+    //
+    // Καθαρή αφήγηση δεν σηκώνει ποτέ σημαία escalation (leaning 0.85–0.91,
+    // υψηλή εμπιστοσύνη ⇒ ο Scout ΕΙΝΑΙ σίγουρος), άρα δεν παράγονται stems
+    // και ο δεξιός κλάδος ήταν τρεις κόμβοι: in → duck_gain → out. Μηδέν
+    // διόρθωση. Αυτή η αλυσίδα δουλεύει στο ΕΝΙΑΙΟ σήμα, χωρίς stems.
+    //
+    // ⚠ ΜΟΝΟ Ο EXPANDER. Οι άλλοι τέσσερις μένουν κλειστοί, με τον λόγο
+    // δίπλα στον καθένα — και με τον ΥΠΑΡΧΟΝΤΑ μηχανισμό σημαιών, όχι νέο.
+    // ΤΟ ΔΟΓΜΑ: μία αλλαγή τη φορά στο ίδιο σήμα· πέντε μαζί και η ακρόαση
+    // δεν ξέρει τι ακούει.
+    let speech_lane_config = sp314_dsp::restoration::RestorationConfig {
+        // ΜΗΔΕΝ κριτήριο προορισμού — δεν ξέρουμε προς τι θα διορθώναμε.
+        lowcut_enabled: false,
+        // F-082: δεν υπάρχει ανιχνευτής. Αφαιρεί 50/100/150 Hz χωρίς να
+        // ρωτήσει αν υπάρχει hum — και μετρήθηκε να τρώει ανδρική θεμελιώδη.
+        hum_enabled: false,
+        // Ακρόαση, όχι κριτήριο. ΚΑΙ στον hybrid τρέχει ΔΥΟ φορές σε σειρά
+        // (rest_chain + vocal_graph, ίδιο −24) — εύρημα 13/09, δεν
+        // κληρονομείται εδώ.
+        deess_enabled: false,
+        // Η ΙΔΙΑ συνθήκη, από την ίδια συνάρτηση. Μηδέν αντίγραφο.
+        gate_enabled,
+    };
+    let mut speech_lane_chain = sp314_dsp::restoration::RestorationChain::new(
+        sample_rate as f32,
+        speech_lane_config,
+        0.0,
+        gate_threshold_db,
+    );
+
     // Precompute LTASS gains for the vocal graph ONCE for the whole file
     if let Some(pre) = pre_analysis {
         let profile = aether_bridge::reference_resolver::ReferenceProfile::load(
@@ -400,6 +434,7 @@ pub fn run_streaming_pipeline_with_timeline(
                                 })?;
                             // on Music->Speech entry, reset to avoid stale-state click
                             rest_chain.reset();
+                            speech_lane_chain.reset();
                         }
                         SegmentType::Music => {
                             graph
@@ -490,6 +525,20 @@ pub fn run_streaming_pipeline_with_timeline(
                         }
                         dual_graph_processed = true;
                     }
+                }
+
+                // Η ΛΩΡΙΔΑ «ΣΙΓΟΥΡΑ ΦΩΝΗ»: το τμήμα είναι Speech ΚΑΙ δεν
+                // παρήχθησαν stems γι' αυτό — δηλαδή ο Scout ήταν ΣΙΓΟΥΡΟΣ.
+                // Τρέχει στο ΕΝΙΑΙΟ bl/br, που έχει ήδη πάρει pre_gain μία
+                // φορά (:379) και καμία άλλη — ο διπλός δρόμος του hybrid
+                // (:463-464) δεν περνάει από εδώ.
+                // ΔΕΝ θέτει dual_graph_processed: ο fallback graph τρέχει
+                // κανονικά μετά, όπως πάντα, και εφαρμόζει το duck_gain.
+                if !dual_graph_processed
+                    && seg_type == SegmentType::Speech
+                    && config.restoration_enabled
+                {
+                    speech_lane_chain.process(&mut bl, &mut br);
                 }
 
                 last_idx = Some(seg_idx);

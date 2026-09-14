@@ -1385,3 +1385,88 @@ fn expander_runs_only_when_the_floor_exceeds_the_destination_limit() {
         "πάτωμα πάνω από το όριο ⇒ ο expander τρέχει ⇒ η έξοδος πρέπει να διαφέρει· mse={d_rb:.3e}"
     );
 }
+
+#[test]
+fn high_confidence_speech_reaches_the_expander_without_stems() {
+    // ΤΟ ΚΕΝΟ ΠΟΥ ΚΑΛΥΠΤΕΙ: κανένα υπάρχον τεστ δεν περνάει από τη νέα
+    // λωρίδα. Εννιά από τα δέκα έχουν `restoration_enabled: false`, και τα
+    // δύο που το έχουν `true` βάζουν το Speech τμήμα στη dead zone
+    // (leaning 0.5, conf 0.2) ⇒ γίνεται flagged ⇒ πάει hybrid.
+    //
+    // Εδώ το Speech τμήμα είναι ΕΞΩ από τη dead zone (leaning 0.90,
+    // conf 0.85) — ό,τι δίνει η καθαρή αφήγηση (μετρήθηκε 0.85–0.91).
+    // Ο Scout είναι ΣΙΓΟΥΡΟΣ ⇒ μηδέν stems ⇒ η νέα λωρίδα.
+    use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+
+    let limit = lineos_types::presets::ACX
+        .max_noise_floor_db
+        .expect("ACX ορίζει max_noise_floor_db");
+
+    let run = |tag: &str, restoration: bool, floor: Option<f32>| -> Vec<f32> {
+        let topology = dummy_ducking_topology();
+        let carrier = quiet_region_fixture();
+        let output_path = format!("/tmp/test_highconf_lane_{tag}.wav");
+        let boundaries = vec![SegmentBoundary {
+            start_sec: 0.0,
+            end_sec: 3.0,
+            segment_type: SegmentType::Speech,
+            avg_leaning: 0.90,   // ΕΞΩ από [0.3, 0.7]
+            avg_confidence: 0.85, // ΠΑΝΩ από 0.4
+        }];
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let reader =
+            m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(&carrier)).unwrap();
+        let _w = m0d::dsp::orchestrator::nmf_worker::spawn(reader, 48000, rx_job, tx_res);
+        let (sent, flagged) =
+            m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+        assert_eq!(sent, 0, "σίγουρη φωνή ΔΕΝ πρέπει να στείλει NMF job");
+        assert!(flagged.is_empty(), "σίγουρη φωνή ΔΕΝ πρέπει να σηκώσει σημαία");
+
+        run_streaming_pipeline_with_timeline(
+            FileDecoder { path: carrier.clone() },
+            &output_path,
+            &StreamingConfig {
+                topology: &topology,
+                block_size: 1024,
+                sample_rate: 48000,
+                ducking_node_id: "duck_gain",
+                speech_gain: 1.0,
+                music_gain: 0.501,
+                pre_gain_linear: 1.0,
+                expected_output_frames: None,
+                quietest_active_window_dbfs: None,
+                max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+                max_noise_floor_db: Some(limit),
+                input_interior_floor_db: floor,
+                intent_dynamics: None,
+                restoration_enabled: restoration,
+            },
+            TimelinePlan { boundaries, flagged_indices: flagged, pre_analysis: None },
+            rx_res,
+        )
+        .unwrap();
+        let (s, _, _) = m0d::handlers::decode::decode_raw_interleaved(&output_path).unwrap();
+        let _ = std::fs::remove_file(&output_path);
+        let _ = std::fs::remove_file(&carrier);
+        s
+    };
+
+    // Αναφορά: η λωρίδα δεν τρέχει καθόλου (bypass flag κλειστό).
+    let off = run("off", false, Some(-46.75));
+    // Η λωρίδα τρέχει, και η συνθήκη του expander ΙΣΧΥΕΙ (−46.75 > −60).
+    let on = run("on", true, Some(-46.75));
+
+    let mse: f64 = off
+        .iter()
+        .zip(&on)
+        .map(|(a, b)| (*a as f64 - *b as f64).powi(2))
+        .sum::<f64>()
+        / off.len() as f64;
+    println!("[HIGHCONF-LANE] mse(off,on)={mse:.3e}");
+
+    assert!(
+        mse > 0.0,
+        "σίγουρη φωνή ΧΩΡΙΣ stems πρέπει να φτάνει στον expander· mse={mse:.3e}"
+    );
+}
