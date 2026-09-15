@@ -2072,7 +2072,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   είναι ΥΠΑΡΚΤΑ και ΤΙΜΙΑ αντί για τη σταθερά.
 
   **(c) ΤΟ STEM DNA ΣΕ ΑΦΗΓΗΣΗ — ΔΕΝ κρύβεται, γράφτηκε λάθος στο (3):**
-  `pdf_gen.rs:87` `if let Some(fp) = blob.stem_fingerprints()`. Στο narration
+  `pdf_gen.rs:102` `if let Some(fp) = blob.stem_fingerprints()`. Στο narration
   path `stem_fingerprints: Some(fingerprints.clone())` (`certificate_node.rs:405`)
   με `fingerprints` από `ContentType::bypassed_render()` (`content_type.rs:62`),
   που επιστρέφει `StemFingerprints::default()` — και το struct
