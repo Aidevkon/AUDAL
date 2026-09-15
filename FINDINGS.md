@@ -2044,6 +2044,60 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   (7) Ασυμμετρία διαδρομών: PDF γεννιέται αυτόματα στο mastering και το endpoint διαβάζει από δίσκο (ΔΕΝ περνάει get_or_rehydrate)· PNG on-demand με rehydrate — το PDF ενός προ-restart blob μπορεί να λείπει ενώ το PNG ανασταίνεται.
   Fix: ΟΛΑ εκτός του (1) ζουν στο §Σ — οι όψεις ανά παραδοτέο ορίζουν τι τυπώνεται, τι σημαίνει απουσία, τι λέει το QR. Το recon αυτό = το ωμό υλικό της όψης-χαρτί. ΣΗΜΕΙΩΣΗ ΕΜΒΕΛΕΙΑΣ §Σ (Anestis 22/08): η πλατφόρμα ΕΝΑ προϊόν, πολλά entries (audiobook/podcast/bedroom musician/Apple bed/Netflix export in scope) — κάθε νέο entry περνάει το τεστ του δόγματος Β (νέες ΤΙΜΕΣ σε υπάρχουσες προβολές = preset· νέο ΕΙΔΟΣ μέτρησης όπως dialog-gated loudness του Netflix = ΑΡΧΙΤΕΚΤΟΝΙΚΗ, δικό της βήμα). Trigger: §Σ draft — και για το (1) μόνο: πριν βγει ΟΠΟΙΟΔΗΠΟΤΕ PDF σε τρίτον.
 
+  ⚠ **ΣΥΜΠΛΗΡΩΜΑ 2026-09-15** (ΔΕΝ πήρε νέο αριθμό — `grep -n "pdf\|PASS" FINDINGS.md`
+  πριν την εγγραφή έδειξε ΑΥΤΟ το εύρημα ήδη ανοιχτό για το ίδιο σκέλος (1)/(3)·
+  ο allocator μένει στο F-100, αδιάθετος). Τρία μετρημένα, το πρώτο διορθώνει
+  το μέγεθος του (1):
+
+  **(a) Το `delivery_checks` ΕΙΝΑΙ προσβάσιμο, αλλά ΠΑΝΤΑ `None` τη στιγμή που
+  υπάρχει το PDF.** `delivery_checks: Option<Vec<DeliveryCheck>>` ζει μέσα στο
+  ΙΔΙΟ `StoredLoudness` (`blob_store.rs:179`) που το `pdf_gen.rs:50` ήδη
+  δεσμεύει ως `l` — μηδέν νέα σύνδεση θα χρειαζόταν το `l.delivery_checks`.
+  ΑΛΛΑ: το ΜΟΝΟ σημείο κλήσης του `generate_silent_certificate` σε όλο το
+  δέντρο είναι `certificate_node.rs:558`, ΑΜΕΣΩΣ μετά το mastering — και στο
+  ΙΔΙΟ `assemble_blob` που χτίζει αυτό το blob, `delivery_checks: None,`
+  (`certificate_node.rs:453`) είναι ρητό, στην ΙΔΙΑ ομάδα πεδίων με το
+  `output_delivery_*` του F-099(Β). Ούτε το `deliver.rs` ούτε το `export.rs`
+  ξανακαλούν `pdf_gen::` (grep «generate_silent_certificate\|pdf_gen::» σε
+  αμφότερα: μηδέν hits) — το PDF παράγεται ΜΙΑ φορά και ΔΕΝ ξανατρέχει όταν
+  αργότερα γεμίσει το `delivery_checks` μέσω `/projects/:id/deliver`.
+  ⇒ **Το (1) δεν είναι «σύνδεσε ένα πεδίο» — είναι «μετακίνησε ή επανάλαβε τη
+  γέννηση του PDF μετά το delivery», ή αλλιώς δείξε κάτι ΑΛΛΟ.**
+
+  **(b) Κάτι ΥΠΑΡΧΕΙ ήδη, μετρημένο, τη στιγμή που γεννιέται το PDF, και δεν
+  διαβάζεται:** `input_acx_compliant` (`certificate_node.rs:446`,
+  `acx.map(|a| a.levels_within_limits())` — πραγματικό `bool` στο ΙΔΙΟ
+  `assemble_blob`) και το `corrections` block (εσωτερικό πάτωμα έναντι ορίου,
+  F-099) — και τα δύο σκοπεύουν την ΕΙΣΟΔΟ, όχι το delivered buffer, αλλά
+  είναι ΥΠΑΡΚΤΑ και ΤΙΜΙΑ αντί για τη σταθερά.
+
+  **(c) ΤΟ STEM DNA ΣΕ ΑΦΗΓΗΣΗ — ΔΕΝ κρύβεται, γράφτηκε λάθος στο (3):**
+  `pdf_gen.rs:87` `if let Some(fp) = blob.stem_fingerprints()`. Στο narration
+  path `stem_fingerprints: Some(fingerprints.clone())` (`certificate_node.rs:405`)
+  με `fingerprints` από `ContentType::bypassed_render()` (`content_type.rs:62`),
+  που επιστρέφει `StemFingerprints::default()` — και το struct
+  (`blob_store.rs:622-629`) είναι ΕΞ ΟΛΟΚΛΗΡΟΥ `String`, άρα default = `""`.
+  Το `Some` ΔΕΝ είναι `None`: το `if let` περνάει, και το PDF τυπώνει την
+  επικεφαλίδα «STEM DNA» και τις έξι γραμμές (`pdf_gen.rs:89-130`) με ΚΕΝΗ
+  τιμή μετά την ετικέτα — «Drums:     », «Bass:      », κ.ο.κ. — ΟΧΙ
+  εξαφάνιση χωρίς ίχνος. Η ενότητα (3) του F-076 χρειάζεται αυτή τη διόρθωση
+  όπου αναφέρεται ειδικά σε στοιχεία τύπου `Option<StemFingerprints>` που
+  είναι στην πράξη πάντα `Some` σε bypassed content.
+
+  Route/κλήση επιβεβαιωμένες: `certificate_node.rs:558` →
+  `generate_silent_certificate` → δύο HTTP routes σερβίρουν το ΙΔΙΟ στατικό
+  αρχείο από δίσκο (`lib.rs:364`, `lib.rs:368`, μέσω
+  `pdf_gen.rs:323` `std::fs::read`) — καμία αναγέννηση.
+
+  ΣΥΓΓΕΝΙΚΟ: F-099 (verdict του πατώματος διαβάζει το ολικό ελάχιστο, όχι το
+  interior) — ίδιο σχήμα, «ετυμηγορία που δεν κοιτάει αυτό που κρίνει»,
+  τρίτη εμφάνιση μετά το ιστορικό e2e_acx_certificate.
+  ΤΡΕΙΣ ΔΡΟΜΟΙ, ΓΡΑΜΜΕΝΟΙ ΩΣ ΑΝΟΙΧΤΟΙ, ΚΑΝΕΝΑΣ ΕΠΙΛΕΓΜΕΝΟΣ: (i) διάβασε το
+  πραγματικό — κοστίζει ΚΑΙ σύνδεση πεδίου ΚΑΙ αλλαγή του ΠΟΤΕ γεννιέται το
+  PDF· (ii) αφαίρεσε τη γραμμή — μία διαγραφή, τίμιο αμέσως, δεν λύνει τι
+  δείχνει· (iii) μένει — υπογεγραμμένο έγγραφο λέει κάτι που δεν έλεγξε.
+  Καμία επιλέγεται εδώ.
+
 - **[F-062] micro-VAD rejected for music gating.** Component: vad_model/scout. Μετρήθηκε (18/08): 97.35% leak σε tambura/violin (το tonality σήμα λέει «φωνή» σε κάθε αρμονικό sustained), 89.66% chop σε rock vocals. Στο podcast παραμένει άψογος (chop 0.12%). Trigger: οποιαδήποτε πρόταση επαναχρήσης VAD στο music path.
 - **[F-063] voice_mask leak σε αρμονικό υλικό χωρίς φωνή.** Component: two_pass masks / w_speech+w_sung. Μετρήθηκε σε Saraga instr (tambura+violin, 60s): speech slots 31.6% + C0 14.65% του max free → ~46% της «ελεύθερης» ενέργειας καταλήγει στο voice stem. Γενίκευση του w19 silence ghost (−38dB, προϋπήρχε κάθε learned prior). Trigger: factory round 6/6b δίκες.
 - **[F-064] frame-heuristic gating: εξαντλήθηκε και απορρίφθηκε με μέτρηση.** 6 διαγνωστικά (r_s, smoothing, perc raw/weighted, VAD, persistence, ασύμμετρο) — προδεσμευμένος κανόνας 0/24. Υλοποιήθηκε mf-only πύλη (hysteresis+ballistics), μετρήθηκε: όφελος +0.46dB στο w19 έναντι 21.3% am_vocal chop και sar_instr 73% ανοιχτή — REVERTED αυθημερόν (18/08). Το sung-vs-strings/drums είναι πρόβλημα ΤΑΥΤΟΤΗΤΑΣ (templates), όχι χρόνου. Trigger: μόνο με θεμελιωδώς καλύτερο per-frame voice σήμα.
