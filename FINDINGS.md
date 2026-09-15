@@ -2105,6 +2105,116 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   ισχυρισμός για το τι ΕΙΝΑΙ φυσικά το μουγκρητό πέρα από το μετρημένο
   φάσμα του.
 
+- **[F-102] Τα stems της λωρίδας hybrid γεμίζουν στον φυσικό ρυθμό του
+  αρχείου και ευρετηριάζονται στον καρφωμένο ρυθμό της ροής — και η
+  καθαρή αφήγηση φτάνει στον διαχωριστή που η ίδια η λωρίδα υπέθετε
+  πως δεν θα έφτανε ποτέ.** Component: `nmf_worker.rs:29,38-39`
+  (`frames_needed`/`read_exact_frames_alloc`, ρυθμός = ο φυσικός του
+  αρχείου) · `executor.rs:333-334` (`read_scout_sample`, πηγή αυτού
+  του ρυθμού) · `streaming_pipeline.rs:524,533` (`local_end_frame`/
+  `stems.voice[local_start_frame..local_end_frame]`, ρυθμός =
+  `StreamingConfig.sample_rate` καρφωμένο 48000) ·
+  `streaming_pipeline.rs:333-341` (το σχόλιο της λωρίδας «ΣΙΓΟΥΡΑ
+  ΦΩΝΗ», commit 082173c, 14/09) · `streaming_integration.rs:1269`
+  (η ομολογία ότι κανένα test δεν φτάνει εδώ). ΜΕΤΡΗΜΕΝΟ 2026-09-15,
+  με εκτύπωση τη στιγμή του panic (recon αυτής της συνεδρίας,
+  προσωρινό instrumentation, αφαιρέθηκε μετά την καταγραφή — δεν
+  υπάρχει μόνιμο lab-log αρχείο για αυτό το σκέλος).
+
+  **Α — Η ΑΝΑΝΤΙΣΤΟΙΧΙΑ ΡΥΘΜΟΥ.** Στο `nmf_worker.rs:38`,
+  `frames_needed = (job.duration_sec * sample_rate as f32) as u64` —
+  το `sample_rate` εδώ ΔΕΝ είναι το 48000 της ροής· είναι η μεταβλητή
+  από `read_scout_sample(path, 30.0)` (`executor.rs:333-334`), ο
+  φυσικός ρυθμός του αρχείου εισόδου. Στο `streaming_pipeline.rs:533`,
+  `stems.voice[local_start_frame..local_end_frame]` ευρετηριάζεται με
+  `local_start_frame` υπολογισμένο από `StreamingConfig.sample_rate`
+  = 48000, καρφωμένο. Για secretgarden_01_burnett.mp3 (φυσικός ρυθμός
+  44100), segment 5 (Music, 55.0–67.0s, duration_sec=12.0):
+  ```
+  nmf_worker: worker_sample_rate=44100 duration_sec=12.0000
+              frames_needed=529200 actual_left_len=529200
+  streaming_pipeline: local_start_frame=529279 local_end_frame=529200
+              voice_len=529200 block_time_sec=66.026665
+  panicked at streaming_pipeline.rs:539:51 (:533 σε αυτή την αρίθμηση)
+    range start index 529279 out of range for slice of length 529200
+  ```
+  529200 frames στα 44100Hz = 12.0s (σωστό ως προς την πηγή τους).
+  Τα ΙΔΙΑ 529200 frames, διαβασμένα σαν να ήταν 48000Hz, εξαντλούνται
+  στα 529200/48000 = 11.025s — 0.975s πριν το πραγματικό τέλος του
+  segment. Το panic είναι απλώς το σημείο όπου ο δείκτης, ήδη λάθος
+  για ~1s, ξεπερνά και το μήκος του buffer.
+
+  ⚠ **ΤΟ PANIC ΔΕΝ ΕΙΝΑΙ ΤΟ ΚΥΡΙΟ ΠΡΟΒΛΗΜΑ.** Στο πρώτο 91.875% κάθε
+  flagged τμήματος (44100/48000) ο δείκτης δείχνει σε λάθος χρονική
+  στιγμή μέσα στο ίδιο buffer — διαβάζεται φωνή ~8.8% μπροστά από
+  εκεί που ο router πιστεύει ότι βρίσκεται. Αυτό συμβαίνει σε ΚΑΘΕ
+  flagged segment με duration_sec > 0 όπου το αρχείο δεν είναι ήδη
+  στα 48kHz — μαθηματική βεβαιότητα του σχήματος, όχι οριακή
+  περίπτωση. Το panic προδίδει μόνο τα segments αρκετά μεγάλα ώστε το
+  deficit να ξεπεράσει το εναπομείναν μήκος του buffer.
+
+  **Γιατί σκάει μόνο ΕΝΑ slice**: `stems.voice[local_start_frame..
+  local_end_frame]` (`:533`) χρησιμοποιεί ωμό range-indexing. Το
+  άθροισμα drums+bass+harmonics+ambience, αμέσως μετά, διαβάζει με
+  δείκτη `idx` μέσα σε βρόχο `0..available_stem_frames`, όπου
+  `available_stem_frames = local_end_frame.saturating_sub(
+  local_start_frame)` — σε start>end αυτό δίνει 0, μηδέν επαναλήψεις,
+  ΣΙΩΠΗΛΑ. Δύο σχήματα πάνω στα ΙΔΙΑ δύο ευρετήρια· το ένα σκάει, το
+  άλλο κρύβει το ίδιο σφάλμα χωρίς ίχνος.
+
+  **Β — Η ΚΑΘΑΡΗ ΑΦΗΓΗΣΗ ΦΤΑΝΕΙ ΣΤΟΝ ΔΙΑΧΩΡΙΣΤΗ.** Η λωρίδα «ΣΙΓΟΥΡΑ
+  ΦΩΝΗ» (`streaming_pipeline.rs:333-341`, commit 082173c, 14/09)
+  γράφτηκε πάνω στην παραδοχή, αυτούσια: «Καθαρή αφήγηση δεν σηκώνει
+  ποτέ σημαία escalation (leaning 0.85–0.91, υψηλή εμπιστοσύνη ⇒ ο
+  Scout ΕΙΝΑΙ σίγουρος), άρα δεν παράγονται stems» (`:338-339`). Το
+  `streaming_integration.rs:1269` ήδη ομολογεί το όριο αυτής της
+  παραδοχής: «το `flagged_hybrid_indices` είναι ΚΕΝΟ (μετρήθηκε 4/4,
+  11/09) και ο κόμβος δεν [τρέχει καθόλου]» — μετρημένο σε 4 δοκίμια,
+  όχι σε πραγματικό βιβλίο.
+  Στο secretgarden_01_burnett (πραγματική αφήγηση, waking): 75
+  segments, 17 flagged — ΟΧΙ μόνο Music (segments 5,7,13,17,27,29,
+  37,39,47,49,67,71), αλλά ΚΑΙ Speech (segments 18,22,34,36,38). Το
+  segment 5 που έσκασε: leaning=0.4325 (μέσα στη dead zone 0.3-0.7),
+  avg_confidence=0.3655 (κάτω από το 0.4 κατώφλι του
+  `needs_stem_escalation`) — flagged σωστά, κατά τον ορισμό. Η
+  παραδοχή «καθαρή αφήγηση δεν φτάνει ποτέ εδώ» δεν επαληθεύεται σε
+  αυτό το αρχείο· ένα ολόκληρο κεφάλαιο έχει μουσικά ιντερλούδια και
+  τμήματα ομιλίας χαμηλής εμπιστοσύνης που περνούν τον διαχωριστή.
+
+  **ΤΟ ΜΕΓΕΘΟΣ:** 3 από τα 9 πραγματικά αρχεία (recon 15/09) σκάνε
+  στη ζωντανή διαδρομή, και στα δύο presets («acx» και «spotify»).
+  Κανένα test δεν το καλύπτει — το ίδιο το σχόλιο του
+  `streaming_integration.rs:1269` το δηλώνει: κανένα από τα τέσσερα
+  δοκίμια δεν ενεργοποιεί αυτόν τον κλάδο. Τα δεκαοκτώ renders της
+  15/09 (lowcut wiring verification) ήταν τα πρώτα πραγματικά αρχεία
+  που πέρασαν από εδώ.
+
+  **ΤΡΕΙΣ ΔΡΟΜΟΙ, ΓΡΑΜΜΕΝΟΙ ΩΣ ΑΝΟΙΧΤΟΙ, ΚΑΝΕΝΑΣ ΕΠΙΛΕΓΜΕΝΟΣ:**
+  (i) τα stems παράγονται στα 48kHz — `read_scout_sample` ζητάει ρητό
+  ρυθμό· κόστος: resampling πριν τον διαχωριστή, άγνωστη επίδραση στο
+  NMF. (ii) το ευρετήριο χρησιμοποιεί τον ρυθμό των stems αντί του
+  48000 — μικρή αλλαγή, αλλά τότε αθροίζονται δείγματα 44.1k με ροή
+  48k στο ίδιο block· η φωνή θα ακουγόταν χαμηλότερα και αργότερα —
+  δεν είναι διόρθωση. (iii) clamp στο `local_start_frame` — σταματάει
+  το panic και μόνο αυτό· η χρονική μετατόπιση μένει, κρυμμένη
+  ακριβώς όπως την κρύβει ήδη το `saturating_sub` στο άθροισμα.
+
+  Ξεχωριστό ερώτημα, γραμμένο ως ανοιχτό: αν η καθαρή αφήγηση φτάνει
+  στον διαχωριστή σε ένα στα εννέα αρχεία, τι σημαίνει αυτό για τη
+  λωρίδα; Ερώτημα για τα `A7_PROVISIONAL` (`scout.rs:235-237`, dead
+  zone/κατώφλι εμπιστοσύνης εν αναμονή βαθμονόμησης M2), όχι για το
+  slicing — δεν απαντιέται εδώ.
+
+  ΣΥΓΓΕΝΙΚΟ, ΟΧΙ ΤΟ ΙΔΙΟ: F-101 (ο ανιχνευτής βόμβου, ίδια αλυσίδα
+  ρύθμισης 14-15/09, άλλο σφάλμα — εκεί ένα όργανο μετράει τρία
+  πράγματα με το ίδιο όνομα, εδώ δύο ρυθμοί μοιράζονται ένα
+  ευρετήριο).
+
+  Καμία σύσταση δρόμου, κανένας ισχυρισμός για το τι κάνει το NMF σε
+  άλλον ρυθμό, καμία αλλαγή κώδικα. Trigger: οποιαδήποτε αλλαγή στο
+  `nmf_worker.rs`/`streaming_pipeline.rs` γύρω από τα stems, ή πριν
+  δοθεί σε παραγωγή πραγματικό βιβλίο με μουσικά ιντερλούδια.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2595,7 +2705,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-101** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-103** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
