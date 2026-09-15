@@ -2215,6 +2215,107 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   `nmf_worker.rs`/`streaming_pipeline.rs` γύρω από τα stems, ή πριν
   δοθεί σε παραγωγή πραγματικό βιβλίο με μουσικά ιντερλούδια.
 
+- **[F-103] Ο ρυθμός δειγματοληψίας υποτίθεται σε εννιά ακόμα θέσεις
+  και δηλώνεται σε πέντε ανεξάρτητες σταθερές — το F-102 ήταν η μόνη
+  από αυτές που σκάει, όχι η μόνη που είναι λάθος.** Component: βλ.
+  παρακάτω, μία γραμμή ανά θέση. ΜΕΤΡΗΜΕΝΟ 2026-09-15, σάρωση όλου
+  του δέντρου (grep 48000/48_000/44100/44_100/24000/22050/TARGET_SR/
+  TARGET_SAMPLE_RATE/sample_rate, εκτός /target, εκτός WS2), μετά τη
+  διόρθωση του F-102 (commit c711853).
+
+  **Α — ΕΝΝΙΑ ΘΕΣΕΙΣ, ΤΑΞΙΝΟΜΗΜΕΝΕΣ ΚΑΤΑ ΣΟΒΑΡΟΤΗΤΑ:**
+
+  1. `handlers/export.rs:890`, μέσα στο `export_mp3_acx`, αυτούσιο:
+     `let original_sr = 48000;` (`:891` `let target_sr = 44100;`). ΔΕΝ
+     διαβάζει `blob.core.sample_rate` — το ΜΕΤΡΗΜΕΝΟ πεδίο. Η αδελφή
+     συνάρτηση `export_mp3` (`:1341`, αυτούσιο: `lame_set_in_samplerate(
+     gfp, blob.core.sample_rate as i32);`) κάνει το σωστό, δύο
+     συναρτήσεις πιο κάτω. Αυτό είναι το παραδοτέο ACX — αν το
+     `blob.core.sample_rate` διαφέρει ποτέ από 48000, κάθε ACX MP3
+     βγαίνει αθόρυβα pitch/speed-shifted.
+  2. `sp314-orchestrator/trunk_pass.rs:190`, αυτούσιο:
+     `const SAMPLE_RATE: u32 = 48_000;` (ιδιωτικό). Δέκα καταναλωτές
+     στο ΙΔΙΟ αρχείο: πάτωμα θορύβου, διάρκεια, Nyquist, δυναμική
+     (`StreamingDynamicsAnalyzer`), LRA (`StreamingLraMeter`),
+     παράθυρα τμηματοποίησης 5s/1s, `AcxCheckAnalyzer`, χρονοσήμανση,
+     `detect_mains_line` — όλα πάνω στη σύμβαση «48k εκ κατασκευής»,
+     χωρίς επαλήθευση του πραγματικού ρυθμού του dump.
+  3. `lineos-corpus/mfcc.rs:16`, αυτούσιο:
+     `pub const SAMPLE_RATE: f32 = 48000.0;` — χρήση στο `:53`,
+     αυτούσιο: `let bin = (hz / SAMPLE_RATE * FFT_SIZE as f32) as
+     usize;`. `MfccAnalyzer::new()` δεν παίρνει sample_rate καθόλου —
+     κανένας δρόμος override.
+  4. `sp314-dsp/src/stft/stem_renderer.rs:143`, αυτούσιο: `let (start,
+     end) = find_most_diverse_window(signal, 48000, 10.0);`.
+     `FiveStemRenderer::render()` δεν παίρνει sample_rate — το
+     «παράθυρο 10s» τροφοδοτεί ολόκληρη την 5-stem NMF εκπαίδευση.
+  5. `sp314-dsp/src/stft/stem_renderer.rs:254-255`, αυτούσιο:
+     `let start_bin = (1024.0 * 1000.0 / 24000.0) as usize;` /
+     `let end_bin = (1024.0 * 4000.0 / 24000.0) as usize;` — Nyquist
+     24000 καρφωμένο στο tie-break ζώνης 1-4kHz voice/harmonics.
+  6. `sp314-dsp/src/stft/nmf.rs:589-591`, αυτούσιο: `// At 48kHz with
+     512 hop, 1 frame = 10.6ms.` / `// 8 frames = ~85ms. Anything
+     shorter is a Hat.` / `let hat_max_frames = 8;` — `resolve_high_
+     end_clash` δεν παίρνει sample_rate.
+  7. `sp314-dsp/src/analysis/phi1_sensor.rs`, αυτούσιο σε πέντε
+     γραμμές: `let orig_sr = 48000.0;` (`:76` `compute_all`, `:172`
+     `decimate_only`, `:212` `compute_all_power`, `:343`
+     `Phi2StreamingFrontend::push`, `:477` `::finish`) — anti-alias
+     φίλτρο + λόγος αποδεκατισμού 3:1 λάθος σε άλλον ρυθμό.
+  8. `sp314-dsp/src/analysis/vad_sensors.rs:135`, αυτούσιο: `let
+     duration = frame.len() as f32 / 48000.0;` — `TransientSensor`
+     δεν έχει καν πεδίο sample_rate.
+  9. `sp314-dsp/src/dsp/crossover.rs:117`, αυτούσιο: `Self::new(
+     48000.0, 200.0, 4000.0)` μέσα σε `impl Default for Crossover3`.
+     ΑΔΡΑΝΕΣ σήμερα — κανένα call site `Crossover3::default()`/`::`
+     βρέθηκε αλλού στο δέντρο.
+
+  ⚠ **ΚΑΝΕΝΑ από τα εννιά δεν σκάει.** Το F-102 ήταν [Π] (panic) — γι'
+  αυτό φάνηκε. Τα εννιά είναι [Σ] (σιωπηλό λάθος αποτέλεσμα): δίνουν
+  αριθμό και συνεχίζουν.
+
+  **Β — ΠΕΝΤΕ ΑΝΕΞΑΡΤΗΤΕΣ ΔΗΛΩΣΕΙΣ ΤΗΣ ΙΔΙΑΣ ΣΤΑΘΕΡΑΣ, ΚΑΜΙΑ ΔΕΝ
+  ΑΝΑΦΕΡΕΤΑΙ ΣΤΗΝ ΑΛΛΗ:**
+  - `m0-daemon/src/dsp/stream_core.rs:7` `TARGET_SR: u32 = 48_000` —
+    ΖΩΝΤΑΝΟ, ο κύριος resampler (`StandardizedAudioStream`).
+  - `m0-daemon/src/handlers/decode.rs:19` `TARGET_SAMPLE_RATE: u32 =
+    48_000` — ΖΩΝΤΑΝΟ, ΔΕΥΤΕΡΟΣ ανεξάρτητος resampler (δικό του
+    rubato, δικές του σταθερές), τροφοδοτεί το preview-stem endpoint.
+  - `m1/xaak/src/lib.rs:49` `TARGET_SAMPLE_RATE: u32 = 48_000` —
+    ΝΕΚΡΟ στην παραγωγή, μοναδική χρήση (`:265`) στο ΔΙΚΟ ΤΟΥ test.
+  - `lineos-corpus/mfcc.rs:16` `SAMPLE_RATE: f32 = 48000.0` — ΖΩΝΤΑΝΟ.
+  - `sp314-orchestrator/trunk_pass.rs:190` `SAMPLE_RATE: u32 =
+    48_000` — ΖΩΝΤΑΝΟ, ιδιωτικό, δέκα καταναλωτές (βλ. Α.2).
+  ⇒ Πέντε, όσες ακριβώς το G_MAX_DB. Αν η πολιτική ρυθμού αλλάξει,
+  χρειάζονται πέντε ξεχωριστές επεμβάσεις — και η νεκρή (xaak) θα
+  έμενε ξεπερασμένη σιωπηλά, αφού κανένας παραγωγικός καταναλωτής δεν
+  θα το πρόσεχε.
+
+  **ΤΟ ΠΛΑΙΣΙΟ, ΓΙΑΤΙ ΔΕΝ ΦΑΙΝΕΤΑΙ ΣΗΜΕΡΑ:** το dump τυποποιείται στα
+  48k πριν από όλα (`pass0_decode_to_dump`/`StandardizedDecoder`) —
+  η σύμβαση τηρείται σήμερα, άρα κανένα από τα εννιά δεν εκδηλώνεται.
+  Το F-102 εκδηλώθηκε ΑΚΡΙΒΩΣ επειδή μία διαδρομή (ο shadow reader
+  του nmf_worker) παρέκαμψε το dump και διάβασε το πρωτότυπο αρχείο
+  στον φυσικό του ρυθμό. Κάθε μελλοντική διαδρομή που κάνει το ίδιο
+  τα ξυπνάει όλα. Το `export.rs:890` είναι ήδη ΕΞΩ από αυτή τη
+  σύμβαση — διαβάζει από `blob`, όχι από dump· ότι δεν έχει εκδηλωθεί
+  σημαίνει ότι το `blob.core.sample_rate` είναι πάντα 48k μέχρι
+  σήμερα, ΟΧΙ ότι ο κώδικας είναι σωστός.
+
+  ΣΥΓΓΕΝΙΚΟ, ΟΧΙ ΤΟ ΙΔΙΟ: F-084 (`declared_latency_samples` στο
+  `blob_store.rs:581` χρησιμοποιεί ΕΠΙΣΗΣ `blob.core.sample_rate =
+  48000` — ΑΛΛΟ πεδίο, ΑΛΛΟΣ υπολογισμός, ίδια οικογένεια «ο
+  καταναλωτής εμπιστεύεται 48000 αντί να διαβάσει το μετρημένο»).
+
+  ΤΡΕΙΣ ΔΡΟΜΟΙ, ΓΡΑΜΜΕΝΟΙ ΩΣ ΑΝΟΙΧΤΟΙ, ΚΑΝΕΝΑΣ ΕΠΙΛΕΓΜΕΝΟΣ: (i) μόνο
+  το `export.rs:890` — μία γραμμή, το σωστό υπάρχει διπλανά, μόνη
+  θέση που αγγίζει παραδοτέο· (ii) μία πηγή για τη σταθερά — οι πέντε
+  γίνονται μία, οι άλλες την εισάγουν· ΔΕΝ διορθώνει καμία από τις
+  εννιά, σταματάει την έκτη· (iii) οι εννιά παίρνουν τον ρυθμό ως
+  παράμετρο — αλλάζει υπογραφές σε εννιά σημεία, και δύο (
+  `TransientSensor`, `MfccAnalyzer`) δεν έχουν καν πεδίο να τον
+  βάλουν. Καμία επιλέγεται εδώ.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2705,7 +2806,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-103** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-104** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
