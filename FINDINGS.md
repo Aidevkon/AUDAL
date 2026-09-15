@@ -2336,6 +2336,40 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   `TransientSensor`, `MfccAnalyzer`) δεν έχουν καν πεδίο να τον
   βάλουν. Καμία επιλέγεται εδώ.
 
+- **[F-105] Έξι ανεξάρτητα μητρώα ονομάτων προορισμού, μηδέν συμφωνία μεταξύ τους· ο νέος έλεγχος συνόρου φυλάει μόνο ένα.** Component: `lineos-types/src/presets.rs` (CATALOGUE, γρ.286-326) · `lineos/shared/schema/bmr-128.schema.json` · `m0-daemon/src/agents/schema.rs` (γρ.61-80) · `cockpit-dioxus/src/state/presets.rs` (PLATFORMS, γρ.39-78) · `lineos/shared/schema/reference-profiles/podcast-v1.json` · `DECISIONS.md:137-139` · `handlers/master.rs::trigger_streaming` (ο νέος έλεγχος, `594766f`). ΜΕΤΡΗΜΕΝΟ 2026-09-15.
+
+  ΣΥΓΓΕΝΙΚΟ ΜΕ F-094, ΟΧΙ ΤΟ ΙΔΙΟ: το F-094 (2026-09-06) μέτρησε ΤΡΙΑ μητρώα και μία συνέπεια — το `acx` πέφτει σε λάθος fallback στη διαδρομή που διαβάζει το `bmr-128.schema.json` απευθείας. Αυτό είναι η ρίζα από την οποία εκείνη η συνέπεια βγαίνει: όχι τρία μητρώα αλλά έξι, και το πρόβλημα δεν είναι ειδικό στο `acx` — είναι δομικό.
+
+  ΤΑ ΕΞΙ, ΜΕ ΚΑΤΑΣΤΑΣΗ:
+  1. `presets::CATALOGUE` — ΖΩΝΤΑΝΟ, μέσω `LoudnessTarget::from_preset`/`ContentType::from_preset`/`lookup`. Το ΜΟΝΟ που ελέγχει η πόρτα του `594766f`.
+  2. `bmr-128.schema.json` — ΖΩΝΤΑΝΟ. ⚠ Είχε γραφτεί ΔΥΟ φορές ως «ορφανό» (ΑΤΖΕΝΤΑ 15/09, recon του ίδιου πρωινού) — ΛΑΘΟΣ. Διαβάζεται με `include_str!` σε `decode_node.rs:38-40` ΚΑΙ `dsp_pipeline.rs:529-531`, με lookup του `preset_id` **μέσα στο JSON**, χωρίς να περνάει ποτέ από το `CATALOGUE`.
+  3. `agents/schema.rs::validate_patch` `ALLOWED` — ΑΣΥΝΔΕΤΟ, μηδέν production callers (ήδη γνωστό).
+  4. `cockpit-dioxus::state::presets::PLATFORMS` — ΖΩΝΤΑΝΟ, το πραγματικό μενού που στέλνει το `preset_id`.
+  5. `reference-profiles/podcast-v1.json` — ΖΩΝΤΑΝΟ, άλλο υποσύστημα (`ReferenceResolver`, spectral shape· όχι `LoudnessTarget`). Το ΜΟΝΟ με citation: `_authority` (γρ.4) *"Byrne et al. 1994 JASA... ITU-R BS.1770-5... EBU R128 v5.0; Apple Podcasts art.893"*.
+  6. `DECISIONS.md:137-139` — πρόζα, όχι κώδικας, και λάθος σήμερα (βλ. πλάγιο 1 παρακάτω).
+
+  ΔΙΑΦΩΝΙΕΣ (όνομα → πού υπάρχει, πού απουσιάζει· `apple_music`/`apple_podcast` ενικός/`podcast` γυμνός ήδη μερικώς καταγεγραμμένοι στο F-094 ως «το κάτοπτρο»):
+  - `podcast` (γυμνό, χωρίς `apple_`): ΜΟΝΟ στο (1). Απών από (2), (3), (4).
+  - `apple_podcasts` (πληθυντικός): ΜΟΝΟ στο (1), ως alias.
+  - `apple_podcast` (ενικός): (1) alias από `594766f`, (2) `-16.0`, (3) παρών, (4) id `"apple_podcast"` label «Podcast» `-16.0`.
+  - `apple_music`: ΑΠΩΝ από (1) — ρητή απόφαση ιδιοκτήτη 2026-09-15, όχι πελάτης. Παρών σε (2) `-16.0`, (3), (4) id `"apple_music"` label «Apple Digital Masters» `-16.0` — τρία μητρώα συμφωνούν σε `-16.0`, όχι στο `-14.0` της παλιάς σιωπηλής πτώσης.
+  - `acx`: (1) `-20.5` sourced· ΑΠΩΝ από (2) — καμία κλειδί `"acx"` στο σχήμα· ΑΠΩΝ από (3).
+  - `tidal`, `raw`: μόνο σε (2) και (3).
+  - `amazon`: ΜΟΝΟ σε (3) — πουθενά αλλού σε όλο το δέντρο.
+
+  ΤΟ ΚΟΣΤΟΣ, ΜΕ ΝΟΥΜΕΡΑ (η συγκεκριμένη περίπτωση του F-094, ξαναδιατυπωμένη ως στιγμιότυπο του γενικού προβλήματος — ο κώδικας-αιτία μένει εκεί, δεν ξαναγράφεται εδώ): `acx` στο `/master/streaming` περνάει από (1) ⇒ `-20.5` LUFS, ταβάνι `-3.0`, πάτωμα `-60`. Το ίδιο `acx` σε διαδρομή που φτάνει στο (2) ⇒ κλειδί δεν βρίσκεται ⇒ fallback αγνώστου `-16.0`, ταβάνι σταθερό `-1.0` (`episode_render.rs:197`), και το `max_noise_floor_db`/`room_tone_*` δεν υπάρχουν καν ως πεδία στο σχήμα (2) — άρα ούτε ο expander ούτε ο lowcut μπορούν να πάρουν κατώφλι από αυτή τη διαδρομή. Τεσσερισήμισι dB στάθμη, δύο dB ταβάνι, πάτωμα που εξαφανίζεται. Και `certificate_node.rs:395` (`preset_id: preset_id.to_string()`) γράφει το ζητηθέν όνομα ταυτόσημα και στις δύο περιπτώσεις — το πιστοποιητικό δεν μπορεί να πει ποια διαδρομή χρησιμοποιήθηκε.
+
+  ΓΙΑΤΙ ΔΕΝ ΕΚΔΗΛΩΝΕΤΑΙ ΣΗΜΕΡΑ — ΟΡΟΣ, ΟΧΙ ΠΑΡΗΓΟΡΙΑ: η διαδρομή που φτάνει στο (2) έχει τέσσερις γνωστές εισόδους — τρία shell scripts (`test_master.sh:8`, `scripts/mass_ingest.sh:35`, `scripts/test_mastering.sh:9`, επαληθευμένο σήμερα με grep) και το browser-fallback του cockpit (`ipc.rs:171`, `is_tauri()==false` ⇒ `/m0/master`). Κανένας desktop χρήστης δεν την περνάει σήμερα. Η απόφαση 2026-09-15 (έξοδος από Tauri προς Dioxus desktop) ξαναγράφει ακριβώς το UI που σήμερα διαλέγει ποια πόρτα ανοίγει· αν η νέα διεπαφή δεν κουβαλήσει την ίδια συνθήκη, η «πίσω» πόρτα μπορεί να γίνει η κύρια χωρίς να το προσέξει κανείς — και τότε κάθε παραδοτέο βγαίνει με λάθος στόχο, υπογεγραμμένο με το σωστό όνομα.
+
+  ΤΡΙΑ ΠΛΑΓΙΑ ΠΟΥ ΒΡΕΘΗΚΑΝ ΜΑΖΙ:
+  1. `DECISIONS.md:137-139` βάζει το `acx` κάτω από «−16.0 LUFS (podcast/acx/episode): SPEC Apple Podcasts», χωρίς URL. Ο κατάλογος δίνει στο `acx` δικό του, sourced `-20.5` από 2026-08-25 — δεύτερος ψευδής ισχυρισμός στο ίδιο έγγραφο (ο πρώτος, στην ίδια περιοχή, ήδη γνωστός: «λύθηκε από το μητρώο» για το -16 fallback).
+  2. `config.rs:55-56`: `pub type Bmr128Schema = LoudnessTarget;` / `pub type PresetThresholds = LoudnessTarget;` — «v2.9 compatibility aliases». Τρία crates (`insights`, `metadata`, `rule-engine`) έχουν header σχόλια «thresholds πάντα από bmr-128.schema.json, ποτέ hardcoded» (π.χ. `metadata/src/bmr128.rs:2`) για τύπους που είναι πλέον ψευδώνυμα του `LoudnessTarget` — τροφοδοτούνται από το (1), το hardcoded `CATALOGUE`, όχι από το (2).
+  3. Η εγγραφή `podcast` στο (1) έχει `-16.0` χωρίς πηγή δίπλα της. Το νούμερο ΕΧΕΙ citation — στο (5), `reference-profiles/podcast-v1.json:20` (`hard_constraints.target_lufs: -16.0`) — που τροφοδοτεί άλλο υποσύστημα και δεν φτάνει ποτέ στο (1).
+
+  ΤΡΕΙΣ ΔΡΟΜΟΙ, ΓΡΑΜΜΕΝΟΙ ΩΣ ΑΝΟΙΧΤΟΙ, ΚΑΝΕΝΑΣ ΕΠΙΛΕΓΜΕΝΟΣ: (Α) ίδιος έλεγχος και στην πίσω πόρτα — μικρό, σταματάει το άγνωστο όνομα, ΔΕΝ λύνει τη διαφωνία τιμών (το `acx` θα περνάει τον έλεγχο και θα παίρνει ακόμα `-16`)· (Β) οι δύο κόμβοι του (2) διαβάζουν το (1) — μία πηγή, το `bmr-128.schema.json` παύει να είναι μητρώο, αγγίζει ήχο στην πίσω διαδρομή· (Γ) η πίσω πόρτα κλείνει — το ορφανό topology φεύγει μαζί της, τα τρία scripts και το browser fallback σπάνε. Καμία επιλέγεται εδώ.
+
+  Trigger: ΠΡΙΝ οριστικοποιηθεί η νέα (Dioxus) διεπαφή — ή αν το `acx`/οποιοδήποτε preset χτυπηθεί ποτέ μέσω των τεσσάρων γνωστών εισόδων της πίσω πόρτας.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2826,7 +2860,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-104** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-106** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
