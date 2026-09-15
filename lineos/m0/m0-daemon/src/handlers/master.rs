@@ -8,7 +8,7 @@
 //! FORBIDDEN: Returning serde_json::Value.
 //! FORBIDDEN: Calling sp314-dsp from the Tauri backend directly.
 
-use axum::{extract::State, Json};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
@@ -337,7 +337,31 @@ pub struct StreamingRequest {
 pub async fn trigger_streaming(
     State(state): State<AppState>,
     Json(req): Json<StreamingRequest>,
-) -> Json<serde_json::Value> {
+) -> impl IntoResponse {
+    // ΜΕΤΡΗΘΗΚΕ 2026-09-15: από το IPC μέχρι τον
+    // executor δεν υπήρχε κανένας έλεγχος. Άγνωστο
+    // preset έπεφτε σιωπηλά σε spotify — στόχος −14
+    // αντί −16 — και το πιστοποιητικό υπέγραφε το
+    // όνομα που ζητήθηκε. Δεκατρείς καταναλωτές
+    // μάντευαν σιωπηλά, τέσσερις όχι.
+    // Ο επιλυτής κρατάει το fallback του· το σύνορο
+    // αρνείται.
+    if lineos_types::presets::lookup(&req.preset_id).is_none() {
+        let known: Vec<&str> = lineos_types::presets::CATALOGUE
+            .iter()
+            .map(|e| e.id)
+            .collect();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "unknown preset_id",
+                "requested": req.preset_id,
+                "known": known,
+            })),
+        )
+            .into_response();
+    }
+
     use crate::agents::operator::{Intent, StreamingParams};
     use tokio::sync::oneshot;
 
@@ -476,5 +500,5 @@ pub async fn trigger_streaming(
     });
 
     // Return job_id IMMEDIATELY
-    Json(serde_json::json!({ "job_id": session_id }))
+    Json(serde_json::json!({ "job_id": session_id })).into_response()
 }

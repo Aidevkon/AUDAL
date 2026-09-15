@@ -92,6 +92,82 @@ async fn test_streaming_http_smoke() {
     println!("Output file size: {}", out_meta.len());
 }
 
+/// The boundary check added at handlers/master.rs::trigger_streaming: an
+/// unknown preset_id must be rejected with 400 before anything is dispatched
+/// (no job_id, no progress entry, no silent fall to spotify inside
+/// LoudnessTarget::from_preset). "apple_podcast" (singular) is the other
+/// side of the same check — it is a real customer under a name the UI/bmr-128
+/// send in the singular, aliased onto the existing "podcast" catalogue entry,
+/// so the boundary must accept it exactly like "podcast" itself.
+#[tokio::test]
+async fn test_streaming_http_preset_boundary() {
+    let audit_dir = TempDir::new().unwrap();
+    let audit = Arc::new(m0d::audit::AuditLog::open(audit_dir.path().to_str().unwrap()).unwrap());
+    let config = std::sync::Arc::new(m0d::config::M0Config::from_env());
+    let (state, _handles) = m0d::app_state::AppState::new_for_test(audit, config.clone()).await;
+    let app = m0d::build_router_for_test(state, &config);
+
+    // 1. Known preset, singular alias ("apple_podcast") — must pass, not 400.
+    let ok_body = serde_json::json!({
+        "audioPath": concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav"),
+        "presetId": "apple_podcast",
+        "flavourId": null,
+        "intentTone": 0.5,
+        "intentDynamics": 0.5
+    });
+    let ok_request = Request::builder()
+        .method("POST")
+        .uri("/master/streaming")
+        .header("Content-Type", "application/json")
+        .body(Body::from(ok_body.to_string()))
+        .unwrap();
+    let ok_response = app.clone().oneshot(ok_request).await.unwrap();
+    assert_eq!(
+        ok_response.status(),
+        StatusCode::OK,
+        "apple_podcast (alias of podcast) must be accepted"
+    );
+    let ok_bytes = axum::body::to_bytes(ok_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let ok_json: serde_json::Value = serde_json::from_slice(&ok_bytes).unwrap();
+    assert!(
+        ok_json.get("job_id").and_then(|v| v.as_str()).is_some(),
+        "accepted request must return a job_id, got {ok_json}"
+    );
+
+    // 2. Unknown preset ("apple_music") — not a customer, must be 400, never
+    //    silently resolved to spotify.
+    let bad_body = serde_json::json!({
+        "audioPath": concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/test_stereo_input.wav"),
+        "presetId": "apple_music",
+        "flavourId": null,
+        "intentTone": 0.5,
+        "intentDynamics": 0.5
+    });
+    let bad_request = Request::builder()
+        .method("POST")
+        .uri("/master/streaming")
+        .header("Content-Type", "application/json")
+        .body(Body::from(bad_body.to_string()))
+        .unwrap();
+    let bad_response = app.clone().oneshot(bad_request).await.unwrap();
+    assert_eq!(
+        bad_response.status(),
+        StatusCode::BAD_REQUEST,
+        "apple_music is not in the catalogue and must not silently fall to spotify"
+    );
+    let bad_bytes = axum::body::to_bytes(bad_response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let bad_json: serde_json::Value = serde_json::from_slice(&bad_bytes).unwrap();
+    assert_eq!(
+        bad_json.get("requested").and_then(|v| v.as_str()),
+        Some("apple_music")
+    );
+    assert!(bad_json.get("known").is_some(), "must list what exists");
+}
+
 #[tokio::test]
 async fn test_streaming_progress_reaches_sse_listeners() {
     use axum::body::Body;

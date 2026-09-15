@@ -304,7 +304,11 @@ pub static CATALOGUE: &[PresetEntry] = &[
     },
     PresetEntry {
         id: "podcast",
-        aliases: &["spoken_word", "episode", "apple_podcasts"],
+        // ΜΕΤΡΗΘΗΚΕ 2026-09-15: τρεις θέσεις γράφουν αυτό
+        // το όνομα, δύο στον ενικό (UI, bmr-128) και μία
+        // στον πληθυντικό (εδώ). Ο ενικός γίνεται δεκτός
+        // ώστε το μενού να μην πέφτει σιωπηλά σε spotify.
+        aliases: &["spoken_word", "episode", "apple_podcasts", "apple_podcast"],
         content: ContentKind::Episode,
         delivery: PODCAST,
     },
