@@ -4,7 +4,12 @@ use blake3::Hasher as Blake3Hasher;
 use rubato::{Resampler, SincFixedIn};
 use sha2::{Digest, Sha256};
 
-pub const TARGET_SR: u32 = 48_000;
+// F-103/F-104: μία δήλωση, οι υπόλοιπες εισάγουν. Η πηγή είναι
+// lineos-types (μοναδικός κοινός πρόγονος στο dependency graph των
+// πέντε καταναλωτών: m0-daemon, xaak, lineos-corpus, sp314-orchestrator,
+// sp314-dsp — όλοι εξαρτώνται από lineos-types, κανείς άλλος δεν
+// εξαρτάται από κανέναν άλλον από τους πέντε).
+pub use lineos_types::analysis::ANALYSIS_SAMPLE_RATE as TARGET_SR;
 pub const SINC_LEN: usize = 256;
 pub const SINC_OVERSAMPLE: usize = 256;
 pub const RESAMPLE_CHUNK_FRAMES: usize = 1024;

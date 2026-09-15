@@ -46,7 +46,12 @@ pub struct PlaybackState {
 use ringbuf::{traits::*, HeapRb};
 use uuid::Uuid;
 
-pub const TARGET_SAMPLE_RATE: u32 = 48_000;
+// F-103/F-104: μία δήλωση, οι υπόλοιπες εισάγουν — βλ. stream_core.rs:7.
+// ΝΕΚΡΟ στην παραγωγή σήμερα (η μόνη χρήση είναι στο δικό του test,
+// F-103 §Β) — η δημόσια επιφάνεια ΔΕΝ αφαιρέθηκε εδώ, μόνο η
+// ανεξάρτητη δήλωσή της· η αφαίρεση του pub const είναι ξεχωριστή
+// απόφαση API, εκτός εμβέλειας αυτού του task.
+pub use lineos_types::analysis::ANALYSIS_SAMPLE_RATE as TARGET_SAMPLE_RATE;
 pub const TARGET_CHANNELS: u16 = 2;
 
 // ── PcmTransfer ───────────────────────────────────────────────────────────────

@@ -73,7 +73,8 @@ impl Phi1MelFrontend {
     }
 
     pub fn compute_all(&mut self, mono_48k: &[f32]) -> Vec<[f32; 64]> {
-        let orig_sr = 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7.
+        let orig_sr = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         let fc = 7600.0 / orig_sr;
         let m = 120;
         let mut h = vec![0.0f32; m + 1];
@@ -169,7 +170,8 @@ impl Phi1MelFrontend {
 
 
     pub fn decimate_only(&self, mono_48k: &[f32]) -> Vec<f32> {
-        let orig_sr = 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7.
+        let orig_sr = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         let fc = 7600.0 / orig_sr;
         let m = 120;
         let mut h = vec![0.0f32; m + 1];
@@ -209,7 +211,8 @@ impl Phi1MelFrontend {
     }
 
     pub fn compute_all_power(&mut self, mono_48k: &[f32]) -> Vec<[f32; 64]> {
-        let orig_sr = 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7.
+        let orig_sr = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         let fc = 7600.0 / orig_sr;
         let m = 120;
         let mut h = vec![0.0f32; m + 1];
@@ -340,7 +343,8 @@ impl Phi2StreamingFrontend {
             return frames;
         }
 
-        let orig_sr = 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7.
+        let orig_sr = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         let fc = 7600.0 / orig_sr;
         let mut h = vec![0.0f32; m + 1];
         let mut sum_h = 0.0;
@@ -474,7 +478,8 @@ impl Phi2StreamingFrontend {
             return frames;
         }
 
-        let orig_sr = 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7.
+        let orig_sr = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         let fc = 7600.0 / orig_sr;
         let mut h = vec![0.0f32; m + 1];
         let mut sum_h = 0.0;

@@ -2275,21 +2275,41 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   αριθμό και συνεχίζουν.
 
   **Β — ΠΕΝΤΕ ΑΝΕΞΑΡΤΗΤΕΣ ΔΗΛΩΣΕΙΣ ΤΗΣ ΙΔΙΑΣ ΣΤΑΘΕΡΑΣ, ΚΑΜΙΑ ΔΕΝ
-  ΑΝΑΦΕΡΕΤΑΙ ΣΤΗΝ ΑΛΛΗ:**
-  - `m0-daemon/src/dsp/stream_core.rs:7` `TARGET_SR: u32 = 48_000` —
-    ΖΩΝΤΑΝΟ, ο κύριος resampler (`StandardizedAudioStream`).
-  - `m0-daemon/src/handlers/decode.rs:19` `TARGET_SAMPLE_RATE: u32 =
-    48_000` — ΖΩΝΤΑΝΟ, ΔΕΥΤΕΡΟΣ ανεξάρτητος resampler (δικό του
+  ΑΝΑΦΕΡΕΤΑΙ ΣΤΗΝ ΑΛΛΗ** (ΗΤΑΝ, ΠΡΙΝ το F-104 — βλ. παρακάτω):
+  - `m0-daemon/src/dsp/stream_core.rs:7` ήταν `TARGET_SR: u32 =
+    48_000` — ΖΩΝΤΑΝΟ, ο κύριος resampler (`StandardizedAudioStream`).
+  - `m0-daemon/src/handlers/decode.rs:19` ήταν `TARGET_SAMPLE_RATE:
+    u32 = 48_000` — ΖΩΝΤΑΝΟ, ΔΕΥΤΕΡΟΣ ανεξάρτητος resampler (δικό του
     rubato, δικές του σταθερές), τροφοδοτεί το preview-stem endpoint.
-  - `m1/xaak/src/lib.rs:49` `TARGET_SAMPLE_RATE: u32 = 48_000` —
+  - `m1/xaak/src/lib.rs:49` ήταν `TARGET_SAMPLE_RATE: u32 = 48_000` —
     ΝΕΚΡΟ στην παραγωγή, μοναδική χρήση (`:265`) στο ΔΙΚΟ ΤΟΥ test.
-  - `lineos-corpus/mfcc.rs:16` `SAMPLE_RATE: f32 = 48000.0` — ΖΩΝΤΑΝΟ.
-  - `sp314-orchestrator/trunk_pass.rs:190` `SAMPLE_RATE: u32 =
+  - `lineos-corpus/mfcc.rs:16` ήταν `SAMPLE_RATE: f32 = 48000.0` —
+    ΖΩΝΤΑΝΟ.
+  - `sp314-orchestrator/trunk_pass.rs:190` ήταν `SAMPLE_RATE: u32 =
     48_000` — ΖΩΝΤΑΝΟ, ιδιωτικό, δέκα καταναλωτές (βλ. Α.2).
-  ⇒ Πέντε, όσες ακριβώς το G_MAX_DB. Αν η πολιτική ρυθμού αλλάξει,
-  χρειάζονται πέντε ξεχωριστές επεμβάσεις — και η νεκρή (xaak) θα
+  ⇒ Πέντε, όσες ακριβώς το G_MAX_DB. Αν η πολιτική ρυθμού άλλαζε,
+  θα χρειάζονταν πέντε ξεχωριστές επεμβάσεις — και η νεκρή (xaak) θα
   έμενε ξεπερασμένη σιωπηλά, αφού κανένας παραγωγικός καταναλωτής δεν
   θα το πρόσεχε.
+
+  ⚠ **F-104 (2026-09-15, ίδια μέρα): η ΕΝΩΣΗ.** Οι πέντε παραπάνω
+  παύουν να είναι δηλώσεις — γίνονται εισαγωγές της μίας πηγής,
+  `lineos_types::analysis::ANALYSIS_SAMPLE_RATE` (`lineos-types/src/
+  analysis.rs:6`, μοναδικός κοινός πρόγονος στο dependency graph των
+  πέντε καταναλωτριών crates). `stream_core.rs:7` και `decode.rs:19`
+  τώρα `pub use ... as TARGET_SR`/`TARGET_SAMPLE_RATE` (ίδιο όνομα,
+  ίδιος τύπος, μηδέν αλλαγή στους καταναλωτές τους). `xaak/lib.rs:49`
+  το ίδιο — η ΝΕΚΡΗ δημόσια επιφάνεια ΔΕΝ αφαιρέθηκε, μόνο η
+  ανεξάρτητη δήλωσή της (η αφαίρεση pub API είναι ξεχωριστή απόφαση,
+  δηλωμένη, όχι εκτελεσμένη). `mfcc.rs:16` και `trunk_pass.rs:190`
+  τώρα `const` με τιμή παραγόμενη από την πηγή (`as f32`/`as u32`),
+  όχι ανεξάρτητο literal. Τα εννιά γυμνά (Α παραπάνω) εισάγουν επίσης
+  — εκτός από `export.rs:890`, που διαβάζει `blob.core.sample_rate`
+  (το ΜΕΤΡΗΜΕΝΟ πεδίο, όχι τη σταθερά — μόνη θέση που αγγίζει
+  παραδοτέο) και `nmf.rs:589-591`, που δεν έχει γυμνό `48000` να
+  εισάγει (μόνο παράγωγη σταθερά `8`, σχόλιο). Φρουρός:
+  `scripts/sample-rate-lint.sh` — δύο μετρητές (δηλώσεις, γυμνά),
+  ίδιο πρότυπο baseline/προειδοποίησης με τους άλλους πέντε φρουρούς.
 
   **ΤΟ ΠΛΑΙΣΙΟ, ΓΙΑΤΙ ΔΕΝ ΦΑΙΝΕΤΑΙ ΣΗΜΕΡΑ:** το dump τυποποιείται στα
   48k πριν από όλα (`pass0_decode_to_dump`/`StandardizedDecoder`) —

@@ -96,7 +96,7 @@ target_cpu · opt_level · codegen_units · rustc_version` —
 |                  | του πίνακα τα συγχέει — διορθώθηκε 23/08.     |
 | input_pcm_sha256 | SHA-256 · interleaved (όλα τα κανάλια του     |
 | (πρώην input_    | input) · **f32 BIG-ENDIAN** (ρητό:            |
-| pcm_hash)        | stream_core.rs:178 `to_be_bytes`, ΜΕΤΡΗΜΕΝΟ   |
+| pcm_hash)        | stream_core.rs:170 `to_be_bytes`, ΜΕΤΡΗΜΕΝΟ   |
 |                  | 2026-08-23) · 48kHz, POST-resample,           |
 |                  | pre-quantize. ΤΟ input provenance πεδίο —     |
 |                  | αυτό επαληθεύει ο τρίτος.                     |

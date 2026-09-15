@@ -16,7 +16,8 @@
 // ── Decode constants ──────────────────────────────────────────────────────────
 // All limits enforced before calling sp314-dsp.
 
-pub const TARGET_SAMPLE_RATE: u32 = 48_000;
+// F-103/F-104: μία δήλωση, οι υπόλοιπες εισάγουν — βλ. stream_core.rs:7.
+pub use lineos_types::analysis::ANALYSIS_SAMPLE_RATE as TARGET_SAMPLE_RATE;
 pub const TARGET_CHANNELS: u16 = 2;
 // RAM-bound path — this cap is memory protection, not policy; the streaming caps live in stream_core.
 pub const MAX_DURATION_SECS: u64 = 720; // 12 minutes

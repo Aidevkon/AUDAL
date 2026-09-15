@@ -886,8 +886,12 @@ pub fn export_mp3_acx(blob: &StoredBlobV2, path: &Path) -> Result<AcxExportOutco
         planar[1].push(chunk[1]);
     }
 
-    // 2. Resample 48000 -> 44100
-    let original_sr = 48000;
+    // 2. Resample blob.core.sample_rate -> 44100 (ACX delivery rate).
+    // F-103/F-104: ΔΕΝ παίρνει τη σταθερά — παίρνει το ΜΕΤΡΗΜΕΝΟ πεδίο,
+    // όπως ήδη κάνει η αδελφή export_mp3 (:lame_set_in_samplerate).
+    // Η σταθερά θα ήταν λάθος διόρθωση: αυτό είναι το μόνο σημείο που
+    // διαβάζει από blob, όχι από το ήδη-48k dump.
+    let original_sr = blob.core.sample_rate;
     let target_sr = 44100;
     let ratio = target_sr as f64 / original_sr as f64;
     let params = SincInterpolationParameters {

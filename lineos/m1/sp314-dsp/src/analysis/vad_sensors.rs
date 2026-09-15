@@ -132,7 +132,9 @@ impl TransientSensor {
             self.was_above = is_above;
         }
 
-        let duration = frame.len() as f32 / 48000.0;
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7. TransientSensor
+        // δεν έχει πεδίο sample_rate· δεν προστέθηκε εδώ (άλλο βήμα).
+        let duration = frame.len() as f32 / lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
         if duration <= 0.0 {
             0.0
         } else {

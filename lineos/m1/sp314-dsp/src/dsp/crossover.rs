@@ -114,7 +114,13 @@ impl Crossover3 {
 
 impl Default for Crossover3 {
     fn default() -> Self {
-        Self::new(48000.0, 200.0, 4000.0)
+        // F-103/F-104: μία πηγή — βλ. stream_core.rs:7. ΑΔΡΑΝΕΣ σήμερα
+        // (κανένα call site Crossover3::default()/:: βρέθηκε αλλού).
+        Self::new(
+            lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32,
+            200.0,
+            4000.0,
+        )
     }
 }
 

@@ -140,7 +140,10 @@ impl FiveStemRenderer {
 
         // Step 1: Find representative window (spectral flux)
         use crate::stft::nmf::find_most_diverse_window;
-        let (start, end) = find_most_diverse_window(signal, 48000, 10.0);
+        // F-103/F-104: μία πηγή για τον ρυθμό — βλ. stream_core.rs:7.
+        // ΔΕΝ αλλάζει υπογραφή· render() παραμένει χωρίς sample_rate.
+        let (start, end) =
+            find_most_diverse_window(signal, lineos_types::analysis::ANALYSIS_SAMPLE_RATE, 10.0);
         let sample = &signal[start..end];
 
         // Step 2: STFT + Magnitude on sample only
@@ -250,9 +253,12 @@ impl FiveStemRenderer {
         let td1 = component_transient_density(&h_rows[remaining_voice[1]], n_frames);
 
         if (td0 - td1).abs() <= 0.01 {
-            // Tie-break: highest centroid in 1-4kHz presence band
-            let start_bin = (1024.0 * 1000.0 / 24000.0) as usize;
-            let end_bin = (1024.0 * 4000.0 / 24000.0) as usize;
+            // Tie-break: highest centroid in 1-4kHz presence band.
+            // F-103/F-104: 24000 ήταν καρφωμένο Nyquist — τώρα παράγεται
+            // από τη μία πηγή, βλ. stream_core.rs:7.
+            let nyquist = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32 / 2.0;
+            let start_bin = (1024.0 * 1000.0 / nyquist) as usize;
+            let end_bin = (1024.0 * 4000.0 / nyquist) as usize;
 
             let mut c0_sum = 0.0;
             let mut c0_mass = 0.0;

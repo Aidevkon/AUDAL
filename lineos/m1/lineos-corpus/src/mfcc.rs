@@ -13,7 +13,10 @@ use rustfft::num_complex::Complex;
 pub const N_MFCC: usize = 13;
 pub const N_FILTERS: usize = 26;
 pub const FFT_SIZE: usize = 1024;
-pub const SAMPLE_RATE: f32 = 48000.0;
+// F-103/F-104: μία δήλωση, οι υπόλοιπες εισάγουν — βλ. stream_core.rs:7.
+// f32 εδώ (η κλίμακα bin θέλει float) — δεν χωράει σε `pub use` alias
+// (η πηγή είναι u32), άρα const με τιμή παραγόμενη από την πηγή.
+pub const SAMPLE_RATE: f32 = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
 pub const F_MIN: f32 = 20.0;
 pub const F_MAX: f32 = 8000.0;
 

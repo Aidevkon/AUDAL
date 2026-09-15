@@ -187,7 +187,9 @@ impl TrunkMetrics {
 // Mirror scan_file's constants exactly [scout_scanner.rs:6-7].
 const WINDOW_SECS: f32 = 5.0;
 const HOP_SECS: f32 = 1.0;
-const SAMPLE_RATE: u32 = 48_000;
+// F-103/F-104: μία δήλωση, οι υπόλοιπες εισάγουν — βλ. stream_core.rs:7.
+// ΙΔΙΩΤΙΚΟ όπως πριν — `use` χωρίς `pub` διατηρεί την ορατότητα.
+use lineos_types::analysis::ANALYSIS_SAMPLE_RATE as SAMPLE_RATE;
 const CHUNK_FRAMES: usize = 4096;
 
 // Mirror signal_health.rs:92 — windows below this are dead air.

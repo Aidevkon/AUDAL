@@ -376,7 +376,7 @@ COMMIT MESSAGE που υπόσχεται Χ δεν εγγυάται Χ.
   MaskingEQ       υπάρχει, gains πάντα [0.0; 8]
   ambience_reverb υπάρχει, mix πάντα 0.0
   "BYTE-IDENTICAL by construction"
-                  stream_core.rs:144 `// Contract: The dump is BYTE-IDENTICAL to the blake3 input stream by construction.`
+                  stream_core.rs:149 `// Contract: The dump is BYTE-IDENTICAL to the blake3 input stream by construction.`
                   ΤΕΚΜΗΡΙΟ: ΣΧΟΛΙΟ-ΩΣ-ΣΥΜΒΑΣΗ
                   lint = ΤΑΙΡΙΑΖΕΙ_ΩΣ_ΣΧΟΛΙΟ (ea2ce92).
                     ΗΤΑΝ ΤΑΦΟΣ, γνωστό ψευδές — θεραπεύτηκε.
