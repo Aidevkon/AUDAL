@@ -75,8 +75,16 @@ fn _generate(blob: &StoredBlobV2, output_path: &str) {
         Mm(224.0),
         &font,
     );
+    // F-076 (2026-08-22, συμπλήρωμα 2026-09-15): εδώ ήταν σταθερό «EBU R128:
+    // PASS ITU-BS.1770: PASS Deterministic: YES» — κυριολεκτικό, δεν διάβαζε
+    // κανένα πεδίο, τυπωνόταν ταυτόσημο και σε αρχείο που αποτυγχάνει.
+    // ΔΕΝ αντικαταστάθηκε από το πραγματικό verdict γιατί το delivery_checks
+    // είναι None τη στιγμή που γεννιέται το PDF (certificate_node.rs:453):
+    // οι έλεγχοι υπολογίζονται αργότερα, σε διαδρομή που δεν ξανακαλεί τον
+    // εκτυπωτή. Το να γίνει αληθές είναι απόφαση για το ΠΟΤΕ παράγεται το
+    // έγγραφο, όχι καλωδίωση πεδίου.
     layer.use_text(
-        "EBU R128: PASS   ITU-BS.1770: PASS   Deterministic: YES",
+        "Verdict and full measurements: signed sidecar",
         9.0,
         Mm(20.0),
         Mm(218.0),
@@ -84,50 +92,64 @@ fn _generate(blob: &StoredBlobV2, output_path: &str) {
     );
 
     // Stem fingerprints
+    // F-076: σε αφήγηση το stem_fingerprints είναι Some(default)
+    // (content_type.rs:62), όχι None — ο έλεγχος περνούσε και τυπώνονταν
+    // επικεφαλίδα και έξι ετικέτες με κενό μετά. Η επικεφαλίδα και οι
+    // γραμμές τώρα εμφανίζονται μόνο όταν υπάρχει τουλάχιστον ένα πραγματικό
+    // αποτύπωμα stem (voice/drums/bass/harmonics/ambience) — το pipeline
+    // εξαιρείται από τον έλεγχο γιατί είναι hash ΤΩΝ ΑΛΛΩΝ, όχι δικό του
+    // stem.
     if let Some(fp) = blob.stem_fingerprints() {
-        layer.use_text("STEM DNA", 11.0, Mm(20.0), Mm(208.0), &font_bold);
-        layer.use_text(
-            format!("Voice:     {}", fp.voice),
-            9.0,
-            Mm(20.0),
-            Mm(201.0),
-            &font,
-        );
-        layer.use_text(
-            format!("Drums:     {}", fp.drums),
-            9.0,
-            Mm(20.0),
-            Mm(195.0),
-            &font,
-        );
-        layer.use_text(
-            format!("Bass:      {}", fp.bass),
-            9.0,
-            Mm(20.0),
-            Mm(189.0),
-            &font,
-        );
-        layer.use_text(
-            format!("Harmonics: {}", fp.harmonics),
-            9.0,
-            Mm(20.0),
-            Mm(183.0),
-            &font,
-        );
-        layer.use_text(
-            format!("Ambience:  {}", fp.ambience),
-            9.0,
-            Mm(20.0),
-            Mm(177.0),
-            &font,
-        );
-        layer.use_text(
-            format!("Pipeline:  {}", fp.pipeline),
-            9.0,
-            Mm(20.0),
-            Mm(171.0),
-            &font,
-        );
+        let has_real_stem = !fp.voice.is_empty()
+            || !fp.drums.is_empty()
+            || !fp.bass.is_empty()
+            || !fp.harmonics.is_empty()
+            || !fp.ambience.is_empty();
+        if has_real_stem {
+            layer.use_text("STEM DNA", 11.0, Mm(20.0), Mm(208.0), &font_bold);
+            layer.use_text(
+                format!("Voice:     {}", fp.voice),
+                9.0,
+                Mm(20.0),
+                Mm(201.0),
+                &font,
+            );
+            layer.use_text(
+                format!("Drums:     {}", fp.drums),
+                9.0,
+                Mm(20.0),
+                Mm(195.0),
+                &font,
+            );
+            layer.use_text(
+                format!("Bass:      {}", fp.bass),
+                9.0,
+                Mm(20.0),
+                Mm(189.0),
+                &font,
+            );
+            layer.use_text(
+                format!("Harmonics: {}", fp.harmonics),
+                9.0,
+                Mm(20.0),
+                Mm(183.0),
+                &font,
+            );
+            layer.use_text(
+                format!("Ambience:  {}", fp.ambience),
+                9.0,
+                Mm(20.0),
+                Mm(177.0),
+                &font,
+            );
+            layer.use_text(
+                format!("Pipeline:  {}", fp.pipeline),
+                9.0,
+                Mm(20.0),
+                Mm(171.0),
+                &font,
+            );
+        }
     }
 
     // BLAKE3 + Signature

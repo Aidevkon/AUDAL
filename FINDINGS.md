@@ -2087,7 +2087,7 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   Route/κλήση επιβεβαιωμένες: `certificate_node.rs:558` →
   `generate_silent_certificate` → δύο HTTP routes σερβίρουν το ΙΔΙΟ στατικό
   αρχείο από δίσκο (`lib.rs:364`, `lib.rs:368`, μέσω
-  `pdf_gen.rs:323` `std::fs::read`) — καμία αναγέννηση.
+  `pdf_gen.rs:345` `std::fs::read`) — καμία αναγέννηση.
 
   ΣΥΓΓΕΝΙΚΟ: F-099 (verdict του πατώματος διαβάζει το ολικό ελάχιστο, όχι το
   interior) — ίδιο σχήμα, «ετυμηγορία που δεν κοιτάει αυτό που κρίνει»,
