@@ -467,7 +467,7 @@ pub fn execute_streaming_plan(
     //
     // ΚΕΝΟ όταν ο προορισμός δεν δηλώνει όριο: ο analyzer δεν έτρεξε
     // καθόλου, άρα δεν υπάρχει ανάλυση. Κενό ΔΕΝ είναι `absent`.
-    let corrections: Vec<crate::blob_store::CorrectionRecord> =
+    let mut corrections: Vec<crate::blob_store::CorrectionRecord> =
         match (delivery_max_noise_floor_db, delivery_edge_sec) {
             (Some(limit_db), Some(edge_sec)) => {
                 let mut measurements = Vec::new();
@@ -573,6 +573,59 @@ pub fn execute_streaming_plan(
             }
             _ => Vec::new(),
         };
+
+    // ΤΡΙΤΗ ΕΓΓΡΑΦΗ, ΕΞΩ ΑΠΟ ΤΟ MATCH: ο ανιχνευτής βόμβου τρέχει σε ΚΑΘΕ
+    // render (trunk_pass.rs, mains_line είναι πεδίο του TrunkReport,
+    // υπολογίζεται ΑΝΕΞΑΡΤΗΤΑ από `with_acx`/`delivery_max_noise_floor_db`)
+    // — άρα δεν έχει νόημα μέσα στο `(Some, Some) =>` παραπάνω. ΜΕΤΡΗΣΗ,
+    // όχι κρίση: μηδέν κατώφλι, μηδέν «υπάρχει βόμβος».
+    // ⚠ ΑΛΛΑΓΗ ΣΗΜΑΣΙΑΣ ΤΟΥ ΚΕΝΟΥ: πριν από αυτή την εγγραφή, άδειο
+    // corrections σήμαινε «ο προορισμός δεν δηλώνει όριο, τίποτα δεν
+    // έτρεξε». Από εδώ και πέρα το corrections ΔΕΝ είναι ΠΟΤΕ κενό.
+    // certificate-schema-v0.md χρειάζεται γραμμή γι' αυτό — δεν γράφτηκε
+    // εδώ, αναφέρεται ξεχωριστά.
+    let (mh_state, mh_reason) = match (
+        &trunk_report.mains_line,
+        trunk_report.quiet_window_split_dbfs,
+    ) {
+        (Some(_), _) => ("measured", String::new()),
+        // ΕΠΑΛΗΘΕΥΜΕΝΟ 2026-09-15: ο ίδιος ο ανιχνευτής (mains_hum.rs)
+        // αρνείται ΜΟΝΟ κάτω από 48 δείγματα· η παύση που φτάνει εδώ
+        // είναι πάντα ≥ QW_WINDOW (100ms @48kHz = 4800 δείγματα), άρα
+        // αυτό το None ΔΕΝ έρχεται ποτέ από τον ανιχνευτή — έρχεται από
+        // την ορχήστρα, και οι δύο περιπτώσεις παρακάτω είναι εξαντλητικές.
+        (None, None) => (
+            "absent",
+            "the level distribution shows no room separate from the voice".to_string(),
+        ),
+        (None, Some(_)) => ("absent", "no pause long enough to measure".to_string()),
+    };
+    let mut mh_measurements = Vec::new();
+    if let Some(line) = &trunk_report.mains_line {
+        mh_measurements.push(crate::blob_store::NamedValue {
+            name: "mains_frequency_hz".into(),
+            value: line.hz,
+            unit: "Hz".into(),
+        });
+        // Η προεξοχή ΕΞΑΡΤΑΤΑΙ ΑΠΟ ΤΟ ΟΡΓΑΝΟ.
+        // ΜΕΤΡΗΘΗΚΕ 2026-09-14: το ίδιο δοκίμιο διαβάζεται 5.12 dB με
+        // Welch N=16384 στα 48 kHz και 16.08 dB με αποδεκατισμό ×48 και
+        // ένα FFT. Αυτό εδώ είναι το δεύτερο. Κάθε σύγκριση με νούμερο
+        // άλλου οργάνου είναι άκυρη.
+        // ΚΑΙ: πραγματικός φορέας χωρίς αντιληπτό βόμβο έδωσε 9.09 dB σε
+        // αυτό το όργανο.
+        mh_measurements.push(crate::blob_store::NamedValue {
+            name: "prominence_db".into(),
+            value: line.prominence_db,
+            unit: "dB".into(),
+        });
+    }
+    corrections.push(crate::blob_store::CorrectionRecord {
+        stage: "mains_hum_analysis".into(),
+        state: mh_state.into(),
+        reason: mh_reason,
+        measurements: mh_measurements,
+    });
 
     let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {
         pcm_blake3: measured.pcm_blake3.clone(),
