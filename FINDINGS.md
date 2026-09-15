@@ -1948,6 +1948,80 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   διαγώνιοι, που κουβαλούν τη διάγνωση, κινούνται κάτω από 0.05%.
   ⇒ **Η επιλογή είναι αδιάφορη, και αυτό είναι το μετρημένο συμπέρασμα.**
 
+- **[F-099] Το verdict του πατώματος θορύβου στο πιστοποιητικό διαβάζει το
+  ΟΛΙΚΟ ελάχιστο, όχι το εσωτερικό δωμάτιο — το κουμπί δεν γράφει καν
+  πάτωμα παραδοτέου, και το PDF δεν δείχνει τίποτα από τα δύο.**
+  Component: `acx_check.rs:93-95,135-140,146-184,283,331-350` ·
+  `certificate_node.rs:432,447-451` · `deliver.rs:452-454,463` ·
+  `blob_store.rs:132-134,150-164` · `pdf_gen.rs` (392 γραμμές, grep
+  «floor»/«noise» = μηδέν). ΜΕΤΡΗΜΕΝΟ 2026-09-15.
+
+  ΤΡΙΑ ΣΚΕΛΗ, ΚΟΙΝΗ ΡΙΖΑ: ο έλεγχος αντιγράφει πιστά το ACX Check του
+  Audacity — και εκείνο το εργαλείο είναι επιεικές ΕΞ ΟΡΙΣΜΟΥ, όχι
+  χαλασμένο.
+
+  **Α — ΤΟ VERDICT ΕΙΝΑΙ ΚΕΝΟ.** `noise_floor_db` (`acx_check.rs:93-95`,
+  αυτούσιο: «RMS of the quietest sliding 500 ms (100 ms hop) after HP8 @
+  10 Hz» · «None: input shorter than 1 s, matching the plugin's
+  refusal») σαρώνει `sub_mean_sqs` ΟΛΟΚΛΗΡΟ, ΧΩΡΙΣ αποκλεισμό άκρων
+  (`acx_check.rs:331-350`). `margin_checks()` (`:146-184`) ΚΑΙ
+  `levels_within_limits()` (`:135-140`) διαβάζουν ΑΚΡΙΒΩΣ αυτό το
+  πεδίο — ΟΧΙ το `interior_noise_floor_db(edge_sec)` (`:283`), που
+  εξαιρεί άκρα και ΚΙΝΕΙΤΑΙ με τον expander.
+  ΜΕΤΡΗΜΕΝΟ (15/09, `docs/lab-logs/expander-threshold-sensitivity-20260915.txt`,
+  sweep Otsu±4dB σε 5 τομές): το `noise_floor_db` («absolute») ΕΜΕΙΝΕ
+  ΑΚΙΝΗΤΟ σε ΟΛΕΣ τις 5 τομές:
+  ```
+  monte_cristo −82.854 dBFS   σε όλες τις 5 τομές
+  anne         −96.077 dBFS   σε όλες τις 5 τομές
+  ```
+  ενώ το `interior` (η ίδια μέτρηση, εξαιρώντας άκρα) κινήθηκε 4.09 έως
+  8.02 dB στο ίδιο sweep. Το anne έχει εσωτερικό πάτωμα δωματίου στα
+  −52.05 dBFS και περνάει με −96.08 — **44 dB απόσταση ανάμεσα σε αυτό
+  που «περνάει» και σε αυτό που ακούγεται**.
+  ⚠ Το όργανο δεν είναι χαλασμένο — μιμείται το ACX Check του Audacity
+  και το δηλώνει. Το ερώτημα είναι τι σημαίνει το pass.
+
+  **Β — ΤΟ ΚΟΥΜΠΙ ΔΕΝ ΓΡΑΦΕΙ ΠΑΤΩΜΑ ΠΑΡΑΔΟΤΕΟΥ.** `certificate_node.rs:447-451`,
+  αυτούσιο: «output_delivery_* δεν μετριέται εδώ — μόνο στο export path
+  (run_deliver_core), μετά το certificate». ΜΟΝΟ το
+  `/projects/:id/deliver` το γεμίζει (`deliver.rs:463`), και ΜΟΝΟ όταν
+  υπάρχουν `masters_dir`+`project_id` (`deliver.rs:452-454`). Ένα cert
+  από render+export έχει `output_delivery_noise_floor_db = None` — έχει
+  ΜΟΝΟ την είσοδο (`certificate_node.rs:432`).
+
+  **Γ — ΤΟ PDF ΔΕΝ ΔΕΙΧΝΕΙ ΚΑΝΕΝΑ.** grep «floor»/«noise» σε
+  `pdf_gen.rs` (392 γραμμές): ΜΗΔΕΝ hits. Ούτε τα δύο `delivery` πεδία,
+  ούτε το `corrections` block (`blob_store.rs:132-134,150-164`). Ο
+  άνθρωπος που κρατάει το πιστοποιητικό δεν βλέπει τίποτα για το
+  πάτωμα.
+
+  **ΤΟ ΠΛΑΙΣΙΟ (ΔΗΛΩΜΕΝΟ, ΟΧΙ ΜΕΤΡΗΜΕΝΟ ΕΔΩ):** η προδιαγραφή ορίζει
+  το πάτωμα ως RMS του θορύβου υποβάθρου όταν κανείς δεν μιλάει — room
+  tone, όχι το ησυχότερο δείγμα· και οι παραβιάσεις πατώματος είναι
+  σταθερά ο συχνότερος λόγος απόρριψης, ενώ ο αυτόματος έλεγχος
+  περνάει. Δόθηκε επίσης δείγμα 11/20 SLEEPING · 9/20 WAKING όπου το
+  εργαλείο θα έλεγε 20/20 PASS — ΔΕΝ επαληθεύτηκε σε αυτό το task, ΔΕΝ
+  έχει τεκμήριο εδώ. Η ΜΕΘΟΔΟΣ που χρησιμοποιεί ο οίκος (Audacity ACX
+  Check) είναι ΑΠΟΝ — καμία πηγή δεν τη δίνει, ούτε εδώ ούτε σε
+  προηγούμενο task.
+
+  ΤΡΙΑ ΞΕΧΩΡΙΣΤΑ ΜΕΤΩΠΑ, ΤΡΕΙΣ ΑΠΟΦΑΣΕΙΣ — καμία εδώ.
+  Trigger: πριν οποιαδήποτε αλλαγή στο certificate schema/PDF template,
+  ή σε threshold/gate που υποτίθεται πως προστατεύεται από αυτό το
+  verdict.
+
+  ΤΕΚΜΗΡΙΟ: `docs/lab-logs/expander-threshold-sensitivity-20260915.txt`
+  (το σκέλος Α) · οι παραπομπές path:line παραπάνω (τα σκέλη Β/Γ, δεν
+  παρήγαγαν ξεχωριστό αρχείο).
+
+  ΣΥΓΓΕΝΙΚΑ, ΟΧΙ ΤΟ ΙΔΙΟ: F-096 (`noise_floor_dbfs` = η πιο ήσυχη
+  ομιλία, όχι πάτωμα — άλλο πεδίο, άλλο σφάλμα) και F-097 (ταξινομεί τα
+  πέντε ονόματα «noise floor» και ήδη σημειώνει το `noise_floor_db` ως
+  «[Π] ΠΡΑΓΜΑΤΙΚΟ ΠΑΤΩΜΑ. Πάει στο cert.» — αυτό εδώ δείχνει ότι ΚΑΙ το
+  [Π], το «σωστό» πεδίο, είναι το ίδιο επιεικές: χωρίς interior, χωρίς
+  γραφή στο κουμπί, αόρατο στο PDF).
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2384,7 +2458,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-099** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-100** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
