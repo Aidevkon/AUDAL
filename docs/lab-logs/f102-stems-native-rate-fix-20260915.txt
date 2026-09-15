@@ -1,0 +1,185 @@
+ΚΑΤΑΓΡΑΦΗ: IMPLEMENT — τα stems παράγονται στον ρυθμό της ροής
+Ημερομηνία: 2026-09-15
+Task: "τα stems παράγονται στον ρυθμό της ροής." (F-102, FINDINGS.md)
+
+── ΒΗΜΑ 0 — Η ΠΥΛΗ ──
+
+0.1 — ΜΠΟΡΕΙ ΤΟ read_scout_sample ΝΑ ΖΗΤΗΣΕΙ ΡΥΘΜΟ;
+Υπογραφή αυτούσια (lazy_reader.rs:328-331):
+  pub fn read_scout_sample(path: &std::path::Path, sample_secs: f32)
+      -> Option<(Vec<f32>, Vec<f32>, u32)>
+Καμία παράμετρος ρυθμού. Ο ρυθμός προκύπτει από
+`reader.sample_rate()` (lazy_reader.rs:335) — ο ΦΥΣΙΚΟΣ ρυθμός του
+codec, ΧΩΡΙΣ resampling (lazy_reader.rs:77,
+`track.codec_params.sample_rate`, καμία μετατροπή). ΟΧΙ επεκτάσιμο
+χωρίς αλλαγή signature.
+
+Υπάρχει ΗΔΗ resampler στο δέντρο; ΝΑΙ: `StandardizedAudioStream`
+(standardized_stream.rs, rubato::SincFixedIn, `TARGET_SR`=48000 από
+stream_core.rs:7) — το ΙΔΙΟ που το `pass0_decode_to_dump`
+χρησιμοποιεί ήδη (μέσω StandardizedDecoder) για να γράψει το
+raw_tap_path dump. ΑΛΛΑ: streaming-only, ΧΩΡΙΣ seek (ImplementError
+seekable_provider.rs's ExactSeekProvider δεν υλοποιείται από αυτό —
+μόνο LazyAudioReader το υλοποιεί, μοναδικός impl στο δέντρο, grep
+επιβεβαιωμένο). Seek+resample σύνθεση θα ήταν ΝΕΟ component
+(rubato's SincFixedIn έχει εσωτερική κατάσταση, seek στη μέση θα
+έδινε warm-up transient ασυνεπές με το parity-critical ring design
+του standardized_stream.rs).
+
+ΤΟ ΜΙΚΡΟ ΠΟΥ ΒΡΕΘΗΚΕ: το raw_tap_path (η ΗΔΗ πλήρως γραμμένη 48kHz
+dump, από pass0_decode_to_dump, ΠΡΙΝ κληθεί nmf_worker::spawn —
+σειρά επιβεβαιωμένη: executor.rs pass0 στη γραμμή 269, nmf_worker
+spawn στη γραμμή 372+19≈391 μετά τις αλλαγές) είναι ΗΔΗ resampled,
+ήδη στο δίσκο, headerless interleaved stereo f32 LE (ίδιο format με
+ό,τι διαβάζει το DumpDecodeProvider, decode_provider.rs:202-203,
+`from_le_bytes`). Seek πάνω σε ΑΥΤΟ είναι αριθμητική byte-offset σε
+flat αρχείο — καμία κατάσταση resampler, καμία νέα DSP. ΜΙΚΡΟ.
+ΕΠΙΛΟΓΗ: νέος τύπος DumpSeekProvider (decode_provider.rs), seek+read
+πάνω στο ΙΔΙΟ dump — ΟΧΙ αλλαγή στο read_scout_sample.
+
+0.2 — ΤΟ NMF, ΣΤΑΘΕΡΕΣ ΔΕΜΕΝΕΣ ΜΕ ΤΟΝ ΡΥΘΜΟ;
+ΔΙΑΒΑΣΤΗΚΕ, ΟΧΙ ΑΠΟ ΜΝΗΜΗ:
+· nmf_worker (`FiveStemRenderer::render`, stem_renderer.rs) καλεί
+  `crate::stft::nmf::{NmfEngine, N_COMPONENTS}` (stem_renderer.rs:7)
+  — ΟΧΙ nmfd. Επιβεβαιώθηκε με grep.
+· NmfEngine::fit_transform (nmf.rs:74) αρχικοποιεί W/H με
+  ΝΤΕΤΕΡΜΙΝΙΣΤΙΚΟ xorshift32 seed=42 (nmf.rs:80-88) — ΚΑΝΕΝΑ
+  include_bytes!/include_str!/φόρτωση αρχείου πουθενά στο nmf.rs.
+  ΚΑΝΕΝΑ προεκπαιδευμένο W. Fit ΦΡΕΣΚΟ ανά κλήση, πάνω στο ΙΔΙΟ το
+  σήμα εισόδου. ⇒ το «W που φορτώνει» ΔΕΝ υπάρχει σε αυτή τη
+  διαδρομή· η ερώτηση δεν εφαρμόζεται εδώ.
+· FFT_SIZE=2048, HOP_SIZE=512 (stft/mod.rs:4-5) — μεγέθη σε
+  ΔΕΙΓΜΑΤΑ, όχι δευτερόλεπτα· η ίδια η STFT δουλεύει σωστά σε
+  ΟΠΟΙΟΝΔΗΠΟΤΕ ρυθμό.
+· ΔΥΟ εσωτερικές ευρεστικές ΠΡΟΫΠΟΘΕΤΟΥΝ 48kHz, ρητά:
+  - nmf.rs:589 σχόλιο αυτούσιο: «At 48kHz with 512 hop, 1 frame =
+    10.6ms», nmf.rs:591 `hat_max_frames = 8` (καρφωμένος αριθμός
+    πλαισίων, ΟΧΙ προσαρμοσμένος στον πραγματικό ρυθμό).
+  - stem_renderer.rs:254-255: `start_bin = 1024.0*1000.0/24000.0`,
+    `end_bin = 1024.0*4000.0/24000.0` — το 24000 είναι Nyquist στα
+    48kHz, καρφωμένο.
+  ΠΡΙΝ τη διόρθωση, τα stems έμπαιναν σε αυτές τις συναρτήσεις
+  ΣΤΟΝ ΦΥΣΙΚΟ ρυθμό της πηγής (π.χ. 44100) — και οι δύο ευρεστικές
+  ήδη υπολόγιζαν λάθος πλαίσιο/bin ζώνη κατά ~8.8%, σιωπηλά, ΠΡΙΝ
+  από αυτό το task. Η διόρθωση ΔΕΝ αγγίζει αυτές τις γραμμές — τις
+  κάνει σωστές για πρώτη φορά, ως παράπλευρη συνέπεια, όχι στόχο.
+⇒ ΠΥΛΗ ΠΕΡΝΑΕΙ: καμία σταθερά δεν σπάει. Οι δύο ρητά-48kHz
+  ευρεστικές διορθώνονται, δεν χαλάνε.
+
+0.3 — ΠΟΣΟΙ ΚΑΛΟΥΝ ΤΟ read_scout_sample;
+grep, ΟΧΙ tests: ΔΥΟ σημεία παραγωγής.
+  executor.rs:334 → τροφοδοτεί scout_node::run (leaning/confidence)
+  dsp_pipeline.rs:1020 → ΙΔΙΟ ρόλο, batch/v2 path, τροφοδοτεί Scout
+Και τα δύο ταξινόμηση. ΔΕΝ αγγίχτηκε το read_scout_sample πουθενά —
+η επιλογή του 0.1 (DumpSeekProvider αντί για αλλαγή signature) το
+απέφυγε εξ ολοκλήρου. Καμία αλλαγή δρομολόγησης.
+
+── nmf ΕΝΑΝΤΙ nmfd, ΓΙΑΤΙ ΡΩΤΗΘΗΚΕ ──
+ΔΥΟ αρχεία, ΔΥΟ ενεργές, ΔΙΑΦΟΡΕΤΙΚΕΣ διαδρομές — ΟΧΙ «ίδιο πράγμα,
+δύο ονόματα, το ονομασμένο νεκρό»:
+· nmf.rs (NmfEngine) — καλείται από stem_renderer.rs, που καλεί ο
+  nmf_worker (η ΖΩΝΤΑΝΗ ΓΙΑ ΑΥΤΟ ΤΟ TASK διαδρομή, streaming hybrid
+  lane). Καμία σταθερά W.
+· nmfd.rs (nmfd_f32_h_only, nmfd_f32_partial_frozen) — καλείται
+  ΜΟΝΟ από two_pass.rs (two_pass.rs:341,889), ΞΕΧΩΡΙΣΤΗ
+  batch/two-pass διαδρομή, ενεργοποιημένη από τη σημαία
+  `use_nmfd: bool` που ταξιδεύει StreamingPlan/RenderSettings→
+  dsp_pipeline.rs/scout_node.rs/render_node.rs (7 αρχεία, grep
+  επιβεβαιωμένο, ΟΛΑ threading το ΙΔΙΟ bool flag, ΟΧΙ καλώντας το
+  module nmfd απευθείας). Κανένα include_bytes/φόρτωση W ούτε εδώ.
+  Ο `use_nmfd` δρόμος δεν είναι το ίδιο πράγμα με το streaming
+  hybrid lane αυτού του task — ΞΕΧΩΡΙΣΤΟ μονοπάτι, INV-DET-1
+  (preset «spotify», use_nmfd:true) το ασκεί, ΟΧΙ το nmf_worker.
+
+── Η ΑΛΛΑΓΗ ──
+Α. decode_provider.rs: νέος τύπος `DumpSeekProvider` — seek+exact
+   read πάνω στο ΙΔΙΟ raw_tap_path dump που το DumpDecodeProvider
+   ήδη διαβάζει (48k/stereo/f32 LE, εγγυημένο κατασκευαστικά).
+   ΜΗΔΕΝ νέο resampling. ~98 γραμμές, δύο trait impls
+   (AudioMetadataProvider, ExactSeekProvider).
+Β. executor.rs: shadow_reader = DumpSeekProvider πάνω στο
+   raw_tap_path (όχι πια LazyAudioReader πάνω στην αρχική πηγή). Το
+   nmf_worker::spawn ΚΑΙ το StreamingConfig.sample_rate διαβάζουν
+   ΤΩΡΑ το ΙΔΙΟ `crate::dsp::stream_core::TARGET_SR` (48000, ήδη
+   δημόσιο, ήδη η σταθερά που το pass0/StandardizedDecoder στοχεύει)
+   — ΜΗΔΕΝ νέο 48000 literal σε νέα θέση, μία πηγή.
+
+── Η ΕΠΑΛΗΘΕΥΣΗ ──
+
+1. secretgarden ΤΕΛΕΙΩΝΕΙ ΧΩΡΙΣ PANIC: ΝΑΙ. ΚΑΙ τα άλλα δύο
+   μπλοκαρισμένα (dracula, janeeyre) — ΚΑΙ ΑΥΤΑ, τα 9/9 ολοκλήρωσαν.
+
+2. ΟΙ ΕΞΙ ΠΟΥ ΠΕΡΑΣΑΝ ΗΔΗ — ΓΩΝΙΕΣ ΠΡΙΝ/ΜΕΤΑ (lowcut_wiring_verify,
+   preset acx, ΙΔΙΟ εργαλείο και τα δύο τρεξίματα):
+   αρχείο                     fundamental ΠΡΙΝ  fundamental ΜΕΤΑ
+   huckfinn_01_twain_apc          213.579Hz        213.579Hz
+   peterpan_01_barrie             247.289Hz        247.289Hz
+   tale_of_two_cities             110.062Hz        110.062Hz
+   adventurespinocchio             199.240Hz        199.240Hz
+   anne_of_green_gables            201.222Hz        201.222Hz
+   count_of_monte_cristo           216.925Hz        216.925Hz
+   ΤΑΥΤΙΣΗ ΑΠΟΛΥΤΗ, όγδοο δεκαδικό ψηφίο — καμία αλλαγή. Αναμενόμενο:
+   το input_fundamental/low_cut υπολογίζεται στο trunk_pass.rs πάνω
+   στο ΗΔΗ 48kHz dump, ΑΝΕΞΑΡΤΗΤΑ από το nmf_worker/stems — αυτή η
+   αλλαγή δεν άγγιζε ποτέ τη διαδρομή τους. Η ταύτιση επιβεβαιώνει
+   μηδενική επίδραση, όχι επειδή «τυχαία συνέπεσε».
+
+3. ΤΑ ΤΡΙΑ ΠΟΥ ΜΠΛΟΚΑΡΙΣΤΗΚΑΝ, ΤΩΡΑ:
+   secretgarden: state=applied, fundamental=220.691Hz,
+     corner=110.345Hz (=fundamental/2 ακριβώς)
+   dracula: state=applied, fundamental=179.268Hz, corner=89.634Hz
+   janeeyre: state=absent — ΣΩΣΤΟ (η μόνη περίπτωση χωρίς διμερή
+     κατανομή, ΟΠΩΣ σχεδιάστηκε στο προηγούμενο task).
+   ΣΗΜΕΙΩΣΗ, ΤΙΜΙΑ: το ΔΙΚΟ ΜΟΥ εργαλείο επαλήθευσης
+   (lowcut_wiring_verify.rs, WS2, από προηγούμενο task) σημείωσε
+   secretgarden/dracula «⚠ ΕΚΤΟΣ» και janeeyre «⚠ ΑΠΡΟΣΔΟΚΗΤΟ» — και
+   τα δύο ΑΡΤΕΦΑΚΤΑ ΤΟΥ ΙΔΙΟΥ ΤΟΥ ΕΡΓΑΛΕΙΟΥ, ΟΧΙ σφάλμα παραγωγής:
+   (α) η ±0.5Hz ανοχή συγκρίνει το ΝΕΟ όργανο (decim+FFT+envelope-
+   window) με τον ΠΑΛΙΟ πίνακα (Welch+waveform-window) — ήδη
+   τεκμηριωμένο ασύγκριτο στο [F-102]/προηγούμενη αναφορά chat· (β)
+   το `(Some(rec), None) => ΑΠΡΟΣΔΟΚΗΤΟ` κλάδο του εργαλείου θεωρεί
+   ΚΑΘΕ υπαρκτό low_cut record απρόσμενο όταν δεν περίμενε γωνία,
+   αντί να ελέγξει `rec.state == "absent"` ως το ΣΩΣΤΟ αποτέλεσμα —
+   λάθος στην ΙΔΙΑ την υπόθεση επαλήθευσης, γραμμένο στο προηγούμενο
+   task, ΔΕΝ διορθώθηκε εδώ (εκτός δηλωμένης εμβέλειας αυτού του
+   task — WS2 εργαλείο, όχι κώδικας παραγωγής).
+
+4. ΤΕΣΤ ΠΟΥ ΑΣΚΕΙ ΤΟΝ ΚΛΑΔΟ — ΝΕΟ:
+   test_streaming_pipeline_flagged_segment_native_rate_mismatch_regression
+   (streaming_integration.rs). Αυτοτελές: WAV 44100Hz γραμμένο on-
+   the-fly (hound), 6s, δεύτερο τμήμα [1.0,6.0) Music flagged
+   (leaning 0.5, conf 0.2, duration 5.0s). Ο πραγματικός
+   pass0_decode_to_dump παράγει το 48k dump. assert_eq!
+   flagged_indices == vec![1]. Ελέγχει: καμία panic/error, frames>0.
+   ΕΞΕΡΓΑΣΙΑ (κανόνας f2a9f86): shadow_reader προσωρινά αντικαταστάθηκε
+   με την ΠΑΛΙΑ συνταγή (LazyAudioReader πάνω στην αρχική 44100Hz
+   πηγή, σημασμένο EXERCISE_PROOF_F102_MARKER) — ΤΟ ΤΕΣΤ ΚΟΚΚΙΝΙΣΕ:
+     thread ... panicked at streaming_pipeline.rs:533:51:
+     range start index 217216 out of range for slice of length 216600
+   ΙΔΙΟ μοτίβο αποτυχίας με το πρωτότυπο (secretgarden 529279/529200).
+   Επαναφορά στη διορθωμένη συνταγή· grep -c MARKER = 0· τεστ ΞΑΝΑ
+   ΠΡΑΣΙΝΟ.
+
+── ΜΕΤΑ ──
+cargo check --workspace --tests: ΚΑΘΑΡΟ (μόνο προϋπάρχοντα warnings).
+cargo check WS2 (encoder-gap-speech, --bin lowcut_wiring_verify):
+  ΚΑΘΑΡΟ. (Το --bins αποτυγχάνει σε ΠΡΟϋΠΑΡΧΟΝ σπασμένο bin,
+  quality_vs_ffmpeg.rs, commit 56687a1, άσχετο με αυτό το task —
+  επιβεβαιωμένο με git blame, ΔΕΝ διορθώθηκε, εκτός εμβέλειας.)
+streaming_integration.rs, πλήρης σουίτα: 16 περνάνε, 1 ignored
+  (dataset-dependent, άσχετο), 0 αποτυχίες. Ήταν 16 (15+1 ignored)
+  πριν από αυτό το task, +1 νέο test.
+INV-DET-1 (inv_det_1_render_determinism, release, --ignored): ΠΡΑΣΙΝΟ
+  (SHA B: e682a3d...). ΠΡΟΒΛΕΨΗ επιβεβαιώθηκε: το test καλεί
+  run_dsp/dsp_pipeline.rs (preset spotify, use_nmfd:true) — ΤΕΛΕΙΩΣ
+  ΞΕΧΩΡΙΣΤΗ διαδρομή από το streaming hybrid lane/nmf_worker αυτού
+  του task. Καμία αλλαγή αναμενόταν, καμία μετρήθηκε.
+guards: 38·14·4·14·«2 0» — ταυτίζεται με το παγωμένο baseline.
+git diff --stat: executor.rs, streaming_integration.rs (νέο τεστ),
+  decode_provider.rs (νέος τύπος), northstar-v2.md (1 γραμμή,
+  executor.rs:434→445 — η δική μου αλλαγή στο executor.rs μετέθεσε
+  το wav_to_raw_measured κατά +11 γραμμές, ΙΔΙΑ ανάγκη με την
+  αντίστοιχη διόρθωση στο προηγούμενο task, επαληθεύτηκε αυτούσια
+  στη γραμμή 445).
+
+STOP — commit ο χρήστης.

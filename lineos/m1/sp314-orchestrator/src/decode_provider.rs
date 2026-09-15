@@ -1,4 +1,4 @@
-use sp314_dsp::io::decode_types::{DecodeChunk, DecodeError};
+use sp314_dsp::io::decode_types::{DecodeChunk, DecodeError, LazyReaderError};
 
 pub trait DecodeProvider {
     fn stream_to<E, F>(&self, on_chunk: F) -> Result<(u32, u16), DecodeError>
@@ -212,5 +212,101 @@ impl DecodeProvider for DumpDecodeProvider {
         // by pass0_decode_to_dump through StandardizedDecoder, which
         // guarantees 48k/stereo [standardized_decoder.rs:70: Ok((sample_rate, 2))].
         Ok((48_000, 2))
+    }
+}
+
+const DUMP_FRAME_BYTES: usize = 2 * 4; // stereo f32 LE, same layout DumpDecodeProvider reads above
+
+/// Seek+exact-read over the SAME raw PCM dump DumpDecodeProvider streams
+/// — interleaved stereo f32 LE, headerless, already resampled to the
+/// render's target rate by pass0_decode_to_dump/StandardizedDecoder
+/// (guaranteed 48k/stereo, see the comment above).
+///
+/// F-102: the NMF worker previously opened the ORIGINAL input file at
+/// its native rate for this seek+read (`LazyAudioReader`), while the
+/// streaming render loop indexed the resulting stems at the render's
+/// 48kHz — two rates sharing one index. This type gives the worker a
+/// reader whose bytes and whose `sample_rate()` agree with the render,
+/// because both now come from the one file the render already trusts.
+/// Seeking is trivial (byte-offset arithmetic on a flat file) — no
+/// resampler-state concerns the way seeking mid-stream through rubato
+/// would raise.
+pub struct DumpSeekProvider {
+    file: std::fs::File,
+    sample_rate: u32,
+}
+
+impl DumpSeekProvider {
+    pub fn new(path: impl AsRef<std::path::Path>, sample_rate: u32) -> Result<Self, LazyReaderError> {
+        let file = std::fs::File::open(path.as_ref())
+            .map_err(|e| LazyReaderError::Symphonia(format!("dump seek open: {e}")))?;
+        Ok(Self { file, sample_rate })
+    }
+}
+
+impl crate::seekable_provider::AudioMetadataProvider for DumpSeekProvider {
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn channels(&self) -> usize {
+        2
+    }
+
+    fn total_frames_hint(&self) -> Option<u64> {
+        self.file
+            .metadata()
+            .ok()
+            .map(|m| m.len() / DUMP_FRAME_BYTES as u64)
+    }
+}
+
+impl crate::seekable_provider::ExactSeekProvider for DumpSeekProvider {
+    fn seek_exact_frame(&mut self, target_frame: u64) -> Result<(), LazyReaderError> {
+        use std::io::{Seek, SeekFrom};
+        let byte_offset = target_frame * DUMP_FRAME_BYTES as u64;
+        self.file
+            .seek(SeekFrom::Start(byte_offset))
+            .map_err(|e| LazyReaderError::Symphonia(format!("dump seek: {e}")))?;
+        Ok(())
+    }
+
+    fn read_exact_frames_alloc(
+        &mut self,
+        frames: u64,
+    ) -> Result<(Vec<f32>, Vec<f32>), LazyReaderError> {
+        use std::io::Read;
+        let want_bytes = (frames as usize) * DUMP_FRAME_BYTES;
+        let mut buf = vec![0u8; want_bytes];
+        let mut total_read = 0usize;
+        // Best-effort, same contract as LazyAudioReader::read_exact_frames_alloc:
+        // EOF returns fewer frames, not an error.
+        while total_read < want_bytes {
+            match self.file.read(&mut buf[total_read..]) {
+                Ok(0) => break,
+                Ok(n) => total_read += n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(LazyReaderError::Symphonia(format!("dump read: {e}"))),
+            }
+        }
+        let full_frames = total_read / DUMP_FRAME_BYTES;
+        let mut left = Vec::with_capacity(full_frames);
+        let mut right = Vec::with_capacity(full_frames);
+        for i in 0..full_frames {
+            let base = i * DUMP_FRAME_BYTES;
+            left.push(f32::from_le_bytes([
+                buf[base],
+                buf[base + 1],
+                buf[base + 2],
+                buf[base + 3],
+            ]));
+            right.push(f32::from_le_bytes([
+                buf[base + 4],
+                buf[base + 5],
+                buf[base + 6],
+                buf[base + 7],
+            ]));
+        }
+        Ok((left, right))
     }
 }

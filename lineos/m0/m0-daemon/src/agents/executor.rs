@@ -364,14 +364,22 @@ pub fn execute_streaming_plan(
 
     let (tx_job, rx_job) = std::sync::mpsc::channel();
     let (tx_res, rx_res) = std::sync::mpsc::channel();
-    let shadow_reader = crate::dsp::lazy_reader::LazyAudioReader::open(
-        std::path::Path::new(&audio_path),
+    // F-102: the shadow reader used to open the ORIGINAL file at its
+    // native sample rate (`sample_rate` above is read_scout_sample's —
+    // correct for the Scout, wrong here) while the streaming loop
+    // indexed the resulting stems at the render's 48kHz. Reading the
+    // SAME raw_tap_path dump the render itself reads (already
+    // resampled by pass0_decode_to_dump) and passing that ONE rate to
+    // both consumers keeps stems and the streaming index on one clock.
+    let shadow_reader = sp314_orchestrator::decode_provider::DumpSeekProvider::new(
+        &raw_tap_path,
+        crate::dsp::stream_core::TARGET_SR,
     )
     .map_err(|e| ExecutorError::DspFailed(format!("Failed to open shadow reader: {}", e)))?;
 
     let _worker_handle = crate::dsp::orchestrator::nmf_worker::spawn(
         shadow_reader,
-        sample_rate,
+        crate::dsp::stream_core::TARGET_SR,
         rx_job,
         tx_res,
     );
@@ -393,7 +401,10 @@ pub fn execute_streaming_plan(
             &sp314_orchestrator::streaming_pipeline::StreamingConfig {
                 topology: &ducking_topology,
                 block_size: 1024,
-                sample_rate: 48_000,
+                // F-102: same constant the shadow reader/nmf_worker got
+                // above — one source for the rate stems are built AND
+                // indexed at, not two numbers that happened to agree.
+                sample_rate: crate::dsp::stream_core::TARGET_SR,
                 ducking_node_id: "duck_gain",
                 speech_gain: 1.0,
                 music_gain: 0.501,

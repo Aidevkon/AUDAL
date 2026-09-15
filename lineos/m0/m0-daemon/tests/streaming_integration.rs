@@ -321,6 +321,134 @@ fn test_streaming_pipeline_jit_orchestration() {
     std::fs::remove_file(output_path).ok();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// F-102 REGRESSION: τα stems ενός flagged segment στον ρυθμό της ροής,
+// όχι στον φυσικό ρυθμό της πηγής.
+// ─────────────────────────────────────────────────────────────────────────────
+// Πριν τη διόρθωση: ο shadow reader του nmf_worker άνοιγε την ΑΡΧΙΚΗ πηγή στον
+// ΦΥΣΙΚΟ της ρυθμό (`LazyAudioReader::open(original_path)` + `sample_rate`
+// από το `read_scout_sample`) — ενώ το streaming loop ευρετηριάζει τα stems με
+// `StreamingConfig.sample_rate` (48000). Σε πηγή 44100Hz, κάθε flagged
+// τμήμα διάβαζε ~8.8% μπροστά και έσκαγε στο 91.875% της διάρκειάς του
+// (`local_start_frame` ξεπερνάει `stems.voice.len()` πριν ο router αλλάξει
+// segment — recon 15/09, FINDINGS.md [F-102]).
+//
+// ΤΟ ΥΛΙΚΟ: συνθετικό WAV 44100Hz αυτού του τεστ (ΟΧΙ real_world_60s.wav,
+// που είναι ήδη 48kHz και δεν ασκεί το σφάλμα). 6s συνολικά· δεύτερο τμήμα
+// [1.0,6.0) Music, flagged (leaning 0.5 μέσα στη dead zone, conf 0.2 κάτω
+// από το κατώφλι) — 5.0s duration, αρκετό ώστε το deficit (duration_sec ×
+// 3900 frames στα 48k) να ξεπεράσει ΠΟΛΛΑΠΛΑ block_size πριν τη φυσική λήξη
+// του τμήματος.
+fn write_sine_wav_f102(path: &std::path::Path, sr: u32, dur_secs: f32) {
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut w = hound::WavWriter::create(path, spec).unwrap();
+    let n = (sr as f32 * dur_secs) as usize;
+    for i in 0..n {
+        let t = i as f32 / sr as f32;
+        let s = (2.0 * std::f32::consts::PI * 220.0 * t).sin() * 0.5;
+        w.write_sample(s).unwrap();
+        w.write_sample(s).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+#[test]
+fn test_streaming_pipeline_flagged_segment_native_rate_mismatch_regression() {
+    use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+
+    let tmp = tempfile::TempDir::new().unwrap();
+    let native_path = tmp.path().join("f102_native_44100.wav");
+    let dump_path = tmp.path().join("f102_dump_48000.raw");
+    write_sine_wav_f102(&native_path, 44_100, 6.0);
+
+    // Ο πραγματικός resampler της παραγωγής (StandardizedDecoder μέσα στο
+    // pass0), ΟΧΙ αντίγραφο — το dump που παράγει είναι ΑΚΡΙΒΩΣ ό,τι θα
+    // διάβαζε ο render_decoder στο executor.rs.
+    m0d::dsp::input_lufs::pass0_decode_to_dump(&native_path, dump_path.to_str().unwrap())
+        .expect("pass0 decode");
+
+    let boundaries = vec![
+        SegmentBoundary {
+            start_sec: 0.0,
+            end_sec: 1.0,
+            segment_type: SegmentType::Speech,
+            avg_leaning: 0.9,
+            avg_confidence: 0.8,
+        },
+        SegmentBoundary {
+            start_sec: 1.0,
+            end_sec: 6.0,
+            segment_type: SegmentType::Music,
+            avg_leaning: 0.5,
+            avg_confidence: 0.2,
+        }, // Hybrid, 5.0s — αρκετό να ξεπεράσει το deficit πολλαπλά block_size πριν λήξει
+    ];
+
+    let topology = dummy_ducking_topology();
+    let output_path = "/tmp/test_f102_native_rate_mismatch_output.wav";
+
+    let (tx_job, rx_job) = std::sync::mpsc::channel();
+    let (tx_res, rx_res) = std::sync::mpsc::channel();
+    // Η ΔΙΟΡΘΩΜΕΝΗ συνταγή — ίδια με executor.rs: shadow reader πάνω στο
+    // ΗΔΗ 48kHz dump, όχι στην αρχική πηγή.
+    let shadow_reader = sp314_orchestrator::decode_provider::DumpSeekProvider::new(
+        &dump_path,
+        m0d::dsp::stream_core::TARGET_SR,
+    )
+    .unwrap();
+    let _worker_handle = m0d::dsp::orchestrator::nmf_worker::spawn(
+        shadow_reader,
+        m0d::dsp::stream_core::TARGET_SR,
+        rx_job,
+        tx_res,
+    );
+    let (_, flagged_indices) =
+        m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+    assert_eq!(
+        flagged_indices,
+        vec![1],
+        "boundary[1] (leaning 0.5, conf 0.2) must be the sole escalation candidate"
+    );
+
+    let frames = run_streaming_pipeline_with_timeline(
+        sp314_orchestrator::decode_provider::DumpDecodeProvider::new(dump_path.clone()),
+        output_path,
+        &StreamingConfig {
+            topology: &topology,
+            block_size: 1024,
+            sample_rate: m0d::dsp::stream_core::TARGET_SR,
+            ducking_node_id: "duck_gain",
+            speech_gain: 1.0,
+            music_gain: 0.501,
+            pre_gain_linear: 1.0,
+            expected_output_frames: None,
+            quietest_active_window_dbfs: None,
+            max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+            max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+            input_interior_floor_db: None,
+            quiet_window_split_dbfs: None,
+            input_fundamental: None,
+            intent_dynamics: None,
+            restoration_enabled: false,
+        },
+        TimelinePlan {
+            boundaries,
+            flagged_indices,
+            pre_analysis: None,
+        },
+        rx_res,
+    )
+    .expect("streaming pipeline must not error/panic on a flagged segment from a non-48k source");
+
+    assert!(frames > 0, "pipeline must report frames written, got 0");
+    std::fs::remove_file(output_path).ok();
+}
+
 #[test]
 fn test_streaming_pipeline_jit_fallback() {
     use lineos_corpus::scout::{SegmentBoundary, SegmentType};
