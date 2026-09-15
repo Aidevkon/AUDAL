@@ -152,6 +152,7 @@ fn render(
             max_noise_floor_db: limit,
             input_interior_floor_db: floor,
             quiet_window_split_dbfs: split,
+            input_fundamental: None,
             intent_dynamics: None,
             restoration_enabled: true,
         },

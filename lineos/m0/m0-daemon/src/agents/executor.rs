@@ -409,6 +409,10 @@ pub fn execute_streaming_plan(
                 // Το κατώφλι του expander: η τομή της κατανομής του ίδιου του
                 // αρχείου, από το ΙΔΙΟ trunk pass. None = μη διμερής.
                 quiet_window_split_dbfs: trunk_report.quiet_window_split_dbfs,
+                // Η θεμελιώδης ομιλίας, ΙΔΙΟ trunk pass, αντίστροφο
+                // κριτήριο παραθύρου από την παύση. Αποφασίζει τη γωνία
+                // του low-cut στη λωρίδα hybrid.
+                input_fundamental: trunk_report.input_fundamental,
                 intent_dynamics: plan.intent_dynamics,
                 restoration_enabled: true,
             },
@@ -625,6 +629,36 @@ pub fn execute_streaming_plan(
         state: mh_state.into(),
         reason: mh_reason,
         measurements: mh_measurements,
+    });
+
+    // ΤΕΤΑΡΤΗ ΕΓΓΡΑΦΗ: το low-cut. state="applied" — ΟΧΙ "measured": ο
+    // κόμβος ΕΝΕΡΓΕΙ (γωνία = θεμελιώδης/2, cleaner.rs's set_lowcut_corner),
+    // πρώτη φορά που το λεξιλόγιο του σχήματος (0e91323: "applied — ο
+    // κόμβος εκτελέστηκε και ενήργησε") το χρειάζεται αληθινά.
+    // ΜΗΔΕΝ κατώφλι εδώ: το ρεκόρ λέει τι μετρήθηκε και τι έκανε ο
+    // κόμβος, όχι κρίση ποιότητας.
+    let (lc_state, lc_reason) = match &trunk_report.input_fundamental {
+        Some(_) => ("applied", String::new()),
+        None => ("absent", "the fundamental was not measured".to_string()),
+    };
+    let mut lc_measurements = Vec::new();
+    if let Some(fund) = &trunk_report.input_fundamental {
+        lc_measurements.push(crate::blob_store::NamedValue {
+            name: "fundamental_hz".into(),
+            value: fund.hz,
+            unit: "Hz".into(),
+        });
+        lc_measurements.push(crate::blob_store::NamedValue {
+            name: "corner_hz".into(),
+            value: fund.hz / 2.0,
+            unit: "Hz".into(),
+        });
+    }
+    corrections.push(crate::blob_store::CorrectionRecord {
+        stage: "low_cut".into(),
+        state: lc_state.into(),
+        reason: lc_reason,
+        measurements: lc_measurements,
     });
 
     let cert_data = crate::domain::nodes::certificate_node::StreamingCertData {

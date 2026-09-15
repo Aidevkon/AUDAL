@@ -55,6 +55,22 @@ pub struct MainsLine {
 /// «δεν υπάρχει βόμβος». Μια χαμηλή `prominence_db` σημαίνει ακριβώς αυτό:
 /// χαμηλή προεξοχή, μετρημένη — η ερμηνεία είναι του καλούντος.
 pub fn detect_mains_line(samples: &[f32], sample_rate: u32) -> Option<MainsLine> {
+    detect_band_peak(samples, sample_rate, SEARCH_LO_HZ, SEARCH_HI_HZ)
+}
+
+/// ΙΔΙΟ όργανο με `detect_mains_line` (αποδεκατισμός ×48 → ένα FFT
+/// N=4096), ζώνη αναζήτησης ως παράμετρος αντί για καρφωμένη — καμία
+/// αντιγραφή της αλυσίδας decimate/FFT/peak. `detect_mains_line` είναι
+/// τώρα ένα λεπτό περιτύλιγμα γύρω από αυτό, με SEARCH_LO_HZ/SEARCH_HI_HZ.
+///
+/// ⚠ ΓΙΑ ΤΗ ΧΡΗΣΗ [70,250]Hz (θεμελιώδης ομιλίας, orchestrator): ΔΕΝ ΕΙΝΑΙ
+/// ανιχνευτής τονικού ύψους (pitch tracker). Επιστρέφει το ΜΕΓΙΣΤΟ bin
+/// της ζώνης — μπορεί να είναι αρμονική, formant, ή θεμελιώδης. Ελέγχθηκε
+/// 2026-09-15 (εννέα πραγματικά αρχεία αφήγησης, chat) ότι δεν υπάρχει
+/// συστηματική κορυφή στο μισό της βρεθείσας συχνότητας (±2dB από τοπικό
+/// μέσο σε όλα) — δεν πιάνει 2η αρμονική αντί για θεμελιώδη σε αυτό το
+/// δείγμα. ΔΕΝ αποδεικνύει ταυτοποίηση pitch F0.
+pub fn detect_band_peak(samples: &[f32], sample_rate: u32, lo_hz: f32, hi_hz: f32) -> Option<MainsLine> {
     if samples.len() < DECIM {
         return None;
     }
@@ -62,7 +78,7 @@ pub fn detect_mains_line(samples: &[f32], sample_rate: u32) -> Option<MainsLine>
     let dec_sr = sample_rate as f32 / DECIM as f32;
     let psd = single_fft_psd_db(&decimated);
     let bin_hz = dec_sr / NFFT as f32;
-    peak_in_band(&psd, bin_hz, SEARCH_LO_HZ, SEARCH_HI_HZ)
+    peak_in_band(&psd, bin_hz, lo_hz, hi_hz)
         .map(|(hz, prominence_db)| MainsLine { hz, prominence_db })
 }
 
@@ -286,6 +302,57 @@ pub fn longest_run_below(
     let mut i = a;
     while i + w <= b {
         if pause_window_rms_db(&samples[i..i + w]) < thr_db {
+            if cur_len == 0 {
+                cur_start = i;
+            }
+            cur_len += w;
+        } else {
+            if cur_len > best.1 {
+                best = (cur_start, cur_len);
+            }
+            cur_len = 0;
+        }
+        i += w;
+    }
+    if cur_len > best.1 {
+        best = (cur_start, cur_len);
+    }
+    if best.1 == 0 {
+        None
+    } else {
+        Some(best)
+    }
+}
+
+/// Το αντίστροφο κριτήριο του `longest_run_below`: ο μεγαλύτερος
+/// συνεχόμενος χώρος όπου ΚΑΘΕ παράθυρο 100ms είναι ΠΑΝΩ από `thr_db` —
+/// «μέσα σε ομιλία», όχι «μέσα σε παύση». Ίδιο όργανο (`pause_window_rms_db`,
+/// ίδιο παράθυρο), ανεστραμμένη σύγκριση. 2026-09-15, θεμελιώδης ομιλίας.
+pub fn longest_run_above(
+    samples: &[f32],
+    sample_rate: u32,
+    thr_db: f32,
+    range_s: Option<(f32, f32)>,
+) -> Option<(usize, usize)> {
+    let w = (sample_rate as f32 * PAUSE_WINDOW_MS / 1000.0) as usize;
+    if w == 0 {
+        return None;
+    }
+    let sr = sample_rate as f32;
+    let (a, b) = match range_s {
+        Some((from_s, to_s)) => (
+            (from_s * sr) as usize,
+            ((to_s * sr) as usize).min(samples.len()),
+        ),
+        None => (0usize, samples.len()),
+    };
+    if b <= a + w {
+        return None;
+    }
+    let (mut best, mut cur_start, mut cur_len) = ((0usize, 0usize), a, 0usize);
+    let mut i = a;
+    while i + w <= b {
+        if pause_window_rms_db(&samples[i..i + w]) >= thr_db {
             if cur_len == 0 {
                 cur_start = i;
             }

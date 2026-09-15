@@ -68,6 +68,7 @@ fn streaming_pipeline_ducking_e2e() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -122,6 +123,7 @@ fn streaming_pipeline_ducking_e2e() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -257,6 +259,7 @@ fn test_streaming_pipeline_jit_orchestration() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -391,6 +394,7 @@ fn test_streaming_pipeline_jit_fallback() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -465,6 +469,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -518,6 +523,7 @@ fn test_vocal_graph_e2e_ltass_proof() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -753,6 +759,7 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -801,6 +808,7 @@ fn pre_gain_is_linear_below_the_ceiling() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -978,6 +986,7 @@ fn expected_output_frames_trims_the_resampler_tail_in_real_output() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: false,
@@ -1067,6 +1076,7 @@ fn test_restoration_speech_gated() {
             // ακριβώς όπως και πριν από αυτό το βήμα.
             input_interior_floor_db: None,
             quiet_window_split_dbfs: None,
+            input_fundamental: None,
             // Default intent — ο τύπος δίνει 105 ms.
             intent_dynamics: None,
             restoration_enabled: true, // NEW ORACLE: Restoration is explicitly ON
@@ -1348,6 +1358,7 @@ fn run_with_floor(
             max_noise_floor_db: limit_db,
             input_interior_floor_db: floor_db,
             quiet_window_split_dbfs: split_db,
+            input_fundamental: None,
             intent_dynamics: None,
             restoration_enabled: true, // η αλυσίδα τρέχει· η ΣΥΝΘΗΚΗ κρίνει τον gate
         },
@@ -1494,6 +1505,7 @@ fn high_confidence_speech_reaches_the_expander_without_stems() {
                 // Η λωρίδα δοκιμάζεται με διμερή κατανομή — αλλιώς η τετραμερής
                 // συνθήκη θα την έκοβε πριν φτάσει στον κόμβο.
                 quiet_window_split_dbfs: Some(-40.0),
+                input_fundamental: None,
                 intent_dynamics: None,
                 restoration_enabled: restoration,
             },

@@ -29,6 +29,10 @@ pub struct RestorationChain {
     // Low-Cut
     lowcut_hp: Biquad,
     lowcut_enabled: bool,
+    // Κρατημένο ΜΟΝΟ για το set_lowcut_corner παρακάτω (rebuild του
+    // biquad σε νέα γωνία) — new() δεν το χρειαζόταν πριν, δεν αλλάζει
+    // την υπογραφή του.
+    sample_rate: f32,
 
     // Noise Gate
     gate: NoiseGate,
@@ -68,6 +72,7 @@ impl RestorationChain {
             // Low-Cut
             lowcut_hp: Biquad::new(FilterType::HighPass, 80.0, 0.707, sample_rate),
             lowcut_enabled: config.lowcut_enabled,
+            sample_rate,
 
             // Gate
             gate: NoiseGate::new(sample_rate, pad_db_shift, gate_threshold_db),
@@ -77,6 +82,19 @@ impl RestorationChain {
             attack_coef: expf(-1.0 / (sample_rate * 0.001)),
             release_coef: expf(-1.0 / (sample_rate * 0.050)),
         }
+    }
+
+    /// Ξαναχτίζει το low-cut φίλτρο σε ΔΙΑΦΟΡΕΤΙΚΗ γωνία από τα
+    /// hardcoded 80Hz της new() — ίδιος τύπος (HighPass Q=0.707), μόνο η
+    /// συχνότητα αλλάζει. ΔΕΝ αλλάζει το lowcut_enabled· ο καλών
+    /// αποφασίζει ξεχωριστά αν το φίλτρο τρέχει καθόλου.
+    ///
+    /// ΔΕΝ άλλαξε η υπογραφή της new() γι' αυτό: μετρήθηκε 2026-09-15
+    /// ότι το RestorationChain::new() έχει 14 σημεία κλήσης (2 στην
+    /// παραγωγή, 12 σε τεστ) — μια νέα παράμετρος θα άγγιζε και τα 14.
+    /// Αυτό το setter αγγίζει ΜΟΝΟ τον καλούντα που το χρειάζεται.
+    pub fn set_lowcut_corner(&mut self, corner_hz: f32) {
+        self.lowcut_hp = Biquad::new(FilterType::HighPass, corner_hz, 0.707, self.sample_rate);
     }
 
     pub fn process(&mut self, left: &mut [f32], right: &mut [f32]) {

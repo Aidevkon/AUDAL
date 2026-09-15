@@ -4,7 +4,11 @@
       "Bash(./scripts/northstar-lint.sh *)",
       "Bash(./scripts/northstar-lint.sh)",
       "Bash(cargo check*)",
-      "Bash(cargo build*)"
+      "Bash(cargo build*)",
+      "Bash(grep*)",
+      "Bash(sed*)",
+      "Bash(git pull *)",
+      "Bash(cd *)"
     ],
     "deny": [
       "Bash(git commit*)",

@@ -120,6 +120,23 @@ pub struct TrunkReport {
     /// δέντρο — δικό της όργανο, δικά της νούμερα (βλ.
     /// analysis::mains_hum's module doc).
     pub mains_line: Option<sp314_dsp::analysis::mains_hum::MainsLine>,
+    /// Η πιο δυνατή κορυφή 70-250Hz μέσα στο μεγαλύτερο ΣΥΝΕΧΟΜΕΝΟ τμήμα
+    /// ΠΑΝΩ από την τομή Otsu — «μέσα σε ομιλία», το αντίστροφο κριτήριο
+    /// από την παύση (`longest_run_above`, ΙΔΙΟ κατώφλι `quiet_split`).
+    ///
+    /// ⚠ ΔΕΝ ΕΙΝΑΙ pitch tracker — το `sp314_dsp::analysis::mains_hum::
+    /// detect_band_peak` επιστρέφει το ΜΕΓΙΣΤΟ bin της ζώνης, όχι
+    /// αποδεδειγμένο F0. Ελέγχθηκε 2026-09-15 (εννέα αρχεία, chat) ότι
+    /// δεν βρέθηκε συστηματική κορυφή στο μισό της συχνότητας.
+    ///
+    /// None σημαίνει «δεν μετρήθηκε» — ίδια αιτία με `quiet_line = None`
+    /// (καμία τομή Otsu, κατανομή όχι διμερής) ή καμία συνεχής περιοχή
+    /// πάνω από την τομή. ΜΗΔΕΝ default, ΜΗΔΕΝ fallback.
+    ///
+    /// ΚΟΣΤΟΣ: ΔΕΥΤΕΡΟ `read_window` (seek, όχι νέο decode) ΚΑΙ ΔΕΥΤΕΡΟ
+    /// πέρασμα decimate+FFT (ίδιο μέγεθος με του mains_line) — μετρημένο
+    /// 2026-09-15, βλ. docs/lab-logs/lowcut-fundamental-wiring-*.txt.
+    pub input_fundamental: Option<sp314_dsp::analysis::mains_hum::MainsLine>,
 }
 
 impl std::ops::Deref for TrunkReport {
@@ -1013,11 +1030,24 @@ fn run_trunk_internal(
         sp314_dsp::analysis::mains_hum::detect_mains_line(&pause, SAMPLE_RATE)
     });
 
+    // === Η θεμελιώδης ομιλίας, ΑΝΤΙΘΕΤΟ κριτήριο από την παύση παραπάνω
+    // (§lowcut task, 2026-09-15) === ΙΔΙΟ qw_env, ΙΔΙΟ κατώφλι quiet_split
+    // — ΔΕΥΤΕΡΟ seek+FFT, όχι δεύτερος decode.
+    let input_fundamental = quiet_split.and_then(|thr| {
+        let (start_w, len_w) =
+            sp314_dsp::analysis::mains_hum::longest_run_above(&qw_env, 10, thr, None)?;
+        let start_frame = start_w * QW_WINDOW;
+        let len_frames = len_w * QW_WINDOW;
+        let speech = source.read_window(start_frame, len_frames);
+        sp314_dsp::analysis::mains_hum::detect_band_peak(&speech, SAMPLE_RATE, 70.0, 250.0)
+    });
+
     Ok(TrunkReport {
         boundaries,
         acx_interior_noise_floor: acx_interior,
         quiet_window_split_dbfs: quiet_split,
         mains_line,
+        input_fundamental,
         metrics: TrunkMetrics {
             integrated_lufs,
             rms_db,

@@ -83,6 +83,13 @@ pub struct StreamingConfig<'a> {
     /// ξεχωριστό από τη φωνή. ΜΗΔΕΝ default.
     /// ΔΙΑΒΑΖΕΤΑΙ: είναι ΤΟ ΚΑΤΩΦΛΙ του expander.
     pub quiet_window_split_dbfs: Option<f32>,
+    /// Η πιο δυνατή κορυφή 70-250Hz μέσα σε ομιλία (trunk pass,
+    /// `input_fundamental` — αντίστροφο κριτήριο παραθύρου από την
+    /// παύση, ΙΔΙΟ κατώφλι quiet_window_split_dbfs). None σημαίνει «δεν
+    /// μετρήθηκε» — καμία τομή Otsu, ή καμία συνεχής περιοχή πάνω από
+    /// αυτήν. ΔΙΑΒΑΖΕΤΑΙ: αποφασίζει τη γωνία του low-cut στη λωρίδα
+    /// hybrid (γωνία = θεμελιώδης/2) — ΤΡΕΧΕΙ ΜΟΝΟ όταν Some.
+    pub input_fundamental: Option<sp314_dsp::analysis::mains_hum::MainsLine>,
     /// Intent «dynamics» [0.0, 1.0] — Smooth…Punchy. None = default 0.5.
     /// Τροφοδοτεί ΜΟΝΟ τον τύπο του blend_release_ms του limiter.
     pub intent_dynamics: Option<f32>,
@@ -299,12 +306,29 @@ pub fn run_streaming_pipeline_with_timeline(
         };
     let mut restoration_config = sp314_dsp::restoration::RestorationConfig::voice();
     restoration_config.gate_enabled = gate_enabled;
+    // Η γωνία ΔΕΝ είναι διαλεγμένη. Μία οκτάβα κάτω από τη μετρημένη
+    // θεμελιώδη είναι σχέση, όχι αριθμός: το φίλτρο δίνει τότε πάντα
+    // ~-0.3dB στη θεμελιώδη, ίδιο κόστος για κάθε φωνή. Τα 80Hz είναι η
+    // βιομηχανική προεπιλογή και μετρήθηκε ότι κοστίζει εικοσαπλάσια σε
+    // φωνή με θεμελιώδη στα 111Hz (-0.958dB στον λόγο
+    // θεμελιώδους/αρμονικής, έναντι -0.046 σε φωνή στα 246Hz) — και
+    // ακούστηκε ως απώλεια βάθους (docs/lab-logs/lowcut-rumble-20260915.txt).
+    //
+    // ΤΡΕΧΕΙ ΜΟΝΟ ΑΝ Η ΘΕΜΕΛΙΩΔΗΣ ΜΕΤΡΗΘΗΚΕ — ΜΗΔΕΝ πτώση στα 80Hz.
+    // Απόφαση ιδιοκτήτη 2026-09-15: τίμιο και καθαρές εξηγήσεις· το wow
+    // θα έρθει από άλλους παράγοντες, κανείς δεν θα πει ότι έλειπε το
+    // low-cut. Μετρήθηκε ποιο χάνεται: 1/9 (janeeyre) — το μόνο χωρίς
+    // διμερή κατανομή, που ούτε ο expander καλύπτει.
+    restoration_config.lowcut_enabled = config.input_fundamental.is_some();
     let mut rest_chain = sp314_dsp::restoration::RestorationChain::new(
         sample_rate as f32,
         restoration_config,
         0.0,
         gate_threshold_db,
     ); // 0.0 pad because streaming does not pre-pad
+    if let Some(fundamental) = config.input_fundamental {
+        rest_chain.set_lowcut_corner(fundamental.hz / 2.0);
+    }
 
     // ── Η ΛΩΡΙΔΑ «ΣΙΓΟΥΡΑ ΦΩΝΗ» ─────────────────────────────────────────
     // Το σχέδιο την είχε ονομάσει «HIGH-CONF SPEECH → BYPASS NMF»
