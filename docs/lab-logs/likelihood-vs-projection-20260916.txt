@@ -1,0 +1,220 @@
+MEASURE 2026-09-16 — τι θα έλεγε πιθανοφάνεια αντί για προβολή.
+Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή, ΜΗΔΕΝ νέο τρέξιμο ήχου —
+καθαρή αριθμητική πάνω στα 696 ήδη-καταγεγραμμένα παράθυρα
+(rms-texture-20260916.txt, ενότητα attack_detector_recon: cv_ioi,
+cepstral_flux, t, ground truth ανά δοκίμιο).
+
+Σταθερές, ΑΥΤΟΥΣΙΕΣ από scout.rs (F-041), ΜΗΔΕΝ νέα βαθμονόμηση:
+  MUSIC_CV=0.4375  SPEECH_CV=0.6855  CV_POOLED_STD=0.1536
+  MUSIC_FLUX=1.3387  SPEECH_FLUX=1.7242  FLUX_POOLED_STD=0.1738
+  DELTA_CV=1.61458  DELTA_FLUX=2.21807  DELTA_SQ=7.52673  Z_CLAMP=3.0
+
+ΤΕΣΣΕΡΙΣ ΚΑΝΟΝΕΣ, ΣΤΑ ΙΔΙΑ 696 ΣΗΜΕΙΑ:
+
+  Α (baseline, η σημερινή προβολή — αναπαραγωγή, verified έναντι της
+     ήδη-καταγεγραμμένης στήλης "σωστά;"):
+     p_cv = clamp((cv_ioi-MUSIC_CV)/CV_POOLED_STD, -3, 3)
+     p_flux = clamp((flux-MUSIC_FLUX)/FLUX_POOLED_STD, -3, 3)
+     t = (p_cv*DELTA_CV + p_flux*DELTA_FLUX) / DELTA_SQ
+     verdict = Speech αν clamp(t,0,1) >= 0.5, αλλιώς Music
+
+  Β (μόνο flux): κατώφλι στο μέσο (MUSIC_FLUX+SPEECH_FLUX)/2 = 1.5314
+     verdict = Speech αν flux >= 1.5314
+
+  Γ (μόνο cv_ioi): κατώφλι στο μέσο (MUSIC_CV+SPEECH_CV)/2 = 0.5615
+     verdict = Speech αν cv_ioi >= 0.5615
+
+  Δ (πιθανοφάνεια/nearest-centroid, ΑΝΤΙ προβολής):
+     dist_music = sqrt( ((cv_ioi-MUSIC_CV)/CV_POOLED_STD)² + ((flux-MUSIC_FLUX)/FLUX_POOLED_STD)² )
+     dist_speech = sqrt( ((cv_ioi-SPEECH_CV)/CV_POOLED_STD)² + ((flux-SPEECH_FLUX)/FLUX_POOLED_STD)² )
+     verdict = Speech αν dist_speech < dist_music
+     certainty = |dist_music - dist_speech|
+     "μακριά και από τα δύο" = dist_music > 2 ΚΑΙ dist_speech > 2
+     ΧΩΡΙΣ Z_CLAMP εδώ (δεν ήταν μέρος της συνταγής του Δ, δηλωμένο
+     ρητά — η απόσταση μπορεί να ξεπεράσει το 3, δεν κόβεται).
+
+⚠ ΔΗΛΩΜΕΝΟΣ ΠΕΡΙΟΡΙΣΜΟΣ, ΠΡΙΝ ΤΟ ΤΡΕΞΙΜΟ: CV_POOLED_STD/FLUX_POOLED_STD
+είναι ΜΙΑ κοινή (pooled) τυπική απόκλιση ανά άξονα — ΟΧΙ ξεχωριστή ανά
+κλάση (music/speech). Το Δ ΔΕΝ είναι αληθινή Gaussian πιθανοφάνεια
+(που θα χρειαζόταν σ_music και σ_speech ξεχωριστά ανά άξονα) — είναι
+nearest-centroid με κοινή κλίμακα. Μαθηματική συνέπεια, ΕΠΑΛΗΘΕΥΜΕΝΗ
+πριν το τρέξιμο: με κοινή κλίμακα και στις δύο κλάσεις, «πλησιέστερο
+κέντρο» = ακριβώς η ΙΔΙΑ απόφαση με την προβολή στην ευθεία που
+συνδέει τα κέντρα και σύγκριση με το μέσο (κλασική ταυτότητα: το
+πρόσημο του (P-midpoint)·(B-A) καθορίζει ΚΑΙ τα δύο). DELTA_CV/
+DELTA_FLUX/DELTA_SQ επαληθεύτηκαν να ΕΙΝΑΙ ακριβώς οι z-scored
+διαφορές κέντρων (π.χ. (SPEECH_CV-MUSIC_CV)/CV_POOLED_STD = 1.6146 ≈
+DELTA_CV) — άρα το Α ΕΙΝΑΙ ήδη μαθηματικά nearest-centroid. Το Δ
+αναμένεται να δώσει ΤΗΝ ΙΔΙΑ ετυμηγορία με το Α σε κάθε σημείο — η
+μόνη νέα πληροφορία είναι η ΤΡΙΤΗ κατάσταση («μακριά και από τα δύο»),
+που η προβολή δεν μπορεί να εκφράσει καθόλου.
+
+── ΠΡΟΒΛΕΨΗ, ΓΡΑΜΜΕΝΗ ΠΡΙΝ ΤΟ ΤΡΕΞΙΜΟ ──
+
+Το Β νικάει το Α στα (3)(4)(6) και χάνει στο (2). Το Δ δείχνει ότι τα
+δοκίμια ΜΕ bed έχουν πολλά παράθυρα μακριά και από τα δύο κέντρα.
+⚠ Το άγνωστο, δηλωμένο: αν τα κέντρα έχουν μόνο μία κοινή τυπική
+απόκλιση (pooled, όχι ανά κλάση), το Δ είναι περιορισμένο — και βάσει
+της ταυτότητας πάνω, αναμένεται Δ≡Α σε κάθε ετυμηγορία.
+
+── ΜΕΤΡΗΜΕΝΟ ──
+
+MID_CV=0.5615  MID_FLUX=1.5314
+
+1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ          n=116  Α= 99.1%  Β=100.0%  Γ= 93.1%  Δ= 99.1%   μακριά-και-απο-τα-δύο=43/116
+2 ΣΚΕΤΟ BED              n=116  Α=100.0%  Β=100.0%  Γ=100.0%  Δ=100.0%   μακριά-και-απο-τα-δύο=0/116
+3 ΑΦΗΓΗΣΗ+BED -20dB      n=116  Α= 75.9%  Β= 96.6%  Γ= 62.9%  Δ= 75.9%   μακριά-και-απο-τα-δύο=9/116
+4 ΑΦΗΓΗΣΗ+BED -12dB      n=116  Α= 10.3%  Β= 73.3%  Γ=  7.8%  Δ= 10.3%   μακριά-και-απο-τα-δύο=1/116
+5 ΕΝΑΛΛΑΓΗ 30/60/90      n=116  Α= 95.7%  Β= 94.8%  Γ= 95.7%  Δ= 95.7%   μακριά-και-απο-τα-δύο=26/116
+6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s    n=116  Α= 86.2%  Β= 96.6%  Γ= 78.4%  Δ= 86.2%   μακριά-και-απο-τα-δύο=26/116
+
+ΣΥΝΟΛΟ (696 παράθυρα): Α=77.9% Β=93.5% Γ=73.0% Δ=77.9%
+Α vs Δ διαφωνίες (αναμένεται 0, αλγεβρικά ταυτόσημα): 0
+ΣΥΝΟΛΟ 'μακριά και από τα δύο κέντρα' (>2σ και από τα δύο): 105/696
+
+── ΜΕ ΑΚΕΡΑΙΟΥΣ ΑΡΙΘΜΟΥΣ ──
+1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ          n=116  Α=115/116  Β=116/116  Γ=108/116  Δ=115/116
+2 ΣΚΕΤΟ BED              n=116  Α=116/116  Β=116/116  Γ=116/116  Δ=116/116
+3 ΑΦΗΓΗΣΗ+BED -20dB      n=116  Α= 88/116  Β=112/116  Γ= 73/116  Δ= 88/116
+4 ΑΦΗΓΗΣΗ+BED -12dB      n=116  Α= 12/116  Β= 85/116  Γ=  9/116  Δ= 12/116
+5 ΕΝΑΛΛΑΓΗ 30/60/90      n=116  Α=111/116  Β=110/116  Γ=111/116  Δ=111/116
+6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s    n=116  Α=100/116  Β=112/116  Γ= 91/116  Δ=100/116
+
+
+──────────────────────────────────────────────────────────────────
+ΠΗΓΗ ΔΕΔΟΜΕΝΩΝ: docs/lab-logs/rms-texture-20260916.txt (ενότητα attack_detector_recon,
+696 παράθυρα, cv_ioi/cepstral_flux/ground-truth ήδη καταγεγραμμένα 16/09).
+Το σενάριο αριθμητικής (Python, καμία εξάρτηση εκτός stdlib) παρατίθεται αυτούσιο:
+
+import re, math, sys
+
+MUSIC_CV=0.4375; SPEECH_CV=0.6855; CV_POOLED_STD=0.1536
+MUSIC_FLUX=1.3387; SPEECH_FLUX=1.7242; FLUX_POOLED_STD=0.1738
+DELTA_CV=1.61458; DELTA_FLUX=2.21807; DELTA_SQ=7.52673
+Z_CLAMP=3.0
+
+MID_FLUX=(MUSIC_FLUX+SPEECH_FLUX)/2.0
+MID_CV=(MUSIC_CV+SPEECH_CV)/2.0
+
+def clamp(x,lo,hi): return max(lo,min(hi,x))
+
+def verdict_A(cv, flux):
+    p_cv = clamp((cv-MUSIC_CV)/CV_POOLED_STD, -Z_CLAMP, Z_CLAMP)
+    p_flux = clamp((flux-MUSIC_FLUX)/FLUX_POOLED_STD, -Z_CLAMP, Z_CLAMP)
+    t = (p_cv*DELTA_CV + p_flux*DELTA_FLUX)/DELTA_SQ
+    leaning = clamp(t,0.0,1.0)
+    return "Speech" if leaning>=0.5 else "Music", t
+
+def verdict_B(cv, flux):
+    return "Speech" if flux>=MID_FLUX else "Music"
+
+def verdict_G(cv, flux):
+    return "Speech" if cv>=MID_CV else "Music"
+
+def dist(cv,flux,c_cv,c_flux):
+    return math.sqrt(((cv-c_cv)/CV_POOLED_STD)**2 + ((flux-c_flux)/FLUX_POOLED_STD)**2)
+
+def verdict_D(cv, flux):
+    dm = dist(cv,flux,MUSIC_CV,MUSIC_FLUX)
+    ds = dist(cv,flux,SPEECH_CV,SPEECH_FLUX)
+    v = "Speech" if ds<dm else "Music"
+    certainty = abs(dm-ds)
+    far_both = (dm>2.0 and ds>2.0)
+    return v, dm, ds, certainty, far_both
+
+cases = [
+    ("1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ", "test1", "AllSpeech"),
+    ("2 ΣΚΕΤΟ BED", "test2", "AllMusic"),
+    ("3 ΑΦΗΓΗΣΗ+BED -20dB", "test3", "AllSpeech"),
+    ("4 ΑΦΗΓΗΣΗ+BED -12dB", "test4", "AllSpeech"),
+    ("5 ΕΝΑΛΛΑΓΗ 30/60/90", "test5", "Alternating"),
+    ("6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s", "test6", "AllSpeech"),
+]
+
+def expected(gt, center):
+    if gt=="AllMusic": return "Music"
+    if gt=="Alternating":
+        block = int(center//30.0)
+        return "Speech" if block%2==0 else "Music"
+    return "Speech"
+
+# parse raw output
+text = open("/tmp/attack_detector_output.txt", encoding="utf-8").read()
+sections = re.split(r"=== (\d) .*? \((test\d)_[^)]*\.wav\) ===", text)
+# sections[0] is preamble; then triples (id, name, body)
+data = {}
+i = 1
+while i < len(sections):
+    idx = sections[i]; name = sections[i+1]; body = sections[i+2]
+    rows = []
+    for line in body.splitlines():
+        m = re.match(r"\s*([\d.]+)s\s+επιθ=\s*(\d+)\s+ioi=\s*(\d+)\s+cv_ioi=\s*([\d.]+|NaN)\s+flux=\s*([\d.]+)\s+(ναι|ΟΧΙ)", line)
+        if m:
+            t, onsets, ioi, cv, flux, ok = m.groups()
+            if cv == "NaN": continue
+            rows.append((float(t), int(onsets), int(ioi), float(cv), float(flux), ok=="ναι"))
+    data[name] = rows
+    i += 3
+
+print(f"MID_CV={MID_CV:.4f}  MID_FLUX={MID_FLUX:.4f}")
+print()
+
+overall = {"A":0,"B":0,"G":0,"D":0}
+overall_n = 0
+a_d_mismatches = 0
+far_both_total = 0
+far_both_by_test = {}
+
+for label, key, gt in cases:
+    rows = data[key]
+    n = len(rows)
+    correct = {"A":0,"B":0,"G":0,"D":0}
+    far_both = 0
+    for (t, onsets, ioi, cv, flux, logged_ok) in rows:
+        center = t + 2.5
+        exp = expected(gt, center)
+        va, tval = verdict_A(cv, flux)
+        vb = verdict_B(cv, flux)
+        vg = verdict_G(cv, flux)
+        vd, dm, ds, cert, fb = verdict_D(cv, flux)
+        if va == exp: correct["A"] += 1
+        if vb == exp: correct["B"] += 1
+        if vg == exp: correct["G"] += 1
+        if vd == exp: correct["D"] += 1
+        if va != vd: a_d_mismatches += 1
+        if fb: far_both += 1
+        # sanity: va should match logged_ok
+        logged_exp_ok = (va=="Speech") == logged_ok if exp=="Speech" else None
+    far_both_by_test[label] = (far_both, n)
+    far_both_total += far_both
+    print(f"{label:<24} n={n:<4} Α={100*correct['A']/n:5.1f}%  Β={100*correct['B']/n:5.1f}%  Γ={100*correct['G']/n:5.1f}%  Δ={100*correct['D']/n:5.1f}%   μακριά-και-απο-τα-δύο={far_both}/{n}")
+    for k in overall: overall[k]+=correct[k]
+    overall_n += n
+
+print()
+print(f"ΣΥΝΟΛΟ (696 παράθυρα): Α={100*overall['A']/overall_n:.1f}% Β={100*overall['B']/overall_n:.1f}% Γ={100*overall['G']/overall_n:.1f}% Δ={100*overall['D']/overall_n:.1f}%")
+print(f"Α vs Δ διαφωνίες (αναμένεται 0, αλγεβρικά ταυτόσημα): {a_d_mismatches}")
+print(f"ΣΥΝΟΛΟ 'μακριά και από τα δύο κέντρα' (>2σ και από τα δύο): {far_both_total}/696")
+
+print()
+print("── ΜΕ ΑΚΕΡΑΙΟΥΣ ΑΡΙΘΜΟΥΣ ──")
+for label, key, gt in cases:
+    rows = data[key]
+    n = len(rows)
+    correct = {"A":0,"B":0,"G":0,"D":0}
+    for (t, onsets, ioi, cv, flux, logged_ok) in rows:
+        center = t + 2.5
+        exp = expected(gt, center)
+        va,_ = verdict_A(cv, flux)
+        vb = verdict_B(cv, flux)
+        vg = verdict_G(cv, flux)
+        vd,_,_,_,_ = verdict_D(cv, flux)
+        if va == exp: correct["A"] += 1
+        if vb == exp: correct["B"] += 1
+        if vg == exp: correct["G"] += 1
+        if vd == exp: correct["D"] += 1
+    print(f"{label:<24} n={n:<4} Α={correct['A']:>3}/{n}  Β={correct['B']:>3}/{n}  Γ={correct['G']:>3}/{n}  Δ={correct['D']:>3}/{n}")
+
+
+sha256(αυτό το αρχείο ΧΩΡΙΣ αυτή τη γραμμή και την επόμενη): 1af157488a015925d9518f94d51d79fab85158d48aa06c5b933b090f1845b356
+πηγή: analyze.py (καθαρή αριθμητική, καμία νέα μέτρηση ήχου), commit εν εξελίξει
