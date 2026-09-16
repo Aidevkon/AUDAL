@@ -379,7 +379,9 @@ pub fn run_streaming_pipeline_with_timeline(
             &profile,
         );
 
-        for (i, &gain) in ref_gains.iter().enumerate() {
+        let compensated_gains = apply_ltass_band_compensation(ref_gains);
+
+        for (i, &gain) in compensated_gains.iter().enumerate() {
             let node_id = format!("ltass_band_{}", i);
             vocal_graph
                 .set_node_parameter_no_glide(&node_id, "gain_db", gain)
@@ -647,4 +649,112 @@ pub fn run_streaming_pipeline_with_timeline(
 
     writer.finalize()?;
     Ok(total_frames_processed)
+}
+
+/// Cross-band compensation for the eight LTASS gains the resolver hands
+/// back, before they reach `set_node_parameter_no_glide`.
+///
+/// ΜΕΤΡΗΜΕΝΟΣ, ΟΧΙ ΑΠΟ ΤΥΠΟ. Γεννήτρια:
+/// research/encoder-gap-speech/src/bin/ltass_band_matrix.rs
+/// Log: docs/lab-logs/ltass-band-matrix-20260912.txt
+/// Ισχύει για q=0.707 στα 48 kHz — τις τιμές αυτής
+/// της τοπολογίας. Άλλο Q ⇒ άλλος πίνακας, και η
+/// γεννήτρια τον βγάζει.
+///
+/// ΓΙΑΤΙ ΟΧΙ Ο A_INV ΤΟΥ dsp/mod.rs: εκείνος λύνει την
+/// επικάλυψη στα ΚΕΝΤΡΑ των συχνοτήτων. Ο resolver
+/// διορθώνει βάσει ΟΛΟΚΛΗΡΩΜΕΝΗΣ ΕΝΕΡΓΕΙΑΣ ΑΝΑ ΜΠΑΝΤΑ.
+/// Μετρήθηκε 2026-09-12: σφάλμα στα κέντρα 0.052,
+/// στις μπάντες 2.271 — σαρανταπλάσιο. F-098.
+fn apply_ltass_band_compensation(ref_gains: [f32; 8]) -> [f32; 8] {
+    #[rustfmt::skip]
+    const B_INV_Q0707: [[f32; 8]; 8] = [
+        [ 1.3717, -0.5135,  0.2316, -0.0911,  0.0310, -0.0102,  0.0030, -0.0008],
+        [-0.4907,  1.7330, -1.0605,  0.4278, -0.1457,  0.0482, -0.0141,  0.0038],
+        [ 0.1502, -0.7726,  2.0203, -1.1928,  0.4248, -0.1406,  0.0413, -0.0110],
+        [-0.0507,  0.2677, -1.1396,  2.2964, -1.2724,  0.4424, -0.1301,  0.0347],
+        [ 0.0199, -0.1049,  0.4686, -1.3901,  2.3899, -1.2671,  0.3908, -0.1044],
+        [-0.0073,  0.0388, -0.1739,  0.5396, -1.3760,  2.2805, -1.0778,  0.3007],
+        [ 0.0024, -0.0129,  0.0579, -0.1802,  0.4809, -1.1825,  1.9069, -0.8234],
+        [-0.0006,  0.0032, -0.0142,  0.0443, -0.1185,  0.3047, -0.7204,  1.7053],
+    ];
+    // Ίδια τιμή με το dsp/mod.rs:506 — αντίγραφο, όχι πηγή,
+    // ίδιο ιστορικό ατύχημα ήδη καταγεγραμμένο εκεί.
+    const G_MAX_DB: f32 = 6.0;
+
+    std::array::from_fn(|i| {
+        let raw: f32 = B_INV_Q0707[i]
+            .iter()
+            .zip(ref_gains.iter())
+            .map(|(&b, &g)| b * g)
+            .sum();
+        raw.clamp(-G_MAX_DB, G_MAX_DB)
+    })
+}
+
+#[cfg(test)]
+mod ltass_compensation_tests {
+    use super::apply_ltass_band_compensation;
+
+    /// Επαναλαμβάνει τον έλεγχο του
+    /// docs/lab-logs/ltass-band-matrix-20260912.txt, block `### q=0.707`,
+    /// στον ΚΩΔΙΚΑ που καλείται πραγματικά — όχι στη γεννήτρια.
+    ///
+    /// Το log δηλώνει: ζητούμενο [+6,0,…,0] ⇒ ΕΦΑΡΜΟΓΗ στη μπάντα 0:
+    /// 8.230 dB — δηλαδή η ΠΡΙΝ-το-clamp τιμή band 0 = B⁻¹[0][0] * 6.0.
+    /// Οι υπόλοιπες επτά τιμές προκύπτουν με τον ίδιο τρόπο από τη στήλη 0
+    /// του ίδιου πίνακα και ΔΕΝ είναι στο log ρητά — υπολογίζονται εδώ από
+    /// τους ίδιους 8 συντελεστές που ελέγχει το πρώτο assert, όχι
+    /// ξαναγραμμένες ανεξάρτητα.
+    ///
+    /// ΑΝΟΧΗ: 1e-3, δηλωμένη πριν το τρέξιμο — το log τυπώνει 4 δεκαδικά.
+    #[test]
+    fn s1_probe_matches_the_generators_log() {
+        const TOL: f32 = 1e-3;
+
+        let out = apply_ltass_band_compensation([6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+
+        // Band 0, πριν το clamp: 8.230 — ρητά στο log. Μετά το clamp
+        // (G_MAX_DB=6.0): 6.0.
+        assert!(
+            (out[0] - 6.0).abs() < TOL,
+            "band 0 expected clamped 6.0 (log: unclamped 8.230), got {}",
+            out[0]
+        );
+
+        // Στήλη 0 του B⁻¹ (q=0.707), ίδιοι 8 συντελεστές με τη σταθερά
+        // μέσα στη συνάρτηση — γραμμένοι εδώ ανεξάρτητα, ίδια πηγή (log).
+        #[rustfmt::skip]
+        let b_inv_col0 = [
+            1.3717_f32, -0.4907, 0.1502, -0.0507, 0.0199, -0.0073, 0.0024, -0.0006,
+        ];
+        for (i, &c) in b_inv_col0.iter().enumerate() {
+            let expected_unclamped = c * 6.0;
+            let expected = expected_unclamped.clamp(-6.0, 6.0);
+            assert!(
+                (out[i] - expected).abs() < TOL,
+                "band {i}: expected {expected} (unclamped {expected_unclamped}), got {}",
+                out[i]
+            );
+        }
+    }
+
+    /// Η γεννήτρια αναφέρει clamp στη μπάντα 0 για το probe [+6,0,…,0]
+    /// (8.230 πριν, 6.0 μετά) — η συνάρτηση πρέπει να το αναπαράγει, όχι
+    /// να αφήσει την τιμή αψαλίδιστη.
+    #[test]
+    fn s1_probe_band_zero_is_clamped() {
+        let out = apply_ltass_band_compensation([6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert!(out[0] <= 6.0 + 1e-6, "band 0 must not exceed G_MAX_DB, got {}", out[0]);
+    }
+
+    /// Μηδενικό ζητούμενο ⇒ μηδενικό αποτέλεσμα, όποιος κι αν είναι ο
+    /// πίνακας — 0 * B⁻¹ = 0. Ελέγχει ότι δεν υπάρχει σταθερό offset.
+    #[test]
+    fn zero_request_stays_zero() {
+        let out = apply_ltass_band_compensation([0.0; 8]);
+        for (i, &g) in out.iter().enumerate() {
+            assert_eq!(g, 0.0, "band {i} should be exactly 0.0 for a zero request");
+        }
+    }
 }
