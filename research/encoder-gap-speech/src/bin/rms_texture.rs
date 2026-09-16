@@ -113,7 +113,7 @@ fn main() {
         let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
         let env_db = qw_env_db(&mono);
 
-        let sample_rate = 48000usize;
+        let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as usize;
         let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
         let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
         let samples_per_analysis_window = win_samples / QW_WINDOW; // 240000/4800 = 50

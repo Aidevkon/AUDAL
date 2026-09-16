@@ -129,7 +129,7 @@ fn main() {
         let (left, right) = read_wav_stereo_f32(&path);
         let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
 
-        let sample_rate = 48000u32;
+        let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
         let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
         let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
 

@@ -152,7 +152,7 @@ fn main() {
     for (label, wav) in cases {
         let path = format!("{WORK}/{wav}");
         let (left, right) = read_wav_stereo_f32(&path);
-        let rows = scan_with_diag(&left, &right, 48000);
+        let rows = scan_with_diag(&left, &right, lineos_types::analysis::ANALYSIS_SAMPLE_RATE);
 
         let mut out_of_range = 0usize;
         let mut out_of_range_wrong = 0usize;
