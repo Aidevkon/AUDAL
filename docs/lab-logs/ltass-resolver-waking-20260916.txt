@@ -1,0 +1,144 @@
+Ανοχή δηλωμένη πριν το τρέξιμο: ±0.5 Hz, μόνο συχνότητα.
+
+  odyssey    ζητούμενο=60.01Hz μετρημένο(ζωντανή)=59.968Hz prom=38.943dB(decim1k, ΝΕΑ ΜΕΤΡΗΣΗ) Δ=0.042Hz ΕΝΤΟΣ
+  swiss      ζητούμενο=59.90Hz μετρημένο(ζωντανή)=59.982Hz prom=28.701dB(decim1k, ΝΕΑ ΜΕΤΡΗΣΗ) Δ=0.082Hz ΕΝΤΟΣ
+  mobydick   ζητούμενο=70.16Hz μετρημένο(ζωντανή)=70.113Hz prom=17.150dB(decim1k, ΝΕΑ ΜΕΤΡΗΣΗ) Δ=0.047Hz ΕΝΤΟΣ
+
+── ΤΑ ΕΙΚΟΣΙ (9 WAKING + 11 SLEEPING, interior-floor-20260912.txt) ──
+(WAKING = interior >= -60dB στο παλιό όργανο· SLEEPING = interior < -60dB. Ουδεμία σχέση με το mains-hum όργανο — μόνο ταυτοποίηση αρχείου.)
+
+
+══ ΤΙ ΖΗΤΑΕΙ Ο RESOLVER ΣΤΑ ΕΝΝΙΑ WAKING (δικό μας υλικό, librivox-hq) ══
+Στήλες ανά μπάντα: RAW (πριν πίνακα, πριν ταβάνι) · POST_B (μετά πίνακα, πριν ταβάνι) · FINAL (μετά ταβάνι).
+
+  adventurespinocchio_01_collodi
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0     2.611     2.552     2.552
+    band 1       150.0     2.153     2.099     2.099
+    band 2       350.0     0.369    -0.629    -0.629
+    band 3       750.0     0.230    -0.055    -0.055
+    band 4      1500.0    -1.031     2.706     2.706
+    band 5      3000.0    -4.332    -8.337    -6.000
+    band 6      6000.0     0.000     4.586     4.586
+    band 7     12000.0     0.000    -1.188    -1.188
+
+  anne_of_green_gables_01_montgomery
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0    -1.011    -5.571    -5.571
+    band 1       150.0     9.527    13.759     6.000
+    band 2       350.0     3.015    -1.297    -1.297
+    band 3       750.0    -0.404    -0.855    -0.855
+    band 4      1500.0    -3.399     2.621     2.621
+    band 5      3000.0    -7.727   -13.309    -6.000
+    band 6      6000.0     0.000     7.625     6.000
+    band 7     12000.0     0.000    -1.981    -1.981
+
+  count_of_monte_cristo_001_dumas
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0    -2.780    -5.850    -5.850
+    band 1       150.0     4.840     7.711     6.000
+    band 2       350.0     2.456    -0.797    -0.797
+    band 3       750.0     0.712     2.474     2.474
+    band 4      1500.0    -2.632    -3.404    -3.404
+    band 5      3000.0    -2.596    -2.132    -2.132
+    band 6      6000.0     0.000     1.748     1.748
+    band 7     12000.0     0.000    -0.465    -0.465
+
+  dracula_01_stoker
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0    13.370    14.339     6.000
+    band 1       150.0     7.533     7.039     6.000
+    band 2       350.0    -2.820    -2.780    -2.780
+    band 3       750.0    -7.361    -6.300    -6.000
+    band 4      1500.0    -6.295    -1.048    -1.048
+    band 5      3000.0    -4.427    -4.721    -4.721
+    band 6      6000.0     0.000     3.306     3.306
+    band 7     12000.0     0.000    -0.873    -0.873
+
+  huckfinn_01_twain_apc
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0    17.669    22.070     6.000
+    band 1       150.0     4.347    -1.453    -1.453
+    band 2       350.0    -0.261     0.380     0.380
+    band 3       750.0    -2.190    -1.743    -1.743
+    band 4      1500.0    -6.633     3.350     3.350
+    band 5      3000.0   -12.932   -21.460    -6.000
+    band 6      6000.0     0.000    12.468     6.000
+    band 7     12000.0     0.000    -3.244    -3.244
+
+  janeeyre_01_bronte
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0     2.862     2.129     2.129
+    band 1       150.0     4.095     4.287     4.287
+    band 2       350.0     1.210     0.033     0.033
+    band 3       750.0    -0.633    -0.693    -0.693
+    band 4      1500.0    -2.636     0.980     0.980
+    band 5      3000.0    -4.898    -7.956    -6.000
+    band 6      6000.0     0.000     4.662     4.662
+    band 7     12000.0     0.000    -1.214    -1.214
+
+  peterpan_01_barrie
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0     6.305     6.565     6.000
+    band 1       150.0     4.045     3.933     3.933
+    band 2       350.0    -0.523    -1.779    -1.779
+    band 3       750.0    -2.062    -0.456    -0.456
+    band 4      1500.0    -3.705    -1.390    -1.390
+    band 5      3000.0    -4.059    -5.069    -5.069
+    band 6      6000.0     0.000     3.322     3.322
+    band 7     12000.0     0.000    -0.872    -0.872
+
+  secretgarden_01_burnett
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0    13.467    14.691     6.000
+    band 1       150.0     7.217     6.192     6.000
+    band 2       350.0    -2.427    -2.187    -2.187
+    band 3       750.0    -6.941    -6.009    -6.000
+    band 4      1500.0    -6.369    -0.930    -0.930
+    band 5      3000.0    -4.947    -5.660    -5.660
+    band 6      6000.0     0.000     3.837     3.837
+    band 7     12000.0     0.000    -1.011    -1.011
+
+  tale_of_two_cities_01_dickens
+    band             hz       RAW    POST_B     FINAL
+    band 0        50.0     1.096     0.539     0.539
+    band 1       150.0     2.510     2.356     2.356
+    band 2       350.0     2.604    -0.131    -0.131
+    band 3       750.0     3.415     3.955     3.955
+    band 4      1500.0    -1.587     2.622     2.622
+    band 5      3000.0    -8.037   -14.665    -6.000
+    band 6      6000.0     0.000     8.246     6.000
+    band 7     12000.0     0.000    -2.139    -2.139
+
+── ΣΥΝΟΛΙΚΑ (δικό μας υλικό, 9 αρχεία × 8 μπάντες = 72) ──
+Μπάντες στο ταβάνι (|POST_B| > 6): 18/72
+    adventurespinocchio_01_collodi  band 5 (3000 Hz)
+    anne_of_green_gables_01_montgomery  band 1 (150 Hz)
+    anne_of_green_gables_01_montgomery  band 5 (3000 Hz)
+    anne_of_green_gables_01_montgomery  band 6 (6000 Hz)
+    count_of_monte_cristo_001_dumas  band 1 (150 Hz)
+    dracula_01_stoker  band 0 (50 Hz)
+    dracula_01_stoker  band 1 (150 Hz)
+    dracula_01_stoker  band 3 (750 Hz)
+    huckfinn_01_twain_apc  band 0 (50 Hz)
+    huckfinn_01_twain_apc  band 5 (3000 Hz)
+    huckfinn_01_twain_apc  band 6 (6000 Hz)
+    janeeyre_01_bronte  band 5 (3000 Hz)
+    peterpan_01_barrie  band 0 (50 Hz)
+    secretgarden_01_burnett  band 0 (50 Hz)
+    secretgarden_01_burnett  band 1 (150 Hz)
+    secretgarden_01_burnett  band 3 (750 Hz)
+    tale_of_two_cities_01_dickens  band 5 (3000 Hz)
+    tale_of_two_cities_01_dickens  band 6 (6000 Hz)
+Μεγαλύτερη ζητούμενη |RAW| διόρθωση στο δείγμα: 17.669 dB
+Διάμεσος |RAW| διόρθωσης: 2.553 dB
+
+⚠ ΚΡΙΣΙΜΟ — ο πίνακας ανεβάζει ζητούμενη τιμή πάνω από το ταβάνι ενώ χωρίς αυτόν θα περνούσε: 6/72
+    adventurespinocchio_01_collodi  band 5 (3000 Hz)
+    anne_of_green_gables_01_montgomery  band 6 (6000 Hz)
+    count_of_monte_cristo_001_dumas  band 1 (150 Hz)
+    huckfinn_01_twain_apc  band 6 (6000 Hz)
+    janeeyre_01_bronte  band 5 (3000 Hz)
+    tale_of_two_cities_01_dickens  band 6 (6000 Hz)
+-- WAKING (9) --
+  adventurespinocchio_01_collodi           Hz=59.991 prominence_db=32.732 (decim1k, ΝΕΑ ΜΕΤΡΗΣΗ) quiet_split=Some(-37.5) παύση@12.9s
