@@ -709,6 +709,122 @@ fn test_vocal_graph_e2e_ltass_proof() {
     std::fs::remove_file(output_path_eq).ok();
 }
 
+/// ΚΟΙΜΑΤΑΙ ΑΠΟ 2026-09-16 (streaming_pipeline.rs): το LTASS υπολογίζεται
+/// ακόμα (διάγνωση) αλλά δεν γράφεται πια στους κόμβους — κανένα από τα
+/// οκτώ κριτήρια συμμόρφωσης του προορισμού δεν είναι φασματικό σχήμα, και
+/// η ακρόαση 16/09 έδειξε ότι η πιστή παράδοση του αιτήματος απομακρύνει
+/// από το πρωτότυπο, όχι κοντά του.
+///
+/// Ίδιο σχήμα με `test_vocal_graph_e2e_ltass_proof` (flat vs raw[3]-=10
+/// aggressive) — αλλά τώρα η πρόβλεψη είναι ΤΟ ΑΝΤΙΘΕΤΟ: δύο εντελώς
+/// διαφορετικά `spectral_profile_db` πρέπει να παράγουν BIT-EXACT ίδιο
+/// αρχείο, σε ΟΛΗ τη διάρκεια — όχι μόνο στην περιοχή Hybrid, γιατί αν
+/// το LTASS πραγματικά κοιμάται δεν υπάρχει ΚΑΝΕΝΑ σημείο όπου να
+/// διαφέρει.
+#[test]
+fn test_ltass_sleeping_does_not_touch_samples() {
+    use lineos_types::pre_analysis::PreAnalysisData;
+
+    let topology = dummy_ducking_topology();
+    let input_path = "../../m1/sp314-dsp/tests/fixtures/real_world_60s.wav";
+    let output_path_flat = "/tmp/test_ltass_sleep_output_flat.wav";
+    let output_path_eq = "/tmp/test_ltass_sleep_output_eq.wav";
+
+    let boundaries = vec![lineos_corpus::scout::SegmentBoundary {
+        start_sec: 10.0,
+        end_sec: 11.0,
+        segment_type: lineos_corpus::scout::SegmentType::Speech,
+        avg_leaning: 0.5,
+        avg_confidence: 0.2, // Forces Hybrid -> runs vocal_graph
+    }];
+
+    let profile = aether_bridge::reference_resolver::ReferenceProfile::load(
+        aether_bridge::reference_resolver::ProfileId::PodcastV1,
+    );
+
+    let run = |spectral_profile_db: [f32; 8], output_path: &str| {
+        let mut pre = PreAnalysisData::silent();
+        pre.spectral_profile_db = spectral_profile_db;
+
+        let (tx_job, rx_job) = std::sync::mpsc::channel();
+        let (tx_res, rx_res) = std::sync::mpsc::channel();
+        let shadow_reader =
+            m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(input_path)).unwrap();
+        let _worker_handle =
+            m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
+        let (_, flagged_indices) =
+            m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
+
+        run_streaming_pipeline_with_timeline(
+            FileDecoder {
+                path: input_path.to_string(),
+            },
+            output_path,
+            &StreamingConfig {
+                topology: &topology,
+                block_size: 1024,
+                sample_rate: 48000,
+                ducking_node_id: "duck_gain",
+                speech_gain: 1.0,
+                music_gain: 0.501,
+                pre_gain_linear: 1.0,
+                expected_output_frames: None,
+                quietest_active_window_dbfs: None,
+                max_true_peak_db: lineos_types::presets::PODCAST.max_true_peak_db,
+                max_noise_floor_db: lineos_types::presets::PODCAST.max_noise_floor_db,
+                input_interior_floor_db: None,
+                quiet_window_split_dbfs: None,
+                input_fundamental: None,
+                intent_dynamics: None,
+                restoration_enabled: false,
+            },
+            TimelinePlan {
+                boundaries: boundaries.clone(),
+                flagged_indices,
+                pre_analysis: Some(&pre),
+            },
+            rx_res,
+        )
+        .unwrap();
+    };
+
+    // ΙΔΙΟ Α/Β με το test_vocal_graph_e2e_ltass_proof: flat (0dB παντού)
+    // έναντι επιθετικό (raw[3] -= 10, θα ζητούσε μεγάλο boost στα 750Hz
+    // αν το LTASS ήταν ξύπνιο).
+    run(profile.spectral_target, output_path_flat);
+    let mut raw = profile.spectral_target;
+    raw[3] -= 10.0;
+    run(raw, output_path_eq);
+
+    let (flat_samples, _, _) =
+        m0d::handlers::decode::decode_raw_interleaved(output_path_flat).unwrap();
+    let (eq_samples, _, _) = m0d::handlers::decode::decode_raw_interleaved(output_path_eq).unwrap();
+
+    assert_eq!(
+        flat_samples.len(),
+        eq_samples.len(),
+        "flat and eq outputs must have the same length"
+    );
+    let mismatches: Vec<usize> = flat_samples
+        .iter()
+        .zip(eq_samples.iter())
+        .enumerate()
+        .filter(|(_, (&a, &b))| a.to_bits() != b.to_bits())
+        .map(|(i, _)| i)
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "LTASS is asleep — flat vs aggressive spectral_profile_db must produce bit-identical \
+         output. {} of {} samples differ, first at index {}",
+        mismatches.len(),
+        flat_samples.len(),
+        mismatches.first().copied().unwrap_or(0)
+    );
+
+    std::fs::remove_file(output_path_flat).ok();
+    std::fs::remove_file(output_path_eq).ok();
+}
+
 #[test]
 fn tapped_decoder_dump_is_byte_identical_to_source_stream() {
     use sp314_orchestrator::decode_provider::{DecodeProvider, TappedDecoder};

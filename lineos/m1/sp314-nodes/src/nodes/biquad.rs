@@ -269,3 +269,62 @@ impl DspNode for BiquadFilterNode {
         "BiquadFilter"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::DspNode;
+
+    /// Επαληθεύει το ΔΟΓΜΑ που δικαιολογεί το «ΚΟΙΜΑΤΑΙ» του LTASS
+    /// (sp314-orchestrator/streaming_pipeline.rs, 2026-09-16): ένα
+    /// Peaking biquad στο gain_db=0.0 πρέπει να είναι BIT-EXACT
+    /// passthrough, μηδενικής καθυστέρησης — όχι «πολύ κοντά».
+    ///
+    /// Απόδειξη, αλγεβρικά, γιατί ισχύει (Direct Form II Transposed,
+    /// γρ. 156-168 παραπάνω): στο gain_db=0.0, a = 10^0 = 1.0 ακριβώς,
+    /// άρα b0 = (1+α·1)/(1+α/1) = 1.0 ακριβώς, και b1/a0 == a1/a0 ·
+    /// b2/a0 == a2/a0 (ίδιοι αριθμητές, ίδιος διαιρέτης — bit-ταυτόσημα).
+    /// Με z1=z2=0 αρχικά: out = 1.0·x + 0 = x ακριβώς· z1_new =
+    /// (b1-a1)·x = 0·x = 0 ακριβώς (αφαίρεση ίδιας τιμής από τον εαυτό
+    /// της)· z2_new ίδια λογική. Με επαγωγή, z1=z2=0 ΓΙΑ ΠΑΝΤΑ — άρα
+    /// out[n] = x[n] ακριβώς, κάθε n. Το test παρακάτω το μετράει, δεν
+    /// το υποθέτει.
+    #[test]
+    fn peaking_gain_zero_is_bit_exact_passthrough() {
+        let mut node = BiquadFilterNode::new(48_000.0);
+        node.set_parameter_no_glide("filter_type", 3.0); // Peaking
+        node.set_parameter_no_glide("freq_hz", 6000.0); // ltass_band_6, το ακραίο περιστατικό
+        node.set_parameter_no_glide("q", 0.707);
+        node.set_parameter_no_glide("gain_db", 0.0);
+
+        // Ντετερμινιστικός λευκός θόρυβος, ίδιος LCG με τα υπόλοιπα
+        // όργανα αυτής της δουλειάς (0x5EED1234, 1664525/1013904223).
+        let mut seed: u32 = 0x5EED1234;
+        let n = 48_000; // 1s @ 48kHz
+        let mut left: Vec<f32> = (0..n)
+            .map(|_| {
+                seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+                (seed >> 8) as f32 / (1u32 << 24) as f32 * 2.0 - 1.0
+            })
+            .collect();
+        let mut right = left.clone();
+        let input = left.clone();
+
+        node.process_stereo(&mut left, &mut right);
+
+        for i in 0..n {
+            assert_eq!(
+                left[i].to_bits(),
+                input[i].to_bits(),
+                "sample {i}: gain=0 Peaking must be bit-exact passthrough (left), got {} vs input {}",
+                left[i],
+                input[i]
+            );
+            assert_eq!(
+                right[i].to_bits(),
+                input[i].to_bits(),
+                "sample {i}: gain=0 Peaking must be bit-exact passthrough (right)"
+            );
+        }
+    }
+}
