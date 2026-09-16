@@ -2397,6 +2397,53 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
   Trigger: πριν οποιαδήποτε αρχιτεκτονική απόφαση για τη λωρίδα/hybrid διχοτόμηση· ή πριν βαθμονομηθούν τα `A7_PROVISIONAL` κατώφλια, οπότε αυτό το εύρημα ξαναμετριέται.
 
+- **[F-107] Ο τεμαχιστής (`smooth_and_segment`) παράγει όρια ενός δευτερολέπτου χωρίς κατώτατο μήκος, και κάθε όριο Music→Speech μηδενίζει την αλυσίδα αποκατάστασης — γιατί κλιμακώνεται καθαρή αφήγηση.** Component: `lineos-corpus/src/scout.rs` (`smooth_and_segment`, `compute_scout_decision`) · `sp314-orchestrator/src/streaming_pipeline.rs` (`rest_chain.reset()`/`speech_lane_chain.reset()` σε κάθε Music→Speech όριο, γρ.503-505 · JIT stem-cache eviction, γρ.486-489 · `expander_threshold_db`, γρ.127-136) · `research/encoder-gap-speech/src/bin/escalation_analysis.rs` (νέο εργαλείο μέτρησης, γενίκευση του `secretgarden_boundaries.rs`). ΜΕΤΡΗΜΕΝΟ 2026-09-16, εννιά αρχεία αφήγησης.
+
+  ΣΥΓΓΕΝΙΚΟ ΜΕ F-106, ΟΧΙ ΤΟ ΙΔΙΟ: εκείνο μέτρησε ότι ο διαχωρισμός είναι ακουστικά διαφανής και άφησε ρητά ανοιχτό «γιατί κλιμακώνεται καθαρή αφήγηση — ερώτημα που προηγείται κάθε αρχιτεκτονικής απόφασης». Αυτό απαντά εκείνο το ερώτημα.
+
+  **(Α) Τα όρια δεν ακολουθούν τη διάρκεια, ακολουθούν κάτι άλλο.** Εννιά αρχεία, ίδιο εργαλείο, βασικά `A7_PROVISIONAL` κατώφλια:
+  ```
+  αρχείο                 διάρκεια  τμήματα  flagged
+  secretgarden              808 s      75      17
+  dracula                  2218 s     114      21
+  count_of_monte_cristo    1180 s      14       0
+  peterpan                 1071 s       8       0
+  janeeyre                   800 s       8       1
+  huckfinn                   532 s       6       0
+  anne_of_green_gables       878 s       4       0
+  tale_of_two_cities         410 s       1       0
+  adventurespinocchio        302 s       1       0
+  ```
+  `tale_of_two_cities` (410s) κόβεται σε ΕΝΑ τμήμα· `secretgarden` (808s, σχεδόν διπλάσιο) κόβεται σε 75. Η κλιμάκωση του flagged ακολουθεί το πλήθος ορίων, όχι τη διάρκεια ή το υλικό: 22.7% και 18.4% στα δύο αρχεία που κόβονται πολύ, σχεδόν μηδέν στα υπόλοιπα επτά.
+
+  **(Β) Τα «Music» τμήματα είναι ενός δευτερολέπτου, και υπάρχουν σε όλα τα αρχεία.** Κανένα ελάχιστο μήκος δεν επιβάλλεται στον τεμαχιστή — το κοντότερο τμήμα σε πολλά αρχεία είναι ακριβώς 1.00s (ένα hop, `HOP_SECS=1.0`, `trunk_pass.rs:189`). Μέση διάρκεια Music: secretgarden 3.6s (16/37 κάτω από 3s) · dracula 2.8s (29/57 κάτω από 3s) · τα υπόλοιπα επτά 1.3-4.3s. ΟΛΑ τα αρχεία με πάνω από ένα τμήμα έχουν «Music»-χαρακτηρισμένα τμήματα· αυτό που ξεχωρίζει τα δύο δεν είναι η διάρκεια της μουσικής (16% και 7% του αρχείου) — είναι η ΣΥΧΝΟΤΗΤΑ εναλλαγής: 37 και 57 έναντι 2-7. ⚠ Ένα σημείο επαληθεύτηκε με ακρόαση, όχι όλα: το τμήμα 18 του secretgarden (Speech, flagged, γειτονικό σε «Music» τμήματα) δεν είχε καθόλου μουσική στο πρωτότυπο (F-106, 16/09, ιδιοκτήτης). Αν τα μονοδευτερόλεπτα «Music» τμήματα είναι πράγματι μουσική ή artifact του τεμαχιστή ΔΕΝ επαληθεύτηκε ανά τμήμα — δεν υπάρχει εργαλείο ακρόασης σε αυτή τη μέτρηση.
+
+  **(Γ) Κάθε όριο Music→Speech μηδενίζει την αλυσίδα, σκόπιμα.** Αυτούσιο, `streaming_pipeline.rs:503-505`:
+  ```rust
+  // on Music->Speech entry, reset to avoid stale-state click
+  rest_chain.reset();
+  speech_lane_chain.reset();
+  ```
+  Ο κόμβος gate/expander της αλυσίδας έχει `release_coef` προϋπολογισμένο για 100ms και `hold_samples` για 50ms (`sp314-dsp/src/restoration/gate.rs:14,52-53`) — χρειάζεται χρόνο να καταστεί σταθερός μετά από κάθε reset. Στο secretgarden αυτό συμβαίνει 37 φορές, στο dracula 57 — σε αρχείο με τόσο πυκνές εναλλαγές, ο ακολουθητής περιβάλλουσας δεν προλαβαίνει ποτέ σταθερή κατάσταση πριν το επόμενο reset. Η επιλογή είναι δηλωμένα σκόπιμη (λύνει ένα click) — το μέτρημα εδώ είναι πόσο συχνά πυροδοτεί, όχι αν είναι λάθος. ⚠ Δεύτερο, ξεχωριστό κόστος ανά όριο: κάθε αλλαγή `seg_idx` αδειάζει το JIT stem-cache του προηγούμενου τμήματος (`streaming_pipeline.rs:486-489`), και αν το επόμενο τμήμα είναι flagged και δεν υπάρχει ήδη στην cache, ο βρόχος μπλοκάρει σε `recv_timeout(Duration::from_secs(10))` περιμένοντας τον NMF worker. Πόσες φορές αυτό πυροδοτεί στην πράξη ΔΕΝ μετρήθηκε.
+
+  **Η προέλευση, δηλωμένα ανεπαρκής.** Αυτούσιο, ακριβώς πάνω από `smooth_and_segment` (`scout.rs:143-144`):
+  ```rust
+  // PROVISIONAL — smoothing gain + crossing threshold validated on
+  // Flights 9-12 (2 clip pairs, both directions) but not corpus-tuned.
+  ```
+  Ο μηχανισμός: εκθετικά εξομαλυμένη ενεργοποίηση όπου το ίδιο το `confidence` ανά παράθυρο είναι το βήμα εξομάλυνσης (`activation += dec.confidence * (dec.leaning_score - activation)`, `scout.rs:172`)· όριο γεννιέται σε κάθε διάβαση του 0.5 (`scout.rs:177`). Μηδέν ελάχιστο μήκος, μηδέν μέγιστο, μηδέν βήμα που ενώνει γειτονικά μικρά τμήματα. Τρία PROVISIONAL, το ένα πάνω στο άλλο: ο τεμαχιστής (2 ζεύγη κλιπ, χωρίς corpus tuning) · η κλιμάκωση (`A7_PROVISIONAL`, «awaiting M2 corpus calibration», F-106) · και πάνω τους τα centroids εισόδου (`MUSIC_CV`/`SPEECH_CV`/`MUSIC_FLUX`/`SPEECH_FLUX`), που ΕΧΟΥΝ σφραγίδα («F-041 Evaluated Centroids», `scout.rs:46`) και μετρημένη αιτιολογία για το `PERP_R_SQ` (p90=1.577, max=2.285, R=2.0 χάνει 6 αρχεία, R=4.0 αφήνει μέσα το music_11 — `scout.rs:75-77`). Η είσοδος είναι τεκμηριωμένη· ο μηχανισμός κοπής όχι — και το δηλώνει μόνος του.
+
+  **Τι κρατάει ένα τμήμα.** Το ducking gain, το restoration on/off, και η επιλεξιμότητα για κλιμάκωση αλλάζουν ΜΟΝΟ σε type-transition (`streaming_pipeline.rs:492,569,606,521`) — ένα τμήμα των 410s σημαίνει μία απόφαση για όλη τη διάρκειά του. Αντίθετα, το κατώφλι του expander (`expander_threshold_db`, `streaming_pipeline.rs:127-136`) και η γωνία του low-cut (`input_fundamental`) είναι ΗΔΗ per-file, μετρημένα σε όλο το αρχείο, ανεξάρτητα από `boundaries`/`seg_idx` — το ένα τμήμα δεν προσθέτει ακαμψία εκεί, απλώς δεν υπάρχει καμία χρονικά-τοπική προσαρμογή πουθενά σε αυτά τα δύο μεγέθη.
+
+  **Το κόστος, μετρημένο.** Ίδιο αρχείο (secretgarden), πλήρες render, τρία τρεξίματα ανά συνθήκη (`/usr/bin/time -v`, όχι το heap gate — F-078 δηλωμένα αναξιόπιστο):
+  ```
+  ΜΕ stems (σημερινός κώδικας)     62.06 · 65.32 · 64.57 s   RSS ~219.6 MB
+  ΧΩΡΙΣ stems (flagged_hybrid_indices άδειο)  46.48 · 48.74 · 48.26 s   RSS ~243.0 MB
+  ```
+  ~33% γρηγορότερο χωρίς, μηδέν επικάλυψη μεταξύ των δύο ομάδων τιμών, για ακουστικά ταυτόσημο αποτέλεσμα (F-106). ⚠ Η μνήμη είναι αντίστροφη από το αναμενόμενο (λιγότερη ΜΕ διαχωρισμό) — ανεξήγητο, καταγράφεται ως έχει.
+
+  Trigger: πριν οποιαδήποτε αλλαγή στον τεμαχιστή (`smooth_and_segment`) ή στα `A7_PROVISIONAL` κατώφλια — τα δύο PROVISIONAL μηχανισμούς αλληλεπιδρούν, η βαθμονόμηση του ενός χωρίς τον άλλον ξαναμετριέται εδώ· ή πριν οποιαδήποτε αρχιτεκτονική απόφαση για τη λωρίδα/hybrid διχοτόμηση (F-106).
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -2887,7 +2934,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-107** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-108** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
