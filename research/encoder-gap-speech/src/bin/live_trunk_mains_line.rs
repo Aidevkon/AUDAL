@@ -162,7 +162,7 @@ fn main() {
     }
 }
 
-const SR: u32 = 48_000;
+use lineos_types::analysis::ANALYSIS_SAMPLE_RATE as SR;
 
 /// ΜΕΤΡΑ ΚΑΙ ΑΝΑΦΕΡΕΙ — μηδέν ζητούμενο, μηδέν κατώφλι, μηδέν κρίση.
 /// Επιστρέφει (hz, prominence_db, θέση_παύσης_sec) ώστε ο main να μπορεί

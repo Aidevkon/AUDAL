@@ -17,6 +17,7 @@
 //!   cargo run --release --bin huckfinn_ltass_ab -- energy <wav> (5-8kHz ενέργεια, dB)
 
 use lineos_corpus::scout::{SegmentBoundary, SegmentType};
+use lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
 use sp314_dsp::masking_eq::biquad::{rbj_highpass, rbj_lowpass, BiquadCoeffs};
 
 const SOURCE_MP3: &str = "/home/aidevcon/Downloads/DATASET/librivox-hq/huckfinn_01_twain_apc.mp3";
@@ -88,7 +89,7 @@ fn pick_window() {
     let mono = read_mono_dump(dump);
     let _ = std::fs::remove_file(dump);
 
-    let sr = 48_000usize;
+    let sr = ANALYSIS_SAMPLE_RATE as usize;
     let win = (CLIP_SECS * sr as f64) as usize;
     let hop = 5 * sr;
     let mut best_start = 0usize;
@@ -113,6 +114,9 @@ fn pick_window() {
 
 fn extract_clip(start_sec: f64) {
     std::fs::create_dir_all(OUT_DIR).ok();
+    // ΣΕΙΡΙΟΠΟΙΗΣΗ, όχι αντίγραφο σταθεράς: όρισμα της εξωτερικής εντολής
+    // ffmpeg (-ar), παράγεται από την ίδια σταθερά με to_string().
+    let sr_arg = ANALYSIS_SAMPLE_RATE.to_string();
     let status = std::process::Command::new("ffmpeg")
         .args([
             "-y",
@@ -126,7 +130,7 @@ fn extract_clip(start_sec: f64) {
             "-t",
             &format!("{CLIP_SECS}"),
             "-ar",
-            "48000",
+            &sr_arg,
             "-ac",
             "2",
             "-acodec",
@@ -250,7 +254,8 @@ fn render(output_path: &str) {
     let (tx_res, rx_res) = std::sync::mpsc::channel();
     let shadow_reader =
         m0d::dsp::lazy_reader::LazyAudioReader::open(std::path::Path::new(CLIP_PATH)).unwrap();
-    let _worker_handle = m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, 48000, rx_job, tx_res);
+    let _worker_handle =
+        m0d::dsp::orchestrator::nmf_worker::spawn(shadow_reader, ANALYSIS_SAMPLE_RATE, rx_job, tx_res);
     let (_, flagged_indices) = m0d::dsp::orchestrator::nmf_worker::dispatch_all_jobs(&boundaries, &tx_job);
 
     run_streaming_pipeline_with_timeline(
@@ -259,7 +264,7 @@ fn render(output_path: &str) {
         &StreamingConfig {
             topology: &topology,
             block_size: 1024,
-            sample_rate: 48000,
+            sample_rate: ANALYSIS_SAMPLE_RATE,
             ducking_node_id: "duck_gain",
             speech_gain: 1.0,
             music_gain: 0.501,
@@ -291,7 +296,7 @@ fn energy_of(path: &str) {
         .expect("pass0 decode");
     let mono = read_mono_dump(&dump);
     let _ = std::fs::remove_file(&dump);
-    let db = band_energy_5_8k_db(&mono, 48_000);
+    let db = band_energy_5_8k_db(&mono, ANALYSIS_SAMPLE_RATE);
     println!("5-8kHz ενέργεια {path}: {db:.2} dB");
 }
 
