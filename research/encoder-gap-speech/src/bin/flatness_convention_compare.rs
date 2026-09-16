@@ -1,0 +1,362 @@
+//! MEASURE 2026-09-17: οι δύο συμβάσεις της επιπεδότητας, στα ίδια
+//! δοκίμια. Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή, ΜΗΔΕΝ αλλαγή
+//! υπογραφής, ΜΗΔΕΝ νέο υλικό.
+//!
+//! ΤΟ ΕΡΩΤΗΜΑ: ο ανιχνευτής επιθέσεων και το spectral_flatness() έχουν
+//! ΤΑΥΤΟΣΗΜΕΣ παραμέτρους FFT (2048/512/Hann/rustfft, ΙΔΙΟΣ StftEngine
+//! — RECON 17/09) — άρα η επαναχρησιμοποίηση των magnitudes θα
+//! μηδένιζε το +70.3% κόστος (44s→75s, dracula). ΑΛΛΑ το εργαλείο
+//! της βάρδιας καλεί το spectral_flatness ΔΕΚΑ φορές ανά παράθυρο
+//! (υποτμήματα 0.5s, διάμεσος) ενώ ο ανιχνευτής κάνει ΜΙΑ συνεχόμενη
+//! ανάλυση στα πλήρη 5s — ίδιο FFT, άλλος τεμαχισμός του σήματος
+//! πριν, άρα πιθανώς άλλο νούμερο. Το ερώτημα: αλλάζει η ετυμηγορία;
+//!
+//! ΔΥΟ ΣΥΜΒΑΣΕΙΣ, ίδιος ασύμμετρος κανόνας (κατώφλι = p10(αρχείου)
+//! επιπεδότητας × 1.75, conf 0.80 — F-111/16-09, το ίδιο ζεύγος
+//! τιμών, ΜΗΔΕΝ νέα πρόταση):
+//!   Α. window_flatness_a — ΙΔΙΟ με F-115/flatness_relative.rs/
+//!      flatness_percentile_battery.rs: διάμεσος spectral_flatness()
+//!      σε 10 υπο-τμήματα 0.5s. ΑΥΤΟ μετρήθηκε ως τώρα.
+//!   Β. window_flatness_b — ΜΙΑ κλήση spectral_flatness() στο πλήρες
+//!      παράθυρο 5s (240.000 δείγματα) — ό,τι θα έδινε η
+//!      επαναχρησιμοποίηση των magnitudes του ανιχνευτή, ΧΩΡΙΣ να
+//!      αλλάζει το FFT — μόνο ο τεμαχισμός πριν από αυτό.
+//!
+//! Η ΠΡΑΓΜΑΤΙΚΗ επαναχρησιμοποίηση ΔΕΝ γίνεται εδώ — θα χρειαζόταν
+//! αλλαγή υπογραφής στο SegmentScout::measure (RECON 17/09: 2
+//! production καλούντες, scout_scanner.rs + trunk_pass.rs). Το β
+//! μετράει μόνο ΑΝ αξίζει, όχι πώς θα υλοποιηθεί.
+//!
+//! ΧΡΗΣΗ: cargo run --release --bin flatness_convention_compare
+
+use lineos_corpus::scout::{
+    compute_cepstral_flux, compute_scout_decision, smooth_and_segment, ScoutDecision, SegmentType,
+};
+use sp314_dsp::analysis::scout::SegmentScout;
+use sp314_dsp::analysis::spectral::spectral_flatness;
+
+const WINDOW_SECS: f32 = 5.0;
+const HOP_SECS: f32 = 1.0;
+const SUBCHUNK_SECS: f32 = 0.5;
+const BOUNDARY_TOLERANCE_SECS: f32 = 5.0;
+const A7_ZONE_LOW: f32 = 0.3;
+const A7_ZONE_HIGH: f32 = 0.7;
+const A7_MIN_CONF: f32 = 0.4;
+const DUMP_FRAME_BYTES: usize = 8;
+const OWNER_CONF: f32 = 0.80;
+const PERCENTILE_K: f32 = 10.0;
+const MARGIN_M: f32 = 0.75;
+
+fn read_wav_stereo_f32(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let mut reader = hound::WavReader::open(path).unwrap_or_else(|e| panic!("open {path}: {e}"));
+    let samples: Vec<f32> = reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect();
+    let left: Vec<f32> = samples.iter().step_by(2).copied().collect();
+    let right: Vec<f32> = samples.iter().skip(1).step_by(2).copied().collect();
+    (left, right)
+}
+
+fn read_dump_stereo(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let buf = std::fs::read(path).unwrap_or_else(|e| panic!("read dump {path}: {e}"));
+    let full_frames = buf.len() / DUMP_FRAME_BYTES;
+    let mut left = Vec::with_capacity(full_frames);
+    let mut right = Vec::with_capacity(full_frames);
+    for i in 0..full_frames {
+        let base = i * DUMP_FRAME_BYTES;
+        left.push(f32::from_le_bytes([buf[base], buf[base + 1], buf[base + 2], buf[base + 3]]));
+        right.push(f32::from_le_bytes([buf[base + 4], buf[base + 5], buf[base + 6], buf[base + 7]]));
+    }
+    (left, right)
+}
+
+fn median(xs: &[f32]) -> f32 {
+    let mut v = xs.to_vec();
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let n = v.len();
+    if n == 0 { return f32::NAN; }
+    if n % 2 == 0 { (v[n / 2 - 1] + v[n / 2]) / 2.0 } else { v[n / 2] }
+}
+
+fn percentile_of(values: &[f32], p: f32) -> f32 {
+    let mut v = values.to_vec();
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if v.is_empty() { return f32::NAN; }
+    let idx = ((p / 100.0) * (v.len() - 1) as f32).round() as usize;
+    v[idx.min(v.len() - 1)]
+}
+
+/// ΣΥΜΒΑΣΗ Α — ΙΔΙΟΣ ορισμός με F-115/flatness_relative.rs: διάμεσος
+/// spectral_flatness() σε 10 υπο-τμήματα 0.5s. Ό,τι μετρήθηκε ως τώρα.
+fn window_flatness_a(mono_slice: &[f32], sample_rate: u32) -> f32 {
+    let sub_samples = (SUBCHUNK_SECS * sample_rate as f32) as usize;
+    let mut vals = Vec::new();
+    let mut pos = 0;
+    while pos + sub_samples <= mono_slice.len() {
+        vals.push(spectral_flatness(&mono_slice[pos..pos + sub_samples]));
+        pos += sub_samples;
+    }
+    median(&vals)
+}
+
+/// ΣΥΜΒΑΣΗ Β — μία κλήση spectral_flatness() στο πλήρες παράθυρο 5s.
+/// Ό,τι θα έδινε η επαναχρησιμοποίηση των magnitudes του ανιχνευτή
+/// επιθέσεων (ίδιο StftEngine, μία συνεχόμενη ανάλυση, καμία αλλαγή
+/// FFT — μόνο ο τεμαχισμός πριν).
+fn window_flatness_b(mono_slice: &[f32]) -> f32 {
+    spectral_flatness(mono_slice)
+}
+
+fn apply_asymmetric(dec_a: ScoutDecision, flatness: f32, threshold: f32, override_conf: f32) -> ScoutDecision {
+    if dec_a.leaning_score >= 0.5 {
+        dec_a
+    } else if flatness > threshold {
+        ScoutDecision { leaning_score: 1.0, confidence: override_conf }
+    } else {
+        dec_a
+    }
+}
+
+fn match_boundaries(expected: &[f32], produced: &[f32], tol: f32) -> (usize, usize, usize) {
+    let mut used = vec![false; produced.len()];
+    let mut found = 0usize;
+    for &e in expected {
+        if let Some(idx) = produced
+            .iter()
+            .enumerate()
+            .filter(|(i, &p)| !used[*i] && (p - e).abs() <= tol)
+            .min_by(|a, b| (a.1 - e).abs().partial_cmp(&(b.1 - e).abs()).unwrap())
+            .map(|(i, _)| i)
+        {
+            used[idx] = true;
+            found += 1;
+        }
+    }
+    let missed = expected.len() - found;
+    let extra = used.iter().filter(|&&u| !u).count();
+    (found, missed, extra)
+}
+
+fn expected_type(schedule: &[(f32, f32, SegmentType)], center: f32) -> SegmentType {
+    for &(s, e, ty) in schedule {
+        if center >= s && center < e { return ty; }
+    }
+    schedule.last().unwrap().2
+}
+
+fn expected_boundaries(schedule: &[(f32, f32, SegmentType)]) -> Vec<f32> {
+    let mut out = Vec::new();
+    for w in schedule.windows(2) {
+        if w[0].2 != w[1].2 { out.push(w[1].0); }
+    }
+    out
+}
+
+fn music_to_speech_resets(segs: &[(f32, f32, SegmentType)]) -> usize {
+    segs.windows(2).filter(|w| w[0].2 == SegmentType::Music && w[1].2 == SegmentType::Speech).count()
+}
+
+fn under_5s(segs: &[(f32, f32, SegmentType)]) -> usize {
+    segs.iter().filter(|(s, e, _)| (e - s) < 5.0).count()
+}
+
+fn flagged(leaning: f32, conf: f32) -> bool {
+    let in_dead_zone = leaning > A7_ZONE_LOW && leaning < A7_ZONE_HIGH;
+    let low_confidence = conf < A7_MIN_CONF;
+    in_dead_zone && low_confidence
+}
+
+struct Fixture {
+    label: &'static str,
+    wav: &'static str,
+    schedule: Vec<(f32, f32, SegmentType)>,
+}
+
+struct WindowData {
+    times: Vec<f32>,
+    dec_a: Vec<ScoutDecision>,
+    flats_a: Vec<f32>,
+    flats_b: Vec<f32>,
+}
+
+fn scan_fixture(fx: &Fixture) -> WindowData {
+    let path = format!("/tmp/scout-groundtruth/{}", fx.wav);
+    let (left, right) = read_wav_stereo_f32(&path);
+    let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    scan_mono(&mono, sample_rate)
+}
+
+fn scan_mono(mono: &[f32], sample_rate: u32) -> WindowData {
+    let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
+    let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
+    let mut scout = SegmentScout::new();
+    let mut times = Vec::new();
+    let mut dec_a = Vec::new();
+    let mut flats_a = Vec::new();
+    let mut flats_b = Vec::new();
+    let mut start = 0usize;
+    while start + win_samples <= mono.len() {
+        let mono_slice = &mono[start..start + win_samples];
+        let start_sec = start as f32 / sample_rate as f32;
+
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfccs = Vec::new();
+        let mut f = 0;
+        while f + 1024 <= mono_slice.len() {
+            mfccs.push(mfcc_analyzer.compute(&mono_slice[f..f + 1024]));
+            f += 512;
+        }
+        let cepstral_flux = compute_cepstral_flux(&mfccs);
+        let meas = scout.measure(mono_slice, cepstral_flux, sample_rate);
+        let dec = compute_scout_decision(&meas);
+
+        times.push(start_sec);
+        dec_a.push(dec);
+        flats_a.push(window_flatness_a(mono_slice, sample_rate));
+        flats_b.push(window_flatness_b(mono_slice));
+        start += hop_samples;
+    }
+    WindowData { times, dec_a, flats_a, flats_b }
+}
+
+fn segments_from_decisions(times: &[f32], decisions: &[ScoutDecision]) -> Vec<(f32, f32, SegmentType)> {
+    let d: Vec<(f32, ScoutDecision)> = times.iter().zip(decisions.iter()).map(|(&t, &dec)| (t, dec)).collect();
+    smooth_and_segment(&d).iter().map(|b| (b.start_sec, b.end_sec, b.segment_type)).collect()
+}
+
+struct Outcome { correct: usize, total: usize, segs: Vec<(f32, f32, SegmentType)> }
+
+fn fixture_result(wd: &WindowData, schedule: &[(f32, f32, SegmentType)], flats: &[f32]) -> Outcome {
+    let threshold = percentile_of(flats, PERCENTILE_K) * (1.0 + MARGIN_M);
+    let total = wd.times.len();
+    let mut correct = 0usize;
+    let mut final_decisions = Vec::with_capacity(total);
+    for i in 0..total {
+        let center = wd.times[i] + WINDOW_SECS / 2.0;
+        let exp = expected_type(schedule, center);
+        let final_dec = apply_asymmetric(wd.dec_a[i], flats[i], threshold, OWNER_CONF);
+        let verdict = if final_dec.leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+        if verdict == exp { correct += 1; }
+        final_decisions.push(final_dec);
+    }
+    let segs = segments_from_decisions(&wd.times, &final_decisions);
+    Outcome { correct, total, segs }
+}
+
+fn fmt_row(label: &str, o: &Outcome, exp_bounds: &[f32]) -> String {
+    let prod: Vec<f32> = o.segs.windows(2).map(|w| w[1].0).collect();
+    let (found, missed, extra) = match_boundaries(exp_bounds, &prod, BOUNDARY_TOLERANCE_SECS);
+    format!(
+        "acc={:>3}/{} ({:>5.1}%)  όρια f={found}/{} m={missed} e={extra}",
+        o.correct, o.total, 100.0 * o.correct as f32 / o.total as f32, exp_bounds.len()
+    )
+}
+
+fn stats(values: &[f32]) -> (f32, f32, f32) {
+    let mut v = values.to_vec();
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    (median(&v), *v.first().unwrap(), *v.last().unwrap())
+}
+
+fn run_book_b(label: &str, path: &str) {
+    let dump = format!("/tmp/flatness_conv_{}.raw", label.split_whitespace().next().unwrap_or("x"));
+    m0d::dsp::input_lufs::pass0_decode_to_dump(std::path::Path::new(path), &dump)
+        .unwrap_or_else(|e| panic!("pass0 decode {path}: {e}"));
+    let (left, right) = read_dump_stereo(&dump);
+    let _ = std::fs::remove_file(&dump);
+    let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    let wd = scan_mono(&mono, sample_rate);
+    let threshold = percentile_of(&wd.flats_b, PERCENTILE_K) * (1.0 + MARGIN_M);
+
+    let final_decisions: Vec<ScoutDecision> = (0..wd.times.len())
+        .map(|i| apply_asymmetric(wd.dec_a[i], wd.flats_b[i], threshold, OWNER_CONF))
+        .collect();
+    let segs = segments_from_decisions(&wd.times, &final_decisions);
+    let mut flagged_n = 0usize;
+    for &(s, e, _) in &segs {
+        let in_range: Vec<usize> = (0..wd.times.len()).filter(|&i| wd.times[i] >= s && wd.times[i] < e).collect();
+        if in_range.is_empty() { continue; }
+        let avg_l = in_range.iter().map(|&i| final_decisions[i].leaning_score).sum::<f32>() / in_range.len() as f32;
+        let avg_c = in_range.iter().map(|&i| final_decisions[i].confidence).sum::<f32>() / in_range.len() as f32;
+        if flagged(avg_l, avg_c) { flagged_n += 1; }
+    }
+    println!(
+        "{:<24} thr(B)={:.4}  τμήματα={:<4} resets(M→S)={:<4} flagged={:<4} <5s={}",
+        label, threshold, segs.len(), music_to_speech_resets(&segs), flagged_n, under_5s(&segs)
+    );
+}
+
+fn main() {
+    use SegmentType::{Music, Speech};
+    let fixtures = vec![
+        Fixture { label: "1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ", wav: "test1_narration_only.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "2 ΣΚΕΤΟ BED", wav: "test2_bed_only.wav", schedule: vec![(0.0, 120.0, Music)] },
+        Fixture { label: "3 ΑΦΗΓΗΣΗ+BED -20dB", wav: "test3_narration_bed_m20dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "4 ΑΦΗΓΗΣΗ+BED -12dB", wav: "test4_narration_bed_m12dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "5 ΕΝΑΛΛΑΓΗ 30/60/90", wav: "test5_alternation_30_60_90.wav", schedule: vec![(0.0, 30.0, Speech), (30.0, 60.0, Music), (60.0, 90.0, Speech), (90.0, 120.0, Music)] },
+        Fixture { label: "6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s", wav: "test6_bed_enters_60s.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ", wav: "test7_nonround_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "8 ΣΥΝΤΟΜΕΣ 20s×6", wav: "test8_short_20s_x6.wav", schedule: vec![(0.0, 20.0, Speech), (20.0, 40.0, Music), (40.0, 60.0, Speech), (60.0, 80.0, Music), (80.0, 100.0, Speech), (100.0, 120.0, Music)] },
+        Fixture { label: "9 ΑΣΥΜΜΕΤΡΕΣ", wav: "test9_asymmetric.wav", schedule: vec![(0.0, 45.0, Speech), (45.0, 53.0, Music), (53.0, 103.0, Speech), (103.0, 111.0, Music), (111.0, 120.0, Speech)] },
+        Fixture { label: "10 BED ΣΥΝΕΧΙΖΕΙ", wav: "test10_bed_continues_under.wav", schedule: vec![(0.0, 40.0, Speech), (40.0, 60.0, Music), (60.0, 120.0, Speech)] },
+        Fixture { label: "11 ΑΛΛΟ BED", wav: "test11_altbed_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ", wav: "test12_altnarrator_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+    ];
+
+    let scans: Vec<WindowData> = fixtures.iter().map(scan_fixture).collect();
+    let outcomes_a: Vec<Outcome> = scans.iter().zip(fixtures.iter()).map(|(wd, fx)| fixture_result(wd, &fx.schedule, &wd.flats_a)).collect();
+    let outcomes_b: Vec<Outcome> = scans.iter().zip(fixtures.iter()).map(|(wd, fx)| fixture_result(wd, &fx.schedule, &wd.flats_b)).collect();
+
+    println!("ΚΑΤΩΦΛΙ: p{PERCENTILE_K}(αρχείου)×{}  conf={OWNER_CONF}  ΑΝΟΧΗ_ΟΡΙΩΝ={BOUNDARY_TOLERANCE_SECS}s\n", 1.0 + MARGIN_M);
+
+    let idx_of = |wav_prefix: &str| fixtures.iter().position(|f| f.wav.starts_with(wav_prefix)).unwrap();
+    let idx10 = idx_of("test10");
+    let idx11 = idx_of("test11");
+    let idx2 = idx_of("test2");
+
+    println!("=== ΤΑ ΤΡΙΑ ΚΡΙΣΙΜΑ, ΠΡΩΤΑ ΚΑΙ ΞΕΧΩΡΙΣΤΑ ===");
+    for &i in &[idx10, idx11, idx2] {
+        let fx = &fixtures[i];
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        println!("--- {} ---", fx.label);
+        println!("  Α (10×0.5s median): {}", fmt_row("Α", &outcomes_a[i], &exp_bounds));
+        println!("  Β (1×5s πλήρες)   : {}", fmt_row("Β", &outcomes_b[i], &exp_bounds));
+    }
+
+    println!("\n=== Ο ΠΙΝΑΚΑΣ ΤΩΝ ΔΩΔΕΚΑ, ΔΥΟ ΣΤΗΛΕΣ ===");
+    for (i, fx) in fixtures.iter().enumerate() {
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        println!("--- {} ---", fx.label);
+        println!("  Α: {}", fmt_row("Α", &outcomes_a[i], &exp_bounds));
+        println!("  Β: {}", fmt_row("Β", &outcomes_b[i], &exp_bounds));
+    }
+
+    println!("\n=== ΩΜΕΣ ΤΙΜΕΣ ΕΠΙΠΕΔΟΤΗΤΑΣ, ΑΝΑ ΔΟΚΙΜΙΟ × ΣΥΜΒΑΣΗ (διάμεσος [ελάχιστο-μέγιστο]) ===");
+    for (i, fx) in fixtures.iter().enumerate() {
+        let (ma, mina, maxa) = stats(&scans[i].flats_a);
+        let (mb, minb, maxb) = stats(&scans[i].flats_b);
+        println!(
+            "{:<24} Α: {:.4} [{:.4}-{:.4}]   Β: {:.4} [{:.4}-{:.4}]",
+            fx.label, ma, mina, maxa, mb, minb, maxb
+        );
+    }
+
+    println!("\n=== ΤΑ ΕΝΝΙΑ ΒΙΒΛΙΑ, ΣΥΜΒΑΣΗ Β ΜΟΝΟ ===");
+    println!("ΣΗΜΕΡΙΝΟ (Α, σύγκριση): secretgarden=79 dracula=128 count_of_monte_cristo=16 τα άλλα 1-16. Σύμβαση Α (16/09, ίδιο κανόνα p10×1.75): secretgarden=77 dracula=128 count_of_monte_cristo=16.\n");
+    let dir = "/home/aidevcon/Downloads/DATASET/librivox-hq";
+    let books = [
+        ("secretgarden", "secretgarden_01_burnett.mp3"),
+        ("dracula", "dracula_01_stoker.mp3"),
+        ("count_of_monte_cristo", "count_of_monte_cristo_001_dumas.mp3"),
+        ("peterpan", "peterpan_01_barrie.mp3"),
+        ("anne_of_green_gables", "anne_of_green_gables_01_montgomery.mp3"),
+        ("tale_of_two_cities", "tale_of_two_cities_01_dickens.mp3"),
+        ("adventurespinocchio", "adventurespinocchio_01_collodi.mp3"),
+        ("huckfinn", "huckfinn_01_twain_apc.mp3"),
+        ("janeeyre", "janeeyre_01_bronte.mp3"),
+    ];
+    for (label, fname) in books {
+        let path = format!("{dir}/{fname}");
+        run_book_b(label, &path);
+    }
+}

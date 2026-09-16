@@ -1,0 +1,643 @@
+MEASURE 2026-09-16 — τα δώδεκα δοκίμια με τον κυλιόμενο ορισμό του
+cepstral_flux, αυτόν που τρέχει η παραγωγή. Read-only, ΜΗΔΕΝ αλλαγή
+στην παραγωγή.
+
+ΤΟ ΤΕΚΜΗΡΙΟ (F-111, 16/09): δύο ορισμοί του cepstral_flux. Ο φρέσκος
+(scan_file) χτίζει νέο MfccAnalyzer ανά παράθυρο. Ο κυλιόμενος
+(run_trunk_pass) κρατάει μία ινστάνσα για όλο το αρχείο, με mfcc_prev
+που δεν μηδενίζεται ποτέ, και κάθε παράθυρο διαβάζει στιγμιαία τιμή
+κυλιόμενου μέσου 466 αποστάσεων. Διαφωνούν σε 98-100% των παραθύρων
+σε εννιά πραγματικά αρχεία, από το πρώτο· cv_ioi ταυτόσημο παντού.
+
+── ΒΗΜΑ 0 — ΠΥΛΗ ──
+
+0.1 Κλήση ή αναπαραγωγή; ΚΛΗΣΗ. sp314_orchestrator::trunk_pass::
+    run_trunk_pass(dump_path, false) καλείται ΑΠΕΥΘΕΙΑΣ — καμία
+    αναπαραγωγή λογικής. Το run_trunk_pass παίρνει &Path σε headerless
+    interleaved f32 LE dump (RawPcmFileSource, sp314-dsp/src/stft/
+    raw_pcm_source.rs), όχι buffer. Τα δώδεκα δοκίμια είναι wav
+    (i16, 48kHz, stereo) στο /tmp/scout-groundtruth. Το μόνο νέο βήμα
+    είναι ΜΕΤΑΤΡΟΠΗ ΜΟΡΦΗΣ: wav -> raw dump, ίδια /32768.0 σύμβαση
+    i16->f32 με το fixture_battery.rs. Καμία DSP λογική δεν
+    ξαναγράφεται· μόνο bytes-σε-δίσκο (νέο εργαλείο, research/
+    encoder-gap-speech/src/bin/rolling_battery.rs).
+
+    ΠΙΣΤΟΤΗΤΑ ΤΗΣ ΜΕΤΑΤΡΟΠΗΣ, ελεγμένη ανά δοκίμιο πριν εμπιστευτεί
+    οποιοδήποτε νούμερο: (1) πλήθος παραθύρων από το πραγματικό
+    TrunkReport.metrics.cv_ioi_sequence ταυτίζεται με το φρέσκο
+    πέρασμα· (2) max|cv_ioi_φρέσκο - cv_ioi_κυλιόμενο| πρέπει να είναι
+    ίδιας τάξης με το F-111 (<0.0001) αφού το cv_ioi είναι ταυτόσημο
+    και στους δύο ορισμούς. Αποτέλεσμα, και στα δώδεκα δοκίμια:
+    πλήθος παραθύρων 116=116, max|Δcv_ioi|=0.000000 ακριβώς — η
+    μετατροπή είναι πιστή, τα νούμερα παρακάτω εμπιστεύονται.
+
+0.2 Η ΙΣΤΟΡΙΑ ΤΩΝ ΔΥΟ (git log, ΑΥΤΟΥΣΙΑ):
+
+    scout_scanner.rs (ο φρέσκος), γεννήθηκε 692ae99 (2026-07-11):
+    "feat(scout): Pass-1 Timeline Map — rolling scan + confidence-
+    weighted segmentation" — scan_file(left, right, sample_rate) ->
+    Vec<(f32, ScoutDecision)>, "Rolls a single reused SegmentScout
+    across the whole buffer at 5.0s window / 1.0s hop... Mono is
+    derived once for the full buffer, not per-window."
+
+    trunk_pass.rs (ο κυλιόμενος), γεννήθηκε 190613e (2026-07-23):
+    "Y1-TRUNK: segmentation + metering move onto the dump - the last
+    full-file RAM decode dies" — "SegmentScout served 5s contiguous
+    windows from a bounded sliding history - same instance, same
+    window offsets, same partial-window drop as scan_file... ORACLE
+    integration_trunk_parity (new): old path vs trunk on a
+    contrasting synthetic fixture - boundaries bit-identical...
+    Strangler Fig proven: same algorithm, new plumbing, zero
+    behavioral change." Σε ΑΥΤΟ το commit, trunk_pass.rs ΔΕΝ έχει
+    ακόμα mfcc_prev/flux_distances — ο STRANGLER FIG ισχυρισμός ήταν
+    αληθής ΤΗ ΣΤΙΓΜΗ ΠΟΥ ΓΡΑΦΤΗΚΕ.
+
+    Το commit που έφερε το mfcc_prev/flux_distances ring (git log -S
+    "flux_distances"): b400405 (2026-07-26), "Scout: replace four dead
+    axes with two measured ones (F-041)" — τρεις μέρες μετά το
+    190613e. Το relevant απόσπασμα, ΑΥΤΟΥΣΙΟ:
+
+      "Cepstral flux is computed once in the trunk pass stream, as a
+      ring of consecutive distances with an f64 accumulator: O(1) per
+      frame instead of recomputing 467 MFCCs per window, which the
+      1-second hop would have made five times redundant. The offline
+      scanner computes it per-window; the two paths were measured
+      against each other and agree to within 0.028, seven percent of
+      the distance between the centroids, diverging only through
+      frame alignment."
+
+    ⇒ Ο κυλιόμενος ΔΕΝ μπήκε δανεισμένος από αλλού — γράφτηκε ΕΠΙΤΗΔΕΣ
+      ως βελτιστοποίηση (O(1) αντί για 5x επανυπολογισμό), ΚΑΙ ο
+      συγγραφέας τότε ΜΕΤΡΗΣΕ τη διαφορά και τη δήλωσε μικρή (0.028,
+      7% της απόστασης κέντρων), αποδίδοντάς τη σε "frame alignment".
+    ⇒ Το module-doc STRANGLER FIG σχόλιο (trunk_pass.rs:9-12) γράφτηκε
+      ΠΡΙΝ από αυτό το commit και ποτέ δεν ενημερώθηκε μετά — έγινε
+      ψευδές τρεις μέρες μετά τη γέννησή του, όχι από αμέλεια στην
+      αρχική συγγραφή.
+    ⚠ Ο ισχυρισμός "agree to within 0.028" αφορά ΜΕΓΕΘΟΣ διαφοράς σε
+      ΕΝΑ σημείο μέτρησης τότε (2026-07-26) — το F-111 μέτρησε ΣΥΧΝΟΤΗΤΑ
+      διαφωνίας (98-100% των παραθύρων διαφέρουν ΚΑΘΟΛΟΥ), διαφορετική
+      μετρική. Δεν αντιφάσκουν αυτόματα· η σημερινή μέτρηση παρακάτω
+      δείχνει το πραγματικό μέγεθος στα δώδεκα δοκίμια.
+
+0.3 Πόσες φορές υπάρχει ο υπολογισμός (grep, ολόκληρο το δέντρο,
+    ΧΩΡΙΣ target/):
+
+    compute_cepstral_flux: ΜΙΑ ορισμός — lineos-corpus/src/scout.rs:35.
+    mfcc_euclidean_distance: ΜΙΑ ορισμός — lineos-corpus/src/scout.rs:26.
+    struct MfccAnalyzer: ΜΙΑ ορισμός — lineos-corpus/src/mfcc.rs:119.
+    "flux_distances" (το κυλιόμενο ring pattern): ΔΥΟ θέσεις —
+      trunk_pass.rs (παραγωγή) και io_layer_diag.rs (η δηλωμένη
+      αντιγραφή του αυτής της σύνοδου, ΟΧΙ παραγωγή).
+
+    ⇒ ΔΕΝ είναι τρεις υλοποιήσεις. Παραμένουν ΔΥΟ — αλλά η ακριβής
+      θέση της διχάλας διευκρινίζεται: ΟΧΙ στο MFCC extractor (ένα),
+      ΟΧΙ στη συνάρτηση απόστασης (μία, κοινή και στους δύο δρόμους).
+      Η trunk_pass.rs ΔΕΝ καλεί καν το compute_cepstral_flux — έχει
+      δικό της inline άθροισμα/ring πάνω στην ΙΔΙΑ mfcc_euclidean_
+      distance. Η διχάλα είναι ΑΠΟΚΛΕΙΣΤΙΚΑ στο aggregation
+      (fresh-mean-per-call εναντίον rolling-mean-χωρίς-reset), όχι
+      στο MFCC ή στην απόσταση από μόνη της. Το εύρημα δεν μεγαλώνει
+      σε "τρεις" — διευκρινίζεται σε "μία διχάλα, ένα σημείο".
+    ⚠ Σημειώνεται, όχι διερευνημένο εδώ: lineos-corpus/src/streaming.rs
+      κρατάει κι αυτό ΜΙΑ επίμονη MfccAnalyzer instance ως struct
+      field (γρ.335) — ίδιο σχήμα με το trunk_pass.rs, άλλο υποσύστημα,
+      εκτός εύρους αυτής της μέτρησης.
+
+ΤΙ ΜΕΤΡΑΤΑΙ ΠΑΡΑΚΑΤΩ: δώδεκα δοκίμια (ίδια σχήματα/schedules με το
+fixture_battery.rs), δύο στήλες (ΦΡΕΣΚΟΣ / ΚΥΛΙΟΜΕΝΟΣ), κανόνες Α
+(σημερινή προβολή) και Β (μόνο flux) — ορθότητα ΚΑΙ όρια (ανοχή ±5s).
+Ο Δ (εκφυλισμένος «πάντα ομιλία») τυπώνεται και στις δύο στήλες ως
+έλεγχος υγείας — δεν εξαρτάται από cv_ioi/flux, άρα πρέπει να βγει
+ταυτόσημος· αν δεν βγει, κάτι στη μετατροπή dump είναι λάθος. Το
+«μόνο cv_ioi» (Γ) παραλείπεται — ταυτόσημο εξ ορισμού (max|Δcv_ioi|=0).
+
+ΠΡΟΒΛΕΨΗ, γραμμένη πριν το τρέξιμο: τα νούμερα χειροτερεύουν γενικά,
+ο κυλιόμενος θολώνει τις μεταβάσεις, τα δοκίμια με εναλλαγές χάνουν
+περισσότερο από τα σταθερά. Πέμπτη πτώση σήμερα σε προβλέψεις για
+αυτό το όργανο — δεν θεωρείται αναμενόμενη.
+
+── ΜΕΤΡΗΜΕΝΟ ──
+
+ΒΗΜΑ 0: run_trunk_pass καλείται ΑΠΕΥΘΕΙΑΣ (καμία αναπαραγωγή λογικής).
+Μετατροπή μορφής wav->raw dump (headerless f32 LE interleaved), ίδια /32768.0 σύμβαση με fixture_battery.rs.
+
+MID_CV=0.5615 MID_FLUX=1.5315 ΑΝΟΧΗ_ΟΡΙΩΝ=5s
+
+=== 1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ (test1_narration_only.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=115/116 (99.1%)  Β=116/116 (100.0%)  Δ=116/116 (100.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=115/116 (99.1%)  Β=116/116 (100.0%)  Δ=116/116 (100.0%)
+  αναμενόμενα όρια: []
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+
+=== 2 ΣΚΕΤΟ BED (test2_bed_only.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=116/116 (100.0%)  Β=116/116 (100.0%)  Δ=  0/116 (0.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=116/116 (100.0%)  Β=116/116 (100.0%)  Δ=  0/116 (0.0%)
+  αναμενόμενα όρια: []
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=0
+
+=== 3 ΑΦΗΓΗΣΗ+BED -20dB (test3_narration_bed_m20dB.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α= 88/116 (75.9%)  Β=112/116 (96.6%)  Δ=116/116 (100.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α= 89/116 (76.7%)  Β=114/116 (98.3%)  Δ=116/116 (100.0%)
+  αναμενόμενα όρια: []
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[69.0, 78.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=2
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[60.0, 61.0, 72.0, 73.0, 75.0, 76.0, 93.0, 94.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=8
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[69.0, 78.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=2
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[60.0, 61.0, 75.0, 76.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=4
+
+=== 4 ΑΦΗΓΗΣΗ+BED -12dB (test4_narration_bed_m12dB.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α= 12/116 (10.3%)  Β= 85/116 (73.3%)  Δ=116/116 (100.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α= 13/116 (11.2%)  Β= 80/116 (69.0%)  Δ=116/116 (100.0%)
+  αναμενόμενα όρια: []
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[53.0, 59.0, 106.0, 112.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=4
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[11.0, 13.0, 15.0, 18.0, 19.0, 20.0, 24.0, 26.0, 33.0, 34.0, 36.0, 38.0, 46.0, 47.0, 48.0, 50.0, 60.0, 62.0, 63.0, 64.0, 69.0, 79.0, 84.0, 86.0, 92.0, 94.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=26
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[53.0, 59.0, 107.0, 112.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=4
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[12.0, 13.0, 14.0, 19.0, 24.0, 26.0, 33.0, 34.0, 36.0, 38.0, 39.0, 40.0, 46.0, 47.0, 48.0, 50.0, 60.0, 64.0, 66.0, 67.0, 69.0, 79.0, 84.0, 86.0, 90.0, 94.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=26
+
+=== 5 ΕΝΑΛΛΑΓΗ 30/60/90 (test5_alternation_30_60_90.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=111/116 (95.7%)  Β=110/116 (94.8%)  Δ= 58/116 (50.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=111/116 (95.7%)  Β=110/116 (94.8%)  Δ= 58/116 (50.0%)
+  αναμενόμενα όρια: [30.0, 60.0, 90.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[30.0, 57.0, 91.0]  βρέθηκαν=3/3 χάθηκαν=0 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[27.0, 29.0, 30.0, 56.0, 90.0]  βρέθηκαν=3/3 χάθηκαν=0 περίσσεψαν=2
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[30.0, 57.0, 91.0]  βρέθηκαν=3/3 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[27.0, 29.0, 30.0, 56.0, 90.0]  βρέθηκαν=3/3 χάθηκαν=0 περίσσεψαν=2
+
+=== 6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s (test6_bed_enters_60s.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=100/116 (86.2%)  Β=112/116 (96.6%)  Δ=116/116 (100.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α= 99/116 (85.3%)  Β=114/116 (98.3%)  Δ=116/116 (100.0%)
+  αναμενόμενα όρια: []
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[69.0, 78.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=2
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[60.0, 61.0, 72.0, 73.0, 75.0, 76.0, 93.0, 94.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=8
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[69.0, 78.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=2
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[60.0, 61.0, 75.0, 76.0]  βρέθηκαν=0/0 χάθηκαν=0 περίσσεψαν=4
+
+=== 7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ 17/41/68/94 (test7_nonround_17_41_68_94.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=102/116 (87.9%)  Β=110/116 (94.8%)  Δ= 66/116 (56.9%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=102/116 (87.9%)  Β=107/116 (92.2%)  Δ= 66/116 (56.9%)
+  αναμενόμενα όρια: [17.0, 41.0, 68.0, 94.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[13.0, 44.0, 65.0, 100.0]  βρέθηκαν=3/4 χάθηκαν=1 περίσσεψαν=1
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[14.0, 38.0, 56.0, 57.0, 66.0, 95.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=2
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[13.0, 44.0, 65.0, 100.0]  βρέθηκαν=3/4 χάθηκαν=1 περίσσεψαν=1
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[14.0, 38.0, 55.0, 57.0, 58.0, 59.0, 66.0, 96.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=4
+
+=== 8 ΣΥΝΤΟΜΕΣ 20s x6 (test8_short_20s_x6.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=101/116 (87.1%)  Β=106/116 (91.4%)  Δ= 58/116 (50.0%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=100/116 (86.2%)  Β=101/116 (87.1%)  Δ= 58/116 (50.0%)
+  αναμενόμενα όρια: [20.0, 40.0, 60.0, 80.0, 100.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[20.0, 40.0, 58.0, 90.0, 97.0]  βρέθηκαν=4/5 χάθηκαν=1 περίσσεψαν=1
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[19.0, 37.0, 52.0, 53.0, 59.0, 78.0, 79.0, 85.0, 98.0]  βρέθηκαν=5/5 χάθηκαν=0 περίσσεψαν=4
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[20.0, 40.0, 58.0, 90.0, 97.0]  βρέθηκαν=4/5 χάθηκαν=1 περίσσεψαν=1
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[19.0, 37.0, 52.0, 53.0, 54.0, 55.0, 60.0, 78.0, 79.0, 86.0, 100.0]  βρέθηκαν=5/5 χάθηκαν=0 περίσσεψαν=6
+
+=== 9 ΑΣΥΜΜΕΤΡΕΣ (test9_asymmetric.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=104/116 (89.7%)  Β=108/116 (93.1%)  Δ=100/116 (86.2%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=103/116 (88.8%)  Β=105/116 (90.5%)  Δ=100/116 (86.2%)
+  αναμενόμενα όρια: [45.0, 53.0, 103.0, 111.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[41.0, 58.0, 102.0, 111.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[32.0, 33.0, 40.0, 41.0, 42.0, 53.0, 90.0, 91.0, 102.0, 108.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=6
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[41.0, 58.0, 102.0, 111.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[32.0, 33.0, 34.0, 35.0, 40.0, 41.0, 42.0, 54.0, 103.0, 107.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=6
+
+=== 10 BED ΣΥΝΕΧΙΖΕΙ ΑΠΟ ΚΑΤΩ (test10_bed_continues_under.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α= 21/116 (18.1%)  Β= 24/116 (20.7%)  Δ= 96/116 (82.8%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α= 21/116 (18.1%)  Β= 20/116 (17.2%)  Δ= 96/116 (82.8%)
+  αναμενόμενα όρια: [40.0, 60.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/2 χάθηκαν=2 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[1.0, 22.0, 23.0, 106.0, 107.0, 112.0, 113.0]  βρέθηκαν=0/2 χάθηκαν=2 περίσσεψαν=7
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[]  βρέθηκαν=0/2 χάθηκαν=2 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[]  βρέθηκαν=0/2 χάθηκαν=2 περίσσεψαν=0
+
+=== 11 ΑΛΛΟ BED, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7) (test11_altbed_17_41_68_94.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α= 93/116 (80.2%)  Β=109/116 (94.0%)  Δ= 66/116 (56.9%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α= 92/116 (79.3%)  Β=105/116 (90.5%)  Δ= 66/116 (56.9%)
+  αναμενόμενα όρια: [17.0, 41.0, 68.0, 94.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[14.0, 44.0, 64.0, 100.0]  βρέθηκαν=3/4 χάθηκαν=1 περίσσεψαν=1
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[14.0, 39.0, 56.0, 57.0, 64.0, 95.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=2
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[14.0, 44.0, 64.0, 100.0]  βρέθηκαν=3/4 χάθηκαν=1 περίσσεψαν=1
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[14.0, 40.0, 55.0, 57.0, 58.0, 59.0, 64.0, 96.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=4
+
+=== 12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7) (test12_altnarrator_17_41_68_94.wav) ===
+  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο=116 κυλιόμενο=116 ΣΥΜΦΩΝΙΑ · max|Δcv_ioi|=0.000000
+  ΦΡΕΣΚΟΣ    (n=116): Α=112/116 (96.6%)  Β=111/116 (95.7%)  Δ= 66/116 (56.9%)
+  ΚΥΛΙΟΜΕΝΟΣ (n=116): Α=112/116 (96.6%)  Β=111/116 (95.7%)  Δ= 66/116 (56.9%)
+  αναμενόμενα όρια: [17.0, 41.0, 68.0, 94.0]
+    ΦΡΕΣΚΟΣ όρια Α: παρήχθησαν=[17.0, 45.0, 67.0, 93.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+    ΦΡΕΣΚΟΣ όρια Β: παρήχθησαν=[16.0, 37.0, 67.0, 91.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Α: παρήχθησαν=[17.0, 45.0, 67.0, 93.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+    ΚΥΛΙΟΜΕΝΟΣ όρια Β: παρήχθησαν=[16.0, 37.0, 67.0, 91.0]  βρέθηκαν=4/4 χάθηκαν=0 περίσσεψαν=0
+
+── ΠΙΝΑΚΑΣ 12×2 — ορθότητα κανόνα Α (σημερινή προβολή), ΦΡΕΣΚΟΣ έναντι ΚΥΛΙΟΜΕΝΟΥ ──
+  1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ                  ΦΡΕΣΚΟΣ= 99.1%  ΚΥΛΙΟΜΕΝΟΣ= 99.1%  Δ=  +0.0pp
+  2 ΣΚΕΤΟ BED                      ΦΡΕΣΚΟΣ=100.0%  ΚΥΛΙΟΜΕΝΟΣ=100.0%  Δ=  +0.0pp
+  3 ΑΦΗΓΗΣΗ+BED -20dB              ΦΡΕΣΚΟΣ= 75.9%  ΚΥΛΙΟΜΕΝΟΣ= 76.7%  Δ=  +0.9pp
+  4 ΑΦΗΓΗΣΗ+BED -12dB              ΦΡΕΣΚΟΣ= 10.3%  ΚΥΛΙΟΜΕΝΟΣ= 11.2%  Δ=  +0.9pp
+  5 ΕΝΑΛΛΑΓΗ 30/60/90              ΦΡΕΣΚΟΣ= 95.7%  ΚΥΛΙΟΜΕΝΟΣ= 95.7%  Δ=  +0.0pp
+  6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s            ΦΡΕΣΚΟΣ= 86.2%  ΚΥΛΙΟΜΕΝΟΣ= 85.3%  Δ=  -0.9pp
+  7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ 17/41/68/94      ΦΡΕΣΚΟΣ= 87.9%  ΚΥΛΙΟΜΕΝΟΣ= 87.9%  Δ=  +0.0pp
+  8 ΣΥΝΤΟΜΕΣ 20s x6                ΦΡΕΣΚΟΣ= 87.1%  ΚΥΛΙΟΜΕΝΟΣ= 86.2%  Δ=  -0.9pp
+  9 ΑΣΥΜΜΕΤΡΕΣ                     ΦΡΕΣΚΟΣ= 89.7%  ΚΥΛΙΟΜΕΝΟΣ= 88.8%  Δ=  -0.9pp
+  10 BED ΣΥΝΕΧΙΖΕΙ ΑΠΟ ΚΑΤΩ        ΦΡΕΣΚΟΣ= 18.1%  ΚΥΛΙΟΜΕΝΟΣ= 18.1%  Δ=  +0.0pp
+  11 ΑΛΛΟ BED, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7)   ΦΡΕΣΚΟΣ= 80.2%  ΚΥΛΙΟΜΕΝΟΣ= 79.3%  Δ=  -0.9pp
+  12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7) ΦΡΕΣΚΟΣ= 96.6%  ΚΥΛΙΟΜΕΝΟΣ= 96.6%  Δ=  +0.0pp
+
+
+── ΠΗΓΑΙΟΣ ΚΩΔΙΚΑΣ (rolling_battery.rs) ──
+
+//! MEASURE 2026-09-16: τα δώδεκα δοκίμια του F-109/F-110/fixture_battery,
+//! ξανά, με τον ΚΥΛΙΟΜΕΝΟ ορισμό του cepstral_flux — αυτόν που τρέχει η
+//! παραγωγή (F-111). Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή.
+//!
+//! ΒΗΜΑ 0, απάντηση: ΝΑΙ, καλείται το ΠΡΑΓΜΑΤΙΚΟ
+//! sp314_orchestrator::trunk_pass::run_trunk_pass απευθείας — καμία
+//! αναπαραγωγή λογικής. Το μόνο νέο βήμα είναι μετατροπή ΜΟΡΦΗΣ: τα wav
+//! δοκίμια (i16, 48k, stereo — ίδιος reader με το fixture_battery.rs) εδώ
+//! γράφονται ΚΑΙ ως headerless interleaved f32 LE dump (η μορφή που
+//! περιμένει RawPcmFileSource — sp314_dsp/src/stft/raw_pcm_source.rs,
+//! ίδια σύμβαση με decode_provider.rs's DumpSeekProvider), χρησιμοποιώντας
+//! ΤΗΝ ΙΔΙΑ μετατροπή i16→f32 (/32768.0) που ήδη χρησιμοποιεί το
+//! fixture_battery.rs. Καμία λογική DSP δεν ξαναγράφεται εδώ — μόνο
+//! bytes-σε-δίσκο.
+//!
+//! ΠΙΣΤΟΤΗΤΑ ΤΗΣ ΜΕΤΑΤΡΟΠΗΣ, ελεγμένη ΑΝΑ ΔΟΚΙΜΙΟ πριν εμπιστευτεί
+//! οποιοδήποτε νούμερο: (1) το πλήθος παραθύρων από το πραγματικό
+//! TrunkReport.metrics.cv_ioi_sequence πρέπει να ταυτίζεται με το πλήθος
+//! του φρέσκου περάσματος· (2) το F-111 μέτρησε cv_ioi ταυτόσημο ανάμεσα
+//! στους δύο ορισμούς σε πραγματικά αρχεία — άρα max|cv_ioi_φρέσκο -
+//! cv_ioi_κυλιόμενο| πρέπει να είναι ίδιας τάξης (<0.0001) εδώ. Αν όχι, η
+//! μετατροπή dump είναι λάθος και η μέτρηση ΔΕΝ γράφεται.
+//!
+//! ΙΔΙΕΣ σταθερές/κανόνες με το fixture_battery.rs: MUSIC_CV/SPEECH_CV/
+//! MUSIC_FLUX/SPEECH_FLUX (F-041), MID_CV/MID_FLUX, ΑΝΟΧΗ ορίων ±5.0s,
+//! ΙΔΙΑ δώδεκα δοκίμια/schedules, ΙΔΙΟ smooth_and_segment.
+//!
+//! ΧΡΗΣΗ: cargo run --release --bin rolling_battery
+
+use lineos_corpus::scout::{
+    compute_cepstral_flux, compute_scout_decision, smooth_and_segment, ScoutDecision, ScoutMeasurements,
+    SegmentType,
+};
+use sp314_dsp::analysis::scout::SegmentScout;
+use sp314_orchestrator::trunk_pass::run_trunk_pass;
+use std::path::Path;
+
+const WORK: &str = "/tmp/scout-groundtruth";
+const DUMP_DIR: &str = "/tmp/rolling-battery-dumps";
+const WINDOW_SECS: f32 = 5.0;
+const HOP_SECS: f32 = 1.0;
+const BOUNDARY_TOLERANCE_SECS: f32 = 5.0;
+
+const MUSIC_CV: f32 = 0.4375;
+const SPEECH_CV: f32 = 0.6855;
+const MUSIC_FLUX: f32 = 1.3387;
+const SPEECH_FLUX: f32 = 1.7242;
+const MID_CV: f32 = (MUSIC_CV + SPEECH_CV) / 2.0;
+const MID_FLUX: f32 = (MUSIC_FLUX + SPEECH_FLUX) / 2.0;
+
+fn read_wav_stereo_f32(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let mut reader = hound::WavReader::open(path).unwrap_or_else(|e| panic!("open {path}: {e}"));
+    let samples: Vec<f32> = reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect();
+    let left: Vec<f32> = samples.iter().step_by(2).copied().collect();
+    let right: Vec<f32> = samples.iter().skip(1).step_by(2).copied().collect();
+    (left, right)
+}
+
+/// ΜΟΝΟ μετατροπή μορφής: headerless interleaved f32 LE, ίδια i16→f32
+/// σύμβαση (/32768.0) με το fixture_battery.rs. ΔΕΝ αγγίζει DSP λογική.
+fn wav_to_raw_dump(wav_path: &str, dump_path: &Path) {
+    let mut reader = hound::WavReader::open(wav_path).unwrap_or_else(|e| panic!("open {wav_path}: {e}"));
+    let mut buf: Vec<u8> = Vec::new();
+    for s in reader.samples::<i16>() {
+        let f = s.unwrap() as f32 / 32768.0;
+        buf.extend_from_slice(&f.to_le_bytes());
+    }
+    std::fs::write(dump_path, &buf).unwrap_or_else(|e| panic!("write {}: {e}", dump_path.display()));
+}
+
+struct Fixture {
+    label: &'static str,
+    wav: &'static str,
+    schedule: Vec<(f32, f32, SegmentType)>,
+}
+
+fn expected_type(schedule: &[(f32, f32, SegmentType)], center: f32) -> SegmentType {
+    for &(s, e, ty) in schedule {
+        if center >= s && center < e {
+            return ty;
+        }
+    }
+    schedule.last().unwrap().2
+}
+
+fn expected_boundaries(schedule: &[(f32, f32, SegmentType)]) -> Vec<f32> {
+    let mut out = Vec::new();
+    for w in schedule.windows(2) {
+        if w[0].2 != w[1].2 {
+            out.push(w[1].0);
+        }
+    }
+    out
+}
+
+fn match_boundaries(expected: &[f32], produced: &[f32], tol: f32) -> (usize, usize, usize) {
+    let mut used = vec![false; produced.len()];
+    let mut found = 0usize;
+    for &e in expected {
+        if let Some(idx) = produced
+            .iter()
+            .enumerate()
+            .filter(|(i, &p)| !used[*i] && (p - e).abs() <= tol)
+            .min_by(|a, b| (a.1 - e).abs().partial_cmp(&(b.1 - e).abs()).unwrap())
+            .map(|(i, _)| i)
+        {
+            used[idx] = true;
+            found += 1;
+        }
+    }
+    let missed = expected.len() - found;
+    let extra = used.iter().filter(|&&u| !u).count();
+    (found, missed, extra)
+}
+
+fn boundaries_from_verdicts(times: &[f32], verdicts: &[SegmentType]) -> Vec<f32> {
+    let decisions: Vec<(f32, ScoutDecision)> = times
+        .iter()
+        .zip(verdicts.iter())
+        .map(|(&t, &v)| {
+            let leaning = if v == SegmentType::Speech { 1.0 } else { 0.0 };
+            (t, ScoutDecision { leaning_score: leaning, confidence: 1.0 })
+        })
+        .collect();
+    let segs = smooth_and_segment(&decisions);
+    segs.windows(2).map(|w| w[1].start_sec).collect()
+}
+
+struct Column {
+    correct_a: usize,
+    correct_b: usize,
+    correct_d: usize,
+    total: usize,
+    bounds_a: Vec<f32>,
+    bounds_b: Vec<f32>,
+    cv_ioi: Vec<f32>,
+}
+
+/// ΦΡΕΣΚΟΣ ορισμός — αντίγραφο του fixture_battery.rs's run(), ΙΔΙΑ
+/// λογική (νέος MfccAnalyzer ανά παράθυρο, μηδέν ιστορικό).
+fn run_fresh(mono: &[f32], schedule: &[(f32, f32, SegmentType)]) -> Column {
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
+    let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
+
+    let mut scout = SegmentScout::new();
+    let mut start = 0usize;
+
+    let mut times = Vec::new();
+    let mut real_decisions: Vec<(f32, ScoutDecision)> = Vec::new();
+    let mut verdicts_b = Vec::new();
+    let mut verdicts_d = Vec::new();
+    let mut cv_ioi_seq = Vec::new();
+    let mut correct = [0usize; 3];
+    let mut total = 0usize;
+
+    while start + win_samples <= mono.len() {
+        let end = start + win_samples;
+        let mono_slice = &mono[start..end];
+        let start_sec = start as f32 / sample_rate as f32;
+
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfccs = Vec::new();
+        let mut f = 0;
+        while f + 1024 <= mono_slice.len() {
+            mfccs.push(mfcc_analyzer.compute(&mono_slice[f..f + 1024]));
+            f += 512;
+        }
+        let cepstral_flux = compute_cepstral_flux(&mfccs);
+        let meas: ScoutMeasurements = scout.measure(mono_slice, cepstral_flux, sample_rate);
+        let dec_a = compute_scout_decision(&meas);
+
+        let v_a = if dec_a.leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+        let v_b = if meas.cepstral_flux >= MID_FLUX { SegmentType::Speech } else { SegmentType::Music };
+        let v_d = SegmentType::Speech;
+
+        let center = start_sec + WINDOW_SECS / 2.0;
+        let exp = expected_type(schedule, center);
+        if v_a == exp { correct[0] += 1; }
+        if v_b == exp { correct[1] += 1; }
+        if v_d == exp { correct[2] += 1; }
+        total += 1;
+
+        times.push(start_sec);
+        real_decisions.push((start_sec, dec_a));
+        verdicts_b.push(v_b);
+        verdicts_d.push(v_d);
+        cv_ioi_seq.push(meas.cv_ioi);
+
+        start += hop_samples;
+    }
+
+    let bounds_a: Vec<f32> = smooth_and_segment(&real_decisions).windows(2).map(|w| w[1].start_sec).collect();
+    let bounds_b = boundaries_from_verdicts(&times, &verdicts_b);
+
+    Column {
+        correct_a: correct[0],
+        correct_b: correct[1],
+        correct_d: correct[2],
+        total,
+        bounds_a,
+        bounds_b,
+        cv_ioi: cv_ioi_seq,
+    }
+}
+
+/// ΚΥΛΙΟΜΕΝΟΣ ορισμός — καλεί ΑΠΕΥΘΕΙΑΣ το ΠΡΑΓΜΑΤΙΚΟ run_trunk_pass.
+/// Καμία αναπαραγωγή του MFCC ring: τα cv_ioi_sequence/cepstral_flux_sequence
+/// και τα boundaries έρχονται ΑΥΤΟΥΣΙΑ από το TrunkReport.
+fn run_rolling(dump_path: &Path, schedule: &[(f32, f32, SegmentType)]) -> Column {
+    let report = run_trunk_pass(dump_path, false).unwrap_or_else(|e| panic!("run_trunk_pass: {e}"));
+    let cv_ioi_seq = report.metrics.cv_ioi_sequence.clone();
+    let flux_seq = report.metrics.cepstral_flux_sequence.clone();
+    assert_eq!(cv_ioi_seq.len(), flux_seq.len(), "cv_ioi/flux sequence length mismatch");
+
+    let mut times = Vec::new();
+    let mut verdicts_b = Vec::new();
+    let mut verdicts_d = Vec::new();
+    let mut correct = [0usize; 3];
+    let total = cv_ioi_seq.len();
+
+    for i in 0..total {
+        let start_sec = i as f32 * HOP_SECS;
+        let meas = ScoutMeasurements { cv_ioi: cv_ioi_seq[i], cepstral_flux: flux_seq[i] };
+        let dec_a = compute_scout_decision(&meas);
+
+        let v_a = if dec_a.leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+        let v_b = if meas.cepstral_flux >= MID_FLUX { SegmentType::Speech } else { SegmentType::Music };
+        let v_d = SegmentType::Speech;
+
+        let center = start_sec + WINDOW_SECS / 2.0;
+        let exp = expected_type(schedule, center);
+        if v_a == exp { correct[0] += 1; }
+        if v_b == exp { correct[1] += 1; }
+        if v_d == exp { correct[2] += 1; }
+
+        times.push(start_sec);
+        verdicts_b.push(v_b);
+        verdicts_d.push(v_d);
+    }
+
+    let bounds_a: Vec<f32> = report.boundaries.windows(2).map(|w| w[1].start_sec).collect();
+    let bounds_b = boundaries_from_verdicts(&times, &verdicts_b);
+
+    Column {
+        correct_a: correct[0],
+        correct_b: correct[1],
+        correct_d: correct[2],
+        total,
+        bounds_a,
+        bounds_b,
+        cv_ioi: cv_ioi_seq,
+    }
+}
+
+fn pct(n: usize, total: usize) -> f32 {
+    100.0 * n as f32 / total as f32
+}
+
+fn main() {
+    use SegmentType::{Music, Speech};
+    std::fs::create_dir_all(DUMP_DIR).unwrap();
+
+    let fixtures = vec![
+        Fixture { label: "1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ", wav: "test1_narration_only.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "2 ΣΚΕΤΟ BED", wav: "test2_bed_only.wav", schedule: vec![(0.0, 120.0, Music)] },
+        Fixture { label: "3 ΑΦΗΓΗΣΗ+BED -20dB", wav: "test3_narration_bed_m20dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "4 ΑΦΗΓΗΣΗ+BED -12dB", wav: "test4_narration_bed_m12dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture {
+            label: "5 ΕΝΑΛΛΑΓΗ 30/60/90",
+            wav: "test5_alternation_30_60_90.wav",
+            schedule: vec![(0.0, 30.0, Speech), (30.0, 60.0, Music), (60.0, 90.0, Speech), (90.0, 120.0, Music)],
+        },
+        Fixture { label: "6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s", wav: "test6_bed_enters_60s.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture {
+            label: "7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ 17/41/68/94",
+            wav: "test7_nonround_17_41_68_94.wav",
+            schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)],
+        },
+        Fixture {
+            label: "8 ΣΥΝΤΟΜΕΣ 20s x6",
+            wav: "test8_short_20s_x6.wav",
+            schedule: vec![
+                (0.0, 20.0, Speech), (20.0, 40.0, Music), (40.0, 60.0, Speech),
+                (60.0, 80.0, Music), (80.0, 100.0, Speech), (100.0, 120.0, Music),
+            ],
+        },
+        Fixture {
+            label: "9 ΑΣΥΜΜΕΤΡΕΣ",
+            wav: "test9_asymmetric.wav",
+            schedule: vec![(0.0, 45.0, Speech), (45.0, 53.0, Music), (53.0, 103.0, Speech), (103.0, 111.0, Music), (111.0, 120.0, Speech)],
+        },
+        Fixture {
+            label: "10 BED ΣΥΝΕΧΙΖΕΙ ΑΠΟ ΚΑΤΩ",
+            wav: "test10_bed_continues_under.wav",
+            schedule: vec![(0.0, 40.0, Speech), (40.0, 60.0, Music), (60.0, 120.0, Speech)],
+        },
+        Fixture {
+            label: "11 ΑΛΛΟ BED, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7)",
+            wav: "test11_altbed_17_41_68_94.wav",
+            schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)],
+        },
+        Fixture {
+            label: "12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ, ΙΔΙΟ ΣΧΗΜΑ ΜΕ (7)",
+            wav: "test12_altnarrator_17_41_68_94.wav",
+            schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)],
+        },
+    ];
+
+    println!("ΒΗΜΑ 0: run_trunk_pass καλείται ΑΠΕΥΘΕΙΑΣ (καμία αναπαραγωγή λογικής).");
+    println!("Μετατροπή μορφής wav->raw dump (headerless f32 LE interleaved), ίδια /32768.0 σύμβαση με fixture_battery.rs.\n");
+    println!("MID_CV={MID_CV:.4} MID_FLUX={MID_FLUX:.4} ΑΝΟΧΗ_ΟΡΙΩΝ={BOUNDARY_TOLERANCE_SECS}s\n");
+
+    let mut summary: Vec<(String, f32, f32)> = Vec::new();
+
+    for fx in &fixtures {
+        let wav_path = format!("{WORK}/{}", fx.wav);
+        let dump_path = Path::new(DUMP_DIR).join(format!("{}.f32dump", fx.wav));
+        wav_to_raw_dump(&wav_path, &dump_path);
+
+        let (left, right) = read_wav_stereo_f32(&wav_path);
+        let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+
+        let fresh = run_fresh(&mono, &fx.schedule);
+        let rolling = run_rolling(&dump_path, &fx.schedule);
+
+        let count_match = fresh.total == rolling.total;
+        let max_cv_diff = if count_match {
+            fresh.cv_ioi.iter().zip(rolling.cv_ioi.iter())
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max)
+        } else {
+            f32::NAN
+        };
+
+        println!("=== {} ({}) ===", fx.label, fx.wav);
+        println!(
+            "  ΠΙΣΤΟΤΗΤΑ: πλήθος παραθύρων φρέσκο={} κυλιόμενο={} {} · max|Δcv_ioi|={:.6}",
+            fresh.total, rolling.total,
+            if count_match { "ΣΥΜΦΩΝΙΑ" } else { "⚠ ΑΣΥΜΦΩΝΙΑ" },
+            max_cv_diff
+        );
+        println!(
+            "  ΦΡΕΣΚΟΣ    (n={}): Α={:>3}/{} ({:.1}%)  Β={:>3}/{} ({:.1}%)  Δ={:>3}/{} ({:.1}%)",
+            fresh.total, fresh.correct_a, fresh.total, pct(fresh.correct_a, fresh.total),
+            fresh.correct_b, fresh.total, pct(fresh.correct_b, fresh.total),
+            fresh.correct_d, fresh.total, pct(fresh.correct_d, fresh.total),
+        );
+        println!(
+            "  ΚΥΛΙΟΜΕΝΟΣ (n={}): Α={:>3}/{} ({:.1}%)  Β={:>3}/{} ({:.1}%)  Δ={:>3}/{} ({:.1}%)",
+            rolling.total, rolling.correct_a, rolling.total, pct(rolling.correct_a, rolling.total),
+            rolling.correct_b, rolling.total, pct(rolling.correct_b, rolling.total),
+            rolling.correct_d, rolling.total, pct(rolling.correct_d, rolling.total),
+        );
+
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        println!("  αναμενόμενα όρια: {:?}", exp_bounds);
+        for (name, col) in [("ΦΡΕΣΚΟΣ", &fresh), ("ΚΥΛΙΟΜΕΝΟΣ", &rolling)] {
+            for (rule, prod) in [("Α", &col.bounds_a), ("Β", &col.bounds_b)] {
+                let (found, missed, extra) = match_boundaries(&exp_bounds, prod, BOUNDARY_TOLERANCE_SECS);
+                println!(
+                    "    {name} όρια {rule}: παρήχθησαν={:?}  βρέθηκαν={found}/{} χάθηκαν={missed} περίσσεψαν={extra}",
+                    prod, exp_bounds.len()
+                );
+            }
+        }
+        println!();
+
+        summary.push((fx.label.to_string(), pct(fresh.correct_a, fresh.total), pct(rolling.correct_a, rolling.total)));
+    }
+
+    println!("── ΠΙΝΑΚΑΣ 12×2 — ορθότητα κανόνα Α (σημερινή προβολή), ΦΡΕΣΚΟΣ έναντι ΚΥΛΙΟΜΕΝΟΥ ──");
+    for (label, f, r) in &summary {
+        println!("  {:<32} ΦΡΕΣΚΟΣ={:>5.1}%  ΚΥΛΙΟΜΕΝΟΣ={:>5.1}%  Δ={:>+6.1}pp", label, f, r, r - f);
+    }
+}
+
+
+sha256(αυτό το αρχείο ΧΩΡΙΣ αυτή τη γραμμή και την επόμενη): 326f33efcbfe95da2c7a1cd50c5ac21809b6af12a2d0748566fdabd4aa896641
+εργαλείο: rolling_battery (research/encoder-gap-speech), commit εν εξελίξει

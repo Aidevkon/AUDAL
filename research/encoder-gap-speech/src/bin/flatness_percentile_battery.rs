@@ -1,0 +1,492 @@
+//! MEASURE 2026-09-16/17: το κατώφλι ως εκατοστημόριο του ίδιου του
+//! αρχείου. Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή, ΜΗΔΕΝ νέο υλικό.
+//!
+//! ΓΙΑΤΙ: δύο τρόποι δοκιμάστηκαν και έπεσαν (flatness_asymmetric_
+//! battery.rs, 16/09). Απόλυτο 0.045: λύνει το δοκίμιο 10 (100%,
+//! 2/2 όρια) αλλά σπάει το 11 (80.2%→60.3%, σε κάθε τιμή σάρωσης) —
+//! το bed2 έχει διάμεσο επιπεδότητας 0.0498, πάνω από το 0.045, ΚΑΙ
+//! είναι θέση 101/437 στο allowlist (F-116/flatness-allowlist-survey).
+//! Σχετικό με Otsu: χειρότερο ή ίδιο σε 9/12 — στο σκέτο bed (δοκίμιο
+//! 2, ΟΛΑ τα παράθυρα νόμιμα Music) ο Otsu μοιράζει αυθαίρετα στα δύο
+//! (23.3%, 26 ψεύτικα όρια), αφού πάντα βρίσκει κάποια τομή έστω κι
+//! αν δεν υπάρχει διτροπία.
+//!
+//! Η ΥΠΟΘΕΣΗ προς μέτρηση: το μοτίβο που δούλεψε όλη μέρα (expander
+//! quiet_window_split_dbfs στο πάτωμα του αρχείου, ο ανιχνευτής βόμβου
+//! στο ησυχότερο παράθυρο) δεν είναι διχοτόμηση — είναι εκατοστημόριο.
+//! Στο δοκίμιο 10 το bed τρέχει παντού, άρα τα πιο τονικά παράθυρα
+//! (χαμηλότερη επιπεδότητα) είναι το bed μόνο του — ένα χαμηλό
+//! εκατοστημόριο του αρχείου προσεγγίζει «το πάτωμα του bed».
+//!
+//! Ο ΚΑΝΟΝΑΣ — ΙΔΙΟΣ ασύμμετρος με flatness_asymmetric_battery.rs
+//! (Speech της προβολής ΠΟΤΕ δεν αλλάζει· Music κάτω από κατώφλι μένει
+//! Music· πάνω γίνεται Speech, conf 0.80 — πραγματικές (leaning,
+//! confidence) τιμές τροφοδοτούν το ΠΡΑΓΜΑΤΙΚΟ smooth_and_segment):
+//!   κατώφλι(αρχείο) = percentile_k(επιπεδότητα ανά παράθυρο, ΟΛΟ το
+//!   αρχείο) × (1 + m)
+//!
+//! ΣΑΡΩΣΗ ΔΥΟ ΔΙΑΣΤΑΣΕΩΝ, δώδεκα κελιά, ΜΗΔΕΝ πρόταση τιμής:
+//!   εκατοστημόριο k ∈ {5, 10, 20} · περιθώριο m ∈ {0.20,0.35,0.50,0.75}
+//!   (πολλαπλασιαστικό — κλιμακώνεται με το αρχείο, όχι προσθετικό).
+//!
+//! ΤΕΣΣΕΡΑ ΣΚΕΛΗ: (1) τα δώδεκα δοκίμια ανά κελί, δίπλα Α/απόλυτο-0.045/Δ·
+//! (2) τα τρία κρίσιμα (10, 11, 2) πρώτα και ξεχωριστά· (3) το ίδιο το
+//! κατώφλι-σε-Hz-μονάδες που βγήκε ανά αρχείο/κελί· (4) η πύλη — εννιά
+//! βιβλία, στο κελί που κράτησε το δοκίμιο 2 (τον φρουρό) καλύτερα, και
+//! σε ένα ακόμα (το κελί που διόρθωσε καλύτερα το δοκίμιο 11) για
+//! σύγκριση — επιλογή ΜΕΤΡΗΜΕΝΗ από τα ίδια τα σκέλη 1-2, όχι προτεινόμενη.
+//!
+//! ΧΡΗΣΗ: cargo run --release --bin flatness_percentile_battery
+
+use lineos_corpus::scout::{
+    compute_cepstral_flux, compute_scout_decision, smooth_and_segment, ScoutDecision, SegmentType,
+};
+use sp314_dsp::analysis::scout::SegmentScout;
+use sp314_dsp::analysis::spectral::spectral_flatness;
+
+const WINDOW_SECS: f32 = 5.0;
+const HOP_SECS: f32 = 1.0;
+const SUBCHUNK_SECS: f32 = 0.5;
+const BOUNDARY_TOLERANCE_SECS: f32 = 5.0;
+const A7_ZONE_LOW: f32 = 0.3;
+const A7_ZONE_HIGH: f32 = 0.7;
+const A7_MIN_CONF: f32 = 0.4;
+const DUMP_FRAME_BYTES: usize = 8;
+
+const OWNER_THRESHOLD_ABS: f32 = 0.045;
+const OWNER_CONF: f32 = 0.80;
+const PERCENTILES: [f32; 3] = [5.0, 10.0, 20.0];
+const MARGINS: [f32; 4] = [0.20, 0.35, 0.50, 0.75];
+
+fn read_wav_stereo_f32(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let mut reader = hound::WavReader::open(path).unwrap_or_else(|e| panic!("open {path}: {e}"));
+    let samples: Vec<f32> = reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect();
+    let left: Vec<f32> = samples.iter().step_by(2).copied().collect();
+    let right: Vec<f32> = samples.iter().skip(1).step_by(2).copied().collect();
+    (left, right)
+}
+
+fn read_dump_stereo(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let buf = std::fs::read(path).unwrap_or_else(|e| panic!("read dump {path}: {e}"));
+    let full_frames = buf.len() / DUMP_FRAME_BYTES;
+    let mut left = Vec::with_capacity(full_frames);
+    let mut right = Vec::with_capacity(full_frames);
+    for i in 0..full_frames {
+        let base = i * DUMP_FRAME_BYTES;
+        left.push(f32::from_le_bytes([buf[base], buf[base + 1], buf[base + 2], buf[base + 3]]));
+        right.push(f32::from_le_bytes([buf[base + 4], buf[base + 5], buf[base + 6], buf[base + 7]]));
+    }
+    (left, right)
+}
+
+fn median(xs: &[f32]) -> f32 {
+    let mut v = xs.to_vec();
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let n = v.len();
+    if n == 0 {
+        return f32::NAN;
+    }
+    if n % 2 == 0 { (v[n / 2 - 1] + v[n / 2]) / 2.0 } else { v[n / 2] }
+}
+
+/// ΙΔΙΟΣ τύπος με flatness_allowlist_survey.rs: ταξινομημένος πίνακας,
+/// nearest-rank με στρογγυλοποίηση.
+fn percentile_of(values: &[f32], p: f32) -> f32 {
+    let mut v = values.to_vec();
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    if v.is_empty() {
+        return f32::NAN;
+    }
+    let idx = ((p / 100.0) * (v.len() - 1) as f32).round() as usize;
+    v[idx.min(v.len() - 1)]
+}
+
+/// ΙΔΙΟΣ ορισμός με F-115/flatness_relative.rs: διάμεσος spectral_flatness()
+/// σε 10 υπο-τμήματα 0.5s.
+fn window_flatness(mono_slice: &[f32], sample_rate: u32) -> f32 {
+    let sub_samples = (SUBCHUNK_SECS * sample_rate as f32) as usize;
+    let mut vals = Vec::new();
+    let mut pos = 0;
+    while pos + sub_samples <= mono_slice.len() {
+        vals.push(spectral_flatness(&mono_slice[pos..pos + sub_samples]));
+        pos += sub_samples;
+    }
+    median(&vals)
+}
+
+/// Ο ασύμμετρος κανόνας. Μονόδρομος: Speech της προβολής ΠΟΤΕ δεν αλλάζει.
+fn apply_asymmetric(dec_a: ScoutDecision, flatness: f32, threshold: f32, override_conf: f32) -> ScoutDecision {
+    if dec_a.leaning_score >= 0.5 {
+        dec_a
+    } else if flatness > threshold {
+        ScoutDecision { leaning_score: 1.0, confidence: override_conf }
+    } else {
+        dec_a
+    }
+}
+
+fn match_boundaries(expected: &[f32], produced: &[f32], tol: f32) -> (usize, usize, usize) {
+    let mut used = vec![false; produced.len()];
+    let mut found = 0usize;
+    for &e in expected {
+        if let Some(idx) = produced
+            .iter()
+            .enumerate()
+            .filter(|(i, &p)| !used[*i] && (p - e).abs() <= tol)
+            .min_by(|a, b| (a.1 - e).abs().partial_cmp(&(b.1 - e).abs()).unwrap())
+            .map(|(i, _)| i)
+        {
+            used[idx] = true;
+            found += 1;
+        }
+    }
+    let missed = expected.len() - found;
+    let extra = used.iter().filter(|&&u| !u).count();
+    (found, missed, extra)
+}
+
+fn expected_type(schedule: &[(f32, f32, SegmentType)], center: f32) -> SegmentType {
+    for &(s, e, ty) in schedule {
+        if center >= s && center < e {
+            return ty;
+        }
+    }
+    schedule.last().unwrap().2
+}
+
+fn expected_boundaries(schedule: &[(f32, f32, SegmentType)]) -> Vec<f32> {
+    let mut out = Vec::new();
+    for w in schedule.windows(2) {
+        if w[0].2 != w[1].2 {
+            out.push(w[1].0);
+        }
+    }
+    out
+}
+
+fn music_to_speech_resets(segs: &[(f32, f32, SegmentType)]) -> usize {
+    segs.windows(2).filter(|w| w[0].2 == SegmentType::Music && w[1].2 == SegmentType::Speech).count()
+}
+
+fn under_5s(segs: &[(f32, f32, SegmentType)]) -> usize {
+    segs.iter().filter(|(s, e, _)| (e - s) < 5.0).count()
+}
+
+fn flagged(leaning: f32, conf: f32) -> bool {
+    let in_dead_zone = leaning > A7_ZONE_LOW && leaning < A7_ZONE_HIGH;
+    let low_confidence = conf < A7_MIN_CONF;
+    in_dead_zone && low_confidence
+}
+
+struct Fixture {
+    label: &'static str,
+    wav: &'static str,
+    schedule: Vec<(f32, f32, SegmentType)>,
+}
+
+struct WindowData {
+    times: Vec<f32>,
+    dec_a: Vec<ScoutDecision>,
+    flats: Vec<f32>,
+}
+
+fn scan_fixture(fx: &Fixture) -> WindowData {
+    let path = format!("/tmp/scout-groundtruth/{}", fx.wav);
+    let (left, right) = read_wav_stereo_f32(&path);
+    let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    scan_mono(&mono, sample_rate)
+}
+
+fn scan_mono(mono: &[f32], sample_rate: u32) -> WindowData {
+    let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
+    let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
+    let mut scout = SegmentScout::new();
+    let mut times = Vec::new();
+    let mut dec_a = Vec::new();
+    let mut flats = Vec::new();
+    let mut start = 0usize;
+    while start + win_samples <= mono.len() {
+        let mono_slice = &mono[start..start + win_samples];
+        let start_sec = start as f32 / sample_rate as f32;
+
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfccs = Vec::new();
+        let mut f = 0;
+        while f + 1024 <= mono_slice.len() {
+            mfccs.push(mfcc_analyzer.compute(&mono_slice[f..f + 1024]));
+            f += 512;
+        }
+        let cepstral_flux = compute_cepstral_flux(&mfccs);
+        let meas = scout.measure(mono_slice, cepstral_flux, sample_rate);
+        let dec = compute_scout_decision(&meas);
+
+        times.push(start_sec);
+        dec_a.push(dec);
+        flats.push(window_flatness(mono_slice, sample_rate));
+        start += hop_samples;
+    }
+    WindowData { times, dec_a, flats }
+}
+
+fn segments_from_decisions(times: &[f32], decisions: &[ScoutDecision]) -> Vec<(f32, f32, SegmentType)> {
+    let d: Vec<(f32, ScoutDecision)> = times.iter().zip(decisions.iter()).map(|(&t, &dec)| (t, dec)).collect();
+    smooth_and_segment(&d).iter().map(|b| (b.start_sec, b.end_sec, b.segment_type)).collect()
+}
+
+struct Outcome {
+    correct: usize,
+    total: usize,
+    segs: Vec<(f32, f32, SegmentType)>,
+}
+
+fn fixture_result(wd: &WindowData, schedule: &[(f32, f32, SegmentType)], threshold: f32, override_conf: f32) -> Outcome {
+    let total = wd.times.len();
+    let mut correct = 0usize;
+    let mut final_decisions = Vec::with_capacity(total);
+    for i in 0..total {
+        let center = wd.times[i] + WINDOW_SECS / 2.0;
+        let exp = expected_type(schedule, center);
+        let final_dec = apply_asymmetric(wd.dec_a[i], wd.flats[i], threshold, override_conf);
+        let verdict = if final_dec.leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+        if verdict == exp {
+            correct += 1;
+        }
+        final_decisions.push(final_dec);
+    }
+    let segs = segments_from_decisions(&wd.times, &final_decisions);
+    Outcome { correct, total, segs }
+}
+
+fn segments_only(wd: &WindowData, threshold: f32, override_conf: f32) -> (Vec<(f32, f32, SegmentType)>, Vec<ScoutDecision>) {
+    let final_decisions: Vec<ScoutDecision> = (0..wd.times.len())
+        .map(|i| apply_asymmetric(wd.dec_a[i], wd.flats[i], threshold, override_conf))
+        .collect();
+    let segs = segments_from_decisions(&wd.times, &final_decisions);
+    (segs, final_decisions)
+}
+
+fn today_a(wd: &WindowData, schedule: &[(f32, f32, SegmentType)]) -> Outcome {
+    let total = wd.times.len();
+    let mut correct = 0usize;
+    for i in 0..total {
+        let center = wd.times[i] + WINDOW_SECS / 2.0;
+        let exp = expected_type(schedule, center);
+        let v_a = if wd.dec_a[i].leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+        if v_a == exp {
+            correct += 1;
+        }
+    }
+    let segs = segments_from_decisions(&wd.times, &wd.dec_a);
+    Outcome { correct, total, segs }
+}
+
+fn today_degenerate(wd: &WindowData, schedule: &[(f32, f32, SegmentType)]) -> Outcome {
+    let always_speech: Vec<ScoutDecision> = wd.times.iter().map(|_| ScoutDecision { leaning_score: 1.0, confidence: 1.0 }).collect();
+    let segs = segments_from_decisions(&wd.times, &always_speech);
+    let correct = (0..wd.times.len())
+        .filter(|&i| expected_type(schedule, wd.times[i] + WINDOW_SECS / 2.0) == SegmentType::Speech)
+        .count();
+    Outcome { correct, total: wd.times.len(), segs }
+}
+
+fn fmt_row(label: &str, o: &Outcome, exp_bounds: &[f32]) -> String {
+    let prod: Vec<f32> = o.segs.windows(2).map(|w| w[1].0).collect();
+    let (found, missed, extra) = match_boundaries(exp_bounds, &prod, BOUNDARY_TOLERANCE_SECS);
+    format!(
+        "{:<16} acc={:>3}/{} ({:>5.1}%)  όρια f={found}/{} m={missed} e={extra}",
+        label, o.correct, o.total, 100.0 * o.correct as f32 / o.total as f32, exp_bounds.len()
+    )
+}
+
+fn cell_label(p: f32, m: f32) -> String {
+    format!("p{:.0}/m{:.2}", p, m)
+}
+
+fn run_book(label: &str, path: &str, cells: &[(f32, f32, &str)]) {
+    let dump = format!("/tmp/flatness_pct_{}.raw", label.split_whitespace().next().unwrap_or("x"));
+    m0d::dsp::input_lufs::pass0_decode_to_dump(std::path::Path::new(path), &dump)
+        .unwrap_or_else(|e| panic!("pass0 decode {path}: {e}"));
+    let (left, right) = read_dump_stereo(&dump);
+    let _ = std::fs::remove_file(&dump);
+    let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    let wd = scan_mono(&mono, sample_rate);
+
+    print!("{:<24}", label);
+    for &(p, m, tag) in cells {
+        let thr = percentile_of(&wd.flats, p) * (1.0 + m);
+        let (segs, final_decisions) = segments_only(&wd, thr, OWNER_CONF);
+        let mut flagged_n = 0usize;
+        for &(s, e, _) in &segs {
+            let in_range: Vec<usize> = (0..wd.times.len()).filter(|&i| wd.times[i] >= s && wd.times[i] < e).collect();
+            if in_range.is_empty() {
+                continue;
+            }
+            let avg_l = in_range.iter().map(|&i| final_decisions[i].leaning_score).sum::<f32>() / in_range.len() as f32;
+            let avg_c = in_range.iter().map(|&i| final_decisions[i].confidence).sum::<f32>() / in_range.len() as f32;
+            if flagged(avg_l, avg_c) {
+                flagged_n += 1;
+            }
+        }
+        print!(
+            "   [{tag}] thr={:.4} τμήματα={:<4} resets={:<4} flagged={:<4} <5s={}",
+            thr, segs.len(), music_to_speech_resets(&segs), flagged_n, under_5s(&segs)
+        );
+    }
+    println!();
+}
+
+fn main() {
+    use SegmentType::{Music, Speech};
+    let fixtures = vec![
+        Fixture { label: "1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ", wav: "test1_narration_only.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "2 ΣΚΕΤΟ BED", wav: "test2_bed_only.wav", schedule: vec![(0.0, 120.0, Music)] },
+        Fixture { label: "3 ΑΦΗΓΗΣΗ+BED -20dB", wav: "test3_narration_bed_m20dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "4 ΑΦΗΓΗΣΗ+BED -12dB", wav: "test4_narration_bed_m12dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "5 ΕΝΑΛΛΑΓΗ 30/60/90", wav: "test5_alternation_30_60_90.wav", schedule: vec![(0.0, 30.0, Speech), (30.0, 60.0, Music), (60.0, 90.0, Speech), (90.0, 120.0, Music)] },
+        Fixture { label: "6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s", wav: "test6_bed_enters_60s.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ", wav: "test7_nonround_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "8 ΣΥΝΤΟΜΕΣ 20s×6", wav: "test8_short_20s_x6.wav", schedule: vec![(0.0, 20.0, Speech), (20.0, 40.0, Music), (40.0, 60.0, Speech), (60.0, 80.0, Music), (80.0, 100.0, Speech), (100.0, 120.0, Music)] },
+        Fixture { label: "9 ΑΣΥΜΜΕΤΡΕΣ", wav: "test9_asymmetric.wav", schedule: vec![(0.0, 45.0, Speech), (45.0, 53.0, Music), (53.0, 103.0, Speech), (103.0, 111.0, Music), (111.0, 120.0, Speech)] },
+        Fixture { label: "10 BED ΣΥΝΕΧΙΖΕΙ", wav: "test10_bed_continues_under.wav", schedule: vec![(0.0, 40.0, Speech), (40.0, 60.0, Music), (60.0, 120.0, Speech)] },
+        Fixture { label: "11 ΑΛΛΟ BED", wav: "test11_altbed_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ", wav: "test12_altnarrator_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+    ];
+
+    let scans: Vec<WindowData> = fixtures.iter().map(scan_fixture).collect();
+
+    // cells[fixture_idx][cell_idx] = (threshold, accuracy%, Outcome)
+    let mut cell_results: Vec<Vec<(f32, f32, Outcome)>> = Vec::with_capacity(fixtures.len());
+    for (i, fx) in fixtures.iter().enumerate() {
+        let wd = &scans[i];
+        let mut row = Vec::with_capacity(12);
+        for &p in &PERCENTILES {
+            for &m in &MARGINS {
+                let thr = percentile_of(&wd.flats, p) * (1.0 + m);
+                let o = fixture_result(wd, &fx.schedule, thr, OWNER_CONF);
+                let acc = 100.0 * o.correct as f32 / o.total as f32;
+                row.push((thr, acc, o));
+            }
+        }
+        cell_results.push(row);
+    }
+
+    println!("PERCENTILES={PERCENTILES:?} MARGINS={MARGINS:?} OWNER_CONF={OWNER_CONF} OWNER_THRESHOLD_ABS={OWNER_THRESHOLD_ABS} ΑΝΟΧΗ_ΟΡΙΩΝ={BOUNDARY_TOLERANCE_SECS}s\n");
+
+    let idx_of = |wav_prefix: &str| fixtures.iter().position(|f| f.wav.starts_with(wav_prefix)).unwrap();
+    let idx10 = idx_of("test10");
+    let idx11 = idx_of("test11");
+    let idx2 = idx_of("test2");
+
+    println!("=== ΤΑ ΤΡΙΑ ΚΡΙΣΙΜΑ, ΠΡΩΤΑ ΚΑΙ ΞΕΧΩΡΙΣΤΑ ===");
+    for &i in &[idx10, idx11, idx2] {
+        let fx = &fixtures[i];
+        let wd = &scans[i];
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        println!("--- {} ---", fx.label);
+        println!("  {}", fmt_row("Α (σήμερα)", &today_a(wd, &fx.schedule), &exp_bounds));
+        println!("  {}", fmt_row("απόλυτο 0.045", &fixture_result(wd, &fx.schedule, OWNER_THRESHOLD_ABS, OWNER_CONF), &exp_bounds));
+        println!("  {}", fmt_row("Δ (πάντα ομιλία)", &today_degenerate(wd, &fx.schedule), &exp_bounds));
+        let mut ci = 0;
+        for &p in &PERCENTILES {
+            for &m in &MARGINS {
+                let (thr, acc, o) = &cell_results[i][ci];
+                let prod: Vec<f32> = o.segs.windows(2).map(|w| w[1].0).collect();
+                let (f, ms, e) = match_boundaries(&exp_bounds, &prod, BOUNDARY_TOLERANCE_SECS);
+                println!(
+                    "  {:<10} thr={:.4}  acc={:>5.1}%  όρια f={f}/{} m={ms} e={e}",
+                    cell_label(p, m), thr, acc, exp_bounds.len()
+                );
+                ci += 1;
+            }
+        }
+        println!();
+    }
+
+    println!("=== ΣΚΕΛΟΣ 1 — ΤΑ ΔΩΔΕΚΑ ΔΟΚΙΜΙΑ, ΠΛΗΡΕΣ, ΑΝΑ ΚΕΛΙ (ορθότητα%, όρια f/m/e) ===");
+    for (i, fx) in fixtures.iter().enumerate() {
+        let wd = &scans[i];
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        println!("--- {} ---", fx.label);
+        println!("  {}", fmt_row("Α (σήμερα)", &today_a(wd, &fx.schedule), &exp_bounds));
+        println!("  {}", fmt_row("απόλυτο 0.045", &fixture_result(wd, &fx.schedule, OWNER_THRESHOLD_ABS, OWNER_CONF), &exp_bounds));
+        println!("  {}", fmt_row("Δ (πάντα ομιλία)", &today_degenerate(wd, &fx.schedule), &exp_bounds));
+        let mut ci = 0;
+        for &p in &PERCENTILES {
+            for &m in &MARGINS {
+                let (thr, acc, o) = &cell_results[i][ci];
+                let prod: Vec<f32> = o.segs.windows(2).map(|w| w[1].0).collect();
+                let (f, ms, e) = match_boundaries(&exp_bounds, &prod, BOUNDARY_TOLERANCE_SECS);
+                println!(
+                    "  {:<10} thr={:.4}  acc={:>5.1}%  όρια f={f}/{} m={ms} e={e}",
+                    cell_label(p, m), thr, acc, exp_bounds.len()
+                );
+                ci += 1;
+            }
+        }
+        println!();
+    }
+
+    println!("=== ΣΚΕΛΟΣ 3 — ΤΟ ΚΑΤΩΦΛΙ (τιμή επιπεδότητας) ΑΝΑ ΑΡΧΕΙΟ × ΚΕΛΙ ===");
+    print!("{:<24}", "δοκίμιο");
+    for &p in &PERCENTILES {
+        for &m in &MARGINS {
+            print!("  {:>10}", cell_label(p, m));
+        }
+    }
+    println!();
+    for (i, fx) in fixtures.iter().enumerate() {
+        print!("{:<24}", fx.label);
+        for (thr, _, _) in &cell_results[i] {
+            print!("  {:>10.4}", thr);
+        }
+        println!();
+    }
+
+    // ── Επιλογή κελιών για την πύλη, ΜΕΤΡΗΜΕΝΗ από τα σκέλη 1-2 ──
+    let cell_names: Vec<(f32, f32)> = PERCENTILES.iter().flat_map(|&p| MARGINS.iter().map(move |&m| (p, m))).collect();
+    let guard_best_ci = (0..12).max_by(|&a, &b| cell_results[idx2][a].1.partial_cmp(&cell_results[idx2][b].1).unwrap()).unwrap();
+    let f11_best_ci = (0..12).max_by(|&a, &b| cell_results[idx11][a].1.partial_cmp(&cell_results[idx11][b].1).unwrap()).unwrap();
+    let (gp, gm) = cell_names[guard_best_ci];
+    let (fp, fm) = cell_names[f11_best_ci];
+    println!(
+        "\nΚελί-φρουρός (καλύτερο στο δοκίμιο 2): {} (acc={:.1}%). Κελί-11 (καλύτερο στο δοκίμιο 11): {} (acc={:.1}%).",
+        cell_label(gp, gm), cell_results[idx2][guard_best_ci].1,
+        cell_label(fp, fm), cell_results[idx11][f11_best_ci].1
+    );
+    if guard_best_ci == f11_best_ci {
+        println!("⇒ ΤΑΥΤΙΖΟΝΤΑΙ — ένα μόνο κελί τρέχει στην πύλη, δηλωμένο.");
+    }
+
+    println!("\n=== ΣΚΕΛΟΣ 4 — Η ΠΥΛΗ: ΕΝΝΙΑ ΒΙΒΛΙΑ ===");
+    println!("ΣΗΜΕΡΙΝΟ (Α, για σύγκριση): secretgarden=79 dracula=128 τα άλλα 1-16. ΑΠΟΛΥΤΟ 0.045 (16/09): secretgarden=65 dracula=27.\n");
+    let mut cells_to_run: Vec<(f32, f32, &str)> = vec![(gp, gm, "φρουρός")];
+    if guard_best_ci != f11_best_ci {
+        cells_to_run.push((fp, fm, "δοκίμιο-11"));
+    }
+    // p10/m0.75 μετρήθηκε (σκέλη 1-2) να ικανοποιεί ΚΑΙ τα τρία κρίσιμα
+    // ταυτόχρονα (δοκίμιο 10=99.1%, δοκίμιο 11=88.8%, δοκίμιο 2=100.0%) —
+    // ούτε το κελί-φρουρός ούτε το κελί-11 (επιλεγμένα με μονοδιάστατο
+    // argmax) το συμπεριλαμβάνουν. Προστίθεται εδώ ως τρίτο σημείο,
+    // ΜΕΤΡΗΜΕΝΟ ήδη στα δώδεκα δοκίμια — όχι νέα πρόταση τιμής.
+    if !cells_to_run.iter().any(|&(p, m, _)| p == 10.0 && m == 0.75) {
+        cells_to_run.push((10.0, 0.75, "10&11&2"));
+    }
+    let dir = "/home/aidevcon/Downloads/DATASET/librivox-hq";
+    let books = [
+        ("secretgarden", "secretgarden_01_burnett.mp3"),
+        ("dracula", "dracula_01_stoker.mp3"),
+        ("count_of_monte_cristo", "count_of_monte_cristo_001_dumas.mp3"),
+        ("peterpan", "peterpan_01_barrie.mp3"),
+        ("anne_of_green_gables", "anne_of_green_gables_01_montgomery.mp3"),
+        ("tale_of_two_cities", "tale_of_two_cities_01_dickens.mp3"),
+        ("adventurespinocchio", "adventurespinocchio_01_collodi.mp3"),
+        ("huckfinn", "huckfinn_01_twain_apc.mp3"),
+        ("janeeyre", "janeeyre_01_bronte.mp3"),
+    ];
+    for (label, fname) in books {
+        let path = format!("{dir}/{fname}");
+        run_book(label, &path, &cells_to_run);
+    }
+}
