@@ -8,7 +8,7 @@
 //! ΧΡΗΣΗ: cargo run --release --bin boundary_step_measure -- <audio_path> <boundary_sec>
 use sp314_dsp::analysis::pre_analysis::{butter_hp2, butter_lp2, Biquad, BAND_EDGES};
 
-const SR: f32 = 48000.0;
+const SR: f32 = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as f32;
 const WIN_MS: f32 = 200.0;
 
 fn rms_db(samples: &[f32]) -> f32 {

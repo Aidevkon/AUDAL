@@ -5,7 +5,7 @@
 //! παραγωγή, ΔΕΝ ξαναγράφει decode λογική — μόνο slice+write.
 //! ΧΡΗΣΗ: cargo run --release --bin excerpt_from_dump -- <dump> <start_sec> <end_sec> <out.wav>
 const DUMP_FRAME_BYTES: usize = 8;
-const SR: u32 = 48000;
+const SR: u32 = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
