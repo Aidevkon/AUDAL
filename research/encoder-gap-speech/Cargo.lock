@@ -1431,6 +1431,7 @@ dependencies = [
  "sp314-dsp",
  "sp314-nodes",
  "sp314-orchestrator",
+ "symphonia",
  "tempfile",
  "tokio",
  "tracing",

@@ -62,6 +62,12 @@ axum = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# 2026-09-18: source_channel_probe.rs χρειάζεται το ΙΔΙΟ symphonia probe
+# με το decode.rs (container channel count), χωρίς το duration cap που
+# έχει το decode_raw_interleaved της παραγωγής. Ίδια version/features
+# με m0d (Cargo.toml:45-52).
+symphonia = { version = "0.5", features = ["mp3", "flac", "pcm", "aiff", "wav", "isomp4"] }
+
 [workspace]
 
 # ⚠ ΠΡΟΣΩΡΙΝΟ — 2026-08-24, execution_order recon.

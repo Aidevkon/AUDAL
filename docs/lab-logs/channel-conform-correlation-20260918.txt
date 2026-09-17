@@ -1,0 +1,336 @@
+RECON 2026-09-18 — το channel conform: πόσο κινεί τη στάθμη, και τι
+λέει ο προορισμός. Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή.
+
+ΤΟ ΤΕΚΜΗΡΙΟ (17/09): το spacing conform κινεί το RMS κατά 0.043dB το
+πολύ — αμελητέο. Το channel conform είναι η αντίθετη περίπτωση και
+δεν μετρήθηκε: η παραγωγή κάνει (l+r)*0.5, άρα ταυτόσημα κανάλια
+χάνουν μηδέν και ασύσχετα έως τρία ντεσιμπέλ. Το παράθυρο του ACX
+έχει πλάτος πέντε. Το μόνο στέρεο αρχείο των εννιά έχει συσχέτιση
+0.997 — το εύκολο άκρο.
+
+ΠΡΟΒΛΕΨΗ (γραμμένη πριν, ενδέκατη πτώση δηλωμένη αυτή τη βάρδια):
+«Το CATALOGUE δεν έχει preset που απαιτεί μόνο, και το (1) τελειώνει
+το θέμα.»
+
+ΤΟ ΚΡΙΤΗΡΙΟ (γραμμένο πριν): αν το (1) δείξει ότι δεν χρειάζεται
+ποτέ downmix ⇒ τέλος· αν το (3) δείξει κίνηση πάνω από 1dB σε
+ρεαλιστικό υλικό ⇒ η σειρά του PRD αλλάζει (12 πριν τη μέτρηση
+στάθμης)· κάτω από 0.2dB ⇒ μένει ως έχει.
+
+── (1) ΤΟ ΚΡΙΣΙΜΟ — ΤΙ ΖΗΤΑΕΙ Ο ΠΡΟΟΡΙΣΜΟΣ; ΧΡΕΙΑΖΕΤΑΙ ΚΑΝ downmix; ──
+
+ΔΙΑΒΑΣΜΕΝΟ, lineos/m1/lineos-types/src/presets.rs, το πεδίο
+DeliverySpec::emitted_channels (γρ.119-130):
+
+  «Κανάλια που ΕΜΕΙΣ ΠΑΡΑΓΟΥΜΕ για αυτόν τον προορισμό. ⚠ ΤΟ ΟΝΟΜΑ
+  ΕΙΝΑΙ emitted_, ΟΧΙ required_, ΚΑΙ Η ΔΙΑΦΟΡΑ ΕΙΝΑΙ ΟΥΣΙΑΣ: ο οίκος
+  ΔΕΧΕΤΑΙ mono Ή stereo· η απαίτησή του είναι ΟΜΟΙΟΜΟΡΦΙΑ ΣΕ ΟΛΟ ΤΟ
+  ΒΙΒΛΙΟ, που δεν κρίνεται σε ένα αρχείο (έλεγχος επιπέδου έργου:
+  F-088).» SOURCE: help.acx.com, RETRIEVED 2026-08-25, «Files are in
+  either mono or stereo».
+
+Ανά preset (γρ.144-269):
+  SPOTIFY:    emitted_channels: None
+  YOUTUBE:    emitted_channels: None
+  BROADCAST:  emitted_channels: None
+  PODCAST:    emitted_channels: None
+  ACX:        emitted_channels: Some(1)   ⚠ ΜΟΝΟ αυτό το preset δηλώνει κάτι
+
+Σχόλιο δίπλα στο ACX (γρ.264-267): «Files are in either mono or
+stereo ⚠ Ο ΟΙΚΟΣ ΔΕΧΕΤΑΙ ΚΑΙ ΤΑ ΔΥΟ — αυτό είναι ΤΙ ΠΑΡΑΓΟΥΜΕ ΕΜΕΙΣ,
+όχι τι απαιτεί. Η απαίτησή του είναι ΟΜΟΙΟΜΟΡΦΙΑ σε όλο το βιβλίο·
+έλεγχος επιπέδου έργου: F-088.»
+
+⇒ Ο προορισμός ΔΕΝ απαιτεί συγκεκριμένο αριθμό — ζητάει ΣΥΝΕΠΕΙΑ.
+  ΑΛΛΑ η ΔΙΚΗ ΜΑΣ επιλογή, ήδη καταγεγραμμένη στο CATALOGUE, είναι
+  mono ΓΙΑ ΤΟ ACX (και ΜΟΝΟ για το ACX — τα άλλα τέσσερα presets δεν
+  δηλώνουν τίποτα). Δεν είναι υπόθεση εργασίας — ΕΙΝΑΙ ΗΔΗ Η ΕΠΙΛΟΓΗ.
+  Η «κάνε τα πάντα στέρεο» διαφυγή που έθετε το κριτήριο ΔΕΝ ισχύει
+  εδώ — το αντίθετο έχει ήδη αποφασιστεί, τουλάχιστον στο χαρτί.
+
+⚠ ΚΑΙ ΕΙΝΑΙ ΕΝΕΡΓΟ, ΟΧΙ ΜΟΝΟ ΔΗΛΩΜΕΝΟ: το `emitted_channels`
+  διαβάζεται σε δύο σημεία στο blob_store.rs (γρ.387, 494) — ΟΧΙ ως
+  ενεργός μηχανισμός downmix, αλλά ως ΕΛΕΓΧΟΣ ΣΥΜΜΟΡΦΩΣΗΣ
+  (`DeliveryCheck{metric:"channels", ...}`, verdict pass/fail αν το
+  μετρημένο channel count ταιριάζει). Το ΙΔΙΟ το downmix ζει
+  αλλού — βλ. (2).
+
+ΣΥΜΠΕΡΑΣΜΑ (1): ΔΕΝ τελειώνει το θέμα. Υπάρχει preset (ACX) με
+δηλωμένη, ενεργά ελεγμένη επιλογή mono. Το downmix χρειάζεται —
+συνεχίζουμε.
+
+── ΠΡΟΒΛΕΨΗ ↔ ΜΕΤΡΗΜΕΝΟ ──
+
+«Το CATALOGUE δεν έχει preset που απαιτεί μόνο» → ΔΙΑΨΕΥΣΤΗΚΕ. Το
+ACX ΔΗΛΩΝΕΙ emitted_channels=Some(1), ενεργά ελεγμένο σε
+DeliveryCheck. Η ακριβής διατύπωση σώζεται («ο οίκος δεν απαιτεί
+αριθμό, ΕΜΕΙΣ διαλέξαμε»), αλλά το αποτέλεσμα για το θέμα είναι το
+ίδιο: υπάρχει σήμερα μία, ενεργή, mono-only γραμμή παραγωγής.
+⚠ Δωδέκατη πτώση σε πρόβλεψη αυτή τη βάρδια.
+
+── (2) ΠΟΥ ΓΙΝΕΤΑΙ ΤΟ downmix ΣΗΜΕΡΑ, ΜΕ ΤΙ ΤΥΠΟ, ΚΑΙ ΤΟ ΑΝΤΙΣΤΡΟΦΟ ──
+
+ΔΥΟ ΣΥΝΑΡΤΗΣΕΙΣ MP3 export, ΔΙΑΦΟΡΕΤΙΚΕΣ, ΣΥΝΕΠΕΙΣ ΜΕ ΤΟ CATALOGUE
+(ΟΧΙ το «μοτίβο της ημέρας» — καμία ασυμφωνία βρέθηκε εδώ):
+
+  export_mp3_acx (export.rs:852-948), για preset="acx":
+    Βήμα 3, γρ.942-948: «Downmix to mono (l+r)*0.5. Note: Stereo
+    delivery is a future option, mono is the norm for ACX.»
+    ΙΔΙΟΣ τύπος με trunk_pass.rs:722 (μέτρηση). Συμβαίνει ΠΡΙΝ το
+    RMS/peak correction (Βήματα 4a/4b/5, γρ.950-1087) — το
+    AcxCheckAnalyzer ΜΕΤΡΑΕΙ ΤΟ ΗΔΗ-MONO σήμα. Encoder: γρ.1105
+    `lame_set_num_channels(gfp, 1)` + γρ.1108 `lame_set_mode(gfp,
+    MPEG_mode::MONO)`, σταθερά.
+
+  export_mp3 (export.rs:1304+), για τα άλλα presets:
+    ΚΑΝΕΝΑ downmix — γρ.1340 `lame_set_num_channels(gfp,
+    blob.core.channels as i32)`, διαβάζει το ΠΡΑΓΜΑΤΙΚΟ κανάλι-count
+    του blob. Συνεπές με CATALOGUE: αυτά τα presets δεν δηλώνουν
+    emitted_channels, άρα δεν επιβάλλουν τίποτα.
+
+  ⇒ ΔΥΟ διαφορετικές συναρτήσεις, ΑΛΛΑ όχι ασυνέπεια — καθεμία
+    αντιστοιχεί ΑΚΡΙΒΩΣ στη δική της γραμμή του CATALOGUE.
+
+  ⚠ ΕΥΡΗΜΑ ΠΟΥ ΑΦΟΡΑ ΤΟ (4): στο export_mp3_acx, ΣΗΜΕΡΑ, το channel
+    conform (Βήμα 3) ΗΔΗ προηγείται του level conform (Βήματα
+    4a/4b/5) — μέσα στην ΙΔΙΑ συνάρτηση. Η σειρά που το κριτήριο του
+    task θεωρεί «σωστή» (channel πριν level) ΕΧΕΙ ΗΔΗ προηγούμενο σε
+    παραγωγικό κώδικα, απλώς σε διαφορετική αρχιτεκτονική
+    (μονολιθική συνάρτηση, όχι στάδια pipeline).
+
+ΤΟ ΑΝΤΙΣΤΡΟΦΟ, μόνο→στέρεο: ΥΠΑΡΧΕΙ, στο decode/είσοδο (ΟΧΙ στο
+export). handlers/decode.rs:1-14, header σχόλιο:
+  «Channel normalization: mono → stereo: duplicate each sample ·
+  stereo → stereo: pass through · N > 2 channels → stereo: average
+  L+R pairs, clamp [-1, 1]»
+`mono_to_stereo` (γρ.321) — ΑΝΤΙΓΡΑΦΗ (L=R=το ίδιο δείγμα), ΟΧΙ
+διαίρεση. Συμβαίνει ΣΤΗΝ ΕΙΣΟΔΟ, πριν από οποιαδήποτε επεξεργασία —
+το εσωτερικό pipeline δουλεύει πάντα σε στέρεο (TARGET_CHANNELS=2,
+γρ.21).
+
+⇒ ΕΞΗΓΗΣΗ ΤΟΥ ΠΡΟΗΓΟΥΜΕΝΟΥ RECON (rms-lufs-edge-sensitivity):
+  8/9 βιβλία μετρήθηκαν L≡R ΔΕΙΓΜΑ-ΠΡΟΣ-ΔΕΙΓΜΑ όχι επειδή
+  ηχογραφήθηκαν έτσι, αλλά επειδή η πηγή τους ήταν πιθανόν mono και
+  το `mono_to_stereo` τα διπλασίασε στην είσοδο. Downmix σε τέτοιο
+  υλικό είναι μαθηματικά μηδενικό (L=R=x ⇒ (x+x)/2=x, ΑΚΡΙΒΩΣ) —
+  γι' αυτό η μέτρηση εκεί ήταν αμελητέα. ΔΕΝ λέει τίποτα για
+  γνήσιο στέρεο υλικό.
+
+── (3) Η ΜΕΤΡΗΣΗ ΣΕ ΥΛΙΚΟ ΜΕ ΧΑΜΗΛΗ ΣΥΣΧΕΤΙΣΗ (FMA allowlist, 437) ──
+
+⚠ ΜΟΥΣΙΚΗ, ΟΧΙ ΑΦΗΓΗΣΗ — δηλωμένο όριο. Το ACX δέχεται beds· ένα
+κεφάλαιο με μουσική εισαγωγή έχει ακριβώς αυτό το υλικό μέσα.
+
+Κατανομή συσχέτισης, 437/437 μετρημένα (0 παραλείψεις):
+  [-1.000,-0.500):   9  ( 2.1%)
+  [-0.500, 0.000):  25  ( 5.7%)
+  [ 0.000, 0.500):  78  (17.8%)
+  [ 0.500, 0.800): 100  (22.9%)
+  [ 0.800, 0.950): 117  (26.8%)
+  [ 0.950, 0.999):  69  (15.8%)
+  [ 0.999, 1.000):  39  ( 8.9%)
+  median=0.8055  p10=0.0673  min=-0.9180  max=1.0000
+  correlation < 0.5: 112/437 (25.6%)
+
+⇒ Το «δύσκολο άκρο» ΔΕΝ είναι σπάνιο σε πραγματική μουσική: ένα στα
+  τέσσερα κομμάτια του allowlist έχει συσχέτιση κάτω από 0.5, και
+  34 από τα 437 (7.8%) έχουν αρνητική συσχέτιση — κανάλια που
+  αλληλοαναιρούνται όταν αθροίζονται.
+
+Μέχρι δέκα κομμάτια με correlation < 0.5 — Δ(RMS) mono downmix:
+  track 6674   corr=-0.0048  στέρεο=-17.116dB  mono=-20.148dB  Δ=-3.031dB
+  track 6675   corr= 0.1841  στέρεο= -4.264dB  mono= -6.546dB  Δ=-2.282dB
+  track 6680   corr= 0.4798  στέρεο= -3.471dB  mono= -4.786dB  Δ=-1.315dB
+  track 6684   corr= 0.4498  στέρεο= -1.544dB  mono= -2.946dB  Δ=-1.402dB
+  track 7490   corr= 0.4431  στέρεο=-13.137dB  mono=-14.555dB  Δ=-1.419dB
+  track 9846   corr= 0.2324  στέρεο=-43.734dB  mono=-45.839dB  Δ=-2.105dB
+  track 10695  corr= 0.4741  στέρεο=-19.688dB  mono=-21.019dB  Δ=-1.331dB
+  track 37911  corr= 0.2814  στέρεο=-16.264dB  mono=-18.201dB  Δ=-1.937dB
+  track 38879  corr= 0.3072  στέρεο=-21.415dB  mono=-23.409dB  Δ=-1.994dB
+  track 38880  corr=-0.6415  στέρεο=-17.556dB  mono=-24.085dB  Δ=-6.529dB
+
+  Μέγιστο |Δ|: 6.529dB (track 38880) — αρνητική συσχέτιση σημαίνει
+  ΚΑΤΑΣΤΡΟΦΙΚΗ παρεμβολή στο άθροισμα, πέρα από το θεωρητικό -3dB
+  όριο της ασύσχετης περίπτωσης. Track 6674 (corr≈0, το πρακτικά
+  «καθαρό» ασύσχετο σημείο) δίνει Δ=-3.031dB — σχεδόν ακριβώς το
+  θεωρητικό -3dB, καθαρή επιβεβαίωση του μηχανισμού.
+
+  ΟΛΑ τα δέκα δείγματα υπερβαίνουν το 1dB (ελάχιστο 1.315dB,
+  μέγιστο 6.529dB) — καμία εξαίρεση.
+
+── ΚΡΙΣΗ ΚΑΤΑ ΤΟ ΠΡΟ-ΔΗΛΩΜΕΝΟ ΚΡΙΤΗΡΙΟ, ΓΙΑ ΤΟ (3) ──
+
+Η κίνηση σε ρεαλιστικό υλικό (μουσική, δεκτή ως bed/εισαγωγή στο
+ACX) ΥΠΕΡΒΑΙΝΕΙ το 1dB σε ΟΛΑ τα δέκα μετρημένα δείγματα χαμηλής
+συσχέτισης, φτάνοντας 6.5dB. Κατά το ίδιο το κριτήριο: Η ΣΕΙΡΑ ΤΟΥ
+PRD ΘΑ ΕΠΡΕΠΕ ΝΑ ΑΛΛΑΞΕΙ ΓΙ' ΑΥΤΟ ΤΟ ΥΛΙΚΟ — το channel conform (12)
+πριν τη μέτρηση στάθμης — ΑΝ τέτοιο υλικό (bed/εισαγωγή μουσικής με
+χαμηλή συσχέτιση καναλιών) εμφανίζεται στα πραγματικά κεφάλαια που
+θα περάσουν από αυτό το pipeline. ΜΗΔΕΝ πρόταση σειράς σταδίων εδώ —
+μόνο η μέτρηση και η εφαρμογή του ήδη-γραμμένου κριτηρίου, όπως
+ζητήθηκε.
+⚠ ΑΝΤΙΘΕΤΟ ΑΠΟΤΕΛΕΣΜΑ ΑΠΟ ΤΟ SPACING (17/09): εκεί όλα κάτω από
+  0.2dB σε αφήγηση· εδώ όλα πάνω από 1dB σε μουσική χαμηλής
+  συσχέτισης. Οι δύο σταδίου δεν συμπεριφέρονται συμμετρικά, και το
+  τεκμήριο (17/09) το είχε ήδη πει.
+
+── (4) ΤΟ ΠΛΑΓΙΟ — ΤΟ ΠΑΡΑΘΥΡΟ ΤΟΥ ΠΡΟΟΡΙΣΜΟΥ ──
+
+ACX RMS window: [-23, -18] dBFS, πλάτος 5dB (presets.rs:238,
+rms_window_db: Some((-23.0,-18.0))).
+
+ΔΙΑΒΑΣΜΕΝΟ, F-077 (FINDINGS.md): «τα δικά μας fixtures προσγειώνονται
+−18.50/−22.50 = ΜΕΣΑ στη ζώνη κινδύνου» — ΣΤΑ ΑΚΡΑ του παραθύρου,
+μόνο 0.5dB από κάθε όριο. ⚠ Αυτό είναι μέτρηση σε SYNTHETIC fixture
+(tests/external_acx_ffmpeg_agreement.rs), όχι σε πραγματικό
+render-έ βιβλίο — παρατίθεται όπως γράφτηκε, χωρίς νέα μέτρηση εδώ
+(εκτός εμβέλειας: «ΜΗΔΕΝ νέο υλικό εκτός allowlist»).
+
+Συνδυασμός με το (3): αν ένα κεφάλαιο προσγειωθεί στο κάτω άκρο
+(-22.50) ΚΑΙ περιέχει τμήμα με χαμηλή συσχέτιση καναλιών (bed/
+εισαγωγή), το πραγματικό downmix (l+r)*0.5 ΜΟΝΟ μειώνει τη στάθμη
+(0 έως -6.5dB μετρημένο, ποτέ αύξηση — μαθηματική ιδιότητα του
+τύπου) — άρα σπρώχνει ΠΡΟΣ ΤΑ ΕΞΩ από το παράθυρο, όχι μακριά του.
+Στο άλλο άκρο (-18.50, πάνω) η ίδια μείωση θα βοηθούσε προς το
+κέντρο. Η κατεύθυνση της βλάβης εξαρτάται από ΠΟΙΟ άκρο.
+
+Το Στάδιο 13 (level conform) διορθώνει ΜΕΤΑ — αλλά μόνο σωστά αν
+μετράει το ΗΔΗ-downmixed σήμα (ό,τι θα ακούσει τελικά ο ακροατής),
+όχι μια στοχευμένη τιμή υπολογισμένη πριν το downmix συμβεί. Το ΗΔΗ
+ΥΠΑΡΧΟΝ export_mp3_acx (βλ. (2)) δείχνει ότι αυτή η σειρά (channel
+πριν level) είναι ΕΦΙΚΤΗ και ΗΔΗ υλοποιημένη εκεί, σε διαφορετική
+αρχιτεκτονική. ΜΗΔΕΝ πρόταση για το πώς το PRD v7.1 πρέπει να το
+κάνει — μόνο η παρατήρηση ότι υπάρχει ήδη λειτουργικό προηγούμενο.
+
+── Η ΕΠΑΝΑΦΟΡΑ / ΤΟ ΑΓΓΙΓΜΑ ──
+
+ΜΗΔΕΝ αλλαγή στην παραγωγή — καθαρή ανάγνωση κώδικα (presets.rs,
+export.rs, decode.rs, blob_store.rs) + μέτρηση σε research crate πάνω
+σε ήδη-εγκεκριμένο allowlist. git status: μόνο νέα αρχεία
+έρευνας/lab-logs.
+
+── ΠΗΓΑΙΟΣ ΚΩΔΙΚΑΣ (channel_conform_correlation.rs, αυτούσιος) ──
+
+//! RECON 2026-09-18: το channel conform — correlation και Δ(RMS) του
+//! mono downmix, σε υλικό με χαμηλή συσχέτιση καναλιών (FMA allowlist,
+//! ΟΧΙ αφήγηση — δηλωμένο όριο). Read-only, ΜΗΔΕΝ αλλαγή στην
+//! παραγωγή, ΜΗΔΕΝ νέο υλικό εκτός allowlist.
+//!
+//! ΓΙΑΤΙ FMA: τα εννιά βιβλία αφήγησης δεν έχουν το δύσκολο άκρο (μόνο
+//! ένα πραγματικά στέρεο, correlation 0.997). Το FMA allowlist (437
+//! κομμάτια μουσικής) έχει το εύρος συσχέτισης που λείπει.
+//!
+//! ΧΡΗΣΗ: cargo run --release --bin channel_conform_correlation
+use sp314_dsp::analysis::acx_check::AcxCheckAnalyzer;
+use sp314_dsp::analysis::stereo::stereo_correlation;
+use serde::Deserialize;
+
+const SR: u32 = 48_000;
+const DUMP_FRAME_BYTES: usize = 8;
+
+#[derive(Deserialize)]
+struct AllowlistEntry {
+    track_id: String,
+    path: String,
+}
+
+fn read_dump_stereo(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let buf = std::fs::read(path).unwrap_or_else(|e| panic!("read dump {path}: {e}"));
+    let n = buf.len() / DUMP_FRAME_BYTES;
+    let mut l = Vec::with_capacity(n);
+    let mut r = Vec::with_capacity(n);
+    for i in 0..n {
+        let base = i * DUMP_FRAME_BYTES;
+        l.push(f32::from_le_bytes([buf[base], buf[base + 1], buf[base + 2], buf[base + 3]]));
+        r.push(f32::from_le_bytes([buf[base + 4], buf[base + 5], buf[base + 6], buf[base + 7]]));
+    }
+    (l, r)
+}
+
+fn stereo_pooled_rms_db(l: &[f32], r: &[f32]) -> f32 {
+    let mut a = AcxCheckAnalyzer::new(SR);
+    a.feed_chunk(l);
+    a.feed_chunk(r);
+    a.finish().rms_db
+}
+
+fn mono_downmix_rms_db(l: &[f32], r: &[f32]) -> f32 {
+    let mono: Vec<f32> = l.iter().zip(r.iter()).map(|(&a, &b)| (a + b) * 0.5).collect();
+    let mut a = AcxCheckAnalyzer::new(SR);
+    a.feed_chunk(&mono);
+    a.finish().rms_db
+}
+
+fn main() {
+    let allowlist_path = "/home/aidevcon/Downloads/DATASET/fma/fma_small_cc_allowlist_v2.json";
+    let raw = std::fs::read_to_string(allowlist_path).unwrap_or_else(|e| panic!("read {allowlist_path}: {e}"));
+    let entries: Vec<AllowlistEntry> = serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {allowlist_path}: {e}"));
+    let total = entries.len();
+    println!("allowlist: {allowlist_path}  entries={total}\n");
+
+    let mut correlations: Vec<f32> = Vec::with_capacity(total);
+    let mut low_corr_rows: Vec<(String, f32, f32, f32, f32)> = Vec::new(); // track_id, corr, stereo_rms, mono_rms, diff
+    let mut skipped = 0usize;
+
+    for (idx, entry) in entries.iter().enumerate() {
+        let dump = format!("/tmp/chconform_{}.raw", entry.track_id);
+        if let Err(e) = m0d::dsp::input_lufs::pass0_decode_to_dump(std::path::Path::new(&entry.path), &dump) {
+            eprintln!("[{}/{}] ΠΑΡΑΛΕΙΠΕΤΑΙ {} ({}): decode failed: {e}", idx + 1, total, entry.track_id, entry.path);
+            skipped += 1;
+            continue;
+        }
+        let (l, r) = read_dump_stereo(&dump);
+        let _ = std::fs::remove_file(&dump);
+        if l.len() < SR as usize {
+            skipped += 1;
+            continue;
+        }
+
+        let corr = stereo_correlation(&l, &r);
+        correlations.push(corr);
+
+        if corr < 0.5 && low_corr_rows.len() < 10 {
+            let stereo_rms = stereo_pooled_rms_db(&l, &r);
+            let mono_rms = mono_downmix_rms_db(&l, &r);
+            low_corr_rows.push((entry.track_id.clone(), corr, stereo_rms, mono_rms, mono_rms - stereo_rms));
+        }
+
+        if (idx + 1) % 50 == 0 {
+            eprintln!("[{}/{}] ...", idx + 1, total);
+        }
+    }
+
+    println!("μετρήθηκαν={} παραλείφθηκαν={}\n", correlations.len(), skipped);
+
+    // Κατανομή συσχέτισης — δεκάδες bins [-1,1].
+    let mut sorted = correlations.clone();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    println!("=== ΚΑΤΑΝΟΜΗ ΣΥΣΧΕΤΙΣΗΣ, {} ΚΟΜΜΑΤΙΑ ===", sorted.len());
+    let bins = [(-1.0, -0.5), (-0.5, 0.0), (0.0, 0.5), (0.5, 0.8), (0.8, 0.95), (0.95, 0.999), (0.999, 1.0001)];
+    for (lo, hi) in bins {
+        let n = sorted.iter().filter(|&&c| c >= lo && c < hi).count();
+        let pct = 100.0 * n as f32 / sorted.len().max(1) as f32;
+        println!("  [{lo:>7.3}, {hi:<7.3}) : {n:>4}  ({pct:>5.1}%)");
+    }
+    let median = if sorted.is_empty() { f32::NAN } else { sorted[sorted.len() / 2] };
+    let p10 = if sorted.is_empty() { f32::NAN } else { sorted[sorted.len() / 10] };
+    println!("  median={median:.4}  p10={p10:.4}  min={:.4}  max={:.4}", sorted.first().copied().unwrap_or(f32::NAN), sorted.last().copied().unwrap_or(f32::NAN));
+    let n_below_05 = sorted.iter().filter(|&&c| c < 0.5).count();
+    println!("  correlation < 0.5: {n_below_05}/{} ({:.1}%)\n", sorted.len(), 100.0 * n_below_05 as f32 / sorted.len().max(1) as f32);
+
+    println!("=== ΜΕΧΡΙ ΔΕΚΑ ΚΟΜΜΑΤΙΑ ΜΕ correlation < 0.5 — Δ(RMS) mono downmix ===\n");
+    if low_corr_rows.is_empty() {
+        println!("ΚΑΝΕΝΑ κομμάτι με correlation < 0.5 βρέθηκε στο allowlist.");
+    } else {
+        for (track_id, corr, stereo_rms, mono_rms, diff) in &low_corr_rows {
+            println!(
+                "track {track_id:<10} correlation={corr:>7.4}  στέρεο(pooled)={stereo_rms:>7.3}dB  mono(downmix)={mono_rms:>7.3}dB  Δ={diff:>+6.3}dB"
+            );
+        }
+        let max_abs_diff = low_corr_rows.iter().map(|r| r.4.abs()).fold(0.0_f32, f32::max);
+        println!("\nΜέγιστο |Δ| στα χαμηλής-συσχέτισης: {max_abs_diff:.3}dB");
+    }
+}
+
+sha256(αυτό το αρχείο ΧΩΡΙΣ αυτή τη γραμμή και την επόμενη): 94317466405b07f4fb32d152149cc726c1fa797c9b21a9b3619cdbf701421167
+εργαλείο: channel_conform_correlation (research/encoder-gap-speech), commit εν εξελίξει

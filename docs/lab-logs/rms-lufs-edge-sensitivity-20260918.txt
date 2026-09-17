@@ -1,0 +1,265 @@
+RECON 2026-09-18 — πόσο κινεί το RMS και το LUFS το spacing και το
+channel conform. Read-only, ΜΗΔΕΝ αλλαγή στην παραγωγή, ΜΗΔΕΝ γράψιμο
+αρχείου παραγωγής.
+
+ΓΙΑΤΙ: το PRD v7.1 βάζει το Στάδιο 13 (level conform) να διαλέγει
+στόχο από το set_reference (Πέρασμα Β, αρχικές μετρήσεις) — ΠΡΙΝ τα
+Στάδια 11 (spacing) και 12 (channel) που τρέχουν ΜΕΤΑ, αλλάζοντας
+διάρκεια και κανάλια. Υπόθεση: ακυρώνουν τη μέτρηση που το 13
+χρησιμοποιεί. Συμπέρασμα από ανάγνωση, όχι μέτρηση — γι' αυτό το
+recon.
+
+ΠΡΟΒΛΕΨΗ (γραμμένη πριν το τρέξιμο, ενδέκατη φορά αυτή τη βάρδια):
+«Το RMS κινείται πάνω από 0.5 dB σε αρχεία με ήσυχα άκρα, και το LUFS
+σχεδόν καθόλου λόγω του gating.»
+
+ΤΟ ΚΡΙΤΗΡΙΟ (γραμμένο πριν): κίνηση <0.2dB ⇒ αμελητέα, η σειρά δεν
+αλλάζει· >0.5dB ⇒ η σειρά είναι λάθος, διορθώνεται· ανάμεσα ⇒ το λέω
+και αποφασίζει ο ιδιοκτήτης.
+
+── (1) ΤΟ ΚΡΙΣΙΜΟ — ΤΙ ΑΚΡΙΒΩΣ ΜΕΤΡΑΕΙ ΤΟ ACX RMS ──
+
+ΔΙΑΒΑΣΜΕΝΟ, lineos/m1/sp314-dsp/src/analysis/acx_check.rs:
+
+  RMS (AcxCheckAnalyzer::finish().rms_db):
+    "RMS whole-file, unweighted, after DC removal. Computed here in
+    one pass via E[x^2] - mean^2" (γραμμές 12-14). ΚΑΜΙΑ χρονική
+    στάθμιση, ΚΑΜΙΑ εξαίρεση dead air — feed_chunk() (γραμμές 234-259)
+    συσσωρεύει sum/sum_sq πάνω σε ΚΑΘΕ δείγμα ισότιμα, σιωπή
+    συμπεριλαμβανομένης. Τροφοδοτείται με το mono downmix
+    (l+r)*0.5 στην παραγωγή (trunk_pass.rs:722, ίδιος τύπος με
+    scout_scanner.rs:30).
+    ⇒ ΔΕΝ εξαιρεί τη σιωπή — η υπόθεση ότι το κόψιμο room tone «μπορεί
+      να μην το κινεί καθόλου» ΔΕΝ ισχύει μηχανιστικά: κάθε δείγμα
+      μετράει, σιωπηλό ή μη.
+
+  Integrated LUFS (measure_integrated_lufs, gating.rs):
+    ITU-R BS.1770-4, standard: απόλυτο gate ABSOLUTE_GATE_DB=-70.0
+    LUFS (γρ.7) ΚΑΙ σχετικό gate RELATIVE_GATE_LU=-10.0 LU κάτω από
+    τον χωρίς-gate μέσο όρο (γρ.8), ανά block 400ms (19200 δείγματα
+    @48k) με hop 100ms (75% overlap) — integrated_lufs() γρ.30-66,
+    τέσσερα βήματα: (1) απόρριψη blocks κάτω από -70 LUFS απόλυτα,
+    (2) μέσος όρος χωρίς gate από ό,τι απέμεινε, (3) απόρριψη blocks
+    10 LU κάτω από αυτόν τον μέσο όρο, (4) τελικό integrated από ό,τι
+    επιβίωσε.
+    ⇒ Ήσυχα άκρα κάτω από -70 LUFS Ή >10dB κάτω από το επίπεδο
+      αφήγησης αποκλείονται από την ολοκλήρωση σχεδόν εξ ολοκλήρου —
+      το gating δουλεύει ακριβώς όπως υποτέθηκε.
+
+  ΣΥΜΠΕΡΑΣΜΑ 0.1: το RMS ΔΕΝ εξαιρεί σιωπή (μηχανιστικά ευάλωτο στο
+  spacing), το LUFS εξαιρεί ενεργά μέσω διπλού gate (μηχανιστικά
+  προστατευμένο). Η υπόθεση για τη ΚΑΤΕΥΘΥΝΣΗ της ασυμμετρίας
+  RMS-vs-LUFS επιβεβαιώνεται από τον κώδικα — το ΜΕΓΕΘΟΣ μετριέται
+  παρακάτω.
+
+── ΠΡΟΒΛΕΨΗ ↔ ΜΕΤΡΗΜΕΝΟ ──
+
+«Το RMS κινείται πάνω από 0.5dB σε αρχεία με ήσυχα άκρα» →
+ΔΙΑΨΕΥΣΤΗΚΕ, ΚΑΘΑΡΑ. Στα εννιά πραγματικά αρχεία, η ΜΕΓΑΛΥΤΕΡΗ
+κίνηση RMS από κόψιμο 2s ανά άκρο είναι +0.043dB (tale_of_two_cities)
+— ΚΑΤΩ από το ίδιο το κριτήριο «αμελητέας» κίνησης (0.2dB), πόσο
+μάλλον από το όριο αναστροφής (0.5dB). Όλα τα εννιά κάτω από 0.05dB.
+«Το LUFS σχεδόν καθόλου» → ΕΠΙΒΕΒΑΙΩΘΗΚΕ, ακόμα πιο καθαρά: μέγιστη
+κίνηση 0.006dB (adventurespinocchio, huckfinn) — μία τάξη μεγέθους
+μικρότερη ακόμα κι από το ήδη-μικρό RMS.
+
+ΓΙΑΤΙ Η ΠΡΟΒΛΕΨΗ ΕΠΕΣΕ (μηχανισμός, όχι μαντεψιά): τα εννιά αρχεία
+είναι ΟΛΟΚΛΗΡΑ κεφάλαια audiobook — δεκάδες λεπτά η κάθε ένα (π.χ.
+dracula ≈2218s, secretgarden ≈808s, βλ. num_frames της προηγούμενης
+βάρδιας /48000). Το κόψιμο 2s ανά άκρο (4s συνολικά) είναι
+~0.2-0.5% της συνολικής διάρκειας. Το whole-file RMS (χωρίς στάθμιση,
+E[x²]-mean² πάνω σε ΟΛΑ τα δείγματα) είναι σταθμισμένο ΑΠΟ ΤΗ
+ΔΙΑΡΚΕΙΑ — αφαιρώντας μια τόσο μικρή αναλογία δειγμάτων, όσο ήσυχη κι
+αν είναι, η συνεισφορά της στο άθροισμα sum_sq ήταν ήδη αμελητέα σε
+σύγκριση με δεκάδες λεπτά αφήγησης. Ο μηχανισμός (καμία εξαίρεση
+σιωπής) είναι αληθινός· το ΜΕΓΕΘΟΣ στην πράξη, σε πλήρη κεφάλαια,
+είναι πολύ μικρό για να τον κάνει ορατό.
+⚠ Ενδέκατη πτώση σε πρόβλεψη αυτή τη βάρδια, επιβεβαιωμένη — και η
+  δεύτερη φορά (μετά το Otsu) που η κατεύθυνση του μηχανισμού είναι
+  σωστή αλλά το μέγεθος διαψεύδει την πρόβλεψη.
+
+── Ο ΠΙΝΑΚΑΣ ΤΩΝ ΕΝΝΙΑ ──
+
+αρχείο                   RMS ως-έχει  RMS κομμένο  ΔRMS     LUFS ως-έχει  LUFS κομμένο  ΔLUFS   άκρο-αρχή(dBFS)  άκρο-τέλος(dBFS)
+secretgarden             -24.411dB    -24.392dB    +0.019   -20.375       -20.373       +0.002  -30.28           -56.64
+dracula                  -24.597dB    -24.591dB    +0.006   -20.740       -20.740       -0.000  -28.52           -53.39
+count_of_monte_cristo    -26.619dB    -26.607dB    +0.011   -22.557       -22.554       +0.003  -30.06           -76.63
+peterpan                 -24.568dB    -24.559dB    +0.009   -20.405       -20.408       -0.003  -25.24           -144.00
+anne_of_green_gables     -30.395dB    -30.381dB    +0.015   -26.083       -26.079       +0.003  -33.12           -89.85
+tale_of_two_cities       -26.551dB    -26.508dB    +0.043   -21.973       -21.971       +0.002  -57.52           -55.47
+adventurespinocchio      -26.297dB    -26.257dB    +0.040   -22.016       -22.010       +0.006  -29.14           -35.82
+huckfinn                 -19.190dB    -19.164dB    +0.025   -14.269       -14.263       +0.006  -22.71           -56.97
+janeeyre                 -27.452dB    -27.438dB    +0.014   -23.471       -23.468       +0.003  -29.08           -144.00
+
+Μέγιστο |ΔRMS|=0.043dB (tale_of_two_cities) · Μέγιστο |ΔLUFS|=0.006dB
+(adventurespinocchio, huckfinn). Καμία σχέση ορατή ανάμεσα στο πόσο
+ήσυχο είναι το άκρο (από -22.71 έως -144.00 dBFS) και στο μέγεθος της
+κίνησης — ούτε τα δύο αρχεία με ψηφιακή σιωπή στο τέλος (peterpan,
+janeeyre, -144.00dBFS) δεν ξεχωρίζουν στο ΔRMS/ΔLUFS τους. Συνεπές με
+την εξήγηση «η διάρκεια κυριαρχεί, όχι το πόσο ήσυχο είναι το κομμάτι
+που αφαιρείται» — 2s οποιασδήποτε στάθμης έναντι δεκάδων λεπτών
+είναι πάντα αμελητέο.
+
+── (3) ΤΟ ΚΑΝΑΛΙ, ΞΕΧΩΡΙΣΤΑ ──
+
+ΜΟΝΟ 1/9 αρχεία είναι πραγματικά στέρεο (L≠R κάπου) — huckfinn. Τα
+άλλα οκτώ είναι dual-mono (L≡R δείγμα-προς-δείγμα), άρα το channel
+conform (mono downmix) δεν μπορεί να τα κινήσει καθόλου εξ ορισμού.
+
+Θεωρητικό, ΜΕ ΤΟΝ ΠΡΑΓΜΑΤΙΚΟ τύπο downmix της παραγωγής, (l+r)*0.5
+(ΟΧΙ το ενεργειακά-διατηρητικό (l+r)/sqrt(2)): 0dB για ταυτόσημα
+κανάλια, -3dB για ασύσχετα ίσης ισχύος — ΑΝΤΙΣΤΡΟΦΟ από τη σύμβαση
+"+3dB/0dB" που προϋποθέτει το /sqrt(2) downmix. Η μέτρηση:
+
+huckfinn: στέρεο(pooled, ανά-κανάλι)=-19.182dB mono(downmix)=-19.190dB
+  Δ=-0.008dB  global_phase_correlation=0.9970
+
+Με συσχέτιση 0.9970 (σχεδόν πλήρως συσχετισμένα κανάλια — «στέρεο»
+ονομαστικά, σχεδόν dual-mono στην πράξη), η θεωρητική πρόβλεψη για
+Δ→0dB καθώς η συσχέτιση→1 επιβεβαιώνεται ακριβώς: Δ=-0.008dB, σχεδόν
+μηδέν. ⚠ n=1 — δεν υπάρχει στο δείγμα αρχείο με χαμηλή συσχέτιση για
+να δοκιμαστεί το άλλο άκρο (-3dB την ασύσχετη περίπτωση). Το
+εύρημα ισχύει μόνο για ΤΟ ΥΛΙΚΟ ΠΟΥ ΜΕΤΡΗΘΗΚΕ (αφηγηματικό audiobook,
+σχεδόν πάντα dual-mono ή σχεδόν-dual-mono στην πράξη) — δεν γενικεύεται
+σε πραγματικά ευρύ στέρεο (μουσική, φυσικός ήχος δωματίου).
+
+── ΚΡΙΣΗ ΚΑΤΑ ΤΟ ΠΡΟ-ΔΗΛΩΜΕΝΟ ΚΡΙΤΗΡΙΟ ──
+
+Και οι δύο κινήσεις (RMS max 0.043dB, LUFS max 0.006dB) είναι ΚΑΤΩ
+από το όριο «αμελητέο» (0.2dB), σε ΟΛΑ τα εννιά αρχεία, χωρίς
+εξαίρεση. Κατά το ίδιο το προ-δηλωμένο κριτήριο: Η ΣΕΙΡΑ ΤΩΝ ΣΤΑΔΙΩΝ
+ΔΕΝ ΑΛΛΑΖΕΙ βάσει αυτού του μηχανισμού — τουλάχιστον για spacing-trim
+της τάξης του ACX room-tone window (1-5s ανά άκρο) πάνω σε πλήρη
+κεφάλαια audiobook. Το κανάλι-conform εύρημα (n=1, σχεδόν μηδενική
+κίνηση) δεν αντικρούει αυτό το συμπέρασμα, αλλά δεν το επεκτείνει σε
+υλικό με χαμηλότερη συσχέτιση καναλιών.
+ΜΗΔΕΝ πρόταση σειράς σταδίων εδώ — μόνο η μέτρηση, όπως ζητήθηκε.
+
+── ΠΗΓΑΙΟΣ ΚΩΔΙΚΑΣ (rms_lufs_edge_sensitivity.rs, αυτούσιος) ──
+
+use sp314_dsp::analysis::acx_check::AcxCheckAnalyzer;
+use sp314_dsp::analysis::stereo::stereo_correlation;
+use sp314_dsp::metering::lufs::measure_integrated_lufs;
+
+const SR: u32 = 48_000;
+const TRIM_SECS: f32 = 2.0;
+const EDGE_SECS: f32 = 2.0;
+
+fn read_dump_stereo(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let buf = std::fs::read(path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+    let n = buf.len() / 8;
+    let mut l = Vec::with_capacity(n);
+    let mut r = Vec::with_capacity(n);
+    for i in 0..n {
+        let base = i * 8;
+        l.push(f32::from_le_bytes([buf[base], buf[base + 1], buf[base + 2], buf[base + 3]]));
+        r.push(f32::from_le_bytes([buf[base + 4], buf[base + 5], buf[base + 6], buf[base + 7]]));
+    }
+    (l, r)
+}
+
+fn mono_of(l: &[f32], r: &[f32]) -> Vec<f32> {
+    l.iter().zip(r.iter()).map(|(&a, &b)| (a + b) * 0.5).collect()
+}
+
+fn acx_rms_db(mono: &[f32]) -> f32 {
+    let mut a = AcxCheckAnalyzer::new(SR);
+    a.feed_chunk(mono);
+    a.finish().rms_db
+}
+
+fn stereo_pooled_rms_db(l: &[f32], r: &[f32]) -> f32 {
+    let mut a = AcxCheckAnalyzer::new(SR);
+    a.feed_chunk(l);
+    a.feed_chunk(r);
+    a.finish().rms_db
+}
+
+fn main() {
+    let dir = "/home/aidevcon/Downloads/DATASET/librivox-hq";
+    let books = [
+        ("secretgarden", "secretgarden_01_burnett.mp3"),
+        ("dracula", "dracula_01_stoker.mp3"),
+        ("count_of_monte_cristo", "count_of_monte_cristo_001_dumas.mp3"),
+        ("peterpan", "peterpan_01_barrie.mp3"),
+        ("anne_of_green_gables", "anne_of_green_gables_01_montgomery.mp3"),
+        ("tale_of_two_cities", "tale_of_two_cities_01_dickens.mp3"),
+        ("adventurespinocchio", "adventurespinocchio_01_collodi.mp3"),
+        ("huckfinn", "huckfinn_01_twain_apc.mp3"),
+        ("janeeyre", "janeeyre_01_bronte.mp3"),
+    ];
+
+    let trim_samples = (TRIM_SECS * SR as f32) as usize;
+    let edge_samples = (EDGE_SECS * SR as f32) as usize;
+
+    println!("SR={SR} TRIM_SECS={TRIM_SECS} EDGE_SECS={EDGE_SECS}\n");
+    println!("=== (1) ΩΣ ΕΧΕΙ vs ΑΚΡΑ ΚΟΜΜΕΝΑ 2s — RMS/LUFS ===\n");
+
+    let mut n_stereo = 0usize;
+    let mut channel_rows: Vec<(String, f32, f32, f32, f32)> = Vec::new();
+
+    for (label, fname) in books {
+        let path = format!("{dir}/{fname}");
+        let dump = format!("/tmp/rmslufs_{label}.raw");
+        let (_metrics, _dec) = m0d::dsp::input_lufs::pass0_decode_to_dump(
+            std::path::Path::new(&path),
+            &dump,
+        )
+        .unwrap_or_else(|e| panic!("decode {path}: {e}"));
+        let (l, r) = read_dump_stereo(&dump);
+        let _ = std::fs::remove_file(&dump);
+        let n = l.len();
+        if n <= 2 * trim_samples {
+            println!("{label}: ΠΟΛΥ ΚΟΝΤΟ για κόψιμο {TRIM_SECS}s ανά άκρο — παραλείπεται");
+            continue;
+        }
+
+        let mono_full = mono_of(&l, &r);
+        let rms_full = acx_rms_db(&mono_full);
+        let lufs_full = measure_integrated_lufs(&l, &r);
+
+        let l_trim = &l[trim_samples..n - trim_samples];
+        let r_trim = &r[trim_samples..n - trim_samples];
+        let mono_trim = mono_of(l_trim, r_trim);
+        let rms_trim = acx_rms_db(&mono_trim);
+        let lufs_trim = measure_integrated_lufs(l_trim, r_trim);
+
+        let rms_diff = rms_trim - rms_full;
+        let lufs_diff = lufs_trim - lufs_full;
+
+        let start_edge = mono_of(&l[..edge_samples.min(n)], &r[..edge_samples.min(n)]);
+        let end_edge = mono_of(&l[n - edge_samples.min(n)..], &r[n - edge_samples.min(n)..]);
+        let edge_start_db = acx_rms_db(&start_edge);
+        let edge_end_db = acx_rms_db(&end_edge);
+
+        println!(
+            "{:<24} RMS ως-έχει={:>7.3}dB κομμένο={:>7.3}dB Δ={:>+6.3}dB | LUFS ως-έχει={:>7.3} κομμένο={:>7.3} Δ={:>+6.3} | άκρα(dBFS) αρχή={:>7.2} τέλος={:>7.2}",
+            label, rms_full, rms_trim, rms_diff, lufs_full, lufs_trim, lufs_diff, edge_start_db, edge_end_db
+        );
+
+        let is_stereo = l.iter().zip(r.iter()).any(|(&a, &b)| (a - b).abs() > 1e-6);
+        if is_stereo {
+            n_stereo += 1;
+            let stereo_rms = stereo_pooled_rms_db(&l, &r);
+            let mono_rms = rms_full;
+            let corr = stereo_correlation(&l, &r);
+            channel_rows.push((label.to_string(), stereo_rms, mono_rms, mono_rms - stereo_rms, corr));
+        }
+    }
+
+    println!("\n=== (3) ΚΑΝΑΛΙ — RMS ανά-κανάλι (pooled) vs mono downmix (l+r)*0.5, ΚΑΙ global_phase_correlation ===\n");
+    if n_stereo == 0 {
+        println!("ΚΑΝΕΝΑ από τα εννιά αρχεία δεν είναι στέρεο (L≡R παντού) — τέλος για το (3).");
+    } else {
+        println!("{n_stereo}/9 αρχεία είναι πραγματικά στέρεο (L≠R κάπου). Θεωρητικό: 0dB για ταυτόσημα κανάλια, -3dB για ασύσχετα, ΜΕ ΤΟΝ ΠΡΑΓΜΑΤΙΚΟ τύπο downmix (l+r)*0.5 — ΟΧΙ +3dB/0dB της σύμβασης (l+r)/sqrt(2).\n");
+        for (label, stereo_rms, mono_rms, diff, corr) in &channel_rows {
+            println!(
+                "{:<24} στέρεο(pooled)={:>7.3}dB mono(downmix)={:>7.3}dB Δ={:>+6.3}dB  global_phase_correlation={:>6.4}",
+                label, stereo_rms, mono_rms, diff, corr
+            );
+        }
+    }
+}
+
+sha256(αυτό το αρχείο ΧΩΡΙΣ αυτή τη γραμμή και την επόμενη): b0f070fcd8ed7d21380568cdc65c4694f6d0ec3e4b63d024951f3b63a44e0cb1
+εργαλείο: rms_lufs_edge_sensitivity (research/encoder-gap-speech), commit εν εξελίξει
