@@ -1,0 +1,442 @@
+//! MEASURE 2026-09-17: το k του δυναμικού κατωφλίου στον ανιχνευτή
+//! επιθέσεων, και μια παράγωγη εναλλακτική χωρίς k. Read-only, ΜΗΔΕΝ
+//! αλλαγή στην παραγωγή, ΜΗΔΕΝ συνδυασμό με την επιπεδότητα, ΜΗΔΕΝ
+//! νέο υλικό.
+//!
+//! ΤΟ ΤΕΚΜΗΡΙΟ (16/09, real_files_battery.rs): το δυναμικό κατώφλι
+//! (threshold = median(flux_norm) + k·std(flux_norm), k=2.0, τοπικά
+//! ανά παράθυρο 5s) βελτίωσε 9/12 δοκίμια με γνωστή απάντηση, κόστος
+//! στον φρουρό (δοκίμιο 2, 100%→93.1%)· και στα εννιά βιβλία:
+//! secretgarden 79→51 τμήματα (39→25 resets), dracula 128→82 (63→40).
+//! Το ΜΟΝΟ από οκτώ μέτρα εκείνης της βάρδιας που άγγιξε το αρχικό
+//! πρόβλημα (F-107): ψεύτικα όρια σε καθαρή αφήγηση, κάθε όριο
+//! μηδενίζει την αλυσίδα αποκατάστασης.
+//!
+//! ⚠ Το k=2.0 δεν έχει δηλωμένη προέλευση — «απλός στρογγυλός
+//! αριθμός, χωρίς συντονισμό, δεν δοκιμάστηκε άλλη τιμή» (agent,
+//! 16/09). Θα ήταν το 39ο ασφράγιστο κατώφλι.
+//!
+//! ΤΡΕΙΣ ΣΤΗΛΕΣ:
+//!   Α. Το σημερινό σταθερό 0.20 — ΤΟ ΠΡΑΓΜΑΤΙΚΟ SpectralFluxDetector
+//!      μέσω SegmentScout::measure, αναλλοίωτο. Baseline.
+//!   Β. Σάρωση k ∈ {1.5, 1.8, 2.0, 2.5, 3.0} — αντίγραφο, γραμμή-
+//!      προς-γραμμή, του SpectralFluxDetector::detect (ΙΔΙΟ StftEngine,
+//!      ΙΔΙΟ FLUX_MIN_DISTANCE, ΧΩΡΙΣ μάσκα bins), μόνη αλλαγή το
+//!      κατώφλι.
+//!   Γ. Otsu στην κατανομή του flux_norm μέσα στο παράθυρο — ΧΩΡΙΣ k
+//!      καθόλου. ΙΔΙΑ μέθοδος (Otsu) με flatness_relative.rs/
+//!      flatness_asymmetric_battery.rs — νέος κώδικας, καμία εξάρτηση.
+//!      Υπόθεση δηλωμένη: εδώ υπάρχουν δύο πληθυσμοί μέσα στο
+//!      παράθυρο (πλαίσια με επίθεση, χωρίς) — αντίθετα από τη σκέτη
+//!      επιπεδότητα (μία κλάση, όπου το Otsu απέτυχε χθες).
+//!
+//! Το cepstral_flux/MFCC ring είναι ΙΔΙΟ και στις τρεις στήλες
+//! (υπολογίζεται μία φορά ανά παράθυρο) — μόνο η είσοδος cv_ioi
+//! αλλάζει. Κανόνας απόφασης: ο ΣΗΜΕΡΙΝΟΣ compute_scout_decision +
+//! smooth_and_segment, αναλλοίωτος.
+//!
+//! ΧΡΗΣΗ: cargo run --release --bin attack_dynamic_k_battery
+
+use lineos_corpus::scout::{
+    compute_cepstral_flux, compute_scout_decision, smooth_and_segment, ScoutDecision, SegmentBoundary,
+    SegmentType, ScoutMeasurements,
+};
+use sp314_dsp::analysis::scout::SegmentScout;
+use sp314_dsp::stft::spectral_flux::FLUX_MIN_DISTANCE;
+use sp314_dsp::stft::{StftEngine, HOP_SIZE, N_BINS};
+
+const WINDOW_SECS: f32 = 5.0;
+const HOP_SECS: f32 = 1.0;
+const BOUNDARY_TOLERANCE_SECS: f32 = 5.0;
+const A7_ZONE_LOW: f32 = 0.3;
+const A7_ZONE_HIGH: f32 = 0.7;
+const A7_MIN_CONF: f32 = 0.4;
+const DUMP_FRAME_BYTES: usize = 8;
+const K_SWEEP: [f32; 5] = [1.5, 1.8, 2.0, 2.5, 3.0];
+const OTSU_NBINS: usize = 200;
+const OTSU_BIN_WIDTH: f32 = 1.0 / OTSU_NBINS as f32;
+
+fn read_wav_stereo_f32(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let mut reader = hound::WavReader::open(path).unwrap_or_else(|e| panic!("open {path}: {e}"));
+    let samples: Vec<f32> = reader.samples::<i16>().map(|s| s.unwrap() as f32 / 32768.0).collect();
+    let left: Vec<f32> = samples.iter().step_by(2).copied().collect();
+    let right: Vec<f32> = samples.iter().skip(1).step_by(2).copied().collect();
+    (left, right)
+}
+
+fn read_dump_stereo(path: &str) -> (Vec<f32>, Vec<f32>) {
+    let buf = std::fs::read(path).unwrap_or_else(|e| panic!("read dump {path}: {e}"));
+    let full_frames = buf.len() / DUMP_FRAME_BYTES;
+    let mut left = Vec::with_capacity(full_frames);
+    let mut right = Vec::with_capacity(full_frames);
+    for i in 0..full_frames {
+        let base = i * DUMP_FRAME_BYTES;
+        left.push(f32::from_le_bytes([buf[base], buf[base + 1], buf[base + 2], buf[base + 3]]));
+        right.push(f32::from_le_bytes([buf[base + 4], buf[base + 5], buf[base + 6], buf[base + 7]]));
+    }
+    (left, right)
+}
+
+fn median_std(xs: &[f32]) -> (f32, f32) {
+    let mut sorted = xs.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let n = sorted.len();
+    let med = if n == 0 {
+        0.0
+    } else if n % 2 == 0 {
+        (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+    } else {
+        sorted[n / 2]
+    };
+    let mean = xs.iter().sum::<f32>() / n.max(1) as f32;
+    let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n.max(1) as f32;
+    (med, var.sqrt())
+}
+
+/// ΙΔΙΑ μέθοδος Otsu με flatness_relative.rs — νέος κώδικας, ίδια
+/// μαθηματική βάση (N. Otsu, 1979) με trunk_pass.rs:214-236.
+fn otsu_threshold(values: &[f32]) -> f32 {
+    let mut hist = [0u32; OTSU_NBINS];
+    for &v in values {
+        let b = ((v / OTSU_BIN_WIDTH) as usize).min(OTSU_NBINS - 1);
+        hist[b] += 1;
+    }
+    let total: f64 = hist.iter().map(|&c| c as f64).sum();
+    if total == 0.0 {
+        return 0.5;
+    }
+    let sum_all: f64 = hist.iter().enumerate().map(|(i, &c)| i as f64 * c as f64).sum();
+    let (mut w0, mut sum0) = (0.0_f64, 0.0_f64);
+    let (mut best_var, mut best_t) = (-1.0_f64, 0usize);
+    for t in 0..OTSU_NBINS {
+        w0 += hist[t] as f64;
+        if w0 == 0.0 { continue; }
+        let w1 = total - w0;
+        if w1 == 0.0 { break; }
+        sum0 += t as f64 * hist[t] as f64;
+        let m0 = sum0 / w0;
+        let m1 = (sum_all - sum0) / w1;
+        let var = w0 * w1 * (m0 - m1) * (m0 - m1);
+        if var > best_var {
+            best_var = var;
+            best_t = t;
+        }
+    }
+    if best_var < 0.0 { 0.5 } else { (best_t as f32 + 0.5) * OTSU_BIN_WIDTH }
+}
+
+/// flux_norm ανά πλαίσιο, ΙΔΙΟ με SpectralFluxDetector::detect μέχρι
+/// το σημείο του peak-picking — ΧΩΡΙΣ μάσκα bins (όλα τα N_BINS).
+fn compute_flux_norm(engine: &mut StftEngine, signal: &[f32]) -> Vec<f32> {
+    let (frames, n_frames) = engine.forward(signal);
+    let mut flux = vec![0.0_f32; n_frames];
+    let mut prev = vec![0.0_f32; N_BINS];
+    for (t, frame) in frames.iter().enumerate() {
+        let mut frame_flux = 0.0_f32;
+        for b in 0..N_BINS {
+            let mag = (frame[b].re * frame[b].re + frame[b].im * frame[b].im).sqrt();
+            let diff = mag - prev[b];
+            if diff > 0.0_f32 { frame_flux += diff; }
+            prev[b] = mag;
+        }
+        flux[t] = frame_flux;
+    }
+    let flux_max = flux.iter().cloned().fold(0.0_f32, f32::max);
+    let mut flux_norm = vec![0.0_f32; n_frames];
+    if flux_max > 1e-8_f32 {
+        for t in 0..n_frames { flux_norm[t] = flux[t] / flux_max; }
+    }
+    flux_norm
+}
+
+fn peak_pick(flux_norm: &[f32], thr: f32) -> Vec<usize> {
+    let n_frames = flux_norm.len();
+    let mut beats = Vec::new();
+    for t in 1..n_frames.saturating_sub(1) {
+        if flux_norm[t] >= thr && flux_norm[t] > flux_norm[t - 1] && flux_norm[t] > flux_norm[t + 1] {
+            let dist = if beats.is_empty() { FLUX_MIN_DISTANCE + 1 } else { t - *beats.last().unwrap() };
+            if dist >= FLUX_MIN_DISTANCE { beats.push(t); }
+        }
+    }
+    beats
+}
+
+fn cv_ioi_from_onsets(onsets: &[usize], sample_rate: u32) -> f32 {
+    if onsets.len() < 3 { return f32::NAN; }
+    let hop_size = HOP_SIZE as f32;
+    let mut iois = Vec::with_capacity(onsets.len() - 1);
+    for i in 1..onsets.len() {
+        let diff_frames = (onsets[i] - onsets[i - 1]) as f32;
+        iois.push(diff_frames * hop_size * 1000.0 / sample_rate as f32);
+    }
+    let mean_ioi = iois.iter().sum::<f32>() / iois.len() as f32;
+    if mean_ioi <= 1e-8 { return f32::NAN; }
+    let mut sum_sq = 0.0;
+    for &ioi in &iois {
+        let diff = ioi - mean_ioi;
+        sum_sq += diff * diff;
+    }
+    let variance = sum_sq / iois.len() as f32;
+    libm::sqrtf(variance) / mean_ioi
+}
+
+fn flagged(leaning: f32, conf: f32) -> bool {
+    (leaning > A7_ZONE_LOW && leaning < A7_ZONE_HIGH) && conf < A7_MIN_CONF
+}
+
+fn flagged_count(segs: &[SegmentBoundary]) -> usize {
+    segs.iter().filter(|b| flagged(b.avg_leaning, b.avg_confidence)).count()
+}
+
+fn music_to_speech_resets(segs: &[SegmentBoundary]) -> usize {
+    segs.windows(2)
+        .filter(|w| w[0].segment_type == SegmentType::Music && w[1].segment_type == SegmentType::Speech)
+        .count()
+}
+
+fn under_5s(segs: &[SegmentBoundary]) -> usize {
+    segs.iter().filter(|b| (b.end_sec - b.start_sec) < 5.0).count()
+}
+
+fn match_boundaries(expected: &[f32], produced: &[f32], tol: f32) -> (usize, usize, usize) {
+    let mut used = vec![false; produced.len()];
+    let mut found = 0usize;
+    for &e in expected {
+        if let Some(idx) = produced
+            .iter()
+            .enumerate()
+            .filter(|(i, &p)| !used[*i] && (p - e).abs() <= tol)
+            .min_by(|a, b| (a.1 - e).abs().partial_cmp(&(b.1 - e).abs()).unwrap())
+            .map(|(i, _)| i)
+        {
+            used[idx] = true;
+            found += 1;
+        }
+    }
+    let missed = expected.len() - found;
+    let extra = used.iter().filter(|&&u| !u).count();
+    (found, missed, extra)
+}
+
+fn expected_type(schedule: &[(f32, f32, SegmentType)], center: f32) -> SegmentType {
+    for &(s, e, ty) in schedule {
+        if center >= s && center < e { return ty; }
+    }
+    schedule.last().unwrap().2
+}
+
+fn expected_boundaries(schedule: &[(f32, f32, SegmentType)]) -> Vec<f32> {
+    let mut out = Vec::new();
+    for w in schedule.windows(2) {
+        if w[0].2 != w[1].2 { out.push(w[1].0); }
+    }
+    out
+}
+
+fn segments_from_decisions(times: &[f32], decisions: &[ScoutDecision]) -> Vec<SegmentBoundary> {
+    let d: Vec<(f32, ScoutDecision)> = times.iter().zip(decisions.iter()).map(|(&t, &dec)| (t, dec)).collect();
+    smooth_and_segment(&d)
+}
+
+struct Outcome { correct: usize, total: usize, segs: Vec<SegmentBoundary>, nan_count: usize, attack_counts: Vec<usize> }
+
+fn fmt_row(label: &str, o: &Outcome, exp_bounds: &[f32]) -> String {
+    let prod: Vec<f32> = o.segs.windows(2).map(|w| w[1].start_sec).collect();
+    let (f, m, e) = match_boundaries(exp_bounds, &prod, BOUNDARY_TOLERANCE_SECS);
+    let med_attacks = {
+        let mut v = o.attack_counts.clone();
+        v.sort();
+        if v.is_empty() { 0 } else { v[v.len() / 2] }
+    };
+    format!(
+        "{:<10} acc={:>3}/{} ({:>5.1}%)  όρια f={f}/{} m={m} e={e}  NaN={}/{}  διάμ.επιθέσεις={}",
+        label, o.correct, o.total, 100.0 * o.correct as f32 / o.total as f32, exp_bounds.len(), o.nan_count, o.total, med_attacks
+    )
+}
+
+struct Fixture { label: &'static str, wav: &'static str, schedule: Vec<(f32, f32, SegmentType)> }
+
+/// Επιστρέφει (times, mono) + όλες τις στήλες ήδη σαρωμένες.
+fn scan(mono: &[f32], sample_rate: u32, schedule: &[(f32, f32, SegmentType)]) -> (Vec<f32>, Outcome, Vec<Outcome>, Outcome, Outcome) {
+    let win_samples = (WINDOW_SECS * sample_rate as f32) as usize;
+    let hop_samples = (HOP_SECS * sample_rate as f32) as usize;
+
+    let mut scout = SegmentScout::new();
+    let mut engine = StftEngine::new();
+
+    let mut times = Vec::new();
+    let mut dec_a = Vec::new();
+    let mut nan_a = 0usize;
+    let mut attacks_a = Vec::new();
+
+    let mut dec_b: Vec<Vec<ScoutDecision>> = vec![Vec::new(); K_SWEEP.len()];
+    let mut nan_b = vec![0usize; K_SWEEP.len()];
+    let mut attacks_b: Vec<Vec<usize>> = vec![Vec::new(); K_SWEEP.len()];
+
+    let mut dec_g = Vec::new();
+    let mut nan_g = 0usize;
+    let mut attacks_g = Vec::new();
+
+    let mut start = 0usize;
+    while start + win_samples <= mono.len() {
+        let mono_slice = &mono[start..start + win_samples];
+        let start_sec = start as f32 / sample_rate as f32;
+
+        let mut mfcc_analyzer = lineos_corpus::mfcc::MfccAnalyzer::new();
+        let mut mfccs = Vec::new();
+        let mut f = 0;
+        while f + 1024 <= mono_slice.len() {
+            mfccs.push(mfcc_analyzer.compute(&mono_slice[f..f + 1024]));
+            f += 512;
+        }
+        let cepstral_flux = compute_cepstral_flux(&mfccs);
+
+        // Α: το ΠΡΑΓΜΑΤΙΚΟ όργανο.
+        let meas_a = scout.measure(mono_slice, cepstral_flux, sample_rate);
+        dec_a.push(compute_scout_decision(&meas_a));
+        if meas_a.cv_ioi.is_nan() { nan_a += 1; }
+        // Ο πραγματικός ανιχνευτής δεν εκθέτει το πλήθος επιθέσεων εδώ·
+        // παίρνουμε το ξεχωριστά από το ΙΔΙΟ αντίγραφο flux με thr=0.20
+        // ΜΟΝΟ για μέτρηση πλήθους (ίδιος τύπος με τα Β/Γ, χωρίς να
+        // αλλάζει η μέτρηση cv_ioi/leaning που ήδη πήραμε από το
+        // ΠΡΑΓΜΑΤΙΚΟ SegmentScout::measure παραπάνω).
+        let flux_norm_for_count = compute_flux_norm(&mut StftEngine::new(), mono_slice);
+        attacks_a.push(peak_pick(&flux_norm_for_count, 0.20).len());
+
+        // Β: σάρωση k, ΙΔΙΟ flux_norm (υπολογισμένο μία φορά, reused).
+        let flux_norm = compute_flux_norm(&mut engine, mono_slice);
+        for (ki, &k) in K_SWEEP.iter().enumerate() {
+            let (med, std) = median_std(&flux_norm);
+            let thr = med + k * std;
+            let onsets = peak_pick(&flux_norm, thr);
+            attacks_b[ki].push(onsets.len());
+            let cv_ioi = cv_ioi_from_onsets(&onsets, sample_rate);
+            if cv_ioi.is_nan() { nan_b[ki] += 1; }
+            let meas = ScoutMeasurements { cv_ioi, cepstral_flux };
+            dec_b[ki].push(compute_scout_decision(&meas));
+        }
+
+        // Γ: Otsu στην κατανομή του flux_norm, χωρίς k.
+        let thr_otsu = otsu_threshold(&flux_norm);
+        let onsets_g = peak_pick(&flux_norm, thr_otsu);
+        attacks_g.push(onsets_g.len());
+        let cv_ioi_g = cv_ioi_from_onsets(&onsets_g, sample_rate);
+        if cv_ioi_g.is_nan() { nan_g += 1; }
+        let meas_g = ScoutMeasurements { cv_ioi: cv_ioi_g, cepstral_flux };
+        dec_g.push(compute_scout_decision(&meas_g));
+
+        times.push(start_sec);
+        start += hop_samples;
+    }
+
+    let correct_for = |decisions: &[ScoutDecision]| -> usize {
+        times.iter().zip(decisions.iter()).filter(|(&t, d)| {
+            let exp = expected_type(schedule, t + WINDOW_SECS / 2.0);
+            let v = if d.leaning_score >= 0.5 { SegmentType::Speech } else { SegmentType::Music };
+            v == exp
+        }).count()
+    };
+
+    let outcome_a = Outcome {
+        correct: correct_for(&dec_a), total: times.len(),
+        segs: segments_from_decisions(&times, &dec_a), nan_count: nan_a, attack_counts: attacks_a,
+    };
+    let outcomes_b: Vec<Outcome> = (0..K_SWEEP.len()).map(|ki| Outcome {
+        correct: correct_for(&dec_b[ki]), total: times.len(),
+        segs: segments_from_decisions(&times, &dec_b[ki]), nan_count: nan_b[ki], attack_counts: attacks_b[ki].clone(),
+    }).collect();
+    let outcome_g = Outcome {
+        correct: correct_for(&dec_g), total: times.len(),
+        segs: segments_from_decisions(&times, &dec_g), nan_count: nan_g, attack_counts: attacks_g,
+    };
+    let always_speech: Vec<ScoutDecision> = times.iter().map(|_| ScoutDecision { leaning_score: 1.0, confidence: 1.0 }).collect();
+    let outcome_d = Outcome {
+        correct: times.iter().filter(|&&t| expected_type(schedule, t + WINDOW_SECS / 2.0) == SegmentType::Speech).count(),
+        total: times.len(),
+        segs: segments_from_decisions(&times, &always_speech), nan_count: 0, attack_counts: vec![],
+    };
+
+    (times, outcome_a, outcomes_b, outcome_g, outcome_d)
+}
+
+fn main() {
+    use SegmentType::{Music, Speech};
+    let fixtures = vec![
+        Fixture { label: "1 ΣΚΕΤΗ ΑΦΗΓΗΣΗ", wav: "test1_narration_only.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "2 ΣΚΕΤΟ BED", wav: "test2_bed_only.wav", schedule: vec![(0.0, 120.0, Music)] },
+        Fixture { label: "3 ΑΦΗΓΗΣΗ+BED -20dB", wav: "test3_narration_bed_m20dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "4 ΑΦΗΓΗΣΗ+BED -12dB", wav: "test4_narration_bed_m12dB.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "5 ΕΝΑΛΛΑΓΗ 30/60/90", wav: "test5_alternation_30_60_90.wav", schedule: vec![(0.0, 30.0, Speech), (30.0, 60.0, Music), (60.0, 90.0, Speech), (90.0, 120.0, Music)] },
+        Fixture { label: "6 BED ΜΠΑΙΝΕΙ ΣΤΑ 60s", wav: "test6_bed_enters_60s.wav", schedule: vec![(0.0, 120.0, Speech)] },
+        Fixture { label: "7 ΜΗ-ΣΤΡΟΓΓΥΛΕΣ", wav: "test7_nonround_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "8 ΣΥΝΤΟΜΕΣ 20s×6", wav: "test8_short_20s_x6.wav", schedule: vec![(0.0, 20.0, Speech), (20.0, 40.0, Music), (40.0, 60.0, Speech), (60.0, 80.0, Music), (80.0, 100.0, Speech), (100.0, 120.0, Music)] },
+        Fixture { label: "9 ΑΣΥΜΜΕΤΡΕΣ", wav: "test9_asymmetric.wav", schedule: vec![(0.0, 45.0, Speech), (45.0, 53.0, Music), (53.0, 103.0, Speech), (103.0, 111.0, Music), (111.0, 120.0, Speech)] },
+        Fixture { label: "10 BED ΣΥΝΕΧΙΖΕΙ", wav: "test10_bed_continues_under.wav", schedule: vec![(0.0, 40.0, Speech), (40.0, 60.0, Music), (60.0, 120.0, Speech)] },
+        Fixture { label: "11 ΑΛΛΟ BED", wav: "test11_altbed_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+        Fixture { label: "12 ΑΛΛΟΣ ΑΦΗΓΗΤΗΣ", wav: "test12_altnarrator_17_41_68_94.wav", schedule: vec![(0.0, 17.0, Speech), (17.0, 41.0, Music), (41.0, 68.0, Speech), (68.0, 94.0, Music), (94.0, 120.0, Speech)] },
+    ];
+
+    let sample_rate = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
+    println!("K_SWEEP={K_SWEEP:?} ΑΝΟΧΗ_ΟΡΙΩΝ={BOUNDARY_TOLERANCE_SECS}s\n");
+
+    println!("=== ΣΚΕΛΟΣ 1 — ΤΑ ΔΩΔΕΚΑ ΔΟΚΙΜΙΑ ===");
+    let mut nan_a_first_six = 0usize;
+    let mut total_first_six = 0usize;
+    for (i, fx) in fixtures.iter().enumerate() {
+        let path = format!("/tmp/scout-groundtruth/{}", fx.wav);
+        let (left, right) = read_wav_stereo_f32(&path);
+        let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+        let exp_bounds = expected_boundaries(&fx.schedule);
+        let (_times, oa, obs, og, od) = scan(&mono, sample_rate, &fx.schedule);
+
+        println!("--- {} ---", fx.label);
+        println!("  {}", fmt_row("Α (0.20)", &oa, &exp_bounds));
+        for (ki, &k) in K_SWEEP.iter().enumerate() {
+            println!("  {}", fmt_row(&format!("Β k={k:.1}"), &obs[ki], &exp_bounds));
+        }
+        println!("  {}", fmt_row("Γ (Otsu)", &og, &exp_bounds));
+        println!("  {}", fmt_row("Δ (πάντα ομιλία)", &od, &exp_bounds));
+        println!();
+
+        if i < 6 {
+            nan_a_first_six += oa.nan_count;
+            total_first_six += oa.total;
+        }
+    }
+    println!("Έλεγχος NaN, Α, πρώτα έξι δοκίμια: {}/{} (αναφορά task: 0/696)", nan_a_first_six, total_first_six);
+
+    println!("\n=== ΣΚΕΛΟΣ 2 — Η ΠΥΛΗ: ΕΝΝΙΑ ΒΙΒΛΙΑ (Α, Β k=2.0, Γ Otsu) ===");
+    let dir = "/home/aidevcon/Downloads/DATASET/librivox-hq";
+    let books = [
+        ("secretgarden", "secretgarden_01_burnett.mp3"),
+        ("dracula", "dracula_01_stoker.mp3"),
+        ("count_of_monte_cristo", "count_of_monte_cristo_001_dumas.mp3"),
+        ("peterpan", "peterpan_01_barrie.mp3"),
+        ("anne_of_green_gables", "anne_of_green_gables_01_montgomery.mp3"),
+        ("tale_of_two_cities", "tale_of_two_cities_01_dickens.mp3"),
+        ("adventurespinocchio", "adventurespinocchio_01_collodi.mp3"),
+        ("huckfinn", "huckfinn_01_twain_apc.mp3"),
+        ("janeeyre", "janeeyre_01_bronte.mp3"),
+    ];
+    let k2_idx = K_SWEEP.iter().position(|&k| (k - 2.0).abs() < 1e-6).unwrap();
+
+    for (label, fname) in books {
+        let path = format!("{dir}/{fname}");
+        let dump = format!("/tmp/attack_dynk_{label}.raw");
+        m0d::dsp::input_lufs::pass0_decode_to_dump(std::path::Path::new(&path), &dump)
+            .unwrap_or_else(|e| panic!("decode {path}: {e}"));
+        let (left, right) = read_dump_stereo(&dump);
+        let _ = std::fs::remove_file(&dump);
+        let mono: Vec<f32> = left.iter().zip(right.iter()).map(|(&l, &r)| (l + r) * 0.5).collect();
+
+        let dummy_schedule = vec![(0.0, f32::MAX, Music)];
+        let (_times, oa, obs, og, _od) = scan(&mono, sample_rate, &dummy_schedule);
+
+        for (col_label, o) in [("Α (0.20)", &oa), ("Β (k=2.0)", &obs[k2_idx]), ("Γ (Otsu)", &og)] {
+            println!(
+                "{:<24} [{col_label:<10}] τμήματα={:<4} resets(M→S)={:<4} flagged={:<4} <5s={}",
+                label, o.segs.len(), music_to_speech_resets(&o.segs), flagged_count(&o.segs), under_5s(&o.segs)
+            );
+        }
+    }
+}
