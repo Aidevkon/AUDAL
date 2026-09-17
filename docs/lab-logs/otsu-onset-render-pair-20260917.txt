@@ -1,0 +1,257 @@
+MEASURE 2026-09-17 — το Otsu στον onset detector, ζεύγος render.
+ΑΓΓΙΞΕ ΠΑΡΑΓΩΓΗ ΠΡΟΣΩΡΙΝΑ, ΜΕ ΣΦΡΑΓΙΔΑ ΚΑΙ ΕΠΑΝΑΦΟΡΑ (κανόνας f2a9f86).
+
+ΤΟ ΤΕΚΜΗΡΙΟ (17/09, attack_dynamic_k_battery.rs — hand-copied
+αναπαραγωγή, ΟΧΙ το πραγματικό trunk_pass.rs): secretgarden 79→...
+· 39→31 resets, dracula 128→...·63→42, τα επτά ήσυχα καμία αύξηση.
+⚠ ΑΥΤΟ ΤΟ TASK ΜΕΤΡΑΕΙ ΤΟ ΠΡΑΓΜΑΤΙΚΟ trunk_pass.rs μέσω του
+πραγματικού render — και τα νούμερα ΔΙΑΦΕΡΟΥΝ από το τεκμήριο (βλ.
+ΜΕΤΡΗΜΕΝΟ 0.1/έξι διαδρομές). Ο λόγος: F-111 — scan_file (πλήρες
+buffer, ό,τι χρησιμοποίησε το προηγούμενο εργαλείο) και trunk_pass.rs
+(κυλιόμενο ring, ό,τι πραγματικά τρέχει) διαφέρουν στο cepstral_flux
+ring, άρα και στο τελικό segment count. ΤΟ ΡΕΠΟ ΥΠΕΡΙΣΧΥΕΙ — οι
+αριθμοί παρακάτω είναι οι ΠΡΑΓΜΑΤΙΚΟΙ.
+
+── ΒΗΜΑ 0.1 — ΠΟΥ ΜΠΑΙΝΕΙ, ΤΙ ΑΛΛΑΖΕΙ ΓΙΑ ΤΟΝ ΚΑΘΕΝΑ ──
+
+Το κατώφλι 0.20 ζει σε ΕΝΑ σημείο: SpectralFluxDetector::detect
+(spectral_flux.rs, self.threshold, χρησιμοποιείται στο peak-picking).
+Constructed once, SegmentScout::new() → SpectralFluxDetector::new(0.20).
+Το SegmentScout::measure καλείται από ΔΥΟ σημεία παραγωγής:
+
+  · trunk_pass.rs:883 — μέσα στο run_trunk_pass/run_trunk_pass_with_acx,
+    που η streaming button διαδρομή καλεί ΑΠΕΥΘΕΙΑΣ
+    (executor.rs::execute_streaming_plan, γραμμές 310/316). Το
+    αποτέλεσμα (trunk_report.boundaries) τροφοδοτεί pre_analysis
+    (γραμμή 325) → ΟΛΗ η αλυσίδα ducking/restoration/segment-type.
+    ⇒ Η ΑΛΛΑΓΗ ΕΔΩ είναι ο στόχος του πειράματος — ό,τι μετράμε.
+
+  · scout_scanner.rs:60 — μέσα στο scan_file, που καλείται από
+    TwoPassEngine::scout (two_pass.rs) ΜΟΝΟ όταν run_nmfd=true (κώδικας
+    γύρω από τη γραμμή 794, μέσα σε `if run_nmfd { ... }`). Η streaming
+    button διαδρομή καλεί scout_node::run με το τελευταίο όρισμα
+    ΣΤΑΘΕΡΟ false (executor.rs:345, literal `false`) — άρα αυτός ο
+    κλάδος ΔΕΝ εκτελείται ΠΟΤΕ σε streaming render. Ο μόνος καλών με
+    run_nmfd=true (dsp_pipeline.rs, req.use_nmfd.unwrap_or(true)) είναι
+    το MasterRequest/dsp_pipeline::run_dsp μονοπάτι — επιβεβαιωμένα
+    ορφανό αυτή τη βάρδια (16/09 correction). scan_file's άλλοι δύο
+    καλούντες (stem_escalation.rs, pass1_pipeline.rs) δεν έχουν ΚΑΝΕΝΑ
+    εξωτερικό καλούντα στο src/ δέντρο (μόνο tests/).
+    ⇒ Η ΑΛΛΑΓΗ ΕΔΩ είναι τεχνικά υπαρκτή (ίδια συνάρτηση, ίδιο
+    self.threshold) αλλά ΝΕΚΡΗ ΓΙΑ ΑΥΤΟ ΤΟ RENDER — καμία επίπτωση
+    μετρημένη σε ό,τι το κουμπί πραγματικά παράγει σήμερα.
+
+Συνέπεια: το patch αναγκαστικά αγγίζει και τους δύο καλούντες (μία
+συνάρτηση, ένα self.threshold) — αλλά μόνο ο ένας είναι ζωντανός στο
+render που το κουμπί εκτελεί, και μόνο εκείνος μετρήθηκε.
+
+── ΟΙ ΕΞΙ ΔΙΑΔΡΟΜΕΣ (ΤΡΙΑ ΖΕΥΓΗ × before/after, streaming button) ──
+
+Όλα μέσω execute_streaming_plan (/master/streaming, preset=spotify),
+ΟΧΙ MasterRequest/dsp_pipeline. Πλήρης αλυσίδα: pass0_decode_to_dump →
+run_trunk_pass (boundaries) → scout_node → NMF/spatial/mastering →
+FLAC-grade PCM master.
+
+secretgarden  before: segments=75  resets(M→S)=37  trunk_pass=17.238s  streaming_total=60.319s  pcm_blake3=5bf8a96a...
+secretgarden  after:  segments=63  resets(M→S)=31  trunk_pass=16.150s  streaming_total=52.343s  pcm_blake3=3987b0db...
+dracula       before: segments=114 resets(M→S)=56  trunk_pass=47.409s  streaming_total=123.568s pcm_blake3=1f1b7883...
+dracula       after:  segments=84  resets(M→S)=41  trunk_pass=44.579s  streaming_total=113.853s pcm_blake3=96dbd44c...
+tale_of_two_cities before: segments=1 resets=0     trunk_pass=8.054s   streaming_total=22.841s  pcm_blake3=e59a4697...
+tale_of_two_cities after:  segments=1 resets=0     trunk_pass=7.383s   streaming_total=20.923s  pcm_blake3=e59a4697...
+
+⇒ Ο ΦΡΟΥΡΟΣ (tale_of_two_cities): pcm_blake3 ΤΑΥΤΟΣΗΜΟ before/after —
+όχι απλώς «καμία αλλαγή στο μέτρημα», αλλά byte-για-byte ταυτόσημο
+master. Το πιο αυστηρό δυνατό «καμία διαφορά».
+
+⚠ ΔΙΑΦΟΡΑ ΑΠΟ ΤΟ ΤΕΚΜΗΡΙΟ: secretgarden 75→63 (όχι 79→...), dracula
+114→84 (όχι 128→...) — δείτε την εξήγηση F-111 στην κορυφή. Η ΚΑΤΕΥΘΥΝΣΗ
+συμφωνεί (και τα δύο μειώνονται, τα resets πέφτουν), το ΜΕΓΕΘΟΣ όχι.
+
+── ΤΑ ΝΟΥΜΕΡΑ ΑΝΑ BOUNDARY ΠΟΥ ΑΛΛΑΞΕ ──
+
+Ταίριασμα ±5s (ίδια μέθοδος με attack_dynamic_k_battery.rs) ανάμεσα
+στα boundary points before/after· ό,τι δεν ταιριάζει είναι VANISHED
+(υπήρχε πριν, όχι μετά) ή NEW (δεν υπήρχε πριν, εμφανίζεται μετά).
+
+secretgarden: 74 boundary points before, 62 μετά — 21 vanished, 9 new.
+dracula:      113 boundary points before, 83 μετά — 44 vanished, 14 new.
+tale_of_two_cities: 0/0 — καμία σύγκριση δυνατή, καμία χρειάστηκε.
+
+Ανά boundary: RMS 200ms πριν/μετά (dB, και στα δύο renders), φάσμα
+οκτώ μπαντών delta (after−before, dB — ΠΡΑΓΜΑΤΙΚΟ
+pre_analysis::spectral_profile_levels), μέγιστη στιγμιαία διαφορά
+δείγματος (±0.5s γύρω από το σημείο, ανάμεσα στα δύο renders,
+ταυτόσημο μήκος άρα ταυτόσημο index-alignment). Πλήρης πίνακας: βλ.
+πηγαίο αρχείο παρακάτω (embedded) + docs/lab-logs/otsu-onset-*
+(ίδιο log)· περίληψη:
+
+  · secretgarden: 26 boundaries με μη-αμελητέα διαφορά (max_sample_diff
+    > 0.05 σε f32 πλήρους κλίμακας [-1,1])· η μεγαλύτερη 0.461731 @
+    t=544.000s (VANISHED) — RMS πριν -18.04/-12.78dB, μετά -12.06/-9.83dB
+    (Otsu λέει «ομιλία» εκεί όπου το 0.20 έλεγε αλλαγή τύπου, ~6dB
+    διαφορά ducking σε όλες τις 8 μπάντες).
+  · dracula: η μεγαλύτερη διαφορά ΣΕ ΟΛΟΚΛΗΡΟ το δείγμα (και τα δύο
+    βιβλία) — max_sample_diff=0.634405 @ t=2058.000s (VANISHED).
+    ⚠ ΙΔΙΑΙΤΕΡΟ: εκεί η RMS πριν/μετά είναι ΣΧΕΔΟΝ ΤΑΥΤΟΣΗΜΗ (-17.60/
+    -15.72dB και στα δύο renders, spectral delta <0.25dB σε 7/8
+    μπάντες) — η μεγάλη στιγμιαία διαφορά ΔΕΝ είναι επίπεδο/φάσμα,
+    είναι στιγμιαία (πιθανό crossfade/transient artifact ακριβώς στο
+    σημείο του πρώην boundary, όχι σε όλο το διάστημα γύρω του).
+    ΓΙ' ΑΥΤΟ επιλέχθηκε για το απόσπασμα ακρόασης: η μεγαλύτερη
+    στιγμιαία διαφορά μετρημένη, και το προφίλ της (level ταυτόσημο,
+    στιγμή διαφορετική) είναι ακριβώς το είδος αλλαγής που ένας
+    πίνακας RMS/φάσματος ΔΕΝ θα έδειχνε καθαρά — χρειάζεται αυτί.
+
+⇒ ΑΠΟΣΠΑΣΜΑ 20s: dracula, γύρω από t=2058.000s (παράθυρο 2048.0–2068.0s).
+  before: /tmp/otsu_clips/dracula_boundary2058_before.wav
+  after:  /tmp/otsu_clips/dracula_boundary2058_after.wav
+  ΚΑΜΙΑ κρίση για το αν ακούγεται — μόνο η προετοιμασία, όπως ζητήθηκε.
+
+── INV-DET-1 (render determinism, ΞΕΧΩΡΙΣΤΑ, ΜΕ το patch) ──
+
+cargo test --release --test inv_det_1_render_determinism -- --ignored
+ΑΠΟΤΕΛΕΣΜΑ: PASS (ok, 19.50s) — δύο renders του ίδιου fixture, ίδιο
+SHA. Το patch δεν έσπασε το θεμέλιο του certificate· η Otsu υπολόγιση
+είναι ντετερμινιστική.
+
+── ΚΟΣΤΟΣ ΧΡΟΝΟΥ (run_trunk_pass, dracula dump, τρία τρεξίματα) ──
+
+ΜΕ το patch (Otsu):     38.072s, 39.013s, 40.224s → μ.ό. 39.103s
+ΧΩΡΙΣ το patch (0.20):  39.185s, 39.423s, 40.132s → μ.ό. 39.580s
+Διαφορά: −0.477s (−1.2%) — μέσα στον θόρυβο τρεξίματος, ΟΧΙ πραγματικό
+κόστος. Συμφωνεί με την πρόβλεψη: το Otsu δεν προσθέτει FFT, μόνο ένα
+ιστόγραμμα 200 κάδων ανά παράθυρο 5s — αμελητέο δίπλα στο ίδιο το STFT.
+Για σύγκριση, η επιπεδότητα (+70.3%) και το Phi2 (+314%) ήταν όργανα
+που ΠΡΟΣΘΕΤΑΝ υπολογισμό (FFT/PCEN/RNN) πάνω στο run_trunk_pass· το
+Otsu αντικαθιστά μια σύγκριση με μια σύγκριση.
+
+── Η ΕΠΑΝΑΦΟΡΑ, ΑΥΤΟΥΣΙΑ ──
+
+grep -c OTSU-TEMP-20260917 lineos/m1/sp314-dsp/src/stft/spectral_flux.rs → 0
+git diff lineos/m1/sp314-dsp/src/stft/spectral_flux.rs → (κενό, ταυτόσημο με baseline)
+git status: μόνο τα τρία νέα εργαλεία έρευνας untracked (otsu_render_pair.rs,
+otsu_timing.rs, otsu_boundary_diff.rs) — ΚΑΜΙΑ αλλαγή στην παραγωγή.
+
+── GUARDS (μετά την επαναφορά) ──
+threshold-lint 38=38 · gate-coverage 14=14 · empty-pass-lint 4=4 ·
+reference-lint 14=14 · line-ref-lint 2=2 σπασμένες/0 μετατοπισμένες ·
+sample-rate-lint ίδιο με baseline · allocator-lint 0 διπλά, F-115/F-114
+ΣΥΜΦΩΝΙΑ. Όλα 7/7 πράσινα, ταυτόσημα με πριν το task.
+
+── ΤΟ PATCH, ΑΥΤΟΥΣΙΟ (εφαρμόστηκε, μετρήθηκε, αφαιρέθηκε — ίδιο
+   με το git diff που δείχθηκε στην ώρα του, τεκμηρίωση εδώ) ──
+
+@@ spectral_flux.rs, μέσα στο detect() @@
+-            if flux_norm[t] >= self.threshold
++            if flux_norm[t] >= otsu_thr // OTSU-TEMP-20260917: self.threshold(0.20) swapped for Otsu
+
+Και μία νέα συνάρτηση otsu_threshold_temp_20260917(flux_norm: &[f32])
+-> f32, ίδιο ιστόγραμμα 200 κάδων/ίδια μέθοδος Otsu (N. Otsu 1979) με
+trunk_pass.rs's υπάρχουσα Otsu υλοποίηση (γραμμή ~235) και με
+attack_dynamic_k_battery.rs — κάθε γραμμή σφραγισμένη
+// OTSU-TEMP-20260917, αφαιρέθηκε εξ ολοκλήρου στην επαναφορά.
+
+── ΠΛΗΡΗΣ ΠΙΝΑΚΑΣ, SECRETGARDEN (21 vanished, 9 new) ──
+
+label=secretgarden segments_before=75 segments_after=63 boundary_points_before=74 boundary_points_after=62
+vanished=21 new=9
+frames_before=38810018 frames_after=38810018 (ίδιο μήκος => ίδιο index-alignment)
+VANISHED t=54.000s  RMS200ms(before) pre=-19.35dB post=-18.17dB  RMS200ms(after) pre=-13.36dB post=-14.16dB  8band_delta(after-before)_dB=[4.688713, 5.7387714, 5.783552, 5.7745094, 5.5739927, 5.4323044, 4.1599865, 4.514267]  max_sample_diff(±0.5s)=0.437212
+VANISHED t=55.000s  RMS200ms(before) pre=-18.35dB post=-10.87dB  RMS200ms(after) pre=-18.40dB post=-10.92dB  8band_delta(after-before)_dB=[-1.2349472, -0.20420456, -0.04086113, -0.05508864, -0.23277664, -0.95402336, -2.6973343, -0.696537]  max_sample_diff(±0.5s)=0.105166
+VANISHED t=112.000s  RMS200ms(before) pre=-37.85dB post=-50.53dB  RMS200ms(after) pre=-38.63dB post=-51.10dB  8band_delta(after-before)_dB=[-0.39004517, -0.16148376, -0.019275665, -0.0052948, -0.076042175, -0.29919052, -1.1207962, -0.6650543]  max_sample_diff(±0.5s)=0.063922
+VANISHED t=116.000s  RMS200ms(before) pre=-19.91dB post=-25.90dB  RMS200ms(after) pre=-19.94dB post=-25.97dB  8band_delta(after-before)_dB=[-0.6347313, -0.38996315, -0.022104263, -0.00039577484, -0.057367325, -0.3340149, -1.0271988, -0.7039566]  max_sample_diff(±0.5s)=0.107136
+VANISHED t=162.000s  RMS200ms(before) pre=-25.09dB post=-26.05dB  RMS200ms(after) pre=-25.04dB post=-24.27dB  8band_delta(after-before)_dB=[0.65211105, 0.50188255, 0.1493702, 0.018447876, 0.07535362, 0.73911667, 1.1365261, 1.1453705]  max_sample_diff(±0.5s)=0.273953
+VANISHED t=163.000s  RMS200ms(before) pre=-28.64dB post=-18.57dB  RMS200ms(after) pre=-22.64dB post=-13.94dB  8band_delta(after-before)_dB=[5.7832756, 5.236145, 5.014945, 4.741412, 5.098112, 5.383339, 5.991802, 5.9987965]  max_sample_diff(±0.5s)=0.273874
+VANISHED t=196.000s  RMS200ms(before) pre=-51.08dB post=-56.07dB  RMS200ms(after) pre=-50.99dB post=-51.21dB  8band_delta(after-before)_dB=[1.2790642, 1.533844, 1.803318, 1.009655, 1.5813179, 1.5063705, 1.72826, 1.690712]  max_sample_diff(±0.5s)=0.005831
+VANISHED t=219.000s  RMS200ms(before) pre=-50.66dB post=-30.65dB  RMS200ms(after) pre=-50.66dB post=-30.65dB  8band_delta(after-before)_dB=[-0.0032806396, -0.001625061, -0.004016876, -0.0017356873, 0.005973816, -0.004924774, 0.0016021729, -0.00024032593]  max_sample_diff(±0.5s)=0.004153
+VANISHED t=289.000s  RMS200ms(before) pre=-11.73dB post=-13.82dB  RMS200ms(after) pre=-11.73dB post=-13.64dB  8band_delta(after-before)_dB=[0.10203934, 0.16767502, 0.0985384, 0.07047641, 0.011340618, 0.018781662, 0.3223076, 0.9882736]  max_sample_diff(±0.5s)=0.028696
+VANISHED t=300.000s  RMS200ms(before) pre=-21.06dB post=-20.83dB  RMS200ms(after) pre=-21.06dB post=-24.16dB  8band_delta(after-before)_dB=[-1.4541321, -3.397482, -1.2457161, -1.2831707, -3.279787, -3.82452, -2.532833, -3.5417862]  max_sample_diff(±0.5s)=0.198673
+VANISHED t=434.000s  RMS200ms(before) pre=-31.34dB post=-49.78dB  RMS200ms(after) pre=-31.34dB post=-49.79dB  8band_delta(after-before)_dB=[-0.000869751, 9.536743e-5, -3.8146973e-6, -3.8146973e-6, 0.0, 0.0, 0.0, 0.0]  max_sample_diff(±0.5s)=0.008059
+VANISHED t=436.000s  RMS200ms(before) pre=-19.84dB post=-26.34dB  RMS200ms(after) pre=-19.84dB post=-26.34dB  8band_delta(after-before)_dB=[0.0048446655, 0.0036773682, -0.0024175644, -0.0043640137, 0.0035800934, -0.0023040771, 0.003238678, -0.01719284]  max_sample_diff(±0.5s)=0.069012
+VANISHED t=468.000s  RMS200ms(before) pre=-19.99dB post=-48.22dB  RMS200ms(after) pre=-19.99dB post=-48.22dB  8band_delta(after-before)_dB=[-0.0015106201, -3.8146973e-6, 0.0, 0.0, 1.9073486e-6, 0.0, 0.0, 0.0]  max_sample_diff(±0.5s)=0.003060
+VANISHED t=473.000s  RMS200ms(before) pre=-17.55dB post=-23.10dB  RMS200ms(after) pre=-17.55dB post=-23.11dB  8band_delta(after-before)_dB=[0.18190384, 0.00683403, 0.00093460083, -0.0005197525, 0.0043964386, -0.008201599, -0.03593445, -0.18824387]  max_sample_diff(±0.5s)=0.095721
+VANISHED t=519.000s  RMS200ms(before) pre=-21.32dB post=-18.10dB  RMS200ms(after) pre=-15.32dB post=-13.43dB  8band_delta(after-before)_dB=[5.7500496, 5.2881794, 5.7850075, 5.6677957, 5.1114545, 5.4344835, 5.9841614, 5.9914303]  max_sample_diff(±0.5s)=0.420931
+VANISHED t=525.000s  RMS200ms(before) pre=-20.62dB post=-14.50dB  RMS200ms(after) pre=-20.62dB post=-14.50dB  8band_delta(after-before)_dB=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  max_sample_diff(±0.5s)=0.000000
+VANISHED t=542.000s  RMS200ms(before) pre=-17.90dB post=-27.98dB  RMS200ms(after) pre=-17.90dB post=-26.70dB  8band_delta(after-before)_dB=[0.11810684, 0.22841454, 0.09417057, 0.12469673, 0.19657135, 0.17079163, 0.15112305, 0.07223511]  max_sample_diff(±0.5s)=0.050205
+VANISHED t=544.000s  RMS200ms(before) pre=-18.04dB post=-12.78dB  RMS200ms(after) pre=-12.06dB post=-9.83dB  8band_delta(after-before)_dB=[5.6225586, 5.23287, 4.837366, 4.878038, 5.561137, 5.0289536, 5.3982983, 5.7591248]  max_sample_diff(±0.5s)=0.461731
+VANISHED t=594.000s  RMS200ms(before) pre=-51.20dB post=-15.78dB  RMS200ms(after) pre=-51.20dB post=-14.43dB  8band_delta(after-before)_dB=[0.23206711, 0.87621117, 0.94543266, 0.9517665, 0.7082653, 0.6565342, 0.7185459, 0.8950577]  max_sample_diff(±0.5s)=0.267000
+VANISHED t=662.000s  RMS200ms(before) pre=-51.09dB post=-52.14dB  RMS200ms(after) pre=-51.09dB post=-50.96dB  8band_delta(after-before)_dB=[0.11336136, 0.19858932, 0.18059158, 0.29463577, 0.19535828, 0.2263298, 0.23146439, 0.22264099]  max_sample_diff(±0.5s)=0.006127
+VANISHED t=665.000s  RMS200ms(before) pre=-17.99dB post=-15.25dB  RMS200ms(after) pre=-12.01dB post=-12.19dB  8band_delta(after-before)_dB=[5.7047386, 5.053378, 5.239171, 5.2735815, 4.8421783, 4.415842, 4.872692, 5.5094757]  max_sample_diff(±0.5s)=0.418430
+NEW t=145.000s  RMS200ms(before) pre=-16.07dB post=-17.16dB  RMS200ms(after) pre=-22.07dB post=-17.25dB  8band_delta(after-before)_dB=[-2.4393501, -2.517664, -4.2269955, -2.2618113, -1.9532433, -4.04677, -4.3876877, -2.5756378]  max_sample_diff(±0.5s)=0.429264
+NEW t=149.000s  RMS200ms(before) pre=-13.06dB post=-13.66dB  RMS200ms(after) pre=-18.86dB post=-17.26dB  8band_delta(after-before)_dB=[-5.848072, -5.6214447, -5.704829, -4.9419093, -4.4828005, -4.654232, -4.5992546, -4.7084274]  max_sample_diff(±0.5s)=0.420354
+NEW t=422.000s  RMS200ms(before) pre=-19.49dB post=-31.81dB  RMS200ms(after) pre=-19.49dB post=-33.51dB  8band_delta(after-before)_dB=[-0.10059357, -0.020252228, -0.013521194, -0.0030670166, -0.022857666, -0.12414169, -0.85928917, -0.9051895]  max_sample_diff(±0.5s)=0.022619
+NEW t=425.000s  RMS200ms(before) pre=-15.53dB post=-24.58dB  RMS200ms(after) pre=-21.53dB post=-26.75dB  8band_delta(after-before)_dB=[-5.635502, -6.0000134, -5.999423, -5.997098, -5.757061, -5.90786, -5.198097, -4.491398]  max_sample_diff(±0.5s)=0.404757
+NEW t=602.000s  RMS200ms(before) pre=-17.68dB post=-18.31dB  RMS200ms(after) pre=-17.75dB post=-18.31dB  8band_delta(after-before)_dB=[-1.0450478, -0.41238403, -0.047747612, -1.2397766e-5, -0.009263992, -0.1133728, -0.4270439, -0.44828033]  max_sample_diff(±0.5s)=0.052383
+NEW t=638.000s  RMS200ms(before) pre=-28.80dB post=-49.83dB  RMS200ms(after) pre=-28.80dB post=-51.06dB  8band_delta(after-before)_dB=[-0.08274078, -0.25349808, -0.1914444, -0.18240738, -0.07807922, -0.030544281, -0.0006046295, -0.0023841858]  max_sample_diff(±0.5s)=0.005783
+NEW t=640.000s  RMS200ms(before) pre=-19.20dB post=-12.14dB  RMS200ms(after) pre=-25.20dB post=-15.29dB  8band_delta(after-before)_dB=[-5.4957924, -5.3174915, -5.2479076, -4.7004576, -4.395338, -4.319668, -4.9340286, -4.976387]  max_sample_diff(±0.5s)=0.416480
+NEW t=793.000s  RMS200ms(before) pre=-37.51dB post=-30.57dB  RMS200ms(after) pre=-37.59dB post=-30.58dB  8band_delta(after-before)_dB=[-0.31801605, -0.07897186, -0.027793884, 0.017246246, -0.023162842, -0.017242432, -0.08678436, -0.10164261]  max_sample_diff(±0.5s)=0.129215
+NEW t=796.000s  RMS200ms(before) pre=-41.04dB post=-16.93dB  RMS200ms(after) pre=-41.08dB post=-21.06dB  8band_delta(after-before)_dB=[-0.75930786, -4.2780266, -4.4185524, -4.70798, -3.8638515, -2.5069027, -3.1552887, -3.9369621]  max_sample_diff(±0.5s)=0.175328
+ΕΠΙΛΕΓΜΕΝΟ_ΓΙΑ_ΑΠΟΣΠΑΣΜΑ t=544.000s max_sample_diff=0.461731 (μεγαλύτερη διαφορά μεταξύ όλων των αλλαγμένων boundaries)
+
+── ΠΛΗΡΗΣ ΠΙΝΑΚΑΣ, DRACULA (44 vanished, 14 new) ──
+
+label=dracula segments_before=114 segments_after=84 boundary_points_before=113 boundary_points_after=83
+vanished=44 new=14
+frames_before=106464235 frames_after=106464235 (ίδιο μήκος => ίδιο index-alignment)
+VANISHED t=39.000s  RMS200ms(before) pre=-29.38dB post=-48.13dB  RMS200ms(after) pre=-29.38dB post=-47.10dB  8band_delta(after-before)_dB=[0.0656662, 0.0022201538, 0.030321121, 0.10290909, 0.12427902, 0.040878296, 0.12578964, 0.15109634]  max_sample_diff(±0.5s)=0.007211
+VANISHED t=40.000s  RMS200ms(before) pre=-23.50dB post=-17.82dB  RMS200ms(after) pre=-17.50dB post=-15.02dB  8band_delta(after-before)_dB=[5.6870537, 5.513811, 5.492779, 5.720086, 5.5601807, 5.876766, 5.9058113, 5.8204956]  max_sample_diff(±0.5s)=0.391523
+VANISHED t=59.000s  RMS200ms(before) pre=-48.00dB post=-49.31dB  RMS200ms(after) pre=-48.00dB post=-47.97dB  8band_delta(after-before)_dB=[0.1678772, 0.23737335, 0.24600601, 0.22164154, 0.22861862, 0.260952, 0.2680359, 0.25632477]  max_sample_diff(±0.5s)=0.005864
+VANISHED t=61.000s  RMS200ms(before) pre=-20.55dB post=-23.70dB  RMS200ms(after) pre=-14.54dB post=-20.43dB  8band_delta(after-before)_dB=[5.853153, 5.3782387, 5.630599, 5.766796, 5.9018974, 5.8685474, 5.928751, 5.9127846]  max_sample_diff(±0.5s)=0.404287
+VANISHED t=147.000s  RMS200ms(before) pre=-48.89dB post=-48.75dB  RMS200ms(after) pre=-48.89dB post=-47.51dB  8band_delta(after-before)_dB=[0.20014572, 0.24411774, 0.20887756, 0.2591591, 0.35673904, 0.32475662, 0.34358215, 0.32751465]  max_sample_diff(±0.5s)=0.395590
+VANISHED t=149.000s  RMS200ms(before) pre=-29.57dB post=-32.88dB  RMS200ms(after) pre=-23.56dB post=-27.45dB  8band_delta(after-before)_dB=[5.770893, 5.9009304, 5.9574785, 5.9698296, 5.7657356, 5.9217415, 4.548416, 4.5004883]  max_sample_diff(±0.5s)=0.148187
+VANISHED t=159.000s  RMS200ms(before) pre=-16.42dB post=-13.20dB  RMS200ms(after) pre=-16.42dB post=-13.20dB  8band_delta(after-before)_dB=[-0.06684494, -0.0033740997, 0.003115654, -0.001183033, 0.0022859573, -0.005268097, 0.003025055, -0.016681671]  max_sample_diff(±0.5s)=0.249020
+VANISHED t=160.000s  RMS200ms(before) pre=-20.32dB post=-19.80dB  RMS200ms(after) pre=-20.32dB post=-19.80dB  8band_delta(after-before)_dB=[0.03381729, 0.00033569336, 2.3841858e-5, 2.002716e-5, -0.0020427704, -0.0018539429, -0.00032234192, -0.00016784668]  max_sample_diff(±0.5s)=0.054724
+VANISHED t=179.000s  RMS200ms(before) pre=-48.17dB post=-49.15dB  RMS200ms(after) pre=-48.17dB post=-47.94dB  8band_delta(after-before)_dB=[0.17590714, 0.2662964, 0.2733078, 0.2299385, 0.23434448, 0.22023773, 0.13530731, 0.11026764]  max_sample_diff(±0.5s)=0.269388
+VANISHED t=180.000s  RMS200ms(before) pre=-16.75dB post=-23.14dB  RMS200ms(after) pre=-10.75dB post=-20.04dB  8band_delta(after-before)_dB=[5.953125, 5.487877, 5.9519663, 5.993115, 5.9655933, 5.80184, 5.6229897, 5.6814003]  max_sample_diff(±0.5s)=0.397351
+VANISHED t=297.000s  RMS200ms(before) pre=-47.98dB post=-50.00dB  RMS200ms(after) pre=-47.98dB post=-48.52dB  8band_delta(after-before)_dB=[0.1887207, 0.27662277, 0.2220192, 0.20383835, 0.32290268, 0.28071594, 0.3086319, 0.29638672]  max_sample_diff(±0.5s)=0.007156
+VANISHED t=300.000s  RMS200ms(before) pre=-28.77dB post=-26.56dB  RMS200ms(after) pre=-22.77dB post=-23.86dB  8band_delta(after-before)_dB=[5.8390694, 5.9853554, 5.998905, 5.9890747, 5.7880707, 5.888975, 4.66852, 4.5423203]  max_sample_diff(±0.5s)=0.258664
+VANISHED t=581.000s  RMS200ms(before) pre=-46.14dB post=-47.26dB  RMS200ms(after) pre=-46.14dB post=-46.00dB  8band_delta(after-before)_dB=[0.14358139, 0.22413635, 0.1699028, 0.17568207, 0.16251373, 0.17465973, 0.021453857, 0.029167175]  max_sample_diff(±0.5s)=0.008542
+VANISHED t=582.000s  RMS200ms(before) pre=-18.29dB post=-18.59dB  RMS200ms(after) pre=-12.42dB post=-13.79dB  8band_delta(after-before)_dB=[5.8286667, 5.5411777, 5.6383123, 5.9032664, 5.6990795, 5.864311, 6.0001354, 6.002323]  max_sample_diff(±0.5s)=0.424434
+VANISHED t=760.000s  RMS200ms(before) pre=-47.84dB post=-49.41dB  RMS200ms(after) pre=-47.84dB post=-48.01dB  8band_delta(after-before)_dB=[0.21081543, 0.298172, 0.32045746, 0.28272247, 0.25802994, 0.29473114, 0.31364822, 0.30864716]  max_sample_diff(±0.5s)=0.006751
+VANISHED t=765.000s  RMS200ms(before) pre=-28.10dB post=-17.01dB  RMS200ms(after) pre=-22.10dB post=-16.95dB  8band_delta(after-before)_dB=[4.7104645, 4.812315, 2.677803, 1.0054245, 2.9068737, 3.1216736, 2.455883, 2.268179]  max_sample_diff(±0.5s)=0.218378
+VANISHED t=788.000s  RMS200ms(before) pre=-33.74dB post=-47.74dB  RMS200ms(after) pre=-33.82dB post=-48.24dB  8band_delta(after-before)_dB=[-2.9885635, -0.41485596, -0.029521942, -0.0010681152, -0.20371628, -0.8446846, -3.497284, -2.396988]  max_sample_diff(±0.5s)=0.095093
+VANISHED t=792.000s  RMS200ms(before) pre=-15.22dB post=-37.56dB  RMS200ms(after) pre=-15.24dB post=-35.44dB  8band_delta(after-before)_dB=[-0.54693985, -0.17763138, -0.010046005, 1.335144e-5, -0.052336693, -0.16757584, -0.59317017, 0.7279968]  max_sample_diff(±0.5s)=0.132475
+VANISHED t=1008.000s  RMS200ms(before) pre=-46.26dB post=-48.43dB  RMS200ms(after) pre=-46.26dB post=-46.97dB  8band_delta(after-before)_dB=[0.18800354, 0.32682037, 0.27406693, 0.29228592, 0.28274536, 0.3333931, 0.33933258, 0.3231659]  max_sample_diff(±0.5s)=0.006837
+VANISHED t=1012.000s  RMS200ms(before) pre=-22.51dB post=-12.92dB  RMS200ms(after) pre=-16.51dB post=-12.90dB  8band_delta(after-before)_dB=[4.8041496, 1.3910522, 2.6038895, 5.633565, 5.969181, 3.5743656, 4.4053497, 4.8796196]  max_sample_diff(±0.5s)=0.356776
+VANISHED t=1037.000s  RMS200ms(before) pre=-17.30dB post=-24.24dB  RMS200ms(after) pre=-17.27dB post=-19.38dB  8band_delta(after-before)_dB=[1.5365868, 0.3424549, 0.05060959, 0.023383617, 0.22871399, 0.75327873, 2.189827, 1.9304085]  max_sample_diff(±0.5s)=0.408388
+VANISHED t=1038.000s  RMS200ms(before) pre=-21.63dB post=-25.87dB  RMS200ms(after) pre=-15.63dB post=-21.16dB  8band_delta(after-before)_dB=[5.477867, 5.9393616, 5.918997, 5.945292, 5.8299656, 5.894762, 5.8670063, 5.820797]  max_sample_diff(±0.5s)=0.359040
+VANISHED t=1118.000s  RMS200ms(before) pre=-27.30dB post=-19.98dB  RMS200ms(after) pre=-27.30dB post=-19.98dB  8band_delta(after-before)_dB=[0.080509186, -0.01991272, 0.009918213, 0.0014028549, 0.0058631897, -0.0018615723, 0.00043296814, -0.0036735535]  max_sample_diff(±0.5s)=0.287078
+VANISHED t=1121.000s  RMS200ms(before) pre=-47.21dB post=-23.07dB  RMS200ms(after) pre=-47.21dB post=-23.07dB  8band_delta(after-before)_dB=[-0.0023002625, 0.00030136108, 0.00031852722, 1.9073486e-5, 2.670288e-5, -1.9073486e-6, 0.00076675415, -0.0013237]  max_sample_diff(±0.5s)=0.253345
+VANISHED t=1126.000s  RMS200ms(before) pre=-39.38dB post=-48.12dB  RMS200ms(after) pre=-39.38dB post=-47.10dB  8band_delta(after-before)_dB=[0.11287689, 0.22034073, 0.24985886, 0.28381348, 0.24209213, 0.21110153, 0.2203865, 0.20949554]  max_sample_diff(±0.5s)=0.289822
+VANISHED t=1127.000s  RMS200ms(before) pre=-25.26dB post=-21.76dB  RMS200ms(after) pre=-19.25dB post=-17.33dB  8band_delta(after-before)_dB=[5.8267136, 5.7744904, 5.829914, 5.691084, 5.337632, 5.6584377, 5.61681, 5.6518364]  max_sample_diff(±0.5s)=0.363224
+VANISHED t=1230.000s  RMS200ms(before) pre=-47.08dB post=-37.48dB  RMS200ms(after) pre=-47.08dB post=-37.44dB  8band_delta(after-before)_dB=[0.010871887, -0.005050659, 0.0023765564, 0.0021858215, -0.008956909, 0.0014801025, -0.0035247803, -0.01573944]  max_sample_diff(±0.5s)=0.201167
+VANISHED t=1233.000s  RMS200ms(before) pre=-18.52dB post=-23.14dB  RMS200ms(after) pre=-18.52dB post=-23.14dB  8band_delta(after-before)_dB=[-0.5985184, -0.015010834, 0.0020828247, 0.00055265427, 0.009815216, -0.029478073, -0.067783356, -0.6124916]  max_sample_diff(±0.5s)=0.094790
+VANISHED t=1508.000s  RMS200ms(before) pre=-46.91dB post=-46.69dB  RMS200ms(after) pre=-46.91dB post=-46.69dB  8band_delta(after-before)_dB=[-0.0008163452, -0.02734375, -0.017536163, 0.010314941, 0.0012512207, -0.0034446716, 0.0008621216, -0.003479004]  max_sample_diff(±0.5s)=0.004749
+VANISHED t=1510.000s  RMS200ms(before) pre=-25.89dB post=-22.99dB  RMS200ms(after) pre=-25.88dB post=-22.99dB  8band_delta(after-before)_dB=[-0.16777802, 0.0022964478, -0.009885788, 0.0047798157, -0.026535034, 0.036891937, -0.056735992, -0.018871307]  max_sample_diff(±0.5s)=0.197045
+VANISHED t=1892.000s  RMS200ms(before) pre=-36.99dB post=-47.96dB  RMS200ms(after) pre=-36.99dB post=-46.70dB  8band_delta(after-before)_dB=[0.170887, 0.23702621, 0.22525406, 0.21353912, 0.34181213, 0.28731537, 0.028373718, 0.0230484]  max_sample_diff(±0.5s)=0.231503
+VANISHED t=1893.000s  RMS200ms(before) pre=-24.94dB post=-22.51dB  RMS200ms(after) pre=-18.93dB post=-18.48dB  8band_delta(after-before)_dB=[5.7889786, 5.1769333, 4.9508915, 4.9675446, 5.2693024, 5.86994, 5.929014, 5.8914413]  max_sample_diff(±0.5s)=0.390443
+VANISHED t=1898.000s  RMS200ms(before) pre=-9.52dB post=-11.69dB  RMS200ms(after) pre=-9.52dB post=-11.68dB  8band_delta(after-before)_dB=[0.11361694, 0.0028686523, 0.004871428, -0.0015224218, -0.020519257, -0.009513855, -0.12106705, -0.2175827]  max_sample_diff(±0.5s)=0.256497
+VANISHED t=1904.000s  RMS200ms(before) pre=-20.72dB post=-15.33dB  RMS200ms(after) pre=-20.72dB post=-15.32dB  8band_delta(after-before)_dB=[-1.1307411, 0.018583298, -0.0006246567, -0.00074100494, -0.09901047, 0.008720398, -0.04014778, -0.5494728]  max_sample_diff(±0.5s)=0.295836
+VANISHED t=1911.000s  RMS200ms(before) pre=-11.39dB post=-16.81dB  RMS200ms(after) pre=-11.36dB post=-16.81dB  8band_delta(after-before)_dB=[0.69547653, 0.3013382, 0.001578331, -0.0117429495, 0.048983574, 0.40444565, 1.045021, -0.3933754]  max_sample_diff(±0.5s)=0.328132
+VANISHED t=1925.000s  RMS200ms(before) pre=-43.72dB post=-26.32dB  RMS200ms(after) pre=-37.72dB post=-23.80dB  8band_delta(after-before)_dB=[5.662117, 5.694004, 5.616417, 5.643196, 5.727749, 5.804905, 5.8350983, 5.6186676]  max_sample_diff(±0.5s)=0.378112
+VANISHED t=2058.000s  RMS200ms(before) pre=-17.60dB post=-15.72dB  RMS200ms(after) pre=-17.60dB post=-15.72dB  8band_delta(after-before)_dB=[-0.011516571, 0.035827637, -0.028866768, 0.006890774, -0.004945755, 0.01640892, -0.24867249, -1.2092438]  max_sample_diff(±0.5s)=0.634405
+VANISHED t=2069.000s  RMS200ms(before) pre=-21.12dB post=-15.70dB  RMS200ms(after) pre=-15.14dB post=-11.97dB  8band_delta(after-before)_dB=[9.361748, 5.439844, 5.7786865, 5.7214766, 5.9441752, 6.0838547, 10.022602, 12.270504]  max_sample_diff(±0.5s)=0.470724
+VANISHED t=2136.000s  RMS200ms(before) pre=-46.78dB post=-47.97dB  RMS200ms(after) pre=-46.78dB post=-47.97dB  8band_delta(after-before)_dB=[-0.010501862, 0.046699524, 0.043792725, -0.004585266, -0.019306183, 0.01826477, -0.02443695, -0.044654846]  max_sample_diff(±0.5s)=0.009706
+VANISHED t=2139.000s  RMS200ms(before) pre=-8.48dB post=-11.60dB  RMS200ms(after) pre=-8.47dB post=-11.60dB  8band_delta(after-before)_dB=[-1.7472496, -0.39816284, 0.02048397, 0.0011179149, 0.014613152, 0.3393612, 2.9361572, 3.5381317]  max_sample_diff(±0.5s)=0.394557
+VANISHED t=2153.000s  RMS200ms(before) pre=-47.17dB post=-46.75dB  RMS200ms(after) pre=-47.17dB post=-46.75dB  8band_delta(after-before)_dB=[0.025829315, -0.113082886, 0.024002075, 0.010070801, -0.029006958, 0.012878418, 0.0029754639, -0.05178833]  max_sample_diff(±0.5s)=0.007607
+VANISHED t=2155.000s  RMS200ms(before) pre=-13.44dB post=-22.68dB  RMS200ms(after) pre=-13.44dB post=-22.68dB  8band_delta(after-before)_dB=[0.36618423, 0.025997162, -0.00016784668, 0.00049209595, -0.0061397552, 0.0028686523, -0.03132248, -0.21533585]  max_sample_diff(±0.5s)=0.448632
+VANISHED t=2201.000s  RMS200ms(before) pre=-21.48dB post=-20.84dB  RMS200ms(after) pre=-21.48dB post=-20.24dB  8band_delta(after-before)_dB=[0.30574417, 0.24150276, 0.20582199, 0.27367973, 0.26936054, 0.2511158, 0.35943985, 0.1438942]  max_sample_diff(±0.5s)=0.044699
+VANISHED t=2203.000s  RMS200ms(before) pre=-52.91dB post=-52.67dB  RMS200ms(after) pre=-46.91dB post=-48.79dB  8band_delta(after-before)_dB=[5.719036, 5.3825874, 5.517742, 5.535427, 5.373867, 5.388527, 5.4455757, 5.422989]  max_sample_diff(±0.5s)=0.008043
+NEW t=530.000s  RMS200ms(before) pre=-20.29dB post=-23.40dB  RMS200ms(after) pre=-20.29dB post=-24.08dB  8band_delta(after-before)_dB=[-0.21471786, -0.12440872, -0.1752491, -0.3921795, -0.31365585, -0.38566017, -0.46157074, -0.13189316]  max_sample_diff(±0.5s)=0.029961
+NEW t=532.000s  RMS200ms(before) pre=-13.49dB post=-13.08dB  RMS200ms(after) pre=-19.50dB post=-17.34dB  8band_delta(after-before)_dB=[-5.8175735, -5.3522816, -5.6764307, -5.719961, -4.872139, -5.4021864, -5.4827747, -5.9702034]  max_sample_diff(±0.5s)=0.395639
+NEW t=551.000s  RMS200ms(before) pre=-47.36dB post=-46.95dB  RMS200ms(after) pre=-47.36dB post=-48.10dB  8band_delta(after-before)_dB=[-0.18486786, -0.21605682, -0.21650696, -0.19116974, -0.17844772, -0.22407532, -0.2242508, -0.22018433]  max_sample_diff(±0.5s)=0.373290
+NEW t=552.000s  RMS200ms(before) pre=-13.97dB post=-15.61dB  RMS200ms(after) pre=-19.97dB post=-18.49dB  8band_delta(after-before)_dB=[-5.7915382, -5.7138653, -5.9248276, -5.989299, -6.0001764, -5.984871, -4.786968, -4.2621727]  max_sample_diff(±0.5s)=0.392084
+NEW t=593.000s  RMS200ms(before) pre=-16.91dB post=-23.01dB  RMS200ms(after) pre=-16.91dB post=-23.01dB  8band_delta(after-before)_dB=[0.0020446777, 0.0008239746, -0.0010480881, -0.00013256073, -0.0057315826, -4.005432e-5, 0.0075149536, 0.019638062]  max_sample_diff(±0.5s)=0.076538
+NEW t=594.000s  RMS200ms(before) pre=-17.45dB post=-25.51dB  RMS200ms(after) pre=-17.45dB post=-25.51dB  8band_delta(after-before)_dB=[-0.14580154, 0.018558502, -0.0065488815, 0.012681961, 0.06011963, 0.0039463043, 0.003742218, 0.16969681]  max_sample_diff(±0.5s)=0.117259
+NEW t=772.000s  RMS200ms(before) pre=-47.07dB post=-41.85dB  RMS200ms(after) pre=-47.01dB post=-43.90dB  8band_delta(after-before)_dB=[-0.05626297, -0.122558594, -0.2751007, -0.31698227, -0.17138672, 0.028629303, 0.15282059, -0.057411194]  max_sample_diff(±0.5s)=0.412548
+NEW t=773.000s  RMS200ms(before) pre=-12.39dB post=-15.62dB  RMS200ms(after) pre=-18.38dB post=-16.12dB  8band_delta(after-before)_dB=[-4.6418495, -2.5460129, -4.429916, -4.818783, -2.7760496, -1.7911396, -0.7668381, 1.5491791]  max_sample_diff(±0.5s)=0.425667
+NEW t=1349.000s  RMS200ms(before) pre=-26.59dB post=-21.96dB  RMS200ms(after) pre=-26.59dB post=-22.67dB  8band_delta(after-before)_dB=[-0.15978622, -0.27116585, -0.18367767, -0.23145771, -0.14057922, -0.4380932, -0.43378067, -0.13155365]  max_sample_diff(±0.5s)=0.045846
+NEW t=1350.000s  RMS200ms(before) pre=-24.05dB post=-12.02dB  RMS200ms(after) pre=-30.06dB post=-15.71dB  8band_delta(after-before)_dB=[-5.7322197, -5.410761, -4.8619976, -4.812336, -4.784548, -4.902649, -5.82213, -5.915844]  max_sample_diff(±0.5s)=0.327037
+NEW t=1779.000s  RMS200ms(before) pre=-47.51dB post=-21.02dB  RMS200ms(after) pre=-48.57dB post=-21.02dB  8band_delta(after-before)_dB=[-1.85009, -0.0035877228, -0.014638901, -0.0002117157, 0.012149811, 0.009687424, 0.0079956055, 0.48870087]  max_sample_diff(±0.5s)=0.293140
+NEW t=1783.000s  RMS200ms(before) pre=-15.21dB post=-11.54dB  RMS200ms(after) pre=-15.21dB post=-11.54dB  8band_delta(after-before)_dB=[0.7952423, 0.038900375, 0.0011062622, 0.0032718182, -0.013530731, -0.006137848, 0.91194534, 7.534073]  max_sample_diff(±0.5s)=0.470090
+NEW t=2096.000s  RMS200ms(before) pre=-46.45dB post=-21.03dB  RMS200ms(after) pre=-46.45dB post=-23.49dB  8band_delta(after-before)_dB=[-0.20774841, -0.3981743, -0.6289902, -0.9171257, -0.77182007, -0.67639923, -0.31959152, -0.3424225]  max_sample_diff(±0.5s)=0.421578
+NEW t=2098.000s  RMS200ms(before) pre=-13.51dB post=-16.32dB  RMS200ms(after) pre=-19.52dB post=-18.73dB  8band_delta(after-before)_dB=[-5.615879, -5.588217, -5.981449, -5.998184, -5.996063, -5.996973, -5.635641, -4.6563644]  max_sample_diff(±0.5s)=0.373842
+ΕΠΙΛΕΓΜΕΝΟ_ΓΙΑ_ΑΠΟΣΠΑΣΜΑ t=2058.000s max_sample_diff=0.634405 (μεγαλύτερη διαφορά μεταξύ όλων των αλλαγμένων boundaries)
+
+sha256(αυτό το αρχείο ΧΩΡΙΣ αυτή τη γραμμή και την επόμενη): a35950501843b1729ecf5f73b192bb0bed240336ae9a922763e98ad8881302c6
+εργαλείο: otsu_render_pair + otsu_timing + otsu_boundary_diff (research/encoder-gap-speech), commit εν εξελίξει
