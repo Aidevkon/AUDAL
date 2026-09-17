@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 FAIL=0
 for s in threshold-lint gate-coverage empty-pass-lint \
          reference-lint line-ref-lint sample-rate-lint \
-         allocator-lint; do
+         allocator-lint orphan-lint; do
   out=$("scripts/$s.sh" 2>&1); rc=$?
   if [ $rc -ne 0 ]; then mark="✗"; FAIL=1; else mark="·"; fi
   printf "%s %-17s " "$mark" "$s"
