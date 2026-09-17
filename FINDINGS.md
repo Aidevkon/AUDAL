@@ -3093,7 +3093,32 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-115** — this line is the ONLY allocator. Taking a number =
+- **[F-115] Η συκιά δεν τελείωσε τη δουλειά της.** Component: `sp314-orchestrator/src/trunk_pass.rs` (190613e, 2026-07-23) · `lineos-corpus/src/scout.rs` (`scan_file`) · `sp314-orchestrator/src/pass1_pipeline.rs` (`build_timeline_map`, ορφανό). ΜΕΤΡΗΜΕΝΟ 2026-09-16/17. Το trunk_pass γράφτηκε ως αντικαταστάτης — το σχόλιό του λέει ρητά «STRANGLER FIG», και το commit message «the last full-file RAM decode dies». Σχεδόν δύο μήνες μετά τη γέννησή του, τίποτα δεν πέθανε: **το `scan_file` ζει και καλείται στην παραγωγή** — αλλά για άλλη δουλειά (τριάντα δευτερόλεπτα proxy για το NMFD, όχι όρια), διαφορετικός καλών, διαφορετική συνέπεια, ποτέ σύγκριση μεταξύ τους. **Το `build_timeline_map`** — η παλιά πλήρους-buffer διαδρομή που το trunk_pass δηλώνει ότι αντικαθιστά — **έχει μηδέν κλήσεις στην παραγωγή**. Μόνο tests και έρευνα. Νεκρό και παρόν. Και το ίδιο το σχόλιο της συκιάς έγινε ψευδές τρεις μέρες μετά τη γραφή του (F-111) και έμεινε ψευδές τρεις μήνες. ⇒ **Το κόστος δεν είναι ο νεκρός κώδικας. Είναι ότι κάθε μέτρηση πρέπει να δηλώνει ποιον αναγνώστη χρησιμοποιεί — και τρεις φορές σε δύο μέρες το ξεχάσαμε.** ⚠ Το `build_timeline_map` μπαίνει στο `docs/ORPHANS.md` ως O-006 — δες εκεί. Σταυρο-παραπομπή στο F-111, όχι επεξεργασία του.
+
+- **[F-116] Τρία tests μνήμης, και κανένα δεν καλύπτει το προϊόν.** Component: `m0-daemon/tests/e2e_episode_streaming.rs` (`episode_render_heap_is_scale_invariant`, `full_pipeline_heap_is_scale_invariant`, `music_pipeline_heap_is_scale_invariant`) · `domain/dsp_pipeline.rs::run_dsp` · `domain/content_type.rs::skip_stems`. ΜΕΤΡΗΜΕΝΟ 2026-09-17.
+
+  Το `music_pipeline_heap_is_scale_invariant` είναι κόκκινο: **51.72 MB όταν η διάρκεια διπλασιάζεται.** Ο λόγος του `#[ignore]`, αυτούσιος: *«PASSING ... diff=0.00MB. Ignored for COST only.»*
+
+  **Η ιστορία, από το ημερολόγιο:** γεννήθηκε `#[ignore]`d και κόκκινο εν γνώσει (2026-07-20, 33.55 MB) ⇒ έγινε πράσινο (2026-07-21, 0.00 MB) και έμεινε ignored για το κόστος χρόνου ⇒ ξανάσπασε σιωπηλά κάποτε μετά. **Κανείς δεν το είδε, ακριβώς επειδή είναι ignored με λόγο που λέει ότι περνάει.** Αυτοσυντηρούμενη τύφλωση.
+
+  **Και η εντύπωση κάλυψης είναι ψεύτικη.** Τρία tests, τρία μη-επικαλυπτόμενα υποσύνολα:
+  - `episode_render_heap_is_scale_invariant` — καλεί το `episode_render` απευθείας.
+  - `full_pipeline_heap_is_scale_invariant` — καλεί το `run_dsp` με preset `"podcast"`, που είναι `Episode`, που έχει `skip_stems()==true`. Το «full» στο όνομα παρακάμπτει τα stems.
+  - `music_pipeline_heap_is_scale_invariant` — το μόνο που τα αγγίζει, και είναι το ignored.
+
+  **Και κανένα από τα τρία δεν καλεί το `execute_streaming_plan`** — τη διαδρομή του κουμπιού. Η μνήμη της ζωντανής διαδρομής δεν έχει μετρηθεί ποτέ.
+
+  Το κατώφλι είναι δανεικό: **5.0 MB**, γεννημένο 2026-07-01 για άλλο test όπου η μέτρηση ήταν 0.33 και 0.34 MB. Αντιγράφηκε αυτούσιο σε βαρύτερο pipeline δεκαεννιά μέρες μετά. ⚠ Αλλά στα 51.72 MB κανένα λογικό κατώφλι δεν το σώζει — το κόκκινο είναι πραγματικό.
+
+  **Και τρίτη πηγή, γνωστή και ρητά παρακαμπτόμενη:** το σχόλιο του ίδιου test καταγράφει ότι το tier-2 FLAC persist, όταν τα ids είναι `Some`, έδωσε 102 έναντι 177 MB — και τα tests τα αφήνουν `None` επίτηδες (F-060). ⚠ Δεν μετρήθηκε αν το κουμπί στέλνει ids.
+
+  **Και το πηγαίο σημείο της διαρροής δεν βρέθηκε.** Ο πιθανότερος υποψήφιος είναι το `v_approx` του NMF, αλλά το call site δεν επιβεβαιώθηκε.
+
+  ⇒ Το σχήμα το ξέρουμε ήδη: το `e2e_acx_certificate` έδειχνε νούμερα του input επί μήνες και περνούσε.
+
+---
+
+**NEXT FREE: F-117** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the

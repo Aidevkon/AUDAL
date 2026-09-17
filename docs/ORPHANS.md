@@ -15,7 +15,7 @@ FINDINGS.md allocator, επαληθευμένος εκεί πριν αντιγρ
 **ΟΡΦΑΝ-ΑΛΛΟΚΑΤΟΡ:** αυτή η γραμμή είναι ο ΜΟΝΟΣ allocator. Νέο ορφανό =
 αύξηση αυτής της γραμμής ΣΤΟ ΙΔΙΟ commit που το καταγράφει.
 
-ORPHAN-ALLOCATOR: O-006
+ORPHAN-ALLOCATOR: O-007
 
 **Ο φρουρός** (`scripts/orphan-lint.sh`, καλείται από `scripts/guards.sh`)
 ελέγχει ΜΟΝΟ:
@@ -93,4 +93,14 @@ ORPHAN-ALLOCATOR: O-006
 - **Πού ζει:** `lineos/m1/sp314-dsp/src/stft/hpss.rs`
 - **Βρέθηκε από:** ΧΩΡΙΣ ΑΡΙΘΜΟ ΕΥΡΗΜΑΤΟΣ (εντοπίστηκε 2026-09-17, εκτός
   υπάρχοντος F-εύρημα — δεν αναδρομικά τεκμηριωμένο, δεν του δόθηκε F)
+- **Κατάσταση:** ΟΡΦΑΝΟ
+
+### [O-006] — build_timeline_map
+- **Τι είναι:** Η παλιά πλήρους-buffer διαδρομή timeline mapping που το
+  `trunk_pass` (190613e, 2026-07-23, σχόλιο «STRANGLER FIG», commit message
+  «the last full-file RAM decode dies») δηλώνει ρητά ότι αντικαθιστά. Δεν
+  αντικαταστάθηκε — μηδέν κλήσεις στην παραγωγή, μόνο tests και έρευνα.
+- **Πού ζει:** `lineos/m1/sp314-orchestrator/src/pass1_pipeline.rs`
+  (`fn build_timeline_map`)
+- **Βρέθηκε από:** F-115 (σταυρο-παραπομπή στο F-111, όχι επεξεργασία του)
 - **Κατάσταση:** ΟΡΦΑΝΟ
