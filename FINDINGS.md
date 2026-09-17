@@ -3118,7 +3118,23 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-117** — this line is the ONLY allocator. Taking a number =
+- **[F-117] Η μηχανή δεν έχει μονοφωνική διαδρομή.** Component: `TARGET_CHANNELS` · `StandardizedAudioStream::channels()` · `RawPcmFileSource::new(dump, 2)` · `decode.rs::mono_to_stereo` (ορφανό) · `StandardizedAudioStream::fill_buffer` (ζωντανό) · `RestorationChain` (DeEsser, LINKED) · `DeEsserNode` (UNLINKED) · `sp314-orchestrator/src/trunk_pass.rs` ((l+r)*0.5). ΜΕΤΡΗΜΕΝΟ 2026-09-17.
+
+  Τρία σημεία καθηλώνουν τα κανάλια στο δύο: `TARGET_CHANNELS`, `StandardizedAudioStream::channels()`, `RawPcmFileSource::new(dump, 2)`. Καμία διαδρομή δεν διατηρεί μονοφωνικό — η μονοφωνική είσοδος διπλασιάζεται αμέσως μετά την αποκωδικοποίηση, και το `run_trunk_pass` δεν δέχεται καν μονοφωνικό.
+
+  Το υλικό είναι κυρίως μονοφωνικό, από δύο διαφορετικούς δρόμους. Στα εννιά βιβλία, με container probe: πέντε δηλώνουν ένα κανάλι (διπλασιάζονται από εμάς), τρία δηλώνουν δύο και είναι ήδη ταυτόσημα, ένα είναι γνήσιο στέρεο. Οκτώ στα εννιά κουβαλάνε δύο φορές το ίδιο σήμα.
+
+  Δύο υλοποιήσεις του διπλασιασμού, όχι μία: το `decode.rs::mono_to_stereo` ζει μόνο στην ορφανή διαδρομή· η ζωντανή χρησιμοποιεί το `StandardizedAudioStream::fill_buffer`. Είναι το μόνο διπλό της ημέρας που έχει φρουρό — `parity_mono_44k` και `parity_mono_48k` αποδεικνύουν byte-ταυτότητα. Δύο υλοποιήσεις, μία συμπεριφορά, αποδεδειγμένα. Γράφεται ως αντιπαράδειγμα.
+
+  Τρίτο σκέλος — δύο de-esser τρέχουν μαζί με διαφορετική σύνδεση καναλιών στο ίδιο σήμα: `RestorationChain` είναι LINKED (`max(|hL|,|hR|)`), `DeEsserNode` είναι UNLINKED (ανεξάρτητες περιβάλλουσες). Σε ταυτόσημα κανάλια η διαφορά εξαφανίζεται — δηλαδή στο οκτώ ένατα του υλικού. Σταυρο-παραπομπή στο F-081, που τους είχε γράψει «ο καλός δεν τρέχει, ο άλλος δεν πιάνει». Τώρα τρέχουν και οι δύο.
+
+  Το κόστος είναι αμέτρητο: το αντιπαράδειγμα δεν υπάρχει στον κώδικα — δεν γίνεται να τρέξει μονοφωνικά για σύγκριση. Και η ανάλυση καταρρέει ήδη σε μονό πριν τον scout (`trunk_pass`, `(l+r)*0.5`), άρα ο διπλασιασμός κοστίζει στα φίλτρα, όχι στη μέτρηση. Μετρήθηκε μόνο το σύνολο: 60.2× και 58.2× πραγματικού χρόνου, κορυφή μνήμης 14.9 και 14.3 MB — ταυτόσημα μέσα στον θόρυβο, και τα δύο εσωτερικά στέρεο. Μηδέν ισχυρισμός ότι «δουλεύει διπλά».
+
+  Και το πλάγιο για τη μνήμη: κορυφή 14.9 MB για δεκαπέντε λεπτά ήχου. Το 51.72 MB του F-116 δεν είναι εδώ. Σταυρο-παραπομπή.
+
+---
+
+**NEXT FREE: F-118** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
