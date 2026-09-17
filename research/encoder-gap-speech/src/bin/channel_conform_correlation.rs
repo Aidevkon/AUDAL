@@ -12,7 +12,7 @@ use sp314_dsp::analysis::acx_check::AcxCheckAnalyzer;
 use sp314_dsp::analysis::stereo::stereo_correlation;
 use serde::Deserialize;
 
-const SR: u32 = 48_000;
+const SR: u32 = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
 const DUMP_FRAME_BYTES: usize = 8;
 
 #[derive(Deserialize)]

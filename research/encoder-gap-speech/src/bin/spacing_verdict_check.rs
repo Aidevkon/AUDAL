@@ -13,7 +13,7 @@
 
 use std::io::Write;
 
-const SR: usize = 48_000;
+const SR: usize = lineos_types::analysis::ANALYSIS_SAMPLE_RATE as usize;
 
 /// Γράφει: head_sec ησυχία → speech_sec ομιλία → tail_sec ησυχία.
 /// Η «ησυχία» είναι room tone στα −70 dBFS (ΟΧΙ ψηφιακή σιωπή) ώστε να
