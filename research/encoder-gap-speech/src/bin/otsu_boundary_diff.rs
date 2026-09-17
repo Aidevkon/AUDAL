@@ -8,7 +8,7 @@
 //! ΧΡΗΣΗ: cargo run --release --bin otsu_boundary_diff -- <label>
 use sp314_dsp::analysis::pre_analysis::spectral_profile_levels;
 
-const SR: u32 = 48_000;
+const SR: u32 = lineos_types::analysis::ANALYSIS_SAMPLE_RATE;
 
 fn read_boundaries(path: &str) -> Vec<(f32, f32, String)> {
     std::fs::read_to_string(path)
