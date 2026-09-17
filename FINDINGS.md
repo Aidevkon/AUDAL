@@ -2585,6 +2585,24 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
   Trigger: πριν οποιαδήποτε πρόταση επανεξέτασης του F-062 με βάση ποιο όργανο μετρήθηκε τότε· πριν οποιαδήποτε αλλαγή στο `vad_observe_enabled`/`USE_NEURAL_VAD`· και πριν οποιαδήποτε χρήση του `phi1_v3` asset ως δήθεν ζωντανού.
 
+- **[F-114] Τα δύο ζωντανά όργανα φωνής μετρήθηκαν και τα δύο έπεσαν — το FixedPriors είναι ο εκφυλισμένος με άλλο όνομα, το Phi2 διακρίνει πραγματικά αλλά πεθαίνει στην πύλη, και το κόστος κλείνει το θέμα.** Component: `sp314-dsp/src/analysis/vad_model.rs` (`VadClassifier<FixedPriors>`), `analysis/vad_features.rs` (`VadFeatureExtractor`), `analysis/phi1_sensor.rs` (`Phi2StreamingFrontend`, `Phi2Pcen`, `Phi2Sensor`) · `research/encoder-gap-speech/src/bin/vad_organ_battery.rs`, `vad_organ_timing.rs` (νέα εργαλεία, καλούν τα παραπάνω απευθείας, ΧΩΡΙΣ TwoPassEngine). ΜΕΤΡΗΜΕΝΟ 2026-09-17, δώδεκα δοκίμια + εννιά βιβλία.
+
+  ⚠ Πρώτα το μεθοδολογικό, γιατί μας κράτησε πίσω: το F-109 έγραψε ότι το παραγωγικό posterior «ζει μέσα στον βρόχο NMF two-pass... καμία standalone είσοδος χωρίς να στηθεί όλο το NMF harness». Μετρημένα ψευδές — και τα τρία όργανα (`VadClassifier<FixedPriors>`, `Phi1Sensor`, `Phi2Sensor`) είναι δημόσια, αυτόνομα structs, χωρίς εξάρτηση από το `TwoPassEngine`. Η μέτρηση έγινε με μηδέν προσωρινό κώδικα, μηδέν άγγιγμα παραγωγής — καμία σφραγίδα, καμία επαναφορά χρειάστηκε. Σταυρο-παραπομπή στο F-109, όχι επεξεργασία του.
+
+  Το `FixedPriors` είναι ο εκφυλισμένος («πάντα ομιλία») με άλλο όνομα: στο σκέτο bed (δοκίμιο 2, ο φρουρός) δίνει **0.0% σε και τα εννιά κελιά** — ποτέ δεν βλέπει μουσική, σε καμία συνδυασμό posterior/ποσοστού. Στο δοκίμιο 10 δίνει 82.8% **αμετάβλητο σε κάθε κατώφλι** — ακριβώς το σκορ του εκφυλισμένου κανόνα «πάντα ομιλία» στο ίδιο δοκίμιο, όχι σύμπτωση. Στα εννιά βιβλία: ένα τμήμα (μηδέν διαχωρισμός) σε επτά από τα εννιά. Το 100% του στο δοκίμιο 4 δεν είναι επιτυχία — είναι η ίδια εκφυλισμένη απάντηση, τυχαία σωστή εκεί επειδή όλο το δοκίμιο είναι πράγματι ομιλία. Επιβεβαιώνει το F-062 ανεξάρτητα: το «97.35% διαρροή σε τονικό υλικό» είναι το ίδιο πράγμα, μετρημένο ξανά με άλλο εργαλείο.
+
+  Το Phi2 διακρίνει πραγματικά — ευαίσθητο και στα δύο κατώφλια της σάρωσης, όχι επίπεδο σαν το FixedPriors — αλλά πεθαίνει στην πύλη της κλίμακας: κρατάει τον φρουρό σε πέντε από τα εννιά κελιά (100.0%), στο δοκίμιο 10 φτάνει κορυφή 86.2% (κάτω από το 99.1% της επιπεδότητας, F-112), και στα βιβλία ισοπεδώνει δραστικά ό,τι το Α βλέπει: secretgarden 79→5, dracula 128→4.
+
+  Και το κόστος κλείνει το θέμα, τέσσερις μετρήσεις δίπλα-δίπλα (dracula, τρία τρεξίματα η καθεμία, ίδιος παρονομαστής `run_trunk_pass` 43.976s):
+  - διαχωριστής στελεχών +33%
+  - επιπεδότητα (F-112) +70.3%
+  - `FixedPriors` +164.8%
+  - `Phi2Sensor` +314.0%
+
+  Το Phi2 κοστίζει πάνω από 4.4× την επιπεδότητα, και χειρότερο σε κάθε μέτρο πέρα από την ίδια τη διάκριση ανά κελί.
+
+  Trigger: πριν οποιαδήποτε πρόταση χρήσης VAD (FixedPriors ή Phi2) για music gating — και τα δύο ήδη μετρημένα πεσμένα εδώ, στο ίδιο υλικό με το F-112· πριν οποιαδήποτε αναθεώρηση του «το production posterior δεν έχει αυτόνομη είσοδο» (F-109) — μετρημένα ψευδές.
+
 - **[F-070] StoredQuality.rms_db = lufs + 3.0 — προσέγγιση που σερβίρεται ως μέτρηση σε κάθε certificate.** Component: certificate_node.rs (assemble_blob, γραμμή ~346). ΜΕΤΡΗΜΕΝΟ 2026-08-21 (ξετρυπώθηκε από το §Σ folddown_gain_db plumbing): το rms_db του quality block ΔΕΝ είναι μέτρηση — είναι K-weighted LUFS + 3.0 hardcoded offset, από γεννησιμιού του πεδίου. Η K-στάθμιση αποκλίνει από το φυσικό RMS 0-3+ dB ανάλογα με το υλικό (δόγμα Ε: προσέγγιση ντυμένη μέτρηση). Το folddown_gain_db ΡΗΤΑ δεν το χρησιμοποιεί (μετράει δικό του streaming RMS — σχόλιο στο dsp_pipeline παραπέμπει εδώ). Εκκρεμεί: είτε αληθινή RMS μέτρηση στο quality block είτε μετονομασία (approx_rms_db) — οι καταναλωτές του πεδίου άγνωστοι, θέλει recon πριν αγγιχτεί. Trigger: schema v0 freeze ή οποιαδήποτε χρήση του quality.rms_db σε κρίση/κατώφλι. **ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21** (recon καταναλωτών πρώτα — 2 αναγνώστες display-only, ΚΑΙ mirror struct QualityMetricsJson στο Tauri ΧΩΡΙΣ alias ⇒ rename απορρίφθηκε, η ΤΙΜΗ διορθώθηκε): το ΗΔΗ μετρημένο streaming stereo RMS (788c1e0) παύει να πετιέται — μπαίνει στο quality.rms_db με fallback lufs+3.0 ΜΟΝΟ όπου δεν μετρήθηκε. ΜΙΣΑΝΟΙΧΤΟ: Episode/streaming path κρατάει την προσέγγιση με σχόλιο-ομολογία (RMS δεν μετριέται εκεί ακόμα).
 
 - **[F-071] Tests ΧΩΡΙΣ #[ignore] που περνάνε ΚΕΝΑ στο CI — το phi1_duck_compare μοτίβο.** Component: sp314-dsp/tests (τουλάχιστον phi1_duck_compare.rs:73). ΜΕΤΡΗΜΕΝΟ 2026-08-21: #[test] χωρίς #[ignore], ψάχνει /tmp/w7a/beds, δεν το βρίσκει, τυπώνει SKIPPED, return, PASS — τρέχει ΠΡΑΣΙΝΟ στο ci.yml:56 ΚΑΙ constitutional-gates.yml μέσω --workspace χωρίς να μετράει τίποτα. Ξέφυγε από την απογραφή γιατί εκείνη κοίταξε #[ignore] — αυτό δεν έχει. Ίδια οικογένεια με το ιστορικό e2e_acx_certificate. ΑΝΟΙΧΤΟ: sweep για ΑΛΛΑ ίδια (grep ανά ΜΠΛΟΚ συμπεριφοράς — SKIPPED/return-on-missing — όχι ανά αρχείο· η ανά-αρχείο κατηγοριοποίηση έπεσε έξω 4 φορές μετρημένα (πλήρης κατάλογος: F-073· το «11 σιωπηλά» ήταν 10): phi1_vs_dsp_jury «σιωπηλό» ενώ τυπώνει, glue_characterize «in-memory» ενώ ανοίγει /tmp — το λάθος ταξίδεψε και στο message του ac88cb9, αμετάβλητο· η διόρθωση ζει εδώ). Fix: Lane Γ παρτίδα 3β. Trigger: ΑΜΕΣΟ — CI λέει ψέματα σήμερα.
@@ -3075,7 +3093,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-114** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-115** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
