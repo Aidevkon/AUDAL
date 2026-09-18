@@ -3241,7 +3241,40 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-124** — this line is the ONLY allocator. Taking a number =
+- **[F-124] Το πεδίο `true_peak_dbtp` που φτάνει στο υπογεγραμμένο πιστοποιητικό δεν μετράει αληθινή κορυφή, και μετράει άλλο αρχείο από το παραδοτέο.** Component: `lineos/m0/m0-daemon/src/dsp/wav_to_raw.rs` · `lineos/m0/m0-daemon/src/agents/executor.rs` · `lineos/m0/m0-daemon/src/domain/nodes/certificate_node.rs` · `lineos/m0/m0-daemon/src/handlers/export.rs` · `lineos/m0/m0-daemon/src/handlers/deliver.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-19 (recon, commit 1b0f75d), δύο σκέλη.
+
+  **Σκέλος 1 — δειγματοληπτική κορυφή, όχι αληθινή.** Αυτούσιο, `wav_to_raw.rs:145-147`:
+  ```rust
+  true_peak_linear = true_peak_linear
+      .max(left_buf[i].abs())
+      .max(right_buf[i].abs());
+  ```
+  και `wav_to_raw.rs:163-164`:
+  ```rust
+  let true_peak_dbtp = if true_peak_linear > 0.0 {
+      20.0 * true_peak_linear.log10()
+  ```
+  Μέγιστη απόλυτη τιμή δείγματος, καμία υπερδειγματοληψία. Η διαδρομή ως το έγγραφο: `executor.rs:445` (`wav_to_raw_measured(&output_path, &mastered_raw_path)`) ⇒ `executor.rs:686` (`measured.true_peak_dbtp`, όρισμα στην κλήση) ⇒ `certificate_node.rs:223` (παράμετρος `true_peak: f32` του `run_streaming`) ⇒ `certificate_node.rs:417` (`true_peak_dbtp: true_peak,`, μέσα στο `StoredLoudness`, `assemble_blob`).
+
+  ⇒ Το όργανο υπάρχει στην ίδια διαδρομή και δεν χρησιμοποιείται εδώ: `TruePeakDetector` τρέχει μέσα στον `BrickwallLimiter` (`limiter/core.rs:18`, πεδίο `true_peak: TruePeakDetector`, `limiter/core.rs:90` κατασκευή)· `TruePeakMeter` τρέχει μέσα στο `export_mp3_acx` (`export.rs:1050-1064`). Κανένα από τα δύο δεν τροφοδοτεί το `true_peak_dbtp` του πιστοποιητικού.
+  ⚠ Πρόζα του μητρώου εντοπίζει το ίδιο μοτίβο («δηλωμένο όνομα, άλλο πράγμα κάτω») αλλού με ρητό αριθμό — «Δέκατο τρίτο ομώνυμο» (`FINDINGS.md:1587`) — αλλά δεν υπάρχει φρουρός/μετρητής αυτού του μοτίβου (σε αντίθεση με τον allocator των F/O), οπότε ο ακριβής αύξων αριθμός αυτού εδώ δεν επαληθεύεται από το δέντρο· δεν γράφεται.
+
+  **Σκέλος 2 — το πιστοποιητικό μετράει άλλο αρχείο από το παραδοτέο.** `executor.rs:445` διαβάζει το `output_path` — το WAV των 48 kHz που έγραψε ο limiter, `executor.rs:238` (`.join(format!("m0d-v3-streaming-{}.wav", blob_id))`, μέσα στο `spool_dir()` του `executor.rs:237`). Το παραδοτέο του ACX παράγεται σε άλλον handler: `export_mp3_acx` (`export.rs:852`), καλούμενο από `deliver.rs:409` (`export_mp3_acx(&blob, &final_path)`), όπου το σήμα αναδειγματοληπτείται σε 44.1 kHz (`export.rs:895`, `let target_sr = 44100;`), υποβιβάζεται σε mono, παίρνει διόρθωση RMS και στατικό κόψιμο κορυφής, και κωδικοποιείται.
+
+  ⇒ Δύο αρχεία, δύο ρυθμοί (48 kHz / 44.1 kHz), δύο αριθμοί καναλιών (2 / 1) — ένα νούμερο στο έγγραφο, από το πρώτο.
+  ⚠ Ίδιο σχήμα με το ιστορικό `e2e_acx_certificate` (`FINDINGS.md:241,966,1021,2675`) που έδειχνε νούμερα της εισόδου — εκεί ήταν δοκίμιο, εδώ είναι το ίδιο το προϊόν.
+
+  **Η θετική πλευρά, ίδιο recon.** Η σειρά μέσα στο τελικό αρχείο είναι σωστή: το στατικό κόψιμο του `export_mp3_acx` (`export.rs:1058-1064`) γίνεται **μετά** την αναδειγματοληψία σε 44.1 kHz (γρ.895-939) και **μετά** το downmix (γρ.942), με `TruePeakMeter` — άρα οι κορυφές που παράγει η ίδια η αναδόμηση του κύματος στη μετατροπή ρυθμού πιάνονται πριν γραφτεί το MP3. Ο φόβος ότι το ταβάνι μπαίνει πριν τη μετατροπή και το παραδοτέο ξεπερνά το −3 έπεσε στον κώδικα.
+  ⇒ Πλαίσιο (ίδιο recon της 19/09, σκέλος 1 προηγούμενου): δύο κλάσεις μετατροπής ρυθμού υπάρχουν, καμία στη διαδρομή του κουμπιού — τέσσερα σημεία εισαγωγής προς 48 kHz (`decode.rs:394,486`, `standardized_stream.rs:99`, `six_channel_stream.rs:76`) και ένα εξαγωγής προς 44.1 kHz (`export.rs:904`). Το `streaming_pipeline.rs` δεν έχει ούτε μετατροπή ούτε κωδικοποίηση — μόνο τον limiter στα 48k.
+  ⚠ Δεν μετρήθηκε πόσο διαφέρει η κορυφή δείγματος από την αληθινή σε αυτό το σήμα, και δεν κρίνεται εδώ ποιο αρχείο *πρέπει* να μετράει το πιστοποιητικό.
+
+  **Γραμμές μετατοπισμένες από το recon της 19/09** (επαληθεύτηκαν εδώ, 2026-09-19, ίδια μέρα — μικρή μετατόπιση από ενδιάμεσα commits): `executor.rs:444`→**445** (`wav_to_raw_measured` κλήση)· `certificate_node.rs:222`→**223** (παράμετρος `true_peak: f32`)· `executor.rs:237`→**238** (το literal `m0d-v3-streaming-{}.wav`, η γραμμή 237 είναι το `let output_path = crate::spool::spool_dir()` που προηγείται). Όλες οι υπόλοιπες παραπομπές (`wav_to_raw.rs:145-147,163-164`· `executor.rs:686`· `certificate_node.rs:417`· `export.rs:852,895,904,1050-1064`· `deliver.rs:409`· `limiter/core.rs:18,90`) επαληθεύτηκαν αυτούσιες, χωρίς μετατόπιση.
+
+---
+
+**NEXT FREE: F-125** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
