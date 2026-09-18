@@ -3205,7 +3205,24 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-122** — this line is the ONLY allocator. Taking a number =
+- **[F-122] Το ορφανό ήταν ευρύτερο απ' όσο το ORPHANS.md O-013 το έλεγε: όχι μόνο η μέθοδος, ολόκληρο το υποσύστημα.** Component: `lineos/m1/sp314-dsp/src/lookahead_ring.rs` (`LookaheadRing`) · `lineos/m1/sp314-nodes/src/nodes/lookahead_telemetry.rs` (`LookaheadTelemetryNode`).
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-19 (recon, commit 1b0f75d): `grep -rn "LookaheadTelemetryNode" --include='*.rs' --exclude-dir=target .` δίνει εννιά χτυπήματα, όλα σε ΕΝΑ αρχείο — το δικό του, `lookahead_telemetry.rs`: πέντε ο ορισμός (γρ.21, 26, 38, 54, 62 — σχόλιο, `struct`, `impl`, `impl Default`, `impl DspNode`) και τέσσερις κατασκευές μέσα στα δικά του `#[cfg(test)] mod tests` (γρ.118, 146, 164, 185). Μηδέν εμφάνιση σε οποιοδήποτε άλλο αρχείο του δέντρου — κανένα factory, κανένα registry, καμία τοπολογία τον αναφέρει.
+
+  ⇒ Δύο επίπεδα ορφανού, όχι ένα:
+    1. **Η μέθοδος.** `LookaheadRing::consume_into()` καλείται μόνο μέσα στο `#[cfg(test)] mod tests` του ίδιου `lookahead_ring.rs` (γρ.175, 184, 199, 205, 213). Μηδέν σε `src/`, μηδέν σε `tests/` ενσωμάτωσης, μηδέν σε `research/`. Ο μοναδικός καταναλωτής της δομής σε `src/`, το `LookaheadTelemetryNode`, καλεί μόνο `feed()` και `peek_into()` (`lookahead_telemetry.rs:67-68,73-76`) — ποτέ `consume_into()`, με το ίδιο το σχόλιο του κώδικα να το δηλώνει ρητά (γρ.19-25): «LookaheadTelemetryNode NEVER calls consume_into(). This is 100% SAFE and intentional... an 'observer-only' node like this one can safely omit calling consume_into().»
+    2. **Ο ίδιος ο κόμβος.** `LookaheadTelemetryNode` υλοποιεί `DspNode` (γρ.62) και κανείς δεν τον κατασκευάζει εκτός των δικών του δοκιμίων — το ερώτημα «μπαίνει σε καμία τοπολογία;» δεν φτάνει καν να τεθεί, γιατί δεν εμφανίζεται πουθενά έξω από το ίδιο του το αρχείο.
+
+  ΔΙΑΒΑΣΤΗΚΕ: `lineos/m1/sp314-dsp/src/limiter/core.rs:4,9-22,64-95` — ο `BrickwallLimiter` (O-002, ΤΑΞΙΔΕΥΕΙ) έχει δική του πρόβλεψη 5ms (`lookahead_samples(sample_rate) = (sample_rate as f32 * 0.005).round()`), με `RingBuffer`/`PeakRing` από `crate::limiter::delay` — άλλος τύπος, άλλο αρχείο· `grep -rn "lookahead_ring\|LookaheadRing" lineos/m1/sp314-dsp/src/limiter/` δίνει μηδέν. Το ερώτημα μπήκε επειδή ο κρίνων υπέθεσε ότι ο δακτύλιος τροφοδοτεί τον limiter — η υπόθεση έπεσε στον κώδικα. Και το ίδιο το commit που εισήγαγε τον δακτύλιο το είχε ήδη γράψει: `git show --no-patch 1ea72f14` — «Distinct from the existing limiter/delay.rs RingBuffer on purpose, not by accident: that one is a per-sample push_and_pop delay line, optimized and inlined for the limiter's ~5ms hot path. This primitive needs block-level peek-without-consuming semantics at a much larger (seconds, not milliseconds) scale... Two siblings, different contracts, not duplicated logic.»
+
+  ⇒ Το εύρημα ήρθε πλάγια από ερώτημα που η απάντησή του ήταν όχι.
+  ⇒ Το ίδιο commit (1ea72f14) ονομάζει τον δακτύλιο «Pillar 2 of the Scout vision, after sparse_scout (Pillar 1)». Ο `sparse_scout` (`lineos/m1/sp314-orchestrator/src/sparse_scout.rs`, καταναλώνεται στην παραγωγή από `m0-daemon/src/handlers/scout.rs`) είναι άλλο πράγμα από τον `SegmentScout` (`sp314_dsp::analysis::scout`, μόνο σε `research/`) που κλαδεύει το §6.4 — σταυρο-παραπομπή επαληθευμένη, όχι το ίδιο σύμβολο.
+  ⚠ Τι δεν αλλάζει εδώ: καμία πρόταση για το τι γίνεται με τον κόμβο· καμία αλλαγή σε ΤΥΧΗ ή ΚΑΤΑΣΤΑΣΗ στο ORPHANS.md (O-013 μένει ΑΚΡΙΤΟ, ΟΡΦΑΝΟ)· κανένας νέος O-αριθμός, δεν είναι νέο ορφανό, είναι το ίδιο μετρημένο σωστά, με ενημερωμένο τίτλο.
+  ⚠ ΔΕΝ ελέγχθηκε αν το crate `sp314-nodes` καταναλώνεται καθόλου αλλού — άλλο ερώτημα, δεν ανοίγει εδώ.
+
+---
+
+**NEXT FREE: F-123** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the

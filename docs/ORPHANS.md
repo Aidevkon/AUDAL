@@ -221,7 +221,7 @@ ORPHAN-ALLOCATOR: O-018
 - **Τύχη:** ΑΚΡΙΤΟ — καμία γραμμή του R5b ή του PRD v7.2 §6.0
   κατονομάζει το allowlist preset του `validate_patch`.
 
-### [O-013] — LookaheadRing::consume_into()
+### [O-013] — LookaheadRing::consume_into() και το υποσύστημα γύρω του (LookaheadTelemetryNode)
 - **Τι είναι:** Μέθοδος Consumer χωρίς πραγματικό Consumer node στο
   δέντρο. Ο μόνος σημερινός χρήστης (LookaheadTelemetryNode) είναι
   observer-only και δηλώνει ρητά ότι δεν την καλεί ποτέ.
@@ -230,6 +230,15 @@ ORPHAN-ALLOCATOR: O-018
 - **Κατάσταση:** ΟΡΦΑΝΟ
 - **Τύχη:** ΑΚΡΙΤΟ — καμία γραμμή του R5b ή του PRD v7.2 §6.0
   κατονομάζει το `LookaheadRing::consume_into()`.
+- **Δύο επίπεδα, μετρημένα 19/09 (F-122):** (1) η μέθοδος
+  `consume_into()` καλείται μόνο στο `#[cfg(test)] mod tests` του
+  ίδιου `lookahead_ring.rs` (γρ.175, 184, 199, 205, 213) — μηδέν σε
+  `src/`, `tests/` ενσωμάτωσης ή `research/`· (2) ο ίδιος ο κόμβος
+  `LookaheadTelemetryNode` (`sp314-nodes/src/nodes/
+  lookahead_telemetry.rs`) υλοποιεί `DspNode` και εμφανίζεται μόνο
+  στο δικό του αρχείο — ορισμός γρ.21,26,38,54,62, δοκίμια
+  γρ.118,146,164,185 — μηδέν σε factory, registry ή τοπολογία.
+  Σταυρο-παραπομπή: F-122.
 
 ### [O-014] — GenreClassifier και οι σταθερές του
 - **Τι είναι:** Αλγόριθμος ταξινόμησης genre (Z-Scored Euclidean)
