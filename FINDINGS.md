@@ -3172,7 +3172,40 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-121** — this line is the ONLY allocator. Taking a number =
+- **[F-121] Πρώτο τρέξιμο του «Audal CI» ποτέ: δεν μεταγλωττίζεται σε ARM λόγω ρύθμισης που έρχεται σε αντίθεση με το ίδιο της το σχόλιο, και το fmt gate βρίσκει 765 σημεία σε 112 αρχεία που ο φρουρός ποτέ δεν είχε δει.** Component: `.github/workflows/ci.yml` (workflow «Audal CI») · `.cargo/config.toml` · `lineos/m0/m0-daemon/build.rs` · `research/diskann-wide` v0.53.0 (εξωτερικό crate) · `lineos/m1/sp314-dsp/tests/zero_arm_guard.rs` · `apps/runtime/loom/tests/loom_contract.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-18 (GitHub Actions, run 35381274029, χειροκίνητο, commit 751df2f, κλάδος canonical, workflow_dispatch — το ΠΡΩΤΟ τρέξιμο αυτής της ροής σε αυτό το αποθετήριο· οι ροές ήρθαν μέσα στο μαζικό ανέβασμα ιστορικού και ο φιλοξενός δεν τις καταχώρησε μέχρι να τις αγγίξει ξεχωριστό push): σύνολο run 8m15s (18:37:35Z→18:45:50Z), δύο εργασίες, και οι δύο κόκκινες.
+
+  **Σκέλος 1 — Quality Gates (ubuntu-latest).** Gate 1 — Check: 7m21s (18:38:22Z→18:45:43Z), επιτυχία — `cargo check --workspace`, 25 crates, μηδέν σφάλματα, σε μηχάνημα που δεν είναι του αναπτύσσοντα. Πρώτη φορά μετρημένο· μέχρι σήμερα ήταν δηλωμένο ως «8/8 αποτυχίες» χωρίς να λέγεται τι έκρυβαν. Gate 2 — Format: 4s, exit 1.
+
+  Το αρχικό ανάκτημα του CI log για το Gate 2 ήταν κομμένο δύο φορές — μία φορά ξεκινώντας από την αρχή του log αλλά με όριο 400 γραμμών, μία φορά ξεκινώντας από τη μέση με όριο 5000 γραμμών του ίδιου του εργαλείου ανάκτησης· καμία λίστα αρχείων από αυτές δεν γράφτηκε εδώ. Το πλήρες μετρήθηκε ΤΟΠΙΚΑ αντ' αυτού, με `cargo fmt --all --check` (rustfmt 1.8.0-stable, e408947bfd 2026-03-25) πάνω στο ίδιο commit 751df2f: exit 1, **11.437 γραμμές εξόδου, 765 σημεία `Diff in`, 112 μοναδικά αρχεία**. Ανά κατάλογο, τα πέντε μεγαλύτερα:
+    - 378 `lineos/m1/sp314-dsp/tests`
+    - 151 `lineos/m0/m0-daemon/tests`
+    - 51 `lineos/m1/sp314-dsp/src/analysis`
+    - 30 `lineos/m0/m0-daemon/src`
+    - 29 `lineos/m1/sp314-dsp/src/stft`
+
+  539 από τα 765 σημεία (70%) είναι σε `tests/`. Η σειρά `w14`, `w16`, `w17`, `w18`, `w19` είναι ολόκληρη μέσα (`w14_batch_equivalence`, `w14_boundary_check`, `w14_pcen_warmup`, `w16_mask_inflation`, `w16_mel_inverse_probe`, `w16_nmfd_k_mismatch`, `w17_bed_sweep`, `w17_flacenc_bloat`, `w17_flacenc_narrow`, `w17_mix_balance`, `w17_stem_spectrum`, `w17_voice_activation`, `w18_nmfd_guard`, `w18_scout_scores`, `w19_silence_leak`) — δηλαδή το `rustfmt` δεν έτρεξε ποτέ σε αυτό το δέντρο, ούτε μία φορά, ενώ ο φρουρός του υπήρχε στο CI από την αρχή και κοκκίνιζε εβδομαδιαία, αγνώριστος γιατί ο φιλοξενός δεν είχε καταχωρήσει τις ροές (πάνω). Μέσα στα 112 είναι και το `tests/zero_arm_guard.rs` και το `apps/runtime/loom/tests/loom_contract.rs` (επαληθευμένο ρητά, `grep -n "zero_arm_guard\|loom_contract"` πάνω στο πλήρες τοπικό αρχείο).
+
+  ⇒ Οκτώ στα οκτώ gates (η ιστορική «8/8») και κανείς δεν το διάβασε· ο φρουρός έτρεχε και δεν φρουρούσε.
+  ⚠ Δεν διορθώνεται τώρα: το μεγαλύτερο μέρος των δοκιμίων με fmt-διαφορά είναι ήδη στη λίστα του κλαδέματος (`docs/ORPHANS.md`) — μια διόρθωση μορφοποίησης πάνω σε κώδικα προς αφαίρεση θα ήταν δουλειά πεταμένη ή, χειρότερα, θα άλλαζε bytes σε αρχεία που ο φρουρός ντετερμινισμού μετράει αλλού.
+  ⚠ Το 765/11.437/112 μετρήθηκε με το ΤΟΠΙΚΟ rustfmt (1.8.0-stable, e408947bfd 2026-03-25). Το CI έχει δική του εγκατάσταση rustfmt, η έκδοσή της δεν επιβεβαιώθηκε εδώ (το κομμένο log δεν έφτανε στο βήμα «Install Rust»). Αν διαφέρουν οι εκδόσεις, διαφέρουν πιθανώς και τα νούμερα — ΑΜΕΤΡΗΤΟ.
+
+  **Σκέλος 2 — ARM64 Build Check (macos-latest, δηλ. Apple Silicon runner).** Gate 1 — Check: exit 101. Το βήμα από μόνο του 6m19s (18:38:11Z→18:44:30Z)· η εργασία στο σύνολό της 6m47s (18:37:48Z→18:44:35Z). Αυτούσιο από το log: `'x86-64' is not a recognized processor for this target (ignoring processor)`, μετά τέσσερα `error: register class 'vreg' requires the 'neon' target feature` σε `diskann-wide-0.53.0/src/arch/aarch64/f32x4_.rs`.
+
+  ΔΙΑΒΑΣΤΗΚΕ: `.cargo/config.toml` — το σχόλιο πάνω από τη ρύθμιση λέει ρητά ότι το INV-PA-1 απαιτεί `target-cpu=baseline`· η γραμμή από κάτω γράφει `[build]` / `rustflags = ["-C", "target-cpu=x86-64"]`, που ισχύει για κάθε στόχο, ARM συμπεριλαμβανομένου. Ο φιλοξενός αγνοεί τον άγνωστο επεξεργαστή και χάνει μαζί του το `neon` — τέσσερα σφάλματα από ένα λάθος.
+  ⚠ Δεν διορθώνεται εδώ: το `[build]` εφαρμόζεται και σε build scripts και σε proc macros, το `[target.*]` όχι — η μετακίνηση δεν είναι ουδέτερη ούτε στο x86, και το τεκμήριό της είναι το πλήρες suite πριν και μετά. Δικό της βήμα.
+  ⇒ Το `diskann-wide` είναι βιβλιοθήκη διανυσματικής αναζήτησης εξωτερική στο προϊόν που μετράει στάθμη και υπογράφει αρχεία — καταγράφεται, δεν κρίνεται εδώ.
+
+  **Σκέλος 3 — πιστοποιητικό πλατφόρμας.** Η έξοδος του fmt αποκάλυψε `lineos/m0/m0-daemon/build.rs`: διαβάζει `TARGET`, `CARGO_CFG_TARGET_ARCH`, `CARGO_CFG_TARGET_OS`, `CARGO_CFG_TARGET_ENV`, `OPT_LEVEL`, `CODEGEN_UNITS`, καλεί `parse_target_cpu()`, με σχόλιο «Declared build profile parameters (Cargo.toml §Ρ)» (ΔΙΑΒΑΣΤΗΚΕ αυτούσιο, `lineos/m0/m0-daemon/build.rs:46`).
+  ⇒ Σχεδόν ακριβώς η λίστα που το §Ρ του `northstar-v2.md` προτείνει ως την εναλλακτική υπόσχεση: όχι «ίδια bytes παντού», αλλά «το πιστοποιητικό δηλώνει πλατφόρμα» (`northstar-v2.md:932-938`). Το σχήμα είναι χτισμένο.
+  ⚠ Άγνωστο: φτάνουν αυτά τα πεδία στο πιστοποιητικό, ή υπολογίζονται και δεν τα διαβάζει κανείς; Ένα recon το απαντάει. Δεν γίνεται εδώ.
+
+  **Μεθοδολογικό, γραμμένο ως έχει:** αυτό το σκέλος είχε δύο λίστες αρχείων πριν γραφτεί, και οι δύο από κομμένη έξοδο — η μία από ανάκτηση που έδειχνε την αρχή του log με όριο γραμμών, η άλλη από ανάκτηση που ξεκινούσε στη μέση. Καμία δεν ήταν ψευδής και καμία δεν ήταν πλήρης· και οι δύο απορρίφθηκαν αντί να γραφτούν. Το εργαλείο (`cargo fmt --check`) τρέχει τοπικά σε δευτερόλεπτα, χωρίς διαμεσολαβητή δικτύου. Όταν το νούμερο είναι σε απομακρυσμένο log πίσω από σελιδοποίηση και το ίδιο εργαλείο υπάρχει τοπικά πάνω στο ίδιο commit, τρέχει τοπικά.
+
+---
+
+**NEXT FREE: F-122** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
