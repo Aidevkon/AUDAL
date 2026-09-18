@@ -3,17 +3,21 @@
     "allow": [
       "Bash(./scripts/northstar-lint.sh *)",
       "Bash(./scripts/northstar-lint.sh)",
+      "Bash(./scripts/guards.sh)",
       "Bash(cargo check*)",
       "Bash(cargo build*)",
       "Bash(grep*)",
       "Bash(sed*)",
       "Bash(git pull *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
       "Bash(cd *)"
     ],
     "deny": [
-      "Bash(git commit*)",
       "Bash(git push*)",
-      "Bash(git add*)",
       "Bash(git reset*)",
       "Bash(git checkout*)",
       "Bash(git rebase*)",
