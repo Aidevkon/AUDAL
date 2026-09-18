@@ -14,10 +14,15 @@
       "Bash(git diff*)",
       "Bash(git status*)",
       "Bash(git log*)",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Bash(git push)",
+      "Bash(git push -u origin claude/*)",
+      "Bash(git push origin claude/*)"
     ],
     "deny": [
-      "Bash(git push*)",
+      "Bash(git push*canonical*)",
+      "Bash(git push*--force*)",
+      "Bash(git push*-f *)",
       "Bash(git reset*)",
       "Bash(git checkout*)",
       "Bash(git rebase*)",
