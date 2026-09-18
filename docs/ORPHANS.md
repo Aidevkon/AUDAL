@@ -80,9 +80,12 @@ ORPHAN-ALLOCATOR: O-018
   registration: `lineos/m1/sp314-nodes/src/graph.rs`
 - **Βρέθηκε από:** F-086
 - **Κατάσταση:** ΟΡΦΑΝΟ
-- **Τύχη:** ΑΚΡΙΤΟ — καμία γραμμή του R5b ή του PRD v7.2 §6.0
-  κατονομάζει το `MultibandCompressorNode` ή το registry key
-  `"Limiter"`.
+- **Τύχη:** ΜΕΝΕΙ — ανήκει στην κατηγορία «dead DSP nodes and their
+  tests» του §6.4 (γρ.489): και οι δύο κόμβοι δηλώνουν
+  `impl DspNode for` (`lineos/m1/sp314-nodes/src/nodes/multiband.rs:51`,
+  `lineos/m1/sp314-nodes/src/nodes/limiter.rs:30`) και καμία topology
+  δεν τους καλεί — ακριβώς το σχήμα της κατηγορίας, όχι υπόθεση ότι
+  «θα μπορούσε» να είναι.
 
 ### [O-002] — BrickwallLimiter
 - **Τι είναι:** Ο μόνος κόμβος του δέντρου που δηλώνει μη-μηδενικό
@@ -170,8 +173,8 @@ ORPHAN-ALLOCATOR: O-018
   `lineos/m1/sp314-dsp/src/cut_heal/crossfade.rs`
 - **Βρέθηκε από:** F-091
 - **Κατάσταση:** ΟΡΦΑΝΟ
-- **Τύχη:** ΑΚΡΙΤΟ — καμία γραμμή του R5b ή του PRD v7.2 §6.0
-  κατονομάζει το `cut_heal`.
+- **Τύχη:** ΜΕΝΕΙ — ανήκει στην κατηγορία «cut-repair» του §6.4
+  (γρ.489), αυτούσια το όνομά της.
 
 ### [O-009] — Το ταβάνι −0.5 του LimiterNode
 - **Τι είναι:** Σταθερά ταβανιού (−0.5) μέσα στο `LimiterNode`,
@@ -182,8 +185,10 @@ ORPHAN-ALLOCATOR: O-018
 - **Πού ζει:** `lineos/m1/sp314-nodes/src/nodes/limiter.rs:12`
 - **Βρέθηκε από:** F-094
 - **Κατάσταση:** ΟΡΦΑΝΟ
-- **Τύχη:** ΑΚΡΙΤΟ — καμία γραμμή του R5b ή του PRD v7.2 §6.0
-  κατονομάζει το ταβάνι −0.5 του `LimiterNode`.
+- **Τύχη:** ΜΕΝΕΙ — ίδια κατηγορία με το O-001, «dead DSP nodes and
+  their tests» (§6.4 γρ.489): η σταθερά και τα tests της ζουν μέσα
+  στο ίδιο νεκρό `LimiterNode` (`limiter.rs:12`, `impl DspNode for
+  LimiterNode` στη γρ.30).
 
 ### [O-010] — Crossover3::default()
 - **Τι είναι:** `impl Default for Crossover3` με σκληροκωδικοποιημένο
@@ -322,12 +327,12 @@ ORPHAN-ALLOCATOR: O-018
 το έγγραφο-κριτήριο είναι ακόμα DRAFT (γρ.63) και το μητρώο λέει ρητά ότι
 καμία τύχη δεν είναι οριστική όσο ισχύει αυτό (γρ.68-70).
 
-- **O-001** (MultibandCompressorNode + LimiterNode, registry key `"Limiter"`) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το §6.0 (γρ.413) ονομάζει μόνο γενικά `LIMITER (spec ceiling)` — ταυτίζεται λειτουργικά με το `BrickwallLimiter` (O-002, ήδη ΤΑΞΙΔΕΥΕΙ μέσω R5, άλλη εγγραφή), όχι με το `LimiterNode`/`MultibandCompressorNode`. Κανένα από τα δύο δεν κατονομάζεται σε R5b ή §6.0 (`grep -ni "limiter\|multiband"` πάνω στα δύο τμήματα: μηδέν χτυπήματα εκτός της γρ.413). Δύο πράγματα, όχι ένα.
+- **O-001** (MultibandCompressorNode + LimiterNode, registry key `"Limiter"`) — **ΜΕΝΕΙ** (διορθώθηκε στο δεύτερο πέρασμα, βλ. παρακάτω· εδώ έμενε ΑΚΡΙΤΟ επειδή το κριτήριο ζητούσε ονομασμένο σύμβολο και όχι κατηγορία — δύο πράγματα από το §6.0 παραμένουν σωστά: το `LIMITER (spec ceiling)` της γρ.413 ταυτίζεται με `BrickwallLimiter`/O-002, όχι με αυτό).
 - **O-003** (duck_gain, control_bus) — **ΜΕΝΕΙ.** R5b (γρ.235): «— | Ducking (music bed under speech) | ✗ mixing | ... | out → Studio stem-aware (R17), where the ratio is a client spec; console otherwise»· §3 Μη-Στόχοι (γρ.76): «Mixing — balancing two signals against each other (ducking, same-stem speaker balancing, ...) | K0. ...»· D16 (γρ.545): «Ducking and same-stem speaker balancing are mixing (K0); out of the consumer edition».
 - **O-004** (Phi1Sensor + phi1_v3) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το R5b (γρ.247, «Sensors that survive the K0 cut») μιλάει για «the macro classifier» και «micro-VAD» με ρόλο, όχι με όνομα κλάσης — και το ίδιο το κείμενο δηλώνει «which of the two instruments was measured is unconfirmed, F-113» (ίδιο ανοιχτό ερώτημα §9.3.17). Καμία γραμμή δεν ονομάζει το `Phi1Sensor`.
 - **O-006** (build_timeline_map) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση σε R5b/§6.0/§6.4/§3.
-- **O-008** (cut_heal: SilenceCut, BreathCut, CrossfadeHeal) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το K0b (R5b γρ.216) και το Στάδιο 11 (γρ.229) συζητούν αφαίρεση δείγματος/room tone εννοιολογικά, όχι με τα ονόματα `cut_heal`/`SilenceCut`/`BreathCut`/`CrossfadeHeal`.
-- **O-009** (ταβάνι −0.5 του LimiterNode) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Ίδιο σκεπτικό με O-001· το §6.0 (γρ.413) γράφει "spec ceiling", όχι σταθερά.
+- **O-008** (cut_heal: SilenceCut, BreathCut, CrossfadeHeal) — **ΜΕΝΕΙ** (διορθώθηκε στο δεύτερο πέρασμα, βλ. παρακάτω· εδώ έμενε ΑΚΡΙΤΟ για τον ίδιο λόγο με το O-001).
+- **O-009** (ταβάνι −0.5 του LimiterNode) — **ΜΕΝΕΙ** (διορθώθηκε στο δεύτερο πέρασμα, βλ. παρακάτω· ίδιος λόγος).
 - **O-010** (Crossover3::default()) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
 - **O-011** (xaak::TARGET_SAMPLE_RATE) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
 - **O-012** (allowlist preset του validate_patch) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
@@ -338,3 +343,56 @@ ORPHAN-ALLOCATOR: O-018
 - **O-017** (στατικό ffmpeg του δέντρου, 192MB) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το R12 ονομάζει το ffmpeg ως εργαλείο/ένορκο από το PATH (ήδη σημειωμένο στην ίδια εγγραφή, γρ.279-281) — η τύχη εδώ αφορά το **δυαδικό μέσα στο δέντρο**, που καμία γραμμή R5b/§6.0 δεν κατονομάζει. Το εργαλείο και το αρχείο δεν είναι το ίδιο ερώτημα.
 
 ⇒ **1 ΜΕΝΕΙ** (O-003) · **0 ΤΑΞΙΔΕΥΕΙ** · **13 ΑΚΡΙΤΟ** (O-001, O-004, O-006, O-008, O-009, O-010, O-011, O-012, O-013, O-014, O-015, O-016, O-017).
+⚠ Το κριτήριο εδώ ζητούσε ονομασμένο ΣΥΜΒΟΛΟ στο R5b/§6.0. Λάθος
+  όργανο: το PRD ονομάζει ΚΑΤΗΓΟΡΙΕΣ στο §6.4, όχι σύμβολα, και το
+  κριτήριο δεν διέκρινε — μηδέν χτυπήματα στα δεκατέσσερα εκτός του
+  O-003 (που έτυχε να κριθεί από ρητή γραμμή έξω από §6.4). Διόρθωση
+  και δεύτερο πέρασμα στην ενότητα «Τύχη των δεκατριών άκριτων — β΄
+  πέρασμα» παρακάτω· τρεις εγγραφές (O-001, O-008, O-009) άλλαξαν
+  εκεί από ΑΚΡΙΤΟ σε ΜΕΝΕΙ και ενημερώθηκαν και στις δικές τους
+  εγγραφές παραπάνω στο αρχείο.
+
+---
+
+## Τύχη των δεκατριών άκριτων — β΄ πέρασμα (2026-09-18)
+
+Το πρώτο πέρασμα (πιο πάνω) ζήτησε ονομασμένο **σύμβολο** στο R5b ή στο
+§6.0 και βρήκε μηδέν στα δεκατέσσερα — λάθος όργανο για την ερώτηση: το
+PRD δεν ονομάζει σύμβολα κώδικα εκεί, ονομάζει **κατηγορίες** στο §6.4
+(γρ.489, το prune scope). Νέο κριτήριο, και μόνο αυτό: αν η εγγραφή
+**ανήκει** σε μία από τις κατηγορίες του §6.4 — η κατηγορία την
+περιγράφει με το όνομά της, όχι ότι θα μπορούσε να την περιλαμβάνει —
+μένει, και η γραμμή ονομάζει την κατηγορία αυτούσια. Το §6.4 (γρ.489)
+ονομάζει: cockpit, JiniPanel and Ollama, Router/Flavor/Pipelineforge,
+**dead DSP nodes and their tests**, spatial path, third upmix,
+**cut-repair**, EarFatigue model (keep the set plumbing R4 needs),
+fuzzer, Tauri, SurrealDB and the six unused tables, Caddy, axum, και ο
+segmenter με τον classifier του (`SegmentScout`, `smooth_and_segment`,
+escalation flagging, το Otsu threshold του onset detector).
+
+Ελέγχθηκε ποιες από τις δεκατρείς εγγραφές είναι πράγματι `impl DspNode
+for` (γρ.489 απαιτεί «dead DSP nodes», όχι οποιοδήποτε νεκρό struct):
+
+```
+lineos/m1/sp314-nodes/src/nodes/multiband.rs:51: impl DspNode for MultibandCompressorNode
+lineos/m1/sp314-nodes/src/nodes/limiter.rs:30:    impl DspNode for LimiterNode
+```
+Το `Phi1Sensor`/`Phi2Sensor` (analysis/phi1_sensor.rs), το `Crossover3`
+(dsp/crossover.rs) και το `LookaheadRing` (lookahead_ring.rs) — καμία
+`impl DspNode for` για κανένα από τα τρία.
+
+- **O-001** (MultibandCompressorNode + LimiterNode) — **ΜΕΝΕΙ.** §6.4 γρ.489: «dead DSP nodes and their tests». Και οι δύο δηλώνουν `impl DspNode for` και καμία topology δεν τους καλεί (ήδη τεκμηριωμένο στην ίδια εγγραφή) — ακριβώς το σχήμα της κατηγορίας.
+- **O-004** (Phi1Sensor + phi1_v3) — ΑΚΡΙΤΟ, παραμένει. Το `Phi1Sensor` ΔΕΝ είναι `DspNode` (είναι analysis sensor) — δεν ανήκει στο «dead DSP nodes». Καμία άλλη κατηγορία του §6.4 δεν το ονομάζει.
+- **O-006** (build_timeline_map) — ΑΚΡΙΤΟ, παραμένει. Συνάρτηση timeline-mapping, όχι DSP node ούτε καμία άλλη κατηγορία.
+- **O-008** (cut_heal: SilenceCut, BreathCut, CrossfadeHeal) — **ΜΕΝΕΙ.** §6.4 γρ.489: «cut-repair», αυτούσια το όνομά της.
+- **O-009** (ταβάνι −0.5 του LimiterNode) — **ΜΕΝΕΙ.** Ίδια κατηγορία με το O-001 — η σταθερά και τα tests της ζουν μέσα στο ίδιο νεκρό `LimiterNode` (`impl DspNode for LimiterNode`, `limiter.rs:30`).
+- **O-010** (Crossover3::default()) — ΑΚΡΙΤΟ, παραμένει. Το `Crossover3` ΔΕΝ είναι `DspNode`, και δεν είναι καν νεκρό — το `::new()` καλείται στην παραγωγή· μόνο η μέθοδος `::default()` είναι ανεκμετάλλευτη. Δεν ανήκει σε «dead DSP nodes» ούτε σε άλλη κατηγορία.
+- **O-011** (xaak::TARGET_SAMPLE_RATE) — ΑΚΡΙΤΟ, παραμένει. Καμία κατηγορία του §6.4 δεν την ονομάζει.
+- **O-012** (allowlist preset του validate_patch) — ΑΚΡΙΤΟ, παραμένει. Καμία κατηγορία.
+- **O-013** (LookaheadRing::consume_into()) — ΑΚΡΙΤΟ, παραμένει. Το `LookaheadRing` δεν είναι `DspNode`· ο μόνος καλών, `LookaheadTelemetryNode`, δεν είναι νεκρός (χρησιμοποιείται, observer-only) — δεν ανήκει σε «dead DSP nodes».
+- **O-014** (GenreClassifier) — ΑΚΡΙΤΟ, παραμένει. Δεν είναι `DspNode`, δεν είναι ο segmenter/classifier του §6.4 (αυτός ονομάζεται ρητά: `SegmentScout`, `smooth_and_segment`, escalation flagging, Otsu threshold — άλλο υποκείμενο, η ταξινόμηση voice/music, όχι genre).
+- **O-015** (MfccAnalyzer::compute_windowed) — ΑΚΡΙΤΟ, παραμένει. Δεν ανήκει σε καμία κατηγορία· δεν κατονομάζεται στη λίστα του segmenter/classifier.
+- **O-016** (compute_sbr_delta, SBR_LO, SBR_HI) — ΑΚΡΙΤΟ, παραμένει. Καμία κατηγορία.
+- **O-017** (στατικό ffmpeg του δέντρου) — ΑΚΡΙΤΟ, παραμένει. Καμία κατηγορία του §6.4 ονομάζει το δυαδικό.
+
+⇒ **3 ΜΕΝΕΙ** (O-001, O-008, O-009) · **0 ΤΑΞΙΔΕΥΕΙ** (αυτό το πέρασμα διαβάζει μόνο τη λίστα του κλαδέματος) · **10 ΑΚΡΙΤΟ** (O-004, O-006, O-010, O-011, O-012, O-013, O-014, O-015, O-016, O-017).
