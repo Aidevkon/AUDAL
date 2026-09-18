@@ -308,3 +308,33 @@ ORPHAN-ALLOCATOR: O-018
 - Ο πίνακας αντιστάθμισης `A_INV` — F-095. Το LTASS βγήκε από την
   παράδοση (D14).
 - `tracks.audio_path` write site — F-087
+
+---
+
+## Τύχη των δεκατεσσάρων άκριτων — επικύρωση 2026-09-18
+
+Οι δεκατέσσερις εγγραφές που έμειναν ΑΚΡΙΤΕΣ στις 18/09 (§ header, παραπάνω)
+επειδή `docs/specs/PRD-v7.2-20260918.md` δεν ήταν τότε στο δέντρο — κρίθηκαν
+τώρα με ανάγνωση ολόκληρου του R5b (γρ.210-247), του §6.0 (γρ.337-461), του
+§6.4 (γρ.485-505) και του §3 (γρ.71-84) του ίδιου εγγράφου (sha256 όπως
+δηλωμένο στο header, κατάσταση **DRAFT**). Καμία ΚΑΤΑΣΤΑΣΗ ούτε καμία
+υπάρχουσα γραμμή Τύχη πιο πάνω άλλαξε — η επικύρωση προστίθεται εδώ, γιατί
+το έγγραφο-κριτήριο είναι ακόμα DRAFT (γρ.63) και το μητρώο λέει ρητά ότι
+καμία τύχη δεν είναι οριστική όσο ισχύει αυτό (γρ.68-70).
+
+- **O-001** (MultibandCompressorNode + LimiterNode, registry key `"Limiter"`) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το §6.0 (γρ.413) ονομάζει μόνο γενικά `LIMITER (spec ceiling)` — ταυτίζεται λειτουργικά με το `BrickwallLimiter` (O-002, ήδη ΤΑΞΙΔΕΥΕΙ μέσω R5, άλλη εγγραφή), όχι με το `LimiterNode`/`MultibandCompressorNode`. Κανένα από τα δύο δεν κατονομάζεται σε R5b ή §6.0 (`grep -ni "limiter\|multiband"` πάνω στα δύο τμήματα: μηδέν χτυπήματα εκτός της γρ.413). Δύο πράγματα, όχι ένα.
+- **O-003** (duck_gain, control_bus) — **ΜΕΝΕΙ.** R5b (γρ.235): «— | Ducking (music bed under speech) | ✗ mixing | ... | out → Studio stem-aware (R17), where the ratio is a client spec; console otherwise»· §3 Μη-Στόχοι (γρ.76): «Mixing — balancing two signals against each other (ducking, same-stem speaker balancing, ...) | K0. ...»· D16 (γρ.545): «Ducking and same-stem speaker balancing are mixing (K0); out of the consumer edition».
+- **O-004** (Phi1Sensor + phi1_v3) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το R5b (γρ.247, «Sensors that survive the K0 cut») μιλάει για «the macro classifier» και «micro-VAD» με ρόλο, όχι με όνομα κλάσης — και το ίδιο το κείμενο δηλώνει «which of the two instruments was measured is unconfirmed, F-113» (ίδιο ανοιχτό ερώτημα §9.3.17). Καμία γραμμή δεν ονομάζει το `Phi1Sensor`.
+- **O-006** (build_timeline_map) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση σε R5b/§6.0/§6.4/§3.
+- **O-008** (cut_heal: SilenceCut, BreathCut, CrossfadeHeal) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το K0b (R5b γρ.216) και το Στάδιο 11 (γρ.229) συζητούν αφαίρεση δείγματος/room tone εννοιολογικά, όχι με τα ονόματα `cut_heal`/`SilenceCut`/`BreathCut`/`CrossfadeHeal`.
+- **O-009** (ταβάνι −0.5 του LimiterNode) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Ίδιο σκεπτικό με O-001· το §6.0 (γρ.413) γράφει "spec ceiling", όχι σταθερά.
+- **O-010** (Crossover3::default()) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-011** (xaak::TARGET_SAMPLE_RATE) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-012** (allowlist preset του validate_patch) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-013** (LookaheadRing::consume_into()) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-014** (GenreClassifier) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση της λέξης "genre" σε R5b/§6.0/§6.4/§3.
+- **O-015** (MfccAnalyzer::compute_windowed) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-016** (compute_sbr_delta, SBR_LO, SBR_HI) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Καμία εμφάνιση.
+- **O-017** (στατικό ffmpeg του δέντρου, 192MB) — ΑΚΡΙΤΟ, επιβεβαιωμένο. Το R12 ονομάζει το ffmpeg ως εργαλείο/ένορκο από το PATH (ήδη σημειωμένο στην ίδια εγγραφή, γρ.279-281) — η τύχη εδώ αφορά το **δυαδικό μέσα στο δέντρο**, που καμία γραμμή R5b/§6.0 δεν κατονομάζει. Το εργαλείο και το αρχείο δεν είναι το ίδιο ερώτημα.
+
+⇒ **1 ΜΕΝΕΙ** (O-003) · **0 ΤΑΞΙΔΕΥΕΙ** · **13 ΑΚΡΙΤΟ** (O-001, O-004, O-006, O-008, O-009, O-010, O-011, O-012, O-013, O-014, O-015, O-016, O-017).
