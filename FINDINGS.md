@@ -3162,7 +3162,17 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-120** — this line is the ONLY allocator. Taking a number =
+- **[F-120] Το παγωμένο του reference-lint ήταν ιδιότητα του δίσκου ενός μηχανήματος, όχι του repo.** Component: `scripts/reference-lint.sh` · `scripts/.reference-baseline` (παγωμένο: 14) · `lineos/m1/sp314-dsp/src/stft/nmfd.rs` (25 παραπομπές σε `nmfconv.py`) · `research/erlangen-nmfd/venv/` (git-ignored, `research/erlangen-nmfd/.gitignore:1`) · `lineos/m0/m0-daemon/src/dsp/mod.rs`, `lineos/m0/m0-daemon/tests/flag_oracle.rs` (4 παραπομπές σε `compute_ainv.py`). ΜΕΤΡΗΜΕΝΟ 2026-09-18, ίδιο commit (b5ebe3b), δύο αντίγραφα του δέντρου: εκεί όπου το venv του `research/erlangen-nmfd` υπήρχε στον δίσκο, `reference-lint.sh` έδειχνε 14 σπασμένες παραπομπές· σε φρέσκο checkout χωρίς το venv, 39. Διαφορά +25, όλες `nmfd.rs` → `nmfconv.py`.
+
+  ΔΙΑΒΑΣΤΗΚΕ: `research/erlangen-nmfd/.gitignore:1` (`venv/`) — το `nmfconv.py` που το `nmfd.rs` παραπέμπει ζει μέσα στο `libnmfd` πακέτο εγκατεστημένο σε αυτό το venv (`research/erlangen-nmfd/venv/lib/python3.12/site-packages/libnmfd/core/nmfconv.py`), git-ignored, ποτέ μέρος του repo. Το `compute_ainv.py` δεν βρέθηκε πουθενά στο δέντρο (grep, find) — οι τέσσερις παραπομπές του ήταν ήδη σπασμένες μέσα στο ίδιο το παγωμένο 14, πριν από αυτό το εύρημα.
+
+  ⇒ Το παγωμένο 14 δεν μέτραγε ποτέ "σπασμένες παραπομπές του repo" — μέτραγε τη σύμπτωση ότι κάποιο μηχάνημα είχε εγκαταστήσει το `libnmfd` σε τοπικό venv. Ένα σβήσιμο του venv (ή, όπως εδώ, ένα checkout που ποτέ δεν το έχτισε) αλλάζει τον αριθμό χωρίς να αλλάξει ούτε μία γραμμή κώδικα ή σχολίου. Τρίτος φρουρός της εβδομάδας που το παγωμένο του μετράει κάτι άλλο από όσο δηλώνει — μετά το νούμερο του ρυθμού και το πλήθος των κόκκινων δοκιμίων.
+
+  ⇒ Δεν ξαναπαγώνει τώρα: `nmfd.rs` (σταυρο-παραπομπή `docs/FUTURES.md` §2, το NMF) και το LTASS (σταυρο-παραπομπή `docs/ORPHANS.md:308`, «βγήκε από την παράδοση, D14») είναι ήδη στη λίστα όσων μένουν πίσω στο κλάδεμα. Όλα τα παγωμένα που εξαρτώνται από κώδικα υπό κλάδεμα κινούνται μία φορά, στο commit του κλαδέματος — όχι τώρα.
+
+---
+
+**NEXT FREE: F-121** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
