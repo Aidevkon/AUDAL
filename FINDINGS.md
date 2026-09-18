@@ -3134,7 +3134,21 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-118** — this line is the ONLY allocator. Taking a number =
+- **[F-118] Το μητρώο είναι ιστορία, και τρία ευρήματα το ξέχασαν.** Component: σταυρο-παραπομπές F-081, F-097, F-090 (μηδέν επεξεργασία τους). ΜΕΤΡΗΜΕΝΟ 2026-09-17, επαλήθευση στο ζωντανό δέντρο.
+
+  **F-081** έγραψε ότι το threshold του `DeEsserNode` είναι 0.0 dBFS και άρα δομικά αδρανές (`streaming_pipeline.rs:114`/`:117` τότε). Σήμερα είναι **−24.0 dBFS** (`sp314-orchestrator/src/streaming_pipeline.rs:198`), από το `f4372d4` — μήνυμα commit: *«the de-esser gets the threshold that was decided by listening, eighteen days ago»*.
+
+  **F-097** έγραψε ότι ο `AcxCheckAnalyzer` δεν τρέχει καθόλου στις διαδρομές που χτίζουν την πύλη — ούτε streaming, ούτε render (`trunk_pass.rs:371-373`, `run_trunk_internal(..., false, ...)` τότε). Σήμερα τρέχει και στο `execute_streaming_plan` (`m0-daemon/src/agents/executor.rs:310`, μέσω `run_trunk_pass_with_acx`) και στο `export_mp3_acx` (`m0-daemon/src/handlers/export.rs`, AcxCheckAnalyzer γρ.976/1082).
+
+  **F-090** έγραψε naming collision: δύο `write_sidecar`, ίδιο όνομα, δύο αρχεία, δύο σχήματα — ένα υπογεγραμμένο Ed25519 (`blob_store::write_sidecar`), ένα ανυπόγραφο (`handlers/export.rs:1087` τότε). Διορθώθηκε — το τοπικό του `export.rs` μετονομάστηκε σε `write_unsigned_export_sidecar` (`export.rs:1519`), με σχόλιο που δηλώνει ρητά τον προηγούμενο ομώνυμο.
+
+  ⇒ Το σχήμα είναι το ίδιο που το μητρώο κυνηγάει, ένα επίπεδο πιο πάνω: το σάπιο σχόλιο είναι τώρα το σάπιο εύρημα. Το μητρώο είναι ιστορία και δεν ξαναγράφεται — η διόρθωση γράφεται δίπλα, ως νέο εύρημα.
+
+  **Και το μεθοδολογικό της ίδιας της απογραφής:** ένα από τα είκοσι δύο υποψήφια — το «rms_db υπολογίζεται και πετιέται» του F-085 — μπήκε αρχικά στη λίστα των ορφανών, ενώ η γραμμή στην οποία παραπέμπει (F-070, *«ΕΚΛΕΙΣΕ ΓΙΑ ΤΟ MUSIC PATH 2026-08-21»*) έλεγε ήδη ότι είχε διορθωθεί. Δεν μπαίνει στο ORPHANS. Καταγράφεται εδώ γιατί είναι το ίδιο λάθος κατηγορίας σε τρίτο επίπεδο: εύρημα παλιό διαβάστηκε σαν να ήταν ακόμα ενεργό — ό,τι ακριβώς αυτό το εύρημα προειδοποιεί.
+
+---
+
+**NEXT FREE: F-119** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
