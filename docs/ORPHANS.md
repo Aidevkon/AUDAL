@@ -23,7 +23,7 @@ FINDINGS.md allocator, επαληθευμένος εκεί πριν αντιγρ
 **ΟΡΦΑΝ-ΑΛΛΟΚΑΤΟΡ:** αυτή η γραμμή είναι ο ΜΟΝΟΣ allocator. Νέο ορφανό =
 αύξηση αυτής της γραμμής ΣΤΟ ΙΔΙΟ commit που το καταγράφει.
 
-ORPHAN-ALLOCATOR: O-018
+ORPHAN-ALLOCATOR: O-021
 
 **Ο φρουρός** (`scripts/orphan-lint.sh`, καλείται από `scripts/guards.sh`)
 ελέγχει ΜΟΝΟ:
@@ -314,6 +314,86 @@ ORPHAN-ALLOCATOR: O-018
   απαίτηση του περιβάλλοντος ανάπτυξης, όχι εξάρτηση εκτέλεσης. Το R12
   το ζητάει ως ένορκο — από το PATH. Σταυρο-παραπομπή: F-077, που
   μετρήθηκε με το `/usr/bin`.
+
+---
+
+### [O-018] — HarmonicNode και HarmonicEngine
+- **Τι είναι:** Χρωματισμός με μη γραμμική παραμόρφωση. Η `waveshape`
+  (`sp314-dsp/src/harmonic/mod.rs:214-225`) υπολογίζει
+  `tanhf(drive · x)` για τις μονές αρμονικές και `x + (x·|x|)·0.5` για
+  τις ζυγές, με προεπιλογές `drive 2.0 · even 0.6 · odd 0.2 · mix 0.3`
+  (`HarmonicConfig::default`). Δύο φορές υπερδειγματοληψία, 32
+  συντελεστές FIR ανά φάση (`TAPS=32, N_PHASES=2`). Προσθέτει
+  συχνότητες που δεν υπήρχαν (παραμόρφωση), δεν αλλάζει υπάρχουσες
+  μπάντες.
+- **Πού ζει:** `lineos/m1/sp314-nodes/src/nodes/harmonic.rs` (63 γρ.,
+  `impl DspNode for HarmonicNode` γρ.24) · `lineos/m1/sp314-dsp/src/harmonic/mod.rs`
+  (283 γρ.)
+- **Βρέθηκε από:** ΧΩΡΙΣ ΑΡΙΘΜΟ ΕΥΡΗΜΑΤΟΣ (εντοπίστηκε 19/09, R5:
+  «`Limiter`, `MultibandCompressor`, `Harmonic`, `SoftClipper` and
+  `GlueChain` are all **dead**» — ίδιο τεκμήριο με O-001)
+- **Κατάσταση:** ΟΡΦΑΝΟ
+- **Τύχη:** ΜΕΝΕΙ — καταχωρημένο στο εργοστάσιο
+  (`sp314-nodes/src/graph.rs:189`, `"Harmonic" => { ... }`), και καμία
+  τοπολογία δεν το ονομάζει — `grep -rn '"Harmonic"' --include=*.rs
+  --include=*.json .` δίνει μόνο την ίδια την καταχώρηση και το
+  `node_type()` getter. Ίδιο σχήμα με το O-001 («κόμβος στο
+  εργοστάσιο, σε καμία τοπολογία»): `impl DspNode` + νεκρό ⇒ η
+  κατηγορία «dead DSP nodes and their tests» του §6.4 το ονομάζει.
+
+### [O-019] — OversampledSoftClipper
+- **Τι είναι:** Κυβική κάμψη κοντά στο ταβάνι. Η `soft_clip`
+  (`sp314-dsp/src/limiter/clipper.rs:173-179`) περιορίζει στο
+  `1.5 × ceiling` και αφαιρεί `(4 / 27c²)·x³`. Τέσσερις φορές
+  υπερδειγματοληψία, 16 συντελεστές. Ίδια οικογένεια με το O-018 — το
+  σχόλιο του `harmonic/mod.rs:8` το λέει ρητά: «Same FIR pattern as
+  OversampledSoftClipper (v3.5)». Προσθέτει αρμονική παραμόρφωση.
+- **Πού ζει:** `lineos/m1/sp314-dsp/src/limiter/clipper.rs:157`,
+  εξάγεται `pub use clipper::OversampledSoftClipper;`
+  (`limiter/mod.rs:10`)
+- **Βρέθηκε από:** ΧΩΡΙΣ ΑΡΙΘΜΟ ΕΥΡΗΜΑΤΟΣ (εντοπίστηκε 19/09, ίδιο
+  τεκμήριο R5 με το O-018· ήδη καταγεγραμμένο ως item 13 στο
+  `docs/unused-pub-audit.md:34,347-363`, «ΔΕΝ καλείται στην
+  παραγωγική αλυσίδα mastering», χωρίς να του δοθεί O-αριθμός τότε)
+- **Κατάσταση:** ΟΡΦΑΝΟ
+- **Τύχη:** ΑΚΡΙΤΟ — δεν είναι καν κόμβος: `grep -rn "SoftClipper"
+  lineos/m1/sp314-nodes/` δίνει μηδέν, δεν υπάρχει καν ως `impl
+  DspNode`. Η κατηγορία «dead DSP nodes and their tests» του §6.4 δεν
+  το ονομάζει (απαιτεί `DspNode`), και καμία άλλη κατηγορία δεν το
+  αγγίζει. Μηδέν κλήση `OversampledSoftClipper::new` σε src/ πουθενά·
+  ούτε ο `BrickwallLimiter` (O-002, ΤΑΞΙΔΕΥΕΙ) το χρησιμοποιεί
+  (`grep -n "OversampledSoftClipper\|clipper" limiter/core.rs`: μηδέν)·
+  μοναδικός καλών το δικό του δοκίμιο,
+  `lineos/m1/sp314-dsp/tests/clipper_contract.rs`.
+
+### [O-020] — GlueChain
+- **Τι είναι:** Αλυσίδα, όχι κόμβος. Οκτώ `Biquad` (χαμηλοπερατό 4ης
+  τάξης στα 8 kHz και υψηλοπερατό 4ης τάξης στα 150 Hz, ανά κανάλι,
+  `dsp/glue.rs:30-43`), ένα `Allpass` για πλάτος σε M/S, και
+  παραμέτρους `width`/`drive`. Φιλτράρει και πλαταίνει — το allpass
+  αλλάζει φάση, όχι φάσμα.
+- **Πού ζει:** `lineos/m1/sp314-dsp/src/dsp/glue.rs`
+- **Βρέθηκε από:** ΧΩΡΙΣ ΑΡΙΘΜΟ ΕΥΡΗΜΑΤΟΣ (εντοπίστηκε 19/09, ίδιο
+  τεκμήριο R5 με O-018/O-019)
+- **Κατάσταση:** ΟΡΦΑΝΟ
+- **Τύχη:** ΑΚΡΙΤΟ — δεν είναι `DspNode`, καμία κατηγορία του §6.4 δεν
+  το ονομάζει. Διαφορετικό σχήμα από τα O-018/O-019: η κλήση
+  **υπάρχει** σε src/ (`m0-daemon/src/domain/dsp_pipeline.rs:1296`,
+  `sp314_dsp::dsp::glue::GlueChain::new(...)`, μέσα σε
+  `if GLUE_SEND_AMOUNT > 1e-6`), αλλά η σταθερά είναι
+  `const GLUE_SEND_AMOUNT: f32 = 0.0; // ΠΡΟΣ ΤΟ ΠΑΡΟΝ 0`
+  (`dsp_pipeline.rs:23`) — πάντα ψευδής, νεκρός κλάδος, όχι άκλητος
+  κώδικας. ⚠ Δεν είναι ξεχασμένο: `DECISIONS.md:41` το έχει στα
+  ανοιχτά με ετυμηγορία, ΜΕΤΡΗΣΗ 2026-08-16 [49207c4, PARK BLUE]:
+  «voice tail στο ambience — NMFD8 corr ratio 1.5525 vs NMF5 1.1050.
+  Το Glue [3] ΦΡΑΓΜΕΝΟ μέχρι voice-aware send ή per-stem reclaim.»
+  Παρκαρισμένο με ετυμηγορία, όχι ασύνδετο από αμέλεια.
+
+**Και τα τρία μαζί:** μηδέν αναφορά στο R5b ή στο §6.0 του PRD· το
+μόνο σημείο που τα ονομάζει είναι το R5, ως μέτρηση κατάστασης:
+«`Limiter`, `MultibandCompressor`, `Harmonic`, `SoftClipper` and
+`GlueChain` are all **dead**» (γρ.201). Και τα τρία είναι χρωματισμός
+ή πλάτος — κινούν το σήμα χωρίς κριτήριο του προορισμού.
 
 ---
 
