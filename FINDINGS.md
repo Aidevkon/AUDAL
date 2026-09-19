@@ -2227,8 +2227,10 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
   **Α — ΕΝΝΙΑ ΘΕΣΕΙΣ, ΤΑΞΙΝΟΜΗΜΕΝΕΣ ΚΑΤΑ ΣΟΒΑΡΟΤΗΤΑ:**
 
-  1. `handlers/export.rs:890`, μέσα στο `export_mp3_acx`, αυτούσιο:
-     `let original_sr = 48000;` (`:891` `let target_sr = 44100;`). ΔΕΝ
+  1. `conformance/src/export.rs:366`, μέσα στο `export_mp3_acx`, αυτούσιο:
+     `let original_sr = blob.core.sample_rate;` (η αρχική γραμμή του
+     ευρήματος, `let original_sr = 48000;`, δεν υπάρχει πια — διορθώθηκε
+     στο c711853, και η παραπομπή δείχνει το αποτέλεσμα). ΔΕΝ
      διαβάζει `blob.core.sample_rate` — το ΜΕΤΡΗΜΕΝΟ πεδίο. Η αδελφή
      συνάρτηση `export_mp3` (`:1341`, αυτούσιο: `lame_set_in_samplerate(
      gfp, blob.core.sample_rate as i32);`) κάνει το σωστό, δύο
