@@ -19,4 +19,3 @@ symphonia    = { version = "0.5", features = [
 ] }
 rubato       = "0.15"   # SincFixedIn resampling → 48000 Hz
 lineos-types = { path = "../lineos-types" }
-sp314-dsp    = { path = "../sp314-dsp" }

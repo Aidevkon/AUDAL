@@ -52,7 +52,7 @@ pub struct AudioPcm {
 
 // ── DecodeError ───────────────────────────────────────────────────────────────
 
-pub use sp314_dsp::io::decode_types::DecodeError;
+pub use lineos_types::decode::DecodeError;
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
