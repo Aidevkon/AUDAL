@@ -3424,9 +3424,39 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Το αμέτρητο, γραμμένο ως τέτοιο:** αν το `hound` και το `flac-codec` καλούνται χωρίς φράγμα και είναι `optional`, το crate με `default = []` δεν θα έπρεπε να μεταγλωττίζεται. Δεν επαληθεύτηκε: μέσα στο ίδιο workspace το `cli` είναι πάντα ενεργό από τα δύο άλλα μέλη (επιβεβαιώθηκε ξανά: `cargo check -p sp314-dsp --no-default-features` ξαναφέρνει το `cpal`/`alsa-sys` παρά το ρητό αίτημα), και το ερώτημα δεν απαντιέται με `cargo check` από μέσα σε αυτό το workspace. Εικασία, όχι μέτρηση. Ανοιχτό.
 
+- **[F-131] Η αλυσίδα των επτά κρίκων: ο ντετερμινιστικός πυρήνας εξαρτάται από το crate της αναπαραγωγής, για έναν τύπο.** Component: `lineos/m1/sp314-dsp/Cargo.toml` · `lineos/m1/sp314-dsp/src/analysis/{album_conductor.rs,ear_fatigue.rs,morph_curve.rs}` · `lineos/m1/xaak/Cargo.toml` · `lineos/m1/xaak/src/flavours.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20, στο τέλος της προσπάθειας να μετακομίσει το `export.rs`.
+
+  **Το εύρημα:** `sp314-dsp/Cargo.toml:20` ⇒ `xaak = { path = "../xaak" }`, χωρίς κανένα φράγμα. Και `xaak/Cargo.toml:18` ⇒ `cpal = "0.15"`, **όχι `optional`**, με το `[features]` του xaak να έχει μόνο `debug-telem = []` και κανένα `default`. ⇒ Το `cpal` μπαίνει πάντα, και το `default-features = false` στη γραμμή δεν το σταματάει (επαληθεύτηκε: το `cpal` δεν είναι πίσω από κανένα feature-flag του xaak — απλή, μόνιμη εξάρτηση). Και το `cpal` τραβάει το `alsa-sys`, που απαιτεί βιβλιοθήκη συστήματος.
+
+  **Τι χρειάζεται ο πυρήνας από το xaak: τρεις γραμμές, ένα σύμβολο.**
+  ```
+  analysis/album_conductor.rs:10  ·  analysis/ear_fatigue.rs:6  ·  analysis/morph_curve.rs:6
+  ```
+  Και οι τρεις: `use xaak::repo::DspState;`
+  ⇒ Δύο από τα τρία αρχεία είναι ήδη γραμμένα να μείνουν πίσω: το `album_conductor.rs` και το `ear_fatigue.rs` είναι ο κώδικας του §4 στο `docs/FUTURES.md` («Η συνοχή του άλμπουμ και η κονσόλα διδασκαλίας» — EarFatigue, AlbumConductor, AlbumMatrix, Wizard, JINI).
+  ⚠ Το `DspState` είναι ο τύπος του τέταρτου λεξιλογίου γούστου του F-125: `xaak/src/flavours.rs:5` εισάγει `crate::repo::DspState`, και οι σταθερές `FLAVOUR_WARM_ANALOG`, `FLAVOUR_CLUB_PUNCH` κ.λπ. (`:14-...`) είναι όλες τύπου `DspState`, συγκεντρωμένες στο `ALL: &[(&str, DspState)]` (`:52-...`) με τα ίδια ονόματα `warm_analog`/`cinematic_wide`/`club_punch`/`radio_edit`/`clean_clear`/`neutral` του F-125. Δηλαδή ο πυρήνας κουβαλάει το crate της κάρτας ήχου για να δει τον τύπο-φορέα των σταθερών ενός λεξιλογίου γούστου, σε τρία αρχεία που είναι ήδη γραμμένα ως προς το πού πηγαίνουν.
+  ⚠ Διόρθωση δικού μου ισχυρισμού πριν γραφτεί: το `docs/ORPHANS.md` O-011 δεν είναι «το ίδιο το xaak» — είναι συγκεκριμένα το `xaak::TARGET_SAMPLE_RATE` (`xaak/src/lib.rs:49`, ΑΚΡΙΤΟ, F-104), μία σταθερά, όχι το crate ως σύνολο. Δεν γράφεται η ευρύτερη διατύπωση.
+
+  **Η αλυσίδα ολόκληρη, όπως μετρήθηκε σε τέσσερα διαδοχικά βήματα της 20/09:**
+  ```
+  export.rs        ⇒ οκτώ συναρτήσεις ΣΗΜΑΤΟΣ παίρνουν &StoredBlobV2           (F-129)
+  StoredBlobV2      ⇒ δεκατέσσερις τύποι χρειάζονται μετακίνηση (745 γραμμές),
+                      όλοι καθαροί· ένας (lineos_types::audio::ManagedPcm)
+                      ήδη έξω — δεκαπέντε συνολικά στην αλυσίδα            (F-129)
+  DeliveryCheck::from_margin_checks ⇒ παίρνει &sp314_dsp::analysis::acx_check::AcxCheckReport
+  sp314-dsp         ⇒ το cli το έφερνε η ενοποίηση χαρακτηριστικών          (F-130)
+  μετά τη διάσπαση του cli ⇒ το xaak το φέρνει μόνο του
+  xaak              ⇒ cpal ⇒ alsa-sys ⇒ βιβλιοθήκη συστήματος
+  ```
+  Επτά κρίκοι, και τρεις από αυτούς είναι ορφανά ή κρυμμένα να μείνουν πίσω.
+
+  **Το μεθοδολογικό, γραμμένο ως τέτοιο:** πέντε κρίκοι της αλυσίδας βρέθηκαν από τον μεταγλωττιστή, όχι από το recon που προηγήθηκε κάθε βήματος — το `pub use` του `DecodeError` που η έκφραση της αναζήτησης δεν έπιανε· το `MAX_FILE_BYTES` που το μοιράζονταν τρία αρχεία· η ενοποίηση χαρακτηριστικών που έφερε το `cpal`· το `apps/runtime/loom`, τρίτος καταναλωτής που δεν ήταν στην ερώτηση· και το `xaak`, που δεν ήταν καν στη γραμμή του `cli`. Το PROTOCOL το έχει ήδη γραμμένο από τον Αύγουστο: ο compiler είναι το recon. Το grep δίνει ελλιπή λίστα· ο μεταγλωττιστής ποτέ.
+
 ---
 
-**NEXT FREE: F-131** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-132** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
