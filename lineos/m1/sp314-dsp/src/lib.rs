@@ -25,7 +25,7 @@
 
 pub mod compressor;
 pub mod harmonic;
-#[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod io;
 pub mod limiter;
 pub mod lookahead_ring;
@@ -34,7 +34,7 @@ pub mod metering;
 pub mod ola_buffer;
 pub mod pipeline;
 pub mod psychoacoustic;
-#[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "realtime"))]
 pub mod realtime;
 pub mod restoration;
 pub mod stft;

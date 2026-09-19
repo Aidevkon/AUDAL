@@ -7981,7 +7981,6 @@ dependencies = [
  "ctrlc",
  "dhat",
  "flac-codec",
- "hex",
  "hound",
  "libm",
  "lineos-corpus",
@@ -7995,7 +7994,6 @@ dependencies = [
  "sha2",
  "symphonia",
  "tempfile",
- "xaak",
 ]
 
 [[package]]

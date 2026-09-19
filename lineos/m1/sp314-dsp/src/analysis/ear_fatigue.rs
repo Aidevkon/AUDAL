@@ -3,7 +3,7 @@
 //! INV-AB-1: same input → same DspState delta. Always.
 
 use lineos_types::pre_analysis::PreAnalysisData;
-use xaak::repo::DspState;
+use lineos_types::dsp_state::DspState;
 
 /// Threshold above which ear fatigue is triggered.
 /// Tracks louder than this require recovery compensation.

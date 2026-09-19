@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
-sp314-dsp = { path = "../sp314-dsp", features = ["cli"] }
+sp314-dsp = { path = "../sp314-dsp" }
 sp314-nodes = { path = "../sp314-nodes" }
 lineos-corpus = { path = "../lineos-corpus" }
 lineos-types = { path = "../lineos-types" }
