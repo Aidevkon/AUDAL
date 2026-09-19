@@ -3347,9 +3347,28 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Συνεπαγόμενο, γραμμένο ως εύρημα:** το «η μηχανή και ο διακομιστής είναι στο ίδιο αρχείο» είναι αληθές στο επίπεδο του *αρχείου* (18 αρχεία εισάγουν axum, `handlers/` είναι μεικτός φάκελος) αλλά ψευδές στο επίπεδο της *συνάρτησης* (28/28 ΣΗΜΑΤΟΣ ήδη χωρίς axum-τύπο ή db-κλήση). Η εξαγωγή σε νέο crate δεν χρειάζεται να σπάσει καμία υπάρχουσα συνάρτηση σήματος — χρειάζεται να μετακινήσει αρχεία (και, για το `deliver.rs`, να αποσπάσει το ήδη-καθαρό `run_deliver_core` από τους δύο γύρω του χειριστές). Το πραγματικό μπλέξιμο που απομένει μετά τη μετακόμιση είναι αρχειοσύστημα και πρόοδος προς χρήστη μέσα στο `run_dsp_internal`/`execute_streaming_plan` — δεν κρίνεται εδώ ποια μορφή θα πάρει.
 
+- **[F-127] Το ίδιο μοτίβο αποκωδικοποίησης — probe → decode → SampleBuffer πάνω σε symphonia — υπάρχει έξι φορές στο δέντρο, και ο κανόνας που τις γέννησε είναι γραμμένος και σωστός.** Component: `lineos/m0/m0-daemon/src/handlers/decode.rs` · `lineos/m1/sp314-dsp/tests/{s2_grid.rs,s2_retrial.rs,nmfd_production_dragon.rs,s6_teacher.rs,nmfd_mask_oracle.rs}` · `lineos/m1/sp314-dsp/src/io/decode_types.rs` · `lineos/m1/sp314-dsp/Cargo.toml`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20 (recon, «πού μπορεί να πάει το decode»).
+
+  **Μία στην παραγωγή, πέντε σε δοκίμια, κάθε ένα δική του συνάρτηση.** `m0-daemon/src/handlers/decode.rs` (724 γρ.) είναι η μοναδική παραγωγική υλοποίηση: `decode_raw_interleaved` (`:176-298`) εισάγει `symphonia::core::{audio::SampleBuffer, codecs::DecoderOptions, formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint}` (`:177-182`). Στο `sp314-dsp/tests/` το ίδιο μοτίβο ξαναγράφεται πέντε φορές, καθεμία με δική της τοπική `fn decode_audio`, κανένα κοινό module: `s2_grid.rs:20-49`, `s2_retrial.rs:19`, `nmfd_production_dragon.rs:14`, `s6_teacher.rs:17`, `nmfd_mask_oracle.rs:15`.
+  ⚠ Δεν είναι ταυτόσημα: `s2_grid.rs:24`, `s2_retrial.rs:23`, `nmfd_production_dragon.rs:18`, `s6_teacher.rs:21` έχουν `hint.with_extension("flac")` σκληρά κωδικοποιημένο· `nmfd_mask_oracle.rs:15,19` είναι η μόνη παραλλαγή με παράμετρο, `fn decode_audio(path: &str, ext: &str) -> Vec<f32>` και `hint.with_extension(ext)`.
+
+  **Ο κανόνας που τις γέννησε, αυτούσιος από το ίδιο το decode.rs:7:**
+  ```
+  symphonia lives only in m0d — never imported by sp314-dsp.
+  ```
+  ⇒ Το `sp314-dsp` είναι ο ντετερμινιστικός πυρήνας, και το `symphonia` κουβαλάει αποκωδικοποιητές και I/O — δεν επιτρέπεται να περάσει το σύνορο.
+  ⇒ Η συνέπεια είναι δομική, όχι παράβλεψη: το δοκίμιο του πυρήνα δεν μπορεί να καλέσει την αποκωδικοποίηση της παραγωγής (διαφορετικό crate, χωρίς εξάρτηση προς τα πίσω), άρα την ξαναγράφει. Πέντε φορές.
+  ⇒ Και ο κανόνας τηρείται ρητά ασύμμετρα: `symphonia = { version = "0.5", features = ["all"] }` και `rubato = "0.14"` ζουν στο `[dev-dependencies]` του `sp314-dsp/Cargo.toml:43,36` — τηρούμενος για την παραγωγή, παρακαμπτόμενος για τα δοκίμια.
+
+  **Έβδομο, ορφανό ικρίωμα για το ίδιο πράγμα — αναφέρεται, δεν αριθμείται εδώ.** `sp314-dsp/src/io/decode_types.rs:41-46` ορίζει `pub enum LazyReaderError { NoSupportedTrack, Symphonia(String), MissingSampleRate, InvalidBufferLength { len: usize, channels: usize } }`, με το μήνυμα `"symphonia error: {e}"` στη `:52`. Grep σε όλο το `sp314-dsp/src`: μηδέν άλλη εμφάνιση του τύπου — δεν κατασκευάζεται, δεν καλείται πουθενά. Τύπος σφάλματος για βιβλιοθήκη που το ίδιο το crate δεν επιτρέπεται να εισάγει.
+
+  **Συνέπεια για την εξαγωγή, γραμμένη ως εύρημα:** το `decode.rs` δεν μπορεί να μετακομίσει σε κανένα από τα τρία υπάρχοντα crates που εξετάστηκαν. Το `sp314-dsp` το απαγορεύει με γραπτό κανόνα (`:7` πιο πάνω)· το `lineos-types/Cargo.toml` έχει μόνο `serde`, `bincode` (προαιρετικό), `serde_json`· το `sp314-orchestrator/Cargo.toml` έχει μόνο εσωτερικά crates του έργου (`sp314-dsp`, `sp314-nodes`, `lineos-corpus`, `lineos-types`, `aether-bridge`) πέρα από `serde`/`serde_json`. Ούτε το `symphonia` ούτε το `rubato` είναι εξάρτηση παραγωγής σε κανένα από τα τρία. Το μόνο που δένει το `decode.rs` στον διακομιστή είναι μία γραμμή, `use crate::config::MAX_FILE_BYTES` (`:24`) — και εννιά συναρτήσεις του είναι ΣΗΜΑ, όλες καθαρές (F-126).
+
 ---
 
-**NEXT FREE: F-127** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-128** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
