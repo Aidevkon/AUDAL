@@ -427,7 +427,7 @@ pub fn run_deliver_core(
         // `preset_id: "acx"` ό,τι κι αν ζήτησε ο χρήστης.
         let spec = &lineos_types::presets::ACX;
         let mut entry_checks =
-            crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
+            conformance::declare::delivery_checks_from_margin_checks(&outcome.report);
         entry_checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
             spec,
             outcome.head_quiet_secs,

@@ -25,56 +25,10 @@
 //! path for verdict parity) with libm math for
 //! cross-platform determinism.
 
-/// A stretch of near-silence in the middle of an
-/// episode. Non-fatal — surfaced as metadata.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct DeadAirEvent {
-    pub start_sec: f32,
-    pub duration_sec: f32,
-}
-
-/// Bounded summary of dead-air across a stream.
-/// `events` is capped at MAX_DEAD_AIR_EVENTS to
-/// preserve O(1) memory on long content (e.g. a
-/// 4-hour music set); the counters below retain
-/// the FULL picture regardless of the cap, so the
-/// certificate never lies about total silence.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct DeadAirSummary {
-    /// Detailed gaps, capped at MAX_DEAD_AIR_EVENTS.
-    pub events: Vec<DeadAirEvent>,
-    /// Total number of gaps found (uncapped count).
-    pub total_count: usize,
-    /// Sum of all gap durations in seconds (uncapped).
-    pub total_sec: f32,
-    /// Longest single gap in seconds (uncapped).
-    pub longest_sec: f32,
-    /// True if events were capped (total_count >
-    /// events.len()).
-    pub truncated: bool,
-    /// Minimum dBFS of any non-dead-air window. None if stream is 100% dead air.
-    /// ΔΕΝ είναι πάτωμα θορύβου — είναι η πιο ήσυχη ΕΝΕΡΓΗ στιγμή, χωρίς
-    /// φιλτράρισμα. ΗΤΑΝ `noise_floor_dbfs` [F-097].
-    pub quietest_active_window_dbfs: Option<f32>,
-}
-
-/// Default = a clean summary: no dead air observed.
-/// Used by the batch (music) path, which has no
-/// SignalHealthMonitor — a mastered track legitimately
-/// has zero dead air, so count=0 is accurate, not a
-/// placeholder.
-impl Default for DeadAirSummary {
-    fn default() -> Self {
-        Self {
-            events: Vec::new(),
-            total_count: 0,
-            total_sec: 0.0,
-            longest_sec: 0.0,
-            truncated: false,
-            quietest_active_window_dbfs: None,
-        }
-    }
-}
+// DeadAirEvent/DeadAirSummary (με το impl Default του) μετακόμισαν στο lineos-types στις 20/09
+// (certificate.rs) — το F-129 τα είχε ήδη μετρήσει ως έναν από τους δεκατέσσερις τύπους του
+// πιστοποιητικού. Ό,τι αγγίζει σήμα (SignalHealthMonitor, παρακάτω) μένει εδώ.
+pub use lineos_types::certificate::{DeadAirEvent, DeadAirSummary};
 
 /// Digital-silence floor for Tier 1 early abort.
 const DIGITAL_SILENCE_DBFS: f32 = -100.0;

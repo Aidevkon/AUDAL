@@ -6,3 +6,4 @@
 //! symphonia lives here, and sp314-dsp still never imports it.
 
 pub mod decode;
+pub mod declare;

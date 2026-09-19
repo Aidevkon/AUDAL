@@ -512,7 +512,7 @@ fn export_mp3_routed(
     let spec = &lineos_types::presets::lookup(&blob.core.preset_id)
         .expect("η δρομολόγηση πιο πάνω το βρήκε ήδη")
         .delivery;
-    let mut checks = crate::blob_store::DeliveryCheck::from_margin_checks(&outcome.report);
+    let mut checks = conformance::declare::delivery_checks_from_margin_checks(&outcome.report);
     checks.extend(crate::blob_store::DeliveryCheck::from_spacing(
         spec,
         outcome.head_quiet_secs,
