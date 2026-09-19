@@ -3399,9 +3399,34 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Το καθαρό:** σε όλη την αλυσίδα των δεκατεσσάρων — μηδέν `axum::`, μηδέν `surrealdb`, μηδέν `DbConn`. Οι τύποι είναι serde με αριθμούς, συμβολοσειρές και λογικές τιμές. Ίδιο σχήμα με το `DecodeError` και το `MAX_FILE_BYTES`, τρίτη φορά: ο τύπος είναι καθαρός, το σπίτι του όχι. Και το `DeadAirSummary` είναι ο μόνος από τους δεκατέσσερις που ζει σε άλλη ενότητα — πεδίο του πιστοποιητικού ορισμένο στο `dsp/`.
 
+- **[F-130] Έξι βιβλιοθήκες σε ένα χαρακτηριστικό, `cli`, και καμία δεν είναι εκεί για τον λόγο που λέει το όνομα.** Component: `lineos/m1/sp314-dsp/Cargo.toml` · `lineos/m1/sp314-dsp/src/realtime/audio_io.rs` · `lineos/m1/sp314-dsp/src/io/{wav_reader.rs,wav_writer.rs,stream.rs,flac_encode.rs}` · `lineos/m1/sp314-dsp/src/analysis/{scout_scanner.rs,stem_escalation.rs}` · `lineos/m1/sp314-dsp/src/bin/{sp314_stems.rs,scratch_bq.rs}`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20, ως προϋπόθεση της εξαγωγής: το `conformance` δεν μπορεί να πάρει το `sp314-dsp` γιατί η ενοποίηση χαρακτηριστικών φέρνει το `cli` από τα άλλα δύο μέλη, και μαζί το `cpal` και το `alsa`. Η γραμμή, `sp314-dsp/Cargo.toml`:
+  ```
+  cli = ["cpal", "hound", "flac-codec", "ringbuf", "sha2", "hex"]
+  ```
+
+  **Τι κάνει η καθεμία μέσα στο crate:**
+  - `cpal` και `ringbuf` ⇒ ένα αρχείο, `src/realtime/audio_io.rs`, και είναι σωστά φραγμένο: `lib.rs:37`, `#[cfg(all(not(target_arch = "wasm32"), feature = "cli"))]` πάνω από το `pub mod realtime;` (`:38`).
+  - `hound` ⇒ πέντε αρχεία του `src/`: `io/wav_reader.rs`, `io/wav_writer.rs`, `io/stream.rs`, `analysis/scout_scanner.rs`, `analysis/stem_escalation.rs`. **Μηδέν `#[cfg(feature = "cli")]`** — ούτε στο αρχείο, ούτε στο `mod.rs` που τα δηλώνει, ούτε στο `lib.rs`.
+  - `flac-codec` ⇒ ένα αρχείο, `src/io/flac_encode.rs`, επίσης χωρίς φράγμα.
+  - `sha2` ⇒ μηδέν εμφάνιση στο `src/`. Υπάρχει ξεχωριστά ως dev-dependency για τέσσερα δοκίμια.
+  - `hex` ⇒ **μηδέν εμφάνιση πουθενά στο crate**, ούτε στα δοκίμια.
+
+  **Τι χρειάζονται οι δύο που το ζητάνε:**
+  - `sp314-orchestrator` ⇒ `StreamingWavWriter` (`streaming_pipeline.rs:25`) ⇒ `hound`. Μηδέν `cpal`, μηδέν `ringbuf`, μηδέν `flac_encode`, μηδέν `sha2`, μηδέν `hex`.
+  - `m0-daemon` ⇒ `wav_writer` (`export.rs:627`, `dsp_pipeline.rs:291`) ⇒ `hound`, και `flac_encode` (`io_flac.rs:1`) ⇒ `flac-codec`. Μηδέν `cpal` — η μόνη εμφάνιση της λέξης σε όλο το crate είναι σχόλιο (`app_state.rs:6`: «Note: cpal::Stream is !Send, so PlaybackEngine cannot live in AppState.»). Μηδέν `ringbuf`. Και έχει δικές του άμεσες εξαρτήσεις `sha2` (`Cargo.toml:24`) και `hex` (`:26`).
+
+  ⇒ Το εύρημα είναι αντίστροφο από το αναμενόμενο: τα δύο που είναι σωστά φραγμένα (`cpal`, `ringbuf`) είναι αυτά που κανένας καταναλωτής δεν χρειάζεται· τα δύο που τα χρειάζονται όλοι (`hound`, `flac-codec`) δεν είναι φραγμένα καθόλου· και δύο (`sha2`, `hex`) δεν χρησιμοποιούνται από κανέναν μέσα στο crate. Το όνομα «cli» το μητρώο το έχει ήδη ως ομώνυμο: λέει «εργαλείο γραμμής εντολών», περιέχει «είσοδος και έξοδος του λειτουργικού». Τώρα μετρήθηκε το περιεχόμενο.
+
+  **Το εκτελέσιμο που το δικαιολογεί:** ένα `[[bin]]` με `required-features = ["cli"]`: `sp314_stems` (`src/bin/sp314_stems.rs`, 103 γραμμές, five-stem separator). Μηδέν αναφορά του σε `research/`, `tests/`, ή σε οποιοδήποτε σενάριο του αποθετηρίου. Το `.cursor/skills/methodology/SKILL.md:20` το καταγράφει ως σπασμένο και παρκαρισμένο σε προηγούμενο σημείο: «discovering `sp314_stems.rs` was broken while converting test assertions... got reported, parked, and fixed as its own deliberate step afterward.»
+  ⚠ Και υπάρχει δεύτερο, σιωπηλό: `src/bin/scratch_bq.rs`, χωρίς δικό του `[[bin]]`, που το cargo ανακαλύπτει μόνο του — το `autobins` δεν είναι απενεργοποιημένο. Χρησιμοποιεί μόνο `restoration::biquad`, καμία από τις έξι.
+
+  **Το αμέτρητο, γραμμένο ως τέτοιο:** αν το `hound` και το `flac-codec` καλούνται χωρίς φράγμα και είναι `optional`, το crate με `default = []` δεν θα έπρεπε να μεταγλωττίζεται. Δεν επαληθεύτηκε: μέσα στο ίδιο workspace το `cli` είναι πάντα ενεργό από τα δύο άλλα μέλη (επιβεβαιώθηκε ξανά: `cargo check -p sp314-dsp --no-default-features` ξαναφέρνει το `cpal`/`alsa-sys` παρά το ρητό αίτημα), και το ερώτημα δεν απαντιέται με `cargo check` από μέσα σε αυτό το workspace. Εικασία, όχι μέτρηση. Ανοιχτό.
+
 ---
 
-**NEXT FREE: F-130** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-131** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
