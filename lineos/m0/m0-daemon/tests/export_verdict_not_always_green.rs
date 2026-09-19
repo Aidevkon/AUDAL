@@ -16,11 +16,14 @@
 //! κατασκευή αποτελέσματος.
 //!
 //! Άρα ο φρουρός χτυπάει τον ΜΗΧΑΝΙΣΜΟ κατευθείαν: η
-//! `DeliveryCheck::from_margin_checks` είναι καθαρή συνάρτηση ενός
-//! `AcxCheckReport`. Δίνεται report εκτός προδιαγραφής και απαιτείται
-//! `verdict == "fail"`, με το ΜΕΤΡΗΜΕΝΟ νούμερο να επιβιώνει στην εγγραφή.
+//! `conformance::declare::delivery_checks_from_margin_checks` είναι καθαρή
+//! συνάρτηση ενός `AcxCheckReport` (ελεύθερη συνάρτηση από τις 20/09 — πριν
+//! ήταν `DeliveryCheck::from_margin_checks`). Δίνεται report εκτός
+//! προδιαγραφής και απαιτείται `verdict == "fail"`, με το ΜΕΤΡΗΜΕΝΟ νούμερο
+//! να επιβιώνει στην εγγραφή.
 
 use m0d::blob_store::DeliveryCheck;
+use conformance::declare::delivery_checks_from_margin_checks;
 use lineos_types::presets::{ACX, SPOTIFY};
 use sp314_dsp::analysis::acx_check::AcxCheckReport;
 
@@ -42,7 +45,7 @@ fn a_failing_report_produces_fail_records_with_the_measured_numbers() {
         noise_floor_db: Some(-45.0),   // > -60.0 ⇒ fail
         quietest_window_start_frame: Some(0),
     };
-    let checks = DeliveryCheck::from_margin_checks(&report);
+    let checks = delivery_checks_from_margin_checks(&report);
 
     assert_eq!(find(&checks, "peak", "max").verdict, "fail");
     assert_eq!(find(&checks, "rms", "min").verdict, "fail");
@@ -67,7 +70,7 @@ fn the_real_first_acx_deliverable_produces_four_passes() {
         noise_floor_db: Some(-90.42713),
         quietest_window_start_frame: Some(119_070),
     };
-    let checks = DeliveryCheck::from_margin_checks(&report);
+    let checks = delivery_checks_from_margin_checks(&report);
 
     assert_eq!(checks.len(), 4, "rms×2 (min+max) + peak + noise_floor");
     assert!(
@@ -87,7 +90,7 @@ fn an_unmeasured_metric_produces_no_record_at_all() {
         noise_floor_db: None,
         quietest_window_start_frame: None,
     };
-    let checks = DeliveryCheck::from_margin_checks(&report);
+    let checks = delivery_checks_from_margin_checks(&report);
 
     assert_eq!(checks.len(), 3, "χωρίς noise_floor εγγραφή");
     assert!(
@@ -116,7 +119,7 @@ fn the_record_agrees_with_the_single_rule_it_came_from() {
         },
     ] {
         let rule = report.margin_checks();
-        let records = DeliveryCheck::from_margin_checks(&report);
+        let records = delivery_checks_from_margin_checks(&report);
         assert_eq!(rule.len(), records.len());
         for (r, d) in rule.iter().zip(records.iter()) {
             assert_eq!(d.metric, r.metric);
@@ -357,7 +360,7 @@ use m0d::blob_store::DeliveryVerdict;
 
 /// Οι πλήρεις γραμμές ενός ACX παραδοτέου με δοσμένο spacing.
 fn acx_rows(report: AcxCheckReport, head: f32, tail: f32) -> Vec<DeliveryCheck> {
-    let mut v = DeliveryCheck::from_margin_checks(&report);
+    let mut v = delivery_checks_from_margin_checks(&report);
     v.extend(DeliveryCheck::from_spacing(&ACX, head, tail));
     v.extend(DeliveryCheck::from_format(&ACX, 44_100, 1, 192.0));
     v
