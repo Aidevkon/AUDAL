@@ -751,7 +751,8 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   `lineos-types/audio.rs:117-123` (`ManagedPcm::drop`)
   · `xaak/src/engine.rs:164-174` · `lib.rs:206-217`
   (startup sweep) · `blob_store.rs:310` (`MAX_BLOBS`)
-  · `blob_store.rs:1015-1016` (`#[serde(skip)]`).
+  · `lineos-types/src/certificate.rs:163-164` (`#[serde(skip)]`)
+  [παραπομπή μετακινήθηκε 20/09 με τη μετακόμιση των τελευταίων τύπων του πιστοποιητικού].
   ΜΕΤΡΗΜΕΝΟ/ΔΙΑΒΑΣΜΕΝΟ 2026-08-25 (recon
   `.reports/2026-08-25-raw-path-lifetime.md`, γραμμές
   αυτούσιες).
@@ -3391,7 +3392,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 - **[F-129] Το σχήμα του πιστοποιητικού ζει στο στρώμα αποθήκευσης — δεκατέσσερις τύποι, ένας ήδη έξω.** Component: `lineos/m0/m0-daemon/src/blob_store.rs` · `lineos/m0/m0-daemon/src/dsp/signal_health.rs`.
 
-  ΜΕΤΡΗΜΕΝΟ 2026-09-20, ως προϋπόθεση της μετακόμισης του `export.rs`: οκτώ συναρτήσεις ΣΗΜΑΤΟΣ του (`delivery_checks_verdict`, `export_mp3_routed`, `export_flac`, `export_wav`, `export_adm_bwf`, `export_aiff`, `export_mp3_acx`, `export_mp3`) παίρνουν `&StoredBlobV2` ως παράμετρο. Για να είναι ο τύπος ορατός έξω από τον διακομιστή, χρειάζονται δεκατέσσερις τύποι: `StoredBlobV2` (`blob_store.rs:1309`) [παραπομπή μετακινήθηκε 20/09 με τη μετακόμιση των τύπων του πιστοποιητικού] · `StoredBlobCore` (`:1383`) · `BlobVariant` (`:1461`) · `StoredLoudness` (`:36`) · `StoredQuality` (`:532`) · `StoredProvenance` (`:588`) · `StoredSpatial` (`:638`) · `StemFingerprints` (`:622`) · `StageRecord` (`:13`) · `CorrectionRecord` (`:1441`) · `UncertifiedReason` (`:1499`) · `DeliveryCheck` (`:192`) · `DeliveryProfileRef` (`:519`) — όλοι στο `blob_store.rs` — και `DeadAirSummary`, σε άλλη ενότητα (`dsp/signal_health.rs:43`). Μόνο ένας είναι ήδη έξω: `lineos_types::audio::ManagedPcm`, που το `StoredBlobCore` κρατάει ως `Arc` (`:1412`).
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20, ως προϋπόθεση της μετακόμισης του `export.rs`: οκτώ συναρτήσεις ΣΗΜΑΤΟΣ του (`delivery_checks_verdict`, `export_mp3_routed`, `export_flac`, `export_wav`, `export_adm_bwf`, `export_aiff`, `export_mp3_acx`, `export_mp3`) παίρνουν `&StoredBlobV2` ως παράμετρο. Για να είναι ο τύπος ορατός έξω από τον διακομιστή, χρειάζονται δεκατέσσερις τύποι: `StoredBlobV2` (`lineos-types/src/certificate.rs:738`) [παραπομπή μετακινήθηκε 20/09 με τη μετακόμιση των τελευταίων τύπων του πιστοποιητικού] · `StoredBlobCore` (`:1383`) · `BlobVariant` (`:1461`) · `StoredLoudness` (`:36`) · `StoredQuality` (`:532`) · `StoredProvenance` (`:588`) · `StoredSpatial` (`:638`) · `StemFingerprints` (`:622`) · `StageRecord` (`:13`) · `CorrectionRecord` (`:1441`) · `UncertifiedReason` (`:1499`) · `DeliveryCheck` (`:192`) · `DeliveryProfileRef` (`:519`) — όλοι στο `blob_store.rs` — και `DeadAirSummary`, σε άλλη ενότητα (`dsp/signal_health.rs:43`). Μόνο ένας είναι ήδη έξω: `lineos_types::audio::ManagedPcm`, που το `StoredBlobCore` κρατάει ως `Arc` (`:1412`).
 
   **Το εύρημα δεν είναι ο αριθμός, είναι το ποιοι:** `StoredLoudness` · `StoredQuality` · `StoredProvenance` · `DeliveryCheck` · `DeliveryProfileRef` · `StageRecord` · `CorrectionRecord` · `UncertifiedReason` · `DeadAirSummary`. Είναι το περιεχόμενο του πιστοποιητικού — στάθμη, κορυφή, πάτωμα, έλεγχοι παράδοσης, προέλευση, τα στάδια που έτρεξαν, οι διορθώσεις, και ο λόγος μη πιστοποίησης. Δηλαδή το προϊόν που πουλιέται, ορισμένο μέσα στο στρώμα αποθήκευσης, με πρόθεμα «Stored». Το σχήμα έχει δικό του έγγραφο, `docs/certificate-schema-v0.md` — το κείμενο είναι ξεχωριστά, οι τύποι όχι.
 
