@@ -3274,7 +3274,64 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
 ---
 
-**NEXT FREE: F-125** — this line is the ONLY allocator. Taking a number =
+- **[F-125] Τέσσερα λεξιλόγια γούστου, μηδέν επικάλυψη, και έξι επιλογές της διεπαφής που γίνονται τέσσερις στην πράξη.** Component: `apps/stillair/cockpit-dioxus/src/state/presets.rs` · `lineos/m0/m0-daemon/src/domain/dsp_pipeline.rs` · `lineos/m0/m0-daemon/src/domain/nodes/scout_node.rs` · `lineos/m0/m0-daemon/src/domain/nodes/dsp_node.rs` · `pipelines/pipelineforge/src/{router.rs,forge.rs,flavor.rs}` · `lineos/m1/xaak/src/flavours.rs` · `lineos/m0/m0-daemon/src/dsp/mod.rs` · `lineos/m0/m0-daemon/src/domain/nodes/render_node.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-19 (recon, commit c19e6519), τέσσερα σκέλη.
+
+  **Σκέλος 1 — έξι επιλογές, τέσσερα αποτελέσματα.** `presets.rs:12-37`:
+  ```rust
+  pub const FLAVOURS: &[FlavourDef] = &[
+      FlavourDef { id: "clean",     label: "Clean & Clear" },
+      FlavourDef { id: "warm",      label: "Warm Analog" },
+      FlavourDef { id: "punch",     label: "Club Punch" },
+      FlavourDef { id: "air",       label: "Open Air" },
+      FlavourDef { id: "film",      label: "Cinematic" },
+      FlavourDef { id: "broadcast", label: "Radio Edit" },
+  ];
+  ```
+  `dsp_pipeline.rs:105-114`:
+  ```rust
+  pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
+      match flavour_id {
+          "warm" => "warm_analog",
+          "clean" => "clean_punch",
+          "punch" => "clean_punch",
+          "air" => "hybrid_hifi",
+          "film" => "cinematic_wide",
+          "broadcast" => "clean_punch",
+          _ => "warm_analog", // default
+      }
+  }
+  ```
+  ⇒ Τρία κουμπιά — «Clean & Clear», «Club Punch», «Radio Edit» — δίνουν το ίδιο αποτέλεσμα (`clean_punch`). Έξι επιλογές, τέσσερις πραγματικές τιμές (`warm_analog`, `clean_punch`, `hybrid_hifi`, `cinematic_wide`).
+  ⇒ Άγνωστη τιμή πέφτει σιωπηλά στο `warm_analog`, με το σχόλιο να το δηλώνει ρητά ως προεπιλογή (`// default`).
+  ⚠ Ίδιο σχήμα με το ήδη καταγεγραμμένο σιωπηλό fallback του άγνωστου preset στο μητρώο — δεν επεξεργάζεται εδώ, μόνο η ομοιότητα σχήματος σημειώνεται.
+
+  **Σκέλος 2 — το ίδιο πεδίο, δύο τύχες μέσα στην ίδια κλήση.** Η διαδρομή: `app.rs:211` (`"flavourId": fl,`) ⇒ Tauri `mastering.rs:143,146,161` (`pub async fn trigger_mastering(...flavour_id: String...)`) ⇒ `m0_client.rs:77,82` (`POST /master/streaming`) ⇒ `master.rs:330` (`pub flavour_id: Option<String>`). Μέσα στο `execute_streaming_plan`:
+  - `executor.rs:338` περνάει το πεδίο στο `scout_node::run`, του οποίου η υπογραφή (`scout_node.rs:14,19`) έχει `_flavour_id: &str` — κάτω παύλα, μηδέν άλλη εμφάνιση στο αρχείο. **Αγνοείται.**
+  - `executor.rs:459-461` περνάει το ίδιο πεδίο στο `build_intent_and_config`, και `dsp_node.rs:107-108` (`use crate::domain::dsp_pipeline::map_flavour_to_persona; let mapped_persona = map_flavour_to_persona(flavour_id);`) το αντιστοιχεί σε persona.
+  ⇒ Δύο σημεία, δύο συμπεριφορές, ένα πεδίο, μία κλήση.
+
+  **Σκέλος 3 — τέσσερα λεξιλόγια, μηδέν επικάλυψη.**
+  - ΔΙΕΠΑΦΗ: `clean`, `warm`, `punch`, `air`, `film`, `broadcast` (`presets.rs:12-37`).
+  - PERSONA: `warm_analog`, `clean_punch`, `hybrid_hifi`, `cinematic_wide` (`dsp_pipeline.rs:105-114`).
+  - `Flavor::` των εννέα (`pipelines/pipelineforge/src/flavor.rs:6-14`): `LowMidClarity`, `PresenceAndAir`, `AntiPumpStabilization`, `MonoSafeMaster`, `LtassCorrection`, `LufsNormalization`, `DcRemoval`, `HumRemoval`, `POXVoice`.
+  - Τέταρτο, ασύνδετο: `xaak/src/flavours.rs:14-19,55` — σταθερές `warm_analog`, `cinematic_wide`, `club_punch`, `radio_edit`, `clean_clear`, `neutral` — **τα ίδια ονόματα με τις persona**, άλλο αρχείο, μηδέν κλήση από τη διεπαφή.
+  ⇒ Ήδη γραμμένο σε προϋπάρχον έγγραφο, `PRODUCT_MAP.md:238`, πηγή "ui-flavour-labels": «μόνο το 2ο συνδέεται με το UI που εξετάστηκε· το xaak σύστημα δεν καλείται ΠΟΤΕ από αυτό το UI».
+  ⇒ Κανένα από τα έξι ονόματα της διεπαφής δεν ταυτίζεται με κανένα από τα εννέα `Flavor::`.
+
+  **Σκέλος 4 — το `flavourId` δεν αγγίζει τα εννέα καθόλου.** Οκτώ από τα εννέα κατασκευάζονται μέσα στο `Router::select` (`router.rs:7,12,15,20,25,32,39,44,48`), που καλείται μόνο από `Pipelineforge::forge` (`forge.rs:8-9`), που καλείται σε src/ από `dsp/mod.rs:67` (εκτός `#[cfg(test)]`· η δεύτερη εμφάνιση, `dsp/mod.rs:636`, είναι μέσα σε δοκίμιο) με `ConditionSet` από το `intent_to_conditions`.
+  ⇒ Επιλέγονται από **ανάλυση σήματος** (`DcOffsetDetected`, `MainsHumDetected`, `MuddyMix`, κ.λπ.), όχι από τον χρήστη.
+  ⇒ Το ένατο, το `POXVoice`, δεν περνάει ποτέ από τον `Router` — κατασκευάζεται απευθείας, `render_node.rs:167` (`let topo = pipelineforge::flavor::Flavor::POXVoice.build(sample_rate);`).
+
+  **Συνεπαγόμενο για το κλάδεμα, γραμμένο ως εύρημα:** η λίστα του §6.4 ονομάζει «Router/Flavor/Pipelineforge» ως μονάδα προς κλάδεμα. Μετρήθηκε ζωντανό, και μέσα του είναι τρία στάδια της παράδοσης: `DcRemoval` (Στάδιο 0, P0, R5b), `HumRemoval` (Στάδιο 2, P0, R5b) και `POXVoice` (πηγή των σταδίων 1, 2, 3, 6 — O-007, ΤΑΞΙΔΕΥΕΙ, επαληθεύτηκε ρητά στο `docs/ORPHANS.md:151-161`, αμετάβλητο).
+  ⇒ Η κατηγορία δεν κλαδεύεται ως έχει. Δεύτερη κατηγορία του §6.4 που σπάει στην ανάγνωση (η πρώτη ήταν το «cut-repair»/`cut_heal`, προηγούμενο recon).
+
+  **Γραμμή μετατοπισμένη από το recon της 19/09:** `presets.rs` FLAVOURS `15-32` → **12-37** (τρεις γραμμές νωρίτερα· η ίδια λίστα, `id: "clean"` στη γρ.14 όχι 15). Όλες οι υπόλοιπες παραπομπές (`dsp_pipeline.rs:105-114`· `scout_node.rs:14,19`· `executor.rs:338,459-461`· `dsp_node.rs:107-108`· `router.rs:7,12,15,20,25,32,39,44,48`· `forge.rs:8-9`· `dsp/mod.rs:67,636`· `render_node.rs:167`· `app.rs:211,697`· `mastering.rs:143,146,161`· `m0_client.rs:77,82`· `master.rs:330`) επαληθεύτηκαν αυτούσιες, χωρίς μετατόπιση.
+
+---
+
+**NEXT FREE: F-126** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
