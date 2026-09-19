@@ -3389,9 +3389,19 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Σχέση με το F-124:** εκείνο μέτρησε ότι η δήλωση ενός προορισμού (`true_peak_dbtp`) αφορά άλλο αρχείο από αυτό που παραδίδεται. Αυτό μετράει ότι οι άλλοι τέσσερις προορισμοί δεν έχουν δήλωση καθόλου. Ίδιο σχήμα, ένα επίπεδο πιο πάνω.
 
+- **[F-129] Το σχήμα του πιστοποιητικού ζει στο στρώμα αποθήκευσης — δεκατέσσερις τύποι, ένας ήδη έξω.** Component: `lineos/m0/m0-daemon/src/blob_store.rs` · `lineos/m0/m0-daemon/src/dsp/signal_health.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20, ως προϋπόθεση της μετακόμισης του `export.rs`: οκτώ συναρτήσεις ΣΗΜΑΤΟΣ του (`delivery_checks_verdict`, `export_mp3_routed`, `export_flac`, `export_wav`, `export_adm_bwf`, `export_aiff`, `export_mp3_acx`, `export_mp3`) παίρνουν `&StoredBlobV2` ως παράμετρο. Για να είναι ο τύπος ορατός έξω από τον διακομιστή, χρειάζονται δεκατέσσερις τύποι: `StoredBlobV2` (`blob_store.rs:1560`) · `StoredBlobCore` (`:1383`) · `BlobVariant` (`:1461`) · `StoredLoudness` (`:36`) · `StoredQuality` (`:532`) · `StoredProvenance` (`:588`) · `StoredSpatial` (`:638`) · `StemFingerprints` (`:622`) · `StageRecord` (`:13`) · `CorrectionRecord` (`:1441`) · `UncertifiedReason` (`:1499`) · `DeliveryCheck` (`:192`) · `DeliveryProfileRef` (`:519`) — όλοι στο `blob_store.rs` — και `DeadAirSummary`, σε άλλη ενότητα (`dsp/signal_health.rs:43`). Μόνο ένας είναι ήδη έξω: `lineos_types::audio::ManagedPcm`, που το `StoredBlobCore` κρατάει ως `Arc` (`:1412`).
+
+  **Το εύρημα δεν είναι ο αριθμός, είναι το ποιοι:** `StoredLoudness` · `StoredQuality` · `StoredProvenance` · `DeliveryCheck` · `DeliveryProfileRef` · `StageRecord` · `CorrectionRecord` · `UncertifiedReason` · `DeadAirSummary`. Είναι το περιεχόμενο του πιστοποιητικού — στάθμη, κορυφή, πάτωμα, έλεγχοι παράδοσης, προέλευση, τα στάδια που έτρεξαν, οι διορθώσεις, και ο λόγος μη πιστοποίησης. Δηλαδή το προϊόν που πουλιέται, ορισμένο μέσα στο στρώμα αποθήκευσης, με πρόθεμα «Stored». Το σχήμα έχει δικό του έγγραφο, `docs/certificate-schema-v0.md` — το κείμενο είναι ξεχωριστά, οι τύποι όχι.
+
+  **Δύο μετρημένα που δείχνουν τι δεν ξέρουμε:** το `blob_store.rs` είναι 1.722 γραμμές και έχει 57 γραμμές με `impl` ή `fn`. Πόσες από αυτές ανήκουν στους δεκατέσσερις δεν μετρήθηκε — δεν γράφεται εικασία. Μέχρι να μετρηθεί, το μέγεθος της μετακόμισης είναι άγνωστο.
+
+  **Το καθαρό:** σε όλη την αλυσίδα των δεκατεσσάρων — μηδέν `axum::`, μηδέν `surrealdb`, μηδέν `DbConn`. Οι τύποι είναι serde με αριθμούς, συμβολοσειρές και λογικές τιμές. Ίδιο σχήμα με το `DecodeError` και το `MAX_FILE_BYTES`, τρίτη φορά: ο τύπος είναι καθαρός, το σπίτι του όχι. Και το `DeadAirSummary` είναι ο μόνος από τους δεκατέσσερις που ζει σε άλλη ενότητα — πεδίο του πιστοποιητικού ορισμένο στο `dsp/`.
+
 ---
 
-**NEXT FREE: F-129** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-130** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
