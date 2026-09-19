@@ -1,0 +1,21 @@
+[package]
+name = "conformance"
+version = "0.1.0"
+# Ιδιωτικό, εμπορικό. Η παραχώρηση αδείας είναι
+# απόφαση του ιδιοκτήτη — ΟΧΙ προεπιλογή εργαλείου.
+# (2026-09-06· repo ιδιωτικό, μηδέν δημοσιεύσεις)
+license = "UNLICENSED"
+publish = false
+edition = "2021"
+
+[dependencies]
+symphonia    = { version = "0.5", features = [
+    "mp3",
+    "flac",
+    "pcm",
+    "aiff",
+    "wav",
+    "isomp4",
+] }
+rubato       = "0.15"   # SincFixedIn resampling → 48000 Hz
+lineos-types = { path = "../lineos-types" }

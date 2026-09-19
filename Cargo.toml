@@ -5,6 +5,7 @@ members = [
     "lineos/m1/lineos-types",
     "lineos/m1/sp314-dsp",
     "lineos/m1/sp314-orchestrator",
+    "lineos/m1/conformance",
     "lineos/m1/telemetry",
     "lineos/m1/metadata",
     "lineos/m1/insights",
