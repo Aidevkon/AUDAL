@@ -17,6 +17,7 @@ pub mod analysis;
 pub mod audio;
 pub mod config;
 pub mod decode;
+pub mod dsp_state;
 pub mod errors;
 pub mod golden_blob;
 pub mod jini;
