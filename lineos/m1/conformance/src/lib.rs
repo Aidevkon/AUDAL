@@ -7,3 +7,5 @@
 
 pub mod decode;
 pub mod declare;
+pub mod export;
+pub mod io_flac;

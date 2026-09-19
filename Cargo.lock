@@ -1166,10 +1166,18 @@ dependencies = [
 name = "conformance"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "hound",
+ "lame-sys",
+ "libm",
  "lineos-types",
  "rubato 0.15.0",
+ "serde",
+ "serde_json",
  "sp314-dsp",
  "symphonia",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]

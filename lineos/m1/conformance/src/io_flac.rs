@@ -54,7 +54,7 @@ pub fn encode_f32_flac_24(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handlers::decode::decode_raw_interleaved;
+    use crate::decode::decode_raw_interleaved;
     use tempfile::TempDir;
 
     #[test]
