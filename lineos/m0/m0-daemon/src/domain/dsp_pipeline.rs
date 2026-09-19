@@ -835,7 +835,7 @@ fn run_dsp_internal(
                         std::slice::from_raw_parts(mmap.as_ptr() as *const f32, mmap.len() / 4)
                     };
                     let t_flac = std::time::Instant::now();
-                    if let Err(e) = crate::io_flac::encode_f32_flac_24(
+                    if let Err(e) = conformance::io_flac::encode_f32_flac_24(
                         mmap_f32,
                         render_res.sample_rate,
                         2,
@@ -1402,7 +1402,7 @@ fn run_dsp_internal(
         let flac_path = project_dir.join(format!("{track_safe}.flac"));
 
         let t_flac = std::time::Instant::now();
-        if let Err(e) = crate::io_flac::encode_f32_flac_24(
+        if let Err(e) = conformance::io_flac::encode_f32_flac_24(
             &mmap_f32[..n_total * 2],
             decoded.pcm_sample_rate,
             2,

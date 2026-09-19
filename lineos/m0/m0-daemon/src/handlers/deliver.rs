@@ -3,7 +3,7 @@ use crate::blob_store::{
     BlobVariant, StoredBlobCore, StoredBlobV2, UncertifiedReason,
 };
 use crate::db::schema::Track;
-use crate::handlers::export::export_mp3_acx;
+use conformance::export::export_mp3_acx;
 use axum::{
     extract::{Path, State},
     Json,

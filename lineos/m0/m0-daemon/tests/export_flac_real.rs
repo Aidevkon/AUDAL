@@ -1,7 +1,7 @@
 use lineos_types::audio::ManagedPcm;
 use m0d::blob_store::{StoredBlobV2, StoredBlobCore, BlobVariant, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial};
 use m0d::dsp::signal_health::DeadAirSummary;
-use m0d::handlers::export::export_flac;
+use conformance::export::export_flac;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
