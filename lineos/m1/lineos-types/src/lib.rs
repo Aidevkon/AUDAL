@@ -15,6 +15,7 @@
 
 pub mod analysis;
 pub mod audio;
+pub mod certificate;
 pub mod config;
 pub mod decode;
 pub mod dsp_state;
