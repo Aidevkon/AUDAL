@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow       = "1"
 chrono       = { version = "0.4", features = ["serde"] }
 uuid         = { version = "1", features = ["v4"] }
-sp314-dsp    = { path = "../../m1/sp314-dsp", features = ["cli"] }
+sp314-dsp    = { path = "../../m1/sp314-dsp" }
 lineos-types = { path = "../../m1/lineos-types" }
 conformance  = { path = "../../m1/conformance" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
