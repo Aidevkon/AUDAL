@@ -2278,7 +2278,8 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
   ΑΝΑΦΕΡΕΤΑΙ ΣΤΗΝ ΑΛΛΗ** (ΗΤΑΝ, ΠΡΙΝ το F-104 — βλ. παρακάτω):
   - `m0-daemon/src/dsp/stream_core.rs:7` ήταν `TARGET_SR: u32 =
     48_000` — ΖΩΝΤΑΝΟ, ο κύριος resampler (`StandardizedAudioStream`).
-  - `m0-daemon/src/handlers/decode.rs:19` ήταν `TARGET_SAMPLE_RATE:
+  - `lineos/m1/conformance/src/decode.rs:21` (η παραπομπή μετακινήθηκε
+    στις 20/09 με τη γέννηση του conformance) ήταν `TARGET_SAMPLE_RATE:
     u32 = 48_000` — ΖΩΝΤΑΝΟ, ΔΕΥΤΕΡΟΣ ανεξάρτητος resampler (δικό του
     rubato, δικές του σταθερές), τροφοδοτεί το preview-stem endpoint.
   - `m1/xaak/src/lib.rs:49` ήταν `TARGET_SAMPLE_RATE: u32 = 48_000` —
@@ -3362,7 +3363,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
   ⇒ Η συνέπεια είναι δομική, όχι παράβλεψη: το δοκίμιο του πυρήνα δεν μπορεί να καλέσει την αποκωδικοποίηση της παραγωγής (διαφορετικό crate, χωρίς εξάρτηση προς τα πίσω), άρα την ξαναγράφει. Πέντε φορές.
   ⇒ Και ο κανόνας τηρείται ρητά ασύμμετρα: `symphonia = { version = "0.5", features = ["all"] }` και `rubato = "0.14"` ζουν στο `[dev-dependencies]` του `sp314-dsp/Cargo.toml:43,36` — τηρούμενος για την παραγωγή, παρακαμπτόμενος για τα δοκίμια.
 
-  **Έβδομο, ορφανό ικρίωμα για το ίδιο πράγμα — αναφέρεται, δεν αριθμείται εδώ.** `sp314-dsp/src/io/decode_types.rs:41-46` ορίζει `pub enum LazyReaderError { NoSupportedTrack, Symphonia(String), MissingSampleRate, InvalidBufferLength { len: usize, channels: usize } }`, με το μήνυμα `"symphonia error: {e}"` στη `:52`. Grep σε όλο το `sp314-dsp/src`: μηδέν άλλη εμφάνιση του τύπου — δεν κατασκευάζεται, δεν καλείται πουθενά. Τύπος σφάλματος για βιβλιοθήκη που το ίδιο το crate δεν επιτρέπεται να εισάγει.
+  **Έβδομο, ορφανό ικρίωμα για το ίδιο πράγμα — αναφέρεται, δεν αριθμείται εδώ.** `sp314-dsp/src/io/decode_types.rs:15-20` (η παραπομπή μετατοπίστηκε στις 20/09 όταν το DecodeError έφυγε για το lineos-types) ορίζει `pub enum LazyReaderError { NoSupportedTrack, Symphonia(String), MissingSampleRate, InvalidBufferLength { len: usize, channels: usize } }`, με το μήνυμα `"symphonia error: {e}"` στη `:26`. Grep σε όλο το `sp314-dsp/src`: μηδέν άλλη εμφάνιση του τύπου — δεν κατασκευάζεται, δεν καλείται πουθενά. Τύπος σφάλματος για βιβλιοθήκη που το ίδιο το crate δεν επιτρέπεται να εισάγει.
 
   **Συνέπεια για την εξαγωγή, γραμμένη ως εύρημα:** το `decode.rs` δεν μπορεί να μετακομίσει σε κανένα από τα τρία υπάρχοντα crates που εξετάστηκαν. Το `sp314-dsp` το απαγορεύει με γραπτό κανόνα (`:7` πιο πάνω)· το `lineos-types/Cargo.toml` έχει μόνο `serde`, `bincode` (προαιρετικό), `serde_json`· το `sp314-orchestrator/Cargo.toml` έχει μόνο εσωτερικά crates του έργου (`sp314-dsp`, `sp314-nodes`, `lineos-corpus`, `lineos-types`, `aether-bridge`) πέρα από `serde`/`serde_json`. Ούτε το `symphonia` ούτε το `rubato` είναι εξάρτηση παραγωγής σε κανένα από τα τρία. Το μόνο που δένει το `decode.rs` στον διακομιστή είναι μία γραμμή, `use crate::config::MAX_FILE_BYTES` (`:24`) — και εννιά συναρτήσεις του είναι ΣΗΜΑ, όλες καθαρές (F-126).
 

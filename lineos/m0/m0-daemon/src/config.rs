@@ -6,7 +6,8 @@ pub const POLICIES_PATH: &str = "lineos/m0/config/policies.toml";
 pub const AUDIT_LOG_DIR: &str = "lineos/m0/logs/audit";
 pub const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
 
-pub const MAX_FILE_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
+// Ο ορισμός μετακόμισε με τον αποκωδικοποιητή στο conformance στις 20/09· η επανεξαγωγή κρατάει μία πηγή και αφήνει το scout.rs και το decode_actor.rs ανέπαφα.
+pub use conformance::decode::MAX_FILE_BYTES;
 
 /// MAX_STREAM_FILE_BYTES: 12GB headroom for streaming (an 8h 48k/32f stereo file is ~11GB)
 pub const MAX_STREAM_FILE_BYTES: u64 = 12 * 1024 * 1024 * 1024;

@@ -4,3 +4,5 @@
 //! μηδέν βάση, μηδέν διακομιστής — κατάσταση έρχεται ως όρισμα.
 //!
 //! symphonia lives here, and sp314-dsp still never imports it.
+
+pub mod decode;
