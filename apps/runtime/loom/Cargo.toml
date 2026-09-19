@@ -21,6 +21,6 @@ symphonia = { version = "0.5", default-features = false, features = ["flac"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
-sp314-dsp = { path = "../../../lineos/m1/sp314-dsp", features = ["cli"] }
+sp314-dsp = { path = "../../../lineos/m1/sp314-dsp" }
 pipelineforge = { path = "../../../pipelines/pipelineforge" }
 

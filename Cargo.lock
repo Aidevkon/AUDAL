@@ -7981,7 +7981,6 @@ dependencies = [
  "ctrlc",
  "dhat",
  "flac-codec",
- "hex",
  "hound",
  "libm",
  "lineos-corpus",

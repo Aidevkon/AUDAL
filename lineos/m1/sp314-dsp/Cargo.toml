@@ -54,8 +54,6 @@ path = "tests/stress/mod.rs"
 
 [[test]]
 name = "adm_bwf_integration"
-required-features = ["cli"]
 
 [[test]]
 name = "fixture_factory"
-required-features = ["cli"]
