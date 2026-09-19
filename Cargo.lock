@@ -7994,7 +7994,6 @@ dependencies = [
  "sha2",
  "symphonia",
  "tempfile",
- "xaak",
 ]
 
 [[package]]

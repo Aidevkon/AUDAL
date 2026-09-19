@@ -19,7 +19,6 @@ hound = "3.5"
 flac-codec = { version = "1.3", default-features = false }
 lineos-types = { path = "../lineos-types" }
 lineos-corpus = { path = "../lineos-corpus" }
-xaak = { path = "../xaak" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.cpal]
 version  = "0.15"

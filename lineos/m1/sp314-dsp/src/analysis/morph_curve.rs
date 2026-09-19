@@ -3,7 +3,7 @@
 //! Authority: aether-black-spec-v1_0.md AB-P3
 //! INV-AB-1: same t + same states → same result. Always.
 
-use xaak::repo::DspState;
+use lineos_types::dsp_state::DspState;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CurveType {

@@ -7,7 +7,7 @@ use crate::analysis::ear_fatigue::EarFatigueModel;
 use crate::analysis::morph_curve::MorphCurve;
 use crate::analysis::phantom_master::PhantomMaster;
 use lineos_types::pre_analysis::PreAnalysisData;
-use xaak::repo::DspState;
+use lineos_types::dsp_state::DspState;
 
 /// Per-track mastering plan computed by AlbumConductor.
 #[derive(Debug, Clone)]
