@@ -48,6 +48,17 @@ TARGETS=(
     "lineos/m0/m0-daemon/src/blob_store.rs"
     "shared/aether-bridge/src/reference_resolver.rs"
     "shared/aether-bridge/src/lib.rs"
+    # 2026-09-20 (F-132): το περιεχόμενο του handlers/export.rs μετακόμισε
+    # εδώ (export_mp3_acx και οι υπόλοιπες συναρτήσεις ΣΗΜΑΤΟΣ). Πέντε
+    # ασφράγιστα ήταν αόρατα στη μετάβαση, μέσα ακριβώς στο export_mp3_acx.
+    "lineos/m1/conformance/src/export.rs"
+    # 2026-09-20 (F-132): οι εικοσιδύο τύποι του πιστοποιητικού, μαζί με το
+    # from_spacing και το from_format — οι παραγωγοί των ελέγχων που ήταν ο
+    # λόγος του blob_store.rs στη λίστα από την 25/08.
+    "lineos/m1/lineos-types/src/certificate.rs"
+    # 2026-09-20 (F-132): η μετάφραση των margin_checks (πρώην
+    # DeliveryCheck::from_margin_checks) — το τρίτο σκέλος του ίδιου λόγου.
+    "lineos/m1/conformance/src/declare.rs"
 )
 
 STRICT=0
