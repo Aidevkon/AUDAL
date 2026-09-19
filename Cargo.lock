@@ -1168,6 +1168,7 @@ version = "0.1.0"
 dependencies = [
  "lineos-types",
  "rubato 0.15.0",
+ "sp314-dsp",
  "symphonia",
 ]
 
