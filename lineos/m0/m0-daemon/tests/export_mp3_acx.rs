@@ -1,7 +1,7 @@
 use lineos_types::audio::ManagedPcm;
 use m0d::blob_store::{StoredBlobV2, StoredBlobCore, BlobVariant, StoredLoudness, StoredProvenance, StoredQuality, StoredSpatial};
 use m0d::dsp::signal_health::DeadAirSummary;
-use m0d::handlers::export::export_mp3_acx;
+use conformance::export::export_mp3_acx;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -173,7 +173,7 @@ fn test_edge_quiet_secs() {
     // 1.5s of -60 dBFS (amplitude 0.001)
     mono.resize(head_frames + body_frames + tail_frames, 0.001);
 
-    let (head, tail) = m0d::handlers::export::edge_quiet_secs(&mono, sr);
+    let (head, tail) = conformance::export::edge_quiet_secs(&mono, sr);
     assert!((head - 0.7).abs() <= 0.15, "expected ~0.7, got {}", head);
     assert!((tail - 1.5).abs() <= 0.15, "expected ~1.5, got {}", tail);
 }

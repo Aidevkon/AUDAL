@@ -35,7 +35,7 @@ use std::path::Path;
 
 use crate::app_state::AppState;
 use crate::audit::{AuditEntry, AuditLevel};
-use crate::blob_store::{StoredBlobV2, StoredLoudness, StoredQuality};
+use crate::blob_store::StoredBlobV2;
 use crate::handlers::blob::{get_or_rehydrate, RehydrateError};
 
 // ── Request/Response types ────────────────────────────────────────────────────
