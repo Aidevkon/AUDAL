@@ -1163,6 +1163,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "conformance"
+version = "0.1.0"
+dependencies = [
+ "lineos-types",
+ "rubato 0.15.0",
+ "symphonia",
+]
+
+[[package]]
 name = "console"
 version = "0.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
