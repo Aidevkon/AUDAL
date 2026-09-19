@@ -3458,9 +3458,57 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Το μεθοδολογικό, γραμμένο ως τέτοιο:** πέντε κρίκοι της αλυσίδας βρέθηκαν από τον μεταγλωττιστή, όχι από το recon που προηγήθηκε κάθε βήματος — το `pub use` του `DecodeError` που η έκφραση της αναζήτησης δεν έπιανε· το `MAX_FILE_BYTES` που το μοιράζονταν τρία αρχεία· η ενοποίηση χαρακτηριστικών που έφερε το `cpal`· το `apps/runtime/loom`, τρίτος καταναλωτής που δεν ήταν στην ερώτηση· και το `xaak`, που δεν ήταν καν στη γραμμή του `cli`. Το PROTOCOL το έχει ήδη γραμμένο από τον Αύγουστο: ο compiler είναι το recon. Το grep δίνει ελλιπή λίστα· ο μεταγλωττιστής ποτέ.
 
+- **[F-132] Ο φρουρός των κατωφλιών έχει ρητή λίστα διαδρομών, και η μετακόμιση του `export.rs` την προσπέρασε — το νούμερο έπεσε επειδή ο φρουρός τυφλώθηκε, όχι επειδή διορθώθηκε κάτι.** Component: `scripts/threshold-lint.sh` · `lineos/m0/m0-daemon/src/handlers/export.rs` · `lineos/m0/m0-daemon/src/blob_store.rs` · `lineos/m1/conformance/src/export.rs` · `lineos/m1/lineos-types/src/certificate.rs` · `lineos/m1/conformance/src/declare.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20, μετά τη μετακόμιση της διαδρομής εξαγωγής (6789a34): το `threshold-lint` πήγε από 38 ασφράγιστα σε 33 — μείωση χωρίς καμία διόρθωση.
+
+  **Η λίστα TARGETS, αυτούσια, με το σχόλιό της** (`scripts/threshold-lint.sh:38-51`):
+  ```
+  TARGETS=(
+      "lineos/m1/sp314-dsp/src/analysis/acx_check.rs"
+      "lineos/m1/lineos-types/src/presets.rs"
+      "lineos/m0/m0-daemon/src/handlers/export.rs"
+      "lineos/m0/m0-daemon/src/handlers/deliver.rs"
+      # 2026-08-25: ΠΑΡΑΓΕΙ ΚΑΘΕ delivery check (from_format · from_spacing ·
+      # η μετάφραση των margin_checks). Ήταν εκτός σάρωσης — δηλαδή ο
+      # φρουρός δεν έβλεπε ΑΚΡΙΒΩΣ εκεί που γεννιούνται οι κρίσεις, και
+      # οι σφραγίδες που μπήκαν εκεί ήταν αόρατες. Ίδιο σχήμα με το
+      # presets.rs δύο γύρους πριν.
+      "lineos/m0/m0-daemon/src/blob_store.rs"
+      "shared/aether-bridge/src/reference_resolver.rs"
+      "shared/aether-bridge/src/lib.rs"
+  )
+  ```
+  Το σχόλιο της 25/08 το είχε ήδη προβλέψει, για το `blob_store.rs`, με σχεδόν τα ίδια λόγια που χρειάζεται τώρα: ο φρουρός δεν βλέπει ακριβώς εκεί που γεννιούνται οι κρίσεις. Το `blob_store.rs` μπήκε στη λίστα ΓΙΑΤΙ παρήγαγε κάθε delivery check — `from_format`, `from_spacing`, και τη μετάφραση των `margin_checks`. Και τα τρία έφυγαν το ίδιο βράδυ: το `DeliveryCheck` (με το `from_spacing`/`from_format`) μετακόμισε στο `lineos-types/src/certificate.rs`, και το `from_margin_checks` έγινε ελεύθερη συνάρτηση στο `conformance/src/declare.rs`.
+
+  **Μετρημένο σήμερα, ανά διαδρομή της λίστας:**
+  ```
+  acx_check.rs                14 κατώφλια, 13 ασφράγιστα
+  presets.rs                  15 κατώφλια,  9 ασφράγιστα
+  handlers/export.rs           1 κατώφλιο,   0 ασφράγιστα
+  handlers/deliver.rs          3 κατώφλια,   3 ασφράγιστα
+  blob_store.rs                3 κατώφλια,   3 ασφράγιστα
+  reference_resolver.rs        3 κατώφλια,   3 ασφράγιστα
+  lib.rs (aether-bridge)       2 κατώφλια,   2 ασφράγιστα
+                                            ── 33 σύνολο (ταυτίζεται με τον φρουρό)
+  ```
+  Και στα νέα σπίτια, ΕΚΤΟΣ της λίστας — ίδιο σαρωτικό regex, εκτός φρουρού:
+  ```
+  conformance/src/export.rs            5 ασφράγιστα (export_mp3_acx: δύο "dbfs < -50.0",
+                                        RMS_MARGIN_DB, "tp_db > -3.0", "diff_sec > 0.1")
+  lineos-types/src/certificate.rs      2 ασφράγιστα (DeadAirSummary::default, total_sec/longest_sec)
+  conformance/src/declare.rs           0 ασφράγιστα
+                                      ── 7 σύνολο εκτός εύρους
+  ```
+  Τα πέντε του `conformance/src/export.rs` είναι ακριβώς το είδος μπλέξιμο που έγραψε το σχόλιο της 25/08 — γεννιούνται μέσα στο `export_mp3_acx`, τη συνάρτηση που μετράει και διορθώνει το τελικό ACX παραδοτέο. Τα δύο του `certificate.rs` δεν είναι νέα τυφλά σημεία απόψε: το `DeadAirSummary` ζούσε πριν σε `dsp/signal_health.rs`, που δεν ήταν ποτέ στη λίστα TARGETS — απλώς άλλαξε αόρατο σπίτι.
+
+  **Το άθροισμα:** 33 (ό,τι βλέπει σήμερα ο φρουρός) + 7 (ό,τι μετρήθηκε έξω από το εύρος) = **40**, όχι 38. Κάτι άλλο συμβαίνει επίσης — η διαφορά δεν εξηγείται πλήρως από τη μετακόμιση του `export.rs` μόνη της (το `DeadAirSummary` ήταν ήδη εκτός εύρους πριν από απόψε).
+
+  **Το εύρημα:** ένας φρουρός με ρητή λίστα διαδρομών τυφλώνεται όταν ο κώδικας μετακομίζει, και δείχνει το αποτέλεσμα ως βελτίωση — το νούμερο πέφτει, ο κόσμος διαβάζει «λιγότερα ασφράγιστα», και το πραγματικό σύνολο δεν άλλαξε (ή μεγάλωσε). Τέταρτο σχήμα του F-120 σε μία μέρα: το `reference-lint` μέτρησε έναν δίσκο, το `sample-rate-lint` ένα νεκρό αρχείο που ο μεταγλωττιστής δεν έβλεπε, και τώρα το `threshold-lint` μετράει φάκελο αντί για δουλειά. Και η παγίδα είναι συγκεκριμένη: αν κατέβει το παγωμένο στο 33, κλειδώνεται η τυφλότητα — το νούμερο δεν κατεβαίνει μέχρι το εύρος να ακολουθήσει τον κώδικα.
+
 ---
 
-**NEXT FREE: F-132** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-133** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
