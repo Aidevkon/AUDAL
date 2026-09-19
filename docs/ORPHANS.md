@@ -71,6 +71,16 @@ ORPHAN-ALLOCATOR: O-021
 ⚠ Μια τύχη μένει έγκυρη μόνο όσο η κατηγορία που την έκρινε περιγράφει
   τον κώδικα. Όταν η αντιστοίχιση έγινε σε όνομα αντί σε συμπεριφορά,
   ξανακρίνεται.
+⚠ Η τύχη του χωρικού κρίθηκε από τον ιδιοκτήτη στις 19/09: το άνοιγμα
+  σε 5.1 και το δίπλωμα πίσω ήταν ο τρόπος της πρώτης έκδοσης να δώσει
+  πλάτος, και η παράδοση δεν το χρειάζεται — σύμφωνο με το R5 (γρ.203,
+  «No Width, no LTASS, no MaskingEQ in any delivery profile») και με
+  τον πίνακα των προφίλ του R1 (γρ.163-167), που έχει τέσσερις
+  προορισμούς και κανέναν με έξι κανάλια. Το `deterministic_upmix`, ο
+  τρίτος και καλύτερος από τους τρεις upmixers που καταγράφει το
+  `docs/certificate-schema-v0.md:346-347`, ζει στο ίδιο αρχείο με το
+  spatial path (`five_dot_one.rs:77`) και μένει μαζί του — δύο
+  κατηγορίες του §6.4, ένα αρχείο.
 
 ---
 
@@ -376,18 +386,30 @@ ORPHAN-ALLOCATOR: O-021
 - **Βρέθηκε από:** ΧΩΡΙΣ ΑΡΙΘΜΟ ΕΥΡΗΜΑΤΟΣ (εντοπίστηκε 19/09, ίδιο
   τεκμήριο R5 με O-018/O-019)
 - **Κατάσταση:** ΟΡΦΑΝΟ
-- **Τύχη:** ΑΚΡΙΤΟ — δεν είναι `DspNode`, καμία κατηγορία του §6.4 δεν
-  το ονομάζει. Διαφορετικό σχήμα από τα O-018/O-019: η κλήση
-  **υπάρχει** σε src/ (`m0-daemon/src/domain/dsp_pipeline.rs:1296`,
+- **Τύχη:** ΜΕΝΕΙ — R5 (γρ.203): «Speech chain and music chain per
+  §6.0. **No Width, no LTASS, no MaskingEQ** in any delivery profile.»
+  Το `GlueChain` είναι πλατυντής M/S με allpass — αυτό ακριβώς που η
+  γραμμή βγάζει. Και §5.3 (γρ.331, «Future considerations (P2)»):
+  «spatial and immersive (**shelved** — the post beachhead may pull
+  it)» — το χωρικό μπαίνει ρητά στα μελλοντικά.
+  Η κλήση **υπάρχει** σε src/ (`m0-daemon/src/domain/dsp_pipeline.rs:1296`,
   `sp314_dsp::dsp::glue::GlueChain::new(...)`, μέσα σε
   `if GLUE_SEND_AMOUNT > 1e-6`), αλλά η σταθερά είναι
   `const GLUE_SEND_AMOUNT: f32 = 0.0; // ΠΡΟΣ ΤΟ ΠΑΡΟΝ 0`
   (`dsp_pipeline.rs:23`) — πάντα ψευδής, νεκρός κλάδος, όχι άκλητος
-  κώδικας. ⚠ Δεν είναι ξεχασμένο: `DECISIONS.md:41` το έχει στα
-  ανοιχτά με ετυμηγορία, ΜΕΤΡΗΣΗ 2026-08-16 [49207c4, PARK BLUE]:
-  «voice tail στο ambience — NMFD8 corr ratio 1.5525 vs NMF5 1.1050.
-  Το Glue [3] ΦΡΑΓΜΕΝΟ μέχρι voice-aware send ή per-stem reclaim.»
-  Παρκαρισμένο με ετυμηγορία, όχι ασύνδετο από αμέλεια.
+  κώδικας. ⚠ Δεν είναι ξεχασμένο από αμέλεια: `DECISIONS.md:41` έχει
+  ετυμηγορία της 2026-08-16 [49207c4, PARK BLUE]: «voice tail στο
+  ambience — NMFD8 corr ratio 1.5525 vs NMF5 1.1050. Το Glue [3]
+  ΦΡΑΓΜΕΝΟ μέχρι voice-aware send ή per-stem reclaim.» Ο όρος
+  ξεμπλοκαρίσματος απαιτεί διάκριση ανά στέλεχος (voice-aware/
+  per-stem) — ακριβώς το είδος πολλαπλών σημάτων που το K0a (R5b
+  γρ.214, «Correction moves one signal toward one criterion. Mixing
+  balances two signals against each other. Mixing is out») βγάζει
+  εκτός παράδοσης. Ο όρος δεν μπορεί να εκπληρωθεί εδώ.
+  ⇒ Και το όνομά του είναι ψευδές: «glue» σε mastering σημαίνει
+  συμπίεση διαύλου (bus glue compression). Αυτό δεν έχει `Compressor`
+  πουθενά στη δομή του (`dsp/glue.rs:30-43`: οκτώ `Biquad` + ένα
+  `Allpass`) — μηδέν συμπίεση, παράλληλη αποστολή ατμόσφαιρας/πλάτους.
 
 **Και τα τρία μαζί:** μηδέν αναφορά στο R5b ή στο §6.0 του PRD· το
 μόνο σημείο που τα ονομάζει είναι το R5, ως μέτρηση κατάστασης:
