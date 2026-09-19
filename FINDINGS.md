@@ -1075,8 +1075,9 @@ Freshness bisect 2026-08-19: 34 audited — 6 resolved (hashes), 2 obsolete, 5 p
 
 - **[F-090] Ο χρήστης παίρνει ΑΝΥΠΟΓΡΑΦΟ sidecar. Το
   υπογεγραμμένο ζει σε μονοπάτι με μηδέν callers.**
-  Component: `handlers/export.rs:1087` (τοπική
-  `write_sidecar`) vs `blob_store::write_sidecar`.
+  Component: `conformance/src/export.rs:991` (τοπική
+  `write_sidecar`, μετακινήθηκε 20/09 με τη μετακόμιση της
+  διαδρομής εξαγωγής) vs `blob_store::write_sidecar`.
   ΜΕΤΡΗΜΕΝΟ 2026-08-25 με τρέξιμο.
   **ΔΕΚΑΤΟ ΤΡΙΤΟ ΟΜΩΝΥΜΟ:** δύο `write_sidecar`, δύο
   αρχεία, δύο σχήματα. Η κλήση στο `:164` είναι
@@ -3142,7 +3143,7 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **F-097** έγραψε ότι ο `AcxCheckAnalyzer` δεν τρέχει καθόλου στις διαδρομές που χτίζουν την πύλη — ούτε streaming, ούτε render (`trunk_pass.rs:371-373`, `run_trunk_internal(..., false, ...)` τότε). Σήμερα τρέχει και στο `execute_streaming_plan` (`m0-daemon/src/agents/executor.rs:310`, μέσω `run_trunk_pass_with_acx`) και στο `export_mp3_acx` (`m0-daemon/src/handlers/export.rs`, AcxCheckAnalyzer γρ.976/1082).
 
-  **F-090** έγραψε naming collision: δύο `write_sidecar`, ίδιο όνομα, δύο αρχεία, δύο σχήματα — ένα υπογεγραμμένο Ed25519 (`blob_store::write_sidecar`), ένα ανυπόγραφο (`handlers/export.rs:1087` τότε). Διορθώθηκε — το τοπικό του `export.rs` μετονομάστηκε σε `write_unsigned_export_sidecar` (`export.rs:1519`), με σχόλιο που δηλώνει ρητά τον προηγούμενο ομώνυμο.
+  **F-090** έγραψε naming collision: δύο `write_sidecar`, ίδιο όνομα, δύο αρχεία, δύο σχήματα — ένα υπογεγραμμένο Ed25519 (`blob_store::write_sidecar`), ένα ανυπόγραφο (`conformance/src/export.rs:991` τότε — παραπομπή μετακινήθηκε 20/09 με τη μετακόμιση της διαδρομής εξαγωγής). Διορθώθηκε — το τοπικό του `export.rs` μετονομάστηκε σε `write_unsigned_export_sidecar` (`export.rs:1519`), με σχόλιο που δηλώνει ρητά τον προηγούμενο ομώνυμο.
 
   ⇒ Το σχήμα είναι το ίδιο που το μητρώο κυνηγάει, ένα επίπεδο πιο πάνω: το σάπιο σχόλιο είναι τώρα το σάπιο εύρημα. Το μητρώο είναι ιστορία και δεν ξαναγράφεται — η διόρθωση γράφεται δίπλα, ως νέο εύρημα.
 
