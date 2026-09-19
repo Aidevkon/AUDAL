@@ -3367,9 +3367,31 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Συνέπεια για την εξαγωγή, γραμμένη ως εύρημα:** το `decode.rs` δεν μπορεί να μετακομίσει σε κανένα από τα τρία υπάρχοντα crates που εξετάστηκαν. Το `sp314-dsp` το απαγορεύει με γραπτό κανόνα (`:7` πιο πάνω)· το `lineos-types/Cargo.toml` έχει μόνο `serde`, `bincode` (προαιρετικό), `serde_json`· το `sp314-orchestrator/Cargo.toml` έχει μόνο εσωτερικά crates του έργου (`sp314-dsp`, `sp314-nodes`, `lineos-corpus`, `lineos-types`, `aether-bridge`) πέρα από `serde`/`serde_json`. Ούτε το `symphonia` ούτε το `rubato` είναι εξάρτηση παραγωγής σε κανένα από τα τρία. Το μόνο που δένει το `decode.rs` στον διακομιστή είναι μία γραμμή, `use crate::config::MAX_FILE_BYTES` (`:24`) — και εννιά συναρτήσεις του είναι ΣΗΜΑ, όλες καθαρές (F-126).
 
+- **[F-128] Η δρομολόγηση της εξαγωγής mp3 γίνεται με πλάγια σημαία, και τέσσερα από τα πέντε delivery profile βγαίνουν χωρίς καμία μέτρηση του παραδοτέου.** Component: `lineos/m0/m0-daemon/src/handlers/export.rs` · `lineos/m1/lineos-types/src/presets.rs`.
+
+  ΜΕΤΡΗΜΕΝΟ 2026-09-20 (recon), τρία σκέλη.
+
+  **Σκέλος 1 — η δρομολόγηση γίνεται με πλάγια σημαία.** `export.rs:470` και μετά (`export_mp3_routed`):
+  ```rust
+  let is_acx_delivery = lineos_types::presets::lookup(&blob.core.preset_id)
+      .and_then(|p| p.delivery.rms_window_db)
+      .is_some();
+
+  if !is_acx_delivery {
+      return export_mp3(blob, path).map(|()| None);
+  }
+  ```
+  Δεν ρωτάει ποιος είναι ο προορισμός· ρωτάει αν το profile έχει `rms_window_db`, και συμπεραίνει ACX από αυτό. Πεδίο φτιαγμένο για άλλη δουλειά (το RMS-window παράθυρο του ACX check), χρησιμοποιημένο εδώ ως σημαία ταυτότητας προορισμού.
+
+  **Σκέλος 2 — τέσσερα από τα πέντε profile βγαίνουν αμέτρητα.** `lineos-types/src/presets.rs`: `rms_window_db: None` στις γραμμές 149 (SPOTIFY), 163 (YOUTUBE), 177 (BROADCAST), 191 (PODCAST) — `Some((-23.0, -18.0))` μόνο στη γραμμή 238 (ACX). Το δοκίμιο της `:367` το κλειδώνει: `assert!(d.rms_window_db.is_none(), "{id} should have no RMS window")`. Το κενό είναι σκόπιμο ως προς το παράθυρο, ακούσιο ως προς τη δρομολόγηση: τα τέσσερα profile πέφτουν στη σκέτη `export_mp3` (`:1304`), που επιστρέφει `None` για τους ελέγχους παράδοσης — μηδέν μέτρηση του παραδοτέου, μηδέν πιστοποιητικό. Το ίδιο το σχόλιο πάνω από τη δρομολόγηση (`:485-489`) το λέει για την άλλη πλευρά, χωρίς να ονομάζει την απουσία: «Η `export_mp3_acx` μετράει το ΤΕΛΙΚΟ σήμα — μετά το resample, μετά το downmix, μετά από κάθε επέμβαση — και είναι η ΜΟΝΗ μέτρηση του πραγματικού παραδοτέου σε αυτή τη διαδρομή.»
+
+  **Σκέλος 3 — το όνομα κλειδώνει τον προορισμό μέσα στον κώδικα.** Οι εξαγωγές του αρχείου είναι ανά μορφή — `export_flac` (`:563`), `export_wav` (`:574`), `export_adm_bwf` (`:609`), `export_opus` (`:671`), `export_aiff` (`:689`) — με μοναδική εξαίρεση το ζεύγος του mp3, `export_mp3_acx` (`:852`) / `export_mp3` (`:1304`), που είναι ανά προορισμό. Μέσα στην `export_mp3_acx` είναι ψημένα τρία νούμερα του προορισμού: `target_sr = 44100` κυριολεκτικό (`:895`, F-124), υποβιβασμός σε μονοφωνικό, και στατικό κόψιμο στα −3 dB (`:1058-1060`, `if tp_db > -3.0 { ... -3.05 ... }`). Κανένα `export_mp3_apple` ή αδελφή συνάρτηση ανά προορισμό δεν υπάρχει.
+
+  **Σχέση με το F-124:** εκείνο μέτρησε ότι η δήλωση ενός προορισμού (`true_peak_dbtp`) αφορά άλλο αρχείο από αυτό που παραδίδεται. Αυτό μετράει ότι οι άλλοι τέσσερις προορισμοί δεν έχουν δήλωση καθόλου. Ίδιο σχήμα, ένα επίπεδο πιο πάνω.
+
 ---
 
-**NEXT FREE: F-128** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-129** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
