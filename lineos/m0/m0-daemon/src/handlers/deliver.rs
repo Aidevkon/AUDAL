@@ -62,6 +62,76 @@ pub struct DeliverResponse {
     /// filename, duration, exists). None on actual delivery responses.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entries: Option<Vec<PlanEntry>>,
+    /// The declaration, as a value. `run_deliver_core` builds it but does not
+    /// write it — the caller writes `manifest.json` from this, once it has
+    /// merged in any sidecar warnings. Not wire format: never sent to HTTP
+    /// clients.
+    #[serde(skip)]
+    pub manifest: Option<Manifest>,
+    /// Per-entry certificate sidecar updates the core computed but did not
+    /// write — the caller performs the `find_sidecar`/`write_sidecar` pair
+    /// (storage-layer work, not the core's).
+    #[serde(skip)]
+    pub sidecar_updates: Vec<SidecarUpdate>,
+}
+
+/// A certified blob's loudness fields, updated with this delivery's
+/// measurements, plus the id needed to look up (and rewrite) its sidecar.
+/// The core computes this as a value; only the caller with masters_dir/
+/// project_id in scope can turn it into a disk write.
+#[derive(Debug)]
+pub struct SidecarUpdate {
+    pub track_id: String,
+    pub blob_id: String,
+    pub updated_blob: StoredBlobV2,
+}
+
+/// Looks up and rewrites each pending sidecar from `resp.sidecar_updates`,
+/// appending the same warning text `run_deliver_core` used to produce
+/// inline. Storage-layer read (`find_sidecar`) and write (`write_sidecar`)
+/// both live here now, outside the core.
+pub fn apply_sidecar_updates(resp: &mut DeliverResponse, masters_dir: &str, project_id: &str) {
+    for update in &resp.sidecar_updates {
+        match crate::blob_store::find_sidecar(masters_dir, &update.blob_id) {
+            Ok(Some(sidecar_path)) => {
+                if let BlobVariant::Certified { .. } = &update.updated_blob.variant {
+                    let master_flac = sidecar_path.with_extension("flac");
+                    if let Err(e) = crate::blob_store::write_sidecar(
+                        masters_dir,
+                        project_id,
+                        &update.updated_blob,
+                        &master_flac,
+                    ) {
+                        resp.warnings.push(format!(
+                            "output-acx: sidecar rewrite failed for track {}: {e}",
+                            update.track_id
+                        ));
+                    }
+                }
+            }
+            Ok(None) => resp.warnings.push(format!(
+                "output-acx: no existing sidecar found for track {} — certificate rewrite skipped",
+                update.track_id
+            )),
+            Err(e) => resp.warnings.push(format!(
+                "output-acx: sidecar lookup failed for track {}: {e}",
+                update.track_id
+            )),
+        }
+    }
+}
+
+/// Writes `manifest.json` from the value `run_deliver_core` returned,
+/// folding in whatever warnings the caller (e.g. `apply_sidecar_updates`)
+/// added since. Call after any warning-producing step, not before.
+pub fn write_manifest_file(resp: &mut DeliverResponse) {
+    let warnings = resp.warnings.clone();
+    if let (Some(manifest), Some(path)) = (&mut resp.manifest, &resp.manifest_path) {
+        manifest.warnings = warnings;
+        if let Ok(json) = serde_json::to_string_pretty(manifest) {
+            let _ = std::fs::write(path, json);
+        }
+    }
 }
 
 pub fn sanitize_title(title: &str) -> String {
@@ -243,6 +313,8 @@ pub async fn post_deliver_plan(
                 warnings: vec![],
                 errors: vec![e.to_string()],
                 entries: None,
+                manifest: None,
+                sidecar_updates: vec![],
             })
         }
     };
@@ -262,6 +334,8 @@ pub async fn post_deliver_plan(
                 warnings: vec![],
                 errors: vec![],
                 entries: Some(plan.entries),
+                manifest: None,
+                sidecar_updates: vec![],
             })
         }
         Err(errors) => Json(DeliverResponse {
@@ -271,11 +345,13 @@ pub async fn post_deliver_plan(
             warnings: vec![],
             errors,
             entries: None,
+            manifest: None,
+            sidecar_updates: vec![],
         }),
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ManifestEntry {
     pub index: u32,
     pub title: String,
@@ -318,7 +394,7 @@ pub struct ManifestEntry {
     pub spacing_checks: Vec<crate::blob_store::DeliveryCheck>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Manifest {
     pub schema_version: u32,
     pub book_title: String,
@@ -368,15 +444,16 @@ fn build_minimal_blob(audio_path: &str) -> StoredBlobV2 {
     blob_v2
 }
 
-/// `masters_dir`/`project_id`: μόνο για το output-ACX certificate
-/// rewrite (§5.6 Δ2) — None σε καλούντες χωρίς πρόσβαση στο store
-/// (π.χ. τεστ με build_minimal_blob fallback) απλώς παραλείπει το
-/// rewrite, δεν αγγίζει τίποτα άλλο στο deliver.
+/// Ο πυρήνας γράφει ήχο, όχι χαρτί (DECISIONS.md §7, απόφαση 3): η
+/// δηλωμένη κατάσταση — το `Manifest` και τα per-entry sidecar-update
+/// δεδομένα — επιστρέφει ΩΣ ΤΙΜΗ μέσα στο `DeliverResponse`
+/// (`manifest`, `sidecar_updates`). Ο καλών γράφει το `manifest.json`
+/// (`write_manifest_file`) και ξαναγράφει το sidecar
+/// (`apply_sidecar_updates`) — και οι δύο, storage-layer, όχι πυρήνας.
+/// `book_dir`/τα mp3 (το ίδιο το παραδοτέο) γράφονται εδώ, αμετάβλητα.
 pub fn run_deliver_core(
     req: &DeliverRequest,
     plan: DeliveryPlan,
-    masters_dir: Option<&str>,
-    project_id: Option<&str>,
 ) -> Result<DeliverResponse, Vec<String>> {
     let out_dir_str = match &req.output_dir {
         Some(d) => d,
@@ -391,6 +468,7 @@ pub fn run_deliver_core(
     let mut manifest_entries = Vec::new();
     let mut warnings = Vec::new();
     let mut files = Vec::new();
+    let mut sidecar_updates = Vec::new();
 
     for plan_entry in &plan.entries {
         if !plan_entry.exists {
@@ -442,62 +520,45 @@ pub fn run_deliver_core(
 
         // §5.6 Δ2, 2026-08-22: το `blob` πιο πάνω είναι ΚΛΩΝΟΣ του
         // resolved_blob (ΒΗΜΑ 0 recon) — γράφοντας output_acx_* πάνω
-        // του δεν αγγίζει το sidecar στον δίσκο. Ξαναγράφουμε ρητά
-        // μέσω του ΥΠΑΡΧΟΝΤΟΣ blob_store::write_sidecar (ετυμηγορία
-        // κρίνοντα: deliver γίνεται ΜΕΤΑ την υπογραφή, η
-        // payload_signature ξαναϋπολογίζεται σκόπιμα — το cert
-        // αποδεικνύει το ΠΑΡΑΔΟΘΕΝ). ΜΟΝΟ όταν υπάρχει πραγματικό
-        // resolved_blob (άρα υπαρκτό sidecar να ξαναγραφεί) ΚΑΙ ο
-        // καλών έδωσε masters_dir/project_id· χωρίς αυτά (π.χ. τεστ
-        // με build_minimal_blob fallback) παραλείπεται σιωπηλά — ΔΕΝ
-        // υπάρχει τι να ξαναγραφεί.
-        if let (Some(_), Some(md), Some(pid)) = (&plan_entry.resolved_blob, masters_dir, project_id)
-        {
-            match crate::blob_store::find_sidecar(md, &blob.core.id) {
-                Ok(Some(sidecar_path)) => {
-                    let master_flac = sidecar_path.with_extension("flac");
-                    let mut updated = blob.clone();
-                    if let BlobVariant::Certified { loudness, .. } = &mut updated.variant {
-                        loudness.output_delivery_peak_db = Some(outcome.report.sample_peak_db);
-                        loudness.output_delivery_rms_db = Some(outcome.report.rms_db);
-                        loudness.output_delivery_noise_floor_db = outcome.report.noise_floor_db;
-                        loudness.output_delivery_quietest_window_start_frame =
-                            outcome.report.quietest_window_start_frame;
-                        // §5.3 — η κρίση μπαίνει στο certificate εδώ, μαζί με
-                        // τα κατώφλια που χρησιμοποίησε (ίδια λογική με
-                        // levels_within_limits_with_margin(), sp314_dsp::analysis::
-                        // acx_check::AcxCheckReport::margin_checks() — μία
-                        // υλοποίηση, δύο καλούντες). Απουσία μετρικής (π.χ.
-                        // noise_floor όταν το αρχείο < 1s) = καμία εγγραφή.
-                        // 2026-08-25: η αντιστοίχιση βγήκε στο
-                        // DeliveryCheck::from_margin_checks — δεύτερος
-                        // καλών (/export) τη χρειάζεται, και inline θα
-                        // σήμαινε δύο αντίγραφα. Ίδιες τιμές, ίδιος κανόνας.
-                        // 2026-08-25: ΚΑΙ το spacing, από τον ΙΔΙΟ
-                        // παραγωγό με το /export (from_spacing) — μία
-                        // υλοποίηση, δύο καλούντες. Χωριστά από τα
-                        // margin_checks ώστε το "advisory" να μη φτάνει
-                        // ποτέ στη συνολική κρίση.
-                        loudness.delivery_checks = Some(entry_checks.clone());
-                        if let Err(e) =
-                            crate::blob_store::write_sidecar(md, pid, &updated, &master_flac)
-                        {
-                            warnings.push(format!(
-                                "output-acx: sidecar rewrite failed for track {}: {e}",
-                                plan_entry.track_id
-                            ));
-                        }
-                    }
-                }
-                Ok(None) => warnings.push(format!(
-                    "output-acx: no existing sidecar found for track {} — certificate rewrite skipped",
-                    plan_entry.track_id
-                )),
-                Err(e) => warnings.push(format!(
-                    "output-acx: sidecar lookup failed for track {}: {e}",
-                    plan_entry.track_id
-                )),
+        // του δεν αγγίζει το sidecar στον δίσκο. Η εύρεση
+        // (`find_sidecar`) και η επανεγγραφή (`write_sidecar`) είναι
+        // ΚΑΙ ΟΙ ΔΥΟ storage-layer — μετακινήθηκαν στον καλούντα
+        // (`apply_sidecar_updates`), που έχει masters_dir/project_id.
+        // Ο πυρήνας εδώ φτιάχνει μόνο την ΤΙΜΗ: το ενημερωμένο blob,
+        // ΜΟΝΟ όταν υπάρχει πραγματικό resolved_blob (άρα υπαρκτό
+        // sidecar να ξαναγραφεί)· χωρίς αυτό (π.χ. τεστ με
+        // build_minimal_blob fallback) δεν παράγεται SidecarUpdate —
+        // ΔΕΝ υπάρχει τι να ξαναγραφεί.
+        if plan_entry.resolved_blob.is_some() {
+            let mut updated = blob.clone();
+            if let BlobVariant::Certified { loudness, .. } = &mut updated.variant {
+                loudness.output_delivery_peak_db = Some(outcome.report.sample_peak_db);
+                loudness.output_delivery_rms_db = Some(outcome.report.rms_db);
+                loudness.output_delivery_noise_floor_db = outcome.report.noise_floor_db;
+                loudness.output_delivery_quietest_window_start_frame =
+                    outcome.report.quietest_window_start_frame;
+                // §5.3 — η κρίση μπαίνει στο certificate εδώ, μαζί με
+                // τα κατώφλια που χρησιμοποίησε (ίδια λογική με
+                // levels_within_limits_with_margin(), sp314_dsp::analysis::
+                // acx_check::AcxCheckReport::margin_checks() — μία
+                // υλοποίηση, δύο καλούντες). Απουσία μετρικής (π.χ.
+                // noise_floor όταν το αρχείο < 1s) = καμία εγγραφή.
+                // 2026-08-25: η αντιστοίχιση βγήκε στο
+                // DeliveryCheck::from_margin_checks — δεύτερος
+                // καλών (/export) τη χρειάζεται, και inline θα
+                // σήμαινε δύο αντίγραφα. Ίδιες τιμές, ίδιος κανόνας.
+                // 2026-08-25: ΚΑΙ το spacing, από τον ΙΔΙΟ
+                // παραγωγό με το /export (from_spacing) — μία
+                // υλοποίηση, δύο καλούντες. Χωριστά από τα
+                // margin_checks ώστε το "advisory" να μη φτάνει
+                // ποτέ στη συνολική κρίση.
+                loudness.delivery_checks = Some(entry_checks.clone());
             }
+            sidecar_updates.push(SidecarUpdate {
+                track_id: plan_entry.track_id.clone(),
+                blob_id: blob.core.id.clone(),
+                updated_blob: updated,
+            });
         }
 
         files.push(plan_entry.filename.clone());
@@ -599,10 +660,11 @@ pub fn run_deliver_core(
         warnings: warnings.clone(),
     };
 
+    // ΔΕΝ γράφεται εδώ πια — η δήλωση μένει τιμή. Ο καλών γράφει το
+    // αρχείο μέσω `write_manifest_file`, αφού πρώτα εφαρμόσει
+    // (ή όχι) τα `sidecar_updates` — τα warnings τους πρέπει να
+    // προλάβουν να μπουν στο `manifest.warnings` πριν τη σειριοποίηση.
     let manifest_path = book_dir.join("manifest.json");
-    if let Ok(json) = serde_json::to_string_pretty(&manifest) {
-        let _ = std::fs::write(&manifest_path, json);
-    }
 
     Ok(DeliverResponse {
         book_dir: Some(book_dir.to_string_lossy().into_owned()),
@@ -611,6 +673,8 @@ pub fn run_deliver_core(
         warnings,
         errors: vec![],
         entries: None,
+        manifest: Some(manifest),
+        sidecar_updates,
     })
 }
 
@@ -634,6 +698,8 @@ pub async fn post_deliver(
                 warnings: vec![],
                 errors: vec![e.to_string()],
                 entries: None,
+                manifest: None,
+                sidecar_updates: vec![],
             })
         }
     };
@@ -673,8 +739,12 @@ pub async fn post_deliver(
 
             // blocking IO in spawn_blocking
             let masters_dir = app.config.masters_path.clone();
+            let project_id_for_core = project_id.clone();
             let result = tokio::task::spawn_blocking(move || {
-                run_deliver_core(&req, plan, Some(&masters_dir), Some(&project_id))
+                let mut resp = run_deliver_core(&req, plan)?;
+                apply_sidecar_updates(&mut resp, &masters_dir, &project_id_for_core);
+                write_manifest_file(&mut resp);
+                Ok(resp)
             })
             .await
             .unwrap_or_else(|e| Err(vec![e.to_string()]));
@@ -688,6 +758,8 @@ pub async fn post_deliver(
                     warnings: vec![],
                     errors,
                     entries: None,
+                    manifest: None,
+                    sidecar_updates: vec![],
                 }),
             }
         }
@@ -698,6 +770,8 @@ pub async fn post_deliver(
             warnings: vec![],
             errors,
             entries: None,
+            manifest: None,
+            sidecar_updates: vec![],
         }),
     }
 }

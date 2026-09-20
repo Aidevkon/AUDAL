@@ -1,6 +1,7 @@
 use m0d::db::schema::Track;
 use m0d::handlers::deliver::{
-    run_deliver_core, sanitize_title, validate_and_plan, DeliverEntry, DeliverRequest,
+    run_deliver_core, sanitize_title, validate_and_plan, write_manifest_file, DeliverEntry,
+    DeliverRequest,
 };
 use std::io::Write;
 
@@ -144,7 +145,11 @@ fn test_deliver_e2e_small() {
     };
 
     let plan = validate_and_plan(&req, &db_tracks).unwrap();
-    let resp = run_deliver_core(&req, plan, None, None).unwrap();
+    let mut resp = run_deliver_core(&req, plan).unwrap();
+    // ΤΟ run_deliver_core πια ΔΕΝ γράφει το manifest.json — επιστρέφει τη
+    // δήλωση ως τιμή (resp.manifest). Το τεστ γράφει τώρα το ίδιο πριν
+    // διαβάσει το αρχείο, αφού δεν χρειάζεται sidecar εδώ.
+    write_manifest_file(&mut resp);
 
     let book_dir = resp.book_dir.unwrap();
     assert!(std::path::Path::new(&book_dir).exists());
@@ -199,7 +204,7 @@ fn test_deliver_acx_ffprobe() {
     };
 
     let plan = validate_and_plan(&req, &db_tracks).unwrap();
-    let resp = run_deliver_core(&req, plan, None, None).unwrap();
+    let resp = run_deliver_core(&req, plan).unwrap();
 
     let book_dir = resp.book_dir.unwrap();
     let f1 = std::path::Path::new(&book_dir).join(&resp.files[0]);

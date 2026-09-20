@@ -57,7 +57,10 @@ use m0d::blob_store::{
     StoredProvenance, StoredQuality, StoredSpatial,
 };
 use m0d::dsp::signal_health::DeadAirSummary;
-use m0d::handlers::deliver::{run_deliver_core, DeliverRequest, DeliveryPlan, PlanEntry};
+use m0d::handlers::deliver::{
+    apply_sidecar_updates, run_deliver_core, write_manifest_file, DeliverRequest, DeliveryPlan,
+    PlanEntry,
+};
 use std::io::Write;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -200,8 +203,12 @@ fn external_ffmpeg_agrees_with_output_acx_certificate() {
     };
 
     // 1. Run the deliver flow, keep the delivered .mp3 path.
-    let resp = run_deliver_core(&req, plan, Some(&masters_root), Some(project_id))
-        .expect("run_deliver_core failed");
+    let mut resp = run_deliver_core(&req, plan).expect("run_deliver_core failed");
+    // Storage-layer work run_deliver_core no longer does itself — the
+    // declaration (resp.sidecar_updates) is a value now, this call is
+    // what turns it into the rewritten sidecar this test reads below.
+    apply_sidecar_updates(&mut resp, &masters_root, project_id);
+    write_manifest_file(&mut resp);
     let book_dir = resp.book_dir.clone().expect("book_dir");
     let delivered_mp3 = std::path::Path::new(&book_dir).join(&resp.files[0]);
     assert!(delivered_mp3.exists(), "delivered mp3 must exist on disk");
