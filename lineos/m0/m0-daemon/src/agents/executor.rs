@@ -160,10 +160,7 @@ pub async fn run(
                     // The engine returns the unsigned declaration — sign_and_render
                     // stays here because it needs identity.rs/handlers::certificate/
                     // handlers::pdf_gen, which stay with the server (§7 απόφαση 3).
-                    let file_path = std::sync::Arc::new(lineos_types::audio::ManagedPcm::new(
-                        crate::spool::spool_dir()
-                            .join(format!("m0d-v3-streaming-{}.wav", blob.core.id)),
-                    ));
+                    let file_path = blob.core.audio_path.clone();
                     let mut cert_out =
                         crate::domain::nodes::certificate_node::CertificateOutput { blob, file_path };
                     crate::domain::nodes::certificate_node::sign_and_render(&mut cert_out)
