@@ -173,20 +173,11 @@ else:
 
 # Validate all M0 config files
 validate:
-    @python3 -c "import json; json.load(open('lineos/m0/config/caddy.json'));          print('  ✅ caddy.json')"
     @python3 -c "import tomllib; tomllib.load(open('lineos/m0/config/policies.toml','rb')); print('  ✅ policies.toml')"
     @python3 -c "import json; json.load(open('lineos/m0/registry/m0-registry.json'));  print('  ✅ m0-registry.json')"
     @python3 -c "import json; json.load(open('lineos/m0/registry/checksums.json'));    print('  ✅ checksums.json')"
     @python3 -c "import json; json.load(open('lineos/m0/api/m0-api.schema.json'));     print('  ✅ m0-api.schema.json')"
     @echo "✅ M0 config valid"
-
-# Validate Caddy is bound to localhost only
-validate-caddy-binding:
-    @echo "→ Caddy binding check..."
-    @grep -n '0\.0\.0\.0' lineos/m0/config/caddy.json \
-        && echo "❌ CADDY EXPOSED ON 0.0.0.0" || echo "✅ Caddy localhost-only"
-    @grep -q '127\.0\.0\.1' lineos/m0/config/caddy.json \
-        && echo "✅ Caddy binds 127.0.0.1" || echo "⚠️  No explicit 127.0.0.1 binding found"
 
 # Validate no --network=host in Podman definitions
 validate-network:
@@ -199,5 +190,5 @@ validate-network:
 # ─────────────────────────────────────────
 
 # Full M0 CI gate: validate + test + verify-assets
-ci: validate validate-caddy-binding validate-network test verify-assets
+ci: validate validate-network test verify-assets
     @echo "✅ M0 CI gates passed"

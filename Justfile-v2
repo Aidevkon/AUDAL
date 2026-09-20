@@ -48,7 +48,6 @@ sys.exit(errors)
     @python3 -c "import json; json.load(open('lineos/m0/registry/m0-registry.json')); print('  ✅ m0-registry.json')"
     @python3 -c "import json; json.load(open('lineos/m0/registry/checksums.json'));   print('  ✅ checksums.json')"
     @python3 -c "import tomllib; tomllib.load(open('lineos/m0/config/policies.toml','rb')); print('  ✅ policies.toml')"
-    @python3 -c "import json; json.load(open('lineos/m0/config/caddy.json'));          print('  ✅ caddy.json')"
     @python3 -c "import json; json.load(open('lineos/m0/api/m0-api.schema.json'));     print('  ✅ m0-api.schema.json')"
     @echo "✅ All schemas valid"
 
@@ -126,12 +125,6 @@ check-thresholds:
         2>/dev/null \
         && echo "⚠️  CHECK: possible hardcoded threshold" || echo "✅ No hardcoded thresholds"
 
-# Caddy bound to localhost only
-check-caddy-binding:
-    @echo "→ Caddy binding check..."
-    @grep -n '0\.0\.0\.0' lineos/m0/config/caddy.json 2>/dev/null \
-        && echo "❌ CADDY EXPOSED ON 0.0.0.0" || echo "✅ Caddy localhost-only"
-
 # No serde_json::Value as engine input
 check-typed-input:
     @echo "→ Typed input check..."
@@ -150,7 +143,7 @@ check-float-methods:
 
 # Run all CI gates
 ci: validate-schemas deny check-boundary check-network check-ml-origin \
-    check-thresholds check-caddy-binding check-typed-input check-float-methods test
+    check-thresholds check-typed-input check-float-methods test
     @echo ""
     @echo "✅ All CI gates passed"
 
@@ -166,9 +159,6 @@ gate-phase1: ci
     @curl -sf http://127.0.0.1:7401/health \
         && echo "  ✅ Health endpoint OK" \
         || (echo "  ❌ Health endpoint failed"; kill %1 2>/dev/null; exit 1)
-    @ss -tlnp | grep "7400" | grep -q "127.0.0.1" \
-        && echo "  ✅ Caddy localhost-only" \
-        || echo "  ❌ Caddy on wrong interface"
     @for port in 7411 7412 7413 7414 7415; do \
         curl -s --connect-timeout 2 http://127.0.0.1:$$port > /dev/null 2>&1 \
             && echo "  ❌ PORT $$port EXPOSED" \

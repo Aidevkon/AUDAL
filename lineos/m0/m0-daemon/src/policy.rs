@@ -89,9 +89,9 @@ impl PolicyEngine {
     }
 
     /// Check whether an inbound path is allowed.
-    /// Currently all inbound routes via Caddy — anything reaching M0 directly is a violation.
+    /// Currently all inbound routes via the reverse proxy — anything reaching M0 directly is a violation.
     pub fn check_inbound(&self, path: &str) -> PolicyDecision {
-        // All inbound traffic must arrive via Caddy proxy on port 7400.
+        // All inbound traffic must arrive via the reverse proxy on port 7400.
         // Direct-to-M0 requests on health port (7401) are fine (health check).
         // Any other direct-to-M0 access is a policy violation.
         let _ = path; // inbound policy expanded in Phase 2
