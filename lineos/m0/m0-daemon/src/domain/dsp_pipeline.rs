@@ -782,7 +782,7 @@ fn run_dsp_internal(
         )?;
 
         let t_cert_node = std::time::Instant::now();
-        let cert_out = crate::domain::nodes::certificate_node::run_streaming(
+        let mut cert_out = crate::domain::nodes::certificate_node::run_streaming(
             &blob_id,
             render_res.output_lufs,
             render_res.output_lra,
@@ -818,6 +818,7 @@ fn run_dsp_internal(
             om_flat,
             om_clips,
         )?;
+        crate::domain::nodes::certificate_node::sign_and_render(&mut cert_out)?;
         eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
         let mut persisted_master = None;
@@ -1425,7 +1426,7 @@ fn run_dsp_internal(
     let processing_timeline = profiler.finalize();
 
     let t_cert_node = std::time::Instant::now();
-    let cert_out = crate::domain::nodes::certificate_node::run(
+    let mut cert_out = crate::domain::nodes::certificate_node::run(
         &blob_id,
         lufs,
         tp,
@@ -1456,6 +1457,7 @@ fn run_dsp_internal(
         // μπαίνει αυτούσιο στο quality.rms_db αντί για την lufs+3.0 προσέγγιση.
         Some(stereo_rms_db_measured),
     )?;
+    crate::domain::nodes::certificate_node::sign_and_render(&mut cert_out)?;
     eprintln!("[PERF-NODE] certificate_node={}ms", t_cert_node.elapsed().as_millis());
 
     // §Π — ΤΟ ΖΕΥΓΟΣ. Στο Music το FLAC γράφτηκε ΠΡΙΝ (γρ. ~1293) και

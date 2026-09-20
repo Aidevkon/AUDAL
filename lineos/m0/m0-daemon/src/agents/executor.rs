@@ -679,7 +679,7 @@ pub fn execute_streaming_plan(
         acx: None,
         corrections,
     };
-    let cert_out = crate::domain::nodes::certificate_node::run_streaming(
+    let mut cert_out = crate::domain::nodes::certificate_node::run_streaming(
         &blob_id,
         measured.output_lufs,
         measured.output_lra,
@@ -715,6 +715,8 @@ pub fn execute_streaming_plan(
         measured.output_clips_detected,
     )
     .map_err(ExecutorError::DspFailed)?;
+    crate::domain::nodes::certificate_node::sign_and_render(&mut cert_out)
+        .map_err(ExecutorError::DspFailed)?;
 
     Ok((
         super::operator::StreamingOutput {

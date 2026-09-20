@@ -93,19 +93,8 @@ pub fn run(
     let cert_json = serde_json::to_string(&cert).unwrap_or_default();
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
 
-    let qr_base64 = crate::handlers::certificate::generate_qr_base64(
-        blob_id,
-        file_path
-            .path()
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown"),
-        lufs,
-        true_peak,
-        telemetry_lra,
-        fingerprints,
-    );
-
+    // QR rendering moved to sign_and_render (§7 απόφαση 3, F-137) —
+    // the core no longer produces it, so assemble_blob gets None here.
     let pcm_blake3 = crate::handlers::certificate::blake3_pcm(left_slice);
 
     // F-085 wiring (offline): οι μετρήσεις γίνονται ΕΔΩ, στα
@@ -163,7 +152,7 @@ pub fn run(
         processing_timeline,
         n_total,
         pcm_blake3,
-        qr_base64,
+        None,
         cert_json,
         config_json,
         telemetry_lra,
@@ -272,18 +261,8 @@ pub fn run_streaming(
     let cert_json = serde_json::to_string(&cert).unwrap_or_default();
     let config_json = serde_json::to_string(&dsp_config).unwrap_or_default();
 
-    let qr_base64 = crate::handlers::certificate::generate_qr_base64(
-        blob_id,
-        file_path
-            .path()
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown"),
-        lufs,
-        true_peak,
-        telemetry_lra,
-        fingerprints,
-    );
+    // QR rendering moved to sign_and_render (§7 απόφαση 3, F-137) —
+    // the core no longer produces it, so assemble_blob gets None here.
 
     assemble_blob(
         blob_id,
@@ -303,7 +282,7 @@ pub fn run_streaming(
         processing_timeline,
         n_total,
         cert_data.pcm_blake3,
-        qr_base64,
+        None,
         cert_json,
         config_json,
         telemetry_lra,
@@ -373,11 +352,10 @@ fn assemble_blob(
     spectral_flatness_measured: f32,
     clips_measured: u32,
 ) -> Result<CertificateOutput, String> {
-    let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
-    let cert_sig =
-        crate::handlers::certificate::sign_certificate(blob_id, &pcm_blake3, lufs, &identity);
-
-    // Extract early to avoid borrow-after-move when dead_air is consumed below.
+    // Signing moved to sign_and_render (§7 απόφαση 3, F-137) — the
+    // core assembles the unsigned declaration as a value, the caller
+    // signs it. Extract early to avoid borrow-after-move when
+    // dead_air is consumed below.
     // ΟΡΙΟ ΜΕΤΟΝΟΜΑΣΙΑΣ [F-097]: το πεδίο πηγή μετονομάστηκε, το πεδίο
     // προορισμού (StoredLoudness) ΟΧΙ — είναι σχήμα υπογεγραμμένου cert.
     let quietest_active = dead_air.quietest_active_window_dbfs;
@@ -395,7 +373,7 @@ fn assemble_blob(
             preset_id: preset_id.to_string(),
             schema_version: 2,
             pcm_blake3: Some(pcm_blake3),
-            cert_signature: Some(cert_sig),
+            cert_signature: None, // sign_and_render fills this in
             audio_path: file_path.clone(),
             sample_rate,
             channels,
@@ -540,6 +518,58 @@ fn assemble_blob(
             },
         }
     };
+    // PDF generation moved to sign_and_render (§7 απόφαση 3, F-137) —
+    // the core returns the unsigned, unrendered declaration as a value.
+
+    Ok(CertificateOutput { blob: blob_v2, file_path })
+}
+
+/// Storage-layer work `assemble_blob` no longer does itself: the
+/// Ed25519 signature, the QR PNG, and the PDF archival copy are all
+/// adapters outside the core (DECISIONS.md §7, απόφαση 3 — «Η δήλωση
+/// είναι τιμή. Αποθήκευση, απόδοση και επαλήθευση είναι προσαρμογείς
+/// έξω από τον πυρήνα»). Called by the three sites that call
+/// `run`/`run_streaming` (execute_streaming_plan, run_dsp_internal
+/// ×2), right after, using the unsigned value they got back — same
+/// shape as `apply_sidecar_updates` in `handlers/deliver.rs`, same
+/// order, same error text.
+pub fn sign_and_render(output: &mut CertificateOutput) -> Result<(), String> {
+    let blob_id = output.blob.core.id.clone();
+    let pcm_blake3 = output.blob.core.pcm_blake3.clone().unwrap_or_default();
+    let lufs = output
+        .blob
+        .loudness()
+        .map(|l| l.integrated_lufs)
+        .unwrap_or_default();
+
+    let identity = crate::identity::load_or_generate_default().map_err(|e| e.to_string())?;
+    let cert_sig =
+        crate::handlers::certificate::sign_certificate(&blob_id, &pcm_blake3, lufs, &identity);
+    output.blob.core.cert_signature = Some(cert_sig);
+
+    let filename = output
+        .file_path
+        .path()
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let true_peak = output
+        .blob
+        .loudness()
+        .map(|l| l.true_peak_dbtp)
+        .unwrap_or_default();
+    let lra = output.blob.loudness().map(|l| l.lra).unwrap_or_default();
+    let qr = output.blob.stem_fingerprints().and_then(|fp| {
+        crate::handlers::certificate::generate_qr_base64(
+            &blob_id, &filename, lufs, true_peak, lra, fp,
+        )
+    });
+    if let crate::blob_store::BlobVariant::Certified { qr_base64, .. } = &mut output.blob.variant
+    {
+        *qr_base64 = qr;
+    }
+
     // Generate PDF certificate — silent, never blocks pipeline.
     // F-067 (2026-08-21): writer ευθυγραμμισμένος με τον reader του
     // GET /blob/:id/certificate.pdf — ΗΤΑΝ temp_dir()/m0d-cert-{short}.pdf
@@ -552,12 +582,12 @@ fn assemble_blob(
     let _ = std::fs::create_dir_all(&certs_dir);
     let pdf_path = certs_dir.join(format!(
         "{}_certificate.pdf",
-        &blob_v2.core.id[..blob_v2.core.id.len().min(8)]
+        &blob_id[..blob_id.len().min(8)]
     ));
     let pdf_path_str = pdf_path.to_string_lossy();
-    crate::handlers::pdf_gen::generate_silent_certificate(&blob_v2, &pdf_path_str);
+    crate::handlers::pdf_gen::generate_silent_certificate(&output.blob, &pdf_path_str);
 
-    Ok(CertificateOutput { blob: blob_v2, file_path })
+    Ok(())
 }
 
 /// AES TD1008 §5: "it is recommended to keep the
