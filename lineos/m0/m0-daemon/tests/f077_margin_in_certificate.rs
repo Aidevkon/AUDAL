@@ -33,7 +33,10 @@ use m0d::blob_store::{
     StoredProvenance, StoredQuality, StoredSpatial,
 };
 use m0d::dsp::signal_health::DeadAirSummary;
-use m0d::handlers::deliver::{run_deliver_core, DeliverRequest, DeliveryPlan, PlanEntry};
+use m0d::handlers::deliver::{
+    apply_sidecar_updates, run_deliver_core, write_manifest_file, DeliverRequest, DeliveryPlan,
+    PlanEntry,
+};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -147,8 +150,11 @@ fn deliver_and_read_checks(label: &str, burst_amp: f32) -> (String, serde_json::
         }],
     };
 
-    let resp = run_deliver_core(&req, plan, Some(&masters_root), Some(&project_id))
-        .expect("run_deliver_core failed");
+    let mut resp = run_deliver_core(&req, plan).expect("run_deliver_core failed");
+    // ΤΟ ΙΔΙΟ ζεύγος find_sidecar/write_sidecar που έκανε πριν ο πυρήνας —
+    // τώρα το κάνει ο καλών, με τη δηλωμένη τιμή resp.sidecar_updates.
+    apply_sidecar_updates(&mut resp, &masters_root, &project_id);
+    write_manifest_file(&mut resp);
 
     let sidecar_path = find_sidecar(&masters_root, &blob_id)
         .unwrap()

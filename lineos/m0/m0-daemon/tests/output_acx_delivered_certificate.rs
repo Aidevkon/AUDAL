@@ -24,7 +24,10 @@ use m0d::blob_store::{
     StoredProvenance, StoredQuality, StoredSpatial,
 };
 use m0d::dsp::signal_health::DeadAirSummary;
-use m0d::handlers::deliver::{run_deliver_core, DeliverRequest, DeliveryPlan, PlanEntry};
+use m0d::handlers::deliver::{
+    apply_sidecar_updates, run_deliver_core, write_manifest_file, DeliverRequest, DeliveryPlan,
+    PlanEntry,
+};
 use std::io::Write;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -149,8 +152,13 @@ fn output_acx_writes_and_signs_the_delivered_certificate() {
         }],
     };
 
-    let resp = run_deliver_core(&req, plan, Some(&masters_root), Some(project_id))
-        .expect("run_deliver_core failed");
+    let mut resp = run_deliver_core(&req, plan).expect("run_deliver_core failed");
+    // Both the sidecar rewrite and the manifest.json write are storage-
+    // layer work the core no longer does itself — this test depends on
+    // both (the manifest-vs-sidecar comparison below, and (β)'s signature
+    // check), so it performs both from the returned declaration value.
+    apply_sidecar_updates(&mut resp, &masters_root, project_id);
+    write_manifest_file(&mut resp);
 
     let manifest_path = resp.manifest_path.expect("manifest path");
     let manifest: serde_json::Value =
