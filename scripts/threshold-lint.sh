@@ -65,6 +65,12 @@ TARGETS=(
     # nmf_worker::dispatch_all_jobs). Ήταν εκτός σάρωσης, ούτε πριν
     # ούτε μετά την επέκταση της 20/09.
     "lineos/m1/lineos-corpus/src/scout.rs"
+    # 2026-09-20 (F-132): το rms_spread_db check (πρώην στο
+    # handlers/deliver.rs:617, μέσα στο run_deliver_core) μετακόμισε
+    # εδώ όταν το run_deliver_core έφυγε στο conformance. Ήταν αόρατο
+    # στη μετάβαση — ίδιο σχήμα με το export.rs/certificate.rs/
+    # declare.rs παραπάνω, ίδια μέρα.
+    "lineos/m1/conformance/src/deliver.rs"
 )
 
 STRICT=0
