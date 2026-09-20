@@ -4,8 +4,12 @@
 repository"), the sentence starting "Scope (Appendix B as guide): …".
 That document is intent/spec, revised at least twice already this
 session (Router/Flavor/Pipelineforge broke apart on reading — F-125;
-cut-repair broke apart on reading — O-008, `docs/ORPHANS.md`) with a
-v7.3 patch already queued. **This file does not copy the list — it
+cut-repair broke apart on reading — O-008, `docs/ORPHANS.md`), with a
+proposed PRD modification toward a next version given in conversation
+21/09, outside the tree, not applied — the live document is v7.2 and
+stays that way; if that proposal is ever applied, its hooks get
+verified against the live document first. **This file does not copy
+the list — it
 tracks status only, one line per category, and points back to the PRD
 for the name.** If the PRD's wording of a category ever changes, this
 file's line for it is read against the PRD text at hand, not against
