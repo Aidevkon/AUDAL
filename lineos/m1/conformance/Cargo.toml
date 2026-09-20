@@ -27,6 +27,20 @@ chrono       = { version = "0.4", features = ["serde"] }
 hound        = "3.5"
 tracing      = "0.1"
 libm         = "0.2"
+# execute_streaming_plan's own dependencies, moved 21/09 (F-137/PRD §6.1) —
+# none bring axum, a database driver, or an audio-hardware crate.
+sha2         = "0.10"
+blake3       = "1.5"
+hex          = "0.4"
+uuid         = { version = "1", features = ["v4"] }
+tokio        = { version = "1", features = ["sync"] }
+sp314-nodes  = { path = "../sp314-nodes" }
+sp314-orchestrator = { path = "../sp314-orchestrator" }
+lineos-telemetry = { path = "../telemetry" }
+lineos-corpus = { path = "../lineos-corpus" }
+aether        = { version = "0.1.0", path = "../../../aether" }
+aether-bridge = { path = "../../../shared/aether-bridge" }
+integration   = { path = "../../../integration" }
 
 [dev-dependencies]
 tempfile  = "3"

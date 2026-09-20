@@ -27,7 +27,7 @@ pub struct DecodedAudio {
 }
 
 pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAudio, String> {
-    use crate::domain::content_type::ContentTypeExt;
+    use conformance::content_type::ContentTypeExt;
     use crate::domain::dsp_pipeline::{
         compute_rms, compute_sha256_bytes, derive_seed, rms_to_lufs,
     };
@@ -133,7 +133,7 @@ pub fn run(audio_path: &str, preset_id: &str, blob_id: &str) -> Result<DecodedAu
         .map_err(|e| format!("Decode error: {e}"))?;
 
         let mut streaming_beat: Option<crate::dsp::beat_detector::StreamingBeatDetector> =
-            if !crate::domain::content_type::ContentType::from_preset(preset_id).skip_stems() {
+            if !conformance::content_type::ContentType::from_preset(preset_id).skip_stems() {
                 Some(crate::dsp::beat_detector::StreamingBeatDetector::new(
                     crate::dsp::standardized_stream::TARGET_SR,
                 ))

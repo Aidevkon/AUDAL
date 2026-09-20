@@ -1,4 +1,4 @@
-use crate::domain::{ContentType, ContentTypeExt};
+use conformance::content_type::{ContentType, ContentTypeExt};
 use crate::handlers::master::MasterRequest;
 use arc_swap::ArcSwap;
 use std::sync::Arc;
@@ -101,18 +101,9 @@ pub fn run_dsp(
     )
 }
 
-#[inline(always)]
-pub fn map_flavour_to_persona(flavour_id: &str) -> &'static str {
-    match flavour_id {
-        "warm" => "warm_analog",
-        "clean" => "clean_punch",
-        "punch" => "clean_punch",
-        "air" => "hybrid_hifi",
-        "film" => "cinematic_wide",
-        "broadcast" => "clean_punch",
-        _ => "warm_analog", // default
-    }
-}
+// map_flavour_to_persona moved to conformance 21/09 (F-137) — zero
+// other caller besides build_intent_and_config, which moved with it.
+pub use conformance::dsp_pipeline_helpers::map_flavour_to_persona;
 
 #[inline(always)]
 // allow: 9 args; a params-struct refactor is deliberately deferred — not done as a clippy side-fix
@@ -712,7 +703,7 @@ fn run_dsp_internal(
             user_model,
         );
 
-        let icfg = crate::domain::nodes::dsp_node::build_intent_and_config(
+        let icfg = conformance::dsp_node::build_intent_and_config(
             preset_id,
             flavour,
             req.intent_tone.or(req.tone),
@@ -1492,19 +1483,11 @@ fn platform_ok(lufs: f32, target: f32, tp: f32) -> bool {
     lufs <= target + 1.0 && tp <= -1.0
 }
 
-/// SHA-256 of input bytes — returns [u8; 32].
-/// Used for both `input_path_sha256` audit field and determinism `seed`.
-pub fn compute_sha256_bytes(data: &[u8]) -> [u8; 32] {
-    use sha2::{Digest, Sha256};
-    let mut h = Sha256::new();
-    h.update(data);
-    h.finalize().into()
-}
-
-/// Derive u64 seed from first 8 bytes of hash (big-endian).
-pub fn derive_seed(hash: &[u8; 32]) -> u64 {
-    u64::from_be_bytes(hash[..8].try_into().unwrap_or([0; 8]))
-}
+// compute_sha256_bytes/derive_seed moved to conformance 21/09
+// (F-137) — decode_node.rs's existing import and run_dsp_internal's
+// own unqualified calls (below, same file) both keep working via
+// this re-export.
+pub use conformance::dsp_pipeline_helpers::{compute_sha256_bytes, derive_seed};
 
 /// Convert raw bytes → f32 PCM samples (little-endian float) with clamping.
 ///

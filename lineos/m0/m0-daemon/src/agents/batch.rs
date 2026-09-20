@@ -217,8 +217,18 @@ pub async fn run_batch(
         };
 
         // Render via execute_streaming_plan
-        let render_res = tokio::task::spawn_blocking(move || {
-            crate::agents::executor::execute_streaming_plan(&plan, None)
+        let render_res = tokio::task::spawn_blocking(
+            move || -> Result<_, crate::agents::operator::ExecutorError> {
+            let (output, blob) = conformance::executor::execute_streaming_plan(&plan, None)?;
+            // The engine returns the unsigned declaration — sign_and_render
+            // stays here because it needs identity.rs/handlers::certificate/
+            // handlers::pdf_gen, which stay with the server (§7 απόφαση 3).
+            let file_path = blob.core.audio_path.clone();
+            let mut cert_out =
+                crate::domain::nodes::certificate_node::CertificateOutput { blob, file_path };
+            crate::domain::nodes::certificate_node::sign_and_render(&mut cert_out)
+                .map_err(crate::agents::operator::ExecutorError::DspFailed)?;
+            Ok((output, cert_out.blob))
         })
         .await;
 
