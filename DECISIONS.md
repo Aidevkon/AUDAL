@@ -241,3 +241,88 @@ master + certificate που ορκίζεται τι μετρήθηκε και τ
   (round_ties_even, ένα σπίτι στο sp314). Το 99791c1c = έγκυρο
   ιστορικό της flacenc εποχής. INV-PERSIST-1 επανεπιβεβαιώθηκε
   με νέο encoder (3930e892 ×2).
+
+## 7. ΑΠΟΦΑΣΕΙΣ ΤΗΣ ΦΑΣΗΣ AUDAL/PRD — 19-21/09
+
+Τα hash παρακάτω είναι του κλάδου `canonical` — εκεί επαληθεύτηκαν, στο
+μηχάνημα του χρήστη. Κάθε βήμα σφραγίζεται δύο φορές: μία στον κλάδο
+εργασίας, μία στο `canonical` όταν το παίρνει ο χρήστης. Έλεγχος μέσα
+στον κλάδο εργασίας θα αποτύχει γι' αυτόν τον λόγο — δύο διαφορετικά
+hash για το ίδιο βήμα — όχι επειδή το hash είναι λάθος. Ίδιο ήδη
+γραμμένο στο `docs/PRUNE-STATUS.md`.
+
+- Το πλάτος μένει πίσω: χωρικό μονοπάτι, τρίτος upmix, GlueChain.
+  Κρίση ιδιοκτήτη 19/09, docs/ORPHANS.md. Λόγος: κανένα προφίλ
+  παράδοσης δεν ζητάει πλάτος. ⚠ Η μείξη καναλιών ΔΕΝ είναι
+  πλάτος — είναι συμμόρφωση, και ταξιδεύει.
+- Το σχήμα του πιστοποιητικού φεύγει από την αποθήκευση.
+  Εικοσιδύο τύποι στο lineos-types· το blob_store μένει με
+  διαδρομές, κατακερματισμό, υπογραφή [F-129 (ac6c4b4d) · e6992ab
+  (οι έντεκα τύποι) · 064d1c6 (οι τελευταίοι πέντε)].
+- Η δήλωση είναι τιμή. Αποθήκευση, απόδοση και επαλήθευση είναι
+  προσαρμογείς έξω από τον πυρήνα. Τρεις θέσεις: η βάση είναι η
+  αλήθεια (το R8 του PRD έχει ήδη πίνακα statements), ο φάκελος
+  του έργου είναι το αντίγραφο του χρήστη, και το παραδοτέο είναι
+  αυτό που ταξιδεύει. ⚠ Το παράπλευρο ονομάζεται με πλήρες όνομα
+  και κατάληξη, όχι με γυμνή «βάση» — για να μην επαναληφθεί το
+  σφάλμα του XMP. ⚠ Ο πυρήνας γράφει ήχο, όχι χαρτί — έχει δύο
+  σημεία δίσκου και το ένα είναι το ίδιο το παραδοτέο [F-133] — η
+  διατύπωση «χωρίς I/O» θα ήταν ψευδής. ⇒ Εκκρεμές μέσα στην
+  εγγραφή: το R7 του PRD ορίζει ήδη τρεις δεσμούς (D10), και ο
+  δεσμός του data-chunk καλύπτει την ενσωμάτωση — αλλά το
+  `deliverable_sha256` ορίζεται ως «τα bytes του αρχείου», και σε
+  ενσωματωμένη περίπτωση περιέχει τον εαυτό του (επαληθεύτηκε
+  αυτούσιο, PRD §R7). Ανοιχτό, με δύο δρόμους: δηλωμένα
+  εξαιρούμενα εύρη, ή το πεδίο λέει `missing`.
+- Η τιμολόγηση δεν είναι κατάλογος κομματιών. Μία τιμή ανά
+  εγκατάσταση με το πακέτο του τμήματος μέσα· η παραλληλία και οι
+  τίτλοι δεν τιμολογούνται ποτέ [ο χάρτης των εννιά κομματιών του
+  ανταγωνιστή, PRD §4.5, 43bebaa]. ⚠ Η αλυσίδα διόρθωσης είναι
+  πάντα μέσα — αν πουληθεί ξεχωριστά, το προϊόν γίνεται μετρητής.
+- Ο τμηματοποιητής δεν κλαδεύεται — τρέχει και στις δύο ζωντανές
+  διαδρομές [F-135].
+- Το `nodes/limiter.rs` δεν διαγράφεται μέχρι να τρέξει η πρώτη
+  τοπολογία παράδοσης — το §6.0 του PRD έχει κουτί για το ταβάνι,
+  άρα η λειτουργία είναι απαίτηση και μόνο η μορφή της ανοιχτή
+  [28d1d09].
+- Το προφίλ δηλώνει τις δυνατότητες που απαιτεί. Αν το εκτελέσιμο
+  δεν τις έχει, αρνείται να φορτώσει και λέει γιατί. Το προφίλ
+  είναι δεδομένα (νούμερα, κριτήρια, πηγή, ημερομηνία)· η
+  δυνατότητα είναι κώδικας στη μεταγλώττιση (περιεκτικά, πύλη
+  διαλόγου, πολυκάναλο) [F-128 — η δρομολόγηση συμπεραίνει τον
+  προορισμό από πλάγια σημαία και τέσσερα στα πέντε προφίλ
+  πέφτουν σιωπηλά σε σκέτη διαδρομή χωρίς χαρτί]. ⇒ Με τον
+  κανόνα, η σιωπηλή πτώση γίνεται αδύνατη, και το R6 του PRD
+  μένει απαντήσιμο.
+- Η λέξη «πακέτο» είναι μονάδα δεδομένων, ποτέ μονάδα τιμολόγησης
+  στον κώδικα. Και ποτέ «πρόσθετο» — το πρώτο είναι δεδομένα και
+  προσαρμογείς στη μεταγλώττιση, το δεύτερο κώδικας που φορτώνεται
+  στον χρόνο εκτέλεσης και κάνει το R6 του PRD αναπάντητο. ⚠
+  Τεκμήριο από την αγορά: ο ανταγωνιστής πουλάει ουρές και νήματα
+  ως επεκτάσεις, και είναι το μόνο προϊόν της γκάμας του που δεν
+  μετακόμισε σε Apple silicon [PRD §4.5, 43bebaa].
+- Every profile carries the date it was read from the source, and a
+  horizon. Past the horizon the profile still loads, but the
+  statement it produces says the criteria were last verified on that
+  date.
+
+  Evidence for why: the destination moves — the spec itself is
+  sealed in the tree with a hash precisely because it moves (F-119),
+  which is sufficient on its own; the argument does not hang on the
+  clause below.
+  ⚠ The "ACX changed its narration policy on 2026-04-15" clause is
+  not in §4.5 — it came from a web search and was misattributed to
+  that section. Corrected citation: secondary source from a 21/09
+  search, unverified against the primary source. The claim stays,
+  but nothing here depends on it.
+
+  ⚠ A certificate signed against a stale profile is not merely
+    useless — it is false, and it is false in the one direction that
+    matters: it reads as broader than it is. R7 already commits to
+    the opposite, that the statement says what it does not cover.
+  ⇒ So the horizon is not licensing and not an expiry of the
+    software. The tool keeps working offline forever, which is the
+    point of one-off payment and of no network call at all. What
+    expires is the silent claim that the numbers are current.
+  ⚠ The length of the horizon is not decided here, and neither is
+    who refreshes a profile.
