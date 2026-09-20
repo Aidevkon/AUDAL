@@ -244,14 +244,21 @@ master + certificate που ορκίζεται τι μετρήθηκε και τ
 
 ## 7. ΑΠΟΦΑΣΕΙΣ ΤΗΣ ΦΑΣΗΣ AUDAL/PRD — 19-21/09
 
+Τα hash παρακάτω είναι του κλάδου `canonical` — εκεί επαληθεύτηκαν, στο
+μηχάνημα του χρήστη. Κάθε βήμα σφραγίζεται δύο φορές: μία στον κλάδο
+εργασίας, μία στο `canonical` όταν το παίρνει ο χρήστης. Έλεγχος μέσα
+στον κλάδο εργασίας θα αποτύχει γι' αυτόν τον λόγο — δύο διαφορετικά
+hash για το ίδιο βήμα — όχι επειδή το hash είναι λάθος. Ίδιο ήδη
+γραμμένο στο `docs/PRUNE-STATUS.md`.
+
 - Το πλάτος μένει πίσω: χωρικό μονοπάτι, τρίτος upmix, GlueChain.
   Κρίση ιδιοκτήτη 19/09, docs/ORPHANS.md. Λόγος: κανένα προφίλ
   παράδοσης δεν ζητάει πλάτος. ⚠ Η μείξη καναλιών ΔΕΝ είναι
   πλάτος — είναι συμμόρφωση, και ταξιδεύει.
 - Το σχήμα του πιστοποιητικού φεύγει από την αποθήκευση.
   Εικοσιδύο τύποι στο lineos-types· το blob_store μένει με
-  διαδρομές, κατακερματισμό, υπογραφή [F-129, ac6c4b4d,
-  bfd9f1cf].
+  διαδρομές, κατακερματισμό, υπογραφή [F-129 (ac6c4b4d) · e6992ab
+  (οι έντεκα τύποι) · 064d1c6 (οι τελευταίοι πέντε)].
 - Η δήλωση είναι τιμή. Αποθήκευση, απόδοση και επαλήθευση είναι
   προσαρμογείς έξω από τον πυρήνα. Τρεις θέσεις: η βάση είναι η
   αλήθεια (το R8 του PRD έχει ήδη πίνακα statements), ο φάκελος
@@ -270,14 +277,14 @@ master + certificate που ορκίζεται τι μετρήθηκε και τ
 - Η τιμολόγηση δεν είναι κατάλογος κομματιών. Μία τιμή ανά
   εγκατάσταση με το πακέτο του τμήματος μέσα· η παραλληλία και οι
   τίτλοι δεν τιμολογούνται ποτέ [ο χάρτης των εννιά κομματιών του
-  ανταγωνιστή, PRD §4.5, ab3d142c]. ⚠ Η αλυσίδα διόρθωσης είναι
+  ανταγωνιστή, PRD §4.5, 43bebaa]. ⚠ Η αλυσίδα διόρθωσης είναι
   πάντα μέσα — αν πουληθεί ξεχωριστά, το προϊόν γίνεται μετρητής.
 - Ο τμηματοποιητής δεν κλαδεύεται — τρέχει και στις δύο ζωντανές
   διαδρομές [F-135].
 - Το `nodes/limiter.rs` δεν διαγράφεται μέχρι να τρέξει η πρώτη
   τοπολογία παράδοσης — το §6.0 του PRD έχει κουτί για το ταβάνι,
   άρα η λειτουργία είναι απαίτηση και μόνο η μορφή της ανοιχτή
-  [de8a6c90].
+  [28d1d09].
 - Το προφίλ δηλώνει τις δυνατότητες που απαιτεί. Αν το εκτελέσιμο
   δεν τις έχει, αρνείται να φορτώσει και λέει γιατί. Το προφίλ
   είναι δεδομένα (νούμερα, κριτήρια, πηγή, ημερομηνία)· η
@@ -293,19 +300,21 @@ master + certificate που ορκίζεται τι μετρήθηκε και τ
   στον χρόνο εκτέλεσης και κάνει το R6 του PRD αναπάντητο. ⚠
   Τεκμήριο από την αγορά: ο ανταγωνιστής πουλάει ουρές και νήματα
   ως επεκτάσεις, και είναι το μόνο προϊόν της γκάμας του που δεν
-  μετακόμισε σε Apple silicon [PRD §4.5, ab3d142c].
+  μετακόμισε σε Apple silicon [PRD §4.5, 43bebaa].
 - Every profile carries the date it was read from the source, and a
   horizon. Past the horizon the profile still loads, but the
   statement it produces says the criteria were last verified on that
   date.
 
   Evidence for why: the destination moves — the spec itself is
-  sealed in the tree with a hash precisely because it moves (F-119).
-  ⚠ Unverified, flagged rather than dropped: the "ACX changed its
-  narration policy on 2026-04-15" clause and its §4.5 citation were
-  given as part of this decision's text but do not appear anywhere
-  in the live §4.5 (checked, zero match) — carried here as written,
-  not confirmed.
+  sealed in the tree with a hash precisely because it moves (F-119),
+  which is sufficient on its own; the argument does not hang on the
+  clause below.
+  ⚠ The "ACX changed its narration policy on 2026-04-15" clause is
+  not in §4.5 — it came from a web search and was misattributed to
+  that section. Corrected citation: secondary source from a 21/09
+  search, unverified against the primary source. The claim stays,
+  but nothing here depends on it.
 
   ⚠ A certificate signed against a stale profile is not merely
     useless — it is false, and it is false in the one direction that
