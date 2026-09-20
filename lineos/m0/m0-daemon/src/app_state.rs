@@ -21,21 +21,11 @@ use xaak::engine::PlaybackHandle;
 use xaak::playback::ScrubState;
 use xaak::repo::{AudioRepo, DspState};
 
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct MasteringProgress {
-    pub job_id: String,
-    pub stage: String,
-    pub elapsed_ms: u64,
-    pub blob_id: Option<String>,
-    pub error: Option<String>,
-    /// Full-file, accurate BPM — telemetry only, for the Kepler UI
-    /// instrument. None until the analysis pass computes it (most
-    /// stages won't carry this; only the stage that follows the
-    /// full-file measurement pass will). Unrelated to and never
-    /// overriding PreAnalyzer's 30s-scout bpm, which drives real DSP
-    /// ducking decisions elsewhere.
-    pub bpm: Option<f32>,
-}
+// Moved to conformance 21/09 — a clean type that lived here only
+// next to AppState's db/xaak fields (F-137). Re-exported in place so
+// every caller (agents/conductor.rs, agents/operator.rs,
+// handlers/master.rs, domain/dsp_pipeline.rs) keeps working unchanged.
+pub use conformance::mastering_progress::MasteringProgress;
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "type")]

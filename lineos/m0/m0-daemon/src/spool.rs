@@ -1,26 +1,6 @@
-use std::path::PathBuf;
-use std::sync::OnceLock;
-
-static SPOOL_DIR: OnceLock<PathBuf> = OnceLock::new();
-
-/// transient files ONLY — everything here may be deleted
-/// at any daemon restart; nothing here survives on purpose (F-050).
-pub fn init_spool_dir(p: PathBuf) {
-    let _ = std::fs::create_dir_all(&p);
-    let _ = SPOOL_DIR.set(p);
-}
-
-pub fn spool_dir() -> PathBuf {
-    SPOOL_DIR.get().cloned().unwrap_or_else(std::env::temp_dir)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_spool_dir_fallback() {
-        let sd = spool_dir();
-        assert_eq!(sd, std::env::temp_dir());
-    }
-}
+//! Το περιεχόμενο μετακόμισε στο conformance/src/spool.rs στις 21/09
+//! (F-137) — η μηχανή το χρειάζεται, και blob_store.rs καλεί
+//! spool_dir() οκτώ φορές εσωτερικά. Προσωρινή γέφυρα ώστε οι
+//! καλούντες να μην αλλάξουν σε αυτό το βήμα. Ίδιο σχήμα με
+//! handlers/decode.rs.
+pub use conformance::spool::*;
