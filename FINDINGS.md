@@ -3544,9 +3544,21 @@ CSV: `/tmp/w1_vad_trace_out.csv` — εφήμερο. Τα τρία νούμερ�
 
   **Το δομικό, γιατί έμειναν τέσσερις μέρες κόκκινοι.** Το CI (F-121) έχει δύο πύλες, Check και Format — **δεν τρέχει δοκίμια καθόλου**, επαληθευμένο στο ίδιο το κείμενο του F-121 (Gate 1 `cargo check --workspace`, Gate 2 `cargo fmt --check`, μηδέν `cargo test` σε καμία). Το περιβάλλον του agent δεν φτάνει ως το CI. Ο μόνος που τρέχει το πλήρες suite είναι ο ιδιοκτήτης· όταν δεν το τρέξει, κανείς δεν το τρέχει. ⚠ Δεκαεννιά στόχοι έδωσαν «0 passed; 0 failed; 0 ignored» — δοκίμια που μεταγλωττίζονται και είναι άδεια. Καταγράφεται, δεν ερμηνεύεται εδώ.
 
+- **[F-135] Ο ανιχνευτής: τρία προσωρινά κατώφλια έξω από κάθε φρουρό, ένα νεκρό διπλό της κλιμάκωσης, και το «segmenter+classifier» του κλαδέματος οριστικά μη κλαδεύσιμο.** Component: `lineos/m1/lineos-corpus/src/scout.rs` · `lineos/m1/sp314-dsp/src/analysis/stem_escalation.rs` · `lineos/m0/m0-daemon/src/dsp/orchestrator/nmf_worker.rs` · `lineos/m1/sp314-orchestrator/src/trunk_pass.rs` · `lineos/m0/m0-daemon/src/{agents/executor.rs,domain/dsp_pipeline.rs,bin/features.rs}` · `scripts/threshold-lint.sh`.
+
+  ΜΕΤΡΗΜΕΝΟ 21/09, συνέχεια του F-134: δύο από τους πέντε κόκκινους (`spectral_flux_contract`, `adversarial_drone`) κρέμονταν από τον ανιχνευτή, και η ανάγνωση της απόφασής του (`compute_scout_decision`, `lineos-corpus/src/scout.rs:80`) έβγαλε τρία πράγματα εκτός του πλαισίου του F-134.
+
+  **Η απόφαση, όπως είναι.** Προβάλλει δύο z-βαθμολογίες στην ευθεία των δύο κεντροειδών και βγάζει `leaning_score` σε `[0.0, 1.0]` (0 = μουσική, 1 = ομιλία) και `confidence`. Τα κεντροειδή είναι σφραγισμένα μετρημένα (`:46-55`, σχόλιο αυτούσιο `// F-041 Evaluated Centroids`). Το `confidence` είναι γινόμενο δύο όρων που ο κώδικας κρατάει χωριστά ως το τέλος: `conf_raw` χαμηλό ⇒ κοντά στο μέσο t=0.5, μεικτό υλικό· `penalty` χαμηλό ⇒ μακριά από τον άξονα κεντροειδών, ασυνήθιστο σήμα. ⚠ Η πύλη κλιμάκωσης (παρακάτω) βλέπει μόνο το τελικό γινόμενο — δύο διαφορετικά αίτια, μία απόφαση.
+
+  **Τρία κατώφλια, αυτοδηλωμένα προσωρινά, έξω από κάθε φρουρό.** `A7_PROVISIONAL_DEAD_ZONE_LOW/HIGH = 0.3 / 0.7` και `A7_PROVISIONAL_MIN_CONFIDENCE = 0.4` (`:235-237`), με το ίδιο τους το σχόλιο να λέει «PROVISIONAL — dead-zone bounds + escalation trigger. Awaiting M2 corpus calibration… REPLACE ON THE FLY: search "A7_PROVISIONAL"» — γραμμένα ακριβώς στη μορφή που το έργο δέχεται: placeholder με trigger. ⚠ Και το `lineos-corpus/src/scout.rs` **δεν είναι στη λίστα `TARGETS` του `threshold-lint.sh`** — επαληθεύτηκε στο ζωντανό αρχείο, ούτε πριν ούτε μετά την επέκταση της 20/09 (F-132): πέμπτο σχήμα του F-132 σε δύο μέρες — ο φρουρός δεν βλέπει εκεί που γεννιέται η κρίση.
+
+  **Και η κλιμάκωση είναι πραγματική, ως το τέλος.** `needs_stem_escalation` ⇒ `avg_leaning` μέσα στη νεκρή ζώνη ΚΑΙ `avg_confidence` κάτω από το κατώφλι ⇒ `flag_escalation_candidates` ⇒ `nmf_worker::dispatch_all_jobs` (`:72-96`) ⇒ πραγματικό `NmfJob` σε νήμα εργάτη ⇒ `NmfResult` με στελέχη. **Δεν είναι από τα «υπολογίζεται και πετιέται» — υπολογίζεται, διαβάζεται, και αλλάζει τι γίνεται με τον ήχο.** ⚠ Υπάρχει δεύτερη υλοποίηση του ίδιου πράγματος: `escalate_to_stems` (`sp314-dsp/src/analysis/stem_escalation.rs:7-16`, επιστρέφει `BusSplit`) — επαληθεύτηκε μηδέν καλών στο παραγωγικό `src/`, μόνο σε ένα εργαλείο έρευνας (`research/encoder-gap-speech/src/bin/escalation_analysis.rs`). Το μοτίβο ξανά: δύο υλοποιήσεις, η ονομασμένη είναι η νεκρή.
+
+  **Και το ερώτημα του κλαδέματος που κλείνει.** `run_trunk_pass`/`run_trunk_pass_with_acx` (`sp314-orchestrator/src/trunk_pass.rs:558,566`) καλούνται από τρία σημεία στο παραγωγικό `src/` (επαληθεύτηκε ξανά, ζωντανό δέντρο): `agents/executor.rs:310,316` — μέσα στο `execute_streaming_plan` — και `domain/dsp_pipeline.rs:1036` — μέσα στο `run_dsp_internal` — και τα δύο ζωντανές διαδρομές του διακομιστή· το τρίτο, `bin/features.rs:87`, είναι εργαλείο. Μέσα του, `trunk_pass.rs:890`, καλεί την απόφαση του ανιχνευτή για κάθε παράθυρο. Η κατηγορία «segmenter+classifier» του §6.4 είναι **οριστικά μη κλαδεύσιμη**: τρέχει και στις δύο διαδρομές του κουμπιού.
+
 ---
 
-**NEXT FREE: F-135** — this line is the ONLY allocator. Taking a number =
+**NEXT FREE: F-136** — this line is the ONLY allocator. Taking a number =
 incrementing this line IN THE SAME COMMIT that introduces the finding.
 Session notes / registers use R-prefixed numbers (R-01...) for local
 findings; graduation into this file assigns a fresh F-number and the
