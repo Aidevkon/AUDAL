@@ -27,6 +27,7 @@ pub mod metrics;
 pub mod onboarding;
 pub mod pre_analysis;
 pub mod presets;
+pub mod streaming;
 pub mod telemetry;
 pub use telemetry::RealtimeFrame;
 
