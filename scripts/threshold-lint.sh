@@ -59,6 +59,12 @@ TARGETS=(
     # 2026-09-20 (F-132): η μετάφραση των margin_checks (πρώην
     # DeliveryCheck::from_margin_checks) — το τρίτο σκέλος του ίδιου λόγου.
     "lineos/m1/conformance/src/declare.rs"
+    # 2026-09-21 (F-135): εδώ γεννιέται η απόφαση μουσική/ομιλία
+    # (compute_scout_decision) και η πύλη κλιμάκωσης που οδηγεί σε
+    # πραγματικό διαχωρισμό στελεχών (flag_escalation_candidates →
+    # nmf_worker::dispatch_all_jobs). Ήταν εκτός σάρωσης, ούτε πριν
+    # ούτε μετά την επέκταση της 20/09.
+    "lineos/m1/lineos-corpus/src/scout.rs"
 )
 
 STRICT=0
