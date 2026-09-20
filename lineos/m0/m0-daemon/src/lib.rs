@@ -1,7 +1,7 @@
 //! m0d — LineOS Local Mirror Daemon
 //! M0 Constitution v2.0
 //! Authority: LineOS Constitution v2.0 · Creator OS Constitution v2.6
-//! Startup order: registry → hash verify → policy → audit → caddy → health gate
+//! Startup order: registry → hash verify → policy → audit → health gate
 //!
 //! Phase 6: Added mastering API router on port 7400 (Caddy proxy target).
 //! New endpoints: POST /master, GET /blob/:id, POST /export
@@ -50,7 +50,7 @@ const AUDIT_LOG_DIR: &str = "lineos/m0/logs/audit";
 const ASSETS_ROOT: &str = "lineos/m0/assets/wasm";
 #[allow(dead_code)]
 const HEALTH_ADDR: &str = "127.0.0.1:7401";
-/// Mastering API — proxied through Caddy at 127.0.0.1:7400
+/// Mastering API
 #[allow(dead_code)]
 const MASTERING_ADDR: &str = "127.0.0.1:7402";
 
@@ -108,10 +108,6 @@ pub async fn run() -> Result<()> {
     gate.set_policy_active(true).await;
     tracing::info!("Policy engine loaded OK (deny-by-default active)");
 
-    // ── Step 5: Caddy ─────────────────────────────────────────────────────────
-    gate.set_caddy_running(true).await;
-    tracing::info!("Caddy integration: Phase 1 stub (process management in Phase 2)");
-
     // ── Step 6: Health gate ───────────────────────────────────────────────────
     if !gate.is_healthy().await {
         anyhow::bail!("Health gate failed on startup — M0 cannot serve (M0 Constitution §04.2)");
@@ -163,7 +159,6 @@ pub async fn run() -> Result<()> {
 
     // ── Step 8: Start mastering API router (Phase 6, port 7402) ──────────────
     // Phase 6: mastering router binds directly to 7402.
-    // Caddy (7400) proxies → 7402. This matches M0 Constitution §03.
     let mastering_router = mastering_router(app_state, &config);
     let mastering_addr: SocketAddr = MASTERING_ADDR.parse()?;
 

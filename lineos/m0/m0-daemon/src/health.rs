@@ -16,8 +16,6 @@ pub struct HealthCriteria {
     pub cdn_ready: bool,
     /// C2: m0-registry.json parsed and digests verified
     pub registry_loaded: bool,
-    /// C3: Caddy proxy port accepting connections on 127.0.0.1:7400
-    pub caddy_running: bool,
     /// C4: policies.toml loaded and deny-by-default active
     pub policy_active: bool,
     /// C5: Audit log directory writable (test write succeeded)
@@ -32,7 +30,6 @@ impl HealthCriteria {
     pub fn all_pass(&self) -> bool {
         self.cdn_ready
             && self.registry_loaded
-            && self.caddy_running
             && self.policy_active
             && self.audit_writable
             && self.health_endpoint_responding
@@ -77,11 +74,6 @@ impl HealthGate {
     #[allow(dead_code)]
     pub async fn set_registry_loaded(&self, v: bool) {
         self.criteria.write().await.registry_loaded = v;
-    }
-
-    #[allow(dead_code)]
-    pub async fn set_caddy_running(&self, v: bool) {
-        self.criteria.write().await.caddy_running = v;
     }
 
     #[allow(dead_code)]
@@ -188,7 +180,6 @@ mod tests {
         let gate = HealthGate::new();
         gate.set_cdn_ready(true).await;
         gate.set_registry_loaded(true).await;
-        gate.set_caddy_running(true).await;
         gate.set_policy_active(true).await;
         gate.set_audit_writable(true).await;
         assert!(gate.is_healthy().await);
@@ -199,7 +190,6 @@ mod tests {
         let gate = HealthGate::new();
         gate.set_cdn_ready(true).await;
         gate.set_registry_loaded(true).await;
-        gate.set_caddy_running(true).await;
         gate.set_policy_active(true).await;
         // audit_writable NOT set
         assert!(!gate.is_healthy().await);
