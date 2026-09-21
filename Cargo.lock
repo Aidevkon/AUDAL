@@ -986,18 +986,30 @@ dependencies = [
 name = "conformance"
 version = "0.1.0"
 dependencies = [
+ "aether",
+ "aether-bridge",
+ "blake3",
  "chrono",
+ "hex",
  "hound",
+ "integration",
  "lame-sys",
  "libm",
+ "lineos-corpus",
+ "lineos-telemetry",
  "lineos-types",
  "rubato 0.15.0",
  "serde",
  "serde_json",
+ "sha2",
  "sp314-dsp",
+ "sp314-nodes",
+ "sp314-orchestrator",
  "symphonia",
  "tempfile",
+ "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
