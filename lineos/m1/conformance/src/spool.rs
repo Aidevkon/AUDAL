@@ -1,3 +1,8 @@
+//! Wrong home: temp-file management, dragged into conformance by the
+//! F-137 move (mastered_path/raw_dump_path call it), not judged to
+//! belong here. Orphan O-021 (docs/ORPHANS.md). Leaves when the home
+//! of infrastructure is decided.
+
 use std::path::PathBuf;
 use std::sync::OnceLock;
 

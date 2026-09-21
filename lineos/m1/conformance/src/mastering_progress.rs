@@ -1,3 +1,8 @@
+//! Wrong home: §6.2 places this in shell-engine communication, not
+//! the engine — dragged in by the F-137 move because
+//! execute_streaming_plan's signature needs it. Orphan O-022
+//! (docs/ORPHANS.md). Leaves when a shell exists; none does yet.
+
 /// Moved from m0-daemon's app_state.rs 21/09 — a clean type that lived
 /// next to `AppState { pub db: DbConn, ... }` only by file proximity.
 /// `AppState`/`DbConn` stay in m0-daemon; app_state.rs re-exports this
