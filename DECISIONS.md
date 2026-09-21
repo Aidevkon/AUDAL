@@ -326,3 +326,65 @@ hash για το ίδιο βήμα — όχι επειδή το hash είναι 
     expires is the silent claim that the numbers are current.
   ⚠ The length of the horizon is not decided here, and neither is
     who refreshes a profile.
+
+- **Η παλιά διαδρομή του `/master` δεν ταξιδεύει (21/09).** Το
+  `run_dsp_internal` μένει όπου είναι, καλεί τη μηχανή με πλήρη
+  διαδρομή, και πεθαίνει με τον διακομιστή. Λόγος: το §6.4 του PRD
+  βάζει ήδη το `/master/streaming` στο αρχείο, και το §6.1 λέει «no
+  daemon». ⇒ Το εναλλακτικό — να σβηστεί τώρα — απορρίφθηκε με
+  μετρημένο λόγο: το §5.1 το ονομάζει τον μόνο κώδικα που διαβάζει
+  ταβάνι από προδιαγραφή, και η διαγραφή είναι το μόνο που δεν
+  γυρίζει. ⇒ Και αυτή η μορφή επέτρεψε τη μετακόμιση των πενήντα
+  αρχείων (519de7a).
+
+- **Διόρθωση της απόφασης για τον τμηματοποιητή (21/09).** Γράφτηκε
+  παραπάνω «δεν κλαδεύεται» [F-135], που διαβάζεται «ταξιδεύει». Δεν
+  ταξιδεύει. Το §3 τον ονομάζει μη-στόχο δύο φορές, το §4 βγάζει τον
+  μουσικό με αριθμό απόφασης, και το διάγραμμα του §6.0 δεν τον
+  σχεδιάζει. ⇒ Το μετρημένο μέρος στέκει: δεν αφαιρείται χειρουργικά
+  όσο ο διακομιστής υπάρχει. Φεύγει μαζί του. Τεκμήριο της διόρθωσης:
+  FINDINGS, ad32ccf.
+
+- **The profile carries source, date and horizon, and the
+  declaration always names all three (21/09).** The declaration
+  never says "passes ACX". It says "meets the criteria of profile
+  acx@DATE".
+  ⇒ Then it is accurate forever, and the horizon becomes a warning
+    level, not a cliff: past the horizon a line states the criteria
+    are that many months old. Never an obstacle.
+  ⇒ And the verifier verifies what was declared, not what holds true
+    today. Written explicitly, or it reads backwards.
+  ⇒ The application never fetches a profile on its own. Three
+    channels: the user imports a file; the owner signs and
+    publishes; the community sends. No "check for updates" — breaks
+    R6.
+  ⇒ And the data is free for everyone; the package says which
+    profiles you may use, the profile says what they say today.
+  ⚠ And an edited profile changes the word of the verdict, not only
+    the footnote. The paper still comes out, but not as certified —
+    the schema already has the type `UncertifiedReason`. Reason: R7
+    has four levels and the first is the verdict. If the truth lives
+    only in the third, we repeat the shape of `e2e_acx_certificate`.
+
+  **And the evidence for the horizon, verified at the source
+  21/09:**
+  · ACX ⇒ the five values are unchanged since at least June 2018 — a
+    2018 forum post already quotes floor −60 dB RMS, peak −3 dB, and
+    mean −23 to −18 dB RMS; 2026 guides give the same, plus 44.1 kHz
+    and 192 kbps CBR. Eight years.
+    ⚠ The "since 2014" that had been said is not documented. The
+      narrow version is written instead.
+  · Netflix ⇒ there is no single document. The old OC-4-1 split into
+    three, each versioned from 1.0, and next to them lives the full
+    non-branded v9.3.
+    ⇒ A version number without the document's name means nothing.
+      The profile carries both.
+    ⇒ And D19 is confirmed in substance: mean level −27 LKFS with
+      ±2 LU tolerance, WITH dialogue gate; peaks up to −2 dB true
+      peak; limiter recommendation at −2.3 dBFS; measured BS.1770-1,
+      not the latest revision.
+  · And the length of the horizon remains theory — twelve months for
+    platforms, six for versioned documents. Written as a placeholder
+    with a trigger: the first time a source actually changes.
+  ⇒ And in Studio the horizon is a contractual obligation —
+    quarterly package delivery (R17).
