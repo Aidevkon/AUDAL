@@ -464,7 +464,7 @@ Shareable profile packs; plugin extensions; spatial and immersive (shelved — t
 
 ### 6.1 Architecture (D9 revised, locked 2026-09-11)
 
-- **Engine:** the `conformance` crate — measure, judge, correct, encode, sign; `deliver` named only the last of those five verbs, and conformance is the purpose all five serve, not a further step after them. `run_deliver_core` and `execute_streaming_plan` relocated out of `m0d` (F-137, 2026-09-21), after three prior cuts had to land first: the core stopped writing paper, stopped signing and printing, and took its signature from the operator handler instead. *Measured: engine crates have zero server dependencies, as this line already said; the relocation itself was fifty files, ~6,400 lines, not two functions in the wrong crate.*
+- **Engine:** the `conformance` crate — measure, judge, correct, encode, sign. Conformance is not one of those five but the purpose they serve; the crate is named for the purpose. Entry points: `execute_streaming_plan` for a render, `run_deliver_core` for a delivery. The engine depends on no server, no database and no audio device, and nothing that does may enter it.
 - **Shell:** **Dioxus 0.7.10 desktop, pinned. No Tauri, no wasm, no daemon.** The shell calls the engine as a function in the same process, shares type definitions with it, and the table holds a reference to the struct that was signed.
 - **Scheduler:** batch queue, work-stealing pool, cancellation, progress events throttled to what the table needs — a row changes when a file completes; one progress bar at ≤ 4 Hz.
 - **Storage:** SQLite (R8). **Packaging:** `dx bundle` → `tauri-bundler`; fallback to a direct bundler or per-OS scripts if runtime breakage persists on 0.7.x.
